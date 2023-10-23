@@ -32,6 +32,7 @@ enum struct ExperimentalFeature
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
     LocalOverlayStore,
+    ConfigurableImpureEnv,
 };
 
 /**

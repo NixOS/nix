@@ -32,9 +32,8 @@ struct SubstitutablePathInfo
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
 
-struct ValidPathInfo
+struct UnkeyedValidPathInfo
 {
-    StorePath path;
     std::optional<StorePath> deriver;
     /**
      * \todo document this
@@ -72,13 +71,19 @@ struct ValidPathInfo
      */
     std::optional<ContentAddress> ca;
 
-    bool operator == (const ValidPathInfo & i) const
-    {
-        return
-            path == i.path
-            && narHash == i.narHash
-            && references == i.references;
-    }
+    UnkeyedValidPathInfo(const UnkeyedValidPathInfo & other) = default;
+
+    UnkeyedValidPathInfo(Hash narHash) : narHash(narHash) { };
+
+    DECLARE_CMP(UnkeyedValidPathInfo);
+
+    virtual ~UnkeyedValidPathInfo() { }
+};
+
+struct ValidPathInfo : UnkeyedValidPathInfo {
+    StorePath path;
+
+    DECLARE_CMP(ValidPathInfo);
 
     /**
      * Return a fingerprint of the store path to be used in binary
@@ -92,11 +97,11 @@ struct ValidPathInfo
 
     void sign(const Store & store, const SecretKey & secretKey);
 
-	/**
-	 * @return The `ContentAddressWithReferences` that determines the
-	 * store path for a content-addressed store object, `std::nullopt`
-	 * for an input-addressed store object.
-	 */
+    /**
+     * @return The `ContentAddressWithReferences` that determines the
+     * store path for a content-addressed store object, `std::nullopt`
+     * for an input-addressed store object.
+     */
     std::optional<ContentAddressWithReferences> contentAddressWithReferences() const;
 
     /**
@@ -122,18 +127,13 @@ struct ValidPathInfo
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 
-    ValidPathInfo(StorePath && path, Hash narHash) : path(std::move(path)), narHash(narHash) { };
-    ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
+    ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(std::move(path)) { };
+    ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(path) { };
 
     ValidPathInfo(const Store & store,
         std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
 
     virtual ~ValidPathInfo() { }
-
-    static ValidPathInfo read(Source & source, const Store & store, unsigned int format);
-    static ValidPathInfo read(Source & source, const Store & store, unsigned int format, StorePath && path);
-
-    void write(Sink & sink, const Store & store, unsigned int format, bool includePath = true) const;
 };
 
 typedef std::map<StorePath, ValidPathInfo> ValidPathInfos;

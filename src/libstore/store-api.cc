@@ -12,6 +12,9 @@
 #include "callback.hh"
 #include "remote-store.hh"
 #include "local-overlay-store.hh"
+// FIXME this should not be here, see TODO below on
+// `addMultipleToStore`.
+#include "worker-protocol.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -155,7 +158,7 @@ StorePath Store::makeStorePath(std::string_view type,
 StorePath Store::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
-    return makeStorePath(type, hash.to_string(Base16, true), name);
+    return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
 }
 
 
@@ -193,7 +196,7 @@ StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInf
             hashString(htSHA256,
                 "fixed:out:"
                 + makeFileIngestionPrefix(info.method)
-                + info.hash.to_string(Base16, true) + ":"),
+                + info.hash.to_string(HashFormat::Base16, true) + ":"),
             name);
     }
 }
@@ -226,12 +229,16 @@ StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentA
 }
 
 
-std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
+std::pair<StorePath, Hash> Store::computeStorePathFromDump(
+    Source & dump,
+    std::string_view name,
+    FileIngestionMethod method,
+    HashType hashAlgo,
+    const StorePathSet & references) const
 {
-    Hash h = method == FileIngestionMethod::Recursive
-        ? hashPath(hashAlgo, srcPath, filter).first
-        : hashFile(hashAlgo, srcPath);
+    HashSink sink(hashAlgo);
+    dump.drainInto(sink);
+    auto h = sink.finish().first;
     FixedOutputInfo caInfo {
         .method = method,
         .hash = h,
@@ -358,7 +365,13 @@ void Store::addMultipleToStore(
 {
     auto expected = readNum<uint64_t>(source);
     for (uint64_t i = 0; i < expected; ++i) {
-        auto info = ValidPathInfo::read(source, *this, 16);
+        // FIXME we should not be using the worker protocol here, let
+        // alone the worker protocol with a hard-coded version!
+        auto info = WorkerProto::Serialise<ValidPathInfo>::read(*this,
+            WorkerProto::ReadConn {
+                .from = source,
+                .version = 16,
+            });
         info.ultimate = false;
         addToStore(info, source, repair, checkSigs);
     }
@@ -885,7 +898,7 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base16, false) + "\n";
+            s += info->narHash.to_string(HashFormat::Base16, false) + "\n";
             s += fmt("%1%\n", info->narSize);
         }
 
@@ -939,7 +952,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
 
 json Store::pathInfoToJSON(const StorePathSet & storePaths,
     bool includeImpureInfo, bool showClosureSize,
-    Base hashBase,
+    HashFormat hashFormat,
     AllowInvalidFlag allowInvalid)
 {
     json::array_t jsonList = json::array();
@@ -952,7 +965,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
 
             jsonPath["path"] = printStorePath(info->path);
             jsonPath["valid"] = true;
-            jsonPath["narHash"] = info->narHash.to_string(hashBase, true);
+            jsonPath["narHash"] = info->narHash.to_string(hashFormat, true);
             jsonPath["narSize"] = info->narSize;
 
             {
@@ -994,7 +1007,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
                     if (!narInfo->url.empty())
                         jsonPath["url"] = narInfo->url;
                     if (narInfo->fileHash)
-                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashBase, true);
+                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashFormat, true);
                     if (narInfo->fileSize)
                         jsonPath["downloadSize"] = narInfo->fileSize;
                     if (showClosureSize)

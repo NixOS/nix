@@ -1,4 +1,5 @@
 #include "args.hh"
+#include "args/root.hh"
 #include "hash.hh"
 #include "json-utils.hh"
 
@@ -26,6 +27,11 @@ void Args::removeFlag(const std::string & longName)
     longFlags.erase(flag);
 }
 
+void Completions::setType(AddCompletions::Type t)
+{
+    type = t;
+}
+
 void Completions::add(std::string completion, std::string description)
 {
     description = trim(description);
@@ -37,7 +43,7 @@ void Completions::add(std::string completion, std::string description)
         if (needs_ellipsis)
             description.append(" [...]");
     }
-    insert(Completion {
+    completions.insert(Completion {
         .completion = completion,
         .description = description
     });
@@ -46,12 +52,20 @@ void Completions::add(std::string completion, std::string description)
 bool Completion::operator<(const Completion & other) const
 { return completion < other.completion || (completion == other.completion && description < other.description); }
 
-CompletionType completionType = ctNormal;
-std::shared_ptr<Completions> completions;
-
 std::string completionMarker = "___COMPLETE___";
 
-static std::optional<std::string> needsCompletion(std::string_view s)
+RootArgs & Args::getRoot()
+{
+    Args * p = this;
+    while (p->parent)
+        p = p->parent;
+
+    auto * res = dynamic_cast<RootArgs *>(p);
+    assert(res);
+    return *res;
+}
+
+std::optional<std::string> RootArgs::needsCompletion(std::string_view s)
 {
     if (!completions) return {};
     auto i = s.find(completionMarker);
@@ -60,7 +74,7 @@ static std::optional<std::string> needsCompletion(std::string_view s)
     return {};
 }
 
-void Args::parseCmdline(const Strings & _cmdline)
+void RootArgs::parseCmdline(const Strings & _cmdline)
 {
     Strings pendingArgs;
     bool dashDash = false;
@@ -71,7 +85,7 @@ void Args::parseCmdline(const Strings & _cmdline)
         size_t n = std::stoi(*s);
         assert(n > 0 && n <= cmdline.size());
         *std::next(cmdline.begin(), n - 1) += completionMarker;
-        completions = std::make_shared<decltype(completions)::element_type>();
+        completions = std::make_shared<Completions>();
         verbosity = lvlError;
     }
 
@@ -125,17 +139,23 @@ void Args::parseCmdline(const Strings & _cmdline)
     for (auto & f : flagExperimentalFeatures)
         experimentalFeatureSettings.require(f);
 
+    /* Now that all the other args are processed, run the deferred completions.
+     */
+    for (auto d : deferredCompletions)
+        d.completer(*completions, d.n, d.prefix);
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 {
     assert(pos != end);
 
+    auto & rootArgs = getRoot();
+
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
 
         if (auto & f = flag.experimentalFeature)
-            flagExperimentalFeatures.insert(*f);
+            rootArgs.flagExperimentalFeatures.insert(*f);
 
         std::vector<std::string> args;
         bool anyCompleted = false;
@@ -146,10 +166,15 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                     "flag '%s' requires %d argument(s), but only %d were given",
                     name, flag.handler.arity, n);
             }
-            if (auto prefix = needsCompletion(*pos)) {
+            if (auto prefix = rootArgs.needsCompletion(*pos)) {
                 anyCompleted = true;
-                if (flag.completer)
-                    flag.completer(n, *prefix);
+                if (flag.completer) {
+                    rootArgs.deferredCompletions.push_back({
+                        .completer = flag.completer,
+                        .n = n,
+                        .prefix = *prefix,
+                    });
+                }
             }
             args.push_back(*pos++);
         }
@@ -159,14 +184,14 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
     };
 
     if (std::string(*pos, 0, 2) == "--") {
-        if (auto prefix = needsCompletion(*pos)) {
+        if (auto prefix = rootArgs.needsCompletion(*pos)) {
             for (auto & [name, flag] : longFlags) {
                 if (!hiddenCategories.count(flag->category)
                     && hasPrefix(name, std::string(*prefix, 2)))
                 {
                     if (auto & f = flag->experimentalFeature)
-                        flagExperimentalFeatures.insert(*f);
-                    completions->add("--" + name, flag->description);
+                        rootArgs.flagExperimentalFeatures.insert(*f);
+                    rootArgs.completions->add("--" + name, flag->description);
                 }
             }
             return false;
@@ -183,12 +208,12 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         return process(std::string("-") + c, *i->second);
     }
 
-    if (auto prefix = needsCompletion(*pos)) {
+    if (auto prefix = rootArgs.needsCompletion(*pos)) {
         if (prefix == "-") {
-            completions->add("--");
+            rootArgs.completions->add("--");
             for (auto & [flagName, flag] : shortFlags)
                 if (experimentalFeatureSettings.isEnabled(flag->experimentalFeature))
-                    completions->add(std::string("-") + flagName, flag->description);
+                    rootArgs.completions->add(std::string("-") + flagName, flag->description);
         }
     }
 
@@ -203,6 +228,8 @@ bool Args::processArgs(const Strings & args, bool finish)
         return true;
     }
 
+    auto & rootArgs = getRoot();
+
     auto & exp = expectedArgs.front();
 
     bool res = false;
@@ -211,15 +238,23 @@ bool Args::processArgs(const Strings & args, bool finish)
         (exp.handler.arity != ArityAny && args.size() == exp.handler.arity))
     {
         std::vector<std::string> ss;
+        bool anyCompleted = false;
         for (const auto &[n, s] : enumerate(args)) {
-            if (auto prefix = needsCompletion(s)) {
+            if (auto prefix = rootArgs.needsCompletion(s)) {
+                anyCompleted = true;
                 ss.push_back(*prefix);
-                if (exp.completer)
-                    exp.completer(n, *prefix);
+                if (exp.completer) {
+                    rootArgs.deferredCompletions.push_back({
+                        .completer = exp.completer,
+                        .n = n,
+                        .prefix = *prefix,
+                    });
+                }
             } else
                 ss.push_back(s);
         }
-        exp.handler.fun(ss);
+        if (!anyCompleted)
+            exp.handler.fun(ss);
         expectedArgs.pop_front();
         res = true;
     }
@@ -236,6 +271,7 @@ nlohmann::json Args::toJSON()
 
     for (auto & [name, flag] : longFlags) {
         auto j = nlohmann::json::object();
+        j["hiddenCategory"] = hiddenCategories.count(flag->category) > 0;
         if (flag->aliases.count(name)) continue;
         if (flag->shortName)
             j["shortName"] = std::string(1, flag->shortName);
@@ -270,11 +306,11 @@ nlohmann::json Args::toJSON()
     return res;
 }
 
-static void hashTypeCompleter(size_t index, std::string_view prefix)
+static void hashTypeCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
     for (auto & type : hashTypes)
         if (hasPrefix(type, prefix))
-            completions->add(type);
+            completions.add(type);
 }
 
 Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
@@ -286,7 +322,7 @@ Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
         .handler = {[ht](std::string s) {
             *ht = parseHashType(s);
         }},
-        .completer = hashTypeCompleter
+        .completer = hashTypeCompleter,
     };
 }
 
@@ -299,13 +335,13 @@ Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<
         .handler = {[oht](std::string s) {
             *oht = std::optional<HashType> { parseHashType(s) };
         }},
-        .completer = hashTypeCompleter
+        .completer = hashTypeCompleter,
     };
 }
 
-static void _completePath(std::string_view prefix, bool onlyDirs)
+static void _completePath(AddCompletions & completions, std::string_view prefix, bool onlyDirs)
 {
-    completionType = ctFilenames;
+    completions.setType(Completions::Type::Filenames);
     glob_t globbuf;
     int flags = GLOB_NOESCAPE;
     #ifdef GLOB_ONLYDIR
@@ -319,20 +355,20 @@ static void _completePath(std::string_view prefix, bool onlyDirs)
                 auto st = stat(globbuf.gl_pathv[i]);
                 if (!S_ISDIR(st.st_mode)) continue;
             }
-            completions->add(globbuf.gl_pathv[i]);
+            completions.add(globbuf.gl_pathv[i]);
         }
     }
     globfree(&globbuf);
 }
 
-void completePath(size_t, std::string_view prefix)
+void Args::completePath(AddCompletions & completions, size_t, std::string_view prefix)
 {
-    _completePath(prefix, false);
+    _completePath(completions, prefix, false);
 }
 
-void completeDir(size_t, std::string_view prefix)
+void Args::completeDir(AddCompletions & completions, size_t, std::string_view prefix)
 {
-    _completePath(prefix, true);
+    _completePath(completions, prefix, true);
 }
 
 Strings argvToStrings(int argc, char * * argv)
@@ -367,10 +403,10 @@ MultiCommand::MultiCommand(const Commands & commands_)
             command = {s, i->second()};
             command->second->parent = this;
         }},
-        .completer = {[&](size_t, std::string_view prefix) {
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             for (auto & [name, command] : commands)
                 if (hasPrefix(name, prefix))
-                    completions->add(name);
+                    completions.add(name);
         }}
     });
 
@@ -392,14 +428,6 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
         return Args::processArgs(args, finish);
 }
 
-void MultiCommand::completionHook()
-{
-    if (command)
-        return command->second->completionHook();
-    else
-        return Args::completionHook();
-}
-
 nlohmann::json MultiCommand::toJSON()
 {
     auto cmds = nlohmann::json::object();
@@ -410,8 +438,8 @@ nlohmann::json MultiCommand::toJSON()
         auto cat = nlohmann::json::object();
         cat["id"] = command->category();
         cat["description"] = trim(categories[command->category()]);
-        j["category"] = std::move(cat);
         cat["experimental-feature"] = command->experimentalFeature();
+        j["category"] = std::move(cat);
         cmds[name] = std::move(j);
     }
 

@@ -235,14 +235,14 @@ package like Terraform:
 
 ```bash
 #! /usr/bin/env nix-shell
-#! nix-shell -i bash --packages "terraform.withPlugins (plugins: [ plugins.openstack ])"
+#! nix-shell -i bash --packages 'terraform.withPlugins (plugins: [ plugins.openstack ])'
 
 terraform apply
 ```
 
 > **Note**
 >
-> You must use double quotes (`"`) when passing a simple Nix expression
+> You must use single or double quotes (`'`, `"`) when passing a simple Nix expression
 > in a nix-shell shebang.
 
 Finally, using the merging of multiple nix-shell shebangs the following
@@ -251,7 +251,7 @@ branch):
 
 ```haskell
 #! /usr/bin/env nix-shell
-#! nix-shell -i runghc --packages "haskellPackages.ghcWithPackages (ps: [ps.download-curl ps.tagsoup])"
+#! nix-shell -i runghc --packages 'haskellPackages.ghcWithPackages (ps: [ps.download-curl ps.tagsoup])'
 #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-20.03.tar.gz
 
 import Network.Curl.Download

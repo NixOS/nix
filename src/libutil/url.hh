@@ -45,4 +45,9 @@ struct ParsedUrlScheme {
 
 ParsedUrlScheme parseUrlScheme(std::string_view scheme);
 
+/* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
+   them by removing the `:` and assuming a scheme of `ssh://`. Also
+   changes absolute paths into file:// URLs. */
+std::string fixGitURL(const std::string & url);
+
 }

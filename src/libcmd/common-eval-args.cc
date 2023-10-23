@@ -9,6 +9,7 @@
 #include "flake/flakeref.hh"
 #include "store-api.hh"
 #include "command.hh"
+#include "tarball.hh"
 
 namespace nix {
 
@@ -132,8 +133,8 @@ MixEvalArgs::MixEvalArgs()
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
         }},
-        .completer = {[&](size_t, std::string_view prefix) {
-            completeFlakeRef(openStore(), prefix);
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeRef(completions, openStore(), prefix);
         }}
     });
 
@@ -168,14 +169,14 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto storePath = fetchers::downloadTarball(
-            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).tree.storePath;
+            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).storePath;
         return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
-        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first.storePath;
+        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
         return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }
 

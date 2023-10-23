@@ -21,8 +21,8 @@ struct CmdBundle : InstallableValueCommand
             .description = fmt("Use a custom bundler instead of the default (`%s`).", bundler),
             .labels = {"flake-url"},
             .handler = {&bundler},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(getStore(), prefix);
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(completions, getStore(), prefix);
             }}
         });
 
@@ -80,7 +80,7 @@ struct CmdBundle : InstallableValueCommand
         auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] = parseFlakeRefWithFragmentAndExtendedOutputsSpec(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
-            evalState, std::move(bundlerFlakeRef), bundlerName, extendedOutputsSpec,
+            evalState, std::move(bundlerFlakeRef), bundlerName, std::move(extendedOutputsSpec),
             {"bundlers." + settings.thisSystem.get() + ".default",
              "defaultBundler." + settings.thisSystem.get()
             },
@@ -109,7 +109,7 @@ struct CmdBundle : InstallableValueCommand
 
         store->buildPaths({
             DerivedPath::Built {
-                .drvPath = drvPath,
+                .drvPath = makeConstantStorePathRef(drvPath),
                 .outputs = OutputsSpec::All { },
             },
         });

@@ -9,6 +9,10 @@
 
 namespace nix {
 
+Config::Config(StringMap initials)
+    : AbstractConfig(std::move(initials))
+{ }
+
 bool Config::set(const std::string & name, const std::string & value)
 {
     bool append = false;
@@ -29,9 +33,9 @@ bool Config::set(const std::string & name, const std::string & value)
 
 void Config::addSetting(AbstractSetting * setting)
 {
-    _settings.emplace(setting->name, Config::SettingData(false, setting));
+    _settings.emplace(setting->name, Config::SettingData{false, setting});
     for (auto & alias : setting->aliases)
-        _settings.emplace(alias, Config::SettingData(true, setting));
+        _settings.emplace(alias, Config::SettingData{true, setting});
 
     bool set = false;
 
@@ -59,6 +63,10 @@ void Config::addSetting(AbstractSetting * setting)
     }
 }
 
+AbstractConfig::AbstractConfig(StringMap initials)
+    : unknownSettings(std::move(initials))
+{ }
+
 void AbstractConfig::warnUnknownSettings()
 {
     for (auto & s : unknownSettings)
@@ -68,6 +76,7 @@ void AbstractConfig::warnUnknownSettings()
 void AbstractConfig::reapplyUnknownSettings()
 {
     auto unknownSettings2 = std::move(unknownSettings);
+    unknownSettings = {};
     for (auto & s : unknownSettings2)
         set(s.first, s.second);
 }
@@ -198,6 +207,13 @@ AbstractSetting::AbstractSetting(
 {
 }
 
+AbstractSetting::~AbstractSetting()
+{
+    // Check against a gcc miscompilation causing our constructor
+    // not to run (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80431).
+    assert(created == 123);
+}
+
 nlohmann::json AbstractSetting::toJSON()
 {
     return nlohmann::json(toJSONObject());
@@ -218,6 +234,9 @@ std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject()
 void AbstractSetting::convertToArg(Args & args, const std::string & category)
 {
 }
+
+
+bool AbstractSetting::isOverridden() const { return overridden; }
 
 template<> std::string BaseSetting<std::string>::parse(const std::string & str) const
 {
@@ -384,10 +403,32 @@ static Path parsePath(const AbstractSetting & s, const std::string & str)
         return canonPath(str);
 }
 
+PathSetting::PathSetting(Config * options,
+    const Path & def,
+    const std::string & name,
+    const std::string & description,
+    const std::set<std::string> & aliases)
+    : BaseSetting<Path>(def, true, name, description, aliases)
+{
+    options->addSetting(this);
+}
+
 Path PathSetting::parse(const std::string & str) const
 {
     return parsePath(*this, str);
 }
+
+
+OptionalPathSetting::OptionalPathSetting(Config * options,
+    const std::optional<Path> & def,
+    const std::string & name,
+    const std::string & description,
+    const std::set<std::string> & aliases)
+    : BaseSetting<std::optional<Path>>(def, true, name, description, aliases)
+{
+    options->addSetting(this);
+}
+
 
 std::optional<Path> OptionalPathSetting::parse(const std::string & str) const
 {
@@ -395,6 +436,11 @@ std::optional<Path> OptionalPathSetting::parse(const std::string & str) const
         return std::nullopt;
     else
         return parsePath(*this, str);
+}
+
+void OptionalPathSetting::operator =(const std::optional<Path> & v)
+{
+    this->assign(v);
 }
 
 bool GlobalConfig::set(const std::string & name, const std::string & value)

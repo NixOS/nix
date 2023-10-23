@@ -379,9 +379,9 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
+    std_out = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
-        throw SysError("dupping stdout");
+        throw SysError("dupping standard output");
 }
 
 
@@ -390,7 +390,7 @@ RunPager::~RunPager()
     try {
         if (pid != -1) {
             std::cout.flush();
-            dup2(stdout, STDOUT_FILENO);
+            dup2(std_out, STDOUT_FILENO);
             pid.wait();
         }
     } catch (...) {

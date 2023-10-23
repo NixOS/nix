@@ -8,13 +8,39 @@
 
 namespace nix {
 
-nlohmann::json BuiltPath::Built::toJSON(ref<Store> store) const {
-    nlohmann::json res;
-    res["drvPath"] = store->printStorePath(drvPath);
-    for (const auto& [output, path] : outputs) {
-        res["outputs"][output] = store->printStorePath(path);
+#define CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, COMPARATOR) \
+    bool MY_TYPE ::operator COMPARATOR (const MY_TYPE & other) const \
+    { \
+        const MY_TYPE* me = this; \
+        auto fields1 = std::make_tuple<const CHILD_TYPE &, const FIELD_TYPE &>(*me->drvPath, me->FIELD); \
+        me = &other; \
+        auto fields2 = std::make_tuple<const CHILD_TYPE &, const FIELD_TYPE &>(*me->drvPath, me->FIELD); \
+        return fields1 COMPARATOR fields2; \
     }
-    return res;
+#define CMP(CHILD_TYPE, MY_TYPE, FIELD) \
+    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, ==) \
+    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, !=) \
+    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, <)
+
+#define FIELD_TYPE std::pair<std::string, StorePath>
+CMP(SingleBuiltPath, SingleBuiltPathBuilt, output)
+#undef FIELD_TYPE
+
+#define FIELD_TYPE std::map<std::string, StorePath>
+CMP(SingleBuiltPath, BuiltPathBuilt, outputs)
+#undef FIELD_TYPE
+
+#undef CMP
+#undef CMP_ONE
+
+StorePath SingleBuiltPath::outPath() const
+{
+    return std::visit(
+        overloaded{
+            [](const SingleBuiltPath::Opaque & p) { return p.path; },
+            [](const SingleBuiltPath::Built & b) { return b.output.second; },
+        }, raw()
+    );
 }
 
 StorePathSet BuiltPath::outPaths() const
@@ -32,6 +58,62 @@ StorePathSet BuiltPath::outPaths() const
     );
 }
 
+SingleDerivedPath::Built SingleBuiltPath::Built::discardOutputPath() const
+{
+    return SingleDerivedPath::Built {
+        .drvPath = make_ref<SingleDerivedPath>(drvPath->discardOutputPath()),
+        .output = output.first,
+    };
+}
+
+SingleDerivedPath SingleBuiltPath::discardOutputPath() const
+{
+    return std::visit(
+        overloaded{
+            [](const SingleBuiltPath::Opaque & p) -> SingleDerivedPath {
+                return p;
+            },
+            [](const SingleBuiltPath::Built & b) -> SingleDerivedPath {
+                return b.discardOutputPath();
+            },
+        }, raw()
+    );
+}
+
+nlohmann::json BuiltPath::Built::toJSON(const Store & store) const
+{
+    nlohmann::json res;
+    res["drvPath"] = drvPath->toJSON(store);
+    for (const auto & [outputName, outputPath] : outputs) {
+        res["outputs"][outputName] = store.printStorePath(outputPath);
+    }
+    return res;
+}
+
+nlohmann::json SingleBuiltPath::Built::toJSON(const Store & store) const
+{
+    nlohmann::json res;
+    res["drvPath"] = drvPath->toJSON(store);
+    auto & [outputName, outputPath] = output;
+    res["output"] = outputName;
+    res["outputPath"] = store.printStorePath(outputPath);
+    return res;
+}
+
+nlohmann::json SingleBuiltPath::toJSON(const Store & store) const
+{
+    return std::visit([&](const auto & buildable) {
+        return buildable.toJSON(store);
+    }, raw());
+}
+
+nlohmann::json BuiltPath::toJSON(const Store & store) const
+{
+    return std::visit([&](const auto & buildable) {
+        return buildable.toJSON(store);
+    }, raw());
+}
+
 RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
 {
     RealisedPath::Set res;
@@ -40,7 +122,7 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
             [&](const BuiltPath::Opaque & p) { res.insert(p.path); },
             [&](const BuiltPath::Built & p) {
                 auto drvHashes =
-                    staticOutputHashes(store, store.readDerivation(p.drvPath));
+                    staticOutputHashes(store, store.readDerivation(p.drvPath->outPath()));
                 for (auto& [outputName, outputPath] : p.outputs) {
                     if (experimentalFeatureSettings.isEnabled(
                                 Xp::CaDerivations)) {
@@ -48,7 +130,7 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                         if (!drvOutput)
                             throw Error(
                                 "the derivation '%s' has unrealised output '%s' (derived-path.cc/toRealisedPaths)",
-                                store.printStorePath(p.drvPath), outputName);
+                                store.printStorePath(p.drvPath->outPath()), outputName);
                         auto thisRealisation = store.queryRealisation(
                             DrvOutput{*drvOutput, outputName});
                         assert(thisRealisation);  // We’ve built it, so we must

@@ -18,15 +18,17 @@ TEST_F(DerivedPathExpressionTest, force_init)
 {
 }
 
+#ifndef COVERAGE
+
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
     prop_opaque_path_round_trip,
-    (const DerivedPath::Opaque & o))
+    (const SingleDerivedPath::Opaque & o))
 {
     auto * v = state.allocValue();
     state.mkStorePathString(o.path, *v);
-    auto d = state.coerceToDerivedPath(noPos, *v, "");
-    RC_ASSERT(DerivedPath { o } == d);
+    auto d = state.coerceToSingleDerivedPath(noPos, *v, "");
+    RC_ASSERT(SingleDerivedPath { o } == d);
 }
 
 // TODO use DerivedPath::Built for parameter once it supports a single output
@@ -34,8 +36,8 @@ RC_GTEST_FIXTURE_PROP(
 
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
-    prop_built_path_placeholder_round_trip,
-    (const StorePath & drvPath, const StorePathName & outputName))
+    prop_derived_path_built_placeholder_round_trip,
+    (const SingleDerivedPath::Built & b))
 {
     /**
      * We set these in tests rather than the regular globals so we don't have
@@ -45,28 +47,22 @@ RC_GTEST_FIXTURE_PROP(
     mockXpSettings.set("experimental-features", "ca-derivations");
 
     auto * v = state.allocValue();
-    state.mkOutputString(*v, drvPath, outputName.name, std::nullopt, mockXpSettings);
-    auto [d, _] = state.coerceToDerivedPathUnchecked(noPos, *v, "");
-    DerivedPath::Built b {
-        .drvPath = drvPath,
-        .outputs = OutputsSpec::Names { outputName.name },
-    };
-    RC_ASSERT(DerivedPath { b } == d);
+    state.mkOutputString(*v, b, std::nullopt, mockXpSettings);
+    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
+    RC_ASSERT(SingleDerivedPath { b } == d);
 }
 
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
-    prop_built_path_out_path_round_trip,
-    (const StorePath & drvPath, const StorePathName & outputName, const StorePath & outPath))
+    prop_derived_path_built_out_path_round_trip,
+    (const SingleDerivedPath::Built & b, const StorePath & outPath))
 {
     auto * v = state.allocValue();
-    state.mkOutputString(*v, drvPath, outputName.name, outPath);
-    auto [d, _] = state.coerceToDerivedPathUnchecked(noPos, *v, "");
-    DerivedPath::Built b {
-        .drvPath = drvPath,
-        .outputs = OutputsSpec::Names { outputName.name },
-    };
-    RC_ASSERT(DerivedPath { b } == d);
+    state.mkOutputString(*v, b, outPath);
+    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
+    RC_ASSERT(SingleDerivedPath { b } == d);
 }
+
+#endif
 
 } /* namespace nix */
