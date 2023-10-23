@@ -57,7 +57,7 @@ protected:
         std::function<void(std::vector<std::string>)> fun;
         size_t arity;
 
-        Handler() {}
+        Handler() = default;
 
         Handler(std::function<void(std::vector<std::string>)> && fun)
             : fun(std::move(fun))
