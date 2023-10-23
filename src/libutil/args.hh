@@ -24,23 +24,8 @@ class AddCompletions;
 
 class Args
 {
-    /**
-     * @brief The command's "working directory", but only set when top level.
-     *
-     * Use getCommandBaseDir() to get the directory regardless of whether this
-     * is a top-level command or subcommand.
-     *
-     * @see getCommandBaseDir()
-     */
-    Path commandBaseDir = ".";
 
 public:
-
-    /**
-     * Parse the command line with argv0, throwing a UsageError if something
-       goes wrong.
-     */
-    void parseCmdline(const Strings & _cmdline, bool allowShebang);
 
     /**
      * Return a short one-line description of the command.
@@ -62,7 +47,7 @@ public:
      *
      * This only returns the correct value after parseCmdline() has run.
      */
-    Path getCommandBaseDir() const;
+    virtual Path getCommandBaseDir() const;
 
 protected:
 

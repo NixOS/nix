@@ -294,7 +294,9 @@ void completeFlakeRefWithFragment(
                 prefixRoot = ".";
             }
             auto flakeRefS = std::string(prefix.substr(0, hash));
-            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath(getCommandBaseDir()));
+
+            // TODO: ideally this would use the command base directory instead of assuming ".".
+            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath("."));
 
             auto evalCache = openEvalCache(*evalState,
                 std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)));

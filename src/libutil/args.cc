@@ -80,12 +80,6 @@ std::optional<std::string> RootArgs::needsCompletion(std::string_view s)
     return {};
 }
 
-void RootArgs::parseCmdline(const Strings & _cmdline)
-{
-    // Default via 5.1.2.2.1 in C standard
-    Args::parseCmdline(_cmdline, false);
-}
-
 /**
  * Basically this is `typedef std::optional<Parser> Parser(std::string_view s, Strings & r);`
  *
@@ -227,7 +221,7 @@ static Strings parseShebangContent(std::string_view s) {
     return result;
 }
 
-void Args::parseCmdline(const Strings & _cmdline, bool allowShebang)
+void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 {
     Strings pendingArgs;
     bool dashDash = false;
@@ -339,10 +333,13 @@ void Args::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
 Path Args::getCommandBaseDir() const
 {
-    if (parent)
-        return parent->getCommandBaseDir();
-    else
-        return commandBaseDir;
+    assert(parent);
+    return parent->getCommandBaseDir();
+}
+
+Path RootArgs::getCommandBaseDir() const
+{
+    return commandBaseDir;
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
