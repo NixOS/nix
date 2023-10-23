@@ -120,7 +120,7 @@ These commands switch to the `my-profile` and default profile,
 respectively. If the profile doesn’t exist, it will be created
 automatically. You should be careful about storing a profile in another
 location than the `profiles` directory, since otherwise it might not be
-used as a root of the [garbage collector](garbage-collection.md).
+used as a root of the [garbage collector](@docroot@/command-ref/nix-store/gc.md).
 
 All `nix-env` operations work on the profile pointed to by
 `~/.nix-profile`, but you can override this using the `--profile` option
