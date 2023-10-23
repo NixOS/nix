@@ -11,8 +11,7 @@ For S3 compatible binary caches, consult that cache's documentation.
 ### Anonymous Reads to your S3-compatible binary cache
 
 > If your binary cache is publicly accessible and does not require authentication,
-> the simplest and easiest way to use Nix with your S3 compatible binary cache is to use the HTTP URL for that cache.
-> In other words, the simplest way to configure Nix to use [HTTP Binary Cache Store] rather than S3 Binary Cache Store;
+> it is simplest to use the [HTTP Binary Cache Store] rather than S3 Binary Cache Store with
 > <https://example-nix-cache.s3.amazonaws.com> instead of <s3://example-nix-cache>.
 
 Your bucket will need a
