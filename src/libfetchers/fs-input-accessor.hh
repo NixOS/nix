@@ -16,6 +16,8 @@ struct FSInputAccessor : InputAccessor
     virtual bool hasAccessControl() = 0;
 };
 
+typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
+
 ref<FSInputAccessor> makeFSInputAccessor(
     const CanonPath & root,
     std::optional<std::set<CanonPath>> && allowedPaths = {},

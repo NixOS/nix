@@ -1,6 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "memory-input-accessor.hh"
+
 #include "tests/libexpr.hh"
 
 namespace nix {

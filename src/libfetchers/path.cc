@@ -130,7 +130,7 @@ struct PathInputScheme : InputScheme
                 Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
                 storePath = store->addToStore(input.getName(), absPath.abs());
                 auto narHash = store->queryPathInfo(*storePath)->narHash;
-                input2.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+                input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
             } else
                 input2.attrs.erase("narHash");
 
@@ -160,6 +160,10 @@ struct PathInputScheme : InputScheme
         return std::nullopt;
     }
 
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
+    }
 };
 
 static auto rPathInputScheme = OnStartup([] { registerInputScheme(std::make_unique<PathInputScheme>()); });

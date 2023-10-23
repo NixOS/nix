@@ -5,7 +5,7 @@ namespace nix {
 
 std::string DownstreamPlaceholder::render() const
 {
-    return "/" + hash.to_string(Base32, false);
+    return "/" + hash.to_string(HashFormat::Base32, false);
 }
 
 
@@ -31,7 +31,7 @@ DownstreamPlaceholder DownstreamPlaceholder::unknownDerivation(
     xpSettings.require(Xp::DynamicDerivations);
     auto compressed = compressHash(placeholder.hash, 20);
     auto clearText = "nix-computed-output:"
-        + compressed.to_string(Base32, false)
+        + compressed.to_string(HashFormat::Base32, false)
         + ":" + std::string { outputName };
     return DownstreamPlaceholder {
         hashString(htSHA256, clearText)

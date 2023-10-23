@@ -474,7 +474,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         auto narHash = accessor->hashPath(CanonPath::root);
 
-        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(SRI, true)}}));
+        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
 
         return narHash;
     }

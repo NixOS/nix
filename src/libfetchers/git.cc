@@ -48,7 +48,7 @@ bool touchCacheFile(const Path & path, time_t touch_time)
 Path getCachePath(std::string_view key)
 {
     return getCacheDir() + "/nix/gitv3/" +
-        hashString(htSHA256, key).to_string(Base32, false);
+        hashString(htSHA256, key).to_string(HashFormat::Base32, false);
 }
 
 // Returns the name of the HEAD branch.
@@ -307,7 +307,7 @@ struct GitInputScheme : InputScheme
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
-                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(HashFormat::Base16, true));
         };
 
         if (auto rev = input.getRev())
@@ -427,7 +427,7 @@ struct GitInputScheme : InputScheme
             // FIXME: remove?
             //input.attrs.erase("narHash");
             auto narHash = store->queryPathInfo(storePath)->narHash;
-            input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+            input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
             auto accessor = makeStorePathAccessor(store, storePath, makeNotAllowedError(repoInfo.url));
 

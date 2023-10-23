@@ -27,8 +27,11 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 1. Search for related issues that cover what you're going to work on.
    It could help to mention there that you will work on the issue.
 
-   Issues labeled [good first issue](https://github.com/NixOS/nix/labels/good-first-issue) should be relatively easy to fix and are likely to get merged quickly.
+   Issues labeled [good first issue](https://github.com/NixOS/nix/labels/good%20first%20issue) should be relatively easy to fix and are likely to get merged quickly.
    Pull requests addressing issues labeled [idea approved](https://github.com/NixOS/nix/labels/idea%20approved) or [RFC](https://github.com/NixOS/nix/labels/RFC) are especially welcomed by maintainers and will receive prioritised review.
+
+   If you are proficient with C++, addressing one of the [popular issues](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc) will be highly appreciated by maintainers and Nix users all over the world.
+   For far-reaching changes, please investigate possible blockers and design implications, and coordinate with maintainers before investing too much time in writing code that may not end up getting merged.
 
    If there is no relevant issue yet and you're not sure whether your change is likely to be accepted, [open an issue](https://github.com/NixOS/nix/issues/new/choose) yourself.
 

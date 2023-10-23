@@ -27,6 +27,7 @@ struct SourcePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct FSInputAccessor;
+struct MemoryInputAccessor;
 
 
 /**
@@ -208,8 +209,20 @@ public:
 
     Bindings emptyBindings;
 
+    /**
+     * The accessor for the root filesystem.
+     */
     const ref<FSInputAccessor> rootFS;
+
+    /**
+     * The in-memory filesystem for <nix/...> paths.
+     */
     const ref<MemoryInputAccessor> corepkgsFS;
+
+    /**
+     * In-memory filesystem for internal, non-user-callable Nix
+     * expressions like call-flake.nix.
+     */
     const ref<MemoryInputAccessor> internalFS;
 
     const SourcePath derivationInternal;

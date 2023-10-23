@@ -13,10 +13,71 @@ namespace nix {
 
 const char commonProtoDir[] = "common-protocol";
 
-using CommonProtoTest = ProtoTest<CommonProto, commonProtoDir>;
+class CommonProtoTest : public ProtoTest<CommonProto, commonProtoDir>
+{
+public:
+    /**
+     * Golden test for `T` reading
+     */
+    template<typename T>
+    void readTest(PathView testStem, T value)
+    {
+        if (testAccept())
+        {
+            GTEST_SKIP() << "Cannot read golden master because another test is also updating it";
+        }
+        else
+        {
+            auto expected = readFile(goldenMaster(testStem));
+
+            T got = ({
+                StringSource from { expected };
+                CommonProto::Serialise<T>::read(
+                    *store,
+                    CommonProto::ReadConn { .from = from });
+            });
+
+            ASSERT_EQ(got, value);
+        }
+    }
+
+    /**
+     * Golden test for `T` write
+     */
+    template<typename T>
+    void writeTest(PathView testStem, const T & value)
+    {
+        auto file = goldenMaster(testStem);
+
+        StringSink to;
+        CommonProto::write(
+            *store,
+            CommonProto::WriteConn { .to = to },
+            value);
+
+        if (testAccept())
+        {
+            createDirs(dirOf(file));
+            writeFile(file, to.s);
+            GTEST_SKIP() << "Updating golden master";
+        }
+        else
+        {
+            auto expected = readFile(file);
+            ASSERT_EQ(to.s, expected);
+        }
+    }
+};
+
+#define CHARACTERIZATION_TEST(NAME, STEM, VALUE) \
+    TEST_F(CommonProtoTest, NAME ## _read) { \
+        readTest(STEM, VALUE); \
+    } \
+    TEST_F(CommonProtoTest, NAME ## _write) { \
+        writeTest(STEM, VALUE); \
+    }
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     string,
     "string",
     (std::tuple<std::string, std::string, std::string, std::string, std::string> {
@@ -28,7 +89,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     storePath,
     "store-path",
     (std::tuple<StorePath, StorePath> {
@@ -37,7 +97,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     contentAddress,
     "content-address",
     (std::tuple<ContentAddress, ContentAddress, ContentAddress> {
@@ -56,7 +115,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     drvOutput,
     "drv-output",
     (std::tuple<DrvOutput, DrvOutput> {
@@ -71,7 +129,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     realisation,
     "realisation",
     (std::tuple<Realisation, Realisation> {
@@ -103,7 +160,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     vector,
     "vector",
     (std::tuple<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, std::vector<std::vector<std::string>>> {
@@ -114,7 +170,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     set,
     "set",
     (std::tuple<std::set<std::string>, std::set<std::string>, std::set<std::string>, std::set<std::set<std::string>>> {
@@ -125,7 +180,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     optionalStorePath,
     "optional-store-path",
     (std::tuple<std::optional<StorePath>, std::optional<StorePath>> {
@@ -136,7 +190,6 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
-    CommonProtoTest,
     optionalContentAddress,
     "optional-content-address",
     (std::tuple<std::optional<ContentAddress>, std::optional<ContentAddress>> {

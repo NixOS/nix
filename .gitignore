@@ -138,7 +138,9 @@ nix-rust/target
 
 result
 
+# IDE
 .vscode/
+.idea/
 
 # clangd and possibly more
 .cache/

@@ -204,7 +204,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , CanonPath::root), **state.vImportedDrvToDerivation);
+                , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
         }
 
         state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
@@ -601,7 +601,9 @@ struct CompareValues
                 case nString:
                     return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
-                    // FIXME: handle accessor?
+                    // Note: we don't take the accessor into account
+                    // since it's not obvious how to compare them in a
+                    // reproducible way.
                     return strcmp(v1->_path.path, v2->_path.path) < 0;
                 case nList:
                     // Lexicographic comparison
@@ -737,6 +739,14 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
       ```
       [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
       ```
+
+      `key` can be one of the following types:
+      - [Number](@docroot@/language/values.md#type-number)
+      - [Boolean](@docroot@/language/values.md#type-boolean)
+      - [String](@docroot@/language/values.md#type-string)
+      - [Path](@docroot@/language/values.md#type-path)
+      - [List](@docroot@/language/values.md#list)
+
       )",
     .fun = prim_genericClosure,
 });
@@ -1762,8 +1772,7 @@ static void prim_hashFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     auto path = realisePath(state, pos, *args[1]);
 
-    // FIXME: state.toRealPath(path, context)
-    v.mkString(hashString(*ht, path.readFile()).to_string(Base16, false));
+    v.mkString(hashString(*ht, path.readFile()).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -2256,10 +2265,7 @@ static void addPath(
         // store on-demand.
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            // FIXME
-            if (method != FileIngestionMethod::Recursive)
-                throw Error("'recursive = false' is not implemented");
-            auto dstPath = path.fetchToStore(state.store, name, filter.get(), state.repair);
+            auto dstPath = path.fetchToStore(state.store, name, method, filter.get(), state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
@@ -2277,7 +2283,6 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
     NixStringContext context;
     auto path = state.coerceToPath(pos, *args[1], context,
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
-
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
     addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
@@ -3785,7 +3790,7 @@ static void prim_hashString(EvalState & state, const PosIdx pos, Value * * args,
     NixStringContext context; // discarded
     auto s = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.hashString");
 
-    v.mkString(hashString(*ht, s).to_string(Base16, false));
+    v.mkString(hashString(*ht, s).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({
@@ -3797,6 +3802,101 @@ static RegisterPrimOp primop_hashString({
       `"sha1"`, `"sha256"` or `"sha512"`.
     )",
     .fun = prim_hashString,
+});
+
+static void prim_convertHash(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceAttrs(*args[0], pos, "while evaluating the first argument passed to builtins.convertHash");
+    auto &inputAttrs = args[0]->attrs;
+
+    Bindings::iterator iteratorHash = getAttr(state, state.symbols.create("hash"), inputAttrs, "while locating the attribute 'hash'");
+    auto hash = state.forceStringNoCtx(*iteratorHash->value, pos, "while evaluating the attribute 'hash'");
+
+    Bindings::iterator iteratorHashAlgo = inputAttrs->find(state.symbols.create("hashAlgo"));
+    std::optional<HashType> ht = std::nullopt;
+    if (iteratorHashAlgo != inputAttrs->end()) {
+        ht = parseHashType(state.forceStringNoCtx(*iteratorHashAlgo->value, pos, "while evaluating the attribute 'hashAlgo'"));
+    }
+
+    Bindings::iterator iteratorToHashFormat = getAttr(state, state.symbols.create("toHashFormat"), args[0]->attrs, "while locating the attribute 'toHashFormat'");
+    HashFormat hf = parseHashFormat(state.forceStringNoCtx(*iteratorToHashFormat->value, pos, "while evaluating the attribute 'toHashFormat'"));
+
+    v.mkString(Hash::parseAny(hash, ht).to_string(hf, hf == HashFormat::SRI));
+}
+
+static RegisterPrimOp primop_convertHash({
+    .name = "__convertHash",
+    .args = {"args"},
+    .doc = R"(
+      Return the specified representation of a hash string, based on the attributes presented in *args*:
+
+      - `hash`
+
+        The hash to be converted.
+        The hash format is detected automatically.
+
+      - `hashAlgo`
+
+        The algorithm used to create the hash. Must be one of
+        - `"md5"`
+        - `"sha1"`
+        - `"sha256"`
+        - `"sha512"`
+
+        The attribute may be omitted when `hash` is an [SRI hash](https://www.w3.org/TR/SRI/#the-integrity-attribute) or when the hash is prefixed with the hash algorithm name followed by a colon.
+        That `<hashAlgo>:<hashBody>` syntax is supported for backwards compatibility with existing tooling.
+
+      - `toHashFormat`
+
+        The format of the resulting hash. Must be one of
+        - `"base16"`
+        - `"base32"`
+        - `"base64"`
+        - `"sri"`
+
+      The result hash is the *toHashFormat* representation of the hash *hash*.
+
+      > **Example**
+      >
+      >   Convert a SHA256 hash in Base16 to SRI:
+      >
+      > ```nix
+      > builtins.convertHash {
+      >   hash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+      >   toHashFormat = "sri";
+      >   hashAlgo = "sha256";
+      > }
+      > ```
+      >
+      >     "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+
+      > **Example**
+      >
+      >   Convert a SHA256 hash in SRI to Base16:
+      >
+      > ```nix
+      > builtins.convertHash {
+      >   hash = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=";
+      >   toHashFormat = "base16";
+      > }
+      > ```
+      >
+      >     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+      > **Example**
+      >
+      >   Convert a hash in the form `<hashAlgo>:<hashBody>` in Base16 to SRI:
+      >
+      > ```nix
+      > builtins.convertHash {
+      >   hash = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+      >   toHashFormat = "sri";
+      > }
+      > ```
+      >
+      >     "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+    )",
+    .fun = prim_convertHash,
 });
 
 struct RegexCache

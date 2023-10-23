@@ -260,7 +260,7 @@ struct CurlInputScheme : InputScheme
         // NAR hashes are preferred over file hashes since tar/zip
         // files don't have a canonical representation.
         if (auto narHash = input.getNarHash())
-            url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
+            url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
         return url;
     }
 
@@ -295,7 +295,7 @@ struct FileInputScheme : CurlInputScheme
 
         // FIXME: remove?
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
-        input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+        input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
         return {makeStorePathAccessor(store, file.storePath), input};
     }
@@ -336,7 +336,7 @@ struct TarballInputScheme : CurlInputScheme
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         input.attrs.insert_or_assign("narHash",
-            getTarballCache()->treeHashToNarHash(result.treeHash).to_string(SRI, true));
+            getTarballCache()->treeHashToNarHash(result.treeHash).to_string(HashFormat::SRI, true));
 
         return {result.accessor, input};
     }

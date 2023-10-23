@@ -81,14 +81,8 @@ std::string Input::to_string() const
     return toURL().to_string();
 }
 
-Attrs Input::toAttrs() const
-{
-    return attrs;
-}
-
 bool Input::isDirect() const
 {
-    assert(scheme);
     return !scheme || scheme->isDirect(*this);
 }
 
@@ -101,6 +95,11 @@ std::optional<std::string> Input::isRelative() const
 {
     assert(scheme);
     return scheme->isRelative(*this);
+}
+
+Attrs Input::toAttrs() const
+{
+    return attrs;
 }
 
 bool Input::operator ==(const Input & other) const
@@ -140,10 +139,10 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
         if (final.getNarHash() != prevNarHash) {
             if (final.getNarHash())
                 throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
-                    specified.to_string(), prevNarHash->to_string(SRI, true), final.getNarHash()->to_string(SRI, true));
+                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true), final.getNarHash()->to_string(HashFormat::SRI, true));
             else
                 throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got none",
-                    specified.to_string(), prevNarHash->to_string(SRI, true));
+                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true));
         }
     }
 

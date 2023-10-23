@@ -635,6 +635,7 @@ LockedFlake lockFlake(
                                 } else {
                                     auto resolvedRef = maybeResolve(state, *input.ref, useRegistries);
                                     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                                    state.registerAccessor(accessor);
                                     return {accessor->root(), lockedRef};
                                 }
                             }();

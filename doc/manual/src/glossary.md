@@ -207,6 +207,7 @@
 - [output]{#gloss-output}
 
   A [store object] produced by a [derivation].
+  See [the `outputs` argument to the `derivation` function](@docroot@/language/derivations.md#attr-outputs) for details.
 
   [output]: #gloss-output
 

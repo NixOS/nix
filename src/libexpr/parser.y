@@ -664,6 +664,8 @@ formal
 #include "tarball.hh"
 #include "store-api.hh"
 #include "flake/flake.hh"
+#include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
 
 
 namespace nix {

@@ -40,5 +40,4 @@ DownloadTarballResult downloadTarball(
     const std::string & url,
     const Headers & headers = {});
 
-
 }

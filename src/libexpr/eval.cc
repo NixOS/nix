@@ -13,6 +13,7 @@
 #include "profiles.hh"
 #include "print.hh"
 #include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -562,6 +563,11 @@ EvalState::EvalState(
     if (rootFS->hasAccessControl())
         for (auto & i : searchPath.elements)
             resolveSearchPathPath(i.path, true);
+
+    corepkgsFS->addFile(
+        CanonPath("fetchurl.nix"),
+        #include "fetchurl.nix.gen.hh"
+    );
 
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
@@ -2277,7 +2283,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            auto dstPath = path.fetchToStore(store, path.baseName(), nullptr, repair);
+            auto dstPath = path.fetchToStore(store, path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
@@ -2295,26 +2301,34 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
 {
     try {
         forceValue(v, pos);
-
-        if (v.type() == nString) {
-            copyContext(v, context);
-            return decodePath(v.string_view(), pos);
-        }
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
     }
 
+    /* Handle path values directly, without coercing to a string. */
     if (v.type() == nPath)
         return v.path();
 
+    /* Similarly, handle __toString where the result may be a path
+       value. */
     if (v.type() == nAttrs) {
-        auto i = v.attrs->find(sOutPath);
-        if (i != v.attrs->end())
-            return coerceToPath(pos, *i->value, context, errorCtx);
+        auto i = v.attrs->find(sToString);
+        if (i != v.attrs->end()) {
+            Value v1;
+            callFunction(*i->value, v, v1, pos);
+            return coerceToPath(pos, v1, context, errorCtx);
+        }
     }
 
-    error("cannot coerce %1% to a path", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
+    /* Any other value should be coercable to a string. */
+    auto s = coerceToString(pos, v, context, errorCtx, false, false).toOwned();
+    try {
+        return decodePath(s, pos);
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx);
+        throw;
+    }
 }
 
 
@@ -2415,6 +2429,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
         case nPath:
             return
+                // FIXME: compare accessors by their fingerprint.
                 v1._path.accessor == v2._path.accessor
                 && strcmp(v1._path.path, v2._path.path) == 0;
 

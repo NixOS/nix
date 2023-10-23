@@ -29,7 +29,7 @@ static void emitTreeAttrs(
     // FIXME: support arbitrary input attributes.
 
     if (auto narHash = input.getNarHash())
-        attrs.alloc("narHash").mkString(narHash->to_string(SRI, true));
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -165,6 +165,11 @@ static void fetchTree(
             attrs.emplace("url", fixGitURL(url));
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
+            if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
+                state.debugThrowLastTrace(EvalError({
+                    .msg = hintfmt("passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"),
+                    .errPos = state.positions[pos]
+                }));
             input = fetchers::Input::fromURL(url);
         }
     }
@@ -217,6 +222,10 @@ static RegisterPrimOp primop_fetchTree({
       *input* must be a [flake reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references), either in attribute set representation or in the URL-like syntax.
       The input should be "locked", that is, it should contain a commit hash or content hash unless impure evaluation (`--impure`) is enabled.
 
+      > **Note**
+      >
+      > The URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
+
       Here are some examples of how to use `fetchTree`:
 
       - Fetch a GitHub repository using the attribute set representation:
@@ -250,7 +259,6 @@ static RegisterPrimOp primop_fetchTree({
           ```
     )",
     .fun = prim_fetchTree,
-    .experimentalFeature = Xp::Flakes,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
@@ -326,7 +334,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             : hashFile(htSHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
             state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true)));
+                *url, expectedHash->to_string(HashFormat::Base32, true), hash.to_string(HashFormat::Base32, true)));
     }
 
     state.allowAndSetStorePathString(storePath, v);

@@ -72,14 +72,6 @@ struct ValidPathInfo
      */
     std::optional<ContentAddress> ca;
 
-    bool operator == (const ValidPathInfo & i) const
-    {
-        return
-            path == i.path
-            && narHash == i.narHash
-            && references == i.references;
-    }
-
     /**
      * Return a fingerprint of the store path to be used in binary
      * cache signatures. It contains the store path, the base-32

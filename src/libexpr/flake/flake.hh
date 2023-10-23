@@ -10,8 +10,6 @@ namespace nix {
 
 class EvalState;
 
-namespace fetchers { struct Tree; }
-
 namespace flake {
 
 struct FlakeInput;

@@ -2,8 +2,10 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 
+#include <algorithm>
 #include <iomanip>
 
+#include <iterator>
 #include <nlohmann/json.hpp>
 
 namespace nix::flake {
@@ -42,16 +44,29 @@ LockedNode::LockedNode(const nlohmann::json & json)
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
 
-std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
+static std::shared_ptr<Node> doFind(
+    const ref<Node> & root,
+    const InputPath & path,
+    std::vector<InputPath> & visited)
 {
     std::shared_ptr<Node> pos = root;
+
+    auto found = std::find(visited.cbegin(), visited.cend(), path);
+
+    if(found != visited.end()) {
+        std::vector<std::string> cycle;
+        std::transform(found, visited.cend(), std::back_inserter(cycle), printInputPath);
+        cycle.push_back(printInputPath(path));
+        throw Error("follow cycle detected: [%s]", concatStringsSep(" -> ", cycle));
+    }
+    visited.push_back(path);
 
     for (auto & elem : path) {
         if (auto i = get(pos->inputs, elem)) {
             if (auto node = std::get_if<0>(&*i))
                 pos = (std::shared_ptr<LockedNode>) *node;
             else if (auto follows = std::get_if<1>(&*i)) {
-                if (auto p = findInput(*follows))
+                if (auto p = doFind(root, *follows, visited))
                     pos = ref(p);
                 else
                     return {};
@@ -61,6 +76,12 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
     }
 
     return pos;
+}
+
+std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
+{
+    std::vector<InputPath> visited;
+    return doFind(root, path, visited);
 }
 
 LockFile::LockFile(std::string_view contents, std::string_view path)

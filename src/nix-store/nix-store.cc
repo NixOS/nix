@@ -406,7 +406,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
                         assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
+                        cout << fmt("%s\n", info->narHash.to_string(HashFormat::Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -769,8 +769,8 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         if (current.first != info->narHash) {
             printError("path '%s' was modified! expected hash '%s', got '%s'",
                 store->printStorePath(path),
-                info->narHash.to_string(Base32, true),
-                current.first.to_string(Base32, true));
+                info->narHash.to_string(HashFormat::Base32, true),
+                current.first.to_string(HashFormat::Base32, true));
             status = 1;
         }
     }
@@ -818,10 +818,16 @@ static void opServe(Strings opFlags, Strings opArgs)
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
     out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
     out.flush();
-    unsigned int clientVersion = readInt(in);
+    ServeProto::Version clientVersion = readInt(in);
 
-    ServeProto::ReadConn rconn { .from = in };
-    ServeProto::WriteConn wconn { .to = out };
+    ServeProto::ReadConn rconn {
+        .from = in,
+        .version = clientVersion,
+    };
+    ServeProto::WriteConn wconn {
+        .to = out,
+        .version = clientVersion,
+    };
 
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
@@ -892,7 +898,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << info->narHash.to_string(Base32, true)
+                            out << info->narHash.to_string(HashFormat::Base32, true)
                                 << renderContentAddress(info->ca)
                                 << info->sigs;
                     } catch (InvalidPath &) {

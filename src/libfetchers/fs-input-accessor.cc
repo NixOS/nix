@@ -1,9 +1,10 @@
 #include "fs-input-accessor.hh"
+#include "posix-source-accessor.hh"
 #include "store-api.hh"
 
 namespace nix {
 
-struct FSInputAccessorImpl : FSInputAccessor
+struct FSInputAccessorImpl : FSInputAccessor, PosixSourceAccessor
 {
     CanonPath root;
     std::optional<std::set<CanonPath>> allowedPaths;
@@ -20,32 +21,27 @@ struct FSInputAccessorImpl : FSInputAccessor
         displayPrefix = root.isRoot() ? "" : root.abs();
     }
 
-    std::string readFile(const CanonPath & path) override
+    void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
-        return nix::readFile(absPath.abs());
+        PosixSourceAccessor::readFile(absPath, sink, sizeCallback);
     }
 
     bool pathExists(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
-        return isAllowed(absPath) && nix::pathExists(absPath.abs());
+        return isAllowed(absPath) && PosixSourceAccessor::pathExists(absPath);
     }
 
     Stat lstat(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
-        auto st = nix::lstat(absPath.abs());
-        return Stat {
-            .type =
-                S_ISREG(st.st_mode) ? tRegular :
-                S_ISDIR(st.st_mode) ? tDirectory :
-                S_ISLNK(st.st_mode) ? tSymlink :
-                tMisc,
-            .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR
-        };
+        return PosixSourceAccessor::lstat(absPath);
     }
 
     DirEntries readDirectory(const CanonPath & path) override
@@ -53,16 +49,9 @@ struct FSInputAccessorImpl : FSInputAccessor
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
         DirEntries res;
-        for (auto & entry : nix::readDirectory(absPath.abs())) {
-            std::optional<Type> type;
-            switch (entry.type) {
-            case DT_REG: type = Type::tRegular; break;
-            case DT_LNK: type = Type::tSymlink; break;
-            case DT_DIR: type = Type::tDirectory; break;
-            }
-            if (isAllowed(absPath + entry.name))
-                res.emplace(entry.name, type);
-        }
+        for (auto & entry : PosixSourceAccessor::readDirectory(absPath))
+            if (isAllowed(absPath + entry.first))
+                res.emplace(entry);
         return res;
     }
 
