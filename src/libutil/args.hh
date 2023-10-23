@@ -130,7 +130,7 @@ protected:
      * The `AddCompletions` that is passed is an interface to the state
      * stored as part of the root command
      */
-    typedef void CompleterFun(AddCompletions &, size_t, std::string_view);
+    using CompleterFun = void(AddCompletions &, size_t, std::string_view);
 
     /**
      * The closure type of the completion callback.
@@ -138,7 +138,7 @@ protected:
      * This is what is actually stored as part of each Flag / Expected
      * Arg.
      */
-    typedef std::function<CompleterFun> CompleterClosure;
+    using CompleterClosure = std::function<CompleterFun>;
 
     /**
      * Description of flags / options
@@ -148,7 +148,7 @@ protected:
      */
     struct Flag
     {
-        typedef std::shared_ptr<Flag> ptr;
+        using ptr = std::shared_ptr<Flag>;
 
         std::string longName;
         std::set<std::string> aliases;
@@ -303,7 +303,7 @@ struct Command : virtual public Args
      */
     virtual void run() = 0;
 
-    typedef int Category;
+    using Category = int;
 
     static constexpr Category catDefault = 0;
 
@@ -312,7 +312,7 @@ struct Command : virtual public Args
     virtual Category category() { return catDefault; }
 };
 
-typedef std::map<std::string, std::function<ref<Command>()>> Commands;
+using Commands = std::map<std::string, std::function<ref<Command>()>>;
 
 /**
  * An argument parser that supports multiple subcommands,
