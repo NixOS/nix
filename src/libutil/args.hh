@@ -84,29 +84,29 @@ protected:
         { }
 
         Handler(std::vector<std::string> * dest)
-            : fun([=](std::vector<std::string> ss) { *dest = ss; })
+            : fun([dest](std::vector<std::string> ss) { *dest = ss; })
             , arity(ArityAny)
         { }
 
         Handler(std::string * dest)
-            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
 
         Handler(std::optional<std::string> * dest)
-            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
 
         template<class T>
         Handler(T * dest, const T & val)
-            : fun([=](std::vector<std::string> ss) { *dest = val; })
+            : fun([dest, val](std::vector<std::string> ss) { *dest = val; })
             , arity(0)
         { }
 
         template<class I>
         Handler(I * dest)
-            : fun([=](std::vector<std::string> ss) {
+            : fun([dest](std::vector<std::string> ss) {
                 *dest = string2IntWithUnitPrefix<I>(ss[0]);
               })
             , arity(1)
@@ -114,7 +114,7 @@ protected:
 
         template<class I>
         Handler(std::optional<I> * dest)
-            : fun([=](std::vector<std::string> ss) {
+            : fun([dest](std::vector<std::string> ss) {
                 *dest = string2IntWithUnitPrefix<I>(ss[0]);
             })
             , arity(1)
