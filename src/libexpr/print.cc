@@ -1,4 +1,6 @@
 #include "print.hh"
+
+#include <algorithm>
 #include <unordered_set>
 
 namespace nix {
@@ -41,44 +43,49 @@ bool isReservedKeyword(const std::string_view str)
     return reservedKeywords.contains(str);
 }
 
+// Returns 'true' if the character is a symbol that can't be used in a variable name.
+bool isSymbolProhibited(const char& symbol) {
+    bool symbolAllowed = (std::isalnum(symbol) || symbol == '_' || symbol == '-'|| symbol == '\'');
+    return !symbolAllowed;
+}
+
 std::ostream &
 printIdentifier(std::ostream & str, std::string_view s) {
-    if (s.empty())
+    if (s.empty()) {
         str << "\"\"";
-    else if (isReservedKeyword(s))
-        str << '"' << s << '"';
-    else {
-        char c = s[0];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            printLiteralString(str, s);
-            return str;
-        }
-        for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') ||
-                  (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9') ||
-                  c == '_' || c == '\'' || c == '-')) {
-                printLiteralString(str, s);
-                return str;
-            }
-        str << s;
+        return str;
     }
+
+    if (isReservedKeyword(s)) {
+        str << '"' << s << '"';
+        return str;
+    }
+
+    char firstSymbol = s[0];
+    // Name can only begin with a letter or an underscore.
+    if (!(std::isalpha(firstSymbol) || firstSymbol == '_')) {
+        printLiteralString(str, s);
+        return str;
+    }
+    // Name cannot contain prohibited symbols.
+    if (std::any_of(std::begin(s), std::end(s), isSymbolProhibited)) {
+        printLiteralString(str, s);
+        return str;
+    }
+
+    str << s;
     return str;
 }
 
 static bool isVarName(std::string_view s)
 {
-    if (s.size() == 0) return false;
+    if (s.empty()) return false;
     if (isReservedKeyword(s)) return false;
-    char c = s[0];
-    if ((c >= '0' && c <= '9') || c == '-' || c == '\'') return false;
-    for (auto & i : s)
-        if (!((i >= 'a' && i <= 'z') ||
-              (i >= 'A' && i <= 'Z') ||
-              (i >= '0' && i <= '9') ||
-              i == '_' || i == '-' || i == '\''))
-            return false;
-    return true;
+    char firstSymbol = s[0];
+    // Name cannot begin with a digit or a special character.
+    if (std::isdigit(firstSymbol) || firstSymbol == '-' || firstSymbol == '\'') return false;
+
+    return std::none_of(std::begin(s), std::end(s), isSymbolProhibited);
 }
 
 std::ostream &
