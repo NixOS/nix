@@ -1,4 +1,5 @@
 #include "fs-input-accessor.hh"
+#include "posix-source-accessor.hh"
 #include "store-api.hh"
 
 namespace nix {

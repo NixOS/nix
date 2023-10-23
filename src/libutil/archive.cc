@@ -14,7 +14,7 @@
 #include "archive.hh"
 #include "util.hh"
 #include "config.hh"
-#include "source-accessor.hh"
+#include "posix-source-accessor.hh"
 
 namespace nix {
 
