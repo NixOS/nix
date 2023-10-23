@@ -134,4 +134,50 @@ std::string NarInfo::to_string(const Store & store) const
     return res;
 }
 
+nlohmann::json NarInfo::toJSON(
+    const Store & store,
+    bool includeImpureInfo,
+    HashFormat hashFormat) const
+{
+    using nlohmann::json;
+
+    auto jsonObject = ValidPathInfo::toJSON(store, includeImpureInfo, hashFormat);
+
+    if (includeImpureInfo) {
+        if (!url.empty())
+            jsonObject["url"] = url;
+        if (fileHash)
+            jsonObject["downloadHash"] = fileHash->to_string(hashFormat, true);
+        if (fileSize)
+            jsonObject["downloadSize"] = fileSize;
+    }
+
+    return jsonObject;
+}
+
+NarInfo NarInfo::fromJSON(
+    const Store & store,
+    const StorePath & path,
+    const nlohmann::json & json)
+{
+    using nlohmann::detail::value_t;
+
+    NarInfo res { ValidPathInfo::fromJSON(store, json) };
+    res.path = path;
+
+    if (json.contains("url"))
+        res.url = ensureType(valueAt(json, "url"), value_t::string);
+
+    if (json.contains("downloadHash"))
+        res.fileHash = Hash::parseAny(
+            static_cast<const std::string &>(
+                ensureType(valueAt(json, "downloadHash"), value_t::string)),
+            std::nullopt);
+
+    if (json.contains("downloadSize"))
+        res.fileSize = ensureType(valueAt(json, "downloadSize"), value_t::number_integer);
+
+    return res;
+}
+
 }

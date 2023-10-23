@@ -1,5 +1,8 @@
+#include <nlohmann/json.hpp>
+
 #include "path-info.hh"
 #include "store-api.hh"
+#include "json-utils.hh"
 
 namespace nix {
 
@@ -142,6 +145,102 @@ ValidPathInfo::ValidPathInfo(
             };
         },
     }, std::move(ca).raw);
+}
+
+
+nlohmann::json ValidPathInfo::toJSON(
+    const Store & store,
+    bool includeImpureInfo,
+    HashFormat hashFormat) const
+{
+    using nlohmann::json;
+
+    auto jsonObject = json::object();
+
+    jsonObject["path"] = store.printStorePath(path);
+    jsonObject["valid"] = true;
+    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    jsonObject["narSize"] = narSize;
+
+    {
+        auto& jsonRefs = (jsonObject["references"] = json::array());
+        for (auto & ref : references)
+            jsonRefs.emplace_back(store.printStorePath(ref));
+    }
+
+    if (ca)
+        jsonObject["ca"] = renderContentAddress(ca);
+
+    if (includeImpureInfo) {
+        if (deriver)
+            jsonObject["deriver"] = store.printStorePath(*deriver);
+
+        if (registrationTime)
+            jsonObject["registrationTime"] = registrationTime;
+
+        if (ultimate)
+            jsonObject["ultimate"] = ultimate;
+
+        if (!sigs.empty()) {
+            for (auto & sig : sigs)
+                jsonObject["signatures"].push_back(sig);
+        }
+    }
+
+    return jsonObject;
+}
+
+ValidPathInfo ValidPathInfo::fromJSON(
+    const Store & store,
+    const nlohmann::json & json)
+{
+    using nlohmann::detail::value_t;
+
+    ValidPathInfo res {
+        StorePath(StorePath::dummy),
+        Hash(Hash::dummy),
+    };
+
+    ensureType(json, value_t::object);
+    res.path = store.parseStorePath(
+        static_cast<const std::string &>(
+            ensureType(valueAt(json, "path"), value_t::string)));
+    res.narHash = Hash::parseAny(
+        static_cast<const std::string &>(
+            ensureType(valueAt(json, "narHash"), value_t::string)),
+        std::nullopt);
+    res.narSize = ensureType(valueAt(json, "narSize"), value_t::number_integer);
+
+    try {
+        auto & references = ensureType(valueAt(json, "references"), value_t::array);
+        for (auto & input : references)
+            res.references.insert(store.parseStorePath(static_cast<const std::string &>
+(input)));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'references'");
+        throw;
+    }
+
+    if (json.contains("ca"))
+        res.ca = ContentAddress::parse(
+            static_cast<const std::string &>(
+                ensureType(valueAt(json, "ca"), value_t::string)));
+
+    if (json.contains("deriver"))
+        res.deriver = store.parseStorePath(
+            static_cast<const std::string &>(
+                ensureType(valueAt(json, "deriver"), value_t::string)));
+
+    if (json.contains("registrationTime"))
+        res.registrationTime = ensureType(valueAt(json, "registrationTime"), value_t::number_integer);
+
+    if (json.contains("ultimate"))
+        res.ultimate = ensureType(valueAt(json, "ultimate"), value_t::boolean);
+
+    if (json.contains("signatures"))
+        res.sigs = valueAt(json, "signatures");
+
+    return res;
 }
 
 }

@@ -125,6 +125,18 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
 
     Strings shortRefs() const;
 
+    /**
+     * @param includeImpureInfo If true, variable elements such as the
+     * registration time are included.
+     */
+    virtual nlohmann::json toJSON(
+        const Store & store,
+        bool includeImpureInfo,
+        HashFormat hashFormat) const;
+    static ValidPathInfo fromJSON(
+        const Store & store,
+        const nlohmann::json & json);
+
     ValidPathInfo(const ValidPathInfo & other) = default;
 
     ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(std::move(path)) { };

@@ -9,6 +9,74 @@
 #include <nlohmann/json.hpp>
 
 using namespace nix;
+using nlohmann::json;
+
+/**
+ * @return the total size of a set of store objects (specified by path),
+ * that is, the sum of the size of the NAR serialisation of each object
+ * in the set.
+ */
+static uint64_t getStoreObjectsTotalSize(Store & store, const StorePathSet & closure)
+{
+    uint64_t totalNarSize = 0;
+    for (auto & p : closure) {
+        totalNarSize += store.queryPathInfo(p)->narSize;
+    }
+    return totalNarSize;
+}
+
+
+/**
+ * Write a JSON representation of store object metadata, such as the
+ * hash and the references.
+ *
+ * @param showClosureSize If true, the closure size of each path is
+ * included.
+ */
+static json pathInfoToJSON(
+    Store & store,
+    const StorePathSet & storePaths,
+    bool showClosureSize)
+{
+    json::array_t jsonList = json::array();
+
+    for (auto & storePath : storePaths) {
+        try {
+            auto info = store.queryPathInfo(storePath);
+
+            auto & jsonPath = jsonList.emplace_back(
+                info->toJSON(store, true, HashFormat::SRI));
+
+            if (showClosureSize) {
+                StorePathSet closure;
+                store.computeFSClosure(storePath, closure, false, false);
+
+                jsonPath["closureSize"] = getStoreObjectsTotalSize(store, closure);
+
+                if (auto * narInfo = dynamic_cast<const NarInfo *>(&*info)) {
+                    uint64_t totalDownloadSize = 0;
+                    for (auto & p : closure) {
+                        auto depInfo = store.queryPathInfo(p);
+                        if (auto * depNarInfo = dynamic_cast<const NarInfo *>(&*depInfo))
+                            totalDownloadSize += depNarInfo->fileSize;
+                        else
+                            throw Error("Missing .narinfo for dep %s of %s",
+                                store.printStorePath(p),
+                                store.printStorePath(storePath));
+                    }
+                    jsonPath["closureDownloadSize"] = totalDownloadSize;
+                }
+            }
+
+        } catch (InvalidPath &) {
+            auto & jsonPath = jsonList.emplace_back(json::object());
+            jsonPath["path"] = store.printStorePath(storePath);
+            jsonPath["valid"] = false;
+        }
+    }
+    return jsonList;
+}
+
 
 struct CmdPathInfo : StorePathsCommand, MixJSON
 {
@@ -87,10 +155,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            std::cout << store->pathInfoToJSON(
+            std::cout << pathInfoToJSON(
+                *store,
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                true, showClosureSize, HashFormat::SRI, AllowInvalid).dump();
+                showClosureSize).dump();
         }
 
         else {
@@ -107,8 +176,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 if (showSize)
                     printSize(info->narSize);
 
-                if (showClosureSize)
-                    printSize(store->getClosureSize(info->path).first);
+                if (showClosureSize) {
+                    StorePathSet closure;
+                    store->computeFSClosure(storePath, closure, false, false);
+                    printSize(getStoreObjectsTotalSize(*store, closure));
+                }
 
                 if (showSigs) {
                     std::cout << '\t';
