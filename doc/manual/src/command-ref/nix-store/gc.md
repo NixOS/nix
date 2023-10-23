@@ -59,7 +59,7 @@ number of bytes that would be freed.
 
 # Examples
 
-To delete all unreachable paths, just do:
+Delete all unreachable paths:
 
 ```console
 $ nix-store --gc
@@ -68,7 +68,7 @@ deleting `/nix/store/kq82idx6g0nyzsp2s14gfsc38npai7lf-cairo-1.0.4.tar.gz.drv'
 8825586 bytes freed (8.42 MiB)
 ```
 
-To delete at least 100 MiBs of unreachable paths:
+Delete at least 100 MiBs of unreachable paths:
 
 ```console
 $ nix-store --gc --max-freed $((100 * 1024 * 1024))
