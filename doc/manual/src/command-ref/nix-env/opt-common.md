@@ -14,10 +14,17 @@ The following options are allowed for all `nix-env` operations, but may not alwa
     top-level directory containing at least a file named `default.nix`.
 
   - `--profile` / `-p` *path*\
-    Specifies the profile to be used by those operations that operate on
-    a profile (designated below as the *active profile*). A profile is a
-    sequence of user environments called *generations*, one of which is
-    the *current generation*.
+    Specifies the profile to be used by those operations that operate on a profile, called the *active profile*.
+    This will *not* change the `~/.nix-profile` symlink.
+
+    > **Example**
+    >
+    > ```console
+    > $ nix-env --profile /nix/var/nix/profiles/other-profile --install --attr nixpkgs.subversion
+    > ```
+
+    Be careful about storing a profile in another location than the [profiles directory](@docroot@/command-ref/files/profiles.md), since otherwise it might not be
+    used as a root of the [garbage collector](@docroot@/command-ref/nix-store/gc).
 
   - `--dry-run`\
     For the `--install`, `--upgrade`, `--uninstall`,

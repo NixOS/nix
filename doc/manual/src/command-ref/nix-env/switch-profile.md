@@ -8,8 +8,10 @@
 
 # Description
 
-This operation makes *path* the current profile for the user. That is,
-the symlink `~/.nix-profile` is made to point to *path*.
+This operation makes *path* the current profile for the user.
+That is, the symlink `~/.nix-profile` is made to point to *path*.
+
+If the profile doesn’t exist, it will be created automatically.
 
 {{#include ./opt-common.md}}
 
@@ -22,5 +24,9 @@ the symlink `~/.nix-profile` is made to point to *path*.
 # Examples
 
 ```console
+$ nix-env --switch-profile /nix/var/nix/profiles/my-profile
+
+$ nix-env --switch-profile /nix/var/nix/profiles/default
+
 $ nix-env --switch-profile ~/my-profile
 ```

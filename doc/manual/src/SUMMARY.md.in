@@ -17,7 +17,6 @@
   - [Upgrading Nix](installation/upgrading.md)
   - [Uninstalling Nix](installation/uninstall.md)
 - [Package Management](package-management/package-management.md)
-  - [Profiles](package-management/profiles.md)
   - [Garbage Collection](package-management/garbage-collection.md)
     - [Garbage Collector Roots](package-management/garbage-collector-roots.md)
   - [Sharing Packages Between Machines](package-management/sharing-packages.md)
