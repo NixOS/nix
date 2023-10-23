@@ -32,14 +32,13 @@ Instead, it looks in a few locations, and acts on all profiles it finds there:
 
 1. The default profile locations as specified in the [profiles] section of the manual.
 
-2. > **NOTE**
-   >
-   > Not stable; subject to change
-   >
-   > Do not rely on this functionality; it just exists for migration purposes and is may change in the future.
-   > These deprecated paths remain a private implementation detail of Nix.
+2. `$NIX_STATE_DIR/profiles` and `$NIX_STATE_DIR/profiles/per-user`
 
-   `$NIX_STATE_DIR/profiles` and `$NIX_STATE_DIR/profiles/per-user`.
+   > **Warning**
+   >
+   > Do not rely on this functionality!
+   > It only exists for migration purposes and may change in the future.
+   > These deprecated paths remain a private implementation detail of Nix.
 
    With the exception of `$NIX_STATE_DIR/profiles/per-user/root` and `$NIX_STATE_DIR/profiles/default`, these directories are no longer used by other commands.
    `nix-collect-garbage` looks there anyways in order to clean up profiles from older versions of Nix.
