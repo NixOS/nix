@@ -296,7 +296,7 @@ struct Command : virtual public Args
 {
     friend class MultiCommand;
 
-    virtual ~Command() { }
+    virtual ~Command() = default;
 
     /**
      * Entry point to the command
