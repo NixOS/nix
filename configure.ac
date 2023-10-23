@@ -223,6 +223,8 @@ AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 
+# Look for libzstd.
+PKG_CHECK_MODULES([LIBZSTD], [libzstd], [CXXFLAGS="$LIBZSTD_CFLAGS $CXXFLAGS"])
 
 # Look for libseccomp, required for Linux sandboxing.
 case "$host_os" in
