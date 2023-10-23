@@ -83,7 +83,7 @@ Your account will need an IAM policy to support uploading to the bucket:
 }
 ```
 
-#### Examples
+### Examples
 
 With bucket policies and authentication set up as described above, uploading works via [`nix copy`](@docroot@/command-ref/new-cli/nix3-copy.md) (experimental).
 
