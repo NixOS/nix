@@ -9,10 +9,11 @@ Store derivations are used internally by Nix. They are store paths with
 extension `.drv` that represent the build-time dependency graph to which
 a Nix expression evaluates.
 
-[store derivation]: ../../glossary.md#gloss-store-derivation
 
-The JSON format is documented under the [`derivation show`] command.
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
-[`derivation show`]: ./nix3-derivation-show.md
+`nix derivation add` takes a single derivation in the following format:
+
+{{#include ../../json/derivation.md}}
 
 )""
