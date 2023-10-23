@@ -10,7 +10,7 @@
 
 Without additional flags, the operation `--gc` performs a garbage
 collection on the Nix store. That is, all paths in the Nix store not
-reachable via file system references from a set of “roots”, are deleted.
+reachable via file system references from a set of gargbage collection roots, are deleted.
 
 The following suboperations may be specified:
 
