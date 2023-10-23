@@ -15,15 +15,13 @@ enum HashType : char;
 
 class MultiCommand;
 
+class RootArgs;
+
+class AddCompletions;
+
 class Args
 {
 public:
-
-    /**
-     * Parse the command line, throwing a UsageError if something goes
-     * wrong.
-     */
-    void parseCmdline(const Strings & cmdline);
 
     /**
      * Return a short one-line description of the command.
@@ -124,6 +122,25 @@ protected:
     };
 
     /**
+     * The basic function type of the completion callback.
+     *
+     * Used to define `CompleterClosure` and some common case completers
+     * that individual flags/arguments can use.
+     *
+     * The `AddCompletions` that is passed is an interface to the state
+     * stored as part of the root command
+     */
+    typedef void CompleterFun(AddCompletions &, size_t, std::string_view);
+
+    /**
+     * The closure type of the completion callback.
+     *
+     * This is what is actually stored as part of each Flag / Expected
+     * Arg.
+     */
+    typedef std::function<CompleterFun> CompleterClosure;
+
+    /**
      * Description of flags / options
      *
      * These are arguments like `-s` or `--long` that can (mostly)
@@ -140,7 +157,7 @@ protected:
         std::string category;
         Strings labels;
         Handler handler;
-        std::function<void(size_t, std::string_view)> completer;
+        CompleterClosure completer;
 
         std::optional<ExperimentalFeature> experimentalFeature;
 
@@ -177,7 +194,7 @@ protected:
         std::string label;
         bool optional = false;
         Handler handler;
-        std::function<void(size_t, std::string_view)> completer;
+        CompleterClosure completer;
     };
 
     /**
@@ -210,13 +227,6 @@ protected:
      * argument (if any) have been processed.
      */
     virtual void initialFlagsProcessed() {}
-
-    /**
-     * Called after the command line has been processed if we need to generate
-     * completions. Useful for commands that need to know the whole command line
-     * in order to know what completions to generate.
-     */
-    virtual void completionHook() { }
 
 public:
 
@@ -252,24 +262,30 @@ public:
         });
     }
 
+    static CompleterFun completePath;
+
+    static CompleterFun completeDir;
+
     virtual nlohmann::json toJSON();
 
     friend class MultiCommand;
 
     /**
      * The parent command, used if this is a subcommand.
+     *
+     * Invariant: An Args with a null parent must also be a RootArgs
+     *
+     * \todo this would probably be better in the CommandClass.
+     * getRoot() could be an abstract method that peels off at most one
+     * layer before recuring.
      */
     MultiCommand * parent = nullptr;
 
-private:
-
     /**
-     * Experimental features needed when parsing args. These are checked
-     * after flag parsing is completed in order to support enabling
-     * experimental features coming after the flag that needs the
-     * experimental feature.
+     * Traverse parent pointers until we find the \ref RootArgs "root
+     * arguments" object.
      */
-    std::set<ExperimentalFeature> flagExperimentalFeatures;
+    RootArgs & getRoot();
 };
 
 /**
@@ -320,8 +336,6 @@ public:
 
     bool processArgs(const Strings & args, bool finish) override;
 
-    void completionHook() override;
-
     nlohmann::json toJSON() override;
 };
 
@@ -333,21 +347,40 @@ struct Completion {
 
     bool operator<(const Completion & other) const;
 };
-class Completions : public std::set<Completion> {
+
+/**
+ * The abstract interface for completions callbacks
+ *
+ * The idea is to restrict the callback so it can only add additional
+ * completions to the collection, or set the completion type. By making
+ * it go through this interface, the callback cannot make any other
+ * changes, or even view the completions / completion type that have
+ * been set so far.
+ */
+class AddCompletions
+{
 public:
-    void add(std::string completion, std::string description = "");
+
+    /**
+     * The type of completion we are collecting.
+     */
+    enum class Type {
+        Normal,
+        Filenames,
+        Attrs,
+    };
+
+    /**
+     * Set the type of the completions being collected
+     *
+     * \todo it should not be possible to change the type after it has been set.
+     */
+    virtual void setType(Type type) = 0;
+
+    /**
+     * Add a single completion to the collection
+     */
+    virtual void add(std::string completion, std::string description = "") = 0;
 };
-extern std::shared_ptr<Completions> completions;
-
-enum CompletionType {
-    ctNormal,
-    ctFilenames,
-    ctAttrs
-};
-extern CompletionType completionType;
-
-void completePath(size_t, std::string_view prefix);
-
-void completeDir(size_t, std::string_view prefix);
 
 }

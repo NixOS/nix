@@ -175,8 +175,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
             .label = "locked",
             .optional = true,
             .handler = {&locked},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(getStore(), prefix);
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(completions, getStore(), prefix);
             }}
         });
     }

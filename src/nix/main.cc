@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "args/root.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
@@ -56,7 +57,7 @@ static bool haveInternet()
 
 std::string programPath;
 
-struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
+struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
 {
     bool useNet = true;
     bool refresh = false;
@@ -241,10 +242,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
 static NixArgs & getNixArgs(Command & cmd)
 {
-    assert(cmd.parent);
-    MultiCommand * toplevel = cmd.parent;
-    while (toplevel->parent) toplevel = toplevel->parent;
-    return dynamic_cast<NixArgs &>(*toplevel);
+    return dynamic_cast<NixArgs &>(cmd.getRoot());
 }
 
 struct CmdHelp : Command
@@ -412,16 +410,16 @@ void mainWrapped(int argc, char * * argv)
 
     Finally printCompletions([&]()
     {
-        if (completions) {
-            switch (completionType) {
-            case ctNormal:
+        if (args.completions) {
+            switch (args.completions->type) {
+            case Completions::Type::Normal:
                 logger->cout("normal"); break;
-            case ctFilenames:
+            case Completions::Type::Filenames:
                 logger->cout("filenames"); break;
-            case ctAttrs:
+            case Completions::Type::Attrs:
                 logger->cout("attrs"); break;
             }
-            for (auto & s : *completions)
+            for (auto & s : args.completions->completions)
                 logger->cout(s.completion + "\t" + trim(s.description));
         }
     });
@@ -429,7 +427,7 @@ void mainWrapped(int argc, char * * argv)
     try {
         args.parseCmdline(argvToStrings(argc, argv));
     } catch (UsageError &) {
-        if (!args.helpRequested && !completions) throw;
+        if (!args.helpRequested && !args.completions) throw;
     }
 
     if (args.helpRequested) {
@@ -446,10 +444,7 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
-    if (completions) {
-        args.completionHook();
-        return;
-    }
+    if (args.completions) return;
 
     if (args.showVersion) {
         printVersion(programName);

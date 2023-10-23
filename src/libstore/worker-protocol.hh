@@ -31,6 +31,8 @@ struct Source;
 struct DerivedPath;
 struct BuildResult;
 struct KeyedBuildResult;
+struct ValidPathInfo;
+struct UnkeyedValidPathInfo;
 enum TrustedFlag : bool;
 
 
@@ -205,6 +207,10 @@ template<>
 DECLARE_WORKER_SERIALISER(BuildResult);
 template<>
 DECLARE_WORKER_SERIALISER(KeyedBuildResult);
+template<>
+DECLARE_WORKER_SERIALISER(ValidPathInfo);
+template<>
+DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
 template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
 

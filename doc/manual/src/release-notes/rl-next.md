@@ -12,4 +12,6 @@
 
 - Introduce a new built-in function [`builtins.convertHash`](@docroot@/language/builtins.md#builtins-convertHash).
 
+- `nix-shell` shebang lines now support single-quoted arguments.
+
 - `builtins.fetchTree` is now marked as stable.
