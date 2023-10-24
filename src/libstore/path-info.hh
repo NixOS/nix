@@ -29,7 +29,7 @@ struct SubstitutablePathInfo
     uint64_t narSize;
 };
 
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
+using SubstitutablePathInfos = std::map<StorePath, SubstitutablePathInfo>;
 
 
 struct UnkeyedValidPathInfo
@@ -136,6 +136,6 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
     virtual ~ValidPathInfo() { }
 };
 
-typedef std::map<StorePath, ValidPathInfo> ValidPathInfos;
+using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 
 }
