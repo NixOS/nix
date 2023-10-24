@@ -9,7 +9,7 @@
 
 #include <memory>
 
-namespace nix { class Store; class StorePath; }
+namespace nix { class Store; class StorePath; struct InputAccessor; }
 
 namespace nix::fetchers {
 
@@ -148,7 +148,9 @@ struct InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
-    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
+    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input);
+
+    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const;
 
     /**
      * Is this `InputScheme` part of an experimental feature?
