@@ -6,10 +6,6 @@ libfindroots_DIR := $(d)/lib
 
 libfindroots_SOURCES := $(wildcard $(d)/lib/*.cc)
 
-ifdef HOST_DARWIN
-libfindroots_LDFLAGS += -lc++fs
-endif
-
 programs += nix-find-roots
 
 nix-find-roots_DIR := $(d)
