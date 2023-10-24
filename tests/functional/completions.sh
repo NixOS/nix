@@ -44,6 +44,10 @@ EOF
 # Input override completion
 [[ "$(NIX_GET_COMPLETIONS=4 nix build ./foo --override-input '')" == $'normal\na\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=5 nix flake show ./foo --override-input '')" == $'normal\na\t' ]]
+cd ./foo
+[[ "$(NIX_GET_COMPLETIONS=3 nix flake update '')" == $'normal\na\t' ]]
+cd ..
+[[ "$(NIX_GET_COMPLETIONS=5 nix flake update --flake './foo' '')" == $'normal\na\t' ]]
 ## With multiple input flakes
 [[ "$(NIX_GET_COMPLETIONS=5 nix build ./foo ./bar --override-input '')" == $'normal\na\t\nb\t' ]]
 ## With tilde expansion
