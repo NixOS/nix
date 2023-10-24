@@ -44,8 +44,11 @@ bool isReservedKeyword(const std::string_view str)
 }
 
 // Returns 'true' if the character is a symbol that can't be used in a variable name.
-bool isSymbolProhibited(const char& symbol) {
-    bool symbolAllowed = (std::isalnum(symbol) || symbol == '_' || symbol == '-'|| symbol == '\'');
+bool isSymbolProhibited(const char & symbol) {
+    bool symbolAllowed =
+        ((symbol >= 'a' && symbol <= 'z') || (symbol >= 'A' && symbol <= 'Z') ||
+         (symbol >= '0' && symbol <= '9') || symbol == '_' || symbol == '\'' ||
+         symbol == '-');
     return !symbolAllowed;
 }
 
@@ -63,7 +66,8 @@ printIdentifier(std::ostream & str, std::string_view s) {
 
     char firstSymbol = s[0];
     // Name can only begin with a letter or an underscore.
-    if (!(std::isalpha(firstSymbol) || firstSymbol == '_')) {
+    if (!((firstSymbol >= 'a' && firstSymbol <= 'z') ||
+          (firstSymbol >= 'A' && firstSymbol <= 'Z') || firstSymbol == '_')) {
         printLiteralString(str, s);
         return str;
     }
@@ -83,7 +87,9 @@ static bool isVarName(std::string_view s)
     if (isReservedKeyword(s)) return false;
     char firstSymbol = s[0];
     // Name cannot begin with a digit or a special character.
-    if (std::isdigit(firstSymbol) || firstSymbol == '-' || firstSymbol == '\'') return false;
+    if ((firstSymbol >= '0' && firstSymbol <= '9') || firstSymbol == '-' ||
+        firstSymbol == '\'')
+        return false;
 
     return std::none_of(std::begin(s), std::end(s), isSymbolProhibited);
 }
