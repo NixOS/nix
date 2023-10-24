@@ -24,15 +24,29 @@ struct TracerConfig {
     std::function<void(std::string_view msg)> debug = logNone;
 };
 
-/*
+/**
  * A value of type `Roots` is a mapping from a store path to the set of roots that keep it alive
  */
 typedef map<fs::path, std::set<fs::path>> Roots;
+
 struct TraceResult {
     Roots storeRoots;
     set<fs::path> deadLinks;
 };
 
+/**
+ * Return the set of all the store paths that are reachable from the given set
+ * of filesystem paths, by:
+ * - descending into the directories
+ * - following the symbolic links (at most twice)
+ * - reading the name of regular files (when encountering a file
+ *   `/foo/bar/abcdef`, the algorithm will try to access `/nix/store/abcdef`)
+ *
+ * Also returns the set of all dead links encountered during the process (so
+ * that they can be removed if it makes sense).
+ */
 TraceResult traceStaticRoots(TracerConfig opts, set<fs::path> initialRoots);
+
 Roots getRuntimeRoots(TracerConfig opts);
+
 }

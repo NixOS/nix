@@ -1,4 +1,6 @@
-/*
+/**
+ * @file
+ *
  * A very simple utility to trace all the gc roots through the file-system
  * The reason for this program is that tracing these roots is the only part of
  * Nix that requires to run as root (because it requires reading through the
@@ -21,22 +23,22 @@ namespace nix::roots_tracer {
 namespace fs = std::filesystem;
 using std::set, std::string;
 
-string quoteRegexChars(const string & raw)
+static string quoteRegexChars(const string & raw)
 {
     static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
     return std::regex_replace(raw, specialRegex, R"(\$&)");
 }
-std::regex storePathRegex(const fs::path storeDir)
+static std::regex storePathRegex(const fs::path storeDir)
 {
     return std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
 }
 
-bool isInStore(fs::path storeDir, fs::path dir)
+static bool isInStore(fs::path storeDir, fs::path dir)
 {
     return (std::search(dir.begin(), dir.end(), storeDir.begin(), storeDir.end()) == dir.begin());
 }
 
-void traceStaticRoot(
+static void traceStaticRoot(
     const TracerConfig & opts,
     int recursionsLeft,
     TraceResult & res,
@@ -101,7 +103,7 @@ void traceStaticRoot(
     }
 }
 
-void traceStaticRoot(
+static void traceStaticRoot(
     const TracerConfig & opts,
     int recursionsLeft,
     TraceResult & res,
@@ -115,17 +117,6 @@ void traceStaticRoot(
     }
 }
 
-/*
- * Return the set of all the store paths that are reachable from the given set
- * of filesystem paths, by:
- * - descending into the directories
- * - following the symbolic links (at most twice)
- * - reading the name of regular files (when encountering a file
- *   `/foo/bar/abcdef`, the algorithm will try to access `/nix/store/abcdef`)
- *
- * Also returns the set of all dead links encountered during the process (so
- * that they can be removed if it makes sense).
- */
 TraceResult traceStaticRoots(TracerConfig opts, set<fs::path> roots)
 {
     int maxRecursionLevel = 2;
@@ -140,7 +131,7 @@ TraceResult traceStaticRoots(TracerConfig opts, set<fs::path> roots)
  * like a store path (i.e. that matches `storePathRegex(opts.storeDir)`) and add them
  * to `res`
  */
-void scanFileContent(const TracerConfig & opts, const fs::path & fileToScan, Roots & res)
+static void scanFileContent(const TracerConfig & opts, const fs::path & fileToScan, Roots & res)
 {
     if (!fs::exists(fileToScan))
         return;
@@ -164,7 +155,7 @@ void scanFileContent(const TracerConfig & opts, const fs::path & fileToScan, Roo
  * Scan the content of a `/proc/[pid]/maps` file for regions that are mmaped to
  * a store path
  */
-void scanMapsFile(const TracerConfig & opts, const fs::path & mapsFile, Roots & res)
+static void scanMapsFile(const TracerConfig & opts, const fs::path & mapsFile, Roots & res)
 {
     if (!fs::exists(mapsFile))
         return;
