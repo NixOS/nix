@@ -20,8 +20,17 @@
     # But put Nix on the path anyways
     environment.systemPackages = [ pkgs.nix ];
 
-    # And install the unit fies for nix-gc-trace
-    systemd.packages = [ pkgs.nix ];
+    # And install the unit files:
+    #
+    # - nix-gc-trace system-wide
+    # - nix-daemon per-user
+    systemd.packages = [
+       (pkgs.runCommand "shuffled-nix-systemd-unit-files" {} ''
+         mkdir -p $out/lib/systemd/{system,user}
+         ln -s ${pkgs.nix}/lib/systemd/system/nix-gc-trace.* $out/lib/systemd/system
+         ln -s ${pkgs.nix}/lib/systemd/system/nix-daemon.* $out/lib/systemd/user
+       '')
+    ];
 
     # And prepare the socket dirs anyways
     systemd.tmpfiles.rules = [
@@ -44,13 +53,16 @@
       '';
     };
 
-    # systemd.user.sockets.nix-daemon = {
-    # };
-    # systemd.user.services.nix-daemon = {
-    #   path = [ pkgs.nix ];
-    #   description = "Nix Daemon (non-root)";
-    #   unitConfig.ConditionUser = "nix-daemon";
-    # };
+    systemd.user.sockets.nix-daemon = {
+    };
+    systemd.user.services.nix-daemon = {
+      path = [ pkgs.nix ];
+      description = "Nix Daemon (non-root)";
+      unitConfig.ConditionUser = "nix-daemon";
+      # Make sure we do not get a "fork bomb" of the daemon trying to
+      # connect to itself.
+      serviceConfig.Environment= "NIX_REMOTE=local";
+    };
 
     systemd.sockets.nix-gc-trace = {
       restartTriggers = [ config.environment.etc."nix/nix.conf".source ];
@@ -82,39 +94,6 @@
     import re
 
     machine.wait_for_unit("multi-user.target")
-
-  ''
-
-  # Set up the *user* nix-daemon unit files.
-  #
-  # TODO Once https://github.com/NixOS/nixpkgs/issues/263248 is fixed we
-  # can do this declaratively without reinventing the wheel.
-  + ''
-    machine.succeed("""
-    su --shell=/run/current-system/sw/bin/bash --login nix-daemon -c "$(cat <<'EOF'
-      set -ex
-      export PS4='+(''${BASH_SOURCE[0]-$0}:$LINENO) '
-
-      src_dir=${pkgs.nix}/lib/systemd/system
-
-      unit_dir=$HOME/.config/systemd/user
-      mkdir -p "$unit_dir"
-      cd "$unit_dir"
-
-      # Make sure we do not get a "daemon fork bomb" of the daemon
-      # trying to connect to itself.
-      cp --no-preserve=mode "$src_dir/nix-daemon.service" ./
-      patch -p1 < ${./no-systemd-unit-fork-bomb.patch}
-
-      ln -sf "$src_dir/nix-daemon.socket" ./
-    EOF
-    )"
-    """)
-
-    (c, _) = machine.systemctl(
-      "daemon-reload",
-      user="nix-daemon")
-    assert c == 0
 
   ''
 
