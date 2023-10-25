@@ -11,7 +11,6 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
-#include "local-overlay-store.hh"
 // FIXME this should not be here, see TODO below on
 // `addMultipleToStore`.
 #include "worker-protocol.hh"
@@ -1456,10 +1455,6 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
         return std::make_shared<UDSRemoteStore>(params);
     } else if (uri == "local") {
         return std::make_shared<LocalStore>(params);
-    } else if (uri == "local-overlay") {
-        auto store = std::make_shared<LocalOverlayStore>(params);
-        experimentalFeatureSettings.require(store->experimentalFeature());
-        return store;
     } else if (isNonUriPath(uri)) {
         Store::Params params2 = params;
         params2["root"] = absPath(uri);

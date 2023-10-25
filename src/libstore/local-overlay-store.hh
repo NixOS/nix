@@ -90,15 +90,18 @@ public:
     LocalOverlayStore(std::string scheme, std::string path, const Params & params)
         : LocalOverlayStore(params)
     {
-        throw UnimplementedError("LocalOverlayStore");
+        if (!path.empty())
+            throw UsageError("local-overlay:// store url doesn't support path part, only scheme and query params");
     }
 
     static std::set<std::string> uriSchemes()
-    { return {}; }
+    {
+        return { "local-overlay" };
+    }
 
     std::string getUri() override
     {
-        return "local-overlay";
+        return "local-overlay://";
     }
 
 private:

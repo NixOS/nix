@@ -29,7 +29,7 @@ storeDirs () {
   storeA="$storeVolume/store-a"
   storeBTop="$storeVolume/store-b"
   storeBRoot="$storeVolume/merged-store"
-  storeB="local-overlay?root=$storeBRoot&lower-store=$storeA&upper-layer=$storeBTop"
+  storeB="local-overlay://?root=$storeBRoot&lower-store=$storeA&upper-layer=$storeBTop"
   # Creating testing directories
   mkdir -p "$storeVolume"/{store-a/nix/store,store-b,merged-store/nix/store,workdir}
 }
