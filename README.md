@@ -16,7 +16,7 @@ Full reference documentation can be found in the [Nix manual](https://nixos.org/
 ## Building And Developing
 
 See our [Hacking guide](https://nixos.org/manual/nix/unstable/contributing/hacking.html) in our manual for instruction on how to
-to set up a development environment and build Nix from source.
+ set up a development environment and build Nix from source.
 
 ## Contributing
 

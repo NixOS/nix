@@ -31,11 +31,29 @@ let
       (builtins.unsafeDiscardStringContext str)
       (builtins.getContext str);
 
+  # Only holds true if string context contains both a `DrvDeep` and
+  # `Opaque` element.
+  almostEtaRule = str:
+    str == builtins.addDrvOutputDependencies
+      (builtins.unsafeDiscardOutputDependency str);
+
+  addDrvOutputDependencies_idempotent = str:
+    builtins.addDrvOutputDependencies str ==
+    builtins.addDrvOutputDependencies (builtins.addDrvOutputDependencies str);
+
+  rules = str: [
+    (etaRule str)
+    (almostEtaRule str)
+    (addDrvOutputDependencies_idempotent str)
+  ];
+
 in [
   (legit-context == desired-context)
   (reconstructed-path == combo-path)
   (etaRule "foo")
-  (etaRule drv.drvPath)
   (etaRule drv.foo.outPath)
-  (etaRule (builtins.unsafeDiscardOutputDependency drv.drvPath))
+] ++ builtins.concatMap rules [
+  drv.drvPath
+  (builtins.addDrvOutputDependencies drv.drvPath)
+  (builtins.unsafeDiscardOutputDependency drv.drvPath)
 ]
