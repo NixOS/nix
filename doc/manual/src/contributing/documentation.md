@@ -151,6 +151,24 @@ Please observe these guidelines to ease reviews:
   > This is a note.
   ```
 
+  Highlight examples as such:
+
+  ````
+  > **Example**
+  >
+  > ```console
+  > $ nix --version
+  > ```
+  ````
+
+  Highlight syntax definiions as such, using [EBNF](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) notation:
+
+  ````
+  > **Syntax**
+  >
+  > *attribute-set* = `{` [ *attribute-name* `=` *expression* `;` ... ] `}`
+  ````
+
 ### The `@docroot@` variable
 
 `@docroot@` provides a base path for links that occur in reusable snippets or other documentation that doesn't have a base path of its own.
