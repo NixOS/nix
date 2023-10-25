@@ -28,6 +28,7 @@ Requires: curl
 Requires: bzip2
 Requires: gzip
 Requires: xz
+Requires: zstd
 BuildRequires: bison
 BuildRequires: boost-devel >= 1.60
 BuildRequires: bzip2-devel
