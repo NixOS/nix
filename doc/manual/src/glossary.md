@@ -59,7 +59,7 @@
 - [store]{#gloss-store}
 
   A collection of store objects, with operations to manipulate that collection.
-  See [Nix Store] for details.
+  See [Nix store](./store/index.md) for details.
 
   There are many types of stores.
   See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md) for a complete list.
