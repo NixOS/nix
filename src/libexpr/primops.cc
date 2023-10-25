@@ -121,13 +121,15 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        StringMap rewrites = state.realiseContext(context);
-
-        auto realPath = state.rootPath(CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context)));
+        if (!context.empty()) {
+            auto rewrites = state.realiseContext(context);
+            auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
+            return {path.accessor, CanonPath(realPath)};
+        }
 
         return flags.checkForPureEval
-            ? state.checkSourcePath(realPath)
-            : realPath;
+            ? state.checkSourcePath(path)
+            : path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -202,18 +204,12 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , CanonPath::root), **state.vImportedDrvToDerivation);
+                , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
         }
 
         state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
         v.mkApp(*state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
-    }
-
-    else if (path2 == corepkgsPrefix + "fetchurl.nix") {
-        state.eval(state.parseExprFromString(
-            #include "fetchurl.nix.gen.hh"
-            , CanonPath::root), v);
     }
 
     else {
@@ -599,7 +595,10 @@ struct CompareValues
                 case nString:
                     return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
-                    return strcmp(v1->_path, v2->_path) < 0;
+                    // Note: we don't take the accessor into account
+                    // since it's not obvious how to compare them in a
+                    // reproducible way.
+                    return strcmp(v1->_path.path, v2->_path.path) < 0;
                 case nList:
                     // Lexicographic comparison
                     for (size_t i = 0;; i++) {
@@ -1493,7 +1492,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
         }));
 
     NixStringContext context;
-    auto path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to builtins.storePath")).path;
+    auto path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'")).path;
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -2211,7 +2210,7 @@ static void addPath(
 
         path = evalSettings.pureEval && expectedHash
             ? path
-            : state.checkSourcePath(CanonPath(path)).path.abs();
+            : state.checkSourcePath(state.rootPath(CanonPath(path))).path.abs();
 
         PathFilter filter = filterFun ? ([&](const Path & path) {
             auto st = lstat(path);
@@ -2244,9 +2243,7 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            StorePath dstPath = settings.readOnlyMode
-                ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs);
+            auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, method, &filter, state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
@@ -2263,7 +2260,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
 {
     NixStringContext context;
     auto path = state.coerceToPath(pos, *args[1], context,
-        "while evaluating the second argument (the path to filter) passed to builtins.filterSource");
+        "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
     addPath(state, pos, path.baseName(), path.path.abs(), args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
@@ -3723,10 +3720,11 @@ static RegisterPrimOp primop_substring({
     .doc = R"(
       Return the substring of *s* from character position *start*
       (zero-based) up to but not including *start + len*. If *start* is
-      greater than the length of the string, an empty string is returned,
-      and if *start + len* lies beyond the end of the string, only the
-      substring up to the end of the string is returned. *start* must be
-      non-negative. For example,
+      greater than the length of the string, an empty string is returned.
+      If *start + len* lies beyond the end of the string or *len* is `-1`,
+      only the substring up to the end of the string is returned.
+      *start* must be non-negative.
+      For example,
 
       ```nix
       builtins.substring 0 3 "nixos"
@@ -4545,12 +4543,7 @@ void EvalState::createBaseEnv()
 
     /* Note: we have to initialize the 'derivation' constant *after*
        building baseEnv/staticBaseEnv because it uses 'builtins'. */
-    char code[] =
-        #include "primops/derivation.nix.gen.hh"
-        // the parser needs two NUL bytes as terminators; one of them
-        // is implied by being a C string.
-        "\0";
-    eval(parse(code, sizeof(code), derivationInternal, {CanonPath::root}, staticBaseEnv), *vDerivation);
+    evalFile(derivationInternal, *vDerivation);
 }
 
 

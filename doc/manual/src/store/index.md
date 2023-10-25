@@ -1,7 +1,7 @@
-# Store
+# Nix Store
 
-A Nix store is a collection of *store objects* with references between them.
-It supports operations to manipulate that collection.
+The *Nix store* is an abstraction used by Nix to store immutable filesystem artifacts (such as software packages) that can have dependencies (*references*) between them.
+There are multiple implementations of the Nix store, such as the actual filesystem (`/nix/store`) and binary caches.
 
 The following concept map is a graphical outline of this chapter.
 Arrows indicate suggested reading order.

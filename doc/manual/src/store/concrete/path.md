@@ -30,7 +30,7 @@ store directory            digest                 name
 
 ## Store Directory
 
-Every [store](./concrete.md) has a store directory.
+Every [store](./index.md) has a store directory.
 
 If the store has a file system representation, this directory contains the store’s [file system objects](./object.md), which can be addressed by [store paths](#store-path).
 

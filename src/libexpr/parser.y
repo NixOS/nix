@@ -520,7 +520,7 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(std::move(path));
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   | HPATH {
     if (evalSettings.pureEval) {
@@ -530,7 +530,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(std::move(path));
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   ;
 
@@ -649,6 +649,8 @@ formal
 #include "tarball.hh"
 #include "store-api.hh"
 #include "flake/flake.hh"
+#include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
 
 
 namespace nix {
@@ -756,11 +758,11 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
         auto r = *rOpt;
 
         Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return CanonPath(canonPath(res));
+        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
     }
 
     if (hasPrefix(path, "nix/"))
-        return CanonPath(concatStrings(corepkgsPrefix, path.substr(4)));
+        return {corepkgsFS, CanonPath(path.substr(3))};
 
     debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval

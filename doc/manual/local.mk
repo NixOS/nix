@@ -32,7 +32,7 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
+nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix=doc/manual --store dummy:// --impure --raw
 
 # re-implement mdBook's include directive to make it usable for terminal output and for proper @docroot@ substitution
 define process-includes
@@ -125,7 +125,7 @@ $(d)/src/command-ref/experimental-features-shortlist.md: $(d)/xp-features.json $
 	@mv $@.tmp $@
 
 $(d)/xp-features.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-xp-features > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-xp-features > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/language/builtins.md: $(d)/language.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
@@ -141,7 +141,7 @@ $(d)/src/language/builtin-constants.md: $(d)/language.json $(d)/generate-builtin
 	@mv $@.tmp $@
 
 $(d)/language.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-language > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-language > $@.tmp
 	@mv $@.tmp $@
 
 # Generate the HTML manual.

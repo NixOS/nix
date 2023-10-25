@@ -310,7 +310,7 @@ namespace nix {
         ASSERT_TRACE2("storePath true",
                       TypeError,
                       hintfmt("cannot coerce %s to a string", "a Boolean"),
-                      hintfmt("while evaluating the first argument passed to builtins.storePath"));
+                      hintfmt("while evaluating the first argument passed to 'builtins.storePath'"));
 
     }
 
@@ -378,12 +378,12 @@ namespace nix {
         ASSERT_TRACE2("filterSource [] []",
                       TypeError,
                       hintfmt("cannot coerce %s to a string", "a list"),
-                      hintfmt("while evaluating the second argument (the path to filter) passed to builtins.filterSource"));
+                      hintfmt("while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'"));
 
         ASSERT_TRACE2("filterSource [] \"foo\"",
                       EvalError,
                       hintfmt("string '%s' doesn't represent an absolute path", "foo"),
-                      hintfmt("while evaluating the second argument (the path to filter) passed to builtins.filterSource"));
+                      hintfmt("while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'"));
 
         ASSERT_TRACE2("filterSource [] ./.",
                       TypeError,

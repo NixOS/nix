@@ -11,6 +11,9 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
+// FIXME this should not be here, see TODO below on
+// `addMultipleToStore`.
+#include "worker-protocol.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -152,12 +155,16 @@ StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentA
 }
 
 
-std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
+std::pair<StorePath, Hash> Store::computeStorePathFromDump(
+    Source & dump,
+    std::string_view name,
+    FileIngestionMethod method,
+    HashType hashAlgo,
+    const StorePathSet & references) const
 {
-    Hash h = method == FileIngestionMethod::Recursive
-        ? hashPath(hashAlgo, srcPath, filter).first
-        : hashFile(hashAlgo, srcPath);
+    HashSink sink(hashAlgo);
+    dump.drainInto(sink);
+    auto h = sink.finish().first;
     FixedOutputInfo caInfo {
         .method = method,
         .hash = h,
@@ -284,7 +291,13 @@ void Store::addMultipleToStore(
 {
     auto expected = readNum<uint64_t>(source);
     for (uint64_t i = 0; i < expected; ++i) {
-        auto info = ValidPathInfo::read(source, *this, 16);
+        // FIXME we should not be using the worker protocol here, let
+        // alone the worker protocol with a hard-coded version!
+        auto info = WorkerProto::Serialise<ValidPathInfo>::read(*this,
+            WorkerProto::ReadConn {
+                .from = source,
+                .version = 16,
+            });
         info.ultimate = false;
         addToStore(info, source, repair, checkSigs);
     }

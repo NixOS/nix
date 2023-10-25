@@ -52,7 +52,7 @@ There is no problem with a store object having an "extra" reference that doesn't
 The store object will have an extra dependency that it doesn't need, but that is fine.
 It is a case adjacent to that of a hash occurring in some obscure location within the store object that is never read.
 
-[Drv files](./drv/drv.md), discussed next, might also contain store paths that *aren't* references.
+[Drv files](./drv/index.md), discussed next, might also contain store paths that *aren't* references.
 The specific reasons for this will be given then, but we can still ask how how could this possibly be safe?
 The fundamental answer is that since the drv file format is known to Nix, it can "do better" than plain scanning.
 Nix knows how to parse them, and thus meaningfully differentiate between hashes based on *where* they occur.

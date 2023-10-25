@@ -716,7 +716,7 @@ public:
 
           - `apple-virt`
 
-            Included on darwin if virtualization is available.
+            Included on Darwin if virtualization is available.
 
           - `kvm`
 

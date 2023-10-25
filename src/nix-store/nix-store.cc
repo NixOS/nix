@@ -959,17 +959,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 MonitorFdHup monitor(in.fd);
                 auto status = store->buildDerivation(drvPath, drv);
 
-                out << status.status << status.errorMsg;
-
-                if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
-                    out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-                if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
-                    DrvOutputs builtOutputs;
-                    for (auto & [output, realisation] : status.builtOutputs)
-                        builtOutputs.insert_or_assign(realisation.id, realisation);
-                    ServeProto::write(*store, wconn, builtOutputs);
-                }
-
+                ServeProto::write(*store, wconn, status);
                 break;
             }
 

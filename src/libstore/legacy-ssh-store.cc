@@ -319,20 +319,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult status;
-        status.status = (BuildResult::Status) readInt(conn->from);
-        conn->from >> status.errorMsg;
-
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
-            conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(*this, *conn);
-            for (auto && [output, realisation] : builtOutputs)
-                status.builtOutputs.insert_or_assign(
-                    std::move(output.outputName),
-                    std::move(realisation));
-        }
-        return status;
+        return ServeProto::Serialise<BuildResult>::read(*this, *conn);
     }
 
     void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
