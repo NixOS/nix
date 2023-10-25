@@ -58,22 +58,16 @@
 
 - [store]{#gloss-store}
 
-  The location in the file system where store objects live. Typically
-  `/nix/store`.
+  A collection of store objects, with operations to manipulate that collection.
+  See [Nix Store] for details.
 
-  From   the  perspective   of   the  location   where  Nix   is
-  invoked, the  Nix store can be  referred to
-  as a "_local_" or a "_remote_" one:
+  There are many types of stores.
+  See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md) for a complete list.
 
-  + A [local store]{#gloss-local-store} exists on the filesystem of
-    the machine where Nix is  invoked. You can use other
-    local stores  by passing  the `--store` flag  to the
-    `nix` command.  Local stores can be used for building derivations.
-
-  + A  *remote store*  exists  anywhere  other than  the
-    local  filesystem. One  example is  the `/nix/store`
-    directory on another machine,  accessed via `ssh` or
-    served by the `nix-serve` Perl script.
+  From the perspective of the location where Nix is invoked, the Nix store can be  referred to _local_ or _remote_.
+  Only a [local store]{#gloss-local-store} exposes a location in the file system of the machine where Nix is invoked that allows access to store objects, typically `/nix/store`.
+  Local stores can be used for building [derivations](#derivation).
+  See [Local Store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) for details.
 
   [store]: #gloss-store
   [local store]: #gloss-local-store
@@ -103,14 +97,18 @@
 
   The Nix data model for representing simplified file system data.
 
-  See [File System Object](@docroot@/architecture/file-system-object.md) for details.
+  See [File System Object](@docroot@/store/file-system-object.md) for details.
 
   [file system object]: #gloss-file-system-object
 
 - [store object]{#gloss-store-object}
 
-  A store object consists of a [file system object], [reference]s to other store objects, and other metadata.
+  Part of the contents of a [store].
+
+  A store object consists of a [file system object], [references][reference] to other store objects, and other metadata.
   It can be referred to by a [store path].
+
+  See [Store Object](@docroot@/store/index.md#store-object) for details.
 
   [store object]: #gloss-store-object
 

@@ -59,6 +59,7 @@ The [Nix language](../language/index.md) evaluator transforms Nix expressions in
 The command line interface and Nix expressions are what users deal with most.
 
 > **Note**
+>
 > The Nix language itself does not have a notion of *packages* or *configurations*.
 > As far as we are concerned here, the inputs and results of a build plan are just data.
 
