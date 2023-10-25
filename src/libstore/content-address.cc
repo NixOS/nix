@@ -29,12 +29,13 @@ std::string ContentAddressMethod::renderPrefix() const
 
 ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
 {
-    ContentAddressMethod method = FileIngestionMethod::Flat;
-    if (splitPrefix(m, "r:"))
-        method = FileIngestionMethod::Recursive;
-    else if (splitPrefix(m, "text:"))
-        method = TextIngestionMethod {};
-    return method;
+    if (splitPrefix(m, "r:")) {
+        return FileIngestionMethod::Recursive;
+    }
+    else if (splitPrefix(m, "text:")) {
+        return TextIngestionMethod {};
+    }
+    return FileIngestionMethod::Flat;
 }
 
 std::string ContentAddressMethod::render(HashType ht) const
