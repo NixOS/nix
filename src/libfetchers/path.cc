@@ -66,14 +66,28 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    std::optional<Path> getSourcePath(const Input & input) override
+    std::optional<Path> getSourcePath(const Input & input) const override
     {
         return getStrAttr(input.attrs, "path");
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const override
     {
-        // nothing to do
+        writeFile((CanonPath(getAbsPath(input)) + path).abs(), contents);
+    }
+
+    CanonPath getAbsPath(const Input & input) const
+    {
+        auto path = getStrAttr(input.attrs, "path");
+
+        if (path[0] == '/')
+            return CanonPath(path);
+
+        throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
