@@ -388,9 +388,8 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 
 
 #if __linux__
-static void linkOrCopy(LocalFSStore & store, const StorePath & from_, const Path & to)
+static void linkOrCopy(const Path & from, const Path & to)
 {
-    auto from = store.toRealPathForHardLink(from_);
     if (link(from.c_str(), to.c_str()) == -1) {
         /* Hard-linking fails if we exceed the maximum link count on a
            file (e.g. 32000 of ext3), which is quite possible after a
@@ -715,7 +714,7 @@ void LocalDerivationGoal::startBuilder()
             if (S_ISDIR(lstat(r).st_mode))
                 dirsInChroot.insert_or_assign(p, r);
             else
-                linkOrCopy(getLocalStore(), i, chrootRootDir + p);
+                linkOrCopy(r, chrootRootDir + p);
         }
 
         /* If we're repairing, checking or rebuilding part of a
@@ -1600,7 +1599,7 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
                     throw Error("could not add path '%s' to sandbox", worker.store.printStorePath(path));
 
             } else
-                linkOrCopy(getLocalStore(), path, target);
+                linkOrCopy(source, target);
 
         #else
             throw Error("don't know how to make path '%s' (produced by a recursive Nix call) appear in the sandbox",

@@ -268,14 +268,6 @@ std::pair<bool, StorePathSet> LocalOverlayStore::verifyAllValidPaths(RepairFlag 
 }
 
 
-Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
-{
-    return lowerStore->isValidPath(path)
-        ? lowerStore->Store::toRealPath(path)
-        : Store::toRealPath(path);
-}
-
-
 void LocalOverlayStore::remountIfNecessary()
 {
     if (!_remountRequired) return;
