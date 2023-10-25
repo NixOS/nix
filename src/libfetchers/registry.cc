@@ -1,6 +1,6 @@
 #include "registry.hh"
 #include "tarball.hh"
-#include "util.hh"
+#include "users.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"

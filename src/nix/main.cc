@@ -1,6 +1,8 @@
 #include <algorithm>
 
 #include "args/root.hh"
+#include "current-process.hh"
+#include "namespaces.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"

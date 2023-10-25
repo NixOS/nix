@@ -1,5 +1,4 @@
 #include "serialise.hh"
-#include "util.hh"
 #include "path-with-outputs.hh"
 #include "store-api.hh"
 #include "build-result.hh"

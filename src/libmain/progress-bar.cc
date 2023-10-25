@@ -1,5 +1,5 @@
 #include "progress-bar.hh"
-#include "util.hh"
+#include "terminal.hh"
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"

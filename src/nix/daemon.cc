@@ -1,11 +1,12 @@
 ///@file
 
+#include "signals.hh"
+#include "unix-domain-socket.hh"
 #include "command.hh"
 #include "shared.hh"
 #include "local-store.hh"
 #include "remote-store.hh"
 #include "remote-store-connection.hh"
-#include "util.hh"
 #include "serialise.hh"
 #include "archive.hh"
 #include "globals.hh"

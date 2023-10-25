@@ -1,5 +1,5 @@
 #include "serialise.hh"
-#include "util.hh"
+#include "signals.hh"
 
 #include <cstring>
 #include <cerrno>

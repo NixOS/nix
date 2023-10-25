@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "serialise.hh"
 #include "source-accessor.hh"
+#include "file-system.hh"
 
 namespace nix {
 

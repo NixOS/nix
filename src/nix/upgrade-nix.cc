@@ -1,3 +1,4 @@
+#include "processes.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"

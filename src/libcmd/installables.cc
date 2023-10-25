@@ -4,6 +4,7 @@
 #include "installable-attr-path.hh"
 #include "installable-flake.hh"
 #include "outputs-spec.hh"
+#include "users.hh"
 #include "util.hh"
 #include "command.hh"
 #include "attr-path.hh"

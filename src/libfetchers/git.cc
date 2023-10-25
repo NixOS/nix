@@ -1,11 +1,12 @@
 #include "fetchers.hh"
+#include "users.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
-#include "util.hh"
+#include "processes.hh"
 #include "git.hh"
 
 #include "fetch-settings.hh"

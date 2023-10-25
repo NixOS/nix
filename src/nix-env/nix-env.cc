@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
 #include "derivations.hh"
@@ -11,7 +12,6 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"
-#include "util.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"

@@ -1,3 +1,4 @@
+#include "terminal.hh"
 #include "flake.hh"
 #include "eval.hh"
 #include "eval-settings.hh"

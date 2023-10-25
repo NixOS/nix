@@ -6,7 +6,6 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
-#include "util.hh"
 #include "worker-protocol.hh"
 
 using namespace nix;

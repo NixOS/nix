@@ -1,10 +1,10 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "comparator.hh"
+#include "config.hh"
 
 #include <variant>
 

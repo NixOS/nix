@@ -2,12 +2,15 @@
 ///@file
 
 #include <iostream>
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 
 #include <nlohmann/json_fwd.hpp>
 
-#include "util.hh"
+#include "types.hh"
+#include "experimental-features.hh"
 
 namespace nix {
 

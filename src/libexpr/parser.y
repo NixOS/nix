@@ -19,6 +19,7 @@
 #include <variant>
 
 #include "util.hh"
+#include "users.hh"
 
 #include "nixexpr.hh"
 #include "eval.hh"

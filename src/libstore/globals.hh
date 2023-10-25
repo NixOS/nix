@@ -3,7 +3,7 @@
 
 #include "types.hh"
 #include "config.hh"
-#include "util.hh"
+#include "environment-variables.hh"
 #include "experimental-features.hh"
 
 #include <map>

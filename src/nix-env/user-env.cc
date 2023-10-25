@@ -1,5 +1,4 @@
 #include "user-env.hh"
-#include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"

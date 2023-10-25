@@ -9,7 +9,6 @@
 #include "hash.hh"
 #include "archive.hh"
 #include "split.hh"
-#include "util.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

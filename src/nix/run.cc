@@ -1,3 +1,4 @@
+#include "current-process.hh"
 #include "run.hh"
 #include "command-installable-value.hh"
 #include "common-args.hh"

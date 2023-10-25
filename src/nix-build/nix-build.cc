@@ -9,12 +9,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "current-process.hh"
 #include "parsed-derivations.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "derivations.hh"
-#include "util.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
 #include "eval.hh"

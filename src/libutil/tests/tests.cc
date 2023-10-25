@@ -1,5 +1,8 @@
 #include "util.hh"
 #include "types.hh"
+#include "file-system.hh"
+#include "processes.hh"
+#include "terminal.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
