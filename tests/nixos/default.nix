@@ -109,7 +109,7 @@ in
       nix.package = lib.mkForce pkgs.nixVersions.nix_2_13;
     };
   };
-  
+
   # TODO: (nixpkgs update) remoteBuildsSshNg_remote_2_18 = ...
 
   # Test our Nix as a builder for clients that are older
@@ -136,6 +136,8 @@ in
 
   # TODO: (nixpkgs update) remoteBuildsSshNg_local_2_18 = ...
   */
+
+  rootless-daemon = runNixOSTestFor "x86_64-linux" ./rootless-daemon;
 
   nix-copy-closure = runNixOSTestFor "x86_64-linux" ./nix-copy-closure.nix;
 
