@@ -24,6 +24,8 @@ struct NarInfo : ValidPathInfo
     NarInfo(const ValidPathInfo & info) : ValidPathInfo(info) { }
     NarInfo(const Store & store, const std::string & s, const std::string & whence);
 
+    DECLARE_CMP(NarInfo);
+
     std::string to_string(const Store & store) const;
 };
 
