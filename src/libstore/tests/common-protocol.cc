@@ -24,14 +24,14 @@ public:
     {
         if (testAccept())
         {
-            GTEST_SKIP() << "Cannot read golden master because another test is also updating it";
+            GTEST_SKIP() << cannotReadGoldenMaster;
         }
         else
         {
-            auto expected = readFile(goldenMaster(testStem));
+            auto encoded = readFile(goldenMaster(testStem));
 
             T got = ({
-                StringSource from { expected };
+                StringSource from { encoded };
                 CommonProto::Serialise<T>::read(
                     *store,
                     CommonProto::ReadConn { .from = from });
@@ -59,7 +59,7 @@ public:
         {
             createDirs(dirOf(file));
             writeFile(file, to.s);
-            GTEST_SKIP() << "Updating golden master";
+            GTEST_SKIP() << updatingGoldenMaster;
         }
         else
         {
