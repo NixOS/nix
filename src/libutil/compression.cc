@@ -5,8 +5,10 @@
 
 #include <lzma.h>
 #include <bzlib.h>
+#include <zstd.h>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include <brotli/decode.h>
 #include <brotli/encode.h>
@@ -198,6 +200,78 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     }
 };
 
+struct ZstdDecompressionSink : CompressionSink
+{
+    Sink & nextSink;
+    ZSTD_DStream *strm;
+
+    std::vector<uint8_t> inbuf;
+    size_t outbuf_size = ZSTD_DStreamOutSize();
+    uint8_t *outbuf = new uint8_t[outbuf_size];
+
+    ZstdDecompressionSink(Sink & nextSink) : nextSink(nextSink)
+    {
+        strm = ZSTD_createDStream();
+        if (!strm)
+            throw CompressionError("unable to initialise zstd decoder");
+
+         ZSTD_initDStream(strm);
+    }
+
+    ~ZstdDecompressionSink()
+    {
+        delete[] outbuf;
+        ZSTD_freeDStream(strm);
+    }
+
+    void finish() override
+    {
+        // this call doesn't make any sense, but it's here for consistency with the other compression sinks
+        // CompressionSink inherits from BufferedSink, but none of the subclasses appear to ever make use of the buffer
+        flush();
+
+        // if we still have undecoded data in the input buffer, we can't signal EOF to libzstd
+        // if we don't, then we're done here anyway
+        if (inbuf.size())
+            throw CompressionError("received unexpected EOF while decompressing zstd file");
+
+        nextSink(nullptr, 0);
+    }
+
+    void write(const unsigned char * data, size_t len) override
+    {
+        inbuf.insert(inbuf.end(), data, data + len);
+
+        ZSTD_inBuffer in = {
+            .src = inbuf.data(),
+            .size = inbuf.size(),
+            .pos = 0
+        };
+
+        ZSTD_outBuffer out = {
+            .dst = outbuf,
+            .size = outbuf_size,
+            .pos = 0
+        };
+
+        while (in.pos < in.size) {
+            out.pos = 0;
+
+            size_t ret = ZSTD_decompressStream(strm, &out, &in);
+            if (ZSTD_isError(ret))
+                throw CompressionError("error %s while decompressing zstd file", ZSTD_getErrorName(ret));
+
+            if (out.pos)
+                nextSink(outbuf, out.pos);
+            else
+                break;
+        }
+
+        // drop consumed input
+        inbuf.erase(inbuf.begin(), inbuf.begin() + in.pos);
+    }
+};
+
 ref<std::string> decompress(const std::string & method, const std::string & in)
 {
     StringSink ssink;
@@ -217,6 +291,8 @@ ref<CompressionSink> makeDecompressionSink(const std::string & method, Sink & ne
         return make_ref<BzipDecompressionSink>(nextSink);
     else if (method == "br")
         return make_ref<BrotliDecompressionSink>(nextSink);
+    else if (method == "zstd")
+        return make_ref<ZstdDecompressionSink>(nextSink);
     else
         throw UnknownCompressionMethod("unknown compression method '%s'", method);
 }

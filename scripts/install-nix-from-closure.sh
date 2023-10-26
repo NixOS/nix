@@ -154,9 +154,15 @@ fi
 mkdir -p $dest/store
 
 printf "copying Nix to %s..." "${dest}/store" >&2
+# Insert a newline if no progress is shown.
+if [ ! -t 0 ]; then
+  echo ""
+fi
 
 for i in $(cd "$self/store" >/dev/null && echo ./*); do
-    printf "." >&2
+    if [ -t 0 ]; then
+      printf "." >&2
+    fi
     i_tmp="$dest/store/$i.$$"
     if [ -e "$i_tmp" ]; then
         rm -rf "$i_tmp"

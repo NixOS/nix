@@ -11,7 +11,7 @@ cp dependencies.nix $tarroot/default.nix
 cp config.nix dependencies.builder*.sh $tarroot/
 
 tarball=$TEST_ROOT/tarball.tar.xz
-(cd $TEST_ROOT && tar c tarball) | xz > $tarball
+(cd $TEST_ROOT && tar cf - tarball) | xz > $tarball
 
 nix-env -f file://$tarball -qa --out-path | grep -q dependencies
 

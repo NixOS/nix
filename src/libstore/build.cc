@@ -34,7 +34,6 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <fcntl.h>
-#include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
@@ -45,7 +44,6 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-#include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
@@ -180,6 +178,8 @@ public:
     virtual void timedOut() = 0;
 
     virtual string key() = 0;
+
+    virtual void cleanup() { }
 
 protected:
 
@@ -426,6 +426,8 @@ void Goal::amDone(ExitCode result)
     }
     waiters.clear();
     worker.removeGoal(shared_from_this());
+
+    cleanup();
 }
 
 
@@ -1222,8 +1224,13 @@ void DerivationGoal::outputsSubstituted()
 
     /*  If the substitutes form an incomplete closure, then we should
         build the dependencies of this derivation, but after that, we
-        can still use the substitutes for this derivation itself. */
-    if (nrIncompleteClosure > 0) retrySubstitution = true;
+        can still use the substitutes for this derivation itself.
+
+        If the nrIncompleteClosure != nrFailed, we have another issue as well.
+        In particular, it may be the case that the hole in the closure is
+        an output of the current derivation, which causes a loop if retried.
+     */
+    if (nrIncompleteClosure > 0 && nrIncompleteClosure == nrFailed) retrySubstitution = true;
 
     nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
 
@@ -1881,22 +1888,6 @@ PathSet DerivationGoal::exportReferences(PathSet storePaths)
     return paths;
 }
 
-static std::once_flag dns_resolve_flag;
-
-static void preloadNSS() {
-    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
-       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
-       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
-       load its lookup libraries in the parent before any child gets a chance to. */
-    std::call_once(dns_resolve_flag, []() {
-        struct addrinfo *res = NULL;
-
-        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) != 0) {
-            if (res) freeaddrinfo(res);
-        }
-    });
-}
-
 void DerivationGoal::startBuilder()
 {
     /* Right platform? */
@@ -1907,9 +1898,6 @@ void DerivationGoal::startBuilder()
             drvPath,
             settings.thisSystem,
             concatStringsSep(", ", settings.systemFeatures));
-
-    if (drv->isBuiltin())
-        preloadNSS();
 
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
@@ -2060,7 +2048,9 @@ void DerivationGoal::startBuilder()
             if (!found)
                 throw Error(format("derivation '%1%' requested impure path '%2%', but it was not in allowed-impure-host-deps") % drvPath % i);
 
-            dirsInChroot[i] = i;
+            /* Allow files in __impureHostDeps to be missing; e.g.
+               macOS 11+ has no /usr/lib/libSystem*.dylib */
+            dirsInChroot[i] = {i, true};
         }
 
 #if __linux__
@@ -2834,8 +2824,6 @@ void DerivationGoal::runChild()
 
                 ss.push_back("/etc/services");
                 ss.push_back("/etc/hosts");
-                if (pathExists("/var/run/nscd/socket"))
-                    ss.push_back("/var/run/nscd/socket");
             }
 
             for (auto & i : ss) dirsInChroot.emplace(i, i);
@@ -3911,6 +3899,8 @@ public:
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
 
+    void cleanup() override;
+
     Path getStorePath() { return storePath; }
 
     void amDone(ExitCode result) override
@@ -3934,15 +3924,7 @@ SubstitutionGoal::SubstitutionGoal(const Path & storePath, Worker & worker, Repa
 
 SubstitutionGoal::~SubstitutionGoal()
 {
-    try {
-        if (thr.joinable()) {
-            // FIXME: signal worker thread to quit.
-            thr.join();
-            worker.childTerminated(this);
-        }
-    } catch (...) {
-        ignoreException();
-    }
+    cleanup();
 }
 
 
@@ -3976,6 +3958,8 @@ void SubstitutionGoal::init()
 void SubstitutionGoal::tryNext()
 {
     trace("trying next substituter");
+
+    cleanup();
 
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
@@ -4104,7 +4088,7 @@ void SubstitutionGoal::tryToRun()
     thr = std::thread([this]() {
         try {
             /* Wake up the worker loop when we're done. */
-            Finally updateStats([this]() { outPipe.writeSide = -1; });
+            Finally updateStats([this]() { outPipe.writeSide.close(); });
 
             Activity act(*logger, actSubstitute, Logger::Fields{storePath, sub->getUri()});
             PushActivity pact(act.id);
@@ -4188,6 +4172,20 @@ void SubstitutionGoal::handleEOF(int fd)
     if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }
 
+void SubstitutionGoal::cleanup()
+{
+    try {
+        if (thr.joinable()) {
+            // FIXME: signal worker thread to quit.
+            thr.join();
+            worker.childTerminated(this);
+        }
+
+        outPipe.close();
+    } catch (...) {
+        ignoreException();
+    }
+}
 
 //////////////////////////////////////////////////////////////////////
 

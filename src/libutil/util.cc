@@ -753,6 +753,7 @@ void AutoCloseFD::close()
         if (::close(fd) == -1)
             /* This should never happen. */
             throw SysError(format("closing file descriptor %1%") % fd);
+        fd = -1;
     }
 }
 
@@ -768,6 +769,12 @@ int AutoCloseFD::release()
     int oldFD = fd;
     fd = -1;
     return oldFD;
+}
+
+void Pipe::close()
+{
+    readSide.close();
+    writeSide.close();
 }
 
 
@@ -1080,7 +1087,7 @@ void runProgram2(const RunOptions & options)
         throw SysError("executing '%1%'", options.program);
     }, processOptions);
 
-    out.writeSide = -1;
+    out.writeSide.close();
 
     std::thread writerThread;
 
@@ -1093,7 +1100,7 @@ void runProgram2(const RunOptions & options)
 
 
     if (source) {
-        in.readSide = -1;
+        in.readSide.close();
         writerThread = std::thread([&]() {
             try {
                 std::vector<unsigned char> buf(8 * 1024);
@@ -1110,7 +1117,7 @@ void runProgram2(const RunOptions & options)
             } catch (...) {
                 promise.set_exception(std::current_exception());
             }
-            in.writeSide = -1;
+            in.writeSide.close();
         });
     }
 

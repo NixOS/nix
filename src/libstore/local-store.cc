@@ -1029,6 +1029,40 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 throw Error("size mismatch importing path '%s';\n  wanted: %s\n  got:   %s",
                     info.path, info.narSize, hashResult.second);
 
+            if (!info.ca.empty()) {
+                auto ca = info.ca;
+                if (hasPrefix(ca, "fixed:")) {
+                    bool recursive = ca.compare(6, 2, "r:") == 0;
+                    Hash expectedHash(std::string(ca, recursive ? 8 : 6));
+                    if (info.references.empty()) {
+                        auto actualFoHash = hashCAPath(
+                                recursive,
+                                expectedHash.type,
+                                realPath
+                                );
+                        if (ca != actualFoHash) {
+                            throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                                    info.path,
+                                    ca,
+                                    actualFoHash);
+                        }
+                    } else {
+                        throw Error("path '%s' claims to be content-addressed, but has references. This isn’t allowed",
+                                info.path);
+                    }
+
+                } else if (hasPrefix(ca, "text:")) {
+                    Hash textHash(std::string(ca, 5));
+                    auto actualTextHash = hashString(htSHA256, readFile(realPath));
+                    if (textHash != actualTextHash) {
+                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                                info.path,
+                                textHash.to_string(Base32, true),
+                                actualTextHash.to_string(Base32, true));
+                    }
+                }
+            }
+
             autoGC();
 
             canonicalisePathMetaData(realPath, -1);
@@ -1449,5 +1483,21 @@ void LocalStore::createUser(const std::string & userName, uid_t userId)
     }
 }
 
+
+std::string LocalStore::hashCAPath(
+    bool recursive,
+    const HashType & hashType,
+    const Path & path
+)
+{
+    HashSink caSink(hashType);
+    if (recursive) {
+        dumpPath(path, caSink);
+    } else {
+        readFile(path, caSink);
+    }
+    auto hash = caSink.finish().first;
+    return makeFixedOutputCA(recursive, hash);
+}
 
 }

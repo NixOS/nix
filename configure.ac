@@ -33,14 +33,6 @@ AC_ARG_WITH(system, AC_HELP_STRING([--with-system=SYSTEM],
         system="$machine_name-`echo $host_os | "$SED" -e's/@<:@0-9.@:>@*$//g'`";;
    esac])
 
-sys_name=$(uname -s | tr 'A-Z ' 'a-z_')
-
-case $sys_name in
-    cygwin*)
-        sys_name=cygwin
-        ;;
-esac
-
 AC_MSG_RESULT($system)
 AC_SUBST(system)
 AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
@@ -67,10 +59,12 @@ AC_SYS_LARGEFILE
 
 # Solaris-specific stuff.
 AC_STRUCT_DIRENT_D_TYPE
-if test "$sys_name" = sunos; then
+case "$host_os" in
+  solaris*)
     # Solaris requires -lsocket -lnsl for network functions
-    LIBS="-lsocket -lnsl $LIBS"
-fi
+    LDFLAGS="-lsocket -lnsl $LDFLAGS"
+    ;;
+esac
 
 
 # Check for pubsetbuf.
@@ -157,6 +151,30 @@ AX_BOOST_BASE([1.66], [CXXFLAGS="$BOOST_CPPFLAGS $CXXFLAGS"], [AC_MSG_ERROR([Nix
 # ends up with LDFLAGS being empty, so we set it afterwards.
 LDFLAGS="$BOOST_LDFLAGS $LDFLAGS"
 
+# On some platforms, new-style atomics need a helper library
+AC_MSG_CHECKING(whether -latomic is needed)
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+#include <stdint.h>
+uint64_t v;
+int main() {
+    return (int)__atomic_load_n(&v, __ATOMIC_ACQUIRE);
+}]])], GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=no, GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC=yes)
+AC_MSG_RESULT($GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC)
+if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
+    LDFLAGS="-latomic $LDFLAGS"
+fi
+
+PKG_PROG_PKG_CONFIG
+
+AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
+  [Build shared libraries for Nix [default=yes]]),
+  shared=$enableval, shared=yes)
+if test "$shared" = yes; then
+  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
+else
+  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
+  PKG_CONFIG="$PKG_CONFIG --static"
+fi
 
 # Look for OpenSSL, a required dependency.
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
@@ -205,24 +223,29 @@ AC_CHECK_LIB([lzma], [lzma_stream_encoder_mt],
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 
+# Look for libzstd.
+PKG_CHECK_MODULES([LIBZSTD], [libzstd], [CXXFLAGS="$LIBZSTD_CFLAGS $CXXFLAGS"])
 
 # Look for libseccomp, required for Linux sandboxing.
-if test "$sys_name" = linux; then
-  AC_ARG_ENABLE([seccomp-sandboxing],
-                AC_HELP_STRING([--disable-seccomp-sandboxing],
-                               [Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)]
-                              ))
-  if test "x$enable_seccomp_sandboxing" != "xno"; then
-    PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
-                      [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
-    have_seccomp=1
-    AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
-  else
+case "$host_os" in
+  linux*)
+    AC_ARG_ENABLE([seccomp-sandboxing],
+                  AC_HELP_STRING([--disable-seccomp-sandboxing],
+                                 [Don't build support for seccomp sandboxing (only recommended if your arch doesn't support libseccomp yet!)]
+                                ))
+    if test "x$enable_seccomp_sandboxing" != "xno"; then
+      PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
+                        [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+      have_seccomp=1
+      AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
+    else
+      have_seccomp=
+    fi
+    ;;
+  *)
     have_seccomp=
-  fi
-else
-  have_seccomp=
-fi
+    ;;
+esac
 AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
 
@@ -238,6 +261,7 @@ if test -n "$enable_s3"; then
   declare -a aws_version_tokens=($(printf '#include <aws/core/VersionConfig.h>\nAWS_SDK_VERSION_STRING' | $CPP $CPPFLAGS - | grep -v '^#.*' | sed 's/"//g' | tr '.' ' '))
   AC_DEFINE_UNQUOTED([AWS_VERSION_MAJOR], ${aws_version_tokens@<:@0@:>@}, [Major version of aws-sdk-cpp.])
   AC_DEFINE_UNQUOTED([AWS_VERSION_MINOR], ${aws_version_tokens@<:@1@:>@}, [Minor version of aws-sdk-cpp.])
+  AC_DEFINE_UNQUOTED([AWS_VERSION_PATCH], ${aws_version_tokens@<:@2@:>@}, [Patch version of aws-sdk-cpp.])
 fi
 
 
@@ -269,9 +293,11 @@ AC_CHECK_FUNCS([strsignal posix_fallocate sysconf])
 
 # This is needed if bzip2 is a static library, and the Nix libraries
 # are dynamic.
-if test "$(uname)" = "Darwin"; then
+case "${host_os}" in
+  darwin*)
     LDFLAGS="-all_load $LDFLAGS"
-fi
+    ;;
+esac
 
 
 # Do we have GNU tar?
@@ -289,16 +315,6 @@ AC_ARG_WITH(sandbox-shell, AC_HELP_STRING([--with-sandbox-shell=PATH],
   [path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
-
-AC_ARG_ENABLE(shared, AC_HELP_STRING([--enable-shared],
-  [Build shared libraries for Nix [default=yes]]),
-  shared=$enableval, shared=yes)
-if test "$shared" = yes; then
-  AC_SUBST(BUILD_SHARED_LIBS, 1, [Whether to build shared libraries.])
-else
-  AC_SUBST(BUILD_SHARED_LIBS, 0, [Whether to build shared libraries.])
-fi
-
 
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix

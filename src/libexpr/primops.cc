@@ -937,10 +937,16 @@ static void prim_hashFile(EvalState & state, const Pos & pos, Value * * args, Va
     if (ht == htUnknown)
       throw Error(format("unknown hash type '%1%', at %2%") % type % pos);
 
-    PathSet context; // discarded
-    Path p = state.coerceToPath(pos, *args[1], context);
+    PathSet context;
+    Path path = state.coerceToPath(pos, *args[1], context);
+    try {
+        state.realiseContext(context);
+    } catch (InvalidPathError & e) {
+        throw EvalError(format("cannot read '%1%', since path '%2%' is not valid, at %3%")
+            % path % e.path % pos);
+    }
 
-    mkString(v, hashFile(ht, state.checkSourcePath(p)).to_string(Base16, false), context);
+    mkString(v, hashFile(ht, state.checkSourcePath(state.toRealPath(path, context))).to_string(Base16, false));
 }
 
 /* Read a directory (without . or ..) */
@@ -1350,6 +1356,10 @@ static void prim_catAttrs(EvalState & state, const Pos & pos, Value * * args, Va
 static void prim_functionArgs(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0]);
+    if (args[0]->type == tPrimOpApp || args[0]->type == tPrimOp) {
+        state.mkAttrs(v, 0);
+        return;
+    }
     if (args[0]->type != tLambda)
         throw TypeError(format("'functionArgs' requires a function, at %1%") % pos);
 
@@ -1817,7 +1827,7 @@ static void prim_hashString(EvalState & state, const Pos & pos, Value * * args, 
     PathSet context; // discarded
     string s = state.forceString(*args[1], context, pos);
 
-    mkString(v, hashString(ht, s).to_string(Base16, false), context);
+    mkString(v, hashString(ht, s).to_string(Base16, false));
 }
 
 
@@ -2075,7 +2085,7 @@ void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             else if (n == "name")
                 request.name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
-                throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % attr.pos);
+                throw EvalError(format("unsupported argument '%1%' to '%2%', at %3%") % attr.name % who % *attr.pos);
         }
 
         if (request.uri.empty())

@@ -9,7 +9,7 @@ libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
 libstore_LIBS = libutil
 
 libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
-ifneq ($(OS), FreeBSD)
+ifdef HOST_LINUX
  libstore_LDFLAGS += -ldl
 endif
 
@@ -21,7 +21,7 @@ ifeq ($(ENABLE_S3), 1)
 	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core
 endif
 
-ifeq ($(OS), SunOS)
+ifdef HOST_SOLARIS
 	libstore_LDFLAGS += -lsocket
 endif
 

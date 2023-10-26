@@ -25,7 +25,9 @@ readonly RED='\033[31m'
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
 readonly NIX_BUILD_GROUP_ID="30000"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
-readonly NIX_FIRST_BUILD_UID="30001"
+# darwin installer needs to override these
+NIX_FIRST_BUILD_UID="30001"
+NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
 readonly NIX_ROOT="/nix"
@@ -61,8 +63,10 @@ contactme() {
     echo "If you can, open an issue at https://github.com/nixos/nix/issues"
     echo ""
     echo "Or feel free to contact the team,"
-    echo " - on IRC #nixos on irc.freenode.net"
+    echo " - on Matrix #nix:nixos.org"
+    echo " - on IRC #nixos on irc.libera.chat"
     echo " - on twitter @nixos_org"
+    echo " - on our forum https://discourse.nixos.org/"
 }
 
 uninstall_directions() {
@@ -102,7 +106,7 @@ EOF
 }
 
 nix_user_for_core() {
-    printf "nixbld%d" "$1"
+    printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
 }
 
 nix_uid_for_core() {

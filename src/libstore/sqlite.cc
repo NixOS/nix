@@ -1,4 +1,5 @@
 #include "sqlite.hh"
+#include "globals.hh"
 #include "util.hh"
 
 #include <sqlite3.h>
@@ -27,8 +28,12 @@ namespace nix {
 
 SQLite::SQLite(const Path & path)
 {
+    // useSQLiteWAL also indicates what virtual file system we need.  Using
+    // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
+    // for Linux (WSL) where useSQLiteWAL should be false by default.
+    const char *vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
     if (sqlite3_open_v2(path.c_str(), &db,
-            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, 0) != SQLITE_OK)
+            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, vfs) != SQLITE_OK)
         throw Error(format("cannot open SQLite database '%s'") % path);
 }
 

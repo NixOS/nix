@@ -1,7 +1,7 @@
 { nix ? builtins.fetchGit ./.
-, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz
+, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-21.05-small.tar.gz
 , officialRelease ? false
-, systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
+, systems ? [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ]
 }:
 
 let
@@ -108,7 +108,8 @@ let
 
         buildInputs =
           [ jobs.build.${system} curl bzip2 xz pkgconfig pkgs.perl boost ]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium;
+          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+          ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
         configureFlags = ''
           --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
@@ -223,16 +224,6 @@ let
       };
 
 
-    #rpm_fedora27x86_64 = makeRPM_x86_64 (diskImageFunsFun: diskImageFunsFun.fedora27x86_64) [ ];
-
-
-    #deb_debian8i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.debian8i386) [ "libsodium-dev" ] [ "libsodium13" ];
-    #deb_debian8x86_64 = makeDeb_x86_64 (diskImageFunsFun: diskImageFunsFun.debian8x86_64) [ "libsodium-dev" ] [ "libsodium13" ];
-
-    #deb_ubuntu1710i386 = makeDeb_i686 (diskImageFuns: diskImageFuns.ubuntu1710i386) [ ] [ "libsodium18" ];
-    #deb_ubuntu1710x86_64 = makeDeb_x86_64 (diskImageFuns: diskImageFuns.ubuntu1710x86_64) [ ] [ "libsodium18" "libboost-context1.62.0" ];
-
-
     # System tests.
     tests.remoteBuilds = (import ./tests/remote-builds.nix rec {
       inherit nixpkgs;
@@ -251,37 +242,6 @@ let
           inherit nixpkgs;
           nix = build.${system}; inherit system;
         });
-
-    tests.binaryTarball =
-      with import nixpkgs { system = "x86_64-linux"; };
-      vmTools.runInLinuxImage (runCommand "nix-binary-tarball-test"
-        { diskImage = vmTools.diskImages.ubuntu1204x86_64;
-        }
-        ''
-          set -x
-          useradd -m alice
-          su - alice -c 'tar xf ${binaryTarball.x86_64-linux}/*.tar.*'
-          mkdir /dest-nix
-          mount -o bind /dest-nix /nix # Provide a writable /nix.
-          chown alice /nix
-          su - alice -c '_NIX_INSTALLER_TEST=1 ./nix-*/install'
-          su - alice -c 'nix-store --verify'
-          su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
-
-          # Check whether 'nix upgrade-nix' works.
-          cat > /tmp/paths.nix <<EOF
-          {
-            x86_64-linux = "${build.x86_64-linux}";
-          }
-          EOF
-          su - alice -c 'nix upgrade-nix -vvv --nix-store-paths-url file:///tmp/paths.nix'
-          (! [ -L /home/alice/.profile-1-link ])
-          su - alice -c 'PAGER= nix-store -qR ${build.x86_64-linux}'
-
-          mkdir -p $out/nix-support
-          touch $out/nix-support/hydra-build-products
-          umount /nix
-        ''); # */
 
     /*
     tests.evalNixpkgs =
@@ -315,7 +275,7 @@ let
           substitute ${./scripts/install.in} $out/install \
             ${pkgs.lib.concatMapStrings
               (system: "--replace '@binaryTarball_${system}@' $(nix hash-file --base16 --type sha256 ${binaryTarball.${system}}/*.tar.xz) ")
-              [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-linux" ]
+              [ "x86_64-linux" "i686-linux" "x86_64-darwin" "aarch64-darwin" "aarch64-linux" ]
             } \
             --replace '@nixVersion@' ${build.x86_64-linux.src.version}
 
@@ -323,57 +283,6 @@ let
         '';
 
   };
-
-
-  makeRPM_i686 = makeRPM "i686-linux";
-  makeRPM_x86_64 = makeRPM "x86_64-linux";
-
-  makeRPM =
-    system: diskImageFun: extraPackages:
-
-    with import nixpkgs { inherit system; };
-
-    releaseTools.rpmBuild rec {
-      name = "nix-rpm";
-      src = jobs.tarball;
-      diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages =
-            [ "sqlite" "sqlite-devel" "bzip2-devel" "libcurl-devel" "openssl-devel" "xz-devel" "libseccomp-devel" "libsodium-devel" "boost-devel" "bison" "flex" ]
-            ++ extraPackages; };
-      # At most 2047MB can be simulated in qemu-system-i386
-      memSize = 2047;
-      meta.schedulingPriority = 50;
-      postRPMInstall = "cd /tmp/rpmout/BUILD/nix-* && make installcheck";
-      #enableParallelBuilding = true;
-    };
-
-
-  makeDeb_i686 = makeDeb "i686-linux";
-  makeDeb_x86_64 = makeDeb "x86_64-linux";
-
-  makeDeb =
-    system: diskImageFun: extraPackages: extraDebPackages:
-
-    with import nixpkgs { inherit system; };
-
-    releaseTools.debBuild {
-      name = "nix-deb";
-      src = jobs.tarball;
-      diskImage = (diskImageFun vmTools.diskImageFuns)
-        { extraPackages =
-            [ "libsqlite3-dev" "libbz2-dev" "libcurl-dev" "libcurl3-nss" "libssl-dev" "liblzma-dev" "libseccomp-dev" "libsodium-dev" "libboost-all-dev" ]
-            ++ extraPackages; };
-      memSize = 2047;
-      meta.schedulingPriority = 50;
-      postInstall = "make installcheck";
-      configureFlags = "--sysconfdir=/etc";
-      debRequires =
-        [ "curl" "libsqlite3-0" "libbz2-1.0" "bzip2" "xz-utils" "libssl1.0.0" "liblzma5" "libseccomp2" ]
-        ++ extraDebPackages;
-      debMaintainer = "Eelco Dolstra <eelco.dolstra@logicblox.com>";
-      doInstallCheck = true;
-      #enableParallelBuilding = true;
-    };
 
 
 in jobs

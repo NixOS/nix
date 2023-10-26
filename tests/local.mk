@@ -12,6 +12,7 @@ nix_tests = \
   timeout.sh secure-drv-outputs.sh nix-channel.sh \
   multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh nix-profile.sh repair.sh dump-db.sh case-hack.sh \
+  substitute-with-invalid-ca.sh \
   check-reqs.sh pass-as-file.sh tarball.sh restricted.sh \
   placeholders.sh nix-shell.sh \
   linux-sandbox.sh \
@@ -39,4 +40,4 @@ tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh
 
-installcheck: $(d)/common.sh $(d)/plugins/libplugintest.$(SO_EXT)
+test-deps += tests/common.sh tests/plugins/libplugintest.$(SO_EXT)

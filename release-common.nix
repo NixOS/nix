@@ -49,7 +49,7 @@ rec {
 
   buildDeps =
     [ curl
-      bzip2 xz brotli editline
+      bzip2 xz brotli zstd editline
       openssl pkgconfig sqlite
       boost
 
@@ -57,7 +57,7 @@ rec {
       git
       mercurial
     ]
-    ++ lib.optionals stdenv.isLinux [libseccomp utillinuxMinimal]
+    ++ lib.optionals stdenv.isLinux [libseccomp (pkgs.util-linuxMinimal or pkgs.utillinuxMinimal)]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin)
       ((aws-sdk-cpp.override {

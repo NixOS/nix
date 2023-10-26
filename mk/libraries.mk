@@ -1,9 +1,9 @@
 libs-list :=
 
-ifeq ($(OS), Darwin)
+ifdef HOST_DARWIN
   SO_EXT = dylib
 else
-  ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
+  ifdef HOST_CYGWIN
     SO_EXT = dll
   else
     SO_EXT = so
@@ -59,7 +59,7 @@ define build-library
   $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
-  ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
+  ifdef HOST_CYGWIN
     $(1)_INSTALL_DIR ?= $$(bindir)
   else
     $(1)_INSTALL_DIR ?= $$(libdir)
@@ -73,18 +73,18 @@ define build-library
   ifeq ($(BUILD_SHARED_LIBS), 1)
 
     ifdef $(1)_ALLOW_UNDEFINED
-      ifeq ($(OS), Darwin)
+      ifdef HOST_DARWIN
         $(1)_LDFLAGS += -undefined suppress -flat_namespace
       endif
     else
-      ifneq ($(OS), Darwin)
-        ifneq (CYGWIN,$(findstring CYGWIN,$(OS)))
+      ifndef HOST_DARWIN
+        ifndef HOST_CYGWIN
           $(1)_LDFLAGS += -Wl,-z,defs
         endif
       endif
     endif
 
-    ifneq ($(OS), Darwin)
+    ifndef HOST_DARWIN
       $(1)_LDFLAGS += -Wl,-soname=$$($(1)_NAME).$(SO_EXT)
     endif
 
@@ -93,7 +93,7 @@ define build-library
     $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
 	$$(trace-ld) $(CXX) -o $$(abspath $$@) -shared $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) $$($(1)_LDFLAGS_UNINSTALLED)
 
-    ifneq ($(OS), Darwin)
+    ifndef HOST_DARWIN
       $(1)_LDFLAGS_USE += -Wl,-rpath,$$(abspath $$(_d))
     endif
     $(1)_LDFLAGS_USE += -L$$(_d) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
@@ -108,7 +108,7 @@ define build-library
 	$$(trace-ld) $(CXX) -o $$@ -shared $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
     $(1)_LDFLAGS_USE_INSTALLED += -L$$(DESTDIR)$$($(1)_INSTALL_DIR) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
-    ifneq ($(OS), Darwin)
+    ifndef HOST_DARWIN
       ifeq ($(SET_RPATH_TO_LIBS), 1)
         $(1)_LDFLAGS_USE_INSTALLED += -Wl,-rpath,$$($(1)_INSTALL_DIR)
       else
