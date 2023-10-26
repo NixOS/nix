@@ -448,10 +448,10 @@ ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s)
 ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr)
 {
     // TODO: did this break the PR 6204 stuff?
-    state.frame.emplace(WithFrame {
-        .expr = expr,
-        .env = env
-        });
+    // state.frame.emplace(WithFrame {
+    //     .expr = expr,
+    //     .env = env
+    //     });
 
     return *this;
 }

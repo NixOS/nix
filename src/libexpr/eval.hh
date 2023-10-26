@@ -141,10 +141,10 @@ struct DebugTrace {
     std::optional<Verbosity> verbosity;
 };
 
-struct WithFrame {
-    const Expr & expr;
-    const Env & env;
-};
+// struct WithFrame {
+//     const Expr & expr;
+//     const Env & env;
+// };
 
 class ErrorBuilder
 {
@@ -236,7 +236,7 @@ public:
     bool debugStop;
     bool debugQuit;
     int trylevel;
-    std::optional<WithFrame> frame;
+    // std::optional<WithFrame> frame;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
@@ -270,12 +270,12 @@ public:
                 runDebugRepl(&error, last.env, last.expr);
             }
         }
-        else if (frame.has_value())
-        {
-            // Looks like we're modifying our argument pointers?
-            env = &(frame->env);
-            expr = &(frame->expr);
-        }
+        // else if (frame.has_value())
+        // {
+        //     // Looks like we're modifying our argument pointers?
+        //     env = &(frame->env);
+        //     expr = &(frame->expr);
+        // }
 
         throw std::move(error);
     }
