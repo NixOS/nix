@@ -185,8 +185,6 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
     return hasPos;
 }
 
-std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
-
 // return verbosity in a string of the appropriate color; doesn't revert to ANSI_NORMAL.
 std::string showVerbosity(Verbosity v)
 {
