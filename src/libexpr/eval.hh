@@ -174,9 +174,6 @@ class ErrorBuilder
         [[nodiscard, gnu::noinline]]
         ErrorBuilder & withSuggestions(Suggestions & s);
 
-        [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withFrame(const Env & e, const Expr & ex);
-
         template<class ErrorType>
         [[gnu::noinline, gnu::noreturn]]
         void debugThrow();
