@@ -31,6 +31,7 @@ enum struct ExperimentalFeature
     DynamicDerivations,
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
+    ConfigurableImpureEnv,
 };
 
 /**

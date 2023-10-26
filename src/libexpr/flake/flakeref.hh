@@ -6,6 +6,7 @@
 #include "fetchers.hh"
 #include "outputs-spec.hh"
 
+#include <regex>
 #include <variant>
 
 namespace nix {
@@ -62,7 +63,7 @@ struct FlakeRef
 
     static FlakeRef fromAttrs(const fetchers::Attrs & attrs);
 
-    std::pair<fetchers::Tree, FlakeRef> fetchTree(ref<Store> store) const;
+    std::pair<StorePath, FlakeRef> fetchTree(ref<Store> store) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
@@ -91,5 +92,7 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
     bool allowMissing = false,
     bool isFlake = true);
 
+const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
+extern std::regex flakeIdRegex;
 
 }

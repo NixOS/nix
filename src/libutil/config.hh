@@ -36,8 +36,8 @@ namespace nix {
  *
  *   std::map<std::string, Config::SettingInfo> settings;
  *   config.getSettings(settings);
- *   config["system"].description == "the current system"
- *   config["system"].value == "x86_64-linux"
+ *   settings["system"].description == "the current system"
+ *   settings["system"].value == "x86_64-linux"
  *
  *
  * The above retrieves all currently known settings from the `Config` object
@@ -52,9 +52,7 @@ class AbstractConfig
 protected:
     StringMap unknownSettings;
 
-    AbstractConfig(const StringMap & initials = {})
-        : unknownSettings(initials)
-    { }
+    AbstractConfig(StringMap initials = {});
 
 public:
 
@@ -150,9 +148,6 @@ public:
     {
         bool isAlias;
         AbstractSetting * setting;
-        SettingData(bool isAlias, AbstractSetting * setting)
-            : isAlias(isAlias), setting(setting)
-        { }
     };
 
     typedef std::map<std::string, SettingData> Settings;
@@ -163,9 +158,7 @@ private:
 
 public:
 
-    Config(const StringMap & initials = {})
-        : AbstractConfig(initials)
-    { }
+    Config(StringMap initials = {});
 
     bool set(const std::string & name, const std::string & value) override;
 
@@ -206,12 +199,7 @@ protected:
         const std::set<std::string> & aliases,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
 
-    virtual ~AbstractSetting()
-    {
-        // Check against a gcc miscompilation causing our constructor
-        // not to run (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80431).
-        assert(created == 123);
-    }
+    virtual ~AbstractSetting();
 
     virtual void set(const std::string & value, bool append = false) = 0;
 
@@ -229,7 +217,7 @@ protected:
 
     virtual void convertToArg(Args & args, const std::string & category);
 
-    bool isOverridden() const { return overridden; }
+    bool isOverridden() const;
 };
 
 /**
@@ -324,8 +312,7 @@ public:
 template<typename T>
 std::ostream & operator <<(std::ostream & str, const BaseSetting<T> & opt)
 {
-    str << (const T &) opt;
-    return str;
+    return str << static_cast<const T &>(opt);
 }
 
 template<typename T>
@@ -365,11 +352,7 @@ public:
         const Path & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<Path>(def, true, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
+        const std::set<std::string> & aliases = {});
 
     Path parse(const std::string & str) const override;
 
@@ -391,15 +374,11 @@ public:
         const std::optional<Path> & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<std::optional<Path>>(def, true, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
+        const std::set<std::string> & aliases = {});
 
     std::optional<Path> parse(const std::string & str) const override;
 
-    void operator =(const std::optional<Path> & v) { this->assign(v); }
+    void operator =(const std::optional<Path> & v);
 };
 
 struct GlobalConfig : public AbstractConfig

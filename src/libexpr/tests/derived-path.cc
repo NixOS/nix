@@ -18,6 +18,8 @@ TEST_F(DerivedPathExpressionTest, force_init)
 {
 }
 
+#ifndef COVERAGE
+
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
     prop_opaque_path_round_trip,
@@ -60,5 +62,7 @@ RC_GTEST_FIXTURE_PROP(
     auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
     RC_ASSERT(SingleDerivedPath { b } == d);
 }
+
+#endif
 
 } /* namespace nix */

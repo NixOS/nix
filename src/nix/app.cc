@@ -20,15 +20,26 @@ StringPairs resolveRewrites(
     const std::vector<BuiltPathWithResult> & dependencies)
 {
     StringPairs res;
-    for (auto & dep : dependencies)
-        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
-            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
-                for (auto & [ outputName, outputPath ] : drvDep->outputs)
-                    res.emplace(
-                        DownstreamPlaceholder::unknownCaOutput(
-                            drvDep->drvPath->outPath(), outputName).render(),
-                        store.printStorePath(outputPath)
-                    );
+    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        return res;
+    }
+    for (auto &dep: dependencies) {
+        auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path);
+        if (!drvDep) {
+            continue;
+        }
+
+        for (const auto & [ outputName, outputPath ] : drvDep->outputs) {
+            res.emplace(
+                DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                    SingleDerivedPath::Built {
+                        .drvPath = make_ref<SingleDerivedPath>(drvDep->drvPath->discardOutputPath()),
+                        .output = outputName,
+                    }).render(),
+                store.printStorePath(outputPath)
+            );
+        }
+    }
     return res;
 }
 
@@ -51,11 +62,11 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
 
     auto type = cursor->getAttr("type")->getString();
 
-    std::string expected = !attrPath.empty() &&
+    std::string expectedType = !attrPath.empty() &&
         (state.symbols[attrPath[0]] == "apps" || state.symbols[attrPath[0]] == "defaultApp")
         ? "app" : "derivation";
-    if (type != expected)
-        throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
+    if (type != expectedType)
+        throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expectedType);
 
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
@@ -81,10 +92,10 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                         .path = o.path,
                     };
                 },
-            }, c.raw()));
+            }, c.raw));
         }
 
-        return UnresolvedApp{App {
+        return UnresolvedApp { App {
             .context = std::move(context2),
             .program = program,
         }};

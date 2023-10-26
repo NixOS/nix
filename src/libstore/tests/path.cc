@@ -39,6 +39,7 @@ TEST_DONT_PARSE(double_star, "**")
 TEST_DONT_PARSE(star_first, "*,foo")
 TEST_DONT_PARSE(star_second, "foo,*")
 TEST_DONT_PARSE(bang, "foo!o")
+TEST_DONT_PARSE(dotfile, ".gitignore")
 
 #undef TEST_DONT_PARSE
 
@@ -101,8 +102,12 @@ Gen<StorePathName> Arbitrary<StorePathName>::arbitrary()
                 pre += '-';
                 break;
             case 64:
-                pre += '.';
-                break;
+                // names aren't permitted to start with a period,
+                // so just fall through to the next case here
+                if (c != 0) {
+                    pre += '.';
+                    break;
+                }
             case 65:
                 pre += '_';
                 break;
@@ -134,6 +139,8 @@ Gen<StorePath> Arbitrary<StorePath>::arbitrary()
 
 namespace nix {
 
+#ifndef COVERAGE
+
 RC_GTEST_FIXTURE_PROP(
     StorePathTest,
     prop_regex_accept,
@@ -149,5 +156,7 @@ RC_GTEST_FIXTURE_PROP(
 {
     RC_ASSERT(p == store->parseStorePath(store->printStorePath(p)));
 }
+
+#endif
 
 }

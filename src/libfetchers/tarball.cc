@@ -1,3 +1,4 @@
+#include "tarball.hh"
 #include "fetchers.hh"
 #include "cache.hh"
 #include "filetransfer.hh"
@@ -133,7 +134,7 @@ DownloadTarballResult downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            .tree = Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
+            .storePath = std::move(cached->storePath),
             .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
@@ -174,7 +175,7 @@ DownloadTarballResult downloadTarball(
         locked);
 
     return {
-        .tree = Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        .storePath = std::move(*unpackedStorePath),
         .lastModified = lastModified,
         .immutableUrl = res.immutableUrl,
     };
@@ -232,7 +233,7 @@ struct CurlInputScheme : InputScheme
         if (type != inputType()) return {};
 
         // FIXME: some of these only apply to TarballInputScheme.
-        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount"};
+        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount", "lastModified"};
         for (auto & [name, value] : attrs)
             if (!allowedNames.count(name))
                 throw Error("unsupported %s input attribute '%s'", *type, name);
@@ -250,15 +251,9 @@ struct CurlInputScheme : InputScheme
         // NAR hashes are preferred over file hashes since tar/zip
         // files don't have a canonical representation.
         if (auto narHash = input.getNarHash())
-            url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
+            url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
         return url;
     }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
 };
 
 struct FileInputScheme : CurlInputScheme
@@ -310,7 +305,10 @@ struct TarballInputScheme : CurlInputScheme
             input = immutableInput;
         }
 
-        return {result.tree.storePath, std::move(input)};
+        if (result.lastModified && !input.attrs.contains("lastModified"))
+            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
+
+        return {result.storePath, std::move(input)};
     }
 };
 

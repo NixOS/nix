@@ -98,13 +98,6 @@ struct MercurialInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        // FIXME: ugly, need to distinguish between dirty and clean
-        // default trees.
-        return input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount");
-    }
-
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
@@ -206,7 +199,7 @@ struct MercurialInputScheme : InputScheme
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && hash->type != htSHA1)
-                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
+                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(HashFormat::Base16, true));
         };
 
 
@@ -252,7 +245,7 @@ struct MercurialInputScheme : InputScheme
             }
         }
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(HashFormat::Base32, false));
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */

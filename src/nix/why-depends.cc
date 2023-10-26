@@ -38,17 +38,13 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         expectArgs({
             .label = "package",
             .handler = {&_package},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeInstallable(prefix);
-            }}
+            .completer = getCompleteInstallable(),
         });
 
         expectArgs({
             .label = "dependency",
             .handler = {&_dependency},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeInstallable(prefix);
-            }}
+            .completer = getCompleteInstallable(),
         });
 
         addFlag({

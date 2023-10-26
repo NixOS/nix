@@ -1228,7 +1228,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                         else {
                             if (v->type() == nString) {
                                 attrs2["type"] = "string";
-                                attrs2["value"] = v->string.s;
+                                attrs2["value"] = v->c_str();
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nInt) {
                                 attrs2["type"] = "int";
@@ -1248,7 +1248,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 for (auto elem : v->listItems()) {
                                     if (elem->type() != nString) continue;
                                     XMLAttrs attrs3;
-                                    attrs3["value"] = elem->string.s;
+                                    attrs3["value"] = elem->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                                 }
                             } else if (v->type() == nAttrs) {
@@ -1260,7 +1260,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                     if(a.value->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["type"] = globals.state->symbols[i.name];
-                                    attrs3["value"] = a.value->string.s;
+                                    attrs3["value"] = a.value->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                             }
                             }
@@ -1531,7 +1531,7 @@ static int main_nix_env(int argc, char * * argv)
 
         op(globals, std::move(opFlags), std::move(opArgs));
 
-        globals.state->printStats();
+        globals.state->maybePrintStats();
 
         return 0;
     }

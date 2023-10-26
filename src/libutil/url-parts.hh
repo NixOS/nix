@@ -30,7 +30,7 @@ extern std::regex refRegex;
 
 /// Instead of defining what a good Git Ref is, we define what a bad Git Ref is
 /// This is because of the definition of a ref in refs.c in https://github.com/git/git
-/// See tests/fetchGitRefs.sh for the full definition
+/// See tests/functional/fetchGitRefs.sh for the full definition
 const static std::string badGitRefRegexS = "//|^[./]|/\\.|\\.\\.|[[:cntrl:][:space:]:?^~\[]|\\\\|\\*|\\.lock$|\\.lock/|@\\{|[/.]$|^@$|^$";
 extern std::regex badGitRefRegex;
 
@@ -40,8 +40,5 @@ extern std::regex revRegex;
 
 /// A ref or revision, or a ref followed by a revision.
 const static std::string refAndOrRevRegex = "(?:(" + revRegexS + ")|(?:(" + refRegexS + ")(?:/(" + revRegexS + "))?))";
-
-const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
-extern std::regex flakeIdRegex;
 
 }

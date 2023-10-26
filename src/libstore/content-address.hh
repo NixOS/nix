@@ -5,6 +5,7 @@
 #include "hash.hh"
 #include "path.hh"
 #include "comparator.hh"
+#include "variant-wrapper.hh"
 
 namespace nix {
 
@@ -71,11 +72,7 @@ struct ContentAddressMethod
 
     GENERATE_CMP(ContentAddressMethod, me->raw);
 
-    /* The moral equivalent of `using Raw::Raw;` */
-    ContentAddressMethod(auto &&... arg)
-        : raw(std::forward<decltype(arg)>(arg)...)
-    { }
-
+    MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
 
     /**
      * Parse the prefix tag which indicates how the files
@@ -252,10 +249,7 @@ struct ContentAddressWithReferences
 
     GENERATE_CMP(ContentAddressWithReferences, me->raw);
 
-    /* The moral equivalent of `using Raw::Raw;` */
-    ContentAddressWithReferences(auto &&... arg)
-        : raw(std::forward<decltype(arg)>(arg)...)
-    { }
+    MAKE_WRAPPER_CONSTRUCTOR(ContentAddressWithReferences);
 
     /**
      * Create a `ContentAddressWithReferences` from a mere

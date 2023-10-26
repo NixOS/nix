@@ -8,9 +8,12 @@
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"
+#include "util.hh"
 
+#include <iterator>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <algorithm>
 
 using namespace nix;
 
@@ -51,6 +54,7 @@ struct BuildEnvironment
 
     std::map<std::string, Value> vars;
     std::map<std::string, std::string> bashFunctions;
+    std::optional<std::pair<std::string, std::string>> structuredAttrs;
 
     static BuildEnvironment fromJSON(std::string_view in)
     {
@@ -72,6 +76,10 @@ struct BuildEnvironment
 
         for (auto & [name, def] : json["bashFunctions"].items()) {
             res.bashFunctions.insert({name, def});
+        }
+
+        if (json.contains("structuredAttrs")) {
+            res.structuredAttrs = {json["structuredAttrs"][".attrs.json"], json["structuredAttrs"][".attrs.sh"]};
         }
 
         return res;
@@ -102,11 +110,35 @@ struct BuildEnvironment
 
         res["bashFunctions"] = bashFunctions;
 
+        if (providesStructuredAttrs()) {
+            auto contents = nlohmann::json::object();
+            contents[".attrs.sh"] = getAttrsSH();
+            contents[".attrs.json"] = getAttrsJSON();
+            res["structuredAttrs"] = std::move(contents);
+        }
+
         auto json = res.dump();
 
         assert(BuildEnvironment::fromJSON(json) == *this);
 
         return json;
+    }
+
+    bool providesStructuredAttrs() const
+    {
+        return structuredAttrs.has_value();
+    }
+
+    std::string getAttrsJSON() const
+    {
+        assert(providesStructuredAttrs());
+        return structuredAttrs->first;
+    }
+
+    std::string getAttrsSH() const
+    {
+        assert(providesStructuredAttrs());
+        return structuredAttrs->second;
     }
 
     void toBash(std::ostream & out, const std::set<std::string> & ignoreVars) const
@@ -291,6 +323,7 @@ struct Common : InstallableCommand, MixProfile
     std::string makeRcScript(
         ref<Store> store,
         const BuildEnvironment & buildEnvironment,
+        const Path & tmpDir,
         const Path & outputsDir = absPath(".") + "/outputs")
     {
         // A list of colon-separated environment variables that should be
@@ -353,7 +386,46 @@ struct Common : InstallableCommand, MixProfile
             }
         }
 
+        if (buildEnvironment.providesStructuredAttrs()) {
+            fixupStructuredAttrs(
+                "sh",
+                "NIX_ATTRS_SH_FILE",
+                buildEnvironment.getAttrsSH(),
+                rewrites,
+                buildEnvironment,
+                tmpDir
+            );
+            fixupStructuredAttrs(
+                "json",
+                "NIX_ATTRS_JSON_FILE",
+                buildEnvironment.getAttrsJSON(),
+                rewrites,
+                buildEnvironment,
+                tmpDir
+            );
+        }
+
         return rewriteStrings(script, rewrites);
+    }
+
+    /**
+     * Replace the value of NIX_ATTRS_*_FILE (`/build/.attrs.*`) with a tmp file
+     * that's accessible from the interactive shell session.
+     */
+    void fixupStructuredAttrs(
+        const std::string & ext,
+        const std::string & envVar,
+        const std::string & content,
+        StringMap & rewrites,
+        const BuildEnvironment & buildEnvironment,
+        const Path & tmpDir)
+    {
+        auto targetFilePath = tmpDir + "/.attrs." + ext;
+        writeFile(targetFilePath, content);
+
+        auto fileInBuilderEnv = buildEnvironment.vars.find(envVar);
+        assert(fileInBuilderEnv != buildEnvironment.vars.end());
+        rewrites.insert({BuildEnvironment::getString(fileInBuilderEnv->second), targetFilePath});
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -487,7 +559,9 @@ struct CmdDevelop : Common, MixEnvironment
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
-        auto script = makeRcScript(store, buildEnvironment);
+        AutoDelete tmpDir(createTempDir("", "nix-develop"), true);
+
+        auto script = makeRcScript(store, buildEnvironment, (Path) tmpDir);
 
         if (verbosity >= lvlDebug)
             script += "set -x\n";
@@ -547,7 +621,7 @@ struct CmdDevelop : Common, MixEnvironment
                 state,
                 std::move(nixpkgs),
                 "bashInteractive",
-                DefaultOutputs(),
+                ExtendedOutputsSpec::Default(),
                 Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
@@ -615,10 +689,12 @@ struct CmdPrintDevEnv : Common, MixJSON
 
         stopProgressBar();
 
-        logger->writeToStdout(
-            json
-            ? buildEnvironment.toJSON()
-            : makeRcScript(store, buildEnvironment));
+        if (json) {
+            logger->writeToStdout(buildEnvironment.toJSON());
+        } else {
+            AutoDelete tmpDir(createTempDir("", "nix-dev-env"), true);
+            logger->writeToStdout(makeRcScript(store, buildEnvironment, tmpDir));
+        }
     }
 };
 

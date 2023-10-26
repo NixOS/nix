@@ -47,7 +47,7 @@ TEST(NixStringContextElemTest, slash_invalid) {
 TEST(NixStringContextElemTest, opaque) {
     std::string_view opaque = "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x";
     auto elem = NixStringContextElem::parse(opaque);
-    auto * p = std::get_if<NixStringContextElem::Opaque>(&elem);
+    auto * p = std::get_if<NixStringContextElem::Opaque>(&elem.raw);
     ASSERT_TRUE(p);
     ASSERT_EQ(p->path, StorePath { opaque });
     ASSERT_EQ(elem.to_string(), opaque);
@@ -60,7 +60,7 @@ TEST(NixStringContextElemTest, opaque) {
 TEST(NixStringContextElemTest, drvDeep) {
     std::string_view drvDeep = "=g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
     auto elem = NixStringContextElem::parse(drvDeep);
-    auto * p = std::get_if<NixStringContextElem::DrvDeep>(&elem);
+    auto * p = std::get_if<NixStringContextElem::DrvDeep>(&elem.raw);
     ASSERT_TRUE(p);
     ASSERT_EQ(p->drvPath, StorePath { drvDeep.substr(1) });
     ASSERT_EQ(elem.to_string(), drvDeep);
@@ -73,7 +73,7 @@ TEST(NixStringContextElemTest, drvDeep) {
 TEST(NixStringContextElemTest, built_opaque) {
     std::string_view built = "!foo!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
     auto elem = NixStringContextElem::parse(built);
-    auto * p = std::get_if<NixStringContextElem::Built>(&elem);
+    auto * p = std::get_if<NixStringContextElem::Built>(&elem.raw);
     ASSERT_TRUE(p);
     ASSERT_EQ(p->output, "foo");
     ASSERT_EQ(*p->drvPath, ((SingleDerivedPath) SingleDerivedPath::Opaque {
@@ -96,7 +96,7 @@ TEST(NixStringContextElemTest, built_built) {
 
     std::string_view built = "!foo!bar!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
     auto elem = NixStringContextElem::parse(built, mockXpSettings);
-    auto * p = std::get_if<NixStringContextElem::Built>(&elem);
+    auto * p = std::get_if<NixStringContextElem::Built>(&elem.raw);
     ASSERT_TRUE(p);
     ASSERT_EQ(p->output, "foo");
     auto * drvPath = std::get_if<SingleDerivedPath::Built>(&*p->drvPath);
@@ -147,6 +147,8 @@ Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
 
 namespace nix {
 
+#ifndef COVERAGE
+
 RC_GTEST_PROP(
     NixStringContextElemTest,
     prop_round_rip,
@@ -154,5 +156,7 @@ RC_GTEST_PROP(
 {
     RC_ASSERT(o == NixStringContextElem::parse(o.to_string()));
 }
+
+#endif
 
 }

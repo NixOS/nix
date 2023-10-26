@@ -46,5 +46,6 @@ sandbox_shell = @sandbox_shell@
 storedir = @storedir@
 sysconfdir = @sysconfdir@
 system = @system@
-tests = @tests@
+ENABLE_BUILD = @ENABLE_BUILD@
+ENABLE_TESTS = @ENABLE_TESTS@
 internal_api_docs = @internal_api_docs@
