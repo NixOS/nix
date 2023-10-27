@@ -38,6 +38,18 @@ struct GitRepo
     /* Get the ref that HEAD points to. */
     virtual std::optional<std::string> getWorkdirRef() = 0;
 
+    struct Submodule
+    {
+        CanonPath path;
+        std::string url;
+        std::string branch;
+        Hash rev;
+    };
+
+    virtual std::vector<Submodule> getSubmodules(const Hash & rev) = 0;
+
+    virtual std::string resolveSubmoduleUrl(const std::string & url) = 0;
+
     struct TarballInfo
     {
         Hash treeHash;

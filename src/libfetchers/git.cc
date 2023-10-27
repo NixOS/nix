@@ -8,6 +8,7 @@
 #include "util.hh"
 #include "git.hh"
 #include "fs-input-accessor.hh"
+#include "union-input-accessor.hh"
 #include "git-utils.hh"
 
 #include "fetch-settings.hh"
@@ -132,11 +133,6 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl)
     }
 
     return std::nullopt;
-}
-
-bool isNotDotGitDirectory(const Path & path)
-{
-    return baseNameOf(path) != ".git";
 }
 
 }  // end namespace
@@ -413,7 +409,7 @@ struct GitInputScheme : InputScheme
 
         std::string name = input.getName();
 
-        auto makeResult2 = [&](const Attrs & infoAttrs, ref<InputAccessor> accessor) -> std::pair<ref<InputAccessor>, Input>
+        auto makeResult = [&](const Attrs & infoAttrs, ref<InputAccessor> accessor) -> std::pair<ref<InputAccessor>, Input>
         {
             assert(input.getRev());
             assert(!origRev || origRev == input.getRev());
@@ -422,18 +418,6 @@ struct GitInputScheme : InputScheme
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
             return {accessor, std::move(input)};
-        };
-
-        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> std::pair<ref<InputAccessor>, Input>
-        {
-            // FIXME: remove?
-            //input.attrs.erase("narHash");
-            auto narHash = store->queryPathInfo(storePath)->narHash;
-            input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-
-            auto accessor = makeStorePathAccessor(store, storePath, makeNotAllowedError(repoInfo.url));
-
-            return makeResult2(infoAttrs, accessor);
         };
 
         auto originalRef = input.getRef();
@@ -542,66 +526,39 @@ struct GitInputScheme : InputScheme
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.url);
 
-        if (!repoInfo.submodules) {
-            auto accessor = GitRepo::openRepo(CanonPath(repoDir))->getAccessor(rev);
-            return makeResult2(infoAttrs, accessor);
+        auto repo = GitRepo::openRepo(CanonPath(repoDir));
+
+        auto accessor = repo->getAccessor(rev);
+
+        /* If the repo has submodules, fetch them and return a union
+           input accessor consisting of the accessor for the top-level
+           repo and the accessors for the submodules. */
+        if (repoInfo.submodules) {
+            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+
+            for (auto & submodule : repo->getSubmodules(rev)) {
+                auto resolved = repo->resolveSubmoduleUrl(submodule.url);
+                debug("Git submodule %s: %s %s %s -> %s",
+                    submodule.path, submodule.url, submodule.branch, submodule.rev.gitRev(), resolved);
+                fetchers::Attrs attrs;
+                attrs.insert_or_assign("type", "git");
+                attrs.insert_or_assign("url", resolved);
+                if (submodule.branch != "")
+                    attrs.insert_or_assign("ref", submodule.branch);
+                attrs.insert_or_assign("rev", submodule.rev.gitRev());
+                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] =
+                    submoduleInput.scheme->getAccessor(store, submoduleInput);
+                mounts.insert_or_assign(submodule.path, submoduleAccessor);
+            }
+
+            if (!mounts.empty()) {
+                mounts.insert_or_assign(CanonPath::root, accessor);
+                accessor = makeUnionInputAccessor(std::move(mounts));
+            }
         }
 
-        else {
-            // FIXME: use libgit2
-            Path tmpDir = createTempDir();
-            AutoDelete delTmpDir(tmpDir, true);
-            PathFilter filter = defaultPathFilter;
-
-            Activity act(*logger, lvlChatty, actUnknown, fmt("copying Git tree '%s' to the store", input.to_string()));
-
-            Path tmpGitDir = createTempDir();
-            AutoDelete delTmpGitDir(tmpGitDir, true);
-
-            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
-
-            {
-                // TODO: repoDir might lack the ref (it only checks if rev
-                // exists, see FIXME above) so use a big hammer and fetch
-                // everything to ensure we get the rev.
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
-                runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" }, {}, true);
-            }
-
-            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", rev.gitRev() });
-
-            /* Ensure that we use the correct origin for fetching
-               submodules. This matters for submodules with relative
-               URLs. */
-            if (repoInfo.isLocal) {
-                writeFile(tmpGitDir + "/config", readFile(repoDir + "/" + repoInfo.gitDir + "/config"));
-
-                /* Restore the config.bare setting we may have just
-                   copied erroneously from the user's repo. */
-                runProgram("git", true, { "-C", tmpDir, "config", "core.bare", "false" });
-            } else
-                runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.url", repoInfo.url });
-
-            /* As an optimisation, copy the modules directory of the
-               source repo if it exists. */
-            auto modulesPath = repoDir + "/" + repoInfo.gitDir + "/modules";
-            if (pathExists(modulesPath)) {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("copying submodules of '%s'", repoInfo.url));
-                runProgram("cp", true, { "-R", "--", modulesPath, tmpGitDir + "/modules" });
-            }
-
-            {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", repoInfo.url));
-                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" }, {}, true);
-            }
-
-            filter = isNotDotGitDirectory;
-
-            auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
-
-            return makeResult(infoAttrs, std::move(storePath));
-        }
+        return makeResult(infoAttrs, accessor);
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
