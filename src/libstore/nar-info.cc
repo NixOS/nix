@@ -146,6 +146,8 @@ nlohmann::json NarInfo::toJSON(
     if (includeImpureInfo) {
         if (!url.empty())
             jsonObject["url"] = url;
+        if (!compression.empty())
+            jsonObject["compression"] = compression;
         if (fileHash)
             jsonObject["downloadHash"] = fileHash->to_string(hashFormat, true);
         if (fileSize)
@@ -167,6 +169,9 @@ NarInfo NarInfo::fromJSON(
 
     if (json.contains("url"))
         res.url = ensureType(valueAt(json, "url"), value_t::string);
+
+    if (json.contains("compression"))
+        res.compression = ensureType(valueAt(json, "compression"), value_t::string);
 
     if (json.contains("downloadHash"))
         res.fileHash = Hash::parseAny(
