@@ -9,3 +9,10 @@ error:
            10|
 
        error: `addDrvOutputDependencies` can only act on derivations, not on a derivation output such as 'out'
+
+       at /pwd/lang/eval-fail-addDrvOutputDependencies-wrong-element-kind.nix:9:4:
+
+            8|
+            9| in builtins.addDrvOutputDependencies drv.outPath
+             |    ^
+           10|

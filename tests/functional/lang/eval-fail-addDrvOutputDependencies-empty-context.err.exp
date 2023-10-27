@@ -8,3 +8,9 @@ error:
             2|
 
        error: context of string '' must have exactly one element, but has 0
+
+       at /pwd/lang/eval-fail-addDrvOutputDependencies-empty-context.nix:1:1:
+
+            1| builtins.addDrvOutputDependencies ""
+             | ^
+            2|
