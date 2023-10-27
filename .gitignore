@@ -91,16 +91,13 @@ perl/Makefile.config
 /tests/functional/dyn-drv/config.nix
 /tests/functional/repl-result-out
 /tests/functional/test-libstoreconsumer/test-libstoreconsumer
+/tests/functional/debugger/*.out
 
 # /tests/functional/lang/
 /tests/functional/lang/*.out
 /tests/functional/lang/*.out.xml
 /tests/functional/lang/*.err
 /tests/functional/lang/*.ast
-
-# /tests/debugger
-/tests/debugger/*.out
-
 
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
