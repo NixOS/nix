@@ -409,17 +409,6 @@ struct GitInputScheme : InputScheme
 
         std::string name = input.getName();
 
-        auto makeResult = [&](const Attrs & infoAttrs, ref<InputAccessor> accessor) -> std::pair<ref<InputAccessor>, Input>
-        {
-            assert(input.getRev());
-            assert(!origRev || origRev == input.getRev());
-            if (!repoInfo.shallow)
-                input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-            input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-
-            return {accessor, std::move(input)};
-        };
-
         auto originalRef = input.getRef();
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
         input.attrs.insert_or_assign("ref", ref);
@@ -558,7 +547,13 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        return makeResult(infoAttrs, accessor);
+        assert(input.getRev());
+        assert(!origRev || origRev == input.getRev());
+        if (!repoInfo.shallow)
+            input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
+        input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
+
+        return {accessor, std::move(input)};
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
