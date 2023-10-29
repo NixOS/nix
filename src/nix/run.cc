@@ -110,16 +110,22 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         setEnviron();
 
         auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
+        auto manPath = tokenizeString<Strings>(getEnv("MANPATH").value_or(""), ":");
 
         while (!todo.empty()) {
             auto path = todo.front();
             todo.pop();
             if (!done.insert(path).second) continue;
 
-            if (true)
-                unixPath.push_front(store->printStorePath(path) + "/bin");
+            auto pathString = store->printStorePath(path);
 
-            auto propPath = store->printStorePath(path) + "/nix-support/propagated-user-env-packages";
+            if (accessor->stat(pathString + "/bin").type != FSAccessor::tMissing)
+                unixPath.push_front(pathString + "/bin");
+
+            if (accessor->stat(pathString + "/share/man").type != FSAccessor::tMissing)
+                manPath.push_front(pathString + "/share/man");
+
+            auto propPath = pathString + "/nix-support/propagated-user-env-packages";
             if (accessor->stat(propPath).type == FSAccessor::tRegular) {
                 for (auto & p : tokenizeString<Paths>(readFile(propPath)))
                     todo.push(store->parseStorePath(p));
@@ -127,6 +133,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         }
 
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
+        setenv("MANPATH", concatStringsSep(":", manPath).c_str(), 1);
 
         Strings args;
         for (auto & arg : command) args.push_back(arg);
