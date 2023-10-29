@@ -191,7 +191,7 @@ namespace nix {
             "description",
             {},
             true,
-            Xp::Flakes,
+            Xp::CaDerivations,
         };
         setting.assign("value");
 
@@ -203,7 +203,7 @@ namespace nix {
               "description": "description\n",
               "documentDefault": true,
               "value": "value",
-              "experimentalFeature": "flakes"
+              "experimentalFeature": "ca-derivations"
             }
           })#"_json);
     }

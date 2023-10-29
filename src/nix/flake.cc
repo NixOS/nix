@@ -1462,12 +1462,6 @@ struct CmdFlake : NixMultiCommand
           #include "flake.md"
           ;
     }
-
-    void run() override
-    {
-        experimentalFeatureSettings.require(Xp::Flakes);
-        NixMultiCommand::run();
-    }
 };
 
 static auto rCmdFlake = registerCommand<CmdFlake>("flake");

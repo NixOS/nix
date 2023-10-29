@@ -51,7 +51,7 @@ in
           virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
           virtualisation.memorySize = 4096;
           nix.settings.substituters = lib.mkForce [ ];
-          nix.extraOptions = "experimental-features = nix-command flakes";
+          nix.extraOptions = "experimental-features = nix-command";
         };
     };
 

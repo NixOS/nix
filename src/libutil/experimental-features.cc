@@ -74,8 +74,9 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .tag = Xp::Flakes,
         .name = "flakes",
         .description = R"(
-            Enable flakes. See the manual entry for [`nix
-            flake`](@docroot@/command-ref/new-cli/nix3-flake.md) for details.
+            *Enabled for Determinate Nix Installer users since 2.19*
+
+            See the manual entry for [`nix flake`](@docroot@/command-ref/new-cli/nix3-flake.md) for details.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/27",
     },
@@ -83,6 +84,8 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .tag = Xp::FetchTree,
         .name = "fetch-tree",
         .description = R"(
+            *Enabled for Determinate Nix Installer users since 2.24*
+
             Enable the use of the [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) built-in function in the Nix language.
 
             `fetchTree` exposes a generic interface for fetching remote file system trees from different types of remote sources.

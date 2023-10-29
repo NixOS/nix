@@ -163,15 +163,11 @@ static void fetchTree(
             }
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
-            if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
-                state.error<EvalError>(
-                    "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
-                ).atPos(pos).debugThrow();
             input = fetchers::Input::fromURL(url);
         }
     }
 
-    if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
+    if (!state.settings.pureEval && !input.isDirect())
         input = lookupInRegistries(state.store, input).first;
 
     if (state.settings.pureEval && !input.isLocked()) {
@@ -383,7 +379,6 @@ static RegisterPrimOp primop_fetchTree({
       - `"mercurial"`
 
      *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
-     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
 
       > **Example**
       >
@@ -420,7 +415,6 @@ static RegisterPrimOp primop_fetchTree({
       >   ```
     )",
     .fun = prim_fetchTree,
-    .experimentalFeature = Xp::FetchTree,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,

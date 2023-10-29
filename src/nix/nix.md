@@ -69,11 +69,9 @@ That is, Nix will operate on the default flake output attribute of the flake in 
 ### Flake output attribute
 
 > **Warning** \
-> Flake output attribute installables depend on both the
-> [`flakes`](@docroot@/contributing/experimental-features.md#xp-feature-flakes)
-> and
+> Flake output attribute installables depend on the
 > [`nix-command`](@docroot@/contributing/experimental-features.md#xp-feature-nix-command)
-> experimental features, and subject to change without notice.
+> experimental feature, and subject to change without notice.
 
 Example: `nixpkgs#hello`
 

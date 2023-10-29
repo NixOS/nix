@@ -22,8 +22,7 @@ struct FlakeSettings : public Config
         "use-registries",
         "Whether to use flake registries to resolve flake references.",
         {},
-        true,
-        Xp::Flakes};
+        true};
 
     Setting<bool> acceptFlakeConfig{
         this,
@@ -31,8 +30,7 @@ struct FlakeSettings : public Config
         "accept-flake-config",
         "Whether to accept nix configuration from a flake without prompting.",
         {},
-        true,
-        Xp::Flakes};
+        true};
 
     Setting<std::string> commitLockFileSummary{
         this,
@@ -43,8 +41,7 @@ struct FlakeSettings : public Config
           empty, the summary is generated based on the action performed.
         )",
         {"commit-lockfile-summary"},
-        true,
-        Xp::Flakes};
+        true};
 };
 
 // TODO: don't use a global variable.

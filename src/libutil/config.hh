@@ -386,7 +386,7 @@ struct ExperimentalFeatureSettings : Config {
           Example:
 
           ```
-          experimental-features = nix-command flakes
+          experimental-features = nix-command
           ```
 
           The following experimental features are available:
