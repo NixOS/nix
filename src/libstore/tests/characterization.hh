@@ -20,4 +20,9 @@ static bool testAccept() {
     return getEnv("_NIX_TEST_ACCEPT") == "1";
 }
 
+constexpr std::string_view cannotReadGoldenMaster =
+    "Cannot read golden master because another test is also updating it";
+
+constexpr std::string_view updatingGoldenMaster =
+    "Updating golden master";
 }

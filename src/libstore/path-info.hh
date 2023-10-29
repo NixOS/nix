@@ -29,7 +29,7 @@ struct SubstitutablePathInfo
     uint64_t narSize;
 };
 
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
+using SubstitutablePathInfos = std::map<StorePath, SubstitutablePathInfo>;
 
 
 struct UnkeyedValidPathInfo
@@ -42,7 +42,7 @@ struct UnkeyedValidPathInfo
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
-    uint64_t id; // internal use only
+    uint64_t id = 0; // internal use only
 
     /**
      * Whether the path is ultimately trusted, that is, it's a
@@ -136,6 +136,6 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
     virtual ~ValidPathInfo() { }
 };
 
-typedef std::map<StorePath, ValidPathInfo> ValidPathInfos;
+using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 
 }
