@@ -3180,9 +3180,14 @@ static RegisterPrimOp primop_foldlStrict({
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
       e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
-      ...`. For example, `foldl' (x: y: x + y) 0 [1 2 3]` evaluates to 6.
-      The return value of each application of `op` is evaluated immediately,
-      even for intermediate values.
+      ...`.
+      For example, `foldl' (acc: elem: acc + elem) 0 [1 2 3]` evaluates
+      to `6` and `foldl' (acc: elem: { "${elem}" = elem; } // acc) {}
+      ["a" "b"]` evaluates to `{ a = "a"; b = "b"; }`.
+      The first argument of `op` is the accumulator wheres the second
+      argument is the current element being processed. The return value
+      of each application of `op` is evaluated immediately, even for
+      intermediate values.
     )",
     .fun = prim_foldlStrict,
 });
