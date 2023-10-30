@@ -56,8 +56,11 @@ protected:
 
     void upsertFile(const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) override
+        const std::string & mimeType,
+        std::map<std::string, std::string> tags) override
     {
+        (void)tags;
+
         auto path2 = binaryCacheDir + "/" + path;
         static std::atomic<int> counter{0};
         Path tmp = fmt("%s.tmp.%d.%d", path2, getpid(), ++counter);

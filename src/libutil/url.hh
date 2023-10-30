@@ -32,6 +32,7 @@ std::string percentDecode(std::string_view in);
 std::string percentEncode(std::string_view s, std::string_view keep="");
 
 std::map<std::string, std::string> decodeQuery(const std::string & query);
+std::string encodeQuery(const std::map<std::string, std::string> & params);
 
 ParsedURL parseURL(const std::string & url);
 

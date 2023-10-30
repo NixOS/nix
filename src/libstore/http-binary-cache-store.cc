@@ -130,8 +130,11 @@ protected:
 
     void upsertFile(const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) override
+        const std::string & mimeType,
+        std::map<std::string, std::string> tags) override
     {
+        (void)tags;
+
         auto req = makeRequest(path);
         req.data = StreamToSourceAdapter(istream).drain();
         req.mimeType = mimeType;

@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "filetransfer.hh"
+#include "url.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -347,11 +348,26 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     void uploadFile(const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType,
-        const std::string & contentEncoding)
+        const std::string & contentEncoding,
+        std::map<std::string, std::string> tags)
     {
         istream->seekg(0, istream->end);
         auto size = istream->tellg();
         istream->seekg(0, istream->beg);
+
+        std::map<std::string, std::string> actual_tags;
+        const std::string prefix = "nix:";
+        for (const auto& kv: tags) {
+            if (kv.first.size() > 128 - prefix.size()) {
+                printMsg(lvlWarn, "tag %s in %s is too long for s3 upload", kv.first, path);
+                continue;
+            }
+            if (kv.second.size() > 256) {
+                printMsg(lvlWarn, "tag value %s in %s is too long for s3 upload", kv.second, path);
+                continue;
+            }
+            actual_tags[prefix + kv.first] = kv.second;
+        }
 
         auto maxThreads = std::thread::hardware_concurrency();
 
@@ -418,6 +434,11 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
             if (contentEncoding != "")
                 request.SetContentEncoding(contentEncoding);
 
+            if (!actual_tags.empty()) {
+                request.SetTagging(encodeQuery(actual_tags));
+            }
+
+
             request.SetBody(istream);
 
             auto result = checkAws(fmt("AWS error uploading '%s'", path),
@@ -440,7 +461,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
     void upsertFile(const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) override
+        const std::string & mimeType,
+        std::map<std::string, std::string> tags) override
     {
         auto compress = [&](std::string compression)
         {
@@ -449,13 +471,13 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         };
 
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
-            uploadFile(path, compress(narinfoCompression), mimeType, narinfoCompression);
+            uploadFile(path, compress(narinfoCompression), mimeType, narinfoCompression, tags);
         else if (lsCompression != "" && hasSuffix(path, ".ls"))
-            uploadFile(path, compress(lsCompression), mimeType, lsCompression);
+            uploadFile(path, compress(lsCompression), mimeType, lsCompression, tags);
         else if (logCompression != "" && hasPrefix(path, "log/"))
-            uploadFile(path, compress(logCompression), mimeType, logCompression);
+            uploadFile(path, compress(logCompression), mimeType, logCompression, tags);
         else
-            uploadFile(path, istream, mimeType, "");
+            uploadFile(path, istream, mimeType, "", tags);
     }
 
     void getFile(const std::string & path, Sink & sink) override
