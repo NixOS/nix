@@ -711,8 +711,16 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .args = {"attrset"},
     .arity = 1,
     .doc = R"(
-      Take an *attrset* with values named `startSet` and `operator` in order to
-      return a *list of attrsets* by starting with the `startSet` and recursively
+      Takes an *attrset* with the following attributes:
+
+      - `startSet` [ Item ]
+        - A list of start items. Each item must be an attrset containing a `key`. The `key` must be comparable.
+      - `operator` Item -> [ Item ]
+        - A function
+
+      returns a *list of attrsets*
+
+      GenericClosure starts with the `startSet` and recursively
       applying the `operator` function to each `item`. The *attrsets* in the
       `startSet` and the *attrsets* produced by `operator` must contain a value
       named `key` which is comparable. The result is produced by calling `operator`
@@ -2525,7 +2533,7 @@ void prim_unsafeGetLambdaDoc(EvalState &state, const PosIdx pos, Value **args, V
 
     doc = Comment::lookupDoc(funPos, false);
     state.mkPos(attrs.alloc("position"), posIdx);
-
+    countApplied = doc.timesApplied;
     // TODO: place the cursor before the outermost lambda.
     // Expr *root =
     // state.parseExprFromFile(std::get<SourcePath>(funPos.origin)); auto root =

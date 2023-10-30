@@ -90,6 +90,11 @@ struct Doc lookupDoc(const Pos &pos, const bool simple) {
     return emptyDoc;
   }
 }
+
+static int countLambdas(std::string piece) {
+    return std::count(piece.begin(), piece.end(), ':');
+}
+
 /* Try to recover a Doc by looking at the text that leads up to a term
    definition */
 static struct Doc parseDoc(std::string sourcePrefix, const bool simple) {
@@ -102,7 +107,8 @@ static struct Doc parseDoc(std::string sourcePrefix, const bool simple) {
                    ident + ")");
   std::string assign("(?:=" + whitespaces + ")");
   std::string lParen("(?:\\(*" + whitespaces + ")*");
-  std::string lambda("(?:" + whitespaces + ":" + ident + lParen + ")*");
+  // Capturing lambdas for 'count_applied'
+  std::string lambda("((:?" + whitespaces + ":" + ident + lParen + ")*)");
   std::string doc("([\\s]*\\/\\*(?:.|[\\s])*?(\\*\\*\\/))?");
 
   // 1. up all whitespaces
@@ -133,18 +139,25 @@ static struct Doc parseDoc(std::string sourcePrefix, const bool simple) {
     e = std::regex(reverseRegex);
   }
 
-#define REGEX_GROUP_COMMENT 1
+#define REGEX_GROUP_COMMENT_SIMPLE 1
+
+#define REGEX_GROUP_LAMBDAS 1
+#define REGEX_GROUP_COMMENT 3
 
   std::smatch matches;
   regex_search(sourcePrefix, matches, e);
 
-  std::stringstream buffer;
-  if (matches.length() < REGEX_GROUP_COMMENT ||
-      matches[REGEX_GROUP_COMMENT].str().empty()) {
-    return emptyDoc;
+  std::string rawComment = matches[REGEX_GROUP_COMMENT_SIMPLE];
+
+  if(!simple) {
+    rawComment = matches[REGEX_GROUP_COMMENT];
+    std::string rawLambdas = matches[REGEX_GROUP_LAMBDAS];
+    int count_applied = countLambdas(rawLambdas);
+
+    std::reverse(rawComment.begin(), rawComment.end());
+    return Doc(rawComment, Doc::stripComment(rawComment), count_applied);
   }
 
-  std::string rawComment = matches[REGEX_GROUP_COMMENT];
   std::reverse(rawComment.begin(), rawComment.end());
   return Doc(rawComment, Doc::stripComment(rawComment));
 }

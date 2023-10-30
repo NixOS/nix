@@ -224,6 +224,13 @@ rec {
   */
   ${"id"} = x: x;
 
+  /**ignoreFour*/
+  ignoreFour = a: b: c: d: d;
+
+  /**some Id*/
+  someId = ignoreFour 1 1 1;
+  /**Double Id*/
+  doubleIt = ignoreFour 1 1;
   /**
     Doc Comment with an argument pattern
   */

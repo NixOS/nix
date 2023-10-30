@@ -24,6 +24,11 @@ struct Doc {
     this->rawComment = rawComment;
     this->comment = comment;
   }
+  Doc(std::string rawComment, std::string comment, int timesApplied) {
+    this->rawComment = rawComment;
+    this->comment = comment;
+    this->timesApplied = timesApplied;
+  }
   Doc(std::string str) {
     this->rawComment = str;
     this->comment = Doc::stripComment(str);
