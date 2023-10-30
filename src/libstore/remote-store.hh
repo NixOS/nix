@@ -22,10 +22,10 @@ struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+    const Setting<int> maxConnections{this, 1, "max-connections",
         "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this,
+    const Setting<unsigned int> maxConnectionAge{this,
         std::numeric_limits<unsigned int>::max(),
         "max-connection-age",
         "Maximum age of a connection before it is closed."};

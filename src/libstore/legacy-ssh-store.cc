@@ -17,10 +17,10 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program",
+    const Setting<Path> remoteProgram{this, "nix-store", "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+    const Setting<int> maxConnections{this, 1, "max-connections",
         "Maximum number of concurrent SSH connections."};
 
     const std::string name() override { return "SSH Store"; }
@@ -38,7 +38,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
     // the documentation
-    const Setting<int> logFD{(StoreConfig*) this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
 
     struct Connection
     {

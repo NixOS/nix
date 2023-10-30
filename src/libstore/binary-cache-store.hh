@@ -17,28 +17,28 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<std::string> compression{(StoreConfig*) this, "xz", "compression",
+    const Setting<std::string> compression{this, "xz", "compression",
         "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
 
-    const Setting<bool> writeNARListing{(StoreConfig*) this, false, "write-nar-listing",
+    const Setting<bool> writeNARListing{this, false, "write-nar-listing",
         "Whether to write a JSON file that lists the files in each NAR."};
 
-    const Setting<bool> writeDebugInfo{(StoreConfig*) this, false, "index-debug-info",
+    const Setting<bool> writeDebugInfo{this, false, "index-debug-info",
         R"(
           Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
           fetch debug info on demand
         )"};
 
-    const Setting<Path> secretKeyFile{(StoreConfig*) this, "", "secret-key",
+    const Setting<Path> secretKeyFile{this, "", "secret-key",
         "Path to the secret key used to sign the binary cache."};
 
-    const Setting<Path> localNarCache{(StoreConfig*) this, "", "local-nar-cache",
+    const Setting<Path> localNarCache{this, "", "local-nar-cache",
         "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`."};
 
-    const Setting<bool> parallelCompression{(StoreConfig*) this, false, "parallel-compression",
+    const Setting<bool> parallelCompression{this, false, "parallel-compression",
         "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`."};
 
-    const Setting<int> compressionLevel{(StoreConfig*) this, -1, "compression-level",
+    const Setting<int> compressionLevel{this, -1, "compression-level",
         R"(
           The *preset level* to be used when compressing NARs.
           The meaning and accepted values depend on the compression method selected.
