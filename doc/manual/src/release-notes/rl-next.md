@@ -12,6 +12,8 @@
 
 - Introduce a new built-in function [`builtins.convertHash`](@docroot@/language/builtins.md#builtins-convertHash).
 
+- Fixed a bug where `nix-env --query` ignored `--drv-path` when `--json` was set.
+
 - `nix-shell` shebang lines now support single-quoted arguments.
 
 - `builtins.fetchTree` is now marked as stable.
