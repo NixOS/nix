@@ -184,7 +184,6 @@ DownloadTarballResult downloadTarball(
 // An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
-    virtual const std::string inputType() const = 0;
     const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
 
     const bool hasTarballExtension(std::string_view path) const
@@ -222,22 +221,27 @@ struct CurlInputScheme : InputScheme
         url.query.erase("rev");
         url.query.erase("revCount");
 
-        input.attrs.insert_or_assign("type", inputType());
+        input.attrs.insert_or_assign("type", std::string { schemeName() });
         input.attrs.insert_or_assign("url", url.to_string());
         return input;
     }
 
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "type",
+            "url",
+            "narHash",
+            "name",
+            "unpack",
+            "rev",
+            "revCount",
+            "lastModified",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        auto type = maybeGetStrAttr(attrs, "type");
-        if (type != inputType()) return {};
-
-        // FIXME: some of these only apply to TarballInputScheme.
-        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount", "lastModified"};
-        for (auto & [name, value] : attrs)
-            if (!allowedNames.count(name))
-                throw Error("unsupported %s input attribute '%s'", *type, name);
-
         Input input;
         input.attrs = attrs;
 
@@ -258,14 +262,14 @@ struct CurlInputScheme : InputScheme
 
 struct FileInputScheme : CurlInputScheme
 {
-    const std::string inputType() const override { return "file"; }
+    std::string_view schemeName() const override { return "file"; }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                ? parsedUrlScheme.application.value() == inputType()
+                ? parsedUrlScheme.application.value() == schemeName()
                 : (!requireTree && !hasTarballExtension(url.path)));
     }
 
@@ -278,7 +282,7 @@ struct FileInputScheme : CurlInputScheme
 
 struct TarballInputScheme : CurlInputScheme
 {
-    const std::string inputType() const override { return "tarball"; }
+    std::string_view schemeName() const override { return "tarball"; }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
@@ -286,7 +290,7 @@ struct TarballInputScheme : CurlInputScheme
 
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                ? parsedUrlScheme.application.value() == inputType()
+                ? parsedUrlScheme.application.value() == schemeName()
                 : (requireTree || hasTarballExtension(url.path)));
     }
 

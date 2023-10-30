@@ -49,14 +49,23 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
+    std::string_view schemeName() const override
+    {
+        return "indirect";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "id",
+            "ref",
+            "rev",
+            "narHash",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "indirect") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "id" && name != "ref" && name != "rev" && name != "narHash")
-                throw Error("unsupported indirect input attribute '%s'", name);
-
         auto id = getStrAttr(attrs, "id");
         if (!std::regex_match(id, flakeRegex))
             throw BadURL("'%s' is not a valid flake ID", id);
@@ -92,7 +101,7 @@ struct IndirectInputScheme : InputScheme
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
     }
 
-    std::optional<ExperimentalFeature> experimentalFeature() override
+    std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;
     }
