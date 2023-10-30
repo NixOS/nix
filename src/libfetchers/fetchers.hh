@@ -8,6 +8,7 @@
 #include "url.hh"
 
 #include <memory>
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix { class Store; }
 
@@ -169,5 +170,7 @@ struct InputScheme
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
+
+nlohmann::json dumpRegisterInputSchemeInfo();
 
 }

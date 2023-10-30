@@ -19,6 +19,19 @@ void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
     inputSchemes->insert_or_assign(schemeName, std::move(inputScheme));
 }
 
+nlohmann::json dumpRegisterInputSchemeInfo() {
+    using nlohmann::json;
+
+    auto res = json::object();
+
+    for (auto & [name, scheme] : *inputSchemes) {
+        auto & r = res[name] = json::object();
+        r["allowedAttrs"] = scheme->allowedAttrs();
+    }
+
+    return res;
+}
+
 Input Input::fromURL(const std::string & url, bool requireTree)
 {
     return fromURL(parseURL(url), requireTree);
