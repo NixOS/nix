@@ -641,29 +641,28 @@ LockedFlake lockFlake(
 
                         auto newLockFileS = fmt("%s\n", newLockFile);
 
-                        if (lockFlags.outputLockFilePath)
+                        if (lockFlags.outputLockFilePath) {
+                            if (lockFlags.commitLockFile)
+                                throw Error("'--commit-lock-file' and '--output-lock-file' are incompatible");
                             writeFile(*lockFlags.outputLockFilePath, newLockFileS);
-                        else {
+                        } else {
                             auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
-                            auto outputLockFilePath = sourcePath ? std::optional{*sourcePath + "/" + relPath} : std::nullopt;
+                            auto outputLockFilePath = *sourcePath + "/" + relPath;
 
-                            bool lockFileExists = pathExists(*outputLockFilePath);
+                            bool lockFileExists = pathExists(outputLockFilePath);
 
                             if (lockFileExists) {
                                 auto s = chomp(diff);
                                 if (s.empty())
-                                    warn("updating lock file '%s'", *outputLockFilePath);
+                                    warn("updating lock file '%s'", outputLockFilePath);
                                 else
-                                    warn("updating lock file '%s':\n%s", *outputLockFilePath, s);
+                                    warn("updating lock file '%s':\n%s", outputLockFilePath, s);
                             } else
-                                warn("creating lock file '%s'", *outputLockFilePath);
+                                warn("creating lock file '%s'", outputLockFilePath);
 
                             std::optional<std::string> commitMessage = std::nullopt;
 
                             if (lockFlags.commitLockFile) {
-                                if (lockFlags.outputLockFilePath) {
-                                    throw Error("--commit-lock-file and --output-lock-file are currently incompatible");
-                                }
                                 std::string cm;
 
                                 cm = fetchSettings.commitLockFileSummary.get();
