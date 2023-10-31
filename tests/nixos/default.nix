@@ -21,6 +21,8 @@ in
 
   remoteBuilds = runNixOSTestFor "x86_64-linux" ./remote-builds.nix;
 
+  remoteBuildsSshNg = runNixOSTestFor "x86_64-linux" ./remote-builds-ssh-ng.nix;
+
   nix-copy-closure = runNixOSTestFor "x86_64-linux" ./nix-copy-closure.nix;
 
   nix-copy = runNixOSTestFor "x86_64-linux" ./nix-copy.nix;
