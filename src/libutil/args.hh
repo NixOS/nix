@@ -200,13 +200,25 @@ protected:
     /**
      * Queue of expected positional argument forms.
      *
-     * Positional arugment descriptions are inserted on the back.
+     * Positional argument descriptions are inserted on the back.
      *
      * As positional arguments are passed, these are popped from the
      * front, until there are hopefully none left as all args that were
      * expected in fact were passed.
      */
     std::list<ExpectedArg> expectedArgs;
+    /**
+     * List of processed positional argument forms.
+     * 
+     * All items removed from `expectedArgs` are added here. After all
+     * arguments were processed, this list should be exactly the same as
+     * `expectedArgs` was before.
+     * 
+     * This list is used to extend the lifetime of the argument forms.
+     * If this is not done, some closures that reference the command
+     * itself will segfault.
+    */
+   std::list<ExpectedArg> processedArgs;
 
     /**
      * Process some positional arugments

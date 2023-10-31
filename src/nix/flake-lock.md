@@ -2,37 +2,39 @@ R""(
 
 # Examples
 
-* Update the `nixpkgs` and `nix` inputs of the flake in the current
-  directory:
+* Create the lock file for the flake in the current directory:
 
   ```console
-  # nix flake lock --update-input nixpkgs --update-input nix
-  * Updated 'nix': 'github:NixOS/nix/9fab14adbc3810d5cc1f88672fde1eee4358405c' -> 'github:NixOS/nix/8927cba62f5afb33b01016d5c4f7f8b7d0adde3c'
-  * Updated 'nixpkgs': 'github:NixOS/nixpkgs/3d2d8f281a27d466fa54b469b5993f7dde198375' -> 'github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293'
+  # nix flake lock
+  warning: creating lock file '/home/myself/repos/testflake/flake.lock':
+  • Added input 'nix':
+      'github:NixOS/nix/9fab14adbc3810d5cc1f88672fde1eee4358405c' (2023-06-28)
+  • Added input 'nixpkgs':
+      'github:NixOS/nixpkgs/3d2d8f281a27d466fa54b469b5993f7dde198375' (2023-06-30)
   ```
+
+* Add missing inputs to the lock file for a flake in a different directory:
+
+  ```console
+  # nix flake lock ~/repos/another
+  warning: updating lock file '/home/myself/repos/another/flake.lock':
+  • Added input 'nixpkgs':
+      'github:NixOS/nixpkgs/3d2d8f281a27d466fa54b469b5993f7dde198375' (2023-06-30)
+  ```
+
+  > **Note**
+  >
+  > When trying to refer to a flake in a subdirectory, write `./another`
+  > instead of `another`.
+  > Otherwise Nix will try to look up the flake in the registry.
 
 # Description
 
-This command updates the lock file of a flake (`flake.lock`) so that
-it contains a lock for every flake input specified in
-`flake.nix`. Existing lock file entries are not updated unless
-required by a flag such as `--update-input`.
+This command adds inputs to the lock file of a flake (`flake.lock`)
+so that it contains a lock for every flake input specified in
+`flake.nix`. Existing lock file entries are not updated.
 
-Note that every command that operates on a flake will also update the
-lock file if needed, and supports the same flags. Therefore,
-
-```console
-# nix flake lock --update-input nixpkgs
-# nix build
-```
-
-is equivalent to:
-
-```console
-# nix build --update-input nixpkgs
-```
-
-Thus, this command is only useful if you want to update the lock file
-separately from any other action such as building.
+If you want to update existing lock entries, use
+[`nix flake update`](@docroot@/command-ref/new-cli/nix3-flake-update.md)
 
 )""
