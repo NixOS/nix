@@ -354,7 +354,7 @@ struct GitInputScheme : InputScheme
         runProgram("git", true, args, {}, true);
     }
 
-    std::optional<Path> getSourcePath(const Input & input) override
+    std::optional<Path> getSourcePath(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
@@ -362,18 +362,26 @@ struct GitInputScheme : InputScheme
         return {};
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const override
     {
-        auto sourcePath = getSourcePath(input);
-        assert(sourcePath);
+        auto root = getSourcePath(input);
+        if (!root)
+            throw Error("cannot commit '%s' to Git repository '%s' because it's not a working tree", path, input.to_string());
+
+        writeFile((CanonPath(*root) + path).abs(), contents);
+
         auto gitDir = ".git";
 
         runProgram("git", true,
-            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(file) });
+            { "-C", *root, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg });
+                { "-C", *root, "--git-dir", gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const

@@ -623,12 +623,7 @@ LockedFlake lockFlake(
 
         debug("new lock file: %s", newLockFile);
 
-        auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
         auto sourcePath = topRef.input.getSourcePath();
-        auto outputLockFilePath = sourcePath ? std::optional{*sourcePath + "/" + relPath} : std::nullopt;
-        if (lockFlags.outputLockFilePath) {
-            outputLockFilePath = lockFlags.outputLockFilePath;
-        }
 
         /* Check whether we need to / can write the new lock file. */
         if (newLockFile != oldLockFile || lockFlags.outputLockFilePath) {
@@ -636,7 +631,7 @@ LockedFlake lockFlake(
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
             if (lockFlags.writeLockFile) {
-                if (outputLockFilePath) {
+                if (sourcePath || lockFlags.outputLockFilePath) {
                     if (auto unlockedInput = newLockFile.isUnlocked()) {
                         if (fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
@@ -644,40 +639,47 @@ LockedFlake lockFlake(
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                        bool lockFileExists = pathExists(*outputLockFilePath);
+                        auto newLockFileS = fmt("%s\n", newLockFile);
 
-                        if (lockFileExists) {
-                            auto s = chomp(diff);
-                            if (s.empty())
-                                warn("updating lock file '%s'", *outputLockFilePath);
-                            else
-                                warn("updating lock file '%s':\n%s", *outputLockFilePath, s);
-                        } else
-                            warn("creating lock file '%s'", *outputLockFilePath);
+                        if (lockFlags.outputLockFilePath) {
+                            if (lockFlags.commitLockFile)
+                                throw Error("'--commit-lock-file' and '--output-lock-file' are incompatible");
+                            writeFile(*lockFlags.outputLockFilePath, newLockFileS);
+                        } else {
+                            auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
+                            auto outputLockFilePath = *sourcePath + "/" + relPath;
 
-                        newLockFile.write(*outputLockFilePath);
+                            bool lockFileExists = pathExists(outputLockFilePath);
 
-                        std::optional<std::string> commitMessage = std::nullopt;
-                        if (lockFlags.commitLockFile) {
-                            if (lockFlags.outputLockFilePath) {
-                                throw Error("--commit-lock-file and --output-lock-file are currently incompatible");
+                            if (lockFileExists) {
+                                auto s = chomp(diff);
+                                if (s.empty())
+                                    warn("updating lock file '%s'", outputLockFilePath);
+                                else
+                                    warn("updating lock file '%s':\n%s", outputLockFilePath, s);
+                            } else
+                                warn("creating lock file '%s'", outputLockFilePath);
+
+                            std::optional<std::string> commitMessage = std::nullopt;
+
+                            if (lockFlags.commitLockFile) {
+                                std::string cm;
+
+                                cm = fetchSettings.commitLockFileSummary.get();
+
+                                if (cm == "") {
+                                    cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
+                                }
+
+                                cm += "\n\nFlake lock file updates:\n\n";
+                                cm += filterANSIEscapes(diff, true);
+                                commitMessage = cm;
                             }
-                            std::string cm;
 
-                            cm = fetchSettings.commitLockFileSummary.get();
-
-                            if (cm == "") {
-                                cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
-                            }
-
-                            cm += "\n\nFlake lock file updates:\n\n";
-                            cm += filterANSIEscapes(diff, true);
-                            commitMessage = cm;
+                            topRef.input.putFile(
+                                CanonPath((topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock"),
+                                newLockFileS, commitMessage);
                         }
-
-                        topRef.input.markChangedFile(
-                            (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock",
-                            commitMessage);
 
                         /* Rewriting the lockfile changed the top-level
                            repo, so we should re-read it. FIXME: we could

@@ -196,12 +196,13 @@ std::optional<Path> Input::getSourcePath() const
     return scheme->getSourcePath(*this);
 }
 
-void Input::markChangedFile(
-    std::string_view file,
+void Input::putFile(
+    const CanonPath & path,
+    std::string_view contents,
     std::optional<std::string> commitMsg) const
 {
     assert(scheme);
-    return scheme->markChangedFile(*this, file, commitMsg);
+    return scheme->putFile(*this, path, contents, commitMsg);
 }
 
 std::string Input::getName() const
@@ -292,14 +293,18 @@ Input InputScheme::applyOverrides(
     return input;
 }
 
-std::optional<Path> InputScheme::getSourcePath(const Input & input)
+std::optional<Path> InputScheme::getSourcePath(const Input & input) const
 {
     return {};
 }
 
-void InputScheme::markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg)
+void InputScheme::putFile(
+    const Input & input,
+    const CanonPath & path,
+    std::string_view contents,
+    std::optional<std::string> commitMsg) const
 {
-    assert(false);
+    throw Error("input '%s' does not support modifying file '%s'", input.to_string(), path);
 }
 
 void InputScheme::clone(const Input & input, const Path & destDir) const
