@@ -20,6 +20,16 @@ struct GitRepo
     /* Return the commit hash to which a ref points. */
     virtual Hash resolveRef(std::string ref) = 0;
 
+    /**
+     * Info about a submodule.
+     */
+    struct Submodule
+    {
+        CanonPath path;
+        std::string url;
+        std::string branch;
+    };
+
     struct WorkdirInfo
     {
         bool isDirty = false;
@@ -31,6 +41,9 @@ struct GitRepo
         /* All files in the working directory that are unchanged,
            modified or added, but excluding deleted files. */
         std::set<CanonPath> files;
+
+        /* The submodules listed in .gitmodules of this workdir. */
+        std::vector<Submodule> submodules;
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
@@ -38,15 +51,11 @@ struct GitRepo
     /* Get the ref that HEAD points to. */
     virtual std::optional<std::string> getWorkdirRef() = 0;
 
-    struct Submodule
-    {
-        CanonPath path;
-        std::string url;
-        std::string branch;
-        Hash rev;
-    };
-
-    virtual std::vector<Submodule> getSubmodules(const Hash & rev) = 0;
+    /**
+     * Return the submodules of this repo at the indicated revision,
+     * along with the revision of each submodule.
+     */
+    virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) = 0;
 
     virtual std::string resolveSubmoduleUrl(const std::string & url) = 0;
 

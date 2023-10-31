@@ -525,16 +525,16 @@ struct GitInputScheme : InputScheme
         if (repoInfo.submodules) {
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
-            for (auto & submodule : repo->getSubmodules(rev)) {
+            for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev)) {
                 auto resolved = repo->resolveSubmoduleUrl(submodule.url);
                 debug("Git submodule %s: %s %s %s -> %s",
-                    submodule.path, submodule.url, submodule.branch, submodule.rev.gitRev(), resolved);
+                    submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", resolved);
                 if (submodule.branch != "")
                     attrs.insert_or_assign("ref", submodule.branch);
-                attrs.insert_or_assign("rev", submodule.rev.gitRev());
+                attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.scheme->getAccessor(store, submoduleInput);
@@ -557,9 +557,45 @@ struct GitInputScheme : InputScheme
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
+        ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
     {
+        if (repoInfo.submodules)
+            /* Create mountpoints for the submodules. */
+            for (auto & submodule : repoInfo.workdirInfo.submodules)
+                repoInfo.workdirInfo.files.insert(submodule.path);
+
+        ref<InputAccessor> accessor =
+            makeFSInputAccessor(CanonPath(repoInfo.url), repoInfo.workdirInfo.files, makeNotAllowedError(repoInfo.url));
+
+        /* If the repo has submodules, return a union input accessor
+           consisting of the accessor for the top-level repo and the
+           accessors for the submodule workdirs. */
+        if (repoInfo.submodules && !repoInfo.workdirInfo.submodules.empty()) {
+            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+
+            for (auto & submodule : repoInfo.workdirInfo.submodules) {
+                auto submodulePath = CanonPath(repoInfo.url) + submodule.path;
+                fetchers::Attrs attrs;
+                attrs.insert_or_assign("type", "git");
+                attrs.insert_or_assign("url", submodulePath.abs());
+                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] =
+                    submoduleInput.scheme->getAccessor(store, submoduleInput);
+
+                /* If the submodule is dirty, mark this repo dirty as
+                   well. */
+                if (!submoduleInput2.getRev())
+                    repoInfo.workdirInfo.isDirty = true;
+
+                mounts.insert_or_assign(submodule.path, submoduleAccessor);
+            }
+
+            mounts.insert_or_assign(CanonPath::root, accessor);
+            accessor = makeUnionInputAccessor(std::move(mounts));
+        }
+
         if (!repoInfo.workdirInfo.isDirty) {
             if (auto ref = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirRef())
                 input.attrs.insert_or_assign("ref", *ref);
@@ -588,10 +624,7 @@ struct GitInputScheme : InputScheme
 
         input.locked = true; // FIXME
 
-        return {
-            makeFSInputAccessor(CanonPath(repoInfo.url), repoInfo.workdirInfo.files, makeNotAllowedError(repoInfo.url)),
-            std::move(input)
-        };
+        return {accessor, std::move(input)};
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
@@ -603,7 +636,7 @@ struct GitInputScheme : InputScheme
         if (input.getRef() || input.getRev() || !repoInfo.isLocal)
             return getAccessorFromCommit(store, repoInfo, std::move(input));
         else
-            return getAccessorFromWorkdir(repoInfo, std::move(input));
+            return getAccessorFromWorkdir(store, repoInfo, std::move(input));
     }
 };
 

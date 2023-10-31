@@ -216,6 +216,43 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return toHash(*oid);
     }
 
+    std::vector<Submodule> parseSubmodules(const CanonPath & configFile)
+    {
+        GitConfig config;
+        if (git_config_open_ondisk(Setter(config), configFile.abs().c_str()))
+            throw Error("parsing .gitmodules file: %s", git_error_last()->message);
+
+        ConfigIterator it;
+        if (git_config_iterator_glob_new(Setter(it), config.get(), "^submodule\\..*\\.(path|url|branch)$"))
+            throw Error("iterating over .gitmodules: %s", git_error_last()->message);
+
+        std::map<std::string, std::string> entries;
+
+        while (true) {
+            git_config_entry * entry = nullptr;
+            if (auto err = git_config_next(&entry, it.get())) {
+                if (err == GIT_ITEROVER) break;
+                throw Error("iterating over .gitmodules: %s", git_error_last()->message);
+            }
+            entries.emplace(entry->name + 10, entry->value);
+        }
+
+        std::vector<Submodule> result;
+
+        for (auto & [key, value] : entries) {
+            if (!hasSuffix(key, ".path")) continue;
+            std::string key2(key, 0, key.size() - 5);
+            auto path = CanonPath(value);
+            result.push_back(Submodule {
+                .path = path,
+                .url = entries[key2 + ".url"],
+                .branch = entries[key2 + ".branch"],
+            });
+        }
+
+        return result;
+    }
+
     WorkdirInfo getWorkdirInfo() override
     {
         WorkdirInfo info;
@@ -246,6 +283,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_status_foreach_ext(*this, &options, &statusCallbackTrampoline, &statusCallback))
             throw Error("getting working directory status: %s", git_error_last()->message);
 
+        /* Get submodule info. */
+        auto modulesFile = path + ".gitmodules";
+        if (pathExists(modulesFile.abs()))
+            info.submodules = parseSubmodules(modulesFile);
+
         return info;
     }
 
@@ -261,7 +303,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return std::nullopt;
     }
 
-    std::vector<Submodule> getSubmodules(const Hash & rev) override;
+    std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) override;
 
     std::string resolveSubmoduleUrl(const std::string & url) override
     {
@@ -521,7 +563,7 @@ ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev)
     return make_ref<GitInputAccessor>(ref<GitRepoImpl>(shared_from_this()), rev);
 }
 
-std::vector<GitRepoImpl::Submodule> GitRepoImpl::getSubmodules(const Hash & rev)
+std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev)
 {
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
@@ -529,44 +571,17 @@ std::vector<GitRepoImpl::Submodule> GitRepoImpl::getSubmodules(const Hash & rev)
     auto accessor = getAccessor(rev);
     if (!accessor->pathExists(modulesFile)) return {};
 
-    /* Parse it. */
+    /* Parse it and get the revision of each submodule. */
     auto configS = accessor->readFile(modulesFile);
 
     auto [fdTemp, pathTemp] = createTempFile("nix-git-submodules");
     writeFull(fdTemp.get(), configS);
 
-    GitConfig config;
-    if (git_config_open_ondisk(Setter(config), pathTemp.c_str()))
-        throw Error("parsing .gitmodules file: %s", git_error_last()->message);
+    std::vector<std::tuple<Submodule, Hash>> result;
 
-    ConfigIterator it;
-    if (git_config_iterator_glob_new(Setter(it), config.get(), "^submodule\\..*\\.(path|url|branch)$"))
-        throw Error("iterating over .gitmodules: %s", git_error_last()->message);
-
-    std::map<std::string, std::string> entries;
-
-    while (true) {
-        git_config_entry * entry = nullptr;
-        if (auto err = git_config_next(&entry, it.get())) {
-            if (err == GIT_ITEROVER) break;
-            throw Error("iterating over .gitmodules: %s", git_error_last()->message);
-        }
-        entries.emplace(entry->name + 10, entry->value);
-    }
-
-    std::vector<Submodule> result;
-
-    for (auto & [key, value] : entries) {
-        if (!hasSuffix(key, ".path")) continue;
-        std::string key2(key, 0, key.size() - 5);
-        auto path = CanonPath(value);
-        auto rev = accessor.dynamic_pointer_cast<GitInputAccessor>()->getSubmoduleRev(path);
-        result.push_back(Submodule {
-            .path = path,
-            .url = entries[key2 + ".url"],
-            .branch = entries[key2 + ".branch"],
-            .rev = rev,
-        });
+    for (auto & submodule : parseSubmodules(CanonPath(pathTemp))) {
+        auto rev = accessor.dynamic_pointer_cast<GitInputAccessor>()->getSubmoduleRev(submodule.path);
+        result.push_back({std::move(submodule), rev});
     }
 
     return result;
