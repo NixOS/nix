@@ -1,5 +1,6 @@
 #include "util.hh"
 #include "types.hh"
+#include "map.hh"
 #include "file-system.hh"
 #include "processes.hh"
 #include "terminal.hh"
@@ -659,4 +660,19 @@ namespace nix {
         ASSERT_EQ(filterANSIEscapes("f𐍈𐍈bär", true, 4), "f𐍈𐍈b");
     }
 
+    /* ----------------------------------------------------------------------------
+     * maybeGet (map.hh)
+     * --------------------------------------------------------------------------*/
+
+    TEST(maybeGet, nested) {
+        std::map<std::string, std::optional<int>> m;
+        m["purgatory"] = std::nullopt;
+        m["hell"] = 666;
+        std::optional<std::optional<int>> awkward;
+        awkward.emplace(std::nullopt);
+        ASSERT_EQ(maybeGet(m, std::string{"nix"}), std::nullopt);
+        ASSERT_NE(maybeGet(m, std::string{"purgatory"}), std::nullopt);
+        ASSERT_EQ(maybeGet(m, std::string{"purgatory"}), awkward);
+        ASSERT_EQ(maybeGet(m, std::string{"hell"}), 666);
+    }
 }
