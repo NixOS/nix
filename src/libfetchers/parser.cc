@@ -9,7 +9,7 @@ namespace nix::fetchers {
         return std::make_shared<Schema>(Schema::Primitive::String);
     }
 
-    std::string parsers::String::parse (Attr in) {
+    std::string parsers::String::parse (nix::fetchers::Attr in) {
         std::string * r = std::get_if<std::string>(&in);
         if (r)
             return *r;
@@ -23,7 +23,7 @@ namespace nix::fetchers {
         return std::make_shared<Schema>(Schema::Primitive::Int);
     }
 
-    uint64_t parsers::Int::parse (Attr in) {
+    uint64_t parsers::Int::parse (nix::fetchers::Attr in) {
         uint64_t * r = std::get_if<uint64_t>(&in);
         if (r)
             return *r;
@@ -37,7 +37,7 @@ namespace nix::fetchers {
         return std::make_shared<Schema>(Schema::Primitive::Bool);
     }
 
-    bool parsers::Bool::parse (Attr in) {
+    bool parsers::Bool::parse (nix::fetchers::Attr in) {
         auto * r = std::get_if<Explicit<bool>>(&in);
         if (r)
             return r->t;
