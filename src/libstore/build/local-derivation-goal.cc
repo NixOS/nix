@@ -1563,10 +1563,11 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
             Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
 
-            if (pathExists(target))
+            if (pathExists(target)) {
                 // There is a similar debug message in doBind, so only run it in this block to not have double messages.
                 debug("bind-mounting %s -> %s", target, source);
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
+            }
 
             /* Bind-mount the path into the sandbox. This requires
                entering its mount namespace, which is not possible
