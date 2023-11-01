@@ -208,7 +208,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
         std::string buildIdDir = "/lib/debug/.build-id";
 
-        if (narAccessor->stat(buildIdDir).type == FSAccessor::tDirectory) {
+        if (auto st = narAccessor->stat(buildIdDir); st && st->type == FSAccessor::tDirectory) {
 
             ThreadPool threadPool(25);
 
@@ -234,14 +234,14 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
             for (auto & s1 : narAccessor->readDirectory(buildIdDir)) {
                 auto dir = buildIdDir + "/" + s1;
 
-                if (narAccessor->stat(dir).type != FSAccessor::tDirectory
+                if (auto st = narAccessor->stat(dir); !st || st->type != FSAccessor::tDirectory
                     || !std::regex_match(s1, regex1))
                     continue;
 
                 for (auto & s2 : narAccessor->readDirectory(dir)) {
                     auto debugPath = dir + "/" + s2;
 
-                    if (narAccessor->stat(debugPath).type != FSAccessor::tRegular
+                    if (auto st = narAccessor->stat(debugPath); !st || st->type != FSAccessor::tRegular
                         || !std::regex_match(s2, regex2))
                         continue;
 

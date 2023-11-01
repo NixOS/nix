@@ -27,25 +27,25 @@ struct LocalStoreAccessor : public FSAccessor
         return store->getRealStoreDir() + std::string(path, store->storeDir.size());
     }
 
-    FSAccessor::Stat stat(const Path & path) override
+    std::optional<FSAccessor::Stat> stat(const Path & path) override
     {
         auto realPath = toRealPath(path);
 
         struct stat st;
         if (lstat(realPath.c_str(), &st)) {
-            if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
+            if (errno == ENOENT || errno == ENOTDIR) return std::nullopt;
             throw SysError("getting status of '%1%'", path);
         }
 
         if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode))
             throw Error("file '%1%' has unsupported type", path);
 
-        return {
+        return {{
             S_ISREG(st.st_mode) ? Type::tRegular :
             S_ISLNK(st.st_mode) ? Type::tSymlink :
             Type::tDirectory,
             S_ISREG(st.st_mode) ? (uint64_t) st.st_size : 0,
-            S_ISREG(st.st_mode) && st.st_mode & S_IXUSR};
+            S_ISREG(st.st_mode) && st.st_mode & S_IXUSR}};
     }
 
     StringSet readDirectory(const Path & path) override

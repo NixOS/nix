@@ -11,13 +11,12 @@ struct MixCat : virtual Args
 
     void cat(ref<FSAccessor> accessor)
     {
-        auto st = accessor->stat(path);
-        if (st.type == FSAccessor::Type::tMissing)
+        if (auto st = accessor->stat(path)) {
+            if (st->type != FSAccessor::Type::tRegular)
+                throw Error("path '%1%' is not a regular file", path);
+            writeFull(STDOUT_FILENO, accessor->readFile(path));
+        } else
             throw Error("path '%1%' does not exist", path);
-        if (st.type != FSAccessor::Type::tRegular)
-            throw Error("path '%1%' is not a regular file", path);
-
-        writeFull(STDOUT_FILENO, accessor->readFile(path));
     }
 };
 

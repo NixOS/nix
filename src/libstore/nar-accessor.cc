@@ -11,13 +11,7 @@ namespace nix {
 
 struct NarMember
 {
-    FSAccessor::Type type = FSAccessor::Type::tMissing;
-
-    bool isExecutable = false;
-
-    /* If this is a regular file, position of the contents of this
-       file in the NAR. */
-    uint64_t start = 0, size = 0;
+    FSAccessor::Stat stat;
 
     std::string target;
 
@@ -57,7 +51,7 @@ struct NarAccessor : public FSAccessor
                 acc.root = std::move(member);
                 parents.push(&acc.root);
             } else {
-                if (parents.top()->type != FSAccessor::Type::tDirectory)
+                if (parents.top()->stat.type != FSAccessor::Type::tDirectory)
                     throw Error("NAR file missing parent directory of path '%s'", path);
                 auto result = parents.top()->children.emplace(baseNameOf(path), std::move(member));
                 parents.push(&result.first->second);
@@ -79,14 +73,15 @@ struct NarAccessor : public FSAccessor
 
         void isExecutable() override
         {
-            parents.top()->isExecutable = true;
+            parents.top()->stat.isExecutable = true;
         }
 
         void preallocateContents(uint64_t size) override
         {
             assert(size <= std::numeric_limits<uint64_t>::max());
-            parents.top()->size = (uint64_t) size;
-            parents.top()->start = pos;
+            auto & st = parents.top()->stat;
+            st.fileSize = (uint64_t) size;
+            st.narOffset = pos;
         }
 
         void receiveContents(std::string_view data) override
@@ -95,7 +90,9 @@ struct NarAccessor : public FSAccessor
         void createSymlink(const Path & path, const std::string & target) override
         {
             createMember(path,
-                NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
+                NarMember{
+                    .stat = {.type = FSAccessor::Type::tSymlink},
+                    .target = target});
         }
 
         size_t read(char * data, size_t len) override
@@ -130,18 +127,20 @@ struct NarAccessor : public FSAccessor
             std::string type = v["type"];
 
             if (type == "directory") {
-                member.type = FSAccessor::Type::tDirectory;
+                member.stat = {.type = FSAccessor::Type::tDirectory};
                 for (auto i = v["entries"].begin(); i != v["entries"].end(); ++i) {
                     std::string name = i.key();
                     recurse(member.children[name], i.value());
                 }
             } else if (type == "regular") {
-                member.type = FSAccessor::Type::tRegular;
-                member.size = v["size"];
-                member.isExecutable = v.value("executable", false);
-                member.start = v["narOffset"];
+                member.stat = {
+                    .type = FSAccessor::Type::tRegular,
+                    .fileSize = v["size"],
+                    .isExecutable = v.value("executable", false),
+                    .narOffset = v["narOffset"]
+                };
             } else if (type == "symlink") {
-                member.type = FSAccessor::Type::tSymlink;
+                member.stat = {.type = FSAccessor::Type::tSymlink};
                 member.target = v.value("target", "");
             } else return;
         };
@@ -158,7 +157,7 @@ struct NarAccessor : public FSAccessor
         for (auto it = path.begin(); it != end; ) {
             // because it != end, the remaining component is non-empty so we need
             // a directory
-            if (current->type != FSAccessor::Type::tDirectory) return nullptr;
+            if (current->stat.type != FSAccessor::Type::tDirectory) return nullptr;
 
             // skip slash (canonPath above ensures that this is always a slash)
             assert(*it == '/');
@@ -183,19 +182,19 @@ struct NarAccessor : public FSAccessor
         return *result;
     }
 
-    Stat stat(const Path & path) override
+    std::optional<Stat> stat(const Path & path) override
     {
         auto i = find(path);
         if (i == nullptr)
-            return {FSAccessor::Type::tMissing, 0, false};
-        return {i->type, i->size, i->isExecutable, i->start};
+            return std::nullopt;
+        return i->stat;
     }
 
     StringSet readDirectory(const Path & path) override
     {
         auto i = get(path);
 
-        if (i.type != FSAccessor::Type::tDirectory)
+        if (i.stat.type != FSAccessor::Type::tDirectory)
             throw Error("path '%1%' inside NAR file is not a directory", path);
 
         StringSet res;
@@ -208,19 +207,19 @@ struct NarAccessor : public FSAccessor
     std::string readFile(const Path & path, bool requireValidPath = true) override
     {
         auto i = get(path);
-        if (i.type != FSAccessor::Type::tRegular)
+        if (i.stat.type != FSAccessor::Type::tRegular)
             throw Error("path '%1%' inside NAR file is not a regular file", path);
 
-        if (getNarBytes) return getNarBytes(i.start, i.size);
+        if (getNarBytes) return getNarBytes(i.stat.narOffset, i.stat.fileSize);
 
         assert(nar);
-        return std::string(*nar, i.start, i.size);
+        return std::string(*nar, i.stat.narOffset, i.stat.fileSize);
     }
 
     std::string readLink(const Path & path) override
     {
         auto i = get(path);
-        if (i.type != FSAccessor::Type::tSymlink)
+        if (i.stat.type != FSAccessor::Type::tSymlink)
             throw Error("path '%1%' inside NAR file is not a symlink", path);
         return i.target;
     }
@@ -246,17 +245,19 @@ using nlohmann::json;
 json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
 {
     auto st = accessor->stat(path);
+    if (!st)
+        throw Error("path '%s' does not exist in NAR", path);
 
     json obj = json::object();
 
-    switch (st.type) {
+    switch (st->type) {
     case FSAccessor::Type::tRegular:
         obj["type"] = "regular";
-        obj["size"] = st.fileSize;
-        if (st.isExecutable)
+        obj["size"] = st->fileSize;
+        if (st->isExecutable)
             obj["executable"] = true;
-        if (st.narOffset)
-            obj["narOffset"] = st.narOffset;
+        if (st->narOffset)
+            obj["narOffset"] = st->narOffset;
         break;
     case FSAccessor::Type::tDirectory:
         obj["type"] = "directory";
@@ -275,9 +276,6 @@ json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
         obj["type"] = "symlink";
         obj["target"] = accessor->readLink(path);
         break;
-    case FSAccessor::Type::tMissing:
-    default:
-        throw Error("path '%s' does not exist in NAR", path);
     }
     return obj;
 }

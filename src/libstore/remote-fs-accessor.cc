@@ -101,7 +101,7 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, boo
     return {addToCache(storePath.hashPart(), std::move(sink.s)), restPath};
 }
 
-FSAccessor::Stat RemoteFSAccessor::stat(const Path & path)
+std::optional<FSAccessor::Stat> RemoteFSAccessor::stat(const Path & path)
 {
     auto res = fetch(path);
     return res.first->stat(res.second);

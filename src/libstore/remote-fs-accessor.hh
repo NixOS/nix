@@ -28,7 +28,7 @@ public:
     RemoteFSAccessor(ref<Store> store,
         const /* FIXME: use std::optional */ Path & cacheDir = "");
 
-    Stat stat(const Path & path) override;
+    std::optional<Stat> stat(const Path & path) override;
 
     StringSet readDirectory(const Path & path) override;
 

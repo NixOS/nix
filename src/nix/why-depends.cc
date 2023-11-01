@@ -214,6 +214,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
             visitPath = [&](const Path & p) {
                 auto st = accessor->stat(p);
+                assert(st);
 
                 auto p2 = p == pathS ? "/" : std::string(p, pathS.size() + 1);
 
@@ -221,13 +222,13 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
                 };
 
-                if (st.type == FSAccessor::Type::tDirectory) {
+                if (st->type == FSAccessor::Type::tDirectory) {
                     auto names = accessor->readDirectory(p);
                     for (auto & name : names)
                         visitPath(p + "/" + name);
                 }
 
-                else if (st.type == FSAccessor::Type::tRegular) {
+                else if (st->type == FSAccessor::Type::tRegular) {
                     auto contents = accessor->readFile(p);
 
                     for (auto & hash : hashes) {
@@ -245,7 +246,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     }
                 }
 
-                else if (st.type == FSAccessor::Type::tSymlink) {
+                else if (st->type == FSAccessor::Type::tSymlink) {
                     auto target = accessor->readLink(p);
 
                     for (auto & hash : hashes) {
