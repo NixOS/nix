@@ -87,7 +87,7 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps) {
     }                                                                     \
                                                                           \
     TEST_F(FIXTURE, DerivationOutput_ ## NAME ## _to_json) {              \
-        writeTest<json>("output-" #NAME ".json", [&]() -> json {          \
+        writeTest("output-" #NAME ".json", [&]() -> json {                \
             return DerivationOutput { (VAL) }.toJSON(                     \
                 *store,                                                   \
                 (DRV_NAME),                                               \
@@ -165,7 +165,7 @@ TEST_JSON(ImpureDerivationTest, impure,
     }                                                                     \
                                                                           \
     TEST_F(FIXTURE, Derivation_ ## NAME ## _to_json) {                    \
-        writeTest<json>(#NAME ".json", [&]() -> json {                    \
+        writeTest(#NAME ".json", [&]() -> json {                          \
             return Derivation { VAL }.toJSON(*store);                     \
         }, [](const auto & file) {                                        \
             return json::parse(readFile(file));                           \

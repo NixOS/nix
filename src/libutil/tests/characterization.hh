@@ -66,16 +66,12 @@ public:
      * @param test hook that produces contents of the file and does the
      * actual work
      */
-    template<typename T>
     void writeTest(
-        PathView testStem,
-        std::invocable<> auto && test,
-        std::invocable<const Path &> auto && readFile2,
-        std::invocable<const Path &, const T &> auto && writeFile2)
+        PathView testStem, auto && test, auto && readFile2, auto && writeFile2)
     {
         auto file = goldenMaster(testStem);
 
-        T got = test();
+        auto got = test();
 
         if (testAccept())
         {
@@ -87,7 +83,7 @@ public:
         }
         else
         {
-            T expected = readFile2(file);
+            decltype(got) expected = readFile2(file);
             ASSERT_EQ(got, expected);
         }
     }
@@ -97,7 +93,7 @@ public:
      */
     void writeTest(PathView testStem, auto && test)
     {
-        writeTest<std::string>(
+        writeTest(
             testStem, test,
             [](const Path & f) -> std::string {
                 return readFile(f);
