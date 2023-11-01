@@ -577,6 +577,8 @@
           };
 
         # System tests.
+        tests.acls = runNixOSTestFor "x86_64-linux" ./tests/nixos/acls.nix;
+
         tests.authorization = runNixOSTestFor "x86_64-linux" ./tests/nixos/authorization.nix;
 
         tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;

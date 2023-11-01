@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
+#include "granular-access-store.hh"
 
 namespace nix {
 
