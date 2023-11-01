@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <variant>
+#include <array>
 
 namespace nix::fetchers {
 
@@ -23,6 +24,10 @@ struct Schema {
         };
         std::map<std::string, Attr> attrs;
         bool operator==(const Attrs & other) const;
+
+        Attrs() {};
+        Attrs(std::map<std::string, Attr> && attrs)
+            : attrs(attrs) {};
     };
     enum Primitive {
         String,
