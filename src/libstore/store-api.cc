@@ -410,7 +410,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     /* Note that fileSink and unusualHashTee must be mutually exclusive, since
        they both write to caHashSink. Note that that requisite is currently true
        because the former is only used in the flat case. */
-    RetrieveRegularNARSink fileSink { caHashSink };
+    RegularFileSink fileSink { caHashSink };
     TeeSink unusualHashTee { narHashSink, caHashSink };
 
     auto & narSink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
@@ -428,10 +428,10 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
        information to narSink. */
     TeeSource tapped { *fileSource, narSink };
 
-    ParseSink blank;
+    NullParseSink blank;
     auto & parseSink = method == FileIngestionMethod::Flat
-        ? fileSink
-        : blank;
+        ? (ParseSink &) fileSink
+        : (ParseSink &) blank;
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */

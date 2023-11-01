@@ -454,13 +454,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                        eagerly consume the entire stream it's given, past the
                        length of the Nar. */
                     TeeSource savedNARSource(from, saved);
-                    ParseSink sink; /* null sink; just parse the NAR */
+                    NullParseSink sink; /* just parse the NAR */
                     parseDump(sink, savedNARSource);
                 } else {
                     /* Incrementally parse the NAR file, stripping the
                        metadata, and streaming the sole file we expect into
                        `saved`. */
-                    RetrieveRegularNARSink savedRegular { saved };
+                    RegularFileSink savedRegular { saved };
                     parseDump(savedRegular, from);
                     if (!savedRegular.regular) throw Error("regular file expected");
                 }
@@ -899,7 +899,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 source = std::make_unique<TunnelSource>(from, to);
             else {
                 TeeSource tee { from, saved };
-                ParseSink ether;
+                NullParseSink ether;
                 parseDump(ether, tee);
                 source = std::make_unique<StringSource>(saved.s);
             }
