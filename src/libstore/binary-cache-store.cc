@@ -241,7 +241,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                 for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
                     auto debugPath = dir + s2;
 
-                    if ( narAccessor->lstat(debugPath).type != SourceAccessor::tRegular
+                    if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular
                         || !std::regex_match(s2, regex2))
                         continue;
 
