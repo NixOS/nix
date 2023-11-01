@@ -1,6 +1,7 @@
 #pragma once
 
 #include "attrs.hh"
+#include <cstdint>
 #include <memory>
 
 namespace nix::fetchers {
@@ -33,7 +34,18 @@ namespace nix::fetchers {
             std::string parse(Attr in) override;
         };
 
-            std::string parse (Attr in) override;
+        /** Accepts an int `Attr`. Rejects the other types. */
+        class Int : public Parser<Attr, uint64_t> {
+        public:
+            std::shared_ptr<Schema> getSchema() override;
+            uint64_t parse(Attr in) override;
+        };
+
+        /** Accepts a bool `Attr`. Rejects the other types. */
+        class Bool : public Parser<Attr, bool> {
+        public:
+            std::shared_ptr<Schema> getSchema() override;
+            bool parse(Attr in) override;
         };
 
     }

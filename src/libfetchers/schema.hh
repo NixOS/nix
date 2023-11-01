@@ -26,8 +26,8 @@ struct Schema {
     // };
     enum Primitive {
         String,
-        // Int,
-        // Bool
+        Int,
+        Bool
     };
     // struct Union {
     //     std::shared_ptr<Schema> a;
