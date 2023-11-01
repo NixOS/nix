@@ -1,11 +1,13 @@
 #include "command.hh"
 #include "common-args.hh"
+#include "granular-access-store.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "store-cast.hh"
 
 using namespace nix;
 
-struct CmdAddToStore : MixDryRun, StoreCommand
+struct CmdAddToStore : MixDryRun, MixProtect, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
@@ -56,6 +58,13 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         info.narSize = sink.s.size();
 
         if (!dryRun) {
+            if (protect) {
+                LocalGranularAccessStore::AccessStatus status;
+                status.isProtected = true;
+                status.entities = {ACL::User(getuid())};
+                info.accessStatus = status;
+            }
+
             auto source = StringSource(sink.s);
             store->addToStore(info, source);
         }

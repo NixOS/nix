@@ -156,14 +156,16 @@ struct Installable
         ref<Store> store,
         Realise mode,
         const Installables & installables,
-        BuildMode bMode = bmNormal);
+        BuildMode bMode = bmNormal,
+        bool protect = false);
 
     static std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> build2(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
         const Installables & installables,
-        BuildMode bMode = bmNormal);
+        BuildMode bMode = bmNormal,
+        bool protect = false);
 
     static std::set<StorePath> toStorePaths(
         ref<Store> evalStore,

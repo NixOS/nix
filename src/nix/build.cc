@@ -65,7 +65,7 @@ static void createOutLinks(const Path& outLink, const std::vector<BuiltPathWithR
     }
 }
 
-struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
+struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile, MixProtect
 {
     Path outLink = "result";
     bool printOutputPaths = false;
@@ -134,7 +134,8 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             getEvalStore(), store,
             Realise::Outputs,
             installables,
-            repair ? bmRepair : buildMode);
+            repair ? bmRepair : buildMode,
+            protect);
 
         if (json) logger->cout("%s", builtPathsWithResultToJSON(buildables, store).dump());
 
