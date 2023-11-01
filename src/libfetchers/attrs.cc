@@ -5,6 +5,14 @@
 
 namespace nix::fetchers {
 
+std::string attrType(const Attr &attr) {
+    return std::visit(overloaded {
+        [](const std::string &) { return "string"; },
+        [](const uint64_t &) { return "int"; },
+        [](const Explicit<bool> &) { return "bool"; },
+    }, attr);
+}
+
 Attrs jsonToAttrs(const nlohmann::json & json)
 {
     Attrs attrs;
