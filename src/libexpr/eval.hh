@@ -199,6 +199,7 @@ public:
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
         sContentAddressed, sImpure,
+        sDrv, sLog, sProtected, sPermissions, sUsers, sGroups,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
         sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
