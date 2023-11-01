@@ -5,12 +5,12 @@ namespace nix::fetchers {
 
     // parsers::String
 
-    std::shared_ptr<Schema> parsers::String::getSchema() {
+    std::shared_ptr<Schema> parsers::String::getSchema() const {
         return std::make_shared<Schema>(Schema::Primitive::String);
     }
 
-    std::string parsers::String::parse (nix::fetchers::Attr in) {
-        std::string * r = std::get_if<std::string>(&in);
+    std::string parsers::String::parse (const nix::fetchers::Attr & in) const {
+        const std::string * r = std::get_if<std::string>(&in);
         if (r)
             return *r;
         else
@@ -19,12 +19,12 @@ namespace nix::fetchers {
 
     // parsers::Int
 
-    std::shared_ptr<Schema> parsers::Int::getSchema() {
+    std::shared_ptr<Schema> parsers::Int::getSchema() const {
         return std::make_shared<Schema>(Schema::Primitive::Int);
     }
 
-    uint64_t parsers::Int::parse (nix::fetchers::Attr in) {
-        uint64_t * r = std::get_if<uint64_t>(&in);
+    uint64_t parsers::Int::parse (const nix::fetchers::Attr & in) const {
+        const uint64_t * r = std::get_if<uint64_t>(&in);
         if (r)
             return *r;
         else
@@ -33,11 +33,11 @@ namespace nix::fetchers {
 
     // parsers::Bool
 
-    std::shared_ptr<Schema> parsers::Bool::getSchema() {
+    std::shared_ptr<Schema> parsers::Bool::getSchema() const {
         return std::make_shared<Schema>(Schema::Primitive::Bool);
     }
 
-    bool parsers::Bool::parse (nix::fetchers::Attr in) {
+    bool parsers::Bool::parse (const nix::fetchers::Attr & in) const {
         auto * r = std::get_if<Explicit<bool>>(&in);
         if (r)
             return r->t;
