@@ -210,10 +210,10 @@ struct NarAccessor : public FSAccessor
         if (i.stat.type != Type::tRegular)
             throw Error("path '%1%' inside NAR file is not a regular file", path);
 
-        if (getNarBytes) return getNarBytes(i.stat.narOffset, i.stat.fileSize);
+        if (getNarBytes) return getNarBytes(*i.stat.narOffset, *i.stat.fileSize);
 
         assert(nar);
-        return std::string(*nar, i.stat.narOffset, i.stat.fileSize);
+        return std::string(*nar, *i.stat.narOffset, *i.stat.fileSize);
     }
 
     std::string readLink(const Path & path) override
@@ -253,11 +253,12 @@ json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
     switch (st->type) {
     case SourceAccessor::Type::tRegular:
         obj["type"] = "regular";
-        obj["size"] = st->fileSize;
+        if (st->fileSize)
+            obj["size"] = *st->fileSize;
         if (st->isExecutable)
             obj["executable"] = true;
-        if (st->narOffset)
-            obj["narOffset"] = st->narOffset;
+        if (st->narOffset && *st->narOffset)
+            obj["narOffset"] = *st->narOffset;
         break;
     case SourceAccessor::Type::tDirectory:
         obj["type"] = "directory";

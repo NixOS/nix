@@ -23,7 +23,7 @@ public:
         /**
          * For regular files only: the size of the file.
          */
-        uint64_t fileSize = 0;
+        std::optional<uint64_t> fileSize;
         /**
          * For regular files only: whether this is an executable.
          */
@@ -32,7 +32,7 @@ public:
          * For regular files only: the position of the contents of this
          * file in the NAR.
          */
-        uint64_t narOffset = 0;
+        std::optional<uint64_t> narOffset;
     };
 
     virtual ~FSAccessor() { }

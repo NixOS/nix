@@ -52,7 +52,7 @@ struct MixLs : virtual Args, MixJSON
                         (st->isExecutable ? "-r-xr-xr-x" : "-r--r--r--") :
                     st->type == FSAccessor::Type::tSymlink ? "lrwxrwxrwx" :
                     "dr-xr-xr-x";
-                auto line = fmt("%s %20d %s", tp, st->fileSize, relPath);
+                auto line = fmt("%s %20d %s", tp, st->fileSize.value_or(0), relPath);
                 if (st->type == FSAccessor::Type::tSymlink)
                     line += " -> " + accessor->readLink(curPath);
                 logger->cout(line);
