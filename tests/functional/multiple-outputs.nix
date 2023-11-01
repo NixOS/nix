@@ -59,7 +59,7 @@ rec {
 
   c = mkDerivation {
     name = "multiple-outputs-c";
-    drv = b.drvPath;
+    drv = builtins.addDrvOutputDependencies b.drvPath;
     builder = builtins.toFile "builder.sh"
       ''
         mkdir $out
@@ -69,7 +69,7 @@ rec {
 
   d = mkDerivation {
     name = "multiple-outputs-d";
-    drv = builtins.unsafeDiscardOutputDependency b.drvPath;
+    drv = b.drvPath;
     builder = builtins.toFile "builder.sh"
       ''
         mkdir $out

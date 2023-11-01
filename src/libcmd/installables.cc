@@ -649,33 +649,22 @@ BuiltPaths Installable::toBuiltPaths(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
-    OperateOn operateOn,
     const Installables & installables)
 {
-    if (operateOn == OperateOn::Output) {
-        BuiltPaths res;
-        for (auto & p : Installable::build(evalStore, store, mode, installables))
-            res.push_back(p.path);
-        return res;
-    } else {
-        if (mode == Realise::Nothing)
-            settings.readOnlyMode = true;
-
-        BuiltPaths res;
-        for (auto & drvPath : Installable::toDerivations(store, installables, true))
-            res.push_back(BuiltPath::Opaque{drvPath});
-        return res;
-    }
+    BuiltPaths res;
+    for (auto & p : Installable::build(evalStore, store, mode, installables))
+        res.push_back(p.path);
+    return res;
 }
 
 StorePathSet Installable::toStorePaths(
     ref<Store> evalStore,
     ref<Store> store,
-    Realise mode, OperateOn operateOn,
+    Realise mode,
     const Installables & installables)
 {
     StorePathSet outPaths;
-    for (auto & path : toBuiltPaths(evalStore, store, mode, operateOn, installables)) {
+    for (auto & path : toBuiltPaths(evalStore, store, mode, installables)) {
         auto thisOutPaths = path.outPaths();
         outPaths.insert(thisOutPaths.begin(), thisOutPaths.end());
     }
@@ -685,10 +674,10 @@ StorePathSet Installable::toStorePaths(
 StorePath Installable::toStorePath(
     ref<Store> evalStore,
     ref<Store> store,
-    Realise mode, OperateOn operateOn,
+    Realise mode,
     ref<Installable> installable)
 {
-    auto paths = toStorePaths(evalStore, store, mode, operateOn, {installable});
+    auto paths = toStorePaths(evalStore, store, mode, {installable});
 
     if (paths.size() != 1)
         throw Error("argument '%s' should evaluate to one store path", installable->what());

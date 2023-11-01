@@ -99,7 +99,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
     void run(ref<Store> store, Installables && installables) override
     {
-        auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
+        auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, installables);
 
         auto accessor = store->getFSAccessor();
 

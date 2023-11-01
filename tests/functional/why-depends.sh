@@ -6,7 +6,7 @@ cp ./dependencies.nix ./dependencies.builder0.sh ./config.nix $TEST_HOME
 
 cd $TEST_HOME
 
-nix why-depends --derivation --file ./dependencies.nix input2_drv input1_drv
+nix why-depends --file ./dependencies.nix input2_drv.drvPath input1_drv.drvPath
 nix why-depends --file ./dependencies.nix input2_drv input1_drv
 
 nix-build ./dependencies.nix -A input0_drv -o dep

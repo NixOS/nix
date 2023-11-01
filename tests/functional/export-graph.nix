@@ -23,7 +23,7 @@ rec {
   foo."bar.buildGraph" = mkDerivation {
     name = "dependencies";
     builder = builtins.toFile "build-graph-builder" "${printRefs}";
-    exportReferencesGraph = ["refs" (import ./dependencies.nix {}).drvPath];
+    exportReferencesGraph = ["refs" (builtins.addDrvOutputDependencies (import ./dependencies.nix {}).drvPath) ];
   };
 
 }

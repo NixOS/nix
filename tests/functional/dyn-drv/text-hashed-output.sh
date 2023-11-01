@@ -20,7 +20,7 @@ nix show-derivation "$drvProducingDrv"
 
 out1=$(nix-build ./text-hashed-output.nix -A producingDrv --no-out-link)
 
-nix path-info $drv --derivation --json | jq
-nix path-info $out1 --derivation --json | jq
+nix path-info $drv --json | jq
+nix path-info $drvProducingDrv --json | jq
 
 test $out1 == $drv

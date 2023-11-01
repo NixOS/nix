@@ -40,20 +40,6 @@ enum class Realise {
 };
 
 /**
- * How to handle derivations in commands that operate on store paths.
- */
-enum class OperateOn {
-    /**
-     * Operate on the output path.
-     */
-    Output,
-    /**
-     * Operate on the .drv path.
-     */
-    Derivation
-};
-
-/**
  * Extra info about a DerivedPath
  *
  * Yes, this is empty, but that is intended. It will be sub-classed by
@@ -170,14 +156,12 @@ struct Installable
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
-        OperateOn operateOn,
         const Installables & installables);
 
     static StorePath toStorePath(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
-        OperateOn operateOn,
         ref<Installable> installable);
 
     static std::set<StorePath> toDerivations(
@@ -189,7 +173,6 @@ struct Installable
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
-        OperateOn operateOn,
         const Installables & installables);
 };
 
