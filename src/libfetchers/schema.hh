@@ -15,15 +15,15 @@ namespace nix::fetchers {
    @todo: Add documentation fields
  */
 struct Schema {
-    // struct Attrs {
-    //     // struct Attr {
-    //     //     bool required;
-    //     //     std::shared_ptr<Schema> type;
-    //     //     bool operator==(const Attr & other) const;
-    //     // };
-    //     // std::map<std::string, Attr> attrs;
-    //     // bool operator==(const Attrs & other) const;
-    // };
+    struct Attrs {
+        struct Attr {
+            bool required;
+            std::shared_ptr<Schema> type;
+            bool operator==(const Attr & other) const;
+        };
+        std::map<std::string, Attr> attrs;
+        bool operator==(const Attrs & other) const;
+    };
     enum Primitive {
         String,
         Int,
@@ -35,7 +35,7 @@ struct Schema {
     //     bool operator==(const Union & other) const;
     // };
 
-    std::variant<Primitive> choice;
+    std::variant<Primitive, Attrs> choice;
     bool operator==(const Schema & other) const;
 };
 
