@@ -2,6 +2,7 @@
 ///@file
 
 #include "types.hh"
+#include "source-accessor.hh"
 
 #include <optional>
 
@@ -14,7 +15,7 @@ namespace nix {
 class FSAccessor
 {
 public:
-    enum Type { tRegular, tSymlink, tDirectory };
+    using Type = SourceAccessor::Type;
 
     struct Stat
     {
