@@ -6,7 +6,7 @@
 #include "derivations.hh"
 #include "local-store.hh"
 #include "finally.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
 #include "build/personality.hh"
@@ -119,9 +119,9 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             if (true)
                 unixPath.push_front(store->printStorePath(path) + "/bin");
 
-            auto propPath = store->printStorePath(path) + "/nix-support/propagated-user-env-packages";
-            if (auto st = accessor->stat(propPath); st && st->type == SourceAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(readFile(propPath)))
+            auto propPath = CanonPath(store->printStorePath(path)) + "nix-support" + "propagated-user-env-packages";
+            if (auto st = accessor->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
+                for (auto & p : tokenizeString<Paths>(accessor->readFile(propPath)))
                     todo.push(store->parseStorePath(p));
             }
         }

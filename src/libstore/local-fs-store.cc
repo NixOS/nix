@@ -1,5 +1,5 @@
 #include "archive.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
@@ -13,26 +13,31 @@ LocalFSStore::LocalFSStore(const Params & params)
 {
 }
 
-struct LocalStoreAccessor : public FSAccessor
+struct LocalStoreAccessor : public SourceAccessor
 {
     ref<LocalFSStore> store;
+    bool requireValidPath;
 
-    LocalStoreAccessor(ref<LocalFSStore> store) : store(store) { }
+    LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
+        : store(store)
+        , requireValidPath(requireValidPath)
+    { }
 
-    Path toRealPath(const Path & path, bool requireValidPath = true)
+    Path toRealPath(const CanonPath & path)
     {
-        auto storePath = store->toStorePath(path).first;
+        auto storePath = store->toStorePath(path.abs()).first;
         if (requireValidPath && !store->isValidPath(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-        return store->getRealStoreDir() + std::string(path, store->storeDir.size());
+        return store->getRealStoreDir() + path.abs().substr(store->storeDir.size());
     }
 
-    std::optional<FSAccessor::Stat> stat(const Path & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto realPath = toRealPath(path);
 
+        // FIXME: use PosixSourceAccessor.
         struct stat st;
-        if (lstat(realPath.c_str(), &st)) {
+        if (::lstat(realPath.c_str(), &st)) {
             if (errno == ENOENT || errno == ENOTDIR) return std::nullopt;
             throw SysError("getting status of '%1%'", path);
         }
@@ -48,7 +53,7 @@ struct LocalStoreAccessor : public FSAccessor
             S_ISREG(st.st_mode) && st.st_mode & S_IXUSR}};
     }
 
-    DirEntries readDirectory(const Path & path) override
+    DirEntries readDirectory(const CanonPath & path) override
     {
         auto realPath = toRealPath(path);
 
@@ -61,21 +66,22 @@ struct LocalStoreAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path, bool requireValidPath = true) override
+    std::string readFile(const CanonPath & path) override
     {
-        return nix::readFile(toRealPath(path, requireValidPath));
+        return nix::readFile(toRealPath(path));
     }
 
-    std::string readLink(const Path & path) override
+    std::string readLink(const CanonPath & path) override
     {
         return nix::readLink(toRealPath(path));
     }
 };
 
-ref<FSAccessor> LocalFSStore::getFSAccessor()
+ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
 {
     return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(
-            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
+            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())),
+        requireValidPath);
 }
 
 void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)

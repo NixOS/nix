@@ -11,7 +11,7 @@ namespace nix {
 
 struct NarMember
 {
-    FSAccessor::Stat stat;
+    SourceAccessor::Stat stat;
 
     std::string target;
 
@@ -19,7 +19,7 @@ struct NarMember
     std::map<std::string, NarMember> children;
 };
 
-struct NarAccessor : public FSAccessor
+struct NarAccessor : public SourceAccessor
 {
     std::optional<const std::string> nar;
 
@@ -149,48 +149,36 @@ struct NarAccessor : public FSAccessor
         recurse(root, v);
     }
 
-    NarMember * find(const Path & path)
+    NarMember * find(const CanonPath & path)
     {
-        Path canon = path == "" ? "" : canonPath(path);
         NarMember * current = &root;
-        auto end = path.end();
-        for (auto it = path.begin(); it != end; ) {
-            // because it != end, the remaining component is non-empty so we need
-            // a directory
+
+        for (auto & i : path) {
             if (current->stat.type != Type::tDirectory) return nullptr;
-
-            // skip slash (canonPath above ensures that this is always a slash)
-            assert(*it == '/');
-            it += 1;
-
-            // lookup current component
-            auto next = std::find(it, end, '/');
-            auto child = current->children.find(std::string(it, next));
+            auto child = current->children.find(std::string(i));
             if (child == current->children.end()) return nullptr;
             current = &child->second;
-
-            it = next;
         }
 
         return current;
     }
 
-    NarMember & get(const Path & path) {
+    NarMember & get(const CanonPath & path) {
         auto result = find(path);
-        if (result == nullptr)
+        if (!result)
             throw Error("NAR file does not contain path '%1%'", path);
         return *result;
     }
 
-    std::optional<Stat> stat(const Path & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto i = find(path);
-        if (i == nullptr)
+        if (!i)
             return std::nullopt;
         return i->stat;
     }
 
-    DirEntries readDirectory(const Path & path) override
+    DirEntries readDirectory(const CanonPath & path) override
     {
         auto i = get(path);
 
@@ -204,7 +192,7 @@ struct NarAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path, bool requireValidPath = true) override
+    std::string readFile(const CanonPath & path) override
     {
         auto i = get(path);
         if (i.stat.type != Type::tRegular)
@@ -216,7 +204,7 @@ struct NarAccessor : public FSAccessor
         return std::string(*nar, *i.stat.narOffset, *i.stat.fileSize);
     }
 
-    std::string readLink(const Path & path) override
+    std::string readLink(const CanonPath & path) override
     {
         auto i = get(path);
         if (i.stat.type != Type::tSymlink)
@@ -225,40 +213,38 @@ struct NarAccessor : public FSAccessor
     }
 };
 
-ref<FSAccessor> makeNarAccessor(std::string && nar)
+ref<SourceAccessor> makeNarAccessor(std::string && nar)
 {
     return make_ref<NarAccessor>(std::move(nar));
 }
 
-ref<FSAccessor> makeNarAccessor(Source & source)
+ref<SourceAccessor> makeNarAccessor(Source & source)
 {
     return make_ref<NarAccessor>(source);
 }
 
-ref<FSAccessor> makeLazyNarAccessor(const std::string & listing,
+ref<SourceAccessor> makeLazyNarAccessor(const std::string & listing,
     GetNarBytes getNarBytes)
 {
     return make_ref<NarAccessor>(listing, getNarBytes);
 }
 
 using nlohmann::json;
-json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
+json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
 {
-    auto st = accessor->stat(path);
-    if (!st)
-        throw Error("path '%s' does not exist in NAR", path);
+    auto st = accessor->lstat(path);
 
     json obj = json::object();
 
-    switch (st->type) {
+    switch (st.type) {
     case SourceAccessor::Type::tRegular:
         obj["type"] = "regular";
-        if (st->fileSize)
-            obj["size"] = *st->fileSize;
-        if (st->isExecutable)
+        if (st.fileSize)
+            obj["size"] = *st.fileSize;
+        if (st.isExecutable)
             obj["executable"] = true;
-        if (st->narOffset && *st->narOffset)
-            obj["narOffset"] = *st->narOffset;
+        if (st.narOffset && *st.narOffset)
+            obj["narOffset"] = *st.narOffset;
         break;
     case SourceAccessor::Type::tDirectory:
         obj["type"] = "directory";
@@ -267,7 +253,7 @@ json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
             json &res2 = obj["entries"];
             for (auto & [name, type] : accessor->readDirectory(path)) {
                 if (recurse) {
-                    res2[name] = listNar(accessor, path + "/" + name, true);
+                    res2[name] = listNar(accessor, path + name, true);
                 } else
                     res2[name] = json::object();
             }

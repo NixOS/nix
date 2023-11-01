@@ -25,6 +25,12 @@ diff -u baz.cat-nar $storePath/foo/baz
 nix store cat $storePath/foo/baz > baz.cat-nar
 diff -u baz.cat-nar $storePath/foo/baz
 
+# Check that 'nix store cat' fails on invalid store paths.
+invalidPath="$(dirname $storePath)/99999999999999999999999999999999-foo"
+mv $storePath $invalidPath
+(! nix store cat $invalidPath/foo/baz)
+mv $invalidPath $storePath
+
 # Test --json.
 diff -u \
     <(nix nar ls --json $narFile / | jq -S) \
@@ -46,7 +52,7 @@ diff -u \
     <(echo '{"type":"regular","size":0}' | jq -S)
 
 # Test missing files.
-expect 1 nix store ls --json -R $storePath/xyzzy 2>&1 | grep 'does not exist in NAR'
+expect 1 nix store ls --json -R $storePath/xyzzy 2>&1 | grep 'does not exist'
 expect 1 nix store ls $storePath/xyzzy 2>&1 | grep 'does not exist'
 
 # Test failure to dump.

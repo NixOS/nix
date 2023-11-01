@@ -10,6 +10,11 @@ SourceAccessor::SourceAccessor()
 {
 }
 
+bool SourceAccessor::pathExists(const CanonPath & path)
+{
+    return maybeLstat(path).has_value();
+}
+
 std::string SourceAccessor::readFile(const CanonPath & path)
 {
     StringSink sink;

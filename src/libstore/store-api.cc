@@ -1,5 +1,5 @@
 #include "crypto.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "globals.hh"
 #include "derivations.hh"
 #include "store-api.hh"
@@ -1338,12 +1338,12 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
     return readDerivation(drvPath);
 }
 
-Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool requireValidPath)
+static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
 {
-    auto accessor = store.getFSAccessor();
+    auto accessor = store.getFSAccessor(requireValidPath);
     try {
         return parseDerivation(store,
-            accessor->readFile(store.printStorePath(drvPath), requireValidPath),
+            accessor->readFile(CanonPath(store.printStorePath(drvPath))),
             Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());

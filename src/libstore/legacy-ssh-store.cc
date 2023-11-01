@@ -363,7 +363,7 @@ public:
     void ensurePath(const StorePath & path) override
     { unsupported("ensurePath"); }
 
-    virtual ref<FSAccessor> getFSAccessor() override
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     { unsupported("getFSAccessor"); }
 
     /**
