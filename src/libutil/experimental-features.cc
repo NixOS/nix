@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -226,6 +226,13 @@ constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
         .name = "read-only-local-store",
         .description = R"(
             Allow the use of the `read-only` parameter in [local store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) URIs.
+        )",
+    },
+    {
+        .tag = Xp::ACLs,
+        .name = "acls",
+        .description = R"(
+            Allow protection of store paths with the use of [POSIX ACLs](https://man7.org/linux/man-pages/man5/acl.5.html).
         )",
     },
 }};

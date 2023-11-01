@@ -132,7 +132,7 @@
             boost
             lowdown-nix
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp]
+          ++ lib.optionals stdenv.isLinux [libseccomp acl]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
@@ -426,6 +426,7 @@
                   pkgs.perl
                   boost
                 ]
+                ++ lib.optional stdenv.isLinux acl
                 ++ lib.optional (currentStdenv.isLinux || currentStdenv.isDarwin) libsodium
                 ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 

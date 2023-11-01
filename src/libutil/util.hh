@@ -197,6 +197,17 @@ void deletePath(const Path & path);
 void deletePath(const Path & path, uint64_t & bytesFreed);
 
 std::string getUserName();
+std::string getUserName(uid_t uid);
+
+/**
+ * Get the groups to which the user belongs
+ */
+std::vector<gid_t> getUserGroups(uid_t uid);
+
+/**
+ * Get the names of groups to which the user belongs
+ */
+std::vector<std::string> getUserGroupNames(uid_t uid);
 
 /**
  * @return the given user's home directory from /etc/passwd.
