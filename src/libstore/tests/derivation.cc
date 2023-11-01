@@ -11,20 +11,20 @@ namespace nix {
 
 using nlohmann::json;
 
-class DerivationTest : public LibStoreTest
+class DerivationTest : public CharacterizationTest, public LibStoreTest
 {
+    Path unitTestData = getUnitTestData() + "/libstore/derivation";
+
 public:
+    Path goldenMaster(std::string_view testStem) const override {
+        return unitTestData + "/" + testStem;
+    }
+
     /**
      * We set these in tests rather than the regular globals so we don't have
      * to worry about race conditions if the tests run concurrently.
      */
     ExperimentalFeatureSettings mockXpSettings;
-
-    Path unitTestData = getUnitTestData() + "/libstore/derivation";
-
-    Path goldenMaster(std::string_view testStem) {
-        return unitTestData + "/" + testStem;
-    }
 };
 
 class CaDerivationTest : public DerivationTest
@@ -73,14 +73,8 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps) {
 
 #define TEST_JSON(FIXTURE, NAME, VAL, DRV_NAME, OUTPUT_NAME)              \
     TEST_F(FIXTURE, DerivationOutput_ ## NAME ## _from_json) {            \
-        if (testAccept())                                                 \
-        {                                                                 \
-            GTEST_SKIP() << cannotReadGoldenMaster;                       \
-        }                                                                 \
-        else                                                              \
-        {                                                                 \
-            auto encoded = json::parse(                                   \
-                readFile(goldenMaster("output-" #NAME ".json")));         \
+        readTest("output-" #NAME ".json", [&](const auto & encoded_) {    \
+            auto encoded = json::parse(encoded_);                         \
             DerivationOutput got = DerivationOutput::fromJSON(            \
                 *store,                                                   \
                 DRV_NAME,                                                 \
@@ -89,28 +83,20 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps) {
                 mockXpSettings);                                          \
             DerivationOutput expected { VAL };                            \
             ASSERT_EQ(got, expected);                                     \
-        }                                                                 \
+        });                                                               \
     }                                                                     \
                                                                           \
     TEST_F(FIXTURE, DerivationOutput_ ## NAME ## _to_json) {              \
-        auto file = goldenMaster("output-" #NAME ".json");                \
-                                                                          \
-        json got = DerivationOutput { VAL }.toJSON(                       \
-            *store,                                                       \
-            DRV_NAME,                                                     \
-            OUTPUT_NAME);                                                 \
-                                                                          \
-        if (testAccept())                                                 \
-        {                                                                 \
-            createDirs(dirOf(file));                                      \
-            writeFile(file, got.dump(2) + "\n");                          \
-            GTEST_SKIP() << updatingGoldenMaster;                         \
-        }                                                                 \
-        else                                                              \
-        {                                                                 \
-            auto expected = json::parse(readFile(file));                  \
-            ASSERT_EQ(got, expected);                                     \
-        }                                                                 \
+        writeTest<json>("output-" #NAME ".json", [&]() -> json {          \
+            return DerivationOutput { (VAL) }.toJSON(                     \
+                *store,                                                   \
+                (DRV_NAME),                                               \
+                (OUTPUT_NAME));                                           \
+        }, [](const auto & file) {                                        \
+            return json::parse(readFile(file));                           \
+        }, [](const auto & file, const auto & got) {                      \
+            return writeFile(file, got.dump(2) + "\n");                   \
+        });                                                               \
     }
 
 TEST_JSON(DerivationTest, inputAddressed,
@@ -167,50 +153,30 @@ TEST_JSON(ImpureDerivationTest, impure,
 
 #define TEST_JSON(FIXTURE, NAME, VAL)                                     \
     TEST_F(FIXTURE, Derivation_ ## NAME ## _from_json) {                  \
-        if (testAccept())                                                 \
-        {                                                                 \
-            GTEST_SKIP() << cannotReadGoldenMaster;                       \
-        }                                                                 \
-        else                                                              \
-        {                                                                 \
-            auto encoded = json::parse(                                   \
-                readFile(goldenMaster( #NAME ".json")));                  \
+        readTest(#NAME ".json", [&](const auto & encoded_) {              \
+            auto encoded = json::parse(encoded_);                         \
             Derivation expected { VAL };                                  \
             Derivation got = Derivation::fromJSON(                        \
                 *store,                                                   \
                 encoded,                                                  \
                 mockXpSettings);                                          \
             ASSERT_EQ(got, expected);                                     \
-        }                                                                 \
+        });                                                               \
     }                                                                     \
                                                                           \
     TEST_F(FIXTURE, Derivation_ ## NAME ## _to_json) {                    \
-        auto file = goldenMaster( #NAME ".json");                         \
-                                                                          \
-        json got = Derivation { VAL }.toJSON(*store);                     \
-                                                                          \
-        if (testAccept())                                                 \
-        {                                                                 \
-            createDirs(dirOf(file));                                      \
-            writeFile(file, got.dump(2) + "\n");                          \
-            GTEST_SKIP() << updatingGoldenMaster;                         \
-        }                                                                 \
-        else                                                              \
-        {                                                                 \
-            auto expected = json::parse(readFile(file));                  \
-            ASSERT_EQ(got, expected);                                     \
-        }                                                                 \
+        writeTest<json>(#NAME ".json", [&]() -> json {                    \
+            return Derivation { VAL }.toJSON(*store);                     \
+        }, [](const auto & file) {                                        \
+            return json::parse(readFile(file));                           \
+        }, [](const auto & file, const auto & got) {                      \
+            return writeFile(file, got.dump(2) + "\n");                   \
+        });                                                               \
     }
 
 #define TEST_ATERM(FIXTURE, NAME, VAL, DRV_NAME)                          \
     TEST_F(FIXTURE, Derivation_ ## NAME ## _from_aterm) {                 \
-        if (testAccept())                                                 \
-        {                                                                 \
-            GTEST_SKIP() << cannotReadGoldenMaster;                       \
-        }                                                                 \
-        else                                                              \
-        {                                                                 \
-            auto encoded = readFile(goldenMaster( #NAME ".drv"));         \
+        readTest(#NAME ".drv", [&](auto encoded) {                        \
             Derivation expected { VAL };                                  \
             auto got = parseDerivation(                                   \
                 *store,                                                   \
@@ -219,25 +185,13 @@ TEST_JSON(ImpureDerivationTest, impure,
                 mockXpSettings);                                          \
             ASSERT_EQ(got.toJSON(*store), expected.toJSON(*store)) ;      \
             ASSERT_EQ(got, expected);                                     \
-        }                                                                 \
+        });                                                               \
     }                                                                     \
                                                                           \
     TEST_F(FIXTURE, Derivation_ ## NAME ## _to_aterm) {                   \
-        auto file = goldenMaster( #NAME ".drv");                          \
-                                                                          \
-        auto got = (VAL).unparse(*store, false);                          \
-                                                                          \
-        if (testAccept())                                                 \
-        {                                                                 \
-            createDirs(dirOf(file));                                      \
-            writeFile(file, got);                                         \
-            GTEST_SKIP() << updatingGoldenMaster;                         \
-        }                                                                 \
-        else                                                              \
-        {                                                                 \
-            auto expected = readFile(file);                               \
-            ASSERT_EQ(got, expected);                                     \
-        }                                                                 \
+        writeTest(#NAME ".drv", [&]() -> std::string {                    \
+            return (VAL).unparse(*store, false);                          \
+        });                                                               \
     }
 
 Derivation makeSimpleDrv(const Store & store) {
