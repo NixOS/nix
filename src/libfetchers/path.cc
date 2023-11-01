@@ -32,22 +32,29 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
+    std::string_view schemeName() const override
+    {
+        return "path";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "path",
+            /* Allow the user to pass in "fake" tree info
+               attributes. This is useful for making a pinned tree work
+               the same as the repository from which is exported (e.g.
+               path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...).
+             */
+            "rev",
+            "revCount",
+            "lastModified",
+            "narHash",
+        };
+    }
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "path") return {};
-
         getStrAttr(attrs, "path");
-
-        for (auto & [name, value] : attrs)
-            /* Allow the user to pass in "fake" tree info
-               attributes. This is useful for making a pinned tree
-               work the same as the repository from which is exported
-               (e.g. path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...). */
-            if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash" || name == "path")
-                // checked in Input::fromAttrs
-                ;
-            else
-                throw Error("unsupported path input attribute '%s'", name);
 
         Input input;
         input.attrs = attrs;
@@ -135,7 +142,7 @@ struct PathInputScheme : InputScheme
         return {std::move(*storePath), input};
     }
 
-    std::optional<ExperimentalFeature> experimentalFeature() override
+    std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;
     }

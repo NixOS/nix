@@ -188,6 +188,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
             j["experimentalFeature"] = storeConfig->experimentalFeature();
         }
         res["stores"] = std::move(stores);
+        res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
 
         return res.dump();
     }

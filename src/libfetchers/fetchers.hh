@@ -8,6 +8,7 @@
 #include "url.hh"
 
 #include <memory>
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix { class Store; class StorePath; }
 
@@ -131,6 +132,24 @@ struct InputScheme
 
     virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
+    /**
+     * What is the name of the scheme?
+     *
+     * The `type` attribute is used to select which input scheme is
+     * used, and then the other fields are forwarded to that input
+     * scheme.
+     */
+    virtual std::string_view schemeName() const = 0;
+
+    /**
+     * Allowed attributes in an attribute set that is converted to an
+     * input.
+     *
+     * `type` is not included from this set, because the `type` field is
+      parsed first to choose which scheme; `type` is always required.
+     */
+    virtual StringSet allowedAttrs() const = 0;
+
     virtual ParsedURL toURL(const Input & input) const;
 
     virtual Input applyOverrides(
@@ -153,12 +172,14 @@ struct InputScheme
     /**
      * Is this `InputScheme` part of an experimental feature?
      */
-    virtual std::optional<ExperimentalFeature> experimentalFeature();
+    virtual std::optional<ExperimentalFeature> experimentalFeature() const;
 
     virtual bool isDirect(const Input & input) const
     { return true; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
+
+nlohmann::json dumpRegisterInputSchemeInfo();
 
 }

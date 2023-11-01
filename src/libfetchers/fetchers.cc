@@ -5,12 +5,31 @@
 
 namespace nix::fetchers {
 
-std::unique_ptr<std::vector<std::shared_ptr<InputScheme>>> inputSchemes = nullptr;
+using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
+
+std::unique_ptr<InputSchemeMap> inputSchemes = nullptr;
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
 {
-    if (!inputSchemes) inputSchemes = std::make_unique<std::vector<std::shared_ptr<InputScheme>>>();
-    inputSchemes->push_back(std::move(inputScheme));
+    if (!inputSchemes)
+        inputSchemes = std::make_unique<InputSchemeMap>();
+    auto schemeName = inputScheme->schemeName();
+    if (inputSchemes->count(schemeName) > 0)
+        throw Error("Input scheme with name %s already registered", schemeName);
+    inputSchemes->insert_or_assign(schemeName, std::move(inputScheme));
+}
+
+nlohmann::json dumpRegisterInputSchemeInfo() {
+    using nlohmann::json;
+
+    auto res = json::object();
+
+    for (auto & [name, scheme] : *inputSchemes) {
+        auto & r = res[name] = json::object();
+        r["allowedAttrs"] = scheme->allowedAttrs();
+    }
+
+    return res;
 }
 
 Input Input::fromURL(const std::string & url, bool requireTree)
@@ -33,7 +52,7 @@ static void fixupInput(Input & input)
 
 Input Input::fromURL(const ParsedURL & url, bool requireTree)
 {
-    for (auto & inputScheme : *inputSchemes) {
+    for (auto & [_, inputScheme] : *inputSchemes) {
         auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
@@ -48,20 +67,44 @@ Input Input::fromURL(const ParsedURL & url, bool requireTree)
 
 Input Input::fromAttrs(Attrs && attrs)
 {
-    for (auto & inputScheme : *inputSchemes) {
-        auto res = inputScheme->inputFromAttrs(attrs);
-        if (res) {
-            experimentalFeatureSettings.require(inputScheme->experimentalFeature());
-            res->scheme = inputScheme;
-            fixupInput(*res);
-            return std::move(*res);
-        }
-    }
+    auto schemeName = ({
+        auto schemeNameOpt = maybeGetStrAttr(attrs, "type");
+        if (!schemeNameOpt)
+            throw Error("'type' attribute to specify input scheme is required but not provided");
+        *std::move(schemeNameOpt);
+    });
 
-    Input input;
-    input.attrs = attrs;
-    fixupInput(input);
-    return input;
+    auto raw = [&]() {
+        // Return an input without a scheme; most operations will fail,
+        // but not all of them. Doing this is to support those other
+        // operations which are supposed to be robust on
+        // unknown/uninterpretable inputs.
+        Input input;
+        input.attrs = attrs;
+        fixupInput(input);
+        return input;
+    };
+
+    std::shared_ptr<InputScheme> inputScheme = ({
+        auto i = inputSchemes->find(schemeName);
+        i == inputSchemes->end() ? nullptr : i->second;
+    });
+
+    if (!inputScheme) return raw();
+
+    experimentalFeatureSettings.require(inputScheme->experimentalFeature());
+
+    auto allowedAttrs = inputScheme->allowedAttrs();
+
+    for (auto & [name, _] : attrs)
+        if (name != "type" && allowedAttrs.count(name) == 0)
+            throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
+
+    auto res = inputScheme->inputFromAttrs(attrs);
+    if (!res) return raw();
+    res->scheme = inputScheme;
+    fixupInput(*res);
+    return std::move(*res);
 }
 
 ParsedURL Input::toURL() const
@@ -312,7 +355,7 @@ void InputScheme::clone(const Input & input, const Path & destDir) const
     throw Error("do not know how to clone input '%s'", input.to_string());
 }
 
-std::optional<ExperimentalFeature> InputScheme::experimentalFeature()
+std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
 {
     return {};
 }

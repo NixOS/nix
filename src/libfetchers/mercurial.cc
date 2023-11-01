@@ -69,14 +69,25 @@ struct MercurialInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
+    std::string_view schemeName() const override
+    {
+        return "hg";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "url",
+            "ref",
+            "rev",
+            "revCount",
+            "narHash",
+            "name",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "hg") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash" && name != "name")
-                throw Error("unsupported Mercurial input attribute '%s'", name);
-
         parseURL(getStrAttr(attrs, "url"));
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
