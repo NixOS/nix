@@ -44,9 +44,13 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
     return nix::pathExists(path.abs());
 }
 
-SourceAccessor::Stat PosixSourceAccessor::lstat(const CanonPath & path)
+std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
 {
-    auto st = nix::lstat(path.abs());
+    struct stat st;
+    if (::lstat(path.c_str(), &st)) {
+        if (errno == ENOENT) return std::nullopt;
+        throw SysError("getting status of '%s'", showPath(path));
+    }
     mtime = std::max(mtime, st.st_mtime);
     return Stat {
         .type =

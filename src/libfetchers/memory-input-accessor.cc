@@ -20,12 +20,12 @@ struct MemoryInputAccessorImpl : MemoryInputAccessor
         return i != files.end();
     }
 
-    Stat lstat(const CanonPath & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto i = files.find(path);
         if (i != files.end())
             return Stat { .type = tRegular, .isExecutable = false };
-        throw Error("file '%s' does not exist", path);
+        return std::nullopt;
     }
 
     DirEntries readDirectory(const CanonPath & path) override

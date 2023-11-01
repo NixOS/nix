@@ -61,9 +61,9 @@ struct SourceAccessor
         bool isExecutable = false; // regular files only
     };
 
-    virtual Stat lstat(const CanonPath & path) = 0;
+    Stat lstat(const CanonPath & path);
 
-    std::optional<Stat> maybeLstat(const CanonPath & path);
+    virtual std::optional<Stat> maybeLstat(const CanonPath & path) = 0;
 
     typedef std::optional<Type> DirEntry;
 
