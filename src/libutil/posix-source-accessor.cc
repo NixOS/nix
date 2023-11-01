@@ -58,7 +58,8 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
             S_ISDIR(st.st_mode) ? tDirectory :
             S_ISLNK(st.st_mode) ? tSymlink :
             tMisc,
-        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR
+        .fileSize = S_ISREG(st.st_mode) ? std::optional<uint64_t>(st.st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR,
     };
 }
 

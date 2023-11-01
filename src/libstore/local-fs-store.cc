@@ -1,5 +1,5 @@
 #include "archive.hh"
-#include "source-accessor.hh"
+#include "posix-source-accessor.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
@@ -13,7 +13,7 @@ LocalFSStore::LocalFSStore(const Params & params)
 {
 }
 
-struct LocalStoreAccessor : public SourceAccessor
+struct LocalStoreAccessor : PosixSourceAccessor
 {
     ref<LocalFSStore> store;
     bool requireValidPath;
@@ -23,57 +23,35 @@ struct LocalStoreAccessor : public SourceAccessor
         , requireValidPath(requireValidPath)
     { }
 
-    Path toRealPath(const CanonPath & path)
+    CanonPath toRealPath(const CanonPath & path)
     {
-        auto storePath = store->toStorePath(path.abs()).first;
+        auto [storePath, rest] = store->toStorePath(path.abs());
         if (requireValidPath && !store->isValidPath(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-        return store->getRealStoreDir() + path.abs().substr(store->storeDir.size());
+        return CanonPath(store->getRealStoreDir()) + storePath.to_string() + CanonPath(rest);
     }
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
-        auto realPath = toRealPath(path);
-
-        // FIXME: use PosixSourceAccessor.
-        struct stat st;
-        if (::lstat(realPath.c_str(), &st)) {
-            if (errno == ENOENT || errno == ENOTDIR) return std::nullopt;
-            throw SysError("getting status of '%1%'", path);
-        }
-
-        if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode))
-            throw Error("file '%1%' has unsupported type", path);
-
-        return {{
-            S_ISREG(st.st_mode) ? Type::tRegular :
-            S_ISLNK(st.st_mode) ? Type::tSymlink :
-            Type::tDirectory,
-            S_ISREG(st.st_mode) ? (uint64_t) st.st_size : 0,
-            S_ISREG(st.st_mode) && st.st_mode & S_IXUSR}};
+        return PosixSourceAccessor::maybeLstat(toRealPath(path));
     }
 
     DirEntries readDirectory(const CanonPath & path) override
     {
-        auto realPath = toRealPath(path);
-
-        auto entries = nix::readDirectory(realPath);
-
-        DirEntries res;
-        for (auto & entry : entries)
-            res.insert_or_assign(entry.name, std::nullopt);
-
-        return res;
+        return PosixSourceAccessor::readDirectory(toRealPath(path));
     }
 
-    std::string readFile(const CanonPath & path) override
+    void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback) override
     {
-        return nix::readFile(toRealPath(path));
+        return PosixSourceAccessor::readFile(toRealPath(path), sink, sizeCallback);
     }
 
     std::string readLink(const CanonPath & path) override
     {
-        return nix::readLink(toRealPath(path));
+        return PosixSourceAccessor::readLink(toRealPath(path));
     }
 };
 
