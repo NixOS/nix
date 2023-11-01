@@ -48,15 +48,15 @@ struct LocalStoreAccessor : public FSAccessor
             S_ISREG(st.st_mode) && st.st_mode & S_IXUSR}};
     }
 
-    StringSet readDirectory(const Path & path) override
+    DirEntries readDirectory(const Path & path) override
     {
         auto realPath = toRealPath(path);
 
         auto entries = nix::readDirectory(realPath);
 
-        StringSet res;
+        DirEntries res;
         for (auto & entry : entries)
-            res.insert(entry.name);
+            res.insert_or_assign(entry.name, std::nullopt);
 
         return res;
     }

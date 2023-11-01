@@ -74,7 +74,7 @@ struct MixLs : virtual Args, MixJSON
         {
             if (st.type == FSAccessor::Type::tDirectory && !showDirectory) {
                 auto names = accessor->readDirectory(curPath);
-                for (auto & name : names)
+                for (auto & [name, type] : names)
                     showFile(curPath + "/" + name, relPath + "/" + name);
             } else
                 showFile(curPath, relPath);

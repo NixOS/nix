@@ -224,7 +224,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
                 if (st->type == FSAccessor::Type::tDirectory) {
                     auto names = accessor->readDirectory(p);
-                    for (auto & name : names)
+                    for (auto & [name, type] : names)
                         visitPath(p + "/" + name);
                 }
 

@@ -30,7 +30,7 @@ public:
 
     std::optional<Stat> stat(const Path & path) override;
 
-    StringSet readDirectory(const Path & path) override;
+    DirEntries readDirectory(const Path & path) override;
 
     std::string readFile(const Path & path, bool requireValidPath = true) override;
 

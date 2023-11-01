@@ -231,14 +231,14 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
             std::regex regex1("^[0-9a-f]{2}$");
             std::regex regex2("^[0-9a-f]{38}\\.debug$");
 
-            for (auto & s1 : narAccessor->readDirectory(buildIdDir)) {
+            for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
                 auto dir = buildIdDir + "/" + s1;
 
                 if (auto st = narAccessor->stat(dir); !st || st->type != SourceAccessor::tDirectory
                     || !std::regex_match(s1, regex1))
                     continue;
 
-                for (auto & s2 : narAccessor->readDirectory(dir)) {
+                for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
                     auto debugPath = dir + "/" + s2;
 
                     if (auto st = narAccessor->stat(debugPath); !st || st->type != SourceAccessor::tRegular

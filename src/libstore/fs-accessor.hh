@@ -39,7 +39,9 @@ public:
 
     virtual std::optional<Stat> stat(const Path & path) = 0;
 
-    virtual StringSet readDirectory(const Path & path) = 0;
+    using DirEntries = SourceAccessor::DirEntries;
+
+    virtual DirEntries readDirectory(const Path & path) = 0;
 
     /**
      * Read a file inside the store.

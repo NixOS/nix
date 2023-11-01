@@ -190,16 +190,16 @@ struct NarAccessor : public FSAccessor
         return i->stat;
     }
 
-    StringSet readDirectory(const Path & path) override
+    DirEntries readDirectory(const Path & path) override
     {
         auto i = get(path);
 
         if (i.stat.type != Type::tDirectory)
             throw Error("path '%1%' inside NAR file is not a directory", path);
 
-        StringSet res;
+        DirEntries res;
         for (auto & child : i.children)
-            res.insert(child.first);
+            res.insert_or_assign(child.first, std::nullopt);
 
         return res;
     }
@@ -264,7 +264,7 @@ json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
         {
             obj["entries"] = json::object();
             json &res2 = obj["entries"];
-            for (auto & name : accessor->readDirectory(path)) {
+            for (auto & [name, type] : accessor->readDirectory(path)) {
                 if (recurse) {
                     res2[name] = listNar(accessor, path + "/" + name, true);
                 } else

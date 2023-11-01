@@ -107,7 +107,7 @@ std::optional<FSAccessor::Stat> RemoteFSAccessor::stat(const Path & path)
     return res.first->stat(res.second);
 }
 
-StringSet RemoteFSAccessor::readDirectory(const Path & path)
+SourceAccessor::DirEntries RemoteFSAccessor::readDirectory(const Path & path)
 {
     auto res = fetch(path);
     return res.first->readDirectory(res.second);
