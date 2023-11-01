@@ -1,4 +1,7 @@
 #include "daemon.hh"
+#include "granular-access-store.hh"
+#include "local-fs-store.hh"
+#include "local-store.hh"
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
 #include "worker-protocol-impl.hh"
@@ -273,7 +276,7 @@ static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int cli
 }
 
 static void performOp(TunnelLogger * logger, ref<Store> store,
-    TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
+    AuthenticatedUser user, RecursiveFlag recursive, unsigned int clientVersion,
     Source & from, BufferedSink & to, WorkerProto::Op op)
 {
     WorkerProto::ReadConn rconn { .from = from };
@@ -482,7 +485,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::AddMultipleToStore: {
         bool repair, dontCheckSigs;
         from >> repair >> dontCheckSigs;
-        if (!trusted && dontCheckSigs)
+        if (!user.trusted && dontCheckSigs)
             dontCheckSigs = false;
 
         logger->startWork();
@@ -509,6 +512,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case WorkerProto::Op::ExportPath: {
         auto path = store->parseStorePath(readString(from));
+        if (!require<LocalGranularAccessStore>(*store).canAccess(path)) throw AccessDenied("Access Denied");
         readInt(from); // obsolete
         logger->startWork();
         TunnelSink sink(to);
@@ -522,7 +526,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         TunnelSource source(from, to);
         auto paths = store->importPaths(source,
-            trusted ? NoCheckSigs : CheckSigs);
+            user.trusted ? NoCheckSigs : CheckSigs);
         logger->stopWork();
         Strings paths2;
         for (auto & i : paths) paths2.push_back(store->printStorePath(i));
@@ -545,7 +549,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                need not be getting the UID of the other end of a Unix Domain
                Socket.
               */
-            if (mode == bmRepair && !trusted)
+            if (mode == bmRepair && !user.trusted)
                 throw Error("repairing is not allowed because you are not in 'trusted-users'");
         }
         logger->startWork();
@@ -564,7 +568,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            clients.
 
            FIXME: layer violation; see above. */
-        if (mode == bmRepair && !trusted)
+        if (mode == bmRepair && !user.trusted)
             throw Error("repairing is not allowed because you are not in 'trusted-users'");
 
         logger->startWork();
@@ -617,15 +621,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            derivations, we throw out the precomputed output paths and just
            store the hashes, so there aren't two competing sources of truth an
            attacker could exploit. */
-        if (!(drvType.isCA() || trusted))
+        if (!(drvType.isCA() || user.trusted))
             throw Error("you are not privileged to build input-addressed derivations");
 
         /* Make sure that the non-input-addressed derivations that got this far
            are in fact content-addressed if we don't trust them. */
-        assert(drvType.isCA() || trusted);
+        assert(drvType.isCA() || user.trusted);
 
         /* Recompute the derivation path when we cannot trust the original. */
-        if (!trusted) {
+        if (!user.trusted) {
             /* Recomputing the derivation path for input-address derivations
                makes it harder to audit them after the fact, since we need the
                original not-necessarily-resolved derivation to verify the drv
@@ -694,7 +698,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::FindRoots: {
         logger->startWork();
         auto & gcStore = require<GcStore>(*store);
-        Roots roots = gcStore.findRoots(!trusted);
+        Roots roots = gcStore.findRoots(!user.trusted);
         logger->stopWork();
 
         size_t size = 0;
@@ -765,7 +769,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         // FIXME: use some setting in recursive mode. Will need to use
         // non-global variables.
         if (!recursive)
-            clientSettings.apply(trusted);
+            clientSettings.apply(user.trusted);
 
         logger->stopWork();
         break;
@@ -852,7 +856,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         bool checkContents, repair;
         from >> checkContents >> repair;
         logger->startWork();
-        if (repair && !trusted)
+        if (repair && !user.trusted)
             throw Error("you are not privileged to repair paths");
         bool errors = store->verifyStore(checkContents, (RepairFlag) repair);
         logger->stopWork();
@@ -891,9 +895,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.sigs = readStrings<StringSet>(from);
         info.ca = ContentAddress::parseOpt(readString(from));
         from >> repair >> dontCheckSigs;
-        if (!trusted && dontCheckSigs)
+        if (!user.trusted && dontCheckSigs)
             dontCheckSigs = false;
-        if (!trusted)
+        if (!user.trusted)
             info.ultimate = false;
 
         if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
@@ -979,7 +983,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::AddBuildLog: {
         StorePath path{readString(from)};
         logger->startWork();
-        if (!trusted)
+        if (!user.trusted)
             throw Error("you are not privileged to add logs");
         auto & logStore = require<LogStore>(*store);
         {
@@ -987,6 +991,71 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             StringSink sink;
             source.drainInto(sink);
             logStore.addBuildLog(path, sink.s);
+        }
+        logger->stopWork();
+        to << 1;
+        break;
+    }
+
+    case WorkerProto::Op::GetAccessStatus: {
+        auto object = WorkerProto::Serialise<StoreObject>::read(*store, rconn);
+        logger->startWork();
+        auto status = require<LocalGranularAccessStore>(*store).getAccessStatus(object);
+        logger->stopWork();
+        WorkerProto::Serialise<LocalStore::AccessStatus>::write(*store, wconn, status);
+        break;
+    }
+
+    case WorkerProto::Op::SetAccessStatus: {
+        auto object = WorkerProto::Serialise<StoreObject>::read(*store, rconn);
+        auto status = WorkerProto::Serialise<LocalStore::AccessStatus>::read(*store, rconn);
+        logger->startWork();
+        auto localStore = dynamic_cast<LocalStore*>(&*store);
+        auto curStatus = require<LocalGranularAccessStore>(*store).getAccessStatus(object);
+        if (status != curStatus) {
+            if (user.trusted) {
+                localStore->setAccessStatus(object, status);
+            } else {
+                // TODO document rationale behind this logic
+                auto [exists, description] = std::visit(overloaded {
+                    [&](StorePath p) {
+                        auto rp = store->toRealPath(p);
+                        return std::pair<bool, std::string>{pathExists(rp), fmt("path %s", rp)};
+                    },
+                    [&](StoreObjectDerivationOutput b) {
+                        auto drv = localStore->readDerivation(b.drvPath);
+                        auto outputHashes = staticOutputHashes(*localStore, drv);
+                        auto drvOutputs = drv.outputsAndOptPaths(*localStore);
+                        bool known = drvOutputs.contains(b.output) && drvOutputs.at(b.output).second;
+                        if (known) {
+                            auto realPath = store->toRealPath(*drvOutputs.at(b.output).second);
+                            bool exists = pathExists(realPath);
+                            return std::pair<bool, std::string>{exists, fmt("path %s", realPath)};
+                        } else {
+                            return std::pair<bool, std::string>{false, fmt("output %s of derivation %s", b.output, store->toRealPath(b.drvPath))};
+                        }
+                    },
+                    [&](StoreObjectDerivationLog l) {
+                        auto baseName = l.drvPath.to_string();
+
+                        auto logPath = fmt("%s/%s/%s/%s.bz2", localStore->logDir, localStore->drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+
+                        return std::pair<bool, std::string>{pathExists(logPath), fmt("build log of derivation %s", store->toRealPath(l.drvPath))};
+                    }
+                }, object);
+                if (exists && status.isProtected != curStatus.isProtected)
+                    throw AccessDenied("You have to be a trusted user to set a protection status on an existing %s", description);
+                if (! status.isProtected)
+                    throw AccessDenied("Only trusted users can set allowed entities on an unprotected %s", description);
+                if (exists && ! std::includes(status.entities.begin(), status.entities.end(), curStatus.entities.begin(), curStatus.entities.end()))
+                    throw AccessDenied("Only trusted users can revoke permissions on %s", description);
+
+                if (! exists || localStore->canAccess(object, user.uid))
+                    localStore->setAccessStatus(object, status);
+                else {
+                    localStore->setFutureAccessStatus(object, status);
+                }
+            }
         }
         logger->stopWork();
         to << 1;
@@ -1006,9 +1075,14 @@ void processConnection(
     ref<Store> store,
     FdSource & from,
     FdSink & to,
-    TrustedFlag trusted,
+    AuthenticatedUser user,
     RecursiveFlag recursive)
 {
+    if (auto aclStore = store.dynamic_pointer_cast<LocalGranularAccessStore>()) {
+        aclStore->effectiveUser = user.uid;
+        aclStore->trusted = user.trusted || user.uid == 0;
+    }
+
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
     /* Exchange the greeting. */
@@ -1048,7 +1122,7 @@ void processConnection(
     if (GET_PROTOCOL_MINOR(clientVersion) >= 35) {
         // We and the underlying store both need to trust the client for
         // it to be trusted.
-        auto temp = trusted
+        auto temp = user.trusted
             ? store->isTrustedClient()
             : std::optional { NotTrusted };
         WorkerProto::WriteConn wconn { .to = to };
@@ -1065,6 +1139,7 @@ void processConnection(
 
         /* Process client requests. */
         while (true) {
+            printMsgUsing(prevLogger, lvlDebug, "waiting for op");
             WorkerProto::Op op;
             try {
                 op = (enum WorkerProto::Op) readInt(from);
@@ -1081,7 +1156,7 @@ void processConnection(
             debug("performing daemon worker op: %d", op);
 
             try {
-                performOp(tunnelLogger, store, trusted, recursive, clientVersion, from, to, op);
+                performOp(tunnelLogger, store, user, recursive, clientVersion, from, to, op);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the

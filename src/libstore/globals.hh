@@ -1036,4 +1036,11 @@ void initLibStore();
  */
 void assertLibStoreInitialized();
 
+enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
+
+struct AuthenticatedUser {
+    TrustedFlag trusted;
+    uid_t uid;
+};
+
 }

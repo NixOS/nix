@@ -4,6 +4,7 @@
 #include <limits>
 #include <string>
 
+#include "local-fs-store.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
@@ -39,7 +40,8 @@ struct RemoteStoreConfig : virtual StoreConfig
 class RemoteStore : public virtual RemoteStoreConfig,
     public virtual Store,
     public virtual GcStore,
-    public virtual LogStore
+    public virtual LogStore,
+    public virtual LocalGranularAccessStore
 {
 public:
 
@@ -169,6 +171,11 @@ public:
     struct Connection;
 
     ref<Connection> openConnectionWrapper();
+
+    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    AccessStatus getAccessStatus(const StoreObject & storeObject) override;
+
+    std::set<ACL::Group> getSubjectGroups(ACL::User user) override;
 
 protected:
 

@@ -2,6 +2,7 @@
 ///@file
 
 #include "serialise.hh"
+#include "acl.hh"
 
 namespace nix {
 
@@ -9,7 +10,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION (1 << 8 | 35)
+#define PROTOCOL_VERSION (1 << 8 | 36)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -29,12 +30,16 @@ struct Source;
 
 // items being serialised
 struct DerivedPath;
+struct StoreObjectDerivationOutput;
+struct StoreObjectDerivationLog;
 struct DrvOutput;
 struct Realisation;
 struct BuildResult;
 struct KeyedBuildResult;
 enum TrustedFlag : bool;
-
+struct AuthenticatedUser;
+namespace acl { struct User; struct Group; };
+template<typename T> struct AccessStatusFor;
 
 /**
  * The "worker protocol", used by unix:// and ssh-ng:// stores.
@@ -158,6 +163,8 @@ enum struct WorkerProto::Op : uint64_t
     AddMultipleToStore = 44,
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
+    GetAccessStatus = 47,
+    SetAccessStatus = 48,
 };
 
 /**
@@ -206,6 +213,10 @@ MAKE_WORKER_PROTO(ContentAddress);
 template<>
 MAKE_WORKER_PROTO(DerivedPath);
 template<>
+MAKE_WORKER_PROTO(StoreObjectDerivationOutput);
+template<>
+MAKE_WORKER_PROTO(StoreObjectDerivationLog);
+template<>
 MAKE_WORKER_PROTO(Realisation);
 template<>
 MAKE_WORKER_PROTO(DrvOutput);
@@ -215,14 +226,36 @@ template<>
 MAKE_WORKER_PROTO(KeyedBuildResult);
 template<>
 MAKE_WORKER_PROTO(std::optional<TrustedFlag>);
+template<>
+MAKE_WORKER_PROTO(AuthenticatedUser);
+template<>
+MAKE_WORKER_PROTO(ACL::User);
+template<>
+MAKE_WORKER_PROTO(ACL::Group);
+template<typename T>
+MAKE_WORKER_PROTO(AccessStatusFor<T>);
 
 template<typename T>
 MAKE_WORKER_PROTO(std::vector<T>);
 template<typename T>
 MAKE_WORKER_PROTO(std::set<T>);
 
+template<typename A, typename B>
+#define X_ std::variant<A, B>
+MAKE_WORKER_PROTO(X_);
+#undef X_
+template<typename A, typename B, typename C>
+#define X_ std::variant<A, B, C>
+MAKE_WORKER_PROTO(X_);
+#undef X_
+
 template<typename K, typename V>
 #define X_ std::map<K, V>
+MAKE_WORKER_PROTO(X_);
+#undef X_
+
+template<typename A, typename B>
+#define X_ std::pair<A, B>
 MAKE_WORKER_PROTO(X_);
 #undef X_
 

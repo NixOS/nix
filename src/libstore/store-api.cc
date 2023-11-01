@@ -975,6 +975,16 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
                     if (showClosureSize)
                         jsonPath["closureDownloadSize"] = closureSizes.second;
                 }
+
+                if (info->accessStatus) {
+                    jsonPath["protected"] = info->accessStatus->isProtected;
+                    for (auto & entity : info->accessStatus->entities) {
+                        std::visit(overloaded {
+                            [&](ACL::User u) { jsonPath["allowedUsers"].push_back(getpwuid(u.uid)->pw_name); },
+                            [&](ACL::Group g) { jsonPath["allowedGroups"].push_back(getgrgid(g.gid)->gr_name); },
+                        }, entity);
+                    }
+                }
             }
 
         } catch (InvalidPath &) {

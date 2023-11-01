@@ -15,10 +15,12 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 
+#include <grp.h>
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
 #include <limits>
 #include <map>
+#include <pwd.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <memory>
@@ -68,6 +70,8 @@ MakeError(BadStorePath, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+MakeError(AccessDenied, Error);
+
 struct BasicDerivation;
 struct Derivation;
 class FSAccessor;
@@ -82,6 +86,7 @@ enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 
+
 /**
  * Magic header of exportPath() output (obsolete).
  */
@@ -89,7 +94,6 @@ const uint32_t exportMagic = 0x4558494e;
 
 
 enum BuildMode { bmNormal, bmRepair, bmCheck };
-enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
 struct KeyedBuildResult;
@@ -920,6 +924,10 @@ void removeTempRoots();
  * is unknown.
  */
 OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
+/**
+ * Resolve the derived path, splitting it into known and unknown outputs.
+ */
+std::pair<OutputPathMap, std::set<DrvOutput>> resolveDerivedPathAll(Store & store, const DerivedPath::Built & bfd, Store * evalStore_ = nullptr);
 
 
 /**

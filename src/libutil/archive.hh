@@ -117,14 +117,14 @@ struct RetrieveRegularNARSink : ParseSink
 
 void parseDump(ParseSink & sink, Source & source);
 
-void restorePath(const Path & path, Source & source);
+void restorePath(const Path & path, Source & source, bool protect = false);
 
 /**
  * Read a NAR from 'source' and write it to 'sink'.
  */
 void copyNAR(Source & source, Sink & sink);
 
-void copyPath(const Path & from, const Path & to);
+void copyPath(const Path & from, const Path & to, bool protect = false);
 
 
 inline constexpr std::string_view narVersionMagic1 = "nix-archive-1";

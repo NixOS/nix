@@ -68,7 +68,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
     std::string doc() override;
 };
 
-class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
+class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore, public virtual LocalGranularAccessStore
 {
 private:
 
@@ -112,6 +112,16 @@ private:
     };
 
     Sync<State> _state;
+
+    /**
+     * Map of paths, which, when added to the store need permissions to be set.
+     */
+    std::map<StoreObject, AccessStatus> futurePermissions;
+
+    /**
+     * Sync path permissions from futurePermissions to a real path in store
+     */
+    void syncPathPermissions(const ValidPathInfo & info);
 
 public:
 
@@ -282,8 +292,21 @@ public:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    std::optional<std::string> getVersion() override;
+    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    void setFutureAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
+    void setCurrentAccessStatus(const Path & path, const AccessStatus & status);
+    AccessStatus getAccessStatus(const StoreObject & storeObject) override;
+    AccessStatus getFutureAccessStatus(const StoreObject & storeObject);
+    AccessStatus getCurrentAccessStatus(const Path & path);
 
+    void grantBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);
+    void revokeBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);
+    void revokeBuildUserAccess(const StorePath & path);
+    void revokeBuildUserAccess();
+
+    std::set<ACL::Group> getSubjectGroups(ACL::User user) override;
+
+    std::optional<std::string> getVersion() override;
 private:
 
     /**

@@ -1,3 +1,5 @@
+#include "globals.hh"
+#include "granular-access-store.hh"
 #include "serialise.hh"
 #include "util.hh"
 #include "path-with-outputs.hh"
@@ -67,6 +69,40 @@ void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const Store & sto
     }
 }
 
+AuthenticatedUser WorkerProto::Serialise<AuthenticatedUser>::read(const Store & store, WorkerProto::ReadConn conn) {
+    AuthenticatedUser user;
+    user.trusted = *WorkerProto::Serialise<std::optional<TrustedFlag>>::read(store, conn);
+    conn.from >> user.uid;
+    return user;
+}
+
+void WorkerProto::Serialise<AuthenticatedUser>::write(const Store & store, WorkerProto::WriteConn conn, const AuthenticatedUser & user)
+{
+    WorkerProto::Serialise<std::optional<TrustedFlag>>::write(store, conn, user.trusted);
+    conn.to << user.uid;
+}
+
+ACL::User WorkerProto::Serialise<ACL::User>::read(const Store & store, WorkerProto::ReadConn conn) {
+    uid_t uid;
+    conn.from >> uid;
+    return uid;
+}
+
+void WorkerProto::Serialise<ACL::User>::write(const Store & store, WorkerProto::WriteConn conn, const ACL::User & user)
+{
+    conn.to << user.uid;
+}
+
+ACL::Group WorkerProto::Serialise<ACL::Group>::read(const Store & store, WorkerProto::ReadConn conn) {
+    gid_t gid;
+    conn.from >> gid;
+    return gid;
+}
+
+void WorkerProto::Serialise<ACL::Group>::write(const Store & store, WorkerProto::WriteConn conn, const ACL::Group & group)
+{
+    conn.to << group.gid;
+}
 
 ContentAddress WorkerProto::Serialise<ContentAddress>::read(const Store & store, WorkerProto::ReadConn conn)
 {
@@ -116,6 +152,28 @@ void WorkerProto::Serialise<DrvOutput>::write(const Store & store, WorkerProto::
     conn.to << drvOutput.to_string();
 }
 
+StoreObjectDerivationOutput WorkerProto::Serialise<StoreObjectDerivationOutput>::read(const Store & store, WorkerProto::ReadConn conn)
+{
+    auto drvPath = WorkerProto::Serialise<StorePath>::read(store, conn);
+    auto output = WorkerProto::Serialise<std::string>::read(store, conn);
+    return {drvPath, output};
+}
+
+void WorkerProto::Serialise<StoreObjectDerivationOutput>::write(const Store & store, WorkerProto::WriteConn conn, const StoreObjectDerivationOutput & drvOutput)
+{
+    WorkerProto::Serialise<StorePath>::write(store, conn, drvOutput.drvPath);
+    WorkerProto::Serialise<std::string>::write(store, conn, drvOutput.output);
+}
+
+StoreObjectDerivationLog WorkerProto::Serialise<StoreObjectDerivationLog>::read(const Store & store, WorkerProto::ReadConn conn)
+{
+    return { WorkerProto::Serialise<StorePath>::read(store, conn) };
+}
+
+void WorkerProto::Serialise<StoreObjectDerivationLog>::write(const Store & store, WorkerProto::WriteConn conn, const StoreObjectDerivationLog & drvLog)
+{
+    WorkerProto::Serialise<StorePath>::write(store, conn, drvLog.drvPath);
+}
 
 KeyedBuildResult WorkerProto::Serialise<KeyedBuildResult>::read(const Store & store, WorkerProto::ReadConn conn)
 {

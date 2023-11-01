@@ -306,18 +306,21 @@ struct RestoreSink : ParseSink
 {
     Path dstPath;
     AutoCloseFD fd;
+    bool protect = false;
 
     void createDirectory(const Path & path) override
     {
         Path p = dstPath + path;
-        if (mkdir(p.c_str(), 0777) == -1)
+        auto mode = (protect && (path == "" || path == "/")) ? 0770 : 0777;
+        if (mkdir(p.c_str(), mode) == -1)
             throw SysError("creating directory '%1%'", p);
     };
 
     void createRegularFile(const Path & path) override
     {
         Path p = dstPath + path;
-        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+        auto mode = (protect && (path == "" || path == "/")) ? 0660 : 0666;
+        fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, mode);
         if (!fd) throw SysError("creating file '%1%'", p);
     }
 
@@ -367,10 +370,11 @@ struct RestoreSink : ParseSink
 };
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(const Path & path, Source & source, bool protect)
 {
     RestoreSink sink;
     sink.dstPath = path;
+    sink.protect = protect;
     parseDump(sink, source);
 }
 
@@ -388,12 +392,12 @@ void copyNAR(Source & source, Sink & sink)
 }
 
 
-void copyPath(const Path & from, const Path & to)
+void copyPath(const Path & from, const Path & to, bool protect)
 {
     auto source = sinkToSource([&](Sink & sink) {
         dumpPath(from, sink);
     });
-    restorePath(to, *source);
+    restorePath(to, *source, protect);
 }
 
 

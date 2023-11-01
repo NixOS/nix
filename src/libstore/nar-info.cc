@@ -1,5 +1,7 @@
+#include "config.hh"
 #include "globals.hh"
 #include "nar-info.hh"
+#include "path-info.hh"
 #include "store-api.hh"
 
 namespace nix {
@@ -78,6 +80,24 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             if (ca) throw corrupt("extra CA");
             // FIXME: allow blank ca or require skipping field?
             ca = ContentAddress::parseOpt(value);
+        } else if (experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
+            if (name == "Protected") {
+                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus {};
+                if (value == "true")
+                    accessStatus->isProtected = true;
+                else if (value == "false")
+                    accessStatus->isProtected = false;
+                else
+                    throw corrupt("invalid Protected value");
+            }
+            else if (name == "AllowedUser") {
+                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus {};
+                accessStatus->entities.insert(ACL::User{getpwnam(value.c_str())->pw_uid});
+            }
+            else if (name == "AllowedGroup") {
+                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus {};
+                accessStatus->entities.insert(ACL::Group{getgrnam(value.c_str())->gr_gid});
+            }
         }
 
         pos = eol + 1;
@@ -121,6 +141,15 @@ std::string NarInfo::to_string(const Store & store) const
 
     if (ca)
         res += "CA: " + renderContentAddress(*ca) + "\n";
+
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs) && accessStatus) {
+        res += "Protected: " + std::string(accessStatus->isProtected ? "true" : "false") + "\n";
+        for (auto entity : accessStatus->entities)
+            std::visit(overloaded {
+                [&](ACL::User u){ res += "AllowedUser: " + std::string(getpwuid(u.uid)->pw_name) + "\n"; },
+                [&](ACL::Group g){ res += "AllowedGroup: " + std::string(getgrgid(g.gid)->gr_name) + "\n"; }
+            }, entity);
+    }
 
     return res;
 }

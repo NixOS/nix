@@ -18,19 +18,20 @@ typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,
- * so the choices are `Absent` or `Valid`.
+ * so the choices are `Absent`, `Inaccessible` or `Valid`.
  */
 enum struct PathStatus {
     Corrupt,
     Absent,
     Valid,
+    Inaccessible,
 };
 
 struct InitialOutputStatus {
     StorePath path;
     PathStatus status;
     /**
-     * Valid in the store, and additionally non-corrupt if we are repairing
+     * Valid in the store, accessible, and additionally non-corrupt if we are repairing
      */
     bool isValid() const {
         return status == PathStatus::Valid;
@@ -40,6 +41,7 @@ struct InitialOutputStatus {
      */
     bool isPresent() const {
         return status == PathStatus::Corrupt
+            || status == PathStatus::Inaccessible
             || status == PathStatus::Valid;
     }
 };

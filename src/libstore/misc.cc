@@ -310,9 +310,19 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 
 OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)
 {
+    auto [outputs, missing] = resolveDerivedPathAll(store, bfd, evalStore_);
+    if (!missing.empty())
+        throw MissingRealisation(*missing.begin());
+    return outputs;
+}
+
+// FIXME refactor with resolveDerivedPath to remove repetition
+std::pair<OutputPathMap, std::set<DrvOutput>> resolveDerivedPathAll(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)
+{
     auto & evalStore = evalStore_ ? *evalStore_ : store;
 
     OutputPathMap outputs;
+    std::set<DrvOutput> missingOutputs;
     auto drv = evalStore.readDerivation(bfd.drvPath);
     auto outputHashes = staticOutputHashes(store, drv);
     auto drvOutputs = drv.outputsAndOptPaths(store);
@@ -336,9 +346,10 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             DrvOutput outputId { *outputHash, output };
             auto realisation = store.queryRealisation(outputId);
-            if (!realisation)
-                throw MissingRealisation(outputId);
-            outputs.insert_or_assign(output, realisation->outPath);
+            if (realisation)
+                outputs.insert_or_assign(output, realisation->outPath);
+            else
+                missingOutputs.insert(outputId);
         } else {
             // If ca-derivations isn't enabled, assume that
             // the output path is statically known.
@@ -348,7 +359,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
             outputs.insert_or_assign(output, *drvOutput->second);
         }
     }
-    return outputs;
+    return {outputs, missingOutputs};
 }
 
 }

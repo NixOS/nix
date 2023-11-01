@@ -142,7 +142,7 @@ struct RealisedPath {
 class MissingRealisation : public Error
 {
 public:
-    MissingRealisation(DrvOutput & outputId)
+    MissingRealisation(const DrvOutput & outputId)
         : Error( "cannot operate on an output of the "
                 "unbuilt derivation '%s'",
                 outputId.to_string())

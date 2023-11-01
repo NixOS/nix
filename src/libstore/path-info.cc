@@ -141,6 +141,12 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
         info.sigs = readStrings<StringSet>(source);
         info.ca = ContentAddress::parseOpt(readString(source));
     }
+    if (format >= 36) {
+        bool hasAccessStatus;
+        source >> hasAccessStatus;
+        if (hasAccessStatus)
+            info.accessStatus = WorkerProto::Serialise<AccessStatus>::read(store, WorkerProto::ReadConn {.from = source});
+    }
     return info;
 }
 
@@ -163,6 +169,14 @@ void ValidPathInfo::write(
         sink << ultimate
              << sigs
              << renderContentAddress(ca);
+    }
+    if (format >= 36) {
+        if (accessStatus) {
+            sink << true;
+            WorkerProto::Serialise<AccessStatus>::write(store, WorkerProto::WriteConn {.to = sink}, *accessStatus);
+        } else {
+            sink << false;
+        }
     }
 }
 

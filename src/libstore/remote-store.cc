@@ -1,3 +1,4 @@
+#include "local-fs-store.hh"
 #include "serialise.hh"
 #include "util.hh"
 #include "path-with-outputs.hh"
@@ -45,6 +46,7 @@ RemoteStore::RemoteStore(const Params & params)
             }
             ))
 {
+    effectiveUser = getuid();
 }
 
 
@@ -103,6 +105,7 @@ void RemoteStore::initConnection(Connection & conn)
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 35) {
             conn.remoteTrustsUs = WorkerProto::Serialise<std::optional<TrustedFlag>>::read(*this, conn);
+            if (conn.remoteTrustsUs && *conn.remoteTrustsUs) trusted = true;
         } else {
             // We don't know the answer; protocol to old.
             conn.remoteTrustsUs = std::nullopt;
@@ -949,6 +952,36 @@ void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
         source.drainInto(sink);
     });
     readInt(conn->from);
+}
+
+void RemoteStore::setAccessStatus(const StoreObject & storeObject, const RemoteStore::AccessStatus & status)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::SetAccessStatus;
+    WorkerProto::Serialise<StoreObject>::write(*this, *conn, storeObject);
+    WorkerProto::Serialise<AccessStatus>::write(*this, *conn, status);
+    conn.processStderr();
+    readInt(conn->from);
+}
+RemoteStore::AccessStatus RemoteStore::getAccessStatus(const StoreObject & storeObject)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::GetAccessStatus;
+    WorkerProto::Serialise<StoreObject>::write(*this, *conn, storeObject);
+    conn.processStderr();
+    auto status = WorkerProto::Serialise<AccessStatus>::read(*this, *conn);
+    return status;
+}
+
+std::set<ACL::Group> RemoteStore::getSubjectGroups(ACL::User user)
+{
+    struct passwd * pw = getpwuid(user.uid);
+    auto groups_vec = getUserGroups(pw->pw_uid);
+    std::set<ACL::Group> groups;
+    for (auto group : groups_vec) {
+        groups.insert(group);
+    }
+    return groups;
 }
 
 
