@@ -96,7 +96,7 @@ void drainFD(int fd, Sink & sink, bool block)
             throw SysError("making file descriptor non-blocking");
     }
 
-    Finally finally([&]() {
+    Finally finally([&] {
         if (!block) {
             if (fcntl(fd, F_SETFL, saved) == -1)
                 throw SysError("making file descriptor blocking");

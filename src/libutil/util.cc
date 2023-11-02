@@ -183,7 +183,7 @@ std::string base64Encode(std::string_view s)
 std::string base64Decode(std::string_view s)
 {
     constexpr char npos = -1;
-    constexpr std::array<char, 256> base64DecodeChars = [&]() {
+    constexpr std::array<char, 256> base64DecodeChars = [&] {
         std::array<char, 256>  result{};
         for (auto& c : result)
             c = npos;

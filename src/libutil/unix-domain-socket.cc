@@ -47,7 +47,7 @@ void bind(int fd, const std::string & path)
     addr.sun_family = AF_UNIX;
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
-        Pid pid = startProcess([&]() {
+        Pid pid = startProcess([&] {
             Path dir = dirOf(path);
             if (chdir(dir.c_str()) == -1)
                 throw SysError("chdir to '%s' failed", dir);
@@ -78,7 +78,7 @@ void connect(int fd, const std::string & path)
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pipe pipe;
         pipe.create();
-        Pid pid = startProcess([&]() {
+        Pid pid = startProcess([&] {
             try {
                 pipe.readSide.close();
                 Path dir = dirOf(path);

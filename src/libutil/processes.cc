@@ -131,7 +131,7 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
-    Pid pid = startProcess([&]() {
+    Pid pid = startProcess([&] {
 
         if (setuid(uid) == -1)
             throw SysError("setting uid");
@@ -197,7 +197,7 @@ static int childEntry(void * arg)
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
-    std::function<void()> wrapper = [&]() {
+    ChildWrapperFunction wrapper = [&] {
         if (!options.allowVfork)
             logger = makeSimpleLogger();
         try {
@@ -229,7 +229,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
         if (stack == MAP_FAILED) throw SysError("allocating stack");
 
-        Finally freeStack([&]() { munmap(stack, stackSize); });
+        Finally freeStack([&] { munmap(stack, stackSize); });
 
         pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
         #else
@@ -308,7 +308,7 @@ void runProgram2(const RunOptions & options)
     }
 
     /* Fork. */
-    Pid pid = startProcess([&]() {
+    Pid pid = startProcess([&] {
         if (options.environment)
             replaceEnv(*options.environment);
         if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
@@ -350,7 +350,7 @@ void runProgram2(const RunOptions & options)
 
     std::promise<void> promise;
 
-    Finally doJoin([&]() {
+    Finally doJoin([&] {
         if (writerThread.joinable())
             writerThread.join();
     });
@@ -358,7 +358,7 @@ void runProgram2(const RunOptions & options)
 
     if (source) {
         in.readSide.close();
-        writerThread = std::thread([&]() {
+        writerThread = std::thread([&] {
             try {
                 std::vector<char> buf(8 * 1024);
                 while (true) {
