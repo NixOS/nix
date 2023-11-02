@@ -168,14 +168,32 @@ struct GitInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
+
+    std::string_view schemeName() const override
+    {
+        return "git";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "url",
+            "ref",
+            "rev",
+            "shallow",
+            "submodules",
+            "lastModified",
+            "revCount",
+            "narHash",
+            "allRefs",
+            "name",
+            "dirtyRev",
+            "dirtyShortRev",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "git") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
-                throw Error("unsupported Git input attribute '%s'", name);
-
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
         maybeGetBoolAttr(attrs, "allRefs");

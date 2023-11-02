@@ -70,7 +70,7 @@ MakeError(InvalidStoreURI, Error);
 
 struct BasicDerivation;
 struct Derivation;
-class FSAccessor;
+struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
 
@@ -703,7 +703,7 @@ public:
     /**
      * @return An object to access files in the Nix store.
      */
-    virtual ref<FSAccessor> getFSAccessor() = 0;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) = 0;
 
     /**
      * Repair the contents of the given path by redownloading it using

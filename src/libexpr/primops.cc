@@ -1548,10 +1548,8 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
 
     try {
         auto checked = state.checkSourcePath(path);
-        auto exists = checked.pathExists();
-        if (exists && mustBeDir) {
-            exists = checked.lstat().type == InputAccessor::tDirectory;
-        }
+        auto st = checked.maybeLstat();
+        auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising

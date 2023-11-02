@@ -28,10 +28,10 @@ struct UnionInputAccessor : InputAccessor
         return accessor->pathExists(subpath);
     }
 
-    Stat lstat(const CanonPath & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto [accessor, subpath] = resolve(path);
-        return accessor->lstat(subpath);
+        return accessor->maybeLstat(subpath);
     }
 
     DirEntries readDirectory(const CanonPath & path) override

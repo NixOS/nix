@@ -402,12 +402,14 @@ struct GitInputAccessor : InputAccessor
         return path.isRoot() ? true : (bool) lookup(path);
     }
 
-    Stat lstat(const CanonPath & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         if (path.isRoot())
             return Stat { .type = tDirectory };
 
-        auto entry = need(path);
+        auto entry = lookup(path);
+        if (!entry)
+            return std::nullopt;
 
         auto mode = git_tree_entry_filemode(entry);
 
