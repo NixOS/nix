@@ -168,11 +168,12 @@ void killUser(uid_t uid)
 
 //////////////////////////////////////////////////////////////////////
 
+using ChildWrapperFunction = std::function<void()>;
 
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
-static pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
-static pid_t doFork(bool allowVfork, std::function<void()> fun)
+static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun) __attribute__((noinline));
+static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 {
 #ifdef __linux__
     pid_t pid = allowVfork ? vfork() : fork();
@@ -188,8 +189,8 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 #if __linux__
 static int childEntry(void * arg)
 {
-    auto main = (std::function<void()> *) arg;
-    (*main)();
+    auto & fun = *reinterpret_cast<ChildWrapperFunction*>(arg);
+    fun();
     return 1;
 }
 #endif
