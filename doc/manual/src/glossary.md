@@ -86,10 +86,13 @@
 
 - [store path]{#gloss-store-path}
 
-  The location of a [store object] in the file system, i.e., an
-  immediate child of the Nix store directory.
+  The location of a [store object](@docroot@/store/index.md#store-object) in the file system, i.e., an immediate child of the Nix store directory.
 
-  Example: `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+  > **Example**
+  >
+  > `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+
+  See [Store Path](@docroot@/store/store-path.md) for details.
 
   [store path]: #gloss-store-path
 
