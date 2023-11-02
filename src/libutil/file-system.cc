@@ -90,7 +90,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
         /* Normal component; copy it. */
         else {
             s += '/';
-            if (const auto slash = path.find('/'); slash == std::string::npos) {
+            if (const auto slash = path.find('/'); slash == path.npos) {
                 s += path;
                 path = {};
             } else {
@@ -123,7 +123,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
 Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
-    if (pos == std::string::npos)
+    if (pos == path.npos)
         return ".";
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
@@ -139,7 +139,7 @@ std::string_view baseNameOf(std::string_view path)
         last -= 1;
 
     auto pos = path.rfind('/', last);
-    if (pos == std::string::npos)
+    if (pos == path.npos)
         pos = 0;
     else
         pos += 1;
