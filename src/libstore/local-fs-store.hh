@@ -43,7 +43,7 @@ public:
     LocalFSStore(const Params & params);
 
     void narFromPath(const StorePath & path, Sink & sink) override;
-    ref<FSAccessor> getFSAccessor() override;
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
 
     /**
      * Creates symlink from the `gcRoot` to the `storePath` and
