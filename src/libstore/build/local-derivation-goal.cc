@@ -2949,16 +2949,22 @@ bool LocalDerivationGoal::isReadDesc(int fd)
 
 StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
+    // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
+    // FIXME: We may want to separate the responsibilities of constructing the path fingerprint and of actually doing the hashing
+    auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
     return worker.store.makeStorePath(
-        "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),
+        pathType,
+        // pass an all-zeroes hash
         Hash(HashAlgorithm::SHA256), outputPathName(drv->name, outputName));
 }
 
 
 StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
+    auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
     return worker.store.makeStorePath(
-        "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string()),
+        pathType,
+        // pass an all-zeroes hash
         Hash(HashAlgorithm::SHA256), path.name());
 }
 
