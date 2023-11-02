@@ -116,7 +116,11 @@ Path canonPath(PathView path, bool resolveSymlinks)
         }
     }
 
-    return s.empty() ? "/" : std::move(s);
+    if (s.empty()) {
+        s = "/";
+    }
+
+    return s;
 }
 
 

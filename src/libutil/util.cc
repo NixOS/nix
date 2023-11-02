@@ -122,12 +122,11 @@ bool hasSuffix(std::string_view s, std::string_view suffix)
 }
 
 
-std::string toLower(const std::string & s)
+std::string toLower(std::string s)
 {
-    std::string r(s);
-    for (auto & c : r)
+    for (auto & c : s)
         c = std::tolower(c);
-    return r;
+    return s;
 }
 
 
@@ -135,7 +134,7 @@ std::string shellEscape(const std::string_view s)
 {
     std::string r;
     r.reserve(s.size() + 2);
-    r += "'";
+    r += '\'';
     for (auto & i : s)
         if (i == '\'') r += "'\\''"; else r += i;
     r += '\'';
