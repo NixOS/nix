@@ -524,10 +524,11 @@ public:
     uid_t getGID() { assert(gid); return gid; }
     std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
 
+    bool findFreeUser();
+
     bool enabled() { return uid != 0; }
 
 };
-
 
 Sync<PathSet> UserLock::lockedPaths_;
 
@@ -535,6 +536,12 @@ Sync<PathSet> UserLock::lockedPaths_;
 UserLock::UserLock()
 {
     assert(settings.buildUsersGroup != "");
+    createDirs(settings.nixStateDir + "/userpool");
+    /* Mark that user is not enabled by default */
+    uid = 0;
+}
+
+bool UserLock::findFreeUser() {
 
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -564,7 +571,6 @@ UserLock::UserLock()
             throw Error(format("the user '%1%' in the group '%2%' does not exist")
                 % i % settings.buildUsersGroup);
 
-        createDirs(settings.nixStateDir + "/userpool");
 
         fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
@@ -605,19 +611,16 @@ UserLock::UserLock()
                 supplementaryGIDs.resize(ngroups);
 #endif
 
-                return;
+                return true;
             }
 
         } catch (...) {
             lockedPaths_.lock()->erase(fnUserLock);
+            return false;
         }
     }
-
-    throw Error(format("all build users are currently in use; "
-        "consider creating additional users and adding them to the '%1%' group")
-        % settings.buildUsersGroup);
+    return false;
 }
-
 
 UserLock::~UserLock()
 {
@@ -625,7 +628,6 @@ UserLock::~UserLock()
     assert(lockedPaths->count(fnUserLock));
     lockedPaths->erase(fnUserLock);
 }
-
 
 void UserLock::kill()
 {
@@ -1415,6 +1417,30 @@ void DerivationGoal::tryToBuild()
 {
     trace("trying to build");
 
+    /* If `build-users-group' is not empty, then we have to build as
+       one of the members of that group. */
+    if (settings.buildUsersGroup != "" && getuid() == 0) {
+#if defined(__linux__) || defined(__APPLE__)
+        if (!buildUser) buildUser = std::make_unique<UserLock>();
+
+        if (!buildUser->enabled()) {
+            if (!buildUser->findFreeUser()) {
+                debug("waiting for build users");
+                worker.waitForAWhile(shared_from_this());
+                return;
+            }
+
+            /* Make sure that no other processes are executing under this
+               uid. */
+            buildUser->kill();
+        }
+#else
+        /* Don't know how to block the creation of setuid/setgid
+           binaries on this platform. */
+        throw Error("build users are not supported on this platform for security reasons");
+#endif
+    }
+
     /* Obtain locks on all output paths.  The locks are automatically
        released when we exit this function or Nix crashes.  If we
        can't acquire the lock, then continue; hopefully some other
@@ -1929,22 +1955,6 @@ void DerivationGoal::startBuilder()
         #else
             throw Error("building using a diverted store is not supported on this platform");
         #endif
-    }
-
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-#if defined(__linux__) || defined(__APPLE__)
-        buildUser = std::make_unique<UserLock>();
-
-        /* Make sure that no other processes are executing under this
-           uid. */
-        buildUser->kill();
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
     }
 
     /* Create a temporary directory where the build will take
@@ -4465,7 +4475,7 @@ void Worker::waitForInput()
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
         if (lastWokenUp == steady_time_point::min())
-            printError("waiting for locks or build slots...");
+            printError("waiting for locks, build slots or build users...");
         if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
         timeout.tv_sec = std::max(1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
