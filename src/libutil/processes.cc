@@ -226,8 +226,8 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
         assert(!(options.cloneFlags & CLONE_VM));
 
         size_t stackSize = 1 * 1024 * 1024;
-        auto stack = (char *) mmap(0, stackSize,
-            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+        auto stack = static_cast<char *>(mmap(0, stackSize,
+            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
         if (stack == MAP_FAILED) throw SysError("allocating stack");
 
         Finally freeStack([&] { munmap(stack, stackSize); });

@@ -114,7 +114,7 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("reading from file");
         }
         else if (rd == 0) break;
-        else sink({(char *) buf.data(), (size_t) rd});
+        else sink({reinterpret_cast<char *>(buf.data()), size_t(rd)});
     }
 }
 

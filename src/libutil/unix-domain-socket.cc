@@ -38,6 +38,14 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     return fdSocket;
 }
 
+static struct sockaddr* safeSockAddrPointerCast(struct sockaddr_un *addr) {
+    // Casting between types like these legacy C library interfaces require
+    // is forbidden in C++.
+    // To maintain backwards compatibility, the implementation of the
+    // bind function contains some hints to the compiler that allow for this
+    // special case.
+    return reinterpret_cast<struct sockaddr *>(addr);
+}
 
 void bind(int fd, const std::string & path)
 {
@@ -45,6 +53,7 @@ void bind(int fd, const std::string & path)
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
+    auto psaddr {safeSockAddrPointerCast(&addr)};
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pid pid = startProcess([&] {
@@ -55,7 +64,7 @@ void bind(int fd, const std::string & path)
             if (base.size() + 1 >= sizeof(addr.sun_path))
                 throw Error("socket path '%s' is too long", base);
             memcpy(addr.sun_path, base.c_str(), base.size() + 1);
-            if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            if (bind(fd, psaddr, sizeof(addr)) == -1)
                 throw SysError("cannot bind to socket '%s'", path);
             _exit(0);
         });
@@ -64,7 +73,7 @@ void bind(int fd, const std::string & path)
             throw Error("cannot bind to socket '%s'", path);
     } else {
         memcpy(addr.sun_path, path.c_str(), path.size() + 1);
-        if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+        if (bind(fd, psaddr, sizeof(addr)) == -1)
             throw SysError("cannot bind to socket '%s'", path);
     }
 }
@@ -74,6 +83,7 @@ void connect(int fd, const std::string & path)
 {
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
+    auto psaddr {safeSockAddrPointerCast(&addr)};
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pipe pipe;
@@ -88,7 +98,7 @@ void connect(int fd, const std::string & path)
                 if (base.size() + 1 >= sizeof(addr.sun_path))
                     throw Error("socket path '%s' is too long", base);
                 memcpy(addr.sun_path, base.c_str(), base.size() + 1);
-                if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                if (connect(fd, psaddr, sizeof(addr)) == -1)
                     throw SysError("cannot connect to socket at '%s'", path);
                 writeFull(pipe.writeSide.get(), "0\n");
             } catch (SysError & e) {
@@ -107,7 +117,7 @@ void connect(int fd, const std::string & path)
         }
     } else {
         memcpy(addr.sun_path, path.c_str(), path.size() + 1);
-        if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+        if (connect(fd, psaddr, sizeof(addr)) == -1)
             throw SysError("cannot connect to socket at '%s'", path);
     }
 }
