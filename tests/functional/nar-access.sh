@@ -28,7 +28,7 @@ diff -u baz.cat-nar $storePath/foo/baz
 # Check that 'nix store cat' fails on invalid store paths.
 invalidPath="$(dirname $storePath)/99999999999999999999999999999999-foo"
 mv $storePath $invalidPath
-(! nix store cat $invalidPath/foo/baz)
+expect 1 nix store cat $invalidPath/foo/baz
 mv $invalidPath $storePath
 
 # Test --json.
