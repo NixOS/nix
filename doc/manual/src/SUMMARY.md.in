@@ -18,6 +18,7 @@
   - [Uninstalling Nix](installation/uninstall.md)
 - [Nix Store](store/index.md)
   - [File System Object](store/file-system-object.md)
+  - [Store Object](store/store-object.md)
 - [Nix Language](language/index.md)
   - [Data Types](language/values.md)
   - [Language Constructs](language/constructs.md)
