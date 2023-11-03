@@ -20,61 +20,43 @@ public:
      * Golden test for `T` reading
      */
     template<typename T>
-    void readTest(PathView testStem, T value)
+    void readProtoTest(PathView testStem, const T & expected)
     {
-        if (testAccept())
-        {
-            GTEST_SKIP() << "Cannot read golden master because another test is also updating it";
-        }
-        else
-        {
-            auto expected = readFile(goldenMaster(testStem));
-
+        CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
             T got = ({
-                StringSource from { expected };
+                StringSource from { encoded };
                 CommonProto::Serialise<T>::read(
                     *store,
                     CommonProto::ReadConn { .from = from });
             });
 
-            ASSERT_EQ(got, value);
-        }
+            ASSERT_EQ(got, expected);
+        });
     }
 
     /**
      * Golden test for `T` write
      */
     template<typename T>
-    void writeTest(PathView testStem, const T & value)
+    void writeProtoTest(PathView testStem, const T & decoded)
     {
-        auto file = goldenMaster(testStem);
-
-        StringSink to;
-        CommonProto::write(
-            *store,
-            CommonProto::WriteConn { .to = to },
-            value);
-
-        if (testAccept())
-        {
-            createDirs(dirOf(file));
-            writeFile(file, to.s);
-            GTEST_SKIP() << "Updating golden master";
-        }
-        else
-        {
-            auto expected = readFile(file);
-            ASSERT_EQ(to.s, expected);
-        }
+        CharacterizationTest::writeTest(testStem, [&]() -> std::string {
+            StringSink to;
+            CommonProto::Serialise<T>::write(
+                *store,
+                CommonProto::WriteConn { .to = to },
+                decoded);
+            return to.s;
+        });
     }
 };
 
 #define CHARACTERIZATION_TEST(NAME, STEM, VALUE) \
     TEST_F(CommonProtoTest, NAME ## _read) { \
-        readTest(STEM, VALUE); \
+        readProtoTest(STEM, VALUE); \
     } \
     TEST_F(CommonProtoTest, NAME ## _write) { \
-        writeTest(STEM, VALUE); \
+        writeProtoTest(STEM, VALUE); \
     }
 
 CHARACTERIZATION_TEST(

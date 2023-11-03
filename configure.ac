@@ -68,6 +68,9 @@ case "$host_os" in
 esac
 
 
+ENSURE_NO_GCC_BUG_80431
+
+
 # Check for pubsetbuf.
 AC_MSG_CHECKING([for pubsetbuf])
 AC_LANG_PUSH(C++)

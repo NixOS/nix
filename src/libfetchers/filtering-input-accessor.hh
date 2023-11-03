@@ -19,7 +19,7 @@ struct FilteringInputAccessor : InputAccessor
 
     bool pathExists(const CanonPath & path) override;
 
-    Stat lstat(const CanonPath & path) override;
+    std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
     DirEntries readDirectory(const CanonPath & path) override;
 

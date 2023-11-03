@@ -57,7 +57,7 @@ protected:
         std::function<void(std::vector<std::string>)> fun;
         size_t arity;
 
-        Handler() {}
+        Handler() = default;
 
         Handler(std::function<void(std::vector<std::string>)> && fun)
             : fun(std::move(fun))
@@ -84,29 +84,29 @@ protected:
         { }
 
         Handler(std::vector<std::string> * dest)
-            : fun([=](std::vector<std::string> ss) { *dest = ss; })
+            : fun([dest](std::vector<std::string> ss) { *dest = ss; })
             , arity(ArityAny)
         { }
 
         Handler(std::string * dest)
-            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
 
         Handler(std::optional<std::string> * dest)
-            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            : fun([dest](std::vector<std::string> ss) { *dest = ss[0]; })
             , arity(1)
         { }
 
         template<class T>
         Handler(T * dest, const T & val)
-            : fun([=](std::vector<std::string> ss) { *dest = val; })
+            : fun([dest, val](std::vector<std::string> ss) { *dest = val; })
             , arity(0)
         { }
 
         template<class I>
         Handler(I * dest)
-            : fun([=](std::vector<std::string> ss) {
+            : fun([dest](std::vector<std::string> ss) {
                 *dest = string2IntWithUnitPrefix<I>(ss[0]);
               })
             , arity(1)
@@ -114,7 +114,7 @@ protected:
 
         template<class I>
         Handler(std::optional<I> * dest)
-            : fun([=](std::vector<std::string> ss) {
+            : fun([dest](std::vector<std::string> ss) {
                 *dest = string2IntWithUnitPrefix<I>(ss[0]);
             })
             , arity(1)
@@ -130,7 +130,7 @@ protected:
      * The `AddCompletions` that is passed is an interface to the state
      * stored as part of the root command
      */
-    typedef void CompleterFun(AddCompletions &, size_t, std::string_view);
+    using CompleterFun = void(AddCompletions &, size_t, std::string_view);
 
     /**
      * The closure type of the completion callback.
@@ -138,7 +138,7 @@ protected:
      * This is what is actually stored as part of each Flag / Expected
      * Arg.
      */
-    typedef std::function<CompleterFun> CompleterClosure;
+    using CompleterClosure = std::function<CompleterFun>;
 
     /**
      * Description of flags / options
@@ -148,7 +148,7 @@ protected:
      */
     struct Flag
     {
-        typedef std::shared_ptr<Flag> ptr;
+        using ptr = std::shared_ptr<Flag>;
 
         std::string longName;
         std::set<std::string> aliases;
@@ -200,13 +200,25 @@ protected:
     /**
      * Queue of expected positional argument forms.
      *
-     * Positional arugment descriptions are inserted on the back.
+     * Positional argument descriptions are inserted on the back.
      *
      * As positional arguments are passed, these are popped from the
      * front, until there are hopefully none left as all args that were
      * expected in fact were passed.
      */
     std::list<ExpectedArg> expectedArgs;
+    /**
+     * List of processed positional argument forms.
+     * 
+     * All items removed from `expectedArgs` are added here. After all
+     * arguments were processed, this list should be exactly the same as
+     * `expectedArgs` was before.
+     * 
+     * This list is used to extend the lifetime of the argument forms.
+     * If this is not done, some closures that reference the command
+     * itself will segfault.
+    */
+   std::list<ExpectedArg> processedArgs;
 
     /**
      * Process some positional arugments
@@ -296,14 +308,14 @@ struct Command : virtual public Args
 {
     friend class MultiCommand;
 
-    virtual ~Command() { }
+    virtual ~Command() = default;
 
     /**
      * Entry point to the command
      */
     virtual void run() = 0;
 
-    typedef int Category;
+    using Category = int;
 
     static constexpr Category catDefault = 0;
 
@@ -312,7 +324,7 @@ struct Command : virtual public Args
     virtual Category category() { return catDefault; }
 };
 
-typedef std::map<std::string, std::function<ref<Command>()>> Commands;
+using Commands = std::map<std::string, std::function<ref<Command>()>>;
 
 /**
  * An argument parser that supports multiple subcommands,

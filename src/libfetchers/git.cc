@@ -172,14 +172,32 @@ struct GitInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
+
+    std::string_view schemeName() const override
+    {
+        return "git";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "url",
+            "ref",
+            "rev",
+            "shallow",
+            "submodules",
+            "lastModified",
+            "revCount",
+            "narHash",
+            "allRefs",
+            "name",
+            "dirtyRev",
+            "dirtyShortRev",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "git") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
-                throw Error("unsupported Git input attribute '%s'", name);
-
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
         maybeGetBoolAttr(attrs, "allRefs");
@@ -251,11 +269,7 @@ struct GitInputScheme : InputScheme
         if (!repoInfo.isLocal)
             throw Error("cannot commit '%s' to Git repository '%s' because it's not a working tree", path, input.to_string());
 
-        auto absPath = CanonPath(repoInfo.url) + path;
-
-        // FIXME: make sure that absPath is not a symlink that escapes
-        // the repo.
-        writeFile(absPath.abs(), contents);
+        writeFile((CanonPath(repoInfo.url) + path).abs(), contents);
 
         runProgram("git", true,
             { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });

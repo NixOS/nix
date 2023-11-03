@@ -37,11 +37,11 @@ struct FSInputAccessorImpl : FSInputAccessor, PosixSourceAccessor
         return isAllowed(absPath) && PosixSourceAccessor::pathExists(absPath);
     }
 
-    Stat lstat(const CanonPath & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
-        return PosixSourceAccessor::lstat(absPath);
+        return PosixSourceAccessor::maybeLstat(absPath);
     }
 
     DirEntries readDirectory(const CanonPath & path) override

@@ -13,10 +13,10 @@ bool FilteringInputAccessor::pathExists(const CanonPath & path)
     return isAllowed(path) && next->pathExists(prefix + path);
 }
 
-InputAccessor::Stat FilteringInputAccessor::lstat(const CanonPath & path)
+std::optional<InputAccessor::Stat> FilteringInputAccessor::maybeLstat(const CanonPath & path)
 {
     checkAccess(path);
-    return next->lstat(prefix + path);
+    return next->maybeLstat(prefix + path);
 }
 
 InputAccessor::DirEntries FilteringInputAccessor::readDirectory(const CanonPath & path)

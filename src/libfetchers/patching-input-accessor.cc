@@ -93,9 +93,9 @@ struct PatchingInputAccessor : InputAccessor
         return next->pathExists(path);
     }
 
-    Stat lstat(const CanonPath & path) override
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
-        return next->lstat(path);
+        return next->maybeLstat(path);
     }
 
     DirEntries readDirectory(const CanonPath & path) override

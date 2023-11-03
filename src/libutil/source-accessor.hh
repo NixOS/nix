@@ -42,7 +42,7 @@ struct SourceAccessor
         Sink & sink,
         std::function<void(uint64_t)> sizeCallback = [](uint64_t size){});
 
-    virtual bool pathExists(const CanonPath & path) = 0;
+    virtual bool pathExists(const CanonPath & path);
 
     enum Type {
       tRegular, tSymlink, tDirectory,
@@ -59,13 +59,29 @@ struct SourceAccessor
     struct Stat
     {
         Type type = tMisc;
-        //uint64_t fileSize = 0; // regular files only
-        bool isExecutable = false; // regular files only
+
+        /**
+         * For regular files only: the size of the file. Not all
+         * accessors return this since it may be too expensive to
+         * compute.
+         */
+        std::optional<uint64_t> fileSize;
+
+        /**
+         * For regular files only: whether this is an executable.
+         */
+        bool isExecutable = false;
+
+        /**
+         * For regular files only: the position of the contents of this
+         * file in the NAR. Only returned by NAR accessors.
+         */
+        std::optional<uint64_t> narOffset;
     };
 
-    virtual Stat lstat(const CanonPath & path) = 0;
+    Stat lstat(const CanonPath & path);
 
-    std::optional<Stat> maybeLstat(const CanonPath & path);
+    virtual std::optional<Stat> maybeLstat(const CanonPath & path) = 0;
 
     typedef std::optional<Type> DirEntry;
 

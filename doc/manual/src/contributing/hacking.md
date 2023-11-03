@@ -210,7 +210,7 @@ See [supported compilation environments](#compilation-environments) and instruct
 To use the LSP with your editor, you first need to [set up `clangd`](https://clangd.llvm.org/installation#project-setup) by running:
 
 ```console
-make clean && bear -- make -j$NIX_BUILD_CORES install
+make clean && bear -- make -j$NIX_BUILD_CORES default check install
 ```
 
 Configure your editor to use the `clangd` from the shell, either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).

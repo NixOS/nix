@@ -178,7 +178,7 @@ struct LockFlags
     /**
      * The path to a lock file to write to instead of the `flake.lock` file in the top-level flake
      */
-    std::optional<SourcePath> outputLockFilePath;
+    std::optional<CanonPath> outputLockFilePath;
 
     /**
      * Flake inputs to be overridden.

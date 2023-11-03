@@ -11,6 +11,11 @@ SourceAccessor::SourceAccessor()
 {
 }
 
+bool SourceAccessor::pathExists(const CanonPath & path)
+{
+    return maybeLstat(path).has_value();
+}
+
 std::string SourceAccessor::readFile(const CanonPath & path)
 {
     StringSink sink;
@@ -43,12 +48,12 @@ Hash SourceAccessor::hashPath(
     return sink.finish().first;
 }
 
-std::optional<SourceAccessor::Stat> SourceAccessor::maybeLstat(const CanonPath & path)
+SourceAccessor::Stat SourceAccessor::lstat(const CanonPath & path)
 {
-    // FIXME: merge these into one operation.
-    if (!pathExists(path))
-        return {};
-    return lstat(path);
+    if (auto st = maybeLstat(path))
+        return *st;
+    else
+        throw Error("path '%s' does not exist", showPath(path));
 }
 
 void SourceAccessor::setPathDisplay(std::string displayPrefix, std::string displaySuffix)

@@ -1,6 +1,5 @@
 #include "command.hh"
 #include "store-api.hh"
-#include "fs-accessor.hh"
 #include "nar-accessor.hh"
 
 using namespace nix;
@@ -9,15 +8,12 @@ struct MixCat : virtual Args
 {
     std::string path;
 
-    void cat(ref<FSAccessor> accessor)
+    void cat(ref<SourceAccessor> accessor)
     {
-        auto st = accessor->stat(path);
-        if (st.type == FSAccessor::Type::tMissing)
-            throw Error("path '%1%' does not exist", path);
-        if (st.type != FSAccessor::Type::tRegular)
+        auto st = accessor->lstat(CanonPath(path));
+        if (st.type != SourceAccessor::Type::tRegular)
             throw Error("path '%1%' is not a regular file", path);
-
-        writeFull(STDOUT_FILENO, accessor->readFile(path));
+        writeFull(STDOUT_FILENO, accessor->readFile(CanonPath(path)));
     }
 };
 

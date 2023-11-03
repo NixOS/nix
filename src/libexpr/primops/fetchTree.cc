@@ -429,7 +429,7 @@ static RegisterPrimOp primop_fetchGit({
 
         The URL of the repo.
 
-      - `name` (default: *basename of the URL*)
+      - `name` (default: `source`)
 
         The name of the directory the repo should be exported to in the store.
 

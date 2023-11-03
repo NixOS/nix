@@ -304,7 +304,7 @@ nix build -o "$TEST_ROOT/result" flake4#xyzzy
 nix flake lock "$flake3Dir"
 [[ -z $(git -C "$flake3Dir" diff master || echo failed) ]]
 
-nix flake update "$flake3Dir" --override-flake flake2 nixpkgs
+nix flake update --flake "$flake3Dir" --override-flake flake2 nixpkgs
 [[ ! -z $(git -C "$flake3Dir" diff master || echo failed) ]]
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
@@ -441,7 +441,7 @@ cat > "$flake3Dir/flake.nix" <<EOF
 }
 EOF
 
-nix flake update "$flake3Dir"
+nix flake update --flake "$flake3Dir"
 [[ $(jq -c .nodes.flake2.inputs.flake1 "$flake3Dir/flake.lock") =~ '["foo"]' ]]
 [[ $(jq .nodes.foo.locked.url "$flake3Dir/flake.lock") =~ flake7 ]]
 
@@ -484,7 +484,7 @@ nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1/master/$hash1
 nix flake lock "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") = $hash1 ]]
 
-nix flake lock "$flake3Dir" --update-input flake2/flake1
+nix flake update flake2/flake1 --flake "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
 
 # Test 'nix flake metadata --json'.

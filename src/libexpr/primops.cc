@@ -1554,10 +1554,8 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
             || arg.string_view().ends_with("/."));
 
     try {
-        auto exists = path.pathExists();
-        if (exists && mustBeDir) {
-            exists = path.lstat().type == InputAccessor::tDirectory;
-        }
+        auto st = path.maybeLstat();
+        auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
@@ -3745,10 +3743,11 @@ static RegisterPrimOp primop_substring({
     .doc = R"(
       Return the substring of *s* from character position *start*
       (zero-based) up to but not including *start + len*. If *start* is
-      greater than the length of the string, an empty string is returned,
-      and if *start + len* lies beyond the end of the string, only the
-      substring up to the end of the string is returned. *start* must be
-      non-negative. For example,
+      greater than the length of the string, an empty string is returned.
+      If *start + len* lies beyond the end of the string or *len* is `-1`,
+      only the substring up to the end of the string is returned.
+      *start* must be non-negative.
+      For example,
 
       ```nix
       builtins.substring 0 3 "nixos"
