@@ -352,7 +352,7 @@ Derivation parseDerivation(
         expect(str, "erive(");
         version = DerivationATermVersion::Traditional;
         break;
-    case 'r':
+    case 'r': {
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
         if (versionS == "xp-dyn-drv") {
@@ -364,6 +364,9 @@ Derivation parseDerivation(
         }
         expect(str, ",");
         break;
+    }
+    default:
+        throw Error("derivation does not start with 'Derive' or 'DrvWithVersion'");
     }
 
     /* Parse the list of outputs. */
