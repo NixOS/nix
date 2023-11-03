@@ -449,7 +449,7 @@ static void main_nix_build(int argc, char * * argv)
             }
         }
         for (const auto & src : drv.inputSrcs) {
-            pathsToBuild.push_back(DerivedPath::Opaque{src});
+            pathsToBuild.emplace_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
         }
 
