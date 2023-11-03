@@ -395,7 +395,7 @@ struct GitInputScheme : InputScheme
         auto gitDir = ".git";
 
         runProgram("git", true,
-            { "-C", *root, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
+            { "-C", *root, "--git-dir", gitDir, "add", "--intent-to-add", "--force", "--", std::string(path.rel()) });
 
         if (commitMsg)
             runProgram("git", true,
