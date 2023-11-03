@@ -819,7 +819,7 @@ void Store::substitutePaths(const StorePathSet & paths)
     std::vector<DerivedPath> paths2;
     for (auto & path : paths)
         if (!path.isDerivation())
-            paths2.push_back(DerivedPath::Opaque{path});
+            paths2.emplace_back(DerivedPath::Opaque{path});
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     queryMissing(paths2,
