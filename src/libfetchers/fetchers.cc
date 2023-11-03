@@ -360,4 +360,9 @@ std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
     return {};
 }
 
+std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
+{
+    return ((nlohmann::json) publicKeys).dump();
+}
+
 }

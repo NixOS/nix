@@ -55,6 +55,7 @@ nix_tests = \
   secure-drv-outputs.sh \
   restricted.sh \
   fetchGitSubmodules.sh \
+  fetchGitVerification.sh \
   flakes/search-root.sh \
   readfile-context.sh \
   nix-channel.sh \
