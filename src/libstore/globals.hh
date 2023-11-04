@@ -150,17 +150,17 @@ public:
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
-        this, 1, "max-jobs",
+        this, getMaxThreads(), "max-jobs",
         R"(
           This option defines the maximum number of jobs that Nix will try to
-          build in parallel. The default is `1`. The special value `auto`
-          causes Nix to use the number of CPUs in your system. `0` is useful
-          when using remote builders to prevent any local builds (except for
-          `preferLocalBuild` derivation attribute which executes locally
-          regardless). It can be overridden using the `--max-jobs` (`-j`)
-          command line switch.
+          build in parallel. The default is `auto` which causes Nix to use
+          the number of CPUs in your system.
+          It can be overridden using the `--max-jobs` / `-j` command line option.
+
+          Setting this to `0` when using remote builders will prevent any local builds.
+          The [`preferLocalBuild`](@docroot@/language/advanced-attributes.md#adv-attr-preferLocalBuild) derivation attribute will make the build always execute locally.
         )",
-        {"build-max-jobs"}};
+        {"build-max-jobs"}, "`auto`"};
 
     Setting<unsigned int> maxSubstitutionJobs{
         this, 16, "max-substitution-jobs",

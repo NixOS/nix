@@ -293,6 +293,11 @@ std::string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 void drainFD(int fd, Sink & sink, bool block = true);
 
 /**
+ * Returns the number of threads available for simultaneous execution if possible, otherwise returns 1.
+ */
+unsigned int getMaxThreads();
+
+/**
  * If cgroups are active, attempt to calculate the number of CPUs available.
  * If cgroups are unavailable or if cpu.max is set to "max", return 0.
  */

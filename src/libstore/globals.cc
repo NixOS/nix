@@ -148,13 +148,12 @@ std::vector<Path> getUserConfigFiles()
 
 unsigned int Settings::getDefaultCores()
 {
-    const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
     const unsigned int maxCPU = getMaxCPU();
 
     if (maxCPU > 0)
       return maxCPU;
     else
-      return concurrency;
+      return getMaxThreads();
 }
 
 #if __APPLE__
@@ -297,13 +296,12 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
 
 unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
-    if (str == "auto") return std::max(1U, std::thread::hardware_concurrency());
-    else {
-        if (auto n = string2Int<decltype(value)>(str))
-            return *n;
-        else
-            throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
-    }
+    if (str == "auto") return getMaxThreads();
+
+    if (auto n = string2Int<decltype(value)>(str))
+        return *n;
+    else
+        throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
 }
 
 
