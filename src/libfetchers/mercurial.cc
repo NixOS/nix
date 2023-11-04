@@ -6,6 +6,7 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
+#include "posix-source-accessor.hh"
 
 #include "fetch-settings.hh"
 
@@ -210,7 +211,12 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, HashAlgorithm::SHA256, filter);
+                PosixSourceAccessor accessor;
+                auto storePath = store->addToStore(
+                    input.getName(),
+                    accessor, CanonPath { actualPath },
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256, {},
+                    filter);
 
                 return {std::move(storePath), input};
             }
@@ -218,7 +224,7 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", "default");
 
-        auto checkHashType = [&](const std::optional<Hash> & hash)
+        auto checkHashAlgorithm = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && hash->algo != HashAlgorithm::SHA1)
                 throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(HashFormat::Base16, true));
@@ -227,7 +233,7 @@ struct MercurialInputScheme : InputScheme
 
         auto getLockedAttrs = [&]()
         {
-            checkHashType(input.getRev());
+            checkHashAlgorithm(input.getRev());
 
             return Attrs({
                 {"type", "hg"},
@@ -246,7 +252,7 @@ struct MercurialInputScheme : InputScheme
         };
 
         if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getLockedAttrs()))
+            if (auto res = getCache()->lookup(*store, getLockedAttrs()))
                 return makeResult(res->first, std::move(res->second));
         }
 
@@ -259,7 +265,7 @@ struct MercurialInputScheme : InputScheme
             {"ref", *input.getRef()},
         });
 
-        if (auto res = getCache()->lookup(store, unlockedAttrs)) {
+        if (auto res = getCache()->lookup(*store, unlockedAttrs)) {
             auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), HashAlgorithm::SHA1);
             if (!input.getRev() || input.getRev() == rev2) {
                 input.attrs.insert_or_assign("rev", rev2.gitRev());
@@ -305,7 +311,7 @@ struct MercurialInputScheme : InputScheme
         auto revCount = std::stoull(tokens[1]);
         input.attrs.insert_or_assign("ref", tokens[2]);
 
-        if (auto res = getCache()->lookup(store, getLockedAttrs()))
+        if (auto res = getCache()->lookup(*store, getLockedAttrs()))
             return makeResult(res->first, std::move(res->second));
 
         Path tmpDir = createTempDir();
@@ -315,7 +321,8 @@ struct MercurialInputScheme : InputScheme
 
         deletePath(tmpDir + "/.hg_archival.txt");
 
-        auto storePath = store->addToStore(name, tmpDir);
+        PosixSourceAccessor accessor;
+        auto storePath = store->addToStore(name, accessor, CanonPath { tmpDir });
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},
@@ -324,14 +331,14 @@ struct MercurialInputScheme : InputScheme
 
         if (!_input.getRev())
             getCache()->add(
-                store,
+                *store,
                 unlockedAttrs,
                 infoAttrs,
                 storePath,
                 false);
 
         getCache()->add(
-            store,
+            *store,
             getLockedAttrs(),
             infoAttrs,
             storePath,

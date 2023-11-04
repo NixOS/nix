@@ -123,17 +123,23 @@ public:
     void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-                                 FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references) override;
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     StorePath addToStore(
-            std::string_view name,
-            const Path & srcPath,
-            FileIngestionMethod method,
-            HashAlgorithm hashAlgo,
-            PathFilter & filter,
-            RepairFlag repair,
-            const StorePathSet & references) override;
+        std::string_view name,
+        SourceAccessor & accessor,
+        const CanonPath & srcPath,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        PathFilter & filter,
+        RepairFlag repair) override;
 
     StorePath addTextToStore(
         std::string_view name,

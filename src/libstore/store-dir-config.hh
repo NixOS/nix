@@ -91,15 +91,17 @@ struct StoreDirConfig : public Config
     StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
 
     /**
-     * Read-only variant of addToStoreFromDump(). It returns the store
-     * path to which a NAR or flat file would be written.
+     * Read-only variant of addToStore(). It returns the store
+     * path for the given file sytem object.
      */
-    std::pair<StorePath, Hash> computeStorePathFromDump(
-        Source & dump,
+    std::pair<StorePath, Hash> computeStorePath(
         std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
-        const StorePathSet & references = {}) const;
+        const StorePathSet & references = {},
+        PathFilter & filter = defaultPathFilter) const;
 
     /**
      * Preparatory part of addTextToStore().

@@ -368,14 +368,14 @@ struct GitInputScheme : InputScheme
 
     RepoInfo getRepoInfo(const Input & input) const
     {
-        auto checkHashType = [&](const std::optional<Hash> & hash)
+        auto checkHashAlgorithm = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && !(hash->algo == HashAlgorithm::SHA1 || hash->algo == HashAlgorithm::SHA256))
                 throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(HashFormat::Base16, true));
         };
 
         if (auto rev = input.getRev())
-            checkHashType(rev);
+            checkHashAlgorithm(rev);
 
         RepoInfo repoInfo;
 

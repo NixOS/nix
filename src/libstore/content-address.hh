@@ -4,6 +4,7 @@
 #include <variant>
 #include "hash.hh"
 #include "path.hh"
+#include "file-content-address.hh"
 #include "comparator.hh"
 #include "variant-wrapper.hh"
 
@@ -32,29 +33,13 @@ namespace nix {
 struct TextIngestionMethod : std::monostate { };
 
 /**
- * An enumeration of the main ways we can serialize file system
- * objects.
- */
-enum struct FileIngestionMethod : uint8_t {
-    /**
-     * Flat-file hashing. Directly ingest the contents of a single file
-     */
-    Flat = 0,
-    /**
-     * Recursive (or NAR) hashing. Serializes the file-system object in Nix
-     * Archive format and ingest that
-     */
-    Recursive = 1
-};
-
-/**
  * Compute the prefix to the hash algorithm which indicates how the
  * files were ingested.
  */
 std::string makeFileIngestionPrefix(FileIngestionMethod m);
 
 /**
- * An enumeration of all the ways we can serialize file system objects.
+ * An enumeration of all the ways we can content-address store objects.
  *
  * Just the type of a content address. Combine with the hash itself, and
  * we have a `ContentAddress` as defined below. Combine that, in turn,
@@ -102,7 +87,15 @@ struct ContentAddressMethod
      *
      * The rough inverse of `parse()`.
      */
-    std::string render(HashAlgorithm ha) const;
+    std::string render(HashAlgorithm ht) const;
+
+    /**
+     * Get the underlying way to content-address file system objects.
+     *
+     * Different ways of hashing store objects may use the same method
+     * for hashing file systeme objects.
+     */
+    FileIngestionMethod getFileIngestionMethod() const;
 };
 
 
@@ -266,11 +259,12 @@ struct ContentAddressWithReferences
      *
      * @param refs References to other store objects or oneself.
      *
-     * Do note that not all combinations are supported; `nullopt` is
-     * returns for invalid combinations.
+     * @note note that all combinations are supported. This is a
+     * *partial function* and exceptions will be thrown for invalid
+     * combinations.
      */
-    static std::optional<ContentAddressWithReferences> fromPartsOpt(
-        ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept;
+    static ContentAddressWithReferences fromParts(
+        ContentAddressMethod method, Hash hash, StoreReferences refs);
 
     ContentAddressMethod getMethod() const;
 

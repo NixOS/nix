@@ -13,6 +13,7 @@
 #include "shared.hh"
 #include "graphml.hh"
 #include "legacy.hh"
+#include "posix-source-accessor.hh"
 #include "path-with-outputs.hh"
 #include "posix-fs-canonicalise.hh"
 
@@ -175,8 +176,12 @@ static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    PosixSourceAccessor accessor;
     for (auto & i : opArgs)
-        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), i)));
+        cout << fmt("%s\n", store->printStorePath(store->addToStore(
+            std::string(baseNameOf(i)),
+            accessor,
+            CanonPath::fromCwd(i))));
 }
 
 
@@ -196,8 +201,14 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     HashAlgorithm hashAlgo = parseHashAlgo(opArgs.front());
     opArgs.pop_front();
 
+    PosixSourceAccessor accessor;
     for (auto & i : opArgs)
-        std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(baseNameOf(i), i, method, hashAlgo).path));
+        std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(
+            baseNameOf(i),
+            accessor,
+            CanonPath::fromCwd(i),
+            method,
+            hashAlgo).path));
 }
 
 
@@ -541,7 +552,10 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             if (canonicalise)
                 canonicalisePathMetaData(store->printStorePath(info->path), {});
             if (!hashGiven) {
-                HashResult hash = hashPath(HashAlgorithm::SHA256, store->printStorePath(info->path));
+                HashResult hash = hashPath(
+                    *store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) },
+
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }

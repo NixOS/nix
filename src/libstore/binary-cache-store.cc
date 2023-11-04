@@ -300,8 +300,13 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     }});
 }
 
-StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view name,
-                                               FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references)
+StorePath BinaryCacheStore::addToStoreFromDump(
+    Source & dump,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
         unsupported("addToStoreFromDump");
@@ -309,15 +314,14 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
         ValidPathInfo info {
             *this,
             name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = nar.first,
-                .references = {
+            ContentAddressWithReferences::fromParts(
+                method,
+                nar.first,
+                {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
-                },
-            },
+                }),
             nar.first,
         };
         info.narSize = nar.second;
@@ -399,42 +403,36 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(
-        std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashAlgorithm hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references)
+    std::string_view name,
+    SourceAccessor & accessor,
+    const CanonPath & path,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    PathFilter & filter,
+    RepairFlag repair)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    HashSink sink { hashAlgo };
-    if (method == FileIngestionMethod::Recursive) {
-        dumpPath(srcPath, sink, filter);
-    } else {
-        readFile(srcPath, sink);
-    }
-    auto h = sink.finish().first;
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
 
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(srcPath, sink, filter);
+        accessor.dumpPath(path, sink, filter);
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
             name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = h,
-                .references = {
+            ContentAddressWithReferences::fromParts(
+                method,
+                h,
+                {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
-                },
-            },
+                }),
             nar.first,
         };
         info.narSize = nar.second;

@@ -82,10 +82,15 @@ public:
             RepairFlag repair);
 
     /**
-     * Add a content-addressable store path. Does not support references. `dump` will be drained.
+     * Add a content-addressable store path. `dump` will be drained.
      */
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-                                 FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;

@@ -177,8 +177,13 @@ public:
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-                                 FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references) override;
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     StorePath addTextToStore(
         std::string_view name,
@@ -349,19 +354,6 @@ private:
      */
     void signPathInfo(ValidPathInfo & info);
     void signRealisation(Realisation &);
-
-    // XXX: Make a generic `Store` method
-    ContentAddress hashCAPath(
-        const ContentAddressMethod & method,
-        const HashAlgorithm & hashAlgo,
-        const StorePath & path);
-
-    ContentAddress hashCAPath(
-        const ContentAddressMethod & method,
-        const HashAlgorithm & hashAlgo,
-        const Path & path,
-        const std::string_view pathHash
-    );
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 

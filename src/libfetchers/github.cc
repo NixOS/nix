@@ -201,7 +201,7 @@ struct GitArchiveInputScheme : InputScheme
             {"rev", rev->gitRev()},
         });
 
-        if (auto res = getCache()->lookup(store, lockedAttrs)) {
+        if (auto res = getCache()->lookup(*store, lockedAttrs)) {
             input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
             return {std::move(res->second), input};
         }
@@ -213,7 +213,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         getCache()->add(
-            store,
+            *store,
             lockedAttrs,
             {
                 {"rev", rev->gitRev()},

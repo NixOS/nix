@@ -5,6 +5,7 @@
 #include "shared.hh"
 #include "references.hh"
 #include "archive.hh"
+#include "posix-source-accessor.hh"
 
 using namespace nix;
 
@@ -88,14 +89,8 @@ struct CmdHashBase : Command
             else
                 hashSink = std::make_unique<HashSink>(ha);
 
-            switch (mode) {
-            case FileIngestionMethod::Flat:
-                readFile(path, *hashSink);
-                break;
-            case FileIngestionMethod::Recursive:
-                dumpPath(path, *hashSink);
-                break;
-            }
+            PosixSourceAccessor accessor;
+            dumpPath(accessor, CanonPath::fromCwd(path), *hashSink, mode);
 
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
