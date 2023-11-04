@@ -174,7 +174,7 @@ namespace nix {
               "aliases": [],
               "defaultValue": "",
               "description": "description\n",
-              "documentDefault": true,
+              "defaultText": null,
               "value": "value",
               "experimentalFeature": null
             }
@@ -190,7 +190,7 @@ namespace nix {
             "name-of-the-setting",
             "description",
             {},
-            true,
+            "default-text",
             Xp::Flakes,
         };
         setting.assign("value");
@@ -201,7 +201,7 @@ namespace nix {
               "aliases": [],
               "defaultValue": "",
               "description": "description\n",
-              "documentDefault": true,
+              "defaultText": "default-text",
               "value": "value",
               "experimentalFeature": "flakes"
             }

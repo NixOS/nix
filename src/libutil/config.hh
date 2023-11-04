@@ -230,7 +230,7 @@ protected:
 
     T value;
     const T defaultValue;
-    const bool documentDefault;
+    const std::optional<std::string> defaultText;
 
     /**
      * Parse the string into a `T`.
@@ -252,15 +252,15 @@ protected:
 public:
 
     BaseSetting(const T & def,
-        const bool documentDefault,
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {},
+        const std::optional<std::string> defaultText = std::nullopt,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
         : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
-        , documentDefault(documentDefault)
+        , defaultText(defaultText)
     { }
 
     operator const T &() const { return value; }
@@ -327,9 +327,9 @@ public:
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {},
-        const bool documentDefault = true,
+        const std::optional<std::string> defaultText = std::nullopt,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases, experimentalFeature)
+        : BaseSetting<T>(def, name, description, aliases, defaultText, experimentalFeature)
     {
         options->addSetting(this);
     }
@@ -352,7 +352,8 @@ public:
         const Path & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {});
+        const std::set<std::string> & aliases = {},
+        const std::optional<std::string> defaultText = std::nullopt);
 
     Path parse(const std::string & str) const override;
 
@@ -374,7 +375,8 @@ public:
         const std::optional<Path> & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {});
+        const std::set<std::string> & aliases = {},
+        const std::optional<std::string> defaultText = std::nullopt);
 
     std::optional<Path> parse(const std::string & str) const override;
 
