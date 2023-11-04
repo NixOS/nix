@@ -3,13 +3,14 @@
 
 #include "types.hh"
 #include "hash.hh"
-#include "path.hh"
+#include "canon-path.hh"
 #include "attrs.hh"
 #include "url.hh"
 
 #include <memory>
+#include <nlohmann/json_fwd.hpp>
 
-namespace nix { class Store; }
+namespace nix { class Store; class StorePath; }
 
 namespace nix::fetchers {
 
@@ -90,8 +91,13 @@ public:
 
     std::optional<Path> getSourcePath() const;
 
-    void markChangedFile(
-        std::string_view file,
+    /**
+     * Write a file to this input, for input types that support
+     * writing. Optionally commit the change (for e.g. Git inputs).
+     */
+    void putFile(
+        const CanonPath & path,
+        std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
     std::string getName() const;
@@ -126,6 +132,24 @@ struct InputScheme
 
     virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
+    /**
+     * What is the name of the scheme?
+     *
+     * The `type` attribute is used to select which input scheme is
+     * used, and then the other fields are forwarded to that input
+     * scheme.
+     */
+    virtual std::string_view schemeName() const = 0;
+
+    /**
+     * Allowed attributes in an attribute set that is converted to an
+     * input.
+     *
+     * `type` is not included from this set, because the `type` field is
+      parsed first to choose which scheme; `type` is always required.
+     */
+    virtual StringSet allowedAttrs() const = 0;
+
     virtual ParsedURL toURL(const Input & input) const;
 
     virtual Input applyOverrides(
@@ -135,21 +159,36 @@ struct InputScheme
 
     virtual void clone(const Input & input, const Path & destDir) const;
 
-    virtual std::optional<Path> getSourcePath(const Input & input);
+    virtual std::optional<Path> getSourcePath(const Input & input) const;
 
-    virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
+    virtual void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const;
 
     virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
 
     /**
      * Is this `InputScheme` part of an experimental feature?
      */
-    virtual std::optional<ExperimentalFeature> experimentalFeature();
+    virtual std::optional<ExperimentalFeature> experimentalFeature() const;
 
     virtual bool isDirect(const Input & input) const
     { return true; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
+
+nlohmann::json dumpRegisterInputSchemeInfo();
+
+struct PublicKey
+{
+    std::string type = "ssh-ed25519";
+    std::string key;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(PublicKey, type, key)
+
+std::string publicKeys_to_string(const std::vector<PublicKey>&);
 
 }

@@ -1,5 +1,5 @@
 #include "crypto.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "globals.hh"
 #include "derivations.hh"
 #include "store-api.hh"
@@ -337,7 +337,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     /* Note that fileSink and unusualHashTee must be mutually exclusive, since
        they both write to caHashSink. Note that that requisite is currently true
        because the former is only used in the flat case. */
-    RetrieveRegularNARSink fileSink { caHashSink };
+    RegularFileSink fileSink { caHashSink };
     TeeSink unusualHashTee { narHashSink, caHashSink };
 
     auto & narSink = method == FileIngestionMethod::Recursive && hashAlgo != htSHA256
@@ -355,10 +355,10 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
        information to narSink. */
     TeeSource tapped { *fileSource, narSink };
 
-    ParseSink blank;
+    NullParseSink blank;
     auto & parseSink = method == FileIngestionMethod::Flat
-        ? fileSink
-        : blank;
+        ? (ParseSink &) fileSink
+        : (ParseSink &) blank;
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */
@@ -746,7 +746,7 @@ void Store::substitutePaths(const StorePathSet & paths)
     std::vector<DerivedPath> paths2;
     for (auto & path : paths)
         if (!path.isDerivation())
-            paths2.push_back(DerivedPath::Opaque{path});
+            paths2.emplace_back(DerivedPath::Opaque{path});
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     queryMissing(paths2,
@@ -1265,12 +1265,12 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
     return readDerivation(drvPath);
 }
 
-Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool requireValidPath)
+static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
 {
-    auto accessor = store.getFSAccessor();
+    auto accessor = store.getFSAccessor(requireValidPath);
     try {
         return parseDerivation(store,
-            accessor->readFile(store.printStorePath(drvPath), requireValidPath),
+            accessor->readFile(CanonPath(store.printStorePath(drvPath))),
             Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());

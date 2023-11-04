@@ -1,53 +1,68 @@
 # Store Path
 
-Nix implements [references](object.md#reference) to [store objects](object.md#store-object) as *store paths*.
+Nix implements references to [store objects](object.md) as *store paths*.
+
+Think of a store path as an [opaque], [unique identifier]:
+The only way to obtain store path is by adding or building store objects.
+A store path will always reference exactly one store object.
+
+[opaque]: https://en.m.wikipedia.org/wiki/Opaque_data_type
+[unique identifier]: https://en.m.wikipedia.org/wiki/Unique_identifier
 
 Store paths are pairs of
 
-- a 20-byte [digest](#digest) for identification
-- a symbolic name for people to read.
+- A 20-byte digest for identification
+- A symbolic name for people to read
 
-Example:
+> **Example**
+>
+> - Digest: `b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z`
+> - Name:   `firefox-33.1`
 
-- digest: `b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z`
-- name:   `firefox-33.1`
+To make store objects accessible to operating system processes, stores have to expose store objects through the file system.
 
-It is rendered to a file system path as the concatenation of
+A store path is rendered to a file system path as the concatenation of
 
-  - [store directory](#store-directory)
-  - path-separator (`/`)
-  - [digest](#digest)
-  - hyphen (`-`)
-  - name
+- [Store directory](#store-directory) (typically `/nix/store`)
+- Path separator (`/`)
+- Digest rendered in a custom variant of [Base32](https://en.wikipedia.org/wiki/Base32) (20 arbitrary bytes become 32 ASCII characters)
+- Hyphen (`-`)
+- Name
 
-Example:
-
-```
-  /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
-  |--------| |------------------------------| |----------|
-store directory            digest                 name
-```
+> **Example**
+>
+> ```
+>   /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
+>   |--------| |------------------------------| |----------|
+> store directory            digest                 name
+> ```
 
 ## Store Directory
 
-Every [store](./index.md) has a store directory.
+Every [Nix store](./index.md) has a store directory.
 
-If the store has a file system representation, this directory contains the store’s [file system objects](./object.md), which can be addressed by [store paths](#store-path).
+Not every store can be accessed through the file system.
+But if the store has a file system representation, the store directory contains the store’s [file system objects], which can be addressed by [store paths](#store-path).
+
+[file system objects]: ./file-system-object.md
 
 This means a store path is not just derived from the referenced store object itself, but depends on the store the store object is in.
 
 > **Note**
+>
 > The store directory defaults to `/nix/store`, but is in principle arbitrary.
 
 It is important which store a given store object belongs to:
 Files in the store object can contain store paths, and processes may read these paths.
-Nix can only guarantee [referential integrity](@docroot@/glossary.md#gloss-closure) if store paths do not cross store boundaries.
+Nix can only guarantee referential integrity if store paths do not cross store boundaries.
 
-Therefore one can only copy store objects to a different store if either
+Therefore one can only copy store objects to a different store if
 
-- the source and target stores' directories match
+- The source and target stores' directories match
 
-- the store object in question has no references, that is, contains no store paths.
+  or
+
+- The store object in question has no references, that is, contains no store paths
 
 One cannot copy a store object to a store with a different store directory.
 Instead, it has to be rebuilt, together with all its dependencies.
@@ -55,12 +70,7 @@ It is in general not enough to replace the store directory string in file conten
 
 ## Name
 
-The name part is a human readable name for the path,
-
-> TODO move derivation parts later, haven't introduce these details yet
-
-It is typically obtained from the name and output name of the derivation, or the name of the source file from which the store path is created.
-For derivation outputs other than the default "out" output, the string `-<id>` is suffixed to `<name>`.
+The name part is a human readable name for the path.
 
 ## Digest
 

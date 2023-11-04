@@ -28,7 +28,7 @@
 
 namespace nix {
 
-static void completeFlakeInputPath(
+void completeFlakeInputPath(
     AddCompletions & completions,
     ref<EvalState> evalState,
     const std::vector<FlakeRef> & flakeRefs,
@@ -45,13 +45,6 @@ static void completeFlakeInputPath(
 MixFlakeOptions::MixFlakeOptions()
 {
     auto category = "Common flake-related options";
-
-    addFlag({
-        .longName = "recreate-lock-file",
-        .description = "Recreate the flake's lock file from scratch.",
-        .category = category,
-        .handler = {&lockFlags.recreateLockFile, true}
-    });
 
     addFlag({
         .longName = "no-update-lock-file",
@@ -83,19 +76,6 @@ MixFlakeOptions::MixFlakeOptions()
         .description = "Commit changes to the flake's lock file.",
         .category = category,
         .handler = {&lockFlags.commitLockFile, true}
-    });
-
-    addFlag({
-        .longName = "update-input",
-        .description = "Update a specific flake input (ignoring its previous entry in the lock file).",
-        .category = category,
-        .labels = {"input-path"},
-        .handler = {[&](std::string s) {
-            lockFlags.inputUpdates.insert(flake::parseInputPath(s));
-        }},
-        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-            completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
-        }}
     });
 
     addFlag({
@@ -683,7 +663,7 @@ BuiltPaths Installable::toBuiltPaths(
 
         BuiltPaths res;
         for (auto & drvPath : Installable::toDerivations(store, installables, true))
-            res.push_back(BuiltPath::Opaque{drvPath});
+            res.emplace_back(BuiltPath::Opaque{drvPath});
         return res;
     }
 }

@@ -970,7 +970,7 @@ void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
     copyNAR(conn->from, sink);
 }
 
-ref<FSAccessor> RemoteStore::getFSAccessor()
+ref<SourceAccessor> RemoteStore::getFSAccessor(bool requireValidPath)
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
 }

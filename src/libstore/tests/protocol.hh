@@ -7,12 +7,11 @@
 namespace nix {
 
 template<class Proto, const char * protocolDir>
-class ProtoTest : public LibStoreTest
+class ProtoTest : public CharacterizationTest, public LibStoreTest
 {
-protected:
     Path unitTestData = getUnitTestData() + "/libstore/" + protocolDir;
 
-    Path goldenMaster(std::string_view testStem) {
+    Path goldenMaster(std::string_view testStem) const override {
         return unitTestData + "/" + testStem + ".bin";
     }
 };
@@ -25,18 +24,11 @@ public:
      * Golden test for `T` reading
      */
     template<typename T>
-    void readTest(PathView testStem, typename Proto::Version version, T value)
+    void readProtoTest(PathView testStem, typename Proto::Version version, T expected)
     {
-        if (testAccept())
-        {
-            GTEST_SKIP() << cannotReadGoldenMaster;
-        }
-        else
-        {
-            auto expected = readFile(ProtoTest<Proto, protocolDir>::goldenMaster(testStem));
-
+        CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
             T got = ({
-                StringSource from { expected };
+                StringSource from { encoded };
                 Proto::template Serialise<T>::read(
                     *LibStoreTest::store,
                     typename Proto::ReadConn {
@@ -45,47 +37,36 @@ public:
                     });
             });
 
-            ASSERT_EQ(got, value);
-        }
+            ASSERT_EQ(got, expected);
+        });
     }
 
     /**
      * Golden test for `T` write
      */
     template<typename T>
-    void writeTest(PathView testStem, typename Proto::Version version, const T & value)
+    void writeProtoTest(PathView testStem, typename Proto::Version version, const T & decoded)
     {
-        auto file = ProtoTest<Proto, protocolDir>::goldenMaster(testStem);
-
-        StringSink to;
-        Proto::write(
-            *LibStoreTest::store,
-            typename Proto::WriteConn {
-                .to = to,
-                .version = version,
-            },
-            value);
-
-        if (testAccept())
-        {
-            createDirs(dirOf(file));
-            writeFile(file, to.s);
-            GTEST_SKIP() << updatingGoldenMaster;
-        }
-        else
-        {
-            auto expected = readFile(file);
-            ASSERT_EQ(to.s, expected);
-        }
+        CharacterizationTest::writeTest(testStem, [&]() {
+            StringSink to;
+            Proto::template Serialise<T>::write(
+                *LibStoreTest::store,
+                typename Proto::WriteConn {
+                    .to = to,
+                    .version = version,
+                },
+                decoded);
+            return std::move(to.s);
+        });
     }
 };
 
 #define VERSIONED_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE) \
     TEST_F(FIXTURE, NAME ## _read) { \
-        readTest(STEM, VERSION, VALUE); \
+        readProtoTest(STEM, VERSION, VALUE); \
     } \
     TEST_F(FIXTURE, NAME ## _write) { \
-        writeTest(STEM, VERSION, VALUE); \
+        writeProtoTest(STEM, VERSION, VALUE); \
     }
 
 }

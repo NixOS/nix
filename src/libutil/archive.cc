@@ -5,12 +5,6 @@
 
 #include <strings.h> // for strcasecmp
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <fcntl.h>
-
 #include "archive.hh"
 #include "util.hh"
 #include "config.hh"
@@ -299,7 +293,7 @@ void copyNAR(Source & source, Sink & sink)
     // FIXME: if 'source' is the output of dumpPath() followed by EOF,
     // we should just forward all data directly without parsing.
 
-    ParseSink parseSink; /* null sink; just parse the NAR */
+    NullParseSink parseSink; /* just parse the NAR */
 
     TeeSource wrapper { source, sink };
 

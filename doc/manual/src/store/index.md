@@ -1,81 +1,8 @@
 # Nix Store
 
-The *Nix store* is an abstraction used by Nix to store immutable filesystem artifacts (such as software packages) that can have dependencies (*references*) between them.
-There are multiple implementations of the Nix store, such as the actual filesystem (`/nix/store`) and binary caches.
+The *Nix store* is an abstraction to store immutable file system data (such as software packages) that can have dependencies on other such data.
 
-The following concept map is a graphical outline of this chapter.
-Arrows indicate suggested reading order.
-
-```
-                      ,--------------[ store ]----------------,
-                      |                  |                    |
-                      v                  v                    v
-               [ store object ]     [ closure ]--,      [ operations ]
-                      |               |   |      |        |        |
-                      v               |   |      v        v        |
-           [ files and processes ]    |   | [ garbage collection ] |
-               /          \           |   |                        |
-              v            v          |   v                        v
-[ file system object ] [ store path ] | [ derivation ]--->[ building ]
-                  |        ^      |   |                         |
-                  v        |      v   v                         |
-             [ digest ]----' [ reference scanning ]<------------'
-              /      \
-             v        v
-[ input addressing ] [ content addressing ]
-```
-
-These store objects can hold arbitrary data.
-Store objects can be build inputs, build results, or build tasks.
-
-## Operations
-
-A Nix store can *add*, *retrieve*, and *delete* store objects.
-
-                [ data ]
-                    |
-                    V
-    [ store ] ---> add ----> [ store' ]
-                    |
-                    V
-              [ reference ]
-
-<!-- -->
-
-              [ reference ]
-                    |
-                    V
-    [ store ] ---> get
-                    |
-                    V
-             [ store object ]
-
-<!-- -->
-
-              [ reference ]
-                    |
-                    V
-    [ store ] --> delete --> [ store' ]
-
-
-It can *perform builds*, that is, create new store objects by transforming build inputs into build outputs, using instructions from the build tasks.
-
-
-              [ reference ]
-                    |
-                    V
-    [ store ] --> build --(maybe)--> [ store' ]
-                             |
-                             V
-                       [ reference ]
-
-
-As it keeps track of references, it can [garbage-collect][garbage-collection] unused store objects.
-
-
-    [ store ] --> collect garbage --> [ store' ]
-
-[garbage-collection]: https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)
+There are multiple implementations of Nix stores with different capabilities, such as the actual filesystem (`/nix/store`) or binary caches.
 
 ## Two models, abstract and concrete
 

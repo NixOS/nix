@@ -65,7 +65,7 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         /* Extract the NAR from the source. */
         StringSink saved;
         TeeSource tee { source, saved };
-        ParseSink ether;
+        NullParseSink ether;
         parseDump(ether, tee);
 
         uint32_t magic = readInt(source);

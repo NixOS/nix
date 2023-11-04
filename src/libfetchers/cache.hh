@@ -2,6 +2,7 @@
 ///@file
 
 #include "fetchers.hh"
+#include "path.hh"
 
 namespace nix::fetchers {
 

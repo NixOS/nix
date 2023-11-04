@@ -44,9 +44,13 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
     return nix::pathExists(path.abs());
 }
 
-SourceAccessor::Stat PosixSourceAccessor::lstat(const CanonPath & path)
+std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
 {
-    auto st = nix::lstat(path.abs());
+    struct stat st;
+    if (::lstat(path.c_str(), &st)) {
+        if (errno == ENOENT) return std::nullopt;
+        throw SysError("getting status of '%s'", showPath(path));
+    }
     mtime = std::max(mtime, st.st_mtime);
     return Stat {
         .type =
@@ -54,7 +58,8 @@ SourceAccessor::Stat PosixSourceAccessor::lstat(const CanonPath & path)
             S_ISDIR(st.st_mode) ? tDirectory :
             S_ISLNK(st.st_mode) ? tSymlink :
             tMisc,
-        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR
+        .fileSize = S_ISREG(st.st_mode) ? std::optional<uint64_t>(st.st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR,
     };
 }
 
