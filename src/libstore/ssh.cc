@@ -132,7 +132,6 @@ Path SSHMaster::startMaster()
 
     if (state->sshMaster != -1) return state->socketPath;
 
-
     state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
 
     Pipe out;
@@ -144,7 +143,8 @@ Path SSHMaster::startMaster()
     logger->pause();
     Finally cleanup = [&]() { logger->resume(); };
 
-    bool wasMasterRunning = isMasterRunning();
+    if (isMasterRunning())
+        return state->socketPath;
 
     state->sshMaster = startProcess([&]() {
         restoreProcessContext();
@@ -165,14 +165,13 @@ Path SSHMaster::startMaster()
 
     out.writeSide = -1;
 
-    if (!wasMasterRunning) {
-        std::string reply;
-        try {
-            reply = readLine(out.readSide.get());
-        } catch (EndOfFile & e) { }
+    std::string reply;
+    try {
+        reply = readLine(out.readSide.get());
+    } catch (EndOfFile & e) { }
 
-        if (reply != "started")
-            throw Error("failed to start SSH master connection to '%s'", host);
+    if (reply != "started") {
+        throw Error("failed to start SSH master connection to '%s'", host);
     }
 
     return state->socketPath;
