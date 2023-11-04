@@ -114,8 +114,10 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
             reply = readLine(out.readSide.get());
         } catch (EndOfFile & e) { }
 
-        if (reply != "started")
+        if (reply != "started") {
+            printTalkative("SSH stdout first line: %s", reply);
             throw Error("failed to start SSH connection to '%s'", host);
+        }
     }
 
     conn->out = std::move(out.readSide);
@@ -171,6 +173,7 @@ Path SSHMaster::startMaster()
     } catch (EndOfFile & e) { }
 
     if (reply != "started") {
+        printTalkative("SSH master stdout first line: %s", reply);
         throw Error("failed to start SSH master connection to '%s'", host);
     }
 
