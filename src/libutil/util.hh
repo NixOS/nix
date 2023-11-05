@@ -35,12 +35,6 @@ struct Source;
 void initLibUtil();
 
 /**
- * The system for which Nix is compiled.
- */
-extern const std::string nativeSystem;
-
-
-/**
  * @return an environment variable.
  */
 std::optional<std::string> getEnv(const std::string & key);

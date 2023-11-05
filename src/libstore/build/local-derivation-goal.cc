@@ -1620,6 +1620,8 @@ void setupSeccomp()
         seccomp_release(ctx);
     });
 
+    constexpr std::string_view nativeSystem = SYSTEM;
+
     if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
         throw SysError("unable to add 32-bit seccomp architecture");
