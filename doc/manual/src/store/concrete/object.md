@@ -4,7 +4,7 @@ A Nix store is a collection of *store objects* with *references* between them.
 Concrete Store objects comes in a few variations of Nix, but the basic model of a store object is the triple of
 
   - A [file system object](./file-system-object.md) as data
-  - A set of [store paths](./store-path.md) as references to other store objects
+  - A set of [store paths](./path.md) as references to other store objects
   - a name
 
 Store objects are [immutable](https://en.wikipedia.org/wiki/Immutable_object):
