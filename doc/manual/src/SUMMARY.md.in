@@ -106,6 +106,7 @@
 - [Architecture and Design](architecture/architecture.md)
 - [Protocols](protocols/index.md)
   - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
+  - [Exact Store Path Specification](protocols/store-path.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/index.md)
