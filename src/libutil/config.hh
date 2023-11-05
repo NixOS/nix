@@ -247,7 +247,7 @@ protected:
      *
      * @param append Whether to append or overwrite.
      */
-    virtual void appendOrSet(T && newValue, bool append);
+    virtual void appendOrSet(T newValue, bool append);
 
 public:
 

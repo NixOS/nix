@@ -301,10 +301,11 @@ template<> Strings BaseSetting<Strings>::parse(const std::string & str) const
     return tokenizeString<Strings>(str);
 }
 
-template<> void BaseSetting<Strings>::appendOrSet(Strings && newValue, bool append)
+template<> void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append)
 {
     if (!append) value.clear();
-    for (auto && s : std::move(newValue)) value.push_back(std::move(s));
+    value.insert(value.end(), std::make_move_iterator(newValue.begin()),
+                              std::make_move_iterator(newValue.end()));
 }
 
 template<> std::string BaseSetting<Strings>::to_string() const
@@ -317,11 +318,10 @@ template<> StringSet BaseSetting<StringSet>::parse(const std::string & str) cons
     return tokenizeString<StringSet>(str);
 }
 
-template<> void BaseSetting<StringSet>::appendOrSet(StringSet && newValue, bool append)
+template<> void BaseSetting<StringSet>::appendOrSet(StringSet newValue, bool append)
 {
     if (!append) value.clear();
-    for (auto && s : std::move(newValue))
-        value.insert(s);
+    value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
 template<> std::string BaseSetting<StringSet>::to_string() const
@@ -342,11 +342,10 @@ template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeatur
     return res;
 }
 
-template<> void BaseSetting<std::set<ExperimentalFeature>>::appendOrSet(std::set<ExperimentalFeature> && newValue, bool append)
+template<> void BaseSetting<std::set<ExperimentalFeature>>::appendOrSet(std::set<ExperimentalFeature> newValue, bool append)
 {
     if (!append) value.clear();
-    for (auto && s : std::move(newValue))
-        value.insert(s);
+    value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
 template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() const
@@ -369,11 +368,10 @@ template<> StringMap BaseSetting<StringMap>::parse(const std::string & str) cons
     return res;
 }
 
-template<> void BaseSetting<StringMap>::appendOrSet(StringMap && newValue, bool append)
+template<> void BaseSetting<StringMap>::appendOrSet(StringMap newValue, bool append)
 {
     if (!append) value.clear();
-    for (auto && [k, v] : std::move(newValue))
-        value.emplace(std::move(k), std::move(v));
+    value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
 template<> std::string BaseSetting<StringMap>::to_string() const
