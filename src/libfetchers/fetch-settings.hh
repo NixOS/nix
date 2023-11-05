@@ -77,16 +77,16 @@ struct FetchSettings : public Config
 
           When empty, disables the global flake registry.
         )",
-        {}, true, Xp::Flakes};
+        {}, std::nullopt, Xp::Flakes};
 
 
     Setting<bool> useRegistries{this, true, "use-registries",
         "Whether to use flake registries to resolve flake references.",
-        {}, true, Xp::Flakes};
+        {}, std::nullopt, Xp::Flakes};
 
     Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
         "Whether to accept nix configuration from a flake without prompting.",
-        {}, true, Xp::Flakes};
+        {}, std::nullopt, Xp::Flakes};
 
     Setting<std::string> commitLockFileSummary{
         this, "", "commit-lockfile-summary",
@@ -94,7 +94,7 @@ struct FetchSettings : public Config
           The commit summary to use when committing changed flake lock files. If
           empty, the summary is generated based on the action performed.
         )",
-        {}, true, Xp::Flakes};
+        {}, std::nullopt, Xp::Flakes};
 };
 
 // FIXME: don't use a global variable.

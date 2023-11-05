@@ -407,8 +407,9 @@ PathSetting::PathSetting(Config * options,
     const Path & def,
     const std::string & name,
     const std::string & description,
-    const std::set<std::string> & aliases)
-    : BaseSetting<Path>(def, true, name, description, aliases)
+    const std::set<std::string> & aliases,
+    const std::optional<std::string> defaultText)
+    : BaseSetting<Path>(def, name, description, aliases, defaultText)
 {
     options->addSetting(this);
 }
@@ -423,8 +424,9 @@ OptionalPathSetting::OptionalPathSetting(Config * options,
     const std::optional<Path> & def,
     const std::string & name,
     const std::string & description,
-    const std::set<std::string> & aliases)
-    : BaseSetting<std::optional<Path>>(def, true, name, description, aliases)
+    const std::set<std::string> & aliases,
+    const std::optional<std::string> defaultText)
+    : BaseSetting<std::optional<Path>>(def, name, description, aliases, defaultText)
 {
     options->addSetting(this);
 }

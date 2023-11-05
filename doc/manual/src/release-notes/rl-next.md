@@ -28,5 +28,7 @@
 
   - The flake-specific flags `--recreate-lock-file` and `--update-input` have been removed from all commands operating on installables.
     They are superceded by `nix flake update`.
-  
+
 - Commit signature verification for the [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) is added as the new [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+
+- The [`max-jobs` setting](@docroot@/command-ref/conf-file.md#conf-max-jobs) now defaults to `auto`.

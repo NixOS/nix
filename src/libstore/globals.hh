@@ -21,8 +21,9 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         unsigned int def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<unsigned int>(def, true, name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        const std::optional<std::string> defaultText = std::nullopt)
+        : BaseSetting<unsigned int>(def, name, description, aliases, defaultText)
     {
         options->addSetting(this);
     }
@@ -38,8 +39,9 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         const Paths & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<Paths>(def, true, name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        const std::optional<std::string> defaultText = std::nullopt)
+        : BaseSetting<Paths>(def, name, description, aliases, defaultText)
     {
         options->addSetting(this);
     }
@@ -148,17 +150,17 @@ public:
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
-        this, 1, "max-jobs",
+        this, getMaxThreads(), "max-jobs",
         R"(
           This option defines the maximum number of jobs that Nix will try to
-          build in parallel. The default is `1`. The special value `auto`
-          causes Nix to use the number of CPUs in your system. `0` is useful
-          when using remote builders to prevent any local builds (except for
-          `preferLocalBuild` derivation attribute which executes locally
-          regardless). It can be overridden using the `--max-jobs` (`-j`)
-          command line switch.
+          build in parallel. The default is `auto` which causes Nix to use
+          the number of CPUs in your system.
+          It can be overridden using the `--max-jobs` / `-j` command line option.
+
+          Setting this to `0` when using remote builders will prevent any local builds.
+          The [`preferLocalBuild`](@docroot@/language/advanced-attributes.md#adv-attr-preferLocalBuild) derivation attribute will make the build always execute locally.
         )",
-        {"build-max-jobs"}};
+        {"build-max-jobs"}, "`auto`"};
 
     Setting<unsigned int> maxSubstitutionJobs{
         this, 16, "max-substitution-jobs",
@@ -183,7 +185,7 @@ public:
           command line switch and defaults to `1`. The value `0` means that
           the builder should use all available CPU cores in the system.
         )",
-        {"build-cores"}, false};
+        {"build-cores"}, "`0`"};
 
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
@@ -260,7 +262,7 @@ public:
         R"(
           A semicolon-separated list of build machines.
           For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
-        )"};
+        )", {}, "`@$NIX_CONF_DIR/machines`"};
 
     Setting<bool> alwaysAllowSubstitutes{
         this, false, "always-allow-substitutes",
@@ -295,7 +297,7 @@ public:
         )"};
 
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
-        "Whether SQLite should use WAL mode."};
+        "Whether SQLite should use WAL mode.", {}, "`false` if using WSL1, `true` otherwise"};
 
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
@@ -341,10 +343,8 @@ public:
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
           `NIX_REMOTE` is `daemon`). Obviously, this should not be used
           with a nix daemon accessible to untrusted clients.
-
-          Defaults to `nixbld` when running as root, *empty* otherwise.
         )",
-        {}, false};
+        {}, "`nixbld` when running as root, *empty* otherwise"};
 
     Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
         R"(
@@ -352,7 +352,7 @@ public:
           users in `build-users-group`.
 
           UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
-        )", {}, true, Xp::AutoAllocateUids};
+        )", {}, std::nullopt, Xp::AutoAllocateUids};
 
     Setting<uint32_t> startId{this,
         #if __linux__
@@ -699,7 +699,7 @@ public:
 
           Build systems will usually detect the target platform to be the current physical system and therefore produce machine code incompatible with what may be intended in the derivation.
           You should design your derivation's `builder` accordingly and cross-check the results when using this option against natively-built versions of your derivation.
-        )", {}, false};
+        )", {}, "*machine-specific*"};
 
     Setting<StringSet> systemFeatures{
         this,
@@ -744,7 +744,7 @@ public:
             [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
 
             Included by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
-        )", {}, false};
+        )", {}, "*machine-specific*"};
 
     Setting<Strings> substituters{
         this,
@@ -878,8 +878,7 @@ public:
         R"(
           If set to an absolute path to a `netrc` file, Nix will use the HTTP
           authentication credentials in this file when trying to download from
-          a remote host through HTTP or HTTPS. Defaults to
-          `$NIX_CONF_DIR/netrc`.
+          a remote host through HTTP or HTTPS.
 
           The `netrc` file consists of a list of accounts in the following
           format:
@@ -896,7 +895,7 @@ public:
           > This must be an absolute path, and `~` is not resolved. For
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.
-        )"};
+        )", {}, "`$NIX_CONF_DIR/netrc`"};
 
     Setting<Path> caFile{
         this, getDefaultSSLCertFile(), "ssl-cert-file",
@@ -1081,7 +1080,7 @@ public:
           setting private access tokens when fetching a private repository.
         )",
         {}, // aliases
-        true, // document default
+        std::nullopt, // default text
         Xp::ConfigurableImpureEnv
     };
 };

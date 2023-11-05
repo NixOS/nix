@@ -777,6 +777,11 @@ void drainFD(int fd, Sink & sink, bool block)
 
 //////////////////////////////////////////////////////////////////////
 
+unsigned int getMaxThreads()
+{
+    return std::max(1U, std::thread::hardware_concurrency());
+}
+
 unsigned int getMaxCPU()
 {
     #if __linux__

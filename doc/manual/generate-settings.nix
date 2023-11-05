@@ -1,5 +1,5 @@
 let
-  inherit (builtins) attrValues concatStringsSep isAttrs isBool mapAttrs;
+  inherit (builtins) attrValues concatStringsSep isAttrs isBool isString mapAttrs;
   inherit (import ./utils.nix) concatStrings indent optionalString squash;
 in
 
@@ -8,7 +8,7 @@ in
 
 let
 
-  showSetting = prefix: setting: { description, documentDefault, defaultValue, aliases, value, experimentalFeature }:
+  showSetting = prefix: setting: { description, defaultValue, defaultText, aliases, value, experimentalFeature }:
     let
       result = squash ''
           - ${item}
@@ -24,7 +24,7 @@ let
 
           ${experimentalFeatureNote}
 
-          **Default:** ${showDefault documentDefault defaultValue}
+          **Default:** ${if isString defaultText then defaultText else showDefault defaultValue}
 
           ${showAliases aliases}
         '';
@@ -45,17 +45,15 @@ let
           ```
         '';
 
-      showDefault = documentDefault: defaultValue:
-        if documentDefault then
-          # a StringMap value type is specified as a string, but
-          # this shows the value type. The empty stringmap is `null` in
-          # JSON, but that converts to `{ }` here.
-          if defaultValue == "" || defaultValue == [] || isAttrs defaultValue
-            then "*empty*"
-            else if isBool defaultValue then
-              if defaultValue then "`true`" else "`false`"
-            else "`${toString defaultValue}`"
-        else "*machine-specific*";
+      showDefault = defaultValue:
+        # a StringMap value type is specified as a string, but
+        # this shows the value type. The empty stringmap is `null` in
+        # JSON, but that converts to `{ }` here.
+        if defaultValue == "" || defaultValue == [] || isAttrs defaultValue
+          then "*empty*"
+          else if isBool defaultValue then
+            if defaultValue then "`true`" else "`false`"
+          else "`${toString defaultValue}`";
 
       showAliases = aliases:
           optionalString (aliases != [])
