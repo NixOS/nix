@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 

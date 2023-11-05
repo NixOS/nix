@@ -4,6 +4,7 @@
 #include "sync.hh"
 #include "thread-pool.hh"
 #include "references.hh"
+#include "signals.hh"
 
 #include <atomic>
 

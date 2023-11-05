@@ -1,6 +1,5 @@
 #include "path-references.hh"
 #include "hash.hh"
-#include "util.hh"
 #include "archive.hh"
 
 #include <map>

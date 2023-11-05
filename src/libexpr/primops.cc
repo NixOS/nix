@@ -10,6 +10,7 @@
 #include "path-references.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "processes.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"

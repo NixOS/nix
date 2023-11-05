@@ -1,6 +1,9 @@
 #include "args.hh"
 #include "args/root.hh"
 #include "hash.hh"
+#include "environment-variables.hh"
+#include "signals.hh"
+#include "users.hh"
 #include "json-utils.hh"
 
 #include <glob.h>

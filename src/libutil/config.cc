@@ -2,6 +2,8 @@
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
 #include "experimental-features.hh"
+#include "util.hh"
+#include "file-system.hh"
 
 #include "config-impl.hh"
 

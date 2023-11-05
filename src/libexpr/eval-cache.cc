@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "eval-cache.hh"
 #include "sqlite.hh"
 #include "eval.hh"

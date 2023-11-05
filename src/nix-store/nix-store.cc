@@ -11,7 +11,6 @@
 #include "serve-protocol.hh"
 #include "serve-protocol-impl.hh"
 #include "shared.hh"
-#include "util.hh"
 #include "graphml.hh"
 #include "legacy.hh"
 #include "path-with-outputs.hh"
