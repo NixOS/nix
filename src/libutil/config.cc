@@ -221,7 +221,7 @@ nlohmann::json AbstractSetting::toJSON()
     return nlohmann::json(toJSONObject());
 }
 
-std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject()
+std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject() const
 {
     std::map<std::string, nlohmann::json> obj;
     obj.emplace("description", description);

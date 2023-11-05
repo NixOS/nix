@@ -213,7 +213,7 @@ protected:
 
     nlohmann::json toJSON();
 
-    virtual std::map<std::string, nlohmann::json> toJSONObject();
+    virtual std::map<std::string, nlohmann::json> toJSONObject() const;
 
     virtual void convertToArg(Args & args, const std::string & category);
 
@@ -306,7 +306,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    std::map<std::string, nlohmann::json> toJSONObject() override;
+    std::map<std::string, nlohmann::json> toJSONObject() const override;
 };
 
 template<typename T>
