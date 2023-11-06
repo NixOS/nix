@@ -174,6 +174,7 @@ struct CmdKeyGenerateSecret : Command
         if (!keyName)
             throw UsageError("required argument '--key-name' is missing");
 
+        stopProgressBar();
         writeFull(STDOUT_FILENO, SecretKey::generate(*keyName).to_string());
     }
 };
@@ -195,6 +196,7 @@ struct CmdKeyConvertSecretToPublic : Command
     void run() override
     {
         SecretKey secretKey(drainFD(STDIN_FILENO));
+        stopProgressBar();
         writeFull(STDOUT_FILENO, secretKey.toPublicKey().to_string());
     }
 };
