@@ -825,7 +825,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         auto message = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.addErrorContext",
                 false, false).toOwned();
-        e.addTrace(nullptr, message, true);
+        e.addTrace(nullptr, hintfmt(message), true);
         throw;
     }
 }
