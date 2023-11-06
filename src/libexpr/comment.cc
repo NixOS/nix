@@ -99,9 +99,9 @@ static int countLambdas(std::string piece) {
    definition */
 static struct Doc parseDoc(std::string sourcePrefix, const bool simple) {
 
-//   std::string spaces("(?:[ \\t]*)");
-//   std::string lineComment("(?:[\\r\\n]*[^\\r\\n]*#" + spaces + "*)");
-  std::string whitespaces("(?:[\\s]*)*");
+  std::string spaces("(?:[ \\t]*)");
+  std::string lineComment("(?:[\\r\\n]*[^\\r\\n]*#" + spaces + "*)");
+  std::string whitespaces("(?:" + lineComment + "*[\\s]*)*");
   std::string ident("(?:[a-zA-Z0-9_'-][a-zA-Z_]*)");
   std::string path("(?:(?:" + whitespaces + ident + "\\." + whitespaces + ")*" +
                    ident + ")");
