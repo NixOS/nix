@@ -1,7 +1,9 @@
 #include "../args.hh"
+#include "libutil/fs-sink.hh"
 #include <list>
 
 #include <gtest/gtest.h>
+#include <rapidcheck/gtest.h>
 
 namespace nix {
 
@@ -90,5 +92,77 @@ namespace nix {
         ASSERT_EQ(*i++, "``");
         ASSERT_EQ(*i++, "```");
     }
+
+
+#ifndef COVERAGE
+
+// quick and dirty
+static inline std::string escape(std::string_view s_) {
+
+    std::string_view s = s_;
+    std::string r = "``";
+
+    // make a guess to allocate ahead of time
+    r.reserve(
+        // plain chars
+        s.size()
+        // quotes
+        + 5
+        // some "escape" backticks
+        + s.size() / 8);
+
+    while (!s.empty()) {
+        if (s[0] == '`' && s.size() >= 2 && s[1] == '`') {
+            // escape it
+            r += "`";
+            while (!s.empty() && s[0] == '`') {
+                r += "`";
+                s = s.substr(1);
+            }
+        } else {
+            r += s[0];
+            s = s.substr(1);
+        }
+    }
+
+    if (!r.empty()
+        && (
+            r[r.size() - 1] == '`'
+            || r[r.size() - 1] == ' '
+        )) {
+        r += " ";
+    }
+
+    r += "``";
+
+    return r;
+};
+
+RC_GTEST_PROP(
+    parseShebangContent,
+    prop_round_trip_single,
+    (const std::string & orig))
+{
+    auto escaped = escape(orig);
+    // RC_LOG() << "escaped: <[[" << escaped << "]]>" << std::endl;
+    auto ss = parseShebangContent(escaped);
+    RC_ASSERT(ss.size() == 1);
+    RC_ASSERT(*ss.begin() == orig);
+}
+
+RC_GTEST_PROP(
+    parseShebangContent,
+    prop_round_trip_two,
+    (const std::string & one, const std::string & two))
+{
+    auto ss = parseShebangContent(escape(one) + " " + escape(two));
+    RC_ASSERT(ss.size() == 2);
+    auto i = ss.begin();
+    RC_ASSERT(*i++ == one);
+    RC_ASSERT(*i++ == two);
+}
+
+
+#endif
 
 }
