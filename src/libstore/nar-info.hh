@@ -24,7 +24,18 @@ struct NarInfo : ValidPathInfo
     NarInfo(const ValidPathInfo & info) : ValidPathInfo(info) { }
     NarInfo(const Store & store, const std::string & s, const std::string & whence);
 
+    DECLARE_CMP(NarInfo);
+
     std::string to_string(const Store & store) const;
+
+    nlohmann::json toJSON(
+        const Store & store,
+        bool includeImpureInfo,
+        HashFormat hashFormat) const override;
+    static NarInfo fromJSON(
+        const Store & store,
+        const StorePath & path,
+        const nlohmann::json & json);
 };
 
 }

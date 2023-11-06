@@ -4,6 +4,15 @@
 
 namespace nix {
 
+GENERATE_CMP_EXT(
+    ,
+    NarInfo,
+    me->url,
+    me->compression,
+    me->fileHash,
+    me->fileSize,
+    static_cast<const ValidPathInfo &>(*me));
+
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
     : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
 {
@@ -121,6 +130,61 @@ std::string NarInfo::to_string(const Store & store) const
 
     if (ca)
         res += "CA: " + renderContentAddress(*ca) + "\n";
+
+    return res;
+}
+
+nlohmann::json NarInfo::toJSON(
+    const Store & store,
+    bool includeImpureInfo,
+    HashFormat hashFormat) const
+{
+    using nlohmann::json;
+
+    auto jsonObject = ValidPathInfo::toJSON(store, includeImpureInfo, hashFormat);
+
+    if (includeImpureInfo) {
+        if (!url.empty())
+            jsonObject["url"] = url;
+        if (!compression.empty())
+            jsonObject["compression"] = compression;
+        if (fileHash)
+            jsonObject["downloadHash"] = fileHash->to_string(hashFormat, true);
+        if (fileSize)
+            jsonObject["downloadSize"] = fileSize;
+    }
+
+    return jsonObject;
+}
+
+NarInfo NarInfo::fromJSON(
+    const Store & store,
+    const StorePath & path,
+    const nlohmann::json & json)
+{
+    using nlohmann::detail::value_t;
+
+    NarInfo res {
+        ValidPathInfo {
+            path,
+            UnkeyedValidPathInfo::fromJSON(store, json),
+        }
+    };
+
+    if (json.contains("url"))
+        res.url = ensureType(valueAt(json, "url"), value_t::string);
+
+    if (json.contains("compression"))
+        res.compression = ensureType(valueAt(json, "compression"), value_t::string);
+
+    if (json.contains("downloadHash"))
+        res.fileHash = Hash::parseAny(
+            static_cast<const std::string &>(
+                ensureType(valueAt(json, "downloadHash"), value_t::string)),
+            std::nullopt);
+
+    if (json.contains("downloadSize"))
+        res.fileSize = ensureType(valueAt(json, "downloadSize"), value_t::number_integer);
 
     return res;
 }

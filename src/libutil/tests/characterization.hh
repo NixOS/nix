@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "types.hh"
+#include "environment-variables.hh"
 
 namespace nix {
 
