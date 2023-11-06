@@ -243,7 +243,9 @@ in [`nix help-stores`](./nix3-help-stores.md).
 The `nix` command can be used as a `#!` interpreter.
 Arguments to Nix can be passed on subsequent lines in the script.
 
-Verbatim strings may be passed in double backtick (```` `` ````) quotes.
+Verbatim strings may be passed in double backtick (```` `` ````) quotes. <!-- that's markdown for two backticks in inline code. -->
+Sequences of _n_ backticks of 3 or longer are parsed as _n-1_ literal backticks.
+A single space before the closing ```` `` ```` is ignored if present.
 
 `--file` and `--expr` resolve relative paths based on the script location.
 

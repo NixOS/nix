@@ -409,4 +409,6 @@ public:
     virtual void add(std::string completion, std::string description = "") = 0;
 };
 
+Strings parseShebangContent(std::string_view s);
+
 }
