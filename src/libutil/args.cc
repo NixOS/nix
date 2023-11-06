@@ -189,10 +189,38 @@ void ParseQuoted::operator()(std::shared_ptr<Parser> &state, Strings & r) {
         throw Error("unterminated quoted string in nix shebang");
     }
     switch (remaining[0]) {
+        case ' ':
+            if ((remaining.size() == 3 && remaining[1] == '`' && remaining[2] == '`')
+                || (remaining.size() > 3 && remaining[1] == '`' && remaining[2] == '`' && remaining[3] != '`')) {
+                // exactly two backticks mark the end of a quoted string, but a preceding space is ignored if present.
+                state = std::make_shared<ParseUnquoted>(ParseUnquoted(remaining.substr(3)));
+                r.push_back(acc);
+                return;
+            }
+            else {
+                // just a normal space
+                acc += remaining[0];
+                remaining = remaining.substr(1);
+                return;
+            }
         case '`':
-            if (remaining.size() > 1 && remaining[1] == '`') {
+            // exactly two backticks mark the end of a quoted string
+            if ((remaining.size() == 2 && remaining[1] == '`')
+                || (remaining.size() > 2 && remaining[1] == '`' && remaining[2] != '`')) {
                 state = std::make_shared<ParseUnquoted>(ParseUnquoted(remaining.substr(2)));
                 r.push_back(acc);
+                return;
+            }
+
+            // a sequence of at least 3 backticks is one escape-backtick which is ignored, followed by any number of backticks, which are verbatim
+            else if (remaining.size() >= 3 && remaining[1] == '`' && remaining[2] == '`') {
+                // ignore "escape" backtick
+                remaining = remaining.substr(1);
+                // add the rest
+                while (remaining.size() > 0 && remaining[0] == '`') {
+                    acc += '`';
+                    remaining = remaining.substr(1);
+                }
                 return;
             }
             else {
@@ -208,7 +236,7 @@ void ParseQuoted::operator()(std::shared_ptr<Parser> &state, Strings & r) {
     assert(false);
 }
 
-static Strings parseShebangContent(std::string_view s) {
+Strings parseShebangContent(std::string_view s) {
     Strings result;
     std::shared_ptr<Parser> parserState(std::make_shared<ParseUnquoted>(ParseUnquoted(s)));
 
