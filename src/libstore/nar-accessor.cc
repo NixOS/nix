@@ -60,12 +60,22 @@ struct NarAccessor : public SourceAccessor
 
         void createDirectory(const Path & path) override
         {
-            createMember(path, {Type::tDirectory, false, 0, 0});
+            createMember(path, NarMember{ .stat = {
+                .type = Type::tDirectory,
+                .fileSize = 0,
+                .isExecutable = false,
+                .narOffset = 0
+            } });
         }
 
         void createRegularFile(const Path & path) override
         {
-            createMember(path, {Type::tRegular, false, 0, 0});
+            createMember(path, NarMember{ .stat = {
+                .type = Type::tRegular,
+                .fileSize = 0,
+                .isExecutable = false,
+                .narOffset = 0
+            } });
         }
 
         void closeRegularFile() override
