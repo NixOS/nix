@@ -1,7 +1,8 @@
 # Release X.Y (202?-??-??)
 
-- The experimental nix command is now a `#!-interpreter` by appending the
-  contents of any `#! nix` lines and the script's location to a single call.
+- The experimental nix command can now act as a [shebang interpreter](@docroot@/command-ref/new-cli/nix.md#shebang-interpreter)
+  by appending the contents of any `#! nix` lines and the script's location to a single call.
+
 - [URL flake references](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references) now support [percent-encoded](https://datatracker.ietf.org/doc/html/rfc3986#section-2.1) characters.
 
 - [Path-like flake references](@docroot@/command-ref/new-cli/nix3-flake.md#path-like-syntax) now accept arbitrary unicode characters (except `#` and `?`).
