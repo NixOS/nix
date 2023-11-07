@@ -161,7 +161,7 @@ struct NarAccessor : public SourceAccessor
     {
         NarMember * current = &root;
 
-        for (auto & i : path) {
+        for (const auto & i : path) {
             if (current->stat.type != Type::tDirectory) return nullptr;
             auto child = current->children.find(std::string(i));
             if (child == current->children.end()) return nullptr;
@@ -194,7 +194,7 @@ struct NarAccessor : public SourceAccessor
             throw Error("path '%1%' inside NAR file is not a directory", path);
 
         DirEntries res;
-        for (auto & child : i.children)
+        for (const auto & child : i.children)
             res.insert_or_assign(child.first, std::nullopt);
 
         return res;
@@ -259,7 +259,7 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
         {
             obj["entries"] = json::object();
             json &res2 = obj["entries"];
-            for (auto & [name, type] : accessor->readDirectory(path)) {
+            for (const auto & [name, type] : accessor->readDirectory(path)) {
                 if (recurse) {
                     res2[name] = listNar(accessor, path + name, true);
                 } else

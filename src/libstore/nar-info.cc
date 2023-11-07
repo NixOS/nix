@@ -38,12 +38,12 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     while (pos < s.size()) {
 
         size_t colon = s.find(':', pos);
-        if (colon == std::string::npos) throw corrupt("expecting ':'");
+        if (colon == s.npos) throw corrupt("expecting ':'");
 
         std::string name(s, pos, colon - pos);
 
         size_t eol = s.find('\n', colon + 2);
-        if (eol == std::string::npos) throw corrupt("expecting '\\n'");
+        if (eol == s.npos) throw corrupt("expecting '\\n'");
 
         std::string value(s, colon + 2, eol - colon - 2);
 

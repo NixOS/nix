@@ -31,14 +31,14 @@ std::optional<TrustedFlag> WorkerProto::Serialise<std::optional<TrustedFlag>>::r
 void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const Store & store, WorkerProto::WriteConn conn, const std::optional<TrustedFlag> & optTrusted)
 {
     if (!optTrusted)
-        conn.to << (uint8_t)0;
+        conn.to << uint8_t{0};
     else {
         switch (*optTrusted) {
         case Trusted:
-            conn.to << (uint8_t)1;
+            conn.to << uint8_t{1};
             break;
         case NotTrusted:
-            conn.to << (uint8_t)2;
+            conn.to << uint8_t{2};
             break;
         default:
             assert(false);
@@ -101,7 +101,7 @@ void WorkerProto::Serialise<KeyedBuildResult>::write(const Store & store, Worker
 BuildResult WorkerProto::Serialise<BuildResult>::read(const Store & store, WorkerProto::ReadConn conn)
 {
     BuildResult res;
-    res.status = (BuildResult::Status) readInt(conn.from);
+    res.status = static_cast<BuildResult::Status>(readInt(conn.from));
     conn.from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
         conn.from
