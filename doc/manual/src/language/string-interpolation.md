@@ -196,3 +196,26 @@ If neither is present, an error is thrown.
 >                 3| in
 >                 4| "${a}"
 >                  |  ^
+
+## Strings with context
+
+An interpolated string keeps a reference to the derivations that were interpolated.
+This context is propagated across operators like `+` and string interpolation.  This is useful when you are creating a script string and what to track all the derivation dependencies that such a script would have.
+
+### Example
+
+```
+nix-repl> :lf nixpkgs
+nix-repl> pkgs = legacyPackages.aarch64-darwin
+nix-repl> s1 = "${pkgs.hello}/bin/hello"
+nix-repl> s2 = "${pkgs.coreutils}/bin/yes"
+nix-repl> :p builtins.getContext s1
+{ "/nix/store/qv7ff3f1xjgax460wl62pr8d2z0jcb9l-hello-2.12.1.drv" = { outputs = [ "out" ]; }; }
+nix-repl> :p builtins.getContext s2
+{ "/nix/store/hkpjm293kzap6cnsacdrljgys3ilhm7k-coreutils-9.3.drv" = { outputs = [ "out" ]; }; }
+:p builtins.getContext (s1 + s2)
+{ "/nix/store/hkpjm293kzap6cnsacdrljgys3ilhm7k-coreutils-9.3.drv" = { outputs = [ "out" ]; }; "/nix/store/qv7ff3f1xjgax460wl62pr8d2z0jcb9l-hello-2.12.1.drv" = { outputs = [ "out" ]; }; }
+ :p builtins.getContext ("${s1}  ; ${s2}")
+{ "/nix/store/hkpjm293kzap6cnsacdrljgys3ilhm7k-coreutils-9.3.drv" = { outputs = [ "out" ]; }; "/nix/store/qv7ff3f1xjgax460wl62pr8d2z0jcb9l-hello-2.12.1.drv" = { outputs = [ "out" ]; }; }
+```
+
