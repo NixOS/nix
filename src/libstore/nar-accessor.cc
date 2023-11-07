@@ -88,9 +88,8 @@ struct NarAccessor : public SourceAccessor
 
         void preallocateContents(uint64_t size) override
         {
-            assert(size <= std::numeric_limits<uint64_t>::max());
             auto & st = parents.top()->stat;
-            st.fileSize = (uint64_t) size;
+            st.fileSize = size;
             st.narOffset = pos;
         }
 
