@@ -137,9 +137,8 @@ struct NarAccessor : public SourceAccessor
 
             if (type == "directory") {
                 member.stat = {.type = Type::tDirectory};
-                for (auto i = v["entries"].begin(); i != v["entries"].end(); ++i) {
-                    std::string name = i.key();
-                    recurse(member.children[name], i.value());
+                for (const auto &[name, function] : v["entries"].items()) {
+                    recurse(member.children[name], function);
                 }
             } else if (type == "regular") {
                 member.stat = {
