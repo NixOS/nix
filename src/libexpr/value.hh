@@ -186,11 +186,15 @@ public:
          * For canonicity, the store paths should be in sorted order.
          */
         struct {
-            const char * s;
+            const char * c_str;
             const char * * context; // must be in sorted order
         } string;
 
-        const char * _path;
+        struct {
+            InputAccessor * accessor;
+            const char * path;
+        } _path;
+
         Bindings * attrs;
         struct {
             size_t size;
@@ -270,7 +274,7 @@ public:
     inline void mkString(const char * s, const char * * context = 0)
     {
         internalType = tString;
-        string.s = s;
+        string.c_str = s;
         string.context = context;
     }
 
@@ -287,11 +291,12 @@ public:
 
     void mkPath(const SourcePath & path);
 
-    inline void mkPath(const char * path)
+    inline void mkPath(InputAccessor * accessor, const char * path)
     {
         clearValue();
         internalType = tPath;
-        _path = path;
+        _path.accessor = accessor;
+        _path.path = path;
     }
 
     inline void mkNull()
@@ -438,13 +443,27 @@ public:
     SourcePath path() const
     {
         assert(internalType == tPath);
-        return SourcePath{CanonPath(_path)};
+        return SourcePath {
+            .accessor = ref(_path.accessor->shared_from_this()),
+            .path = CanonPath(CanonPath::unchecked_t(), _path.path)
+        };
     }
 
-    std::string_view str() const
+    std::string_view string_view() const
     {
         assert(internalType == tString);
-        return std::string_view(string.s);
+        return std::string_view(string.c_str);
+    }
+
+    const char * const c_str() const
+    {
+        assert(internalType == tString);
+        return string.c_str;
+    }
+
+    const char * * context() const
+    {
+        return string.context;
     }
 };
 

@@ -34,12 +34,12 @@ struct DrvOutput {
     /**
      * The name of the output.
      */
-    std::string outputName;
+    OutputName outputName;
 
     std::string to_string() const;
 
     std::string strHash() const
-    { return drvHash.to_string(Base16, true); }
+    { return drvHash.to_string(HashFormat::Base16, true); }
 
     static DrvOutput parse(const std::string &);
 
@@ -84,7 +84,7 @@ struct Realisation {
  * Since these are the outputs of a single derivation, we know the
  * output names are unique so we can use them as the map key.
  */
-typedef std::map<std::string, Realisation> SingleDrvOutputs;
+typedef std::map<OutputName, Realisation> SingleDrvOutputs;
 
 /**
  * Collection type for multiple derivations' outputs' `Realisation`s.
@@ -146,7 +146,7 @@ public:
     MissingRealisation(DrvOutput & outputId)
         : MissingRealisation(outputId.outputName, outputId.strHash())
     {}
-    MissingRealisation(std::string_view drv, std::string outputName)
+    MissingRealisation(std::string_view drv, OutputName outputName)
         : Error( "cannot operate on output '%s' of the "
                 "unbuilt derivation '%s'",
                 outputName,

@@ -4,6 +4,7 @@
 #include "drv-output-substitution-goal.hh"
 #include "local-derivation-goal.hh"
 #include "hook-instance.hh"
+#include "signals.hh"
 
 #include <poll.h>
 
@@ -268,7 +269,10 @@ void Worker::run(const Goals & _topGoals)
     for (auto & i : _topGoals) {
         topGoals.insert(i);
         if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
-            topPaths.push_back(DerivedPath::Built{makeConstantStorePathRef(goal->drvPath), goal->wantedOutputs});
+            topPaths.push_back(DerivedPath::Built {
+                .drvPath = makeConstantStorePathRef(goal->drvPath),
+                .outputs = goal->wantedOutputs,
+            });
         } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Opaque{goal->storePath});
         }
@@ -519,10 +523,13 @@ void Worker::markContentsGood(const StorePath & path)
 }
 
 
-GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal) {
+GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal)
+{
     return subGoal;
 }
-GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal) {
+
+GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
+{
     return subGoal;
 }
 

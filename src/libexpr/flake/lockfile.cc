@@ -2,8 +2,10 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 
+#include <algorithm>
 #include <iomanip>
 
+#include <iterator>
 #include <nlohmann/json.hpp>
 
 namespace nix::flake {
@@ -45,16 +47,26 @@ StorePath LockedNode::computeStorePath(Store & store) const
     return lockedRef.input.computeStorePath(store);
 }
 
-std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
-{
+
+static std::shared_ptr<Node> doFind(const ref<Node>& root, const InputPath & path, std::vector<InputPath>& visited) {
     auto pos = root;
+
+    auto found = std::find(visited.cbegin(), visited.cend(), path);
+
+    if(found != visited.end()) {
+        std::vector<std::string> cycle;
+        std::transform(found, visited.cend(), std::back_inserter(cycle), printInputPath);
+        cycle.push_back(printInputPath(path));
+        throw Error("follow cycle detected: [%s]", concatStringsSep(" -> ", cycle));
+    }
+    visited.push_back(path);
 
     for (auto & elem : path) {
         if (auto i = get(pos->inputs, elem)) {
             if (auto node = std::get_if<0>(&*i))
                 pos = *node;
             else if (auto follows = std::get_if<1>(&*i)) {
-                if (auto p = findInput(*follows))
+                if (auto p = doFind(root, *follows, visited))
                     pos = ref(p);
                 else
                     return {};
@@ -64,6 +76,12 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
     }
 
     return pos;
+}
+
+std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
+{
+    std::vector<InputPath> visited;
+    return doFind(root, path, visited);
 }
 
 LockFile::LockFile(const nlohmann::json & json, const Path & path)
@@ -194,12 +212,6 @@ std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
 {
     stream << lockFile.toJSON().dump(2);
     return stream;
-}
-
-void LockFile::write(const Path & path) const
-{
-    createDirs(dirOf(path));
-    writeFile(path, fmt("%s\n", *this));
 }
 
 std::optional<FlakeRef> LockFile::isUnlocked() const
@@ -345,7 +357,7 @@ void LockFile::check()
 
     for (auto & [inputPath, input] : inputs) {
         if (auto follows = std::get_if<1>(&input)) {
-            if (!follows->empty() && !get(inputs, *follows))
+            if (!follows->empty() && !findInput(*follows))
                 throw Error("input '%s' follows a non-existent input '%s'",
                     printInputPath(inputPath),
                     printInputPath(*follows));

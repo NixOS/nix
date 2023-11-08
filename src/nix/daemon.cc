@@ -1,11 +1,12 @@
 ///@file
 
+#include "signals.hh"
+#include "unix-domain-socket.hh"
 #include "command.hh"
 #include "shared.hh"
 #include "local-store.hh"
 #include "remote-store.hh"
 #include "remote-store-connection.hh"
-#include "util.hh"
 #include "serialise.hh"
 #include "archive.hh"
 #include "globals.hh"
@@ -500,6 +501,45 @@ static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
 
 struct CmdDaemon : StoreCommand
 {
+    bool stdio = false;
+    std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
+
+    CmdDaemon()
+    {
+        addFlag({
+            .longName = "stdio",
+            .description = "Attach to standard I/O, instead of trying to bind to a UNIX socket.",
+            .handler = {&stdio, true},
+        });
+
+        addFlag({
+            .longName = "force-trusted",
+            .description = "Force the daemon to trust connecting clients.",
+            .handler = {[&]() {
+                isTrustedOpt = Trusted;
+            }},
+            .experimentalFeature = Xp::DaemonTrustOverride,
+        });
+
+        addFlag({
+            .longName = "force-untrusted",
+            .description = "Force the daemon to not trust connecting clients. The connection will be processed by the receiving daemon before forwarding commands.",
+            .handler = {[&]() {
+                isTrustedOpt = NotTrusted;
+            }},
+            .experimentalFeature = Xp::DaemonTrustOverride,
+        });
+
+        addFlag({
+            .longName = "default-trust",
+            .description = "Use Nix's default trust.",
+            .handler = {[&]() {
+                isTrustedOpt = std::nullopt;
+            }},
+            .experimentalFeature = Xp::DaemonTrustOverride,
+        });
+    }
+
     std::string description() override
     {
         return "daemon to perform store operations on behalf of non-root clients";
@@ -516,7 +556,7 @@ struct CmdDaemon : StoreCommand
 
     void run(ref<Store> store) override
     {
-        runDaemon(false, std::nullopt);
+        runDaemon(stdio, isTrustedOpt);
     }
 };
 

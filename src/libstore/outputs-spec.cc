@@ -17,7 +17,7 @@ bool OutputsSpec::contains(const std::string & outputName) const
         [&](const OutputsSpec::Names & outputNames) {
             return outputNames.count(outputName) > 0;
         },
-    }, raw());
+    }, raw);
 }
 
 static std::string outputSpecRegexStr =
@@ -49,7 +49,7 @@ OutputsSpec OutputsSpec::parse(std::string_view s)
     std::optional spec = parseOpt(s);
     if (!spec)
         throw Error("invalid outputs specifier '%s'", s);
-    return *spec;
+    return std::move(*spec);
 }
 
 
@@ -63,7 +63,7 @@ std::optional<std::pair<std::string_view, ExtendedOutputsSpec>> ExtendedOutputsS
     auto specOpt = OutputsSpec::parseOpt(s.substr(found + 1));
     if (!specOpt)
         return std::nullopt;
-    return std::pair { s.substr(0, found), ExtendedOutputsSpec::Explicit { *std::move(specOpt) } };
+    return std::pair { s.substr(0, found), ExtendedOutputsSpec::Explicit { std::move(*specOpt) } };
 }
 
 
@@ -85,7 +85,7 @@ std::string OutputsSpec::to_string() const
         [&](const OutputsSpec::Names & outputNames) -> std::string {
             return concatStringsSep(",", outputNames);
         },
-    }, raw());
+    }, raw);
 }
 
 
@@ -98,7 +98,7 @@ std::string ExtendedOutputsSpec::to_string() const
         [&](const ExtendedOutputsSpec::Explicit & outputSpec) -> std::string {
             return "^" + outputSpec.to_string();
         },
-    }, raw());
+    }, raw);
 }
 
 
@@ -118,9 +118,9 @@ OutputsSpec OutputsSpec::union_(const OutputsSpec & that) const
                     ret.insert(thoseNames.begin(), thoseNames.end());
                     return ret;
                 },
-            }, that.raw());
+            }, that.raw);
         },
-    }, raw());
+    }, raw);
 }
 
 
@@ -142,9 +142,9 @@ bool OutputsSpec::isSubsetOf(const OutputsSpec & that) const
                             ret = false;
                     return ret;
                 },
-            }, raw());
+            }, raw);
         },
-    }, that.raw());
+    }, that.raw);
 }
 
 }
@@ -169,7 +169,7 @@ void adl_serializer<OutputsSpec>::to_json(json & json, OutputsSpec t) {
         [&](const OutputsSpec::Names & names) {
             json = names;
         },
-    }, t.raw());
+    }, t.raw);
 }
 
 
@@ -189,7 +189,7 @@ void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, ExtendedOutputsSp
         [&](const ExtendedOutputsSpec::Explicit & e) {
             adl_serializer<OutputsSpec>::to_json(json, e);
         },
-    }, t.raw());
+    }, t.raw);
 }
 
 }

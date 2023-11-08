@@ -63,7 +63,7 @@ StorePathWithOutputs::ParseResult StorePathWithOutputs::tryFromDerivedPath(const
                             [&](const OutputsSpec::Names & outputs) {
                                 return static_cast<StringSet>(outputs);
                             },
-                        }, bfd.outputs.raw()),
+                        }, bfd.outputs.raw),
                     };
                 },
                 [&](const SingleDerivedPath::Built &) -> StorePathWithOutputs::ParseResult {

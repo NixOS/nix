@@ -28,6 +28,11 @@ namespace nix {
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
     std::vector<std::string> res;
+    if (attrPaths.size() == 1 && attrPaths.front().starts_with(".")){
+        attrPaths.front().erase(0,1);
+        res.push_back(attrPaths.front());
+        return res;
+    }
 
     for (auto & prefix : prefixes)
         res.push_back(prefix + *attrPaths.begin());
@@ -141,7 +146,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                 [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
                     return e;
                 },
-            }, extendedOutputsSpec.raw()),
+            }, extendedOutputsSpec.raw),
         },
         .info = make_ref<ExtraPathInfoFlake>(
             ExtraPathInfoValue::Value {

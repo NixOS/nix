@@ -130,6 +130,8 @@ TEST_F(DerivedPathTest, built_built_xp) {
         MissingExperimentalFeature);
 }
 
+#ifndef COVERAGE
+
 RC_GTEST_FIXTURE_PROP(
     DerivedPathTest,
     prop_legacy_round_rip,
@@ -145,5 +147,7 @@ RC_GTEST_FIXTURE_PROP(
 {
     RC_ASSERT(o == DerivedPath::parse(*store, o.to_string(*store)));
 }
+
+#endif
 
 }

@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -163,6 +163,8 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .tag = Xp::ReplFlake,
         .name = "repl-flake",
         .description = R"(
+            *Enabled with [`flakes`](#xp-feature-flakes) since 2.19*
+
             Allow passing [installables](@docroot@/command-ref/new-cli/nix.md#installables) to `nix repl`, making its interface consistent with the other experimental commands.
         )",
     },
@@ -171,7 +173,7 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .name = "auto-allocate-uids",
         .description = R"(
             Allows Nix to automatically pick UIDs for builds, rather than creating
-            `nixbld*` user accounts. See the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting for details.
+            `nixbld*` user accounts. See the [`auto-allocate-uids`](@docroot@/command-ref/conf-file.md#conf-auto-allocate-uids) setting for details.
         )",
     },
     {
@@ -179,7 +181,7 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .name = "cgroups",
         .description = R"(
             Allows Nix to execute builds inside cgroups. See
-            the [`use-cgroups`](#conf-use-cgroups) setting for details.
+            the [`use-cgroups`](@docroot@/command-ref/conf-file.md#conf-use-cgroups) setting for details.
         )",
     },
     {
@@ -217,6 +219,20 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .name = "read-only-local-store",
         .description = R"(
             Allow the use of the `read-only` parameter in [local store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) URIs.
+        )",
+    },
+    {
+        .tag = Xp::ConfigurableImpureEnv,
+        .name = "configurable-impure-env",
+        .description = R"(
+            Allow the use of the [impure-env](@docroot@/command-ref/conf-file.md#conf-impure-env) setting.
+        )",
+    },
+    {
+        .tag = Xp::VerifiedFetches,
+        .name = "verified-fetches",
+        .description = R"(
+            Enables verification of git commit signatures through the [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) built-in.
         )",
     },
 }};
@@ -272,7 +288,7 @@ std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFea
 }
 
 MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature)
-    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override", showExperimentalFeature(feature))
+    : Error("experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it", showExperimentalFeature(feature))
     , missingFeature(feature)
 {}
 

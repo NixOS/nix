@@ -7,7 +7,6 @@
 #include "store-api.hh"
 #include "indirect-root-store.hh"
 #include "sync.hh"
-#include "util.hh"
 
 #include <chrono>
 #include <future>
@@ -40,12 +39,12 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
-    Setting<bool> requireSigs{(StoreConfig*) this,
+    Setting<bool> requireSigs{this,
         settings.requireSigs,
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
 
-    Setting<bool> readOnly{(StoreConfig*) this,
+    Setting<bool> readOnly{this,
         false,
         "read-only",
         R"(

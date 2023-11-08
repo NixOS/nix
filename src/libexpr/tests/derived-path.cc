@@ -18,6 +18,8 @@ TEST_F(DerivedPathExpressionTest, force_init)
 {
 }
 
+#ifndef COVERAGE
+
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
     prop_opaque_path_round_trip,
@@ -34,8 +36,8 @@ RC_GTEST_FIXTURE_PROP(
 
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
-    prop_built_path_placeholder_round_trip,
-    (const StorePath & drvPath, const StorePathName & outputName))
+    prop_derived_path_built_placeholder_round_trip,
+    (const SingleDerivedPath::Built & b))
 {
     /**
      * We set these in tests rather than the regular globals so we don't have
@@ -45,28 +47,22 @@ RC_GTEST_FIXTURE_PROP(
     mockXpSettings.set("experimental-features", "ca-derivations");
 
     auto * v = state.allocValue();
-    state.mkOutputString(*v, drvPath, outputName.name, std::nullopt, mockXpSettings);
+    state.mkOutputString(*v, b, std::nullopt, mockXpSettings);
     auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
-    SingleDerivedPath::Built b {
-        .drvPath = makeConstantStorePathRef(drvPath),
-        .output = outputName.name,
-    };
     RC_ASSERT(SingleDerivedPath { b } == d);
 }
 
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
-    prop_built_path_out_path_round_trip,
-    (const StorePath & drvPath, const StorePathName & outputName, const StorePath & outPath))
+    prop_derived_path_built_out_path_round_trip,
+    (const SingleDerivedPath::Built & b, const StorePath & outPath))
 {
     auto * v = state.allocValue();
-    state.mkOutputString(*v, drvPath, outputName.name, outPath);
+    state.mkOutputString(*v, b, outPath);
     auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
-    SingleDerivedPath::Built b {
-        .drvPath = makeConstantStorePathRef(drvPath),
-        .output = outputName.name,
-    };
     RC_ASSERT(SingleDerivedPath { b } == d);
 }
+
+#endif
 
 } /* namespace nix */

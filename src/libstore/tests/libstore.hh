@@ -8,7 +8,7 @@
 
 namespace nix {
 
-class LibStoreTest : public ::testing::Test {
+class LibStoreTest : public virtual ::testing::Test {
     public:
         static void SetUpTestSuite() {
             initLibStore();

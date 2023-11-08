@@ -30,20 +30,27 @@ static RegisterPrimOp primop_hasContext({
     .name = "__hasContext",
     .args = {"s"},
     .doc = R"(
-      Return `true` if string *s* has a non-empty context. The
-      context can be obtained with
+      Return `true` if string *s* has a non-empty context.
+      The context can be obtained with
       [`getContext`](#builtins-getContext).
+
+      > **Example**
+      >
+      > Many operations require a string context to be empty because they are intended only to work with "regular" strings, and also to help users avoid unintentionally loosing track of string context elements.
+      > `builtins.hasContext` can help create better domain-specific errors in those case.
+      >
+      > ```nix
+      > name: meta:
+      >
+      > if builtins.hasContext name
+      > then throw "package name cannot contain string context"
+      > else { ${name} = meta; }
+      > ```
     )",
     .fun = prim_hasContext
 });
 
 
-/* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
-   builder without causing the derivation to be built (for instance,
-   in the derivation that builds NARs in nix-push, when doing
-   source-only deployment).  This primop marks the string context so
-   that builtins.derivation adds the path to drv.inputSrcs rather than
-   drv.inputDrvs. */
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
@@ -51,13 +58,13 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
 
     NixStringContext context2;
     for (auto && c : context) {
-        if (auto * ptr = std::get_if<NixStringContextElem::DrvDeep>(&c)) {
+        if (auto * ptr = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
             context2.emplace(NixStringContextElem::Opaque {
                 .path = ptr->drvPath
             });
         } else {
             /* Can reuse original item */
-            context2.emplace(std::move(c));
+            context2.emplace(std::move(c).raw);
         }
     }
 
@@ -66,8 +73,80 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
 
 static RegisterPrimOp primop_unsafeDiscardOutputDependency({
     .name = "__unsafeDiscardOutputDependency",
-    .arity = 1,
+    .args = {"s"},
+    .doc = R"(
+      Create a copy of the given string where every "derivation deep" string context element is turned into a constant string context element.
+
+      This is the opposite of [`builtins.addDrvOutputDependencies`](#builtins-addDrvOutputDependencies).
+
+      This is unsafe because it allows us to "forget" store objects we would have otherwise refered to with the string context,
+      whereas Nix normally tracks all dependencies consistently.
+      Safe operations "grow" but never "shrink" string contexts.
+      [`builtins.addDrvOutputDependencies`] in contrast is safe because "derivation deep" string context element always refers to the underlying derivation (among many more things).
+      Replacing a constant string context element with a "derivation deep" element is a safe operation that just enlargens the string context without forgetting anything.
+
+      [`builtins.addDrvOutputDependencies`]: #builtins-addDrvOutputDependencies
+    )",
     .fun = prim_unsafeDiscardOutputDependency
+});
+
+
+static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    NixStringContext context;
+    auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.addDrvOutputDependencies");
+
+	auto contextSize = context.size();
+    if (contextSize != 1) {
+        throw EvalError({
+            .msg = hintfmt("context of string '%s' must have exactly one element, but has %d", *s, contextSize),
+            .errPos = state.positions[pos]
+        });
+    }
+    NixStringContext context2 {
+        (NixStringContextElem { std::visit(overloaded {
+            [&](const NixStringContextElem::Opaque & c) -> NixStringContextElem::DrvDeep {
+                if (!c.path.isDerivation()) {
+                    throw EvalError({
+                        .msg = hintfmt("path '%s' is not a derivation",
+                            state.store->printStorePath(c.path)),
+                        .errPos = state.positions[pos],
+                    });
+                }
+                return NixStringContextElem::DrvDeep {
+                    .drvPath = c.path,
+                };
+            },
+            [&](const NixStringContextElem::Built & c) -> NixStringContextElem::DrvDeep {
+                throw EvalError({
+                    .msg = hintfmt("`addDrvOutputDependencies` can only act on derivations, not on a derivation output such as '%1%'", c.output),
+                    .errPos = state.positions[pos],
+                });
+            },
+            [&](const NixStringContextElem::DrvDeep & c) -> NixStringContextElem::DrvDeep {
+                /* Reuse original item because we want this to be idempotent. */
+                return std::move(c);
+            },
+        }, context.begin()->raw) }),
+    };
+
+    v.mkString(*s, context2);
+}
+
+static RegisterPrimOp primop_addDrvOutputDependencies({
+    .name = "__addDrvOutputDependencies",
+    .args = {"s"},
+    .doc = R"(
+      Create a copy of the given string where a single consant string context element is turned into a "derivation deep" string context element.
+
+      The store path that is the constant string context element should point to a valid derivation, and end in `.drv`.
+
+      The original string context element must not be empty or have multiple elements, and it must not have any other type of element other than a constant or derivation deep element.
+      The latter is supported so this function is idempotent.
+
+      This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-addDrvOutputDependencies).
+    )",
+    .fun = prim_addDrvOutputDependencies
 });
 
 
@@ -114,7 +193,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             [&](NixStringContextElem::Opaque && o) {
                 contextInfos[std::move(o.path)].path = true;
             },
-        }, ((NixStringContextElem &&) i).raw());
+        }, ((NixStringContextElem &&) i).raw);
     }
 
     auto attrs = state.buildBindings(contextInfos.size());

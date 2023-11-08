@@ -50,6 +50,9 @@ struct InitialOutput {
     std::optional<InitialOutputStatus> known;
 };
 
+/**
+ * A goal for building some or all of the outputs of a derivation.
+ */
 struct DerivationGoal : public Goal
 {
     /**
@@ -66,8 +69,7 @@ struct DerivationGoal : public Goal
     std::shared_ptr<DerivationGoal> resolvedDrvGoal;
 
     /**
-     * The specific outputs that we need to build.  Empty means all of
-     * them.
+     * The specific outputs that we need to build.
      */
     OutputsSpec wantedOutputs;
 
@@ -184,7 +186,7 @@ struct DerivationGoal : public Goal
     /**
      * The sort of derivation we are building.
      */
-    DerivationType derivationType;
+    std::optional<DerivationType> derivationType;
 
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
@@ -334,7 +336,9 @@ struct DerivationGoal : public Goal
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 
-    JobCategory jobCategory() override { return JobCategory::Build; };
+    JobCategory jobCategory() const override {
+        return JobCategory::Build;
+    };
 };
 
 MakeError(NotDeterministic, BuildError);

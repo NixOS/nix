@@ -1,3 +1,4 @@
+#include "util.hh"
 #include "value/context.hh"
 
 #include <optional>
@@ -99,7 +100,7 @@ std::string NixStringContextElem::to_string() const
             res += '=';
             res += d.drvPath.to_string();
         },
-    }, raw());
+    }, raw);
 
     return res;
 }

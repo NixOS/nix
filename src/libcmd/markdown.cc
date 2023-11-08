@@ -1,6 +1,7 @@
 #include "markdown.hh"
 #include "util.hh"
 #include "finally.hh"
+#include "terminal.hh"
 
 #include <sys/queue.h>
 #include <lowdown.h>

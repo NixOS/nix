@@ -47,7 +47,7 @@ let
       cp -prd ${nixpkgs} $dir
 
       # Set the correct timestamp in the tarball.
-      find $dir -print0 | xargs -0 touch -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${builtins.substring 12 2 nixpkgs.lastModifiedDate} --
+      find $dir -print0 | xargs -0 touch -h -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${builtins.substring 12 2 nixpkgs.lastModifiedDate} --
 
       mkdir -p $out/archive
       tar cfz $out/archive/${nixpkgs.rev}.tar.gz $dir --hard-dereference
