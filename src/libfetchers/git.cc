@@ -783,7 +783,7 @@ struct GitInputScheme : InputScheme
             auto source = sinkToSource([&](Sink & sink) {
                 runProgram2({
                     .program = "git",
-                    .args = { "-C", repoDir, "--git-dir", gitDir, "archive", input.getRev()->gitRev() },
+                    .args = { "-C", repoDir, "--git-dir", gitDir, "-c", "remote.origin.lfsurl=" + actualUrl, "archive", input.getRev()->gitRev() },
                     .standardOut = &sink
                 });
             });
