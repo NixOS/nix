@@ -60,12 +60,22 @@ struct NarAccessor : public SourceAccessor
 
         void createDirectory(const Path & path) override
         {
-            createMember(path, {Type::tDirectory, false, 0, 0});
+            createMember(path, NarMember{ .stat = {
+                .type = Type::tDirectory,
+                .fileSize = 0,
+                .isExecutable = false,
+                .narOffset = 0
+            } });
         }
 
         void createRegularFile(const Path & path) override
         {
-            createMember(path, {Type::tRegular, false, 0, 0});
+            createMember(path, NarMember{ .stat = {
+                .type = Type::tRegular,
+                .fileSize = 0,
+                .isExecutable = false,
+                .narOffset = 0
+            } });
         }
 
         void closeRegularFile() override
@@ -78,9 +88,8 @@ struct NarAccessor : public SourceAccessor
 
         void preallocateContents(uint64_t size) override
         {
-            assert(size <= std::numeric_limits<uint64_t>::max());
             auto & st = parents.top()->stat;
-            st.fileSize = (uint64_t) size;
+            st.fileSize = size;
             st.narOffset = pos;
         }
 
@@ -128,9 +137,8 @@ struct NarAccessor : public SourceAccessor
 
             if (type == "directory") {
                 member.stat = {.type = Type::tDirectory};
-                for (auto i = v["entries"].begin(); i != v["entries"].end(); ++i) {
-                    std::string name = i.key();
-                    recurse(member.children[name], i.value());
+                for (const auto &[name, function] : v["entries"].items()) {
+                    recurse(member.children[name], function);
                 }
             } else if (type == "regular") {
                 member.stat = {
@@ -153,7 +161,7 @@ struct NarAccessor : public SourceAccessor
     {
         NarMember * current = &root;
 
-        for (auto & i : path) {
+        for (const auto & i : path) {
             if (current->stat.type != Type::tDirectory) return nullptr;
             auto child = current->children.find(std::string(i));
             if (child == current->children.end()) return nullptr;
@@ -186,7 +194,7 @@ struct NarAccessor : public SourceAccessor
             throw Error("path '%1%' inside NAR file is not a directory", path);
 
         DirEntries res;
-        for (auto & child : i.children)
+        for (const auto & child : i.children)
             res.insert_or_assign(child.first, std::nullopt);
 
         return res;
@@ -251,7 +259,7 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
         {
             obj["entries"] = json::object();
             json &res2 = obj["entries"];
-            for (auto & [name, type] : accessor->readDirectory(path)) {
+            for (const auto & [name, type] : accessor->readDirectory(path)) {
                 if (recurse) {
                     res2[name] = listNar(accessor, path + name, true);
                 } else
