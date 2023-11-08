@@ -2,7 +2,7 @@
 
 ## Motivation
 
-The team's main responsibility is to set a direction for the development of Nix and ensure that the code is in good shape.
+The team's main responsibility is to guide and direct the development of Nix and ensure that the code is in good shape.
 
 We aim to achieve this by improving the contributor experience and attracting more maintainers – that is, by helping other people contributing to Nix and eventually taking responsibility – in order to scale the development process to match users' needs.
 
