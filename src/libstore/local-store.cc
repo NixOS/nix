@@ -1257,58 +1257,6 @@ StorePath LocalStore::addToStoreFromDump(
 }
 
 
-StorePath LocalStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references, RepairFlag repair)
-{
-    auto hash = hashString(HashAlgorithm::SHA256, s);
-    auto dstPath = makeTextPath(name, TextInfo {
-        .hash = hash,
-        .references = references,
-    });
-
-    addTempRoot(dstPath);
-
-    if (repair || !isValidPath(dstPath)) {
-
-        auto realPath = Store::toRealPath(dstPath);
-
-        PathLocks outputLock({realPath});
-
-        if (repair || !isValidPath(dstPath)) {
-
-            deletePath(realPath);
-
-            autoGC();
-
-            writeFile(realPath, s);
-
-            canonicalisePathMetaData(realPath, {});
-
-            StringSink sink;
-            dumpString(s, sink);
-            auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
-
-            optimisePath(realPath, repair);
-
-            ValidPathInfo info { dstPath, narHash };
-            info.narSize = sink.s.size();
-            info.references = references;
-            info.ca = {
-                .method = TextIngestionMethod {},
-                .hash = hash,
-            };
-            registerValidPath(info);
-        }
-
-        outputLock.setDeletion(true);
-    }
-
-    return dstPath;
-}
-
-
 /* Create a temporary directory in the store that won't be
    garbage-collected until the returned FD is closed. */
 std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()

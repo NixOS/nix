@@ -109,11 +109,11 @@ struct ContentAddressMethod
  * serialisation methods (flat file vs NAR). Thus, ‘ca’ has one of the
  * following forms:
  *
- * - ‘text:sha256:<sha256 hash of file contents>’: For paths
- *   computed by Store::makeTextPath() / Store::addTextToStore().
+ * - `TextIngestionMethod`:
+ *   ‘text:sha256:<sha256 hash of file contents>’
  *
- * - ‘fixed:<r?>:<ht>:<h>’: For paths computed by
- *   Store::makeFixedOutputPath() / Store::addToStore().
+ * - `FixedIngestionMethod`:
+ *   ‘fixed:<r?>:<hash type>:<hash of file contents>’
  */
 struct ContentAddress
 {

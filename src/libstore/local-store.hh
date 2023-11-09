@@ -185,12 +185,6 @@ public:
         const StorePathSet & references,
         RepairFlag repair) override;
 
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override;
-
     void addTempRoot(const StorePath & path) override;
 
 private:

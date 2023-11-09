@@ -2072,8 +2072,14 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     }
 
     auto storePath = settings.readOnlyMode
-        ? state.store->computeStorePathForText(name, contents, refs)
-        : state.store->addTextToStore(name, contents, refs, state.repair);
+        ? state.store->makeFixedOutputPathFromCA(name, TextInfo {
+            .hash = hashString(HashAlgorithm::SHA256, contents),
+            .references = std::move(refs),
+        })
+        : ({
+            StringSource s { contents };
+            state.store->addToStoreFromDump(s, name, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+        });
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths

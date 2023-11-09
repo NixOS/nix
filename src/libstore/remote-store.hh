@@ -106,12 +106,6 @@ public:
         RepairFlag repair,
         CheckSigsFlag checkSigs) override;
 
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override;
-
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(const DrvOutput &,

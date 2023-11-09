@@ -12,6 +12,7 @@
 #include "thread-pool.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "archive.hh"
 
 #include <chrono>
 #include <future>
@@ -308,15 +309,47 @@ StorePath BinaryCacheStore::addToStoreFromDump(
     const StorePathSet & references,
     RepairFlag repair)
 {
-    if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
-        unsupported("addToStoreFromDump");
-    return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
+    std::optional<Hash> caHash;
+    std::string nar;
+
+    if (auto * dump2p = dynamic_cast<StringSource *>(&dump)) {
+        auto & dump2 = *dump2p;
+        // Hack, this gives us a "replayable" source so we can compute
+        // multiple hashes more easily.
+        caHash = hashString(HashAlgorithm::SHA256, dump2.s);
+        switch (method.getFileIngestionMethod()) {
+        case FileIngestionMethod::Recursive:
+            // The dump is already NAR in this case, just use it.
+            nar = dump2.s;
+            break;
+        case FileIngestionMethod::Flat:
+            // The dump is Flat, so we need to convert it to NAR with a
+            // single file.
+            StringSink s;
+            dumpString(dump2.s, s);
+            nar = std::move(s.s);
+            break;
+        }
+    } else {
+        // Otherwise, we have to do th same hashing as NAR so our single
+        // hash will suffice for both purposes.
+        if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
+            unsupported("addToStoreFromDump");
+    }
+    StringSource narDump { nar };
+
+    // Use `narDump` if we wrote to `nar`.
+    Source & narDump2 = nar.size() > 0
+        ? static_cast<Source &>(narDump)
+        : dump;
+
+    return addToStoreCommon(narDump2, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
             name,
             ContentAddressWithReferences::fromParts(
                 method,
-                nar.first,
+                caHash ? *caHash : nar.first,
                 {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -433,36 +466,6 @@ StorePath BinaryCacheStore::addToStore(
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
                 }),
-            nar.first,
-        };
-        info.narSize = nar.second;
-        return info;
-    })->path;
-}
-
-StorePath BinaryCacheStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    auto textHash = hashString(HashAlgorithm::SHA256, s);
-    auto path = makeTextPath(name, TextInfo { { textHash }, references });
-
-    if (!repair && isValidPath(path))
-        return path;
-
-    StringSink sink;
-    dumpString(s, sink);
-    StringSource source(sink.s);
-    return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
-        ValidPathInfo info {
-            *this,
-            std::string { name },
-            TextInfo {
-                .hash = textHash,
-                .references = references,
-            },
             nar.first,
         };
         info.narSize = nar.second;

@@ -608,16 +608,6 @@ void RemoteStore::addMultipleToStore(
 }
 
 
-StorePath RemoteStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    StringSource source(s);
-    return addCAToStore(source, name, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair)->path;
-}
-
 void RemoteStore::registerDrvOutput(const Realisation & info)
 {
     auto conn(getConnection());

@@ -483,7 +483,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         std::string s = readString(from);
         auto refs = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         logger->startWork();
-        auto path = store->addTextToStore(suffix, s, refs, NoRepair);
+        auto path = ({
+            StringSource source { s };
+            store->addToStoreFromDump(source, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, NoRepair);
+        });
         logger->stopWork();
         to << store->printStorePath(path);
         break;

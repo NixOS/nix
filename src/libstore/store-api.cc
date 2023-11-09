@@ -205,25 +205,19 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
 }
 
 
-StorePath StoreDirConfig::makeTextPath(std::string_view name, const TextInfo & info) const
-{
-    assert(info.hash.algo == HashAlgorithm::SHA256);
-    return makeStorePath(
-        makeType(*this, "text", StoreReferences {
-            .others = info.references,
-            .self = false,
-        }),
-        info.hash,
-        name);
-}
-
-
 StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
 {
     // New template
     return std::visit(overloaded {
         [&](const TextInfo & ti) {
-            return makeTextPath(name, ti);
+            assert(ti.hash.algo == HashAlgorithm::SHA256);
+            return makeStorePath(
+                makeType(*this, "text", StoreReferences {
+                    .others = ti.references,
+                    .self = false,
+                }),
+                ti.hash,
+                name);
         },
         [&](const FixedOutputInfo & foi) {
             return makeFixedOutputPath(name, foi);
@@ -254,18 +248,6 @@ std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
                 })),
         h,
     };
-}
-
-
-StorePath StoreDirConfig::computeStorePathForText(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references) const
-{
-    return makeTextPath(name, TextInfo {
-        .hash = hashString(HashAlgorithm::SHA256, s),
-        .references = references,
-    });
 }
 
 

@@ -469,16 +469,6 @@ public:
     { unsupported("addToStoreFromDump"); }
 
     /**
-     * Like addToStore, but the contents written to the output path is a
-     * regular file containing the given string.
-     */
-    virtual StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair = NoRepair) = 0;
-
-    /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path
      * `output`.
      *

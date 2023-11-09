@@ -1308,17 +1308,6 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         goal.addDependency(info.path);
     }
 
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair = NoRepair) override
-    {
-        auto path = next->addTextToStore(name, s, references, repair);
-        goal.addDependency(path);
-        return path;
-    }
-
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
