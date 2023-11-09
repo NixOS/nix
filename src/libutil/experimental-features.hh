@@ -20,6 +20,7 @@ enum struct ExperimentalFeature
     CaDerivations,
     ImpureDerivations,
     Flakes,
+    FetchTree,
     NixCommand,
     RecursiveNix,
     NoUrlLiterals,

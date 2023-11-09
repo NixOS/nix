@@ -17,7 +17,8 @@
 
 - `nix-shell` shebang lines now support single-quoted arguments.
 
-- `builtins.fetchTree` is now marked as stable.
+- `builtins.fetchTree` is now its own experimental feature, [`fetch-tree`](@docroot@/contributing/experimental-features.md#xp-fetch-tree).
+  As described in the document for that feature, this is because we anticipate polishing it and then stabilizing it before the rest of Flakes.
 
 - The interface for creating and updating lock files has been overhauled:
 
