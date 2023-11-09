@@ -332,8 +332,6 @@ template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeatur
     for (auto & s : tokenizeString<StringSet>(str)) {
         if (auto thisXpFeature = parseExperimentalFeature(s); thisXpFeature) {
             res.insert(thisXpFeature.value());
-            // FIXME: Replace this hack with a proper notion of
-            // experimental feature implications/dependencies.
             if (thisXpFeature.value() == Xp::Flakes)
                 res.insert(Xp::FetchTree);
         } else

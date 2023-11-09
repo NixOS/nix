@@ -80,9 +80,8 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .description = R"(
             Enable the use of the [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) built-in function in the Nix language.
 
-            `fetchTree` exposes a larger suite of fetching functionality in a more systematic way.
-            The same fetching functionality is always used for for
-            [`flakes`](#xp-feature-flakes).
+            `fetchTree` exposes a large suite of fetching functionality in a more systematic way.
+            The [`flakes`](#xp-feature-flakes) feature flag always enables `fetch-tree`.
 
             This built-in was previously guarded by the `flakes` experimental feature because of that overlap,
             but since the plan is to work on stabilizing this first (due 2024 Q1), we are putting it underneath a separate feature.
