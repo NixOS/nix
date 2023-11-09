@@ -2,6 +2,13 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "finally.hh"
+#include "unix-domain-socket.hh"
+#include "signals.hh"
+
+#if !defined(__linux__)
+// For shelling out to lsof
+# include "processes.hh"
+#endif
 
 #include <functional>
 #include <queue>

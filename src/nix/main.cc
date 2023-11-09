@@ -1,6 +1,8 @@
 #include <algorithm>
 
 #include "args/root.hh"
+#include "current-process.hh"
+#include "namespaces.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
@@ -20,6 +22,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <regex>
 
 #include <nlohmann/json.hpp>
 
@@ -426,7 +429,9 @@ void mainWrapped(int argc, char * * argv)
     });
 
     try {
-        args.parseCmdline(argvToStrings(argc, argv));
+        auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
+        auto allowShebang = isNixCommand && argc > 1;
+        args.parseCmdline(argvToStrings(argc, argv),allowShebang);
     } catch (UsageError &) {
         if (!args.helpRequested && !args.completions) throw;
     }

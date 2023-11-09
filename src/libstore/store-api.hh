@@ -80,7 +80,6 @@ typedef std::map<std::string, StorePath> OutputPathMap;
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
-enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 
 /**
  * Magic header of exportPath() output (obsolete).
@@ -664,28 +663,6 @@ public:
      */
     std::string makeValidityRegistration(const StorePathSet & paths,
         bool showDerivers, bool showHash);
-
-    /**
-     * Write a JSON representation of store path metadata, such as the
-     * hash and the references.
-     *
-     * @param includeImpureInfo If true, variable elements such as the
-     * registration time are included.
-     *
-     * @param showClosureSize If true, the closure size of each path is
-     * included.
-     */
-    nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
-        bool includeImpureInfo, bool showClosureSize,
-        HashFormat hashFormat = HashFormat::Base32,
-        AllowInvalidFlag allowInvalid = DisallowInvalid);
-
-    /**
-     * @return the size of the closure of the specified path, that is,
-     * the sum of the size of the NAR serialisation of each path in the
-     * closure.
-     */
-    std::pair<uint64_t, uint64_t> getClosureSize(const StorePath & storePath);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking files

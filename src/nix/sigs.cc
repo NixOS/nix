@@ -1,3 +1,4 @@
+#include "signals.hh"
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"

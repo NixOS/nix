@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "globals.hh"
 #include "profiles.hh"
 #include "eval.hh"

@@ -2,12 +2,15 @@
 ///@file
 
 #include <iostream>
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 
 #include <nlohmann/json_fwd.hpp>
 
-#include "util.hh"
+#include "types.hh"
+#include "experimental-features.hh"
 
 namespace nix {
 
@@ -21,11 +24,12 @@ class AddCompletions;
 
 class Args
 {
+
 public:
 
     /**
      * Return a short one-line description of the command.
-     */
+    */
     virtual std::string description() { return ""; }
 
     virtual bool forceImpureByDefault() { return false; }
@@ -34,6 +38,16 @@ public:
      * Return documentation about this command, in Markdown format.
      */
     virtual std::string doc() { return ""; }
+
+    /**
+     * @brief Get the base directory for the command.
+     *
+     * @return Generally the working directory, but in case of a shebang
+     *         interpreter, returns the directory of the script.
+     *
+     * This only returns the correct value after parseCmdline() has run.
+     */
+    virtual Path getCommandBaseDir() const;
 
 protected:
 
@@ -394,5 +408,7 @@ public:
      */
     virtual void add(std::string completion, std::string description = "") = 0;
 };
+
+Strings parseShebangContent(std::string_view s);
 
 }

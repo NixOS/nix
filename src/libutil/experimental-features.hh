@@ -20,6 +20,7 @@ enum struct ExperimentalFeature
     CaDerivations,
     ImpureDerivations,
     Flakes,
+    FetchTree,
     NixCommand,
     RecursiveNix,
     NoUrlLiterals,
@@ -32,6 +33,7 @@ enum struct ExperimentalFeature
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
     ConfigurableImpureEnv,
+    VerifiedFetches,
 };
 
 /**

@@ -2,6 +2,7 @@
 #include "input-accessor.hh"
 #include "cache.hh"
 #include "finally.hh"
+#include "processes.hh"
 
 #include <boost/core/span.hpp>
 
@@ -21,6 +22,7 @@
 
 #include <unordered_set>
 #include <queue>
+#include <regex>
 
 namespace std {
 
@@ -364,6 +366,64 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
               url,
               refspec
             }, {}, true);
+    }
+
+    void verifyCommit(
+        const Hash & rev,
+        const std::vector<fetchers::PublicKey> & publicKeys) override
+    {
+        // Create ad-hoc allowedSignersFile and populate it with publicKeys
+        auto allowedSignersFile = createTempFile().second;
+        std::string allowedSigners;
+        for (const fetchers::PublicKey & k : publicKeys) {
+            if (k.type != "ssh-dsa"
+                && k.type != "ssh-ecdsa"
+                && k.type != "ssh-ecdsa-sk"
+                && k.type != "ssh-ed25519"
+                && k.type != "ssh-ed25519-sk"
+                && k.type != "ssh-rsa")
+                throw Error("Unknown key type '%s'.\n"
+                    "Please use one of\n"
+                    "- ssh-dsa\n"
+                    "  ssh-ecdsa\n"
+                    "  ssh-ecdsa-sk\n"
+                    "  ssh-ed25519\n"
+                    "  ssh-ed25519-sk\n"
+                    "  ssh-rsa", k.type);
+            allowedSigners += "* " + k.type + " " + k.key + "\n";
+        }
+        writeFile(allowedSignersFile, allowedSigners);
+
+        // Run verification command
+        auto [status, output] = runProgram(RunOptions {
+                .program = "git",
+                .args = {
+                    "-c",
+                    "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
+                    "-C", path.abs(),
+                    "verify-commit",
+                    rev.gitRev()
+                },
+                .mergeStderrToStdout = true,
+        });
+
+        /* Evaluate result through status code and checking if public
+           key fingerprints appear on stderr. This is neccessary
+           because the git command might also succeed due to the
+           commit being signed by gpg keys that are present in the
+           users key agent. */
+        std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
+        for (const fetchers::PublicKey & k : publicKeys){
+            // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
+            auto fingerprint = trim(hashString(htSHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+            auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
+            re += "(" + escaped_fingerprint + ")";
+        }
+        re += "]";
+        if (status == 0 && std::regex_search(output, std::regex(re)))
+            printTalkative("Signature verification on commit %s succeeded.", rev.gitRev());
+        else
+            throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
     }
 };
 

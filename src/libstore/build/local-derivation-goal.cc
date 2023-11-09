@@ -15,7 +15,10 @@
 #include "json-utils.hh"
 #include "cgroup.hh"
 #include "personality.hh"
+#include "current-process.hh"
 #include "namespaces.hh"
+#include "child.hh"
+#include "unix-domain-socket.hh"
 
 #include <regex>
 #include <queue>
@@ -1619,6 +1622,8 @@ void setupSeccomp()
     Finally cleanup([&]() {
         seccomp_release(ctx);
     });
+
+    constexpr std::string_view nativeSystem = SYSTEM;
 
     if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)

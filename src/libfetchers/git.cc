@@ -1,11 +1,12 @@
 #include "fetchers.hh"
+#include "users.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
-#include "util.hh"
+#include "processes.hh"
 #include "git.hh"
 #include "fs-input-accessor.hh"
 #include "union-input-accessor.hh"
@@ -135,6 +136,19 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl)
     return std::nullopt;
 }
 
+std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
+{
+    std::vector<PublicKey> publicKeys;
+    if (attrs.contains("publicKeys")) {
+        nlohmann::json publicKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
+        ensureType(publicKeysJson, nlohmann::json::value_t::array);
+        publicKeys = publicKeysJson.get<std::vector<PublicKey>>();
+    }
+    if (attrs.contains("publicKey"))
+        publicKeys.push_back(PublicKey{maybeGetStrAttr(attrs, "keytype").value_or("ssh-ed25519"),getStrAttr(attrs, "publicKey")});
+    return publicKeys;
+}
+
 }  // end namespace
 
 struct GitInputScheme : InputScheme
@@ -155,9 +169,9 @@ struct GitInputScheme : InputScheme
         attrs.emplace("type", "git");
 
         for (auto & [name, value] : url.query) {
-            if (name == "rev" || name == "ref")
+            if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "allRefs")
+            else if (name == "shallow" || name == "submodules" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -189,14 +203,26 @@ struct GitInputScheme : InputScheme
             "name",
             "dirtyRev",
             "dirtyShortRev",
+            "verifyCommit",
+            "keytype",
+            "publicKey",
+            "publicKeys",
         };
     }
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
+        for (auto & [name, _] : attrs)
+            if (name == "verifyCommit"
+                || name == "keytype"
+                || name == "publicKey"
+                || name == "publicKeys")
+                experimentalFeatureSettings.require(Xp::VerifiedFetches);
+
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
         maybeGetBoolAttr(attrs, "allRefs");
+        maybeGetBoolAttr(attrs, "verifyCommit");
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
             if (std::regex_search(*ref, badGitRefRegex))
@@ -219,6 +245,15 @@ struct GitInputScheme : InputScheme
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
             url.query.insert_or_assign("shallow", "1");
+        if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
+            url.query.insert_or_assign("verifyCommit", "1");
+        auto publicKeys = getPublicKeys(input.attrs);
+        if (publicKeys.size() == 1) {
+            url.query.insert_or_assign("keytype", publicKeys.at(0).type);
+            url.query.insert_or_assign("publicKey", publicKeys.at(0).key);
+        }
+        else if (publicKeys.size() > 1)
+            url.query.insert_or_assign("publicKeys", publicKeys_to_string(publicKeys));
         return url;
     }
 
@@ -416,6 +451,19 @@ struct GitInputScheme : InputScheme
         };
     }
 
+    void verifyCommit(const Input & input, std::shared_ptr<GitRepo> repo) const
+    {
+        auto publicKeys = getPublicKeys(input.attrs);
+        auto verifyCommit = maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(!publicKeys.empty());
+
+        if (verifyCommit) {
+            if (input.getRev() && repo)
+                repo->verifyCommit(*input.getRev(), publicKeys);
+            else
+                throw Error("commit verification is required for Git repository '%s', but it's dirty", input.to_string());
+        }
+    }
+
     std::pair<ref<InputAccessor>, Input> getAccessorFromCommit(
         ref<Store> store,
         RepoInfo & repoInfo,
@@ -513,7 +561,9 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        auto isShallow = GitRepo::openRepo(CanonPath(repoDir))->isShallow();
+        auto repo = GitRepo::openRepo(CanonPath(repoDir));
+
+        auto isShallow = repo->isShallow();
 
         if (isShallow && !repoInfo.shallow)
             throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified", repoInfo.url);
@@ -533,7 +583,7 @@ struct GitInputScheme : InputScheme
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.url);
 
-        auto repo = GitRepo::openRepo(CanonPath(repoDir));
+        verifyCommit(input, repo);
 
         auto accessor = repo->getAccessor(rev);
 
@@ -565,8 +615,7 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        assert(input.getRev());
-        assert(!origRev || origRev == input.getRev());
+        assert(!origRev || origRev == rev);
         if (!repoInfo.shallow)
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
         input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
@@ -615,14 +664,17 @@ struct GitInputScheme : InputScheme
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
-            if (auto ref = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirRef())
+            auto repo = GitRepo::openRepo(CanonPath(repoInfo.url));
+
+            if (auto ref = repo->getWorkdirRef())
                 input.attrs.insert_or_assign("ref", *ref);
 
             auto rev = repoInfo.workdirInfo.headRev.value();
 
             input.attrs.insert_or_assign("rev", rev.gitRev());
-
             input.attrs.insert_or_assign("revCount", getRevCount(repoInfo, repoInfo.url, rev));
+
+            verifyCommit(input, repo);
         } else {
             repoInfo.warnDirty();
 
@@ -632,6 +684,8 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("dirtyShortRev",
                     repoInfo.workdirInfo.headRev->gitShortRev() + "-dirty");
             }
+
+            verifyCommit(input, nullptr);
         }
 
         input.attrs.insert_or_assign(
@@ -651,10 +705,10 @@ struct GitInputScheme : InputScheme
 
         auto repoInfo = getRepoInfo(input);
 
-        if (input.getRef() || input.getRev() || !repoInfo.isLocal)
-            return getAccessorFromCommit(store, repoInfo, std::move(input));
-        else
-            return getAccessorFromWorkdir(store, repoInfo, std::move(input));
+        return
+            input.getRef() || input.getRev() || !repoInfo.isLocal
+            ? getAccessorFromCommit(store, repoInfo, std::move(input))
+            : getAccessorFromWorkdir(store, repoInfo, std::move(input));
     }
 };
 

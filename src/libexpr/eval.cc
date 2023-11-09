@@ -14,6 +14,7 @@
 #include "print.hh"
 #include "fs-input-accessor.hh"
 #include "memory-input-accessor.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <chrono>

@@ -4,6 +4,8 @@
 
 namespace nix {
 
+namespace fetchers { struct PublicKey; }
+
 struct GitRepo
 {
     virtual ~GitRepo()
@@ -72,6 +74,14 @@ struct GitRepo
     virtual void fetch(
         const std::string & url,
         const std::string & refspec) = 0;
+
+    /**
+     * Verify that commit `rev` is signed by one of the keys in
+     * `publicKeys`. Throw an error if it isn't.
+     */
+    virtual void verifyCommit(
+        const Hash & rev,
+        const std::vector<fetchers::PublicKey> & publicKeys) = 0;
 };
 
 }

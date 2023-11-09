@@ -1,6 +1,6 @@
-#include "util.hh"
 #include "local-store.hh"
 #include "globals.hh"
+#include "signals.hh"
 
 #include <cstdlib>
 #include <cstring>

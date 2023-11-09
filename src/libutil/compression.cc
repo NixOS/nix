@@ -1,6 +1,6 @@
 #include "compression.hh"
+#include "signals.hh"
 #include "tarfile.hh"
-#include "util.hh"
 #include "finally.hh"
 #include "logging.hh"
 

@@ -238,4 +238,67 @@ operate are determined as follows:
 Most `nix` subcommands operate on a *Nix store*. These are documented
 in [`nix help-stores`](./nix3-help-stores.md).
 
+# Shebang interpreter 
+
+The `nix` command can be used as a `#!` interpreter.
+Arguments to Nix can be passed on subsequent lines in the script.
+
+Verbatim strings may be passed in double backtick (```` `` ````) quotes. <!-- that's markdown for two backticks in inline code. -->
+Sequences of _n_ backticks of 3 or longer are parsed as _n-1_ literal backticks.
+A single space before the closing ```` `` ```` is ignored if present.
+
+`--file` and `--expr` resolve relative paths based on the script location.
+
+Examples:
+
+```
+#!/usr/bin/env nix
+#! nix shell --file ``<nixpkgs>`` hello cowsay --command bash
+
+hello | cowsay
+```
+
+or with **flakes**:
+
+```
+#!/usr/bin/env nix
+#! nix shell nixpkgs#bash nixpkgs#hello nixpkgs#cowsay --command bash
+
+hello | cowsay
+```
+
+or with an **expression**:
+
+```bash
+#! /usr/bin/env nix
+#! nix shell --impure --expr ``
+#! nix with (import (builtins.getFlake "nixpkgs") {});
+#! nix terraform.withPlugins (plugins: [ plugins.openstack ])
+#! nix ``
+#! nix --command bash
+
+terraform "$@"
+```
+
+or with cascading interpreters. Note that the `#! nix` lines don't need to follow after the first line, to accomodate other interpreters.
+
+```
+#!/usr/bin/env nix
+//! ```cargo
+//! [dependencies]
+//! time = "0.1.25"
+//! ```
+/*
+#!nix shell nixpkgs#rustc nixpkgs#rust-script nixpkgs#cargo --command rust-script
+*/
+fn main() {
+    for argument in std::env::args().skip(1) {
+        println!("{}", argument);
+    };
+    println!("{}", std::env::var("HOME").expect(""));
+    println!("{}", time::now().rfc822z());
+}
+// vim: ft=rust
+```
+
 )""

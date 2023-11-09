@@ -1,3 +1,4 @@
+#include "terminal.hh"
 #include "flake.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
@@ -8,6 +9,7 @@
 #include "fetchers.hh"
 #include "finally.hh"
 #include "fetch-settings.hh"
+#include "value-to-json.hh"
 
 namespace nix {
 
@@ -140,8 +142,13 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         attrs.emplace(state.symbols[attr.name], (long unsigned int)attr.value->integer);
                         break;
                     default:
-                        throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
-                            state.symbols[attr.name], showType(*attr.value));
+                        if (attr.name == state.symbols.create("publicKeys")) {
+                            experimentalFeatureSettings.require(Xp::VerifiedFetches);
+                            NixStringContext emptyContext = {};
+                            attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, emptyContext).dump());
+                        } else
+                            throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
+                                state.symbols[attr.name], showType(*attr.value));
                 }
                 #pragma GCC diagnostic pop
             }

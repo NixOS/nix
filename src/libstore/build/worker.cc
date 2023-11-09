@@ -4,6 +4,7 @@
 #include "drv-output-substitution-goal.hh"
 #include "local-derivation-goal.hh"
 #include "hook-instance.hh"
+#include "signals.hh"
 
 #include <poll.h>
 

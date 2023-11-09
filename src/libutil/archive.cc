@@ -6,9 +6,10 @@
 #include <strings.h> // for strcasecmp
 
 #include "archive.hh"
-#include "util.hh"
 #include "config.hh"
 #include "posix-source-accessor.hh"
+#include "file-system.hh"
+#include "signals.hh"
 
 namespace nix {
 

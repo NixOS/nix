@@ -184,4 +184,13 @@ void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
 
 nlohmann::json dumpRegisterInputSchemeInfo();
 
+struct PublicKey
+{
+    std::string type = "ssh-ed25519";
+    std::string key;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(PublicKey, type, key)
+
+std::string publicKeys_to_string(const std::vector<PublicKey>&);
+
 }

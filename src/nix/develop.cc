@@ -8,7 +8,6 @@
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"
-#include "util.hh"
 
 #include <iterator>
 #include <memory>
