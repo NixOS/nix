@@ -133,17 +133,17 @@ ran test tests/functional/${testName}.sh... [PASS]
 or without `make`:
 
 ```shell-session
-$ ./mk/run-test.sh tests/functional/${testName}.sh
+$ ./mk/run-test.sh tests/functional/${testName}.sh tests/functional/init.sh
 ran test tests/functional/${testName}.sh... [PASS]
 ```
 
 To see the complete output, one can also run:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/functional/${testName}.sh
-+ foo
+$ ./mk/debug-test.sh tests/functional/${testName}.sh tests/functional/init.sh
++(${testName}.sh:1) foo
 output from foo
-+ bar
++(${testName}.sh:2) bar
 output from bar
 ...
 ```
@@ -175,7 +175,7 @@ edit it like so:
 Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/functional/${testName}.sh
+$ ./mk/debug-test.sh tests/functional/${testName}.sh tests/functional/init.sh
 ...
 + gdb blash blub
 GNU gdb (GDB) 12.1

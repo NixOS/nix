@@ -27,3 +27,7 @@ libutil-tests_CXXFLAGS += -I src/libutil
 libutil-tests_LIBS = libutil
 
 libutil-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
+
+check: unit-test-data/libutil/git/check-data.sh.test
+
+$(eval $(call run-test,unit-test-data/libutil/git/check-data.sh))

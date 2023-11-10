@@ -97,6 +97,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         )",
     },
     {
+        .tag = Xp::GitHashing,
+        .name = "git-hashing",
+        .description = R"(
+            Allow creating (content-addressed) store objects which are hashed via Git's hashing algorithm.
+            These store objects will not be understandable by older versions of Nix.
+        )",
+    },
+    {
         .tag = Xp::RecursiveNix,
         .name = "recursive-nix",
         .description = R"(
