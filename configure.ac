@@ -335,8 +335,14 @@ AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
+
 # Look for lowdown library.
 PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"])
+
+
+# Look for libgit2.
+PKG_CHECK_MODULES([LIBGIT2], [libgit2])
+
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
