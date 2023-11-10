@@ -44,10 +44,10 @@ rec {
 
   optionalString = cond: string: if cond then string else "";
 
-  showSetting = { useAnchors }: name: { description, documentDefault, defaultValue, aliases, value, experimentalFeature }:
+  showSetting = { inlineHTML }: name: { description, documentDefault, defaultValue, aliases, value, experimentalFeature }:
     let
       result = squash ''
-          - ${if useAnchors
+          - ${if inlineHTML
               then ''<span id="conf-${name}">[`${name}`](#conf-${name})</span>''
               else ''`${name}`''}
 
