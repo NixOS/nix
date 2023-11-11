@@ -271,6 +271,19 @@ grepQuietInverse() {
     ! grep "$@" > /dev/null
 }
 
+# Forward stdin not just to stdout, but also to stderr.
+# tee /dev/stderr may not work on darwin
+if test -w /dev/stderr && type -p tee > /dev/null; then
+spy() {
+    tee /dev/stderr
+}
+else
+spy() {
+    # nobody suspects a cat https://en.wikipedia.org/wiki/Acoustic_Kitty
+    cat
+}
+fi
+
 trap onError ERR
 
 fi # COMMON_VARS_AND_FUNCTIONS_SH_SOURCED

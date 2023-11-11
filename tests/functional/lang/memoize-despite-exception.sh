@@ -39,11 +39,11 @@ app_and_let_are_memoized() {
 
     # The expensive computation is only performed once, despite evaluating the
     # `mem` thunk twice.
-    n="$(expectStderr 1 nix-instantiate --eval -E "$expr" | tee /dev/stderr | grep 'trace: the expensive computation' | wc -l)"
+    n="$(expectStderr 1 nix-instantiate --eval -E "$expr" | spy | grep 'trace: the expensive computation' | wc -l)"
     [[ "$n" == "1" ]]
 
     # The result is as expected, confirming that the saved thunk is correct.
-    expectStderr 1 nix-instantiate --eval -E "$expr" | tee /dev/stderr | grep 'error: nope!'
+    expectStderr 1 nix-instantiate --eval -E "$expr" | spy | grep 'error: nope!'
 }
 app_and_let_are_memoized
 
@@ -111,11 +111,11 @@ app_and_let_are_memoized_functor() {
 
     # The expensive computation is only performed once, despite evaluating the
     # `mem` thunk twice.
-    n="$(expectStderr 1 nix-instantiate --eval -E "$expr" | tee /dev/stderr | grep 'trace: the expensive computation' | wc -l)"
+    n="$(expectStderr 1 nix-instantiate --eval -E "$expr" | spy | grep 'trace: the expensive computation' | wc -l)"
     [[ "$n" == "1" ]]
 
     # The result is as expected, confirming that the saved thunk is correct.
-    expectStderr 1 nix-instantiate --eval -E "$expr" | tee /dev/stderr | grep 'error: nope!'
+    expectStderr 1 nix-instantiate --eval -E "$expr" | spy | grep 'error: nope!'
 }
 app_and_let_are_memoized_functor
 
@@ -130,11 +130,11 @@ app_and_let_are_memoized_primop_app() {
 
     # The expensive computation is only performed once, despite evaluating the
     # `mem` thunk twice.
-    n="$(nix-instantiate --eval -E "$expr" 2>&1 | tee /dev/stderr | grep 'trace: the expensive computation' | wc -l)"
+    n="$(nix-instantiate --eval -E "$expr" 2>&1 | spy | grep 'trace: the expensive computation' | wc -l)"
     [[ "$n" == "1" ]]
 
     # The result is as expected, confirming that the saved thunk is correct.
-    nix-instantiate --eval -E "$expr" 2>&1 | tee /dev/stderr | grep '"result is ok"'
+    nix-instantiate --eval -E "$expr" 2>&1 | spy | grep '"result is ok"'
 }
 app_and_let_are_memoized_primop_app
 
@@ -150,10 +150,10 @@ app_and_let_are_memoized_primop_app_complete() {
 
     # The expensive computation is only performed once, despite evaluating the
     # `mem` thunk twice.
-    n="$(nix-instantiate --eval -E "$expr" 2>&1 | tee /dev/stderr | grep 'trace: the expensive computation' | wc -l)"
+    n="$(nix-instantiate --eval -E "$expr" 2>&1 | spy | grep 'trace: the expensive computation' | wc -l)"
     [[ "$n" == "1" ]]
 
     # The result is as expected, confirming that the saved thunk is correct.
-    nix-instantiate --eval -E "$expr" 2>&1 | tee /dev/stderr | grep '"result is ok"'
+    nix-instantiate --eval -E "$expr" 2>&1 | spy | grep '"result is ok"'
 }
 app_and_let_are_memoized_primop_app_complete
