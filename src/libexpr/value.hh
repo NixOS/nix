@@ -199,6 +199,11 @@ public:
         Value * left, * right;
     };
 
+    struct Lambda {
+        Env * env;
+        ExprLambda * fun;
+    };
+
     union
     {
         NixInt integer;
@@ -216,10 +221,7 @@ public:
         Value * smallList[2];
         ClosureThunk thunk;
         FunctionApplicationThunk app;
-        struct {
-            Env * env;
-            ExprLambda * fun;
-        } lambda;
+        Lambda lambda;
         PrimOp * primOp;
         FunctionApplicationThunk primOpApp;
         ExternalValueBase * external;
