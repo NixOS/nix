@@ -190,6 +190,11 @@ public:
         const char * path;
     };
 
+    struct ClosureThunk {
+        Env * env;
+        Expr * expr;
+    };
+
     union
     {
         NixInt integer;
@@ -205,10 +210,7 @@ public:
             Value * * elems;
         } bigList;
         Value * smallList[2];
-        struct {
-            Env * env;
-            Expr * expr;
-        } thunk;
+        ClosureThunk thunk;
         struct {
             Value * left, * right;
         } app;
