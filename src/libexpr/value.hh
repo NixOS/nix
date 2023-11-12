@@ -195,6 +195,10 @@ public:
         Expr * expr;
     };
 
+    struct FunctionApplicationThunk {
+        Value * left, * right;
+    };
+
     union
     {
         NixInt integer;
@@ -211,17 +215,13 @@ public:
         } bigList;
         Value * smallList[2];
         ClosureThunk thunk;
-        struct {
-            Value * left, * right;
-        } app;
+        FunctionApplicationThunk app;
         struct {
             Env * env;
             ExprLambda * fun;
         } lambda;
         PrimOp * primOp;
-        struct {
-            Value * left, * right;
-        } primOpApp;
+        FunctionApplicationThunk primOpApp;
         ExternalValueBase * external;
         NixFloat fpoint;
     };
