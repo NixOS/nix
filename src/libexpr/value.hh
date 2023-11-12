@@ -158,37 +158,39 @@ public:
     inline bool isPrimOp() const { return internalType == tPrimOp; };
     inline bool isPrimOpApp() const { return internalType == tPrimOpApp; };
 
+    /**
+     * Strings in the evaluator carry a so-called `context` which
+     * is a list of strings representing store paths.  This is to
+     * allow users to write things like
+     *
+     *   "--with-freetype2-library=" + freetype + "/lib"
+     *
+     * where `freetype` is a derivation (or a source to be copied
+     * to the store).  If we just concatenated the strings without
+     * keeping track of the referenced store paths, then if the
+     * string is used as a derivation attribute, the derivation
+     * will not have the correct dependencies in its inputDrvs and
+     * inputSrcs.
+
+     * The semantics of the context is as follows: when a string
+     * with context C is used as a derivation attribute, then the
+     * derivations in C will be added to the inputDrvs of the
+     * derivation, and the other store paths in C will be added to
+     * the inputSrcs of the derivations.
+
+     * For canonicity, the store paths should be in sorted order.
+     */
+    struct StringWithContext {
+        const char * c_str;
+        const char * * context; // must be in sorted order
+    };
+
     union
     {
         NixInt integer;
         bool boolean;
 
-        /**
-         * Strings in the evaluator carry a so-called `context` which
-         * is a list of strings representing store paths.  This is to
-         * allow users to write things like
-
-         *   "--with-freetype2-library=" + freetype + "/lib"
-
-         * where `freetype` is a derivation (or a source to be copied
-         * to the store).  If we just concatenated the strings without
-         * keeping track of the referenced store paths, then if the
-         * string is used as a derivation attribute, the derivation
-         * will not have the correct dependencies in its inputDrvs and
-         * inputSrcs.
-
-         * The semantics of the context is as follows: when a string
-         * with context C is used as a derivation attribute, then the
-         * derivations in C will be added to the inputDrvs of the
-         * derivation, and the other store paths in C will be added to
-         * the inputSrcs of the derivations.
-
-         * For canonicity, the store paths should be in sorted order.
-         */
-        struct {
-            const char * c_str;
-            const char * * context; // must be in sorted order
-        } string;
+        StringWithContext string;
 
         struct {
             InputAccessor * accessor;
