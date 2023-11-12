@@ -185,6 +185,11 @@ public:
         const char * * context; // must be in sorted order
     };
 
+    struct Path {
+        InputAccessor * accessor;
+        const char * path;
+    };
+
     union
     {
         NixInt integer;
@@ -192,10 +197,7 @@ public:
 
         StringWithContext string;
 
-        struct {
-            InputAccessor * accessor;
-            const char * path;
-        } _path;
+        Path _path;
 
         Bindings * attrs;
         struct {
