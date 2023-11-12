@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <climits>
+#include <span>
 
 #include "symbol-table.hh"
 #include "value/context.hh"
@@ -395,7 +396,13 @@ public:
         return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
 
-    const Value * const * listElems() const
+    std::span<Value * const> listItems() const
+    {
+        assert(isList());
+        return std::span<Value * const>(listElems(), listSize());
+    }
+
+    Value * const * listElems() const
     {
         return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
@@ -413,34 +420,6 @@ public:
      * non-trivial.
      */
     bool isTrivial() const;
-
-    auto listItems()
-    {
-        struct ListIterable
-        {
-            typedef Value * const * iterator;
-            iterator _begin, _end;
-            iterator begin() const { return _begin; }
-            iterator end() const { return _end; }
-        };
-        assert(isList());
-        auto begin = listElems();
-        return ListIterable { begin, begin + listSize() };
-    }
-
-    auto listItems() const
-    {
-        struct ConstListIterable
-        {
-            typedef const Value * const * iterator;
-            iterator _begin, _end;
-            iterator begin() const { return _begin; }
-            iterator end() const { return _end; }
-        };
-        assert(isList());
-        auto begin = listElems();
-        return ConstListIterable { begin, begin + listSize() };
-    }
 
     SourcePath path() const
     {
