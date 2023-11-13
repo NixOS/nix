@@ -1,6 +1,6 @@
 source common.sh
 
-[[ $(type -p hq) ]] || skipTest "Mercurial not installed"
+[[ $(type -p hg) ]] || skipTest "Mercurial not installed"
 
 clearStore
 
@@ -87,6 +87,22 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchMercurial $repo).outPath"
 [ ! -e $path2/dir2/bar ]
 [ ! -e $path2/.hg ]
 [[ $(cat $path2/dir1/foo) = foo ]]
+
+path21=$(nix eval --include-untracked-files --impure --raw --expr "(builtins.fetchMercurial $repo).outPath")
+[ ! -e $path21/hello ]
+[ -e $path21/bar ]
+[ -e $path21/dir2/bar ]
+[ ! -e $path21/.hg ]
+[[ $(cat $path21/dir1/foo) = foo ]]
+
+echo "bar" >> $repo/.hgignore
+path22=$(nix eval --include-untracked-files --impure --raw --expr "(builtins.fetchMercurial $repo).outPath")
+[ ! -e $path22/hello ]
+[ ! -e $path22/bar ]
+[ ! -e $path22/dir2/bar ]
+[ ! -e $path22/.git ]
+sed -i '/bar/d' $repo/.hgignore
+hg status --cwd $repo
 
 [[ $(nix eval --impure --raw --expr "(builtins.fetchMercurial $repo).rev") = 0000000000000000000000000000000000000000 ]]
 

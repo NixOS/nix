@@ -70,6 +70,9 @@ struct FetchSettings : public Config
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
 
+    Setting<bool> includeUntrackedFiles{this, false, "include-untracked-files",
+        "Whether to include untracked files in Git/Mercurial trees."};
+
     Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
         R"(
           Path or URI of the global flake registry.

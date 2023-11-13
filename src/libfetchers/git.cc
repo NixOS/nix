@@ -386,7 +386,7 @@ struct GitInputScheme : InputScheme
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
         if (!input.getRef() && !input.getRev() && repoInfo.isLocal)
-            repoInfo.workdirInfo = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirInfo();
+            repoInfo.workdirInfo = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirInfo(fetchSettings.includeUntrackedFiles);
 
         return repoInfo;
     }

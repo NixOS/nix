@@ -175,7 +175,10 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef() && !input.getRev() && isLocal && pathExists(actualUrl + "/.hg")) {
 
-            bool clean = runHg({ "status", "-R", actualUrl, "--modified", "--added", "--removed" }) == "";
+            Strings hgStatusOptions = { "status", "-R", actualUrl, "--modified", "--added", "--removed" };
+            if (fetchSettings.includeUntrackedFiles)
+                hgStatusOptions.push_back("--unknown");
+            bool clean = runHg(hgStatusOptions) == "";
 
             if (!clean) {
 
@@ -190,8 +193,11 @@ struct MercurialInputScheme : InputScheme
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
 
+                hgStatusOptions = { "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" };
+                if (fetchSettings.includeUntrackedFiles)
+                    hgStatusOptions.push_back("--unknown");
                 auto files = tokenizeString<std::set<std::string>>(
-                    runHg({ "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
+                    runHg(hgStatusOptions), "\0"s);
 
                 Path actualPath(absPath(actualUrl));
 

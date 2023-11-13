@@ -257,7 +257,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return (*((std::function<int(const char * path, unsigned int statusFlags)> *) payload))(path, statusFlags);
     }
 
-    WorkdirInfo getWorkdirInfo() override
+    WorkdirInfo getWorkdirInfo(bool includeUntrackedFiles) override
     {
         WorkdirInfo info;
 
@@ -284,6 +284,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         git_status_options options = GIT_STATUS_OPTIONS_INIT;
         options.flags |= GIT_STATUS_OPT_INCLUDE_UNMODIFIED;
         options.flags |= GIT_STATUS_OPT_EXCLUDE_SUBMODULES;
+        if (includeUntrackedFiles) {
+            options.flags |=  GIT_STATUS_OPT_INCLUDE_UNTRACKED |
+                              GIT_STATUS_OPT_RECURSE_UNTRACKED_DIRS;
+        }
         if (git_status_foreach_ext(*this, &options, &statusCallbackTrampoline, &statusCallback))
             throw Error("getting working directory status: %s", git_error_last()->message);
 
