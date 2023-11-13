@@ -652,8 +652,8 @@ void LocalDerivationGoal::startBuilder()
 #if __linux__
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.  We put it in the Nix store
-           to ensure that we can create hard-links to non-directory
-           inputs in the fake Nix store in the chroot (see below). */
+           so that the build outputs can be moved efficiently from the
+           chroot to their final location. */
         chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
         deletePath(chrootRootDir);
 
