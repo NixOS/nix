@@ -2,6 +2,7 @@ nix_tests = \
   test-infra.sh \
   init.sh \
   flakes/flakes.sh \
+  flakes/develop.sh \
   flakes/run.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
