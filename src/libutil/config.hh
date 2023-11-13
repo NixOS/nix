@@ -83,12 +83,6 @@ public:
     void applyConfig(const std::string & contents, const std::string & path = "<unknown>");
 
     /**
-     * Applies a nix configuration file
-     * - path: the location of the config file to apply
-     */
-    void applyConfigFile(const Path & path);
-
-    /**
      * Resets the `overridden` flag of all Settings
      */
     virtual void resetOverridden() = 0;

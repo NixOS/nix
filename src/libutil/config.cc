@@ -165,14 +165,6 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
             set(name, value);
 }
 
-void AbstractConfig::applyConfigFile(const Path & path)
-{
-    try {
-        std::string contents = readFile(path);
-        applyConfig(contents, path);
-    } catch (SysError &) { }
-}
-
 void Config::resetOverridden()
 {
     for (auto & s : _settings)
