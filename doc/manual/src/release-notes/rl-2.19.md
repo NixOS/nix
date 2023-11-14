@@ -18,7 +18,7 @@
 - `nix-shell` shebang lines now support single-quoted arguments.
 
 - `builtins.fetchTree` is now its own experimental feature, [`fetch-tree`](@docroot@/contributing/experimental-features.md#xp-fetch-tree).
-  As described in the documentation for that feature, this is because we anticipate polishing it and then stabilizing it before the rest of flakes.
+  This allows stabilising it independently of the rest of what is encompassed by [`flakes`](@docroot@/contributing/experimental-features.md#xp-fetch-tree).
 
 - The interface for creating and updating lock files has been overhauled:
 
