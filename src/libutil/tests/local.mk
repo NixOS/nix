@@ -1,6 +1,6 @@
 check: libutil-tests_RUN
 
-programs += libutil-tests
+programs += libutil-tests-exe
 
 libutil-tests-exe_NAME = libnixutil-tests
 
