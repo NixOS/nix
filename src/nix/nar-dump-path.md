@@ -5,7 +5,7 @@ R""(
 * To serialise directory `foo` as a NAR:
 
   ```console
-  # nix nar dump-path ./foo > foo.nar
+  # nix nar pack ./foo > foo.nar
   ```
 
 # Description
@@ -15,3 +15,4 @@ This command generates a NAR file containing the serialisation of
 symbolic links. The NAR is written to standard output.
 
 )""
+
