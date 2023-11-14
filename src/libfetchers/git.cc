@@ -332,7 +332,7 @@ struct GitInputScheme : InputScheme
            whether the working directory is dirty compared to HEAD. */
         GitRepo::WorkdirInfo workdirInfo;
 
-        /* URL of the repo, or its path if isLocal. */
+        /* URL of the repo, or its path if isLocal. Never a `file` URL. */
         std::string url;
 
         void warnDirty() const
