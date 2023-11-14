@@ -220,6 +220,16 @@ std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
     return {std::move(storePath), input};
 }
 
+std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+{
+    try {
+        return scheme->getAccessor(store, *this);
+    } catch (Error & e) {
+        e.addTrace({}, "while fetching the input '%s'", to_string());
+        throw;
+    }
+}
+
 Input Input::applyOverrides(
     std::optional<std::string> ref,
     std::optional<Hash> rev) const

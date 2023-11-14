@@ -83,6 +83,8 @@ public:
      */
     std::pair<StorePath, Input> fetch(ref<Store> store) const;
 
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store) const;
+
     Input applyOverrides(
         std::optional<std::string> ref,
         std::optional<Hash> rev) const;

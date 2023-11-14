@@ -605,7 +605,7 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
-                    submoduleInput.scheme->getAccessor(store, submoduleInput);
+                    submoduleInput.getAccessor(store);
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
 
@@ -649,7 +649,7 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("url", submodulePath.abs());
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
-                    submoduleInput.scheme->getAccessor(store, submoduleInput);
+                    submoduleInput.getAccessor(store);
 
                 /* If the submodule is dirty, mark this repo dirty as
                    well. */
