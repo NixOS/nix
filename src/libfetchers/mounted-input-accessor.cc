@@ -54,18 +54,16 @@ struct MountedInputAccessor : InputAccessor
     std::pair<ref<InputAccessor>, CanonPath> resolve(CanonPath path)
     {
         // Find the nearest parent of `path` that is a mount point.
-        std::vector<std::string> ss;
+        std::vector<std::string> subpath;
         while (true) {
             auto i = mounts.find(path);
             if (i != mounts.end()) {
-                auto subpath = CanonPath::root;
-                for (auto j = ss.rbegin(); j != ss.rend(); ++j)
-                    subpath.push(*j);
-                return {i->second, std::move(subpath)};
+                std::reverse(subpath.begin(), subpath.end());
+                return {i->second, CanonPath(subpath)};
             }
 
             assert(!path.isRoot());
-            ss.push_back(std::string(*path.baseName()));
+            subpath.push_back(std::string(*path.baseName()));
             path.pop();
         }
     }
