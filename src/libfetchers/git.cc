@@ -9,7 +9,7 @@
 #include "processes.hh"
 #include "git.hh"
 #include "fs-input-accessor.hh"
-#include "union-input-accessor.hh"
+#include "mounted-input-accessor.hh"
 #include "git-utils.hh"
 
 #include "fetch-settings.hh"
@@ -587,7 +587,7 @@ struct GitInputScheme : InputScheme
 
         auto accessor = repo->getAccessor(rev);
 
-        /* If the repo has submodules, fetch them and return a union
+        /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
            repo and the accessors for the submodules. */
         if (repoInfo.submodules) {
@@ -611,7 +611,7 @@ struct GitInputScheme : InputScheme
 
             if (!mounts.empty()) {
                 mounts.insert_or_assign(CanonPath::root, accessor);
-                accessor = makeUnionInputAccessor(std::move(mounts));
+                accessor = makeMountedInputAccessor(std::move(mounts));
             }
         }
 
@@ -636,7 +636,7 @@ struct GitInputScheme : InputScheme
         ref<InputAccessor> accessor =
             makeFSInputAccessor(CanonPath(repoInfo.url), repoInfo.workdirInfo.files, makeNotAllowedError(repoInfo.url));
 
-        /* If the repo has submodules, return a union input accessor
+        /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
         if (repoInfo.submodules && !repoInfo.workdirInfo.submodules.empty()) {
@@ -660,7 +660,7 @@ struct GitInputScheme : InputScheme
             }
 
             mounts.insert_or_assign(CanonPath::root, accessor);
-            accessor = makeUnionInputAccessor(std::move(mounts));
+            accessor = makeMountedInputAccessor(std::move(mounts));
         }
 
         if (!repoInfo.workdirInfo.isDirty) {

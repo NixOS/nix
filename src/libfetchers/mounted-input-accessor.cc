@@ -1,12 +1,12 @@
-#include "union-input-accessor.hh"
+#include "mounted-input-accessor.hh"
 
 namespace nix {
 
-struct UnionInputAccessor : InputAccessor
+struct MountedInputAccessor : InputAccessor
 {
     std::map<CanonPath, ref<InputAccessor>> mounts;
 
-    UnionInputAccessor(std::map<CanonPath, ref<InputAccessor>> _mounts)
+    MountedInputAccessor(std::map<CanonPath, ref<InputAccessor>> _mounts)
         : mounts(std::move(_mounts))
     {
         // Currently we require a root filesystem. This could be relaxed.
@@ -71,9 +71,9 @@ struct UnionInputAccessor : InputAccessor
     }
 };
 
-ref<InputAccessor> makeUnionInputAccessor(std::map<CanonPath, ref<InputAccessor>> mounts)
+ref<InputAccessor> makeMountedInputAccessor(std::map<CanonPath, ref<InputAccessor>> mounts)
 {
-    return make_ref<UnionInputAccessor>(std::move(mounts));
+    return make_ref<MountedInputAccessor>(std::move(mounts));
 }
 
 }
