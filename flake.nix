@@ -164,6 +164,10 @@
 
         testConfigureFlags = [
           "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+        ] ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+          "--enable-install-unit-tests"
+          "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+          "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
         ];
 
         internalApiDocsConfigureFlags = [
@@ -404,7 +408,8 @@
             src = nixSrc;
             VERSION_SUFFIX = versionSuffix;
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (currentStdenv.hostPlatform != currentStdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps;
             buildInputs = buildDeps
@@ -710,7 +715,8 @@
           stdenv.mkDerivation {
             name = "nix";
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (stdenv.hostPlatform != stdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps
               ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear

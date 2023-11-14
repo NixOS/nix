@@ -6,7 +6,11 @@ libexpr-tests_NAME := libnixexpr-tests
 
 libexpr-tests_DIR := $(d)
 
-libexpr-tests_INSTALL_DIR :=
+ifeq ($(INSTALL_UNIT_TESTS), yes)
+  libexpr-tests_INSTALL_DIR := $(checkbindir)
+else
+  libexpr-tests_INSTALL_DIR :=
+endif
 
 libexpr-tests_SOURCES := \
     $(wildcard $(d)/*.cc) \
