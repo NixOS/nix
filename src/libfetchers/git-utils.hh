@@ -59,7 +59,9 @@ struct GitRepo
      */
     virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) = 0;
 
-    virtual std::string resolveSubmoduleUrl(const std::string & url) = 0;
+    virtual std::string resolveSubmoduleUrl(
+        const std::string & url,
+        const std::string & base) = 0;
 
     struct TarballInfo
     {

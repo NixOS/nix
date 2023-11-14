@@ -308,13 +308,21 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) override;
 
-    std::string resolveSubmoduleUrl(const std::string & url) override
+    std::string resolveSubmoduleUrl(
+        const std::string & url,
+        const std::string & base) override
     {
         git_buf buf = GIT_BUF_INIT;
         if (git_submodule_resolve_url(&buf, *this, url.c_str()))
             throw Error("resolving Git submodule URL '%s'", url);
         Finally cleanup = [&]() { git_buf_dispose(&buf); };
-        return buf.ptr;
+
+        std::string res(buf.ptr);
+
+        if (!hasPrefix(res, "/") && res.find("://") == res.npos)
+            res = parseURL(base + "/" + res).canonicalise().to_string();
+
+        return res;
     }
 
     bool hasObject(const Hash & oid_) override

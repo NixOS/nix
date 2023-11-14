@@ -594,7 +594,7 @@ struct GitInputScheme : InputScheme
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
             for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev)) {
-                auto resolved = repo->resolveSubmoduleUrl(submodule.url);
+                auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
                 debug("Git submodule %s: %s %s %s -> %s",
                     submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
                 fetchers::Attrs attrs;
