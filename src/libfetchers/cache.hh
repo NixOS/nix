@@ -6,12 +6,13 @@
 
 namespace nix::fetchers {
 
+/*
+ * A cache for arbitrary `Attrs` -> `Attrs` mappings with a timestamp
+ * for expiration.
+ */
 struct Cache
 {
     virtual ~Cache() { }
-
-    /* A cache for arbitrary Attrs -> Attrs mappings with a timestamp
-       for expiration. */
 
     /*
      * Add a value to the cache. The cache is an arbitrary mapping of
