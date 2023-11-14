@@ -15,4 +15,3 @@ This command generates a NAR file containing the serialisation of
 symbolic links. The NAR is written to standard output.
 
 )""
-
