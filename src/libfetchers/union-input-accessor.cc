@@ -12,8 +12,7 @@ struct UnionInputAccessor : InputAccessor
         // Currently we require a root filesystem. This could be relaxed.
         assert(mounts.contains(CanonPath::root));
 
-        // FIXME: should check that every mount point exists. Or we
-        // could return dummy parent directories automatically.
+        // FIXME: return dummy parent directories automatically?
     }
 
     std::string readFile(const CanonPath & path) override
