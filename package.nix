@@ -338,6 +338,12 @@ in {
     echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
 
+  # So the check output gets links for DLLs in the out output.
+  preFixup = lib.optionalString (stdenv.hostPlatform.isWindows && builtins.elem "check" finalAttrs.outputs) ''
+    ln -s "$check/lib/"*.dll "$check/bin"
+    ln -s "$out/bin/"*.dll "$check/bin"
+  '';
+
   doInstallCheck = attrs.doInstallCheck;
 
   installCheckFlags = "sysconfdir=$(out)/etc";
