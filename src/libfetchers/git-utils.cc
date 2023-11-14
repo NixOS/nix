@@ -130,11 +130,6 @@ T peelObject(git_repository * repo, git_object * obj, git_object_t type)
     return obj2;
 }
 
-int statusCallbackTrampoline(const char * path, unsigned int statusFlags, void * payload)
-{
-    return (*((std::function<int(const char * path, unsigned int statusFlags)> *) payload))(path, statusFlags);
-}
-
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     CanonPath path;
@@ -253,6 +248,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         }
 
         return result;
+    }
+
+    // Helper for statusCallback below.
+    static int statusCallbackTrampoline(const char * path, unsigned int statusFlags, void * payload)
+    {
+        return (*((std::function<int(const char * path, unsigned int statusFlags)> *) payload))(path, statusFlags);
     }
 
     WorkdirInfo getWorkdirInfo() override
