@@ -73,3 +73,5 @@
   [`XDG_DATA_DIRS`](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html#variables) is now populated with the path to the `/share` subdirectory of the current profile.
   This means that command completion scripts, `.desktop` files, and similar artifacts installed via [`nix-env`](@docroot@/command-ref/nix-env.md) or [`nix profile`](@docroot@/command-ref/new-cli/nix3-profile.md)
   (experimental) can be found by any program that follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
+
+- A new command `nix store add` has been added. It replaces `nix store add-file` and `nix store add-path` which are now deprecated.
