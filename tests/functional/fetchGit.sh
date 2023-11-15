@@ -51,9 +51,7 @@ git -C $repo add differentbranch
 git -C $repo commit -m 'Test2'
 git -C $repo checkout master
 devrev=$(git -C $repo rev-parse devtest)
-out=$(nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }" 2>&1) || status=$?
-[[ $status == 1 ]]
-[[ $out =~ 'Cannot find Git revision' ]]
+nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }"
 
 [[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; allRefs = true; } + \"/differentbranch\")") = 'different file' ]]
 
