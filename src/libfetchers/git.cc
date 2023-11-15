@@ -323,8 +323,6 @@ struct GitInputScheme : InputScheme
         bool submodules = false;
         bool allRefs = false;
 
-        std::string cacheType;
-
         /* Whether this is a local, non-bare repository. */
         bool isLocal = false;
 
@@ -370,11 +368,6 @@ struct GitInputScheme : InputScheme
             .submodules = getSubmodulesAttr(input),
             .allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false)
         };
-
-        repoInfo.cacheType = "git";
-        if (repoInfo.shallow) repoInfo.cacheType += "-shallow";
-        if (repoInfo.submodules) repoInfo.cacheType += "-submodules";
-        if (repoInfo.allRefs) repoInfo.cacheType += "-all-refs";
 
         // file:// URIs are normally not cloned (but otherwise treated the
         // same as remote URIs, i.e. we don't use the working tree or
