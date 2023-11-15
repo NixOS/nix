@@ -14,6 +14,7 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "value.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -2522,7 +2523,7 @@ void prim_unsafeGetLambdaDoc(EvalState &state, const PosIdx pos, Value **args, V
 
   // TODO: Rewind the position so there is no outer lambda anymore.
   // TODO: Rewind the position so there is no attr path anymore.
-  auto attrs = state.buildBindings(4);
+  auto attrs = state.buildBindings(9);
   int countApplied = 0;
   bool isPrimOp = false;
   Comment::Doc doc = Comment::emptyDoc;
@@ -2553,6 +2554,22 @@ void prim_unsafeGetLambdaDoc(EvalState &state, const PosIdx pos, Value **args, V
       std::string s(primDoc);
       doc = Comment::Doc(s);
     }
+    auto args = value.primOp->args;
+    auto arity = value.primOp->arity;
+    auto experimentalFeature = value.primOp->experimentalFeature;
+    auto name = value.primOp->name;
+    attrs.alloc("name").mkString(name);
+
+    auto & argsList = attrs.alloc("args");
+
+    state.mkList(argsList, args.size());
+    for (unsigned int n = 0; n < args.size(); ++n){
+        std::string arg = args[n];
+        (argsList.listElems()[n] = state.allocValue())->mkString(arg);
+    }
+
+    attrs.alloc("arity").mkInt(NixInt(arity));
+    attrs.alloc("experimental").mkBool(experimentalFeature.has_value());
   }
 
   if (value.isPrimOpApp()) {

@@ -5,7 +5,10 @@
 rec {
 
   #############################################
-
+  /**Both a set and a function. Can be called with arg*/
+  buildEnv = {
+    __functor = self: arg: self;
+  };
   # Parenthesis
 
   /**Doc*/
