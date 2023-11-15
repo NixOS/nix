@@ -65,8 +65,8 @@ struct CmdStoreAccessRevoke : StorePathsCommand
                 if (all) {
                     status.entities = {};
                 } else {
-                    for (auto user : users) status.entities.erase(*getpwnam(user.c_str()));
-                    for (auto group : groups) status.entities.erase(*getgrnam(group.c_str()));
+                    for (auto user : users) status.entities.erase(nix::ACL::User(user));
+                    for (auto group : groups) status.entities.erase(nix::ACL::Group(group));
                 }
                 localStore.setAccessStatus(path, status);
             }
