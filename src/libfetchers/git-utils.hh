@@ -75,7 +75,8 @@ struct GitRepo
 
     virtual void fetch(
         const std::string & url,
-        const std::string & refspec) = 0;
+        const std::string & refspec,
+        bool shallow) = 0;
 
     /**
      * Verify that commit `rev` is signed by one of the keys in

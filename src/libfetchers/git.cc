@@ -219,9 +219,6 @@ struct GitInputScheme : InputScheme
                 || name == "publicKeys")
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
 
-        maybeGetBoolAttr(attrs, "shallow");
-        maybeGetBoolAttr(attrs, "submodules");
-        maybeGetBoolAttr(attrs, "allRefs");
         maybeGetBoolAttr(attrs, "verifyCommit");
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
@@ -234,6 +231,9 @@ struct GitInputScheme : InputScheme
         auto url = fixGitURL(getStrAttr(attrs, "url"));
         parseURL(url);
         input.attrs["url"] = url;
+        getShallowAttr(input);
+        getSubmodulesAttr(input);
+        getAllRefsAttr(input);
         return input;
     }
 
@@ -243,8 +243,10 @@ struct GitInputScheme : InputScheme
         if (url.scheme != "git") url.scheme = "git+" + url.scheme;
         if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
-        if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
+        if (getShallowAttr(input))
             url.query.insert_or_assign("shallow", "1");
+        if (getSubmodulesAttr(input))
+            url.query.insert_or_assign("submodules", "1");
         if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
             url.query.insert_or_assign("verifyCommit", "1");
         auto publicKeys = getPublicKeys(input.attrs);
@@ -319,10 +321,6 @@ struct GitInputScheme : InputScheme
 
     struct RepoInfo
     {
-        bool shallow = false;
-        bool submodules = false;
-        bool allRefs = false;
-
         /* Whether this is a local, non-bare repository. */
         bool isLocal = false;
 
@@ -347,9 +345,19 @@ struct GitInputScheme : InputScheme
         std::string gitDir = ".git";
     };
 
+    bool getShallowAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+    }
+
     bool getSubmodulesAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    }
+
+    bool getAllRefsAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
     }
 
     RepoInfo getRepoInfo(const Input & input) const
@@ -363,11 +371,7 @@ struct GitInputScheme : InputScheme
         if (auto rev = input.getRev())
             checkHashType(rev);
 
-        RepoInfo repoInfo {
-            .shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false),
-            .submodules = getSubmodulesAttr(input),
-            .allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false)
-        };
+        RepoInfo repoInfo;
 
         // file:// URIs are normally not cloned (but otherwise treated the
         // same as remote URIs, i.e. we don't use the working tree or
@@ -501,7 +505,7 @@ struct GitInputScheme : InputScheme
             if (auto rev = input.getRev()) {
                 doFetch = !repo->hasObject(*rev);
             } else {
-                if (repoInfo.allRefs) {
+                if (getAllRefsAttr(input)) {
                     doFetch = true;
                 } else {
                     /* If the local ref is older than ‘tarball-ttl’ seconds, do a
@@ -514,7 +518,7 @@ struct GitInputScheme : InputScheme
 
             if (doFetch) {
                 try {
-                    auto fetchRef = repoInfo.allRefs
+                    auto fetchRef = getAllRefsAttr(input)
                         ? "refs/*"
                         : ref.compare(0, 5, "refs/") == 0
                         ? ref
@@ -522,7 +526,7 @@ struct GitInputScheme : InputScheme
                         ? ref
                         : "refs/heads/" + ref;
 
-                    repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef));
+                    repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     logError(e.info());
@@ -556,7 +560,7 @@ struct GitInputScheme : InputScheme
 
         auto isShallow = repo->isShallow();
 
-        if (isShallow && !repoInfo.shallow)
+        if (isShallow && !getShallowAttr(input))
             throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified", repoInfo.url);
 
         // FIXME: check whether rev is an ancestor of ref?
@@ -568,7 +572,7 @@ struct GitInputScheme : InputScheme
             {"lastModified", getLastModified(repoInfo, repoDir, rev)},
         });
 
-        if (!repoInfo.shallow)
+        if (!getShallowAttr(input))
             infoAttrs.insert_or_assign("revCount",
                 getRevCount(repoInfo, repoDir, rev));
 
@@ -581,7 +585,7 @@ struct GitInputScheme : InputScheme
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
            repo and the accessors for the submodules. */
-        if (repoInfo.submodules) {
+        if (getSubmodulesAttr(input)) {
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
             for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev)) {
@@ -607,7 +611,7 @@ struct GitInputScheme : InputScheme
         }
 
         assert(!origRev || origRev == rev);
-        if (!repoInfo.shallow)
+        if (!getShallowAttr(input))
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
         input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
@@ -619,7 +623,7 @@ struct GitInputScheme : InputScheme
         RepoInfo & repoInfo,
         Input && input) const
     {
-        if (repoInfo.submodules)
+        if (getSubmodulesAttr(input))
             /* Create mountpoints for the submodules. */
             for (auto & submodule : repoInfo.workdirInfo.submodules)
                 repoInfo.workdirInfo.files.insert(submodule.path);
@@ -630,7 +634,7 @@ struct GitInputScheme : InputScheme
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
-        if (repoInfo.submodules && !repoInfo.workdirInfo.submodules.empty()) {
+        if (getSubmodulesAttr(input) && !repoInfo.workdirInfo.submodules.empty()) {
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {

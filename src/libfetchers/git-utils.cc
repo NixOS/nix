@@ -364,7 +364,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     void fetch(
         const std::string & url,
-        const std::string & refspec) override
+        const std::string & refspec,
+        bool shallow) override
     {
         Activity act(*logger, lvlTalkative, actFetchTree, fmt("fetching Git repository '%s'", url));
 
@@ -380,6 +381,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         };
 
         git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
+        opts.depth = shallow ? 1 : GIT_FETCH_DEPTH_FULL;
         opts.callbacks.payload = &act;
         opts.callbacks.sideband_progress = sidebandProgressCallback;
         opts.callbacks.transfer_progress = transferProgressCallback;
