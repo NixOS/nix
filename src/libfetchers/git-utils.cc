@@ -3,6 +3,7 @@
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
+#include "signals.hh"
 
 #include <boost/core/span.hpp>
 
@@ -341,10 +342,32 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     ref<InputAccessor> getAccessor(const Hash & rev) override;
 
+    static int sidebandProgressCallback(const char * str, int len, void * payload)
+    {
+        auto act = (Activity *) payload;
+        act->result(resFetchStatus, trim(std::string_view(str, len)));
+        return _isInterrupted ? -1 : 0;
+    }
+
+    static int transferProgressCallback(const git_indexer_progress * stats, void * payload)
+    {
+        auto act = (Activity *) payload;
+        act->result(resFetchStatus,
+            fmt("%d/%d objects received, %d/%d deltas indexed, %.1f MiB",
+                stats->received_objects,
+                stats->total_objects,
+                stats->indexed_deltas,
+                stats->total_deltas,
+                stats->received_bytes / (1024.0 * 1024.0)));
+        return _isInterrupted ? -1 : 0;
+    }
+
     void fetch(
         const std::string & url,
         const std::string & refspec) override
     {
+        Activity act(*logger, lvlTalkative, actFetchTree, fmt("fetching Git repository '%s'", url));
+
         Remote remote;
 
         if (git_remote_create_anonymous(Setter(remote), *this, url.c_str()))
@@ -356,7 +379,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             .count = 1
         };
 
-        if (git_remote_fetch(remote.get(), &refspecs2, nullptr, nullptr))
+        git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
+        opts.callbacks.payload = &act;
+        opts.callbacks.sideband_progress = sidebandProgressCallback;
+        opts.callbacks.transfer_progress = transferProgressCallback;
+
+        if (git_remote_fetch(remote.get(), &refspecs2, &opts, nullptr))
             throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
     }
 

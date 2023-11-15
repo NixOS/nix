@@ -340,6 +340,14 @@ public:
             state->activitiesByType[type].expected += j;
             update(*state);
         }
+
+        else if (type == resFetchStatus) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.lastLine = getS(fields, 0);
+            update(*state);
+        }
     }
 
     void update(State & state)

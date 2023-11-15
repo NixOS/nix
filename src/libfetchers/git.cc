@@ -520,8 +520,6 @@ struct GitInputScheme : InputScheme
             }
 
             if (doFetch) {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", repoInfo.url));
-
                 try {
                     auto fetchRef = repoInfo.allRefs
                         ? "refs/*"
