@@ -14,7 +14,7 @@ namespace nix {
  *
  * Note: this is expected to be multiplied by sizeof(Value), or about 24 bytes.
  */
-constexpr size_t nonRecursiveStackReservation = 256;
+constexpr size_t nonRecursiveStackReservation = 128;
 
 /**
  * Functions that maybe applied to self-similar inputs, such as concatMap on a
