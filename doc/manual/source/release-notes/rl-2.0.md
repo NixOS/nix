@@ -8,13 +8,13 @@ The following incompatible changes have been made:
     It has been superseded by the binary cache substituter mechanism
     since several years. As a result, the following programs have been
     removed:
-    
+
       - `nix-pull`
-    
+
       - `nix-generate-patches`
-    
+
       - `bsdiff`
-    
+
       - `bspatch`
 
   - The “copy from other stores” substituter mechanism
@@ -58,26 +58,26 @@ This release has the following new features:
     `nix-build`, `nix-shell -p`, `nix-env -qa`, `nix-instantiate
     --eval`, `nix-push` and `nix-copy-closure`. It has the following
     major features:
-    
+
       - Unlike the legacy commands, it has a consistent way to refer to
         packages and package-like arguments (like store paths). For
         example, the following commands all copy the GNU Hello package
         to a remote machine:
-        
+
             nix copy --to ssh://machine nixpkgs.hello
-        
+
             nix copy --to ssh://machine /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10
-        
+
             nix copy --to ssh://machine '(with import <nixpkgs> {}; hello)'
-        
+
         By contrast, `nix-copy-closure` only accepted store paths as
         arguments.
-    
+
       - It is self-documenting: `--help` shows all available
         command-line arguments. If `--help` is given after a subcommand,
         it shows examples for that subcommand. `nix
                                                                         --help-config` shows all configuration options.
-    
+
       - It is much less verbose. By default, it displays a single-line
         progress indicator that shows how many packages are left to be
         built or downloaded, and (if there are running builds) the most
@@ -85,7 +85,7 @@ This release has the following new features:
         last few lines of builder output. The full build log can be
         retrieved using `nix
                                                                         log`.
-    
+
       - It
         [provides](https://github.com/NixOS/nix/commit/b8283773bd64d7da6859ed520ee19867742a03ba)
         all `nix.conf` configuration options as command line flags. For
@@ -93,122 +93,122 @@ This release has the following new features:
                                                                         http-connections 100` you can write `--http-connections 100`.
         Boolean options can be written as `--foo` or `--no-foo` (e.g.
         `--no-auto-optimise-store`).
-    
+
       - Many subcommands have a `--json` flag to write results to stdout
         in JSON format.
-    
+
     > **Warning**
-    > 
+    >
     > Please note that the `nix` command is a work in progress and the
     > interface is subject to change.
-    
+
     It provides the following high-level (“porcelain”) subcommands:
-    
+
       - `nix build` is a replacement for `nix-build`.
-    
+
       - `nix run` executes a command in an environment in which the
         specified packages are available. It is (roughly) a replacement
         for `nix-shell
                                                                         -p`. Unlike that command, it does not execute the command in a
         shell, and has a flag (`-c`) that specifies the unquoted command
         line to be executed.
-        
+
         It is particularly useful in conjunction with chroot stores,
         allowing Linux users who do not have permission to install Nix
         in `/nix/store` to still use binary substitutes that assume
         `/nix/store`. For example,
-        
+
             nix run --store ~/my-nix nixpkgs.hello -c hello --greeting 'Hi everybody!'
-        
+
         downloads (or if not substitutes are available, builds) the GNU
         Hello package into `~/my-nix/nix/store`, then runs `hello` in a
         mount namespace where `~/my-nix/nix/store` is mounted onto
         `/nix/store`.
-    
+
       - `nix search` replaces `nix-env
                                                                         -qa`. It searches the available packages for occurrences of a
         search string in the attribute name, package name or
         description. Unlike `nix-env -qa`, it has a cache to speed up
         subsequent searches.
-    
+
       - `nix copy` copies paths between arbitrary Nix stores,
         generalising `nix-copy-closure` and `nix-push`.
-    
+
       - `nix repl` replaces the external program `nix-repl`. It provides
         an interactive environment for evaluating and building Nix
         expressions. Note that it uses `linenoise-ng` instead of GNU
         Readline.
-    
+
       - `nix upgrade-nix` upgrades Nix to the latest stable version.
         This requires that Nix is installed in a profile. (Thus it won’t
         work on NixOS, or if it’s installed outside of the Nix store.)
-    
+
       - `nix verify` checks whether store paths are unmodified and/or
         “trusted” (see below). It replaces `nix-store --verify` and
         `nix-store
                                                                         --verify-path`.
-    
+
       - `nix log` shows the build log of a package or path. If the
         build log is not available locally, it will try to obtain it
         from the configured substituters (such as
         [cache.nixos.org](https://cache.nixos.org/), which now
         provides build logs).
-    
+
       - `nix edit` opens the source code of a package in your editor.
-    
+
       - `nix eval` replaces `nix-instantiate --eval`.
-    
+
       - `nix
                                                                         why-depends` shows why one store path has another in its
         closure. This is primarily useful to finding the causes of
         closure bloat. For example,
-        
+
             nix why-depends nixpkgs.vlc nixpkgs.libdrm.dev
-        
+
         shows a chain of files and fragments of file contents that cause
         the VLC package to have the “dev” output of `libdrm` in its
         closure — an undesirable situation.
-    
+
       - `nix path-info` shows information about store paths, replacing
         `nix-store -q`. A useful feature is the option `--closure-size`
         (`-S`). For example, the following command show the closure
         sizes of every path in the current NixOS system closure, sorted
         by size:
-        
+
             nix path-info -rS /run/current-system | sort -nk2
-    
+
       - `nix optimise-store` replaces `nix-store --optimise`. The main
         difference is that it has a progress indicator.
-    
+
     A number of low-level (“plumbing”) commands are also available:
-    
+
       - `nix ls-store` and `nix
                                                                         ls-nar` list the contents of a store path or NAR file. The
         former is primarily useful in conjunction with remote stores,
         e.g.
-        
+
             nix ls-store --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10
-        
+
         lists the contents of path in a binary cache.
-    
+
       - `nix cat-store` and `nix
                                                                         cat-nar` allow extracting a file from a store path or NAR file.
-    
+
       - `nix dump-path` writes the contents of a store path to stdout in
         NAR format. This replaces `nix-store --dump`.
-    
+
       - `nix
-                                                                        show-derivation` displays a store derivation in JSON format.
+                                                                        show-derivation` displays a derivation in JSON format.
         This is an alternative to `pp-aterm`.
-    
+
       - `nix
                                                                         add-to-store` replaces `nix-store
                                                                         --add`.
-    
+
       - `nix sign-paths` signs store paths.
-    
+
       - `nix copy-sigs` copies signatures from one store to another.
-    
+
       - `nix show-config` shows all configuration options and their
         current values.
 
@@ -224,11 +224,11 @@ This release has the following new features:
     `nix-copy-closure`, `nix-push` and substitution are all instances
     of the general notion of copying paths between different kinds of
     Nix stores.
-    
+
     Stores are specified using an URI-like syntax, e.g.
     <https://cache.nixos.org/> or <ssh://machine>. The following store
     types are supported:
-    
+
       - `LocalStore` (stori URI `local` or an absolute path) and the
         misnamed `RemoteStore` (`daemon`) provide access to a local Nix
         store, the latter via the Nix daemon. You can use `auto` or the
@@ -236,63 +236,63 @@ This release has the following new features:
         whether you have write permission to the Nix store. It is no
         longer necessary to set the `NIX_REMOTE` environment variable to
         use the Nix daemon.
-        
+
         As noted above, `LocalStore` now supports chroot builds,
         allowing the “physical” location of the Nix store (e.g.
         `/home/alice/nix/store`) to differ from its “logical” location
         (typically `/nix/store`). This allows non-root users to use Nix
         while still getting the benefits from prebuilt binaries from
         [cache.nixos.org](https://cache.nixos.org/).
-    
+
       - `BinaryCacheStore` is the abstract superclass of all binary
         cache stores. It supports writing build logs and NAR content
         listings in JSON format.
-    
+
       - `HttpBinaryCacheStore` (`http://`, `https://`) supports binary
         caches via HTTP or HTTPS. If the server supports `PUT` requests,
         it supports uploading store paths via commands such as `nix
                                                                         copy`.
-    
+
       - `LocalBinaryCacheStore` (`file://`) supports binary caches in
         the local filesystem.
-    
+
       - `S3BinaryCacheStore` (`s3://`) supports binary caches stored in
         Amazon S3, if enabled at compile time.
-    
+
       - `LegacySSHStore` (`ssh://`) is used to implement remote builds
         and `nix-copy-closure`.
-    
+
       - `SSHStore` (`ssh-ng://`) supports arbitrary Nix operations on a
         remote machine via the same protocol used by `nix-daemon`.
 
   - Security has been improved in various ways:
-    
+
       - Nix now stores signatures for local store paths. When paths are
         copied between stores (e.g., copied from a binary cache to a
         local store), signatures are propagated.
-        
+
         Locally-built paths are signed automatically using the secret
         keys specified by the `secret-key-files` store option.
         Secret/public key pairs can be generated using `nix-store
                                                                         --generate-binary-cache-key`.
-        
+
         In addition, locally-built store paths are marked as “ultimately
         trusted”, but this bit is not propagated when paths are copied
         between stores.
-    
+
       - Content-addressable store paths no longer require signatures —
         they can be imported into a store by unprivileged users even if
         they lack signatures.
-    
+
       - The command `nix verify` checks whether the specified paths are
         trusted, i.e., have a certain number of trusted signatures, are
         ultimately trusted, or are content-addressed.
-    
+
       - Substitutions from binary caches
         [now](https://github.com/NixOS/nix/commit/ecbc3fedd3d5bdc5a0e1a0a51b29062f2874ac8b)
         require signatures by default. This was already the case on
         NixOS.
-    
+
       - In Linux sandbox builds, we
         [now](https://github.com/NixOS/nix/commit/eba840c8a13b465ace90172ff76a0db2899ab11b)
         use `/build` instead of `/tmp` as the temporary build directory.
@@ -309,7 +309,7 @@ This release has the following new features:
     hash or commit hash is specified. For example, calls to
     `builtins.fetchGit` are only allowed if a `rev` attribute is
     specified.
-    
+
     The goal of this feature is to enable true reproducibility and
     traceability of builds (including NixOS system configurations) at
     the evaluation level. For example, in the future, `nixos-rebuild`
@@ -367,21 +367,21 @@ This release has the following new features:
     log will be shown if a build fails.
 
   - Networking has been improved:
-    
+
       - HTTP/2 is now supported. This makes binary cache lookups [much
         more
         efficient](https://github.com/NixOS/nix/commit/90ad02bf626b885a5dd8967894e2eafc953bdf92).
-    
+
       - We now retry downloads on many HTTP errors, making binary caches
         substituters more resilient to temporary failures.
-    
+
       - HTTP credentials can now be configured via the standard `netrc`
         mechanism.
-    
+
       - If S3 support is enabled at compile time, <s3://> URIs are
         [supported](https://github.com/NixOS/nix/commit/9ff9c3f2f80ba4108e9c945bbfda2c64735f987b)
         in all places where Nix allows URIs.
-    
+
       - Brotli compression is now supported. In particular,
         [cache.nixos.org](https://cache.nixos.org/) build logs are now compressed
         using Brotli.
@@ -431,9 +431,9 @@ The Nix language has the following new features:
   - Derivation attributes can now reference the outputs of the
     derivation using the `placeholder` builtin function. For example,
     the attribute
-    
+
         configureFlags = "--prefix=${placeholder "out"} --includedir=${placeholder "dev"}";
-    
+
     will cause the `configureFlags` environment variable to contain the
     actual store paths corresponding to the `out` and `dev` outputs.
 
@@ -444,7 +444,7 @@ The following builtin functions are new or extended:
     Nixpkgs, which fetches at build time and cannot be used to fetch Nix
     expressions during evaluation. A typical use case is to import
     external NixOS modules from your configuration, e.g.
-    
+
         imports = [ (builtins.fetchGit https://github.com/edolstra/dwarffs + "/module.nix") ];
 
   - Similarly, `builtins.fetchMercurial` allows you to fetch Mercurial
@@ -485,7 +485,7 @@ The Nix build environment has the following changes:
     builder via the file `.attrs.json` in the builder’s temporary
     directory. This obviates the need for `passAsFile` since JSON files
     have no size restrictions, unlike process environments.
-    
+
     [As a convenience to Bash
     builders](https://github.com/NixOS/nix/commit/2d5b1b24bf70a498e4c0b378704cfdb6471cc699),
     Nix writes a script named `.attrs.sh` to the builder’s directory

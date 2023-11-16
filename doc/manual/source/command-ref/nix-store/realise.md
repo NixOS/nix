@@ -11,10 +11,10 @@
 
 Each of *paths* is processed as follows:
 
-- If the path leads to a [store derivation]:
-  1. If it is not [valid], substitute the store derivation file itself.
+- If the path leads to a [derivation]:
+  1. If it is not [valid], substitute the derivation file itself.
   2. Realise its [output paths]:
-    - Try to fetch from [substituters] the [store objects] associated with the output paths in the store derivation's [closure].
+    - Try to fetch from [substituters] the [store objects] associated with the output paths in the derivation's [closure].
       - With [content-addressed derivations] (experimental):
         Determine the output paths to realise by querying content-addressed realisation entries in the [Nix database].
     - For any store paths that cannot be substituted, produce the required store objects:
@@ -23,11 +23,11 @@ Each of *paths* is processed as follows:
          <!-- TODO: Link to build process page #8888 -->
 - Otherwise, and if the path is not already valid: Try to fetch the associated [store objects] in the path's [closure] from [substituters].
 
-If no substitutes are available and no store derivation is given, realisation fails.
+If no substitutes are available and no derivation is given, realisation fails.
 
 [store paths]: @docroot@/store/store-path.md
 [valid]: @docroot@/glossary.md#gloss-validity
-[store derivation]: @docroot@/glossary.md#gloss-store-derivation
+[derivation]: @docroot@/glossary.md#gloss-derivation
 [output paths]: @docroot@/glossary.md#gloss-output-path
 [store objects]: @docroot@/store/store-object.md
 [closure]: @docroot@/glossary.md#gloss-closure
@@ -71,7 +71,7 @@ For non-derivation arguments, the argument itself is printed.
 
 # Examples
 
-This operation is typically used to build [store derivation]s produced by
+This operation is typically used to build [derivation]s produced by
 [`nix-instantiate`](@docroot@/command-ref/nix-instantiate.md):
 
 ```console

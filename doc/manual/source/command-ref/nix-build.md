@@ -37,11 +37,11 @@ directory containing at least a file named `default.nix`.
 
 `nix-build` is essentially a wrapper around
 [`nix-instantiate`](nix-instantiate.md) (to translate a high-level Nix
-expression to a low-level [store derivation]) and [`nix-store
+expression to a low-level [derivation]) and [`nix-store
 --realise`](@docroot@/command-ref/nix-store/realise.md) (to build the store
 derivation).
 
-[store derivation]: @docroot@/glossary.md#gloss-store-derivation
+[derivation]: @docroot@/glossary.md#gloss-derivation
 
 > **Warning**
 >
@@ -80,7 +80,7 @@ except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](n
 
 ```console
 $ nix-build '<nixpkgs>' --attr firefox
-store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
+derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
 /nix/store/d18hyl92g30l...-firefox-1.5.0.7
 
 $ ls -l result

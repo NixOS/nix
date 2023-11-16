@@ -1505,7 +1505,7 @@ static void derivationStrictInternal(
     }
 
     else {
-        /* Compute a hash over the "masked" store derivation, which is
+        /* Compute a hash over the "masked" derivation, which is
            the final one except that in the list of outputs, the
            output paths are empty strings, and the corresponding
            environment variables have an empty value.  This ensures
@@ -1551,7 +1551,7 @@ static void derivationStrictInternal(
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
-       case we don't actually write store derivations, so we can't
+       case we don't actually write derivations, so we can't
        read them later. */
     {
         auto h = hashDerivationModulo(*state.store, drv, false);

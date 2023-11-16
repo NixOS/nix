@@ -21,31 +21,26 @@
 
 - [derivation]{#gloss-derivation}
 
-  A description of a build task. The result of a derivation is a
-  store object. Derivations declared in Nix expressions are specified
-  using the [`derivation` primitive](./language/derivations.md). These are
-  translated into low-level *store derivations* (implicitly by
-  `nix-build`, or explicitly by `nix-instantiate`).
+  A single build task.
+  See [Derivation](@docroot@/doc/manual/src/store/drv.md#Derivation) for details.
 
   [derivation]: #gloss-derivation
 
-- [store derivation]{#gloss-store-derivation}
+- [derivation expression]{#gloss-derivation}
 
-  A [derivation] represented as a `.drv` file in the [store].
-  It has a [store path], like any [store object].
-  It is the [instantiated][instantiate] form of a derivation.
+  A description of a [derivation] in the Nix language.
+  The result of a derivation is a store object.
+  Derivations are typically specified in Nix expressions using the [`derivation` primitive](./language/derivations.md).
+  These are translated into low-level *derivations* (implicitly by
+  `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
 
-  Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
-
-  See [`nix derivation show`](./command-ref/new-cli/nix3-derivation-show.md) (experimental) for displaying the contents of store derivations.
-
-  [store derivation]: #gloss-store-derivation
+  [derivation expression]: #gloss-derivation-expression
 
 - [instantiate]{#gloss-instantiate}, instantiation
 
-  Save an evaluated [derivation] as a [store derivation] in the Nix [store].
+  Translate a [derivation expression] into a [derivation].
 
-  See [`nix-instantiate`](./command-ref/nix-instantiate.md), which produces a store derivation from a Nix expression that evaluates to a derivation.
+  See [`nix-instantiate`](./command-ref/nix-instantiate.md), which produces a derivation from a Nix expression that evaluates to a derivation.
 
   [instantiate]: #gloss-instantiate
 
@@ -188,7 +183,7 @@
   >
   > The contents of a `.nix` file form a Nix expression.
 
-  Nix expressions specify [derivations][derivation], which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
+  Nix expressions specify [derivation expressions][derivation expression], which are [instantiated][instantiate] into the Nix store as [derivations][derivation].
   These derivations can then be [realised][realise] to produce [outputs][output].
 
   > **Example**
@@ -257,7 +252,7 @@
 
 - [deriver]{#gloss-deriver}
 
-  The [store derivation] that produced an [output path].
+  The [derivation] that produced an [output path].
 
   The deriver for an output path can be queried with the `--deriver` option to
   [`nix-store --query`](@docroot@/command-ref/nix-store/query.md).

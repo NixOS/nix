@@ -4,9 +4,9 @@ The most important built-in function is `derivation`, which is used to describe 
 a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
 It takes as input an attribute set, the attributes of which specify the inputs to the process.
-It outputs an attribute set, and produces a [store derivation] as a side effect of evaluation.
+It outputs an attribute set, and produces a [derivation] as a side effect of evaluation.
 
-[store derivation]: @docroot@/glossary.md#gloss-store-derivation
+[derivation]: @docroot@/glossary.md#gloss-derivation
 
 ## Input attributes
 
@@ -15,7 +15,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 - [`name`]{#attr-name} ([String](@docroot@/language/types.md#type-string))
 
   A symbolic name for the derivation.
-  It is added to the [store path] of the corresponding [store derivation] as well as to its [output paths](@docroot@/glossary.md#gloss-output-path).
+  It is added to the [store path] of the corresponding [derivation] as well as to its [output paths](@docroot@/glossary.md#gloss-output-path).
 
   [store path]: @docroot@/store/store-path.md
 
@@ -28,7 +28,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > }
   > ```
   >
-  > The store derivation's path will be `/nix/store/<hash>-hello.drv`.
+  > The derivation's path will be `/nix/store/<hash>-hello.drv`.
   > The [output](#attr-outputs) paths will be of the form `/nix/store/<hash>-hello[-<output>]`
 
 - [`system`]{#attr-system} ([String](@docroot@/language/types.md#type-string))
@@ -182,7 +182,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > }
   > ```
   >
-  > The store derivation path will be `/nix/store/<hash>-example.drv`.
+  > The derivation path will be `/nix/store/<hash>-example.drv`.
   > The output paths will be
   > - `/nix/store/<hash>-example-lib`
   > - `/nix/store/<hash>-example-dev`
