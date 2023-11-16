@@ -1,6 +1,7 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "hash.hh"
+#include "primops.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -2015,7 +2016,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         return result;
     };
 
-    boost::container::small_vector<Value, 16> values(es->size());
+    boost::container::small_vector<Value, conservativeStackReservation> values(es->size());
     Value * vTmpP = values.data();
 
     for (auto & [i_pos, i] : *es) {
