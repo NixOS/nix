@@ -3189,10 +3189,14 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
     state.forceFunction(*args[0], pos, std::string("while evaluating the first argument passed to builtins.") + (any ? "any" : "all"));
     state.forceList(*args[1], pos, std::string("while evaluating the second argument passed to builtins.") + (any ? "any" : "all"));
 
+    std::string_view errorCtx = any
+        ? "while evaluating the return value of the function passed to builtins.any"
+        : "while evaluating the return value of the function passed to builtins.all";
+
     Value vTmp;
     for (auto elem : args[1]->listItems()) {
         state.callFunction(*args[0], *elem, vTmp, pos);
-        bool res = state.forceBool(vTmp, pos, std::string("while evaluating the return value of the function passed to builtins.") + (any ? "any" : "all"));
+        bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
             v.mkBool(any);
             return;
