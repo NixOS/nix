@@ -5,7 +5,7 @@ let
   inherit (import ./utils.nix) concatStrings optionalString filterAttrs trim squash unique showSettings;
 in
 
-commandDump:
+inlineHTML: commandDump:
 
 let
 
@@ -30,7 +30,7 @@ let
 
         ${maybeSubcommands}
 
-        ${maybeDocumentation}
+        ${maybeStoreDocs}
 
         ${maybeOptions}
       '';
@@ -70,7 +70,7 @@ let
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
 
-      maybeDocumentation = optionalString
+      maybeStoreDocs = optionalString
         (details ? doc)
         (replaceStrings ["@stores@"] [storeDocs] details.doc);
 
@@ -91,17 +91,20 @@ let
           listOptions = opts: concatStringsSep "\n" (attrValues (mapAttrs showOption opts));
           showOption = name: option:
             let
+              result = trim ''
+                - ${item}
+                  ${option.description}
+              '';
+              item = if inlineHTML
+                then ''<span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}''
+                else "`--${name}` ${shortName} ${labels}";
               shortName = optionalString
                 (option ? shortName)
                 ("/ `-${option.shortName}`");
               labels = optionalString
                 (option ? labels)
                 (concatStringsSep " " (map (s: "*${s}*") option.labels));
-            in trim ''
-              - <span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}
-
-                ${option.description}
-            '';
+            in result;
           categories = sort lessThan (unique (map (cmd: cmd.category) (attrValues allOptions)));
         in concatStrings (map showCategory categories);
     in squash result;
@@ -162,7 +165,7 @@ let
 
           **Settings**:
 
-          ${showSettings { useAnchors = false; } settings}
+          ${showSettings { inherit inlineHTML; } settings}
         '';
     in concatStrings (attrValues (mapAttrs showStore commandInfo.stores));
 

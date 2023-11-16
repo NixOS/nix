@@ -218,7 +218,8 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     vDump->mkString(toplevel.dumpCli());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, *vDump, *vRes, noPos);
+    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
+    state.callFunction(*vRes, *vDump, *vRes, noPos);
 
     auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
     if (!attr)
