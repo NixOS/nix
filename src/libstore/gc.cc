@@ -339,7 +339,7 @@ static void readProcLink(const std::string & file, UncheckedRoots & roots)
         throw SysError("reading symlink");
     }
     if (res == bufsiz) {
-        throw Error("stupidly long symlink");
+        throw Error("overly long symlink starting with '%1%'", std::string_view(buf, bufsiz));
     }
     if (res > 0 && buf[0] == '/')
         roots[std::string(static_cast<char *>(buf), res)]
