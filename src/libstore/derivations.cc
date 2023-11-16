@@ -151,11 +151,10 @@ StorePath writeDerivation(Store & store,
 /* Read string `s' from stream `str'. */
 static void expect(std::istream & str, std::string_view s)
 {
-    char s2[s.size()];
-    str.read(s2, s.size());
-    std::string_view s2View { s2, s.size() };
-    if (s2View != s)
-        throw FormatError("expected string '%s', got '%s'", s, s2View);
+    for (auto & c : s) {
+        if (str.get() != c)
+            throw FormatError("expected string '%1%'", s);
+    }
 }
 
 

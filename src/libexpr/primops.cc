@@ -29,7 +29,6 @@
 
 #include <cmath>
 
-
 namespace nix {
 
 
@@ -2550,6 +2549,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     /* Get the attribute names to be removed.
        We keep them as Attrs instead of Symbols so std::set_difference
        can be used to remove them from attrs[0]. */
+    // 64: large enough to fit the attributes of a derivation
     boost::container::small_vector<Attr, 64> names;
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
@@ -2729,8 +2729,8 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.catAttrs"));
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
-    Value * res[args[1]->listSize()];
-    unsigned int found = 0;
+    boost::container::small_vector<Value *, nonRecursiveStackReservation> res(args[1]->listSize());
+    size_t found = 0;
 
     for (auto v2 : args[1]->listItems()) {
         state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
@@ -3064,9 +3064,8 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    // FIXME: putting this on the stack is risky.
-    Value * vs[args[1]->listSize()];
-    unsigned int k = 0;
+    boost::container::small_vector<Value *, nonRecursiveStackReservation> vs(args[1]->listSize());
+    size_t k = 0;
 
     bool same = true;
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
@@ -3191,10 +3190,14 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
     state.forceFunction(*args[0], pos, std::string("while evaluating the first argument passed to builtins.") + (any ? "any" : "all"));
     state.forceList(*args[1], pos, std::string("while evaluating the second argument passed to builtins.") + (any ? "any" : "all"));
 
+    std::string_view errorCtx = any
+        ? "while evaluating the return value of the function passed to builtins.any"
+        : "while evaluating the return value of the function passed to builtins.all";
+
     Value vTmp;
     for (auto elem : args[1]->listItems()) {
         state.callFunction(*args[0], *elem, vTmp, pos);
-        bool res = state.forceBool(vTmp, pos, std::string("while evaluating the return value of the function passed to builtins.") + (any ? "any" : "all"));
+        bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
             v.mkBool(any);
             return;
@@ -3450,7 +3453,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
     auto nrLists = args[1]->listSize();
 
-    Value lists[nrLists];
+    boost::container::small_vector<Value, conservativeStackReservation> lists(nrLists);
     size_t len = 0;
 
     for (unsigned int n = 0; n < nrLists; ++n) {
