@@ -2015,7 +2015,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         return result;
     };
 
-    boost::container::small_vector<Value, 64> values(es->size());
+    boost::container::small_vector<Value, 16> values(es->size());
     Value * vTmpP = values.data();
 
     for (auto & [i_pos, i] : *es) {
