@@ -6,7 +6,11 @@ libutil-tests-exe_NAME = libnixutil-tests
 
 libutil-tests-exe_DIR := $(d)
 
-libutil-tests-exe_INSTALL_DIR :=
+ifeq ($(INSTALL_UNIT_TESTS), yes)
+  libutil-tests-exe_INSTALL_DIR := $(checkbindir)
+else
+  libutil-tests-exe_INSTALL_DIR :=
+endif
 
 libutil-tests-exe_LIBS = libutil-tests
 
@@ -18,7 +22,11 @@ libutil-tests_NAME = libnixutil-tests
 
 libutil-tests_DIR := $(d)
 
-libutil-tests_INSTALL_DIR :=
+ifeq ($(INSTALL_UNIT_TESTS), yes)
+  libutil-tests_INSTALL_DIR := $(checklibdir)
+else
+  libutil-tests_INSTALL_DIR :=
+endif
 
 libutil-tests_SOURCES := $(wildcard $(d)/*.cc)
 
