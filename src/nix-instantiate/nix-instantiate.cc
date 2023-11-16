@@ -22,7 +22,7 @@ static Path gcRoot;
 static int rootNr = 0;
 
 
-enum OutputKind { okPlain, okXML, okJSON };
+enum OutputKind { okPlain, okXML, okJSON, okRaw };
 
 
 void processExpr(EvalState & state, const Strings & attrPaths,
@@ -53,6 +53,9 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
             else if (output == okJSON) {
                 printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
+                std::cout << std::endl;
+            } else if (output == okRaw) {
+                std::cout << *state.coerceToString(noPos, vRes, context, "while generating the nix-instantiate output");
                 std::cout << std::endl;
             } else {
                 if (strict) state.forceValueDeep(vRes);
@@ -134,6 +137,8 @@ static int main_nix_instantiate(int argc, char * * argv)
                 outputKind = okXML;
             else if (*arg == "--json")
                 outputKind = okJSON;
+            else if (*arg == "--raw")
+                outputKind = okRaw;
             else if (*arg == "--no-location")
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")
