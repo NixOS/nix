@@ -1474,6 +1474,7 @@ void DerivationGoal::done(
     SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
+    outputLocks.unlock();
     buildResult.status = status;
     if (ex)
         buildResult.errorMsg = fmt("%s", normaltxt(ex->info().msg));
