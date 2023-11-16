@@ -802,7 +802,7 @@ std::string showType(const Value & v);
 /**
  * If `path` refers to a directory, then append "/default.nix".
  */
-SourcePath resolveExprPath(const SourcePath & path);
+SourcePath resolveExprPath(SourcePath path);
 
 struct InvalidPathError : EvalError
 {
