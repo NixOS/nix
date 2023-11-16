@@ -54,7 +54,7 @@ BASH_INTERACTIVE_EXECUTABLE="$PWD/bash-interactive/bin/bash"
 [[ "$(
     nix develop --no-write-lock-file .#hello <<EOF
 export PATH="$PATH"
-ps --pid $$ --format exe --no-headers
+$lsof -a -d txt -p \$$ 2>&1 | grep -o '/.*/bash'
 EOF
 )" -ef "$BASH_INTERACTIVE_EXECUTABLE" ]]
 
