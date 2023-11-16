@@ -138,7 +138,8 @@ nix_tests = \
   test-libstoreconsumer.sh \
   toString-path.sh \
   read-only-store.sh \
-  acls.sh
+  acls.sh \
+  acls/protect_dep.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
