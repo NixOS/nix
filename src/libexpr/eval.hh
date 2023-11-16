@@ -18,6 +18,12 @@
 
 namespace nix {
 
+/**
+ * We put a limit on primop arity because it lets us use a fixed size array on
+ * the stack. 16 is already an impractical number of arguments. Use an attrset
+ * argument for such overly complicated functions.
+ */
+constexpr size_t maxPrimOpArity = 64;
 
 class Store;
 class EvalState;
@@ -71,6 +77,12 @@ struct PrimOp
      * Optional experimental for this to be gated on.
      */
     std::optional<ExperimentalFeature> experimentalFeature;
+
+    /**
+     * Validity check to be performed by functions that introduce primops,
+     * such as RegisterPrimOp() and Value::mkPrimOp().
+     */
+    void check();
 };
 
 /**

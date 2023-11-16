@@ -723,6 +723,23 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 }
 
 
+void PrimOp::check()
+{
+    if (arity > maxPrimOpArity) {
+        throw Error("primop arity must not exceed %1%", maxPrimOpArity);
+    }
+}
+
+
+void Value::mkPrimOp(PrimOp * p)
+{
+    p->check();
+    clearValue();
+    internalType = tPrimOp;
+    primOp = p;
+}
+
+
 Value * EvalState::addPrimOp(PrimOp && primOp)
 {
     /* Hack to make constants lazy: turn them into a application of
@@ -1692,8 +1709,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 /* We have all the arguments, so call the primop with
                    the previous and new arguments. */
 
-                assert(arity < 64);
-                Value * vArgs[64];
+                Value * vArgs[maxPrimOpArity];
                 auto n = argsDone;
                 for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp.left)
                     vArgs[--n] = arg->primOpApp.right;
