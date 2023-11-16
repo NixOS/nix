@@ -2549,7 +2549,8 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     /* Get the attribute names to be removed.
        We keep them as Attrs instead of Symbols so std::set_difference
        can be used to remove them from attrs[0]. */
-    boost::container::small_vector<Attr, 16> names;
+    // 64: large enough to fit the attributes of a derivation
+    boost::container::small_vector<Attr, 64> names;
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
