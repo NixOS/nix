@@ -23,7 +23,7 @@
 
 - [store derivation output reference]{#gloss-store-derivation-output-reference}
 
-  The string resulting from concatenating three things:
+  The string resulting from the concatenation of:
 
   - The path to a [store derivation](#gloss-store-derivation)
   - The character `^`
