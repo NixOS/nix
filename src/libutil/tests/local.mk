@@ -1,4 +1,4 @@
-check: libutil-tests_RUN
+check: libutil-tests-exe_RUN
 
 programs += libutil-tests-exe
 
