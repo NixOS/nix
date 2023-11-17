@@ -686,17 +686,25 @@ Expr * EvalState::parse(
 }
 
 
-SourcePath resolveExprPath(const SourcePath & path)
+SourcePath resolveExprPath(SourcePath path)
 {
+    unsigned int followCount = 0, maxFollow = 1024;
+
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    auto path2 = path.resolveSymlinks();
+    while (true) {
+        // Basic cycle/depth limit to avoid infinite loops.
+        if (++followCount >= maxFollow)
+            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+        if (path.lstat().type != InputAccessor::tSymlink) break;
+        path = {path.accessor, CanonPath(path.readLink(), path.path.parent().value_or(CanonPath::root))};
+    }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path2.lstat().type == InputAccessor::tDirectory)
-        return path2 + "default.nix";
+    if (path.lstat().type == InputAccessor::tDirectory)
+        return path + "default.nix";
 
-    return path2;
+    return path;
 }
 
 
