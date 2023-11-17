@@ -31,9 +31,15 @@
     - one of the store derivation's [output names](#gloss-output-name) or
     - the character `*` denoting all outputs of the derivation
 
-  > **Examples**
+  > **Example**
+  >
+  > Reference to all outputs of a given `stdenv-linux` derivation:
   >
   > `/nix/store/xvni94ndxy75v1wdpshk8k0l75nwyc54-stdenv-linux.drv^*`
+
+  > **Example**
+  >
+  > Reference to the `man` output of a given `bash-5.2-p15` derivation:
   >
   > `/nix/store/llil5bng8p7203l25mqb5lwdhlaya4d9-bash-5.2-p15.drv^man`
 
