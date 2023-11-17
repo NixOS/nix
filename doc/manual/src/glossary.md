@@ -29,7 +29,7 @@
   - The character `^`
   - Either:
     - one of the store derivation's [output names](#gloss-output-name) or
-    - the character `*`
+    - the character `*` denoting all outputs of the derivation
 
   > **Examples**
   >
