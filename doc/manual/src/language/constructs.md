@@ -132,7 +132,7 @@ a = src-set.a; b = src-set.b; c = src-set.c;
 when used while defining local variables in a let-expression or while
 defining a set.
 
-in a let expression, inherit can be used to selectively bring specific attributes of a set into scope. For example
+In a `let` expression, `inherit` can be used to selectively bring specific attributes of a set into scope. For example
 
 
 ```nix
@@ -156,7 +156,7 @@ in
 }
 ```
 
-both resolve to `{ names = [ "a" "b" ]; }`.
+both evaluate to `{ names = [ "a" "b" ]; }`.
 
 ## Functions
 
