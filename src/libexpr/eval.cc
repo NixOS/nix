@@ -31,6 +31,7 @@
 
 #include <sys/resource.h>
 #include <nlohmann/json.hpp>
+#include <boost/container/small_vector.hpp>
 
 #if HAVE_BOEHMGC
 
@@ -42,7 +43,6 @@
 #include <boost/coroutine2/coroutine.hpp>
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
 #include <boost/context/stack_context.hpp>
-#include <boost/container/small_vector.hpp>
 
 #endif
 
