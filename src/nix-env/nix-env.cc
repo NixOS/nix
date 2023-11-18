@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
 #include "derivations.hh"
@@ -11,7 +12,6 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"
-#include "util.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
@@ -481,12 +481,12 @@ static void printMissing(EvalState & state, DrvInfos & elems)
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
         if (auto drvPath = i.queryDrvPath())
-            targets.push_back(DerivedPath::Built{
+            targets.emplace_back(DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(*drvPath),
                 .outputs = OutputsSpec::All { },
             });
         else
-            targets.push_back(DerivedPath::Opaque{
+            targets.emplace_back(DerivedPath::Opaque{
                 .path = i.queryOutPath(),
             });
 

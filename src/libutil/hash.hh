@@ -3,6 +3,7 @@
 
 #include "types.hh"
 #include "serialise.hh"
+#include "file-system.hh"
 
 
 namespace nix {

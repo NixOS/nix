@@ -9,12 +9,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "current-process.hh"
 #include "parsed-derivations.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "derivations.hh"
-#include "util.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
 #include "eval.hh"
@@ -449,7 +449,7 @@ static void main_nix_build(int argc, char * * argv)
             }
         }
         for (const auto & src : drv.inputSrcs) {
-            pathsToBuild.push_back(DerivedPath::Opaque{src});
+            pathsToBuild.emplace_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
         }
 

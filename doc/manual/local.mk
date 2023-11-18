@@ -103,7 +103,7 @@ $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/generate-settings.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-settings.nix { prefix = "opt-"; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-settings.nix { prefix = "conf"; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix

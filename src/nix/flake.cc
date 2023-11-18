@@ -15,6 +15,7 @@
 #include "registry.hh"
 #include "eval-cache.hh"
 #include "markdown.hh"
+#include "users.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -24,8 +25,10 @@ using namespace nix;
 using namespace nix::flake;
 using json = nlohmann::json;
 
+struct CmdFlakeUpdate;
 class FlakeCommand : virtual Args, public MixFlakeOptions
 {
+protected:
     std::string flakeUrl = ".";
 
 public:
@@ -63,6 +66,8 @@ public:
 
 struct CmdFlakeUpdate : FlakeCommand
 {
+public:
+
     std::string description() override
     {
         return "update flake lock file";
@@ -70,9 +75,31 @@ struct CmdFlakeUpdate : FlakeCommand
 
     CmdFlakeUpdate()
     {
+        expectedArgs.clear();
+        addFlag({
+            .longName="flake",
+            .description="The flake to operate on. Default is the current directory.",
+            .labels={"flake-url"},
+            .handler={&flakeUrl},
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(completions, getStore(), prefix);
+            }}
+        });
+        expectArgs({
+            .label="inputs",
+            .optional=true,
+            .handler={[&](std::string inputToUpdate){
+                auto inputPath = flake::parseInputPath(inputToUpdate);
+                if (lockFlags.inputUpdates.contains(inputPath))
+                    warn("Input '%s' was specified multiple times. You may have done this by accident.");
+                lockFlags.inputUpdates.insert(inputPath);
+            }},
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+            }}
+        });
+
         /* Remove flags that don't make sense. */
-        removeFlag("recreate-lock-file");
-        removeFlag("update-input");
         removeFlag("no-update-lock-file");
         removeFlag("no-write-lock-file");
     }
@@ -87,8 +114,9 @@ struct CmdFlakeUpdate : FlakeCommand
     void run(nix::ref<nix::Store> store) override
     {
         settings.tarballTtl = 0;
+        auto updateAll = lockFlags.inputUpdates.empty();
 
-        lockFlags.recreateLockFile = true;
+        lockFlags.recreateLockFile = updateAll;
         lockFlags.writeLockFile = true;
         lockFlags.applyNixConfig = true;
 

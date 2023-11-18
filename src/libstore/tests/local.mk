@@ -6,7 +6,11 @@ libstore-tests-exe_NAME = libnixstore-tests
 
 libstore-tests-exe_DIR := $(d)
 
-libstore-tests-exe_INSTALL_DIR :=
+ifeq ($(INSTALL_UNIT_TESTS), yes)
+  libstore-tests-exe_INSTALL_DIR := $(checkbindir)
+else
+  libstore-tests-exe_INSTALL_DIR :=
+endif
 
 libstore-tests-exe_LIBS = libstore-tests
 
@@ -18,7 +22,11 @@ libstore-tests_NAME = libnixstore-tests
 
 libstore-tests_DIR := $(d)
 
-libstore-tests_INSTALL_DIR :=
+ifeq ($(INSTALL_UNIT_TESTS), yes)
+  libstore-tests_INSTALL_DIR := $(checklibdir)
+else
+  libstore-tests_INSTALL_DIR :=
+endif
 
 libstore-tests_SOURCES := $(wildcard $(d)/*.cc)
 

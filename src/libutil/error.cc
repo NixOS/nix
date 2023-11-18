@@ -1,4 +1,7 @@
 #include "error.hh"
+#include "environment-variables.hh"
+#include "signals.hh"
+#include "terminal.hh"
 
 #include <iostream>
 #include <optional>
@@ -6,8 +9,6 @@
 #include <sstream>
 
 namespace nix {
-
-const std::string nativeSystem = SYSTEM;
 
 void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame)
 {

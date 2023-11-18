@@ -70,7 +70,7 @@ MakeError(InvalidStoreURI, Error);
 
 struct BasicDerivation;
 struct Derivation;
-class FSAccessor;
+struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
 
@@ -80,7 +80,6 @@ typedef std::map<std::string, StorePath> OutputPathMap;
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
-enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 
 /**
  * Magic header of exportPath() output (obsolete).
@@ -666,28 +665,6 @@ public:
         bool showDerivers, bool showHash);
 
     /**
-     * Write a JSON representation of store path metadata, such as the
-     * hash and the references.
-     *
-     * @param includeImpureInfo If true, variable elements such as the
-     * registration time are included.
-     *
-     * @param showClosureSize If true, the closure size of each path is
-     * included.
-     */
-    nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
-        bool includeImpureInfo, bool showClosureSize,
-        HashFormat hashFormat = HashFormat::Base32,
-        AllowInvalidFlag allowInvalid = DisallowInvalid);
-
-    /**
-     * @return the size of the closure of the specified path, that is,
-     * the sum of the size of the NAR serialisation of each path in the
-     * closure.
-     */
-    std::pair<uint64_t, uint64_t> getClosureSize(const StorePath & storePath);
-
-    /**
      * Optimise the disk space usage of the Nix store by hard-linking files
      * with the same contents.
      */
@@ -703,7 +680,7 @@ public:
     /**
      * @return An object to access files in the Nix store.
      */
-    virtual ref<FSAccessor> getFSAccessor() = 0;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) = 0;
 
     /**
      * Repair the contents of the given path by redownloading it using

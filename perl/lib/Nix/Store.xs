@@ -11,7 +11,6 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "store-api.hh"
-#include "util.hh"
 #include "crypto.hh"
 
 #include <sodium.h>

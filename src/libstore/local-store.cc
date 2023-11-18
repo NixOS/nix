@@ -10,6 +10,7 @@
 #include "topo-sort.hh"
 #include "finally.hh"
 #include "compression.hh"
+#include "signals.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -1200,7 +1201,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     bool narRead = false;
     Finally cleanup = [&]() {
         if (!narRead) {
-            ParseSink sink;
+            NullParseSink sink;
             parseDump(sink, source);
         }
     };

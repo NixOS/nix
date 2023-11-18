@@ -16,8 +16,10 @@ R""(
 
 # Description
 
-This command upgrades Nix to the stable version declared in Nixpkgs.
-This stable version is defined in [nix-fallback-paths.nix](https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix)
+This command upgrades Nix to the stable version.
+
+By default, the latest stable version is defined by Nixpkgs, in
+[nix-fallback-paths.nix](https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix)
 and updated manually. It may not always be the latest tagged release.
 
 By default, it locates the directory containing the `nix` binary in the `$PATH`

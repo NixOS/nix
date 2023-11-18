@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "derived-path.hh"
 #include "realisation.hh"
 

@@ -171,7 +171,7 @@ enum struct WorkerProto::Op : uint64_t
  */
 inline Sink & operator << (Sink & sink, WorkerProto::Op op)
 {
-    return sink << (uint64_t) op;
+    return sink << static_cast<uint64_t>(op);
 }
 
 /**
@@ -181,7 +181,7 @@ inline Sink & operator << (Sink & sink, WorkerProto::Op op)
  */
 inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
 {
-    return s << (uint64_t) op;
+    return s << static_cast<uint64_t>(op);
 }
 
 /**

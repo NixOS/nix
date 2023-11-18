@@ -1,3 +1,4 @@
+#include "terminal.hh"
 #include "flake.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
@@ -8,6 +9,7 @@
 #include "fetchers.hh"
 #include "finally.hh"
 #include "fetch-settings.hh"
+#include "value-to-json.hh"
 
 namespace nix {
 
@@ -140,8 +142,13 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         attrs.emplace(state.symbols[attr.name], (long unsigned int)attr.value->integer);
                         break;
                     default:
-                        throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
-                            state.symbols[attr.name], showType(*attr.value));
+                        if (attr.name == state.symbols.create("publicKeys")) {
+                            experimentalFeatureSettings.require(Xp::VerifiedFetches);
+                            NixStringContext emptyContext = {};
+                            attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, emptyContext).dump());
+                        } else
+                            throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
+                                state.symbols[attr.name], showType(*attr.value));
                 }
                 #pragma GCC diagnostic pop
             }
@@ -447,8 +454,8 @@ LockedFlake lockFlake(
 
                     assert(input.ref);
 
-                    /* Do we have an entry in the existing lock file? And we
-                       don't have a --update-input flag for this input? */
+                    /* Do we have an entry in the existing lock file?
+                       And the input is not in updateInputs? */
                     std::shared_ptr<LockedNode> oldLock;
 
                     updatesUsed.insert(inputPath);
@@ -472,9 +479,8 @@ LockedFlake lockFlake(
 
                         node->inputs.insert_or_assign(id, childNode);
 
-                        /* If we have an --update-input flag for an input
-                           of this input, then we must fetch the flake to
-                           update it. */
+                        /* If we have this input in updateInputs, then we
+                           must fetch the flake to update it. */
                         auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
 
                         auto mustRefetch =
@@ -616,19 +622,14 @@ LockedFlake lockFlake(
 
         for (auto & i : lockFlags.inputUpdates)
             if (!updatesUsed.count(i))
-                warn("the flag '--update-input %s' does not match any input", printInputPath(i));
+                warn("'%s' does not match any input of this flake", printInputPath(i));
 
         /* Check 'follows' inputs. */
         newLockFile.check();
 
         debug("new lock file: %s", newLockFile);
 
-        auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
         auto sourcePath = topRef.input.getSourcePath();
-        auto outputLockFilePath = sourcePath ? std::optional{*sourcePath + "/" + relPath} : std::nullopt;
-        if (lockFlags.outputLockFilePath) {
-            outputLockFilePath = lockFlags.outputLockFilePath;
-        }
 
         /* Check whether we need to / can write the new lock file. */
         if (newLockFile != oldLockFile || lockFlags.outputLockFilePath) {
@@ -636,7 +637,7 @@ LockedFlake lockFlake(
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
             if (lockFlags.writeLockFile) {
-                if (outputLockFilePath) {
+                if (sourcePath || lockFlags.outputLockFilePath) {
                     if (auto unlockedInput = newLockFile.isUnlocked()) {
                         if (fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
@@ -644,40 +645,47 @@ LockedFlake lockFlake(
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                        bool lockFileExists = pathExists(*outputLockFilePath);
+                        auto newLockFileS = fmt("%s\n", newLockFile);
 
-                        if (lockFileExists) {
+                        if (lockFlags.outputLockFilePath) {
+                            if (lockFlags.commitLockFile)
+                                throw Error("'--commit-lock-file' and '--output-lock-file' are incompatible");
+                            writeFile(*lockFlags.outputLockFilePath, newLockFileS);
+                        } else {
+                            auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
+                            auto outputLockFilePath = *sourcePath + "/" + relPath;
+
+                            bool lockFileExists = pathExists(outputLockFilePath);
+
                             auto s = chomp(diff);
-                            if (s.empty())
-                                warn("updating lock file '%s'", *outputLockFilePath);
-                            else
-                                warn("updating lock file '%s':\n%s", *outputLockFilePath, s);
-                        } else
-                            warn("creating lock file '%s'", *outputLockFilePath);
+                            if (lockFileExists) {
+                                if (s.empty())
+                                    warn("updating lock file '%s'", outputLockFilePath);
+                                else
+                                    warn("updating lock file '%s':\n%s", outputLockFilePath, s);
+                            } else
+                                warn("creating lock file '%s': \n%s", outputLockFilePath, s);
 
-                        newLockFile.write(*outputLockFilePath);
+                            std::optional<std::string> commitMessage = std::nullopt;
 
-                        std::optional<std::string> commitMessage = std::nullopt;
-                        if (lockFlags.commitLockFile) {
-                            if (lockFlags.outputLockFilePath) {
-                                throw Error("--commit-lock-file and --output-lock-file are currently incompatible");
+                            if (lockFlags.commitLockFile) {
+                                std::string cm;
+
+                                cm = fetchSettings.commitLockFileSummary.get();
+
+                                if (cm == "") {
+                                    cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
+                                }
+
+                                cm += "\n\nFlake lock file updates:\n\n";
+                                cm += filterANSIEscapes(diff, true);
+                                commitMessage = cm;
                             }
-                            std::string cm;
 
-                            cm = fetchSettings.commitLockFileSummary.get();
-
-                            if (cm == "") {
-                                cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
-                            }
-
-                            cm += "\n\nFlake lock file updates:\n\n";
-                            cm += filterANSIEscapes(diff, true);
-                            commitMessage = cm;
+                            topRef.input.putFile(
+                                CanonPath((topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock"),
+                                newLockFileS, commitMessage);
                         }
-
-                        topRef.input.markChangedFile(
-                            (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock",
-                            commitMessage);
 
                         /* Rewriting the lockfile changed the top-level
                            repo, so we should re-read it. FIXME: we could

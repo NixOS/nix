@@ -3,6 +3,7 @@
 
 #include "logging.hh"
 #include "serialise.hh"
+#include "processes.hh"
 
 namespace nix {
 
