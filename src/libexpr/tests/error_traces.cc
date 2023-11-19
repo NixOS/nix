@@ -906,12 +906,12 @@ namespace nix {
         ASSERT_TRACE2("concatMap (x: 1) [ \"foo\" ] # TODO",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "an integer"),
-                      hintfmt("while evaluating the return value of the function passed to buitlins.concatMap"));
+                      hintfmt("while evaluating the return value of the function passed to builtins.concatMap"));
 
         ASSERT_TRACE2("concatMap (x: \"foo\") [ 1 2 ] # TODO",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "a string"),
-                      hintfmt("while evaluating the return value of the function passed to buitlins.concatMap"));
+                      hintfmt("while evaluating the return value of the function passed to builtins.concatMap"));
 
     }
 
