@@ -63,7 +63,7 @@ SourcePath SourcePath::parent() const
 
 SourcePath SourcePath::followSymlinks() const {
     SourcePath path = *this;
-    unsigned int followCount = 0, maxFollow = 1024;
+    unsigned int followCount = 0, maxFollow = 1000;
 
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
@@ -81,7 +81,7 @@ SourcePath SourcePath::resolveSymlinks() const
 {
     auto res = accessor->root();
 
-    int linksAllowed = 1024;
+    int linksAllowed = 1000;
 
     std::list<std::string> todo;
     for (auto & c : path)
