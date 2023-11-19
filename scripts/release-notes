@@ -89,33 +89,35 @@ if [[ ! -n "${VERSION:-}" ]]; then
   exit 1
 fi
 
-# mutate/initialize:
-# VERSION:      MAJOR.MINOR
-# FULL_VERSION: MAJOR.MINOR.PATCH
-# IS_PATCH:     true if this is a patch release; append instead of create
+# version_major_minor:      MAJOR.MINOR
+# version_full:             MAJOR.MINOR.PATCH
+# IS_PATCH:                 true if this is a patch release; append instead of create
 if grep -E '^[0-9]+\.[0-9]+$' <<< "$VERSION" >/dev/null; then
   log 'is minor'
   IS_PATCH=false
-  FULL_VERSION="$VERSION.0"
+  version_full="$VERSION.0"
+  version_major_minor="$VERSION"
 elif grep -E '^[0-9]+\.[0-9]+\.0$' <<< "$VERSION" >/dev/null; then
   log 'is minor (.0)'
   IS_PATCH=false
-  FULL_VERSION="$VERSION"
-  VERSION="$(echo "$VERSION" | sed -e 's/\.0$//')"
+  version_full="$VERSION"
+  version_major_minor="$(echo "$VERSION" | sed -e 's/\.0$//')"
 elif grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' <<< "$VERSION" >/dev/null; then
   log 'is patch'
   IS_PATCH=true
-  FULL_VERSION="$VERSION"
-  VERSION="$(echo "$VERSION" | sed -e 's/\.[0-9]*$//')"
+  version_full="$VERSION"
+  version_major_minor="$(echo "$VERSION" | sed -e 's/\.[0-9]*$//')"
 else
   die "VERSION must be MAJOR.MINOR[.PATCH], where each is a number, e.g. 2.20 or 2.20.1 (VERSION was set to $VERSION)"
 fi
 
-log "VERSION=$VERSION"
-log "FULL_VERSION=$FULL_VERSION"
+unset VERSION
+
+log "version_major_minor=$version_major_minor"
+log "version_full=$version_full"
 log "IS_PATCH=$IS_PATCH"
 
-basename=rl-$VERSION.md
+basename=rl-${version_major_minor}.md
 file=doc/manual/src/release-notes/$basename
 
 if ! $IS_PATCH; then
@@ -142,9 +144,9 @@ esac
 # --- DO THE WORK ---
 
 # menu
-title="Release $VERSION ($DATE)"
+title="Release $version_major_minor ($DATE)"
 # section on page
-section_title="Release $FULL_VERSION ($DATE)"
+section_title="Release $version_full ($DATE)"
 
 (
   # TODO add minor number, and append?
@@ -172,6 +174,6 @@ done
 
 logcmd git add $file doc/manual/src/SUMMARY.md.in
 logcmd git status
-logcmd git commit -m "release notes: $VERSION"
+logcmd git commit -m "release notes: $version_full"
 
 report_done
