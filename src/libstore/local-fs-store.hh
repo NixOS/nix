@@ -71,6 +71,40 @@ public:
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 
+    /**
+     * @todo this was moved to `LocalFSStore` from `LocalStore` because
+     * building needed it. Instead of just blindly moving it, we should
+     * should consider the division of labor and trust between the
+     * builder and the store.
+     */
+    virtual void registerValidPaths(const ValidPathInfos & infos)
+    { unsupported("registerValidPaths"); }
+
+    /**
+     * Optimise a single store path. Optionally, test the encountered
+     * symlinks for corruption.
+     *
+     * @todo this was moved to `LocalFSStore` from `LocalStore` because
+     * building needed it. Instead of just blindly moving it, we should
+     * should consider the division of labor and trust between the
+     * builder and the store.
+     */
+    virtual void optimisePath(const Path & path, RepairFlag repair)
+    { unsupported("optimisePath"); }
+
+    /**
+     * Add signatures to a ValidPathInfo or Realisation using the secret keys
+     * specified by the ‘secret-key-files’ option.
+     *
+     * @todo this was moved to `LocalFSStore` from `LocalStore` because
+     * building needed it. Instead of just blindly moving it, we should
+     * should consider the division of labor and trust between the
+     * builder and the store.
+     */
+    virtual void signPathInfo(ValidPathInfo & info)
+    { unsupported("signPathInfo"); }
+    virtual void signRealisation(Realisation &)
+    { unsupported("signRealisation"); }
 };
 
 }

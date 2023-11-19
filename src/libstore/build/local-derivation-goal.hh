@@ -2,14 +2,14 @@
 ///@file
 
 #include "derivation-goal.hh"
-#include "local-store.hh"
+#include "local-fs-store.hh"
 #include "processes.hh"
 
 namespace nix {
 
 struct LocalDerivationGoal : public DerivationGoal
 {
-    LocalStore & getLocalStore();
+    LocalFSStore & getLocalFSStore();
 
     /**
      * User selected for running the builder.

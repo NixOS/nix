@@ -121,9 +121,9 @@ inline bool LocalDerivationGoal::needsHashRewrite()
 }
 
 
-LocalStore & LocalDerivationGoal::getLocalStore()
+LocalFSStore & LocalDerivationGoal::getLocalFSStore()
 {
-    auto p = dynamic_cast<LocalStore *>(&worker.store);
+    auto p = dynamic_cast<LocalFSStore *>(&worker.store);
     assert(p);
     return *p;
 }
@@ -204,7 +204,7 @@ void LocalDerivationGoal::tryLocalBuild()
             useChroot = derivationType->isSandboxed() && !noChroot;
     }
 
-    auto & localStore = getLocalStore();
+    auto & localStore = getLocalFSStore();
     if (localStore.storeDir != localStore.realStoreDir.get()) {
         #if __linux__
             useChroot = true;
@@ -343,7 +343,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
        so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
     {
-        auto & localStore = getLocalStore();
+        auto & localStore = getLocalFSStore();
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
         if (statvfs(localStore.realStoreDir.get().c_str(), &st) == 0 &&
@@ -1223,16 +1223,16 @@ struct RestrictedStoreConfig : virtual LocalFSStoreConfig
     const std::string name() { return "Restricted Store"; }
 };
 
-/* A wrapper around LocalStore that only allows building/querying of
+/* A wrapper around LocalFSStore that only allows building/querying of
    paths that are in the input closures of the build or were added via
    recursive Nix calls. */
 struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
 {
-    ref<LocalStore> next;
+    ref<LocalFSStore> next;
 
     LocalDerivationGoal & goal;
 
-    RestrictedStore(const Params & params, ref<LocalStore> next, LocalDerivationGoal & goal)
+    RestrictedStore(const Params & params, ref<LocalFSStore> next, LocalDerivationGoal & goal)
         : StoreConfig(params)
         , LocalFSStoreConfig(params)
         , RestrictedStoreConfig(params)
@@ -1459,12 +1459,12 @@ void LocalDerivationGoal::startDaemon()
     Store::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
-    if (auto & optRoot = getLocalStore().rootDir.get())
+    if (auto & optRoot = getLocalFSStore().rootDir.get())
         params["root"] = *optRoot;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
     auto store = make_ref<RestrictedStore>(params,
-        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(worker.store.shared_from_this())),
+        ref<LocalFSStore>(std::dynamic_pointer_cast<LocalFSStore>(worker.store.shared_from_this())),
         *this);
 
     addedPaths.clear();
@@ -2632,7 +2632,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             }
         }
 
-        auto & localStore = getLocalStore();
+        auto & localStore = getLocalFSStore();
 
         if (buildMode == bmCheck) {
 
@@ -2709,7 +2709,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
     {
-        auto & localStore = getLocalStore();
+        auto & localStore = getLocalFSStore();
 
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
@@ -2754,7 +2754,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
 void LocalDerivationGoal::signRealisation(Realisation & realisation)
 {
-    getLocalStore().signRealisation(realisation);
+    getLocalFSStore().signRealisation(realisation);
 }
 
 

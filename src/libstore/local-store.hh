@@ -237,11 +237,7 @@ public:
 
     void optimiseStore() override;
 
-    /**
-     * Optimise a single store path. Optionally, test the encountered
-     * symlinks for corruption.
-     */
-    void optimisePath(const Path & path, RepairFlag repair);
+    void optimisePath(const Path & path, RepairFlag repair) override;
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -255,7 +251,7 @@ public:
      */
     void registerValidPath(const ValidPathInfo & info);
 
-    void registerValidPaths(const ValidPathInfos & infos);
+    void registerValidPaths(const ValidPathInfos & infos) override;
 
     unsigned int getProtocol() override;
 
@@ -343,12 +339,8 @@ private:
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
 
-    /**
-     * Add signatures to a ValidPathInfo or Realisation using the secret keys
-     * specified by the ‘secret-key-files’ option.
-     */
-    void signPathInfo(ValidPathInfo & info);
-    void signRealisation(Realisation &);
+    void signPathInfo(ValidPathInfo & info) override;
+    void signRealisation(Realisation &) override;
 
     // XXX: Make a generic `Store` method
     ContentAddress hashCAPath(

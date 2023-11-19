@@ -3,6 +3,8 @@
 #include "substitution-goal.hh"
 #include "drv-output-substitution-goal.hh"
 #include "local-derivation-goal.hh"
+// Just for `autoGC`, which should have own interface, don't add more usage!
+#include "local-store.hh"
 #include "hook-instance.hh"
 #include "signals.hh"
 
@@ -64,7 +66,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
     const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return !dynamic_cast<LocalStore *>(&store)
+        return !dynamic_cast<LocalFSStore *>(&store)
             ? std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
             : std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
     });
@@ -75,7 +77,7 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
     const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return !dynamic_cast<LocalStore *>(&store)
+        return !dynamic_cast<LocalFSStore *>(&store)
             ? std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
             : std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
