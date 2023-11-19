@@ -1,6 +1,7 @@
 #include "local-store.hh"
 #include "globals.hh"
 #include "signals.hh"
+#include "local-fs-canonicalise.hh"
 
 #include <cstdlib>
 #include <cstring>
