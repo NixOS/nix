@@ -121,6 +121,19 @@ CanonPath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
     return path;
 }
 
+CanonPath MemorySourceAccessor::addSymlink(CanonPath path, std::string &&contents)
+{
+    auto * f = open(path, File { File::Symlink {} });
+    if (!f)
+        throw Error("file '%s' cannot be made because some parent file is not a directory", path);
+    if (auto * s = std::get_if<File::Symlink>(&f->raw))
+        s->target = std::move(contents);
+    else
+        throw Error("file '%s' is not a symbolic link", path);
+
+    return path;
+}
+
 
 using File = MemorySourceAccessor::File;
 

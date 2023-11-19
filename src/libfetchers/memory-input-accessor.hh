@@ -8,6 +8,7 @@ namespace nix {
 struct MemoryInputAccessor : InputAccessor
 {
     virtual SourcePath addFile(CanonPath path, std::string && contents) = 0;
+    virtual SourcePath addSymlink(CanonPath path, std::string && contents) = 0;
 };
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor();

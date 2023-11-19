@@ -12,6 +12,14 @@ struct MemoryInputAccessorImpl : MemoryInputAccessor, MemorySourceAccessor
             MemorySourceAccessor::addFile(path, std::move(contents))
         };
     }
+
+    SourcePath addSymlink(CanonPath path, std::string && contents) override
+    {
+        return {
+            ref(shared_from_this()),
+            MemorySourceAccessor::addSymlink(path, std::move(contents))
+        };
+    }
 };
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor()

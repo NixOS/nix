@@ -29,6 +29,7 @@ UNIT_TEST_ENV = _NIX_TEST_UNIT_DATA=unit-test-data
 makefiles += \
   src/libutil/tests/local.mk \
   src/libstore/tests/local.mk \
+  src/libfetchers/tests/local.mk \
   src/libexpr/tests/local.mk
 endif
 

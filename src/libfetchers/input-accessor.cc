@@ -70,7 +70,7 @@ SourcePath SourcePath::followSymlinks() const {
     while (true) {
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
-            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+            throw Error("too many levels of symbolic links while traversing the path '%s'; assuming it leads to a cycle after following %d indirections", this->to_string(), maxFollow);
         if (path.lstat().type != InputAccessor::tSymlink) break;
         path = {path.accessor, CanonPath(path.readLink(), path.path.parent().value_or(CanonPath::root))};
     }
