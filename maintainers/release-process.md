@@ -28,7 +28,7 @@ release:
 
   ```console
   $ git checkout -b release-notes
-  $ VERSION=X.YY ./scripts/release-notes
+  $ VERSION=X.YY ./maintainers/release-notes
   ```
 
   where `X.YY` is *without* the patch level, e.g. `2.12` rather than ~~`2.12.0`~~.
@@ -165,7 +165,7 @@ release:
 * Update release notes.
 
   ```console
-  $ ./scripts/release-notes
+  $ ./maintainers/release-notes
   ```
 
 * Push.
