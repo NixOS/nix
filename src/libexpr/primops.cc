@@ -2374,7 +2374,7 @@ static RegisterPrimOp primop_path({
           like `@`.
 
         - filter\
-          A function of the type expected by `builtins.filterSource`,
+          A function of the type expected by [`builtins.filterSource`](#builtins-filterSource),
           with the same semantics.
 
         - recursive\
