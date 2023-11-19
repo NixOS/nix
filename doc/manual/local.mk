@@ -92,7 +92,7 @@ $(d)/nix-profiles.5: $(d)/src/command-ref/files/profiles.md
 	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
-$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/SUMMARY-rl-next.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
 	@cp $< $@
 	@$(call process-includes,$@,$@)
 
@@ -144,8 +144,17 @@ $(d)/language.json: $(bindir)/nix
 	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-language > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/release-notes/rl-next.md: $(d)/rl-next/*
+# Generate "Upcoming release" notes (or clear it and remove from menu)
+$(d)/src/release-notes/rl-next.md: $(d)/rl-next $(d)/rl-next/*
 	$(trace-gen) changelog-d doc/manual/rl-next > $@
+
+$(d)/src/SUMMARY-rl-next.md: $(d)/src/release-notes/rl-next.md
+	$(trace-gen) true
+	@if [ -s $< ]; then \
+		echo '  - [Upcoming release](release-notes/rl-next.md)' > $@; \
+	else \
+	  true > $@; \
+	fi
 
 # Generate the HTML manual.
 .PHONY: manual-html
