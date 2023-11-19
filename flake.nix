@@ -173,6 +173,10 @@
           "--enable-internal-api-docs"
         ];
 
+        # TODO: after backport of https://github.com/NixOS/nixpkgs/pull/268487, remove `haskellPackages.` -
+        #       vastly improves output closure, and adds shell completions
+        changelog-d = pkgs.buildPackages.haskellPackages.changelog-d;
+
         nativeBuildDeps =
           [
             buildPackages.bison
@@ -190,7 +194,10 @@
             buildPackages.jq # Also for custom mdBook preprocessor.
             buildPackages.openssh # only needed for tests (ssh-keygen)
           ]
-          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
+          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)]
+          # Official releases don't have rl-next, so we don't need to compile a changelog
+          ++ lib.optional (!officialRelease) changelog-d
+          ;
 
         buildDeps =
           [ curl
@@ -727,6 +734,8 @@
               ++ lib.optional
                 (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform)
                 pkgs.buildPackages.clang-tools
+              # We want changelog-d in the shell even if it's an official release
+              ++ lib.optional officialRelease changelog-d
               ;
 
             buildInputs = buildDeps ++ propagatedDeps

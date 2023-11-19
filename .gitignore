@@ -27,6 +27,7 @@ perl/Makefile.config
 /doc/manual/src/contributing/experimental-feature-descriptions.md
 /doc/manual/src/language/builtins.md
 /doc/manual/src/language/builtin-constants.md
+/doc/manual/src/release-notes/rl-next.md
 
 # /scripts/
 /scripts/nix-profile.sh
