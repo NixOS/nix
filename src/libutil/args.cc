@@ -97,6 +97,8 @@ struct Parser {
     virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) = 0;
 
     Parser(std::string_view s) : remaining(s) {};
+
+    virtual ~Parser() { };
 };
 
 struct ParseQuoted : public Parser {
