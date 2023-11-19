@@ -150,6 +150,30 @@ release:
 
 ## Creating a point release
 
+* Checkout.
+
+  ```console
+  $ git checkout XX.YY-maintenance
+  ```
+
+* Determine the next patch version.
+
+  ```console
+  $ export VERSION=XX.YY.ZZ
+  ```
+
+* Update release notes.
+
+  ```console
+  $ ./scripts/release-notes
+  ```
+
+* Push.
+
+  ```console
+  $ git push
+  ```
+
 * Wait for the desired evaluation of the maintenance jobset to finish
   building.
 

@@ -89,14 +89,40 @@ if [[ ! -n "${VERSION:-}" ]]; then
   exit 1
 fi
 
-case "$VERSION" in
-  # FIXME: accepts "." without any real digits
-  [[:digit:]]*.[[:digit:]]*)
-    ;;
-  *)
-    die "VERSION must be MAJOR.MINOR, where each is a number, e.g. 2.20 (VERSION was set to $VERSION)"
-    ;;
-esac
+# mutate/initialize:
+# VERSION:      MAJOR.MINOR
+# FULL_VERSION: MAJOR.MINOR.PATCH
+# IS_PATCH:     true if this is a patch release; append instead of create
+if grep -E '^[0-9]+\.[0-9]+$' <<< "$VERSION" >/dev/null; then
+  log 'is minor'
+  IS_PATCH=false
+  FULL_VERSION="$VERSION.0"
+elif grep -E '^[0-9]+\.[0-9]+\.0$' <<< "$VERSION" >/dev/null; then
+  log 'is minor (.0)'
+  IS_PATCH=false
+  FULL_VERSION="$VERSION"
+  VERSION="$(echo "$VERSION" | sed -e 's/\.0$//')"
+elif grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' <<< "$VERSION" >/dev/null; then
+  log 'is patch'
+  IS_PATCH=true
+  FULL_VERSION="$VERSION"
+  VERSION="$(echo "$VERSION" | sed -e 's/\.[0-9]*$//')"
+else
+  die "VERSION must be MAJOR.MINOR[.PATCH], where each is a number, e.g. 2.20 or 2.20.1 (VERSION was set to $VERSION)"
+fi
+
+log "VERSION=$VERSION"
+log "FULL_VERSION=$FULL_VERSION"
+log "IS_PATCH=$IS_PATCH"
+
+basename=rl-$VERSION.md
+file=doc/manual/src/release-notes/$basename
+
+if ! $IS_PATCH; then
+  if [[ -e $file ]]; then
+    die "release notes file $file already exists. If you'd like to make a minor release, pass a patch version, e.g. 2.20.1"
+  fi
+fi
 
 # --- DEFAULTS ---
 
@@ -106,7 +132,7 @@ if [[ ! -n "${DATE:-}" ]]; then
 fi
 
 case "$DATE" in
-  [[:digit:]]*-[[:digit:]]*-[[:digit:]]*)
+  [0-9]*-[0-9]*-[0-9]*)
     ;;
   *)
     die "DATE must be YYYY-MM-DD, e.g. 2021-12-31 (DATE was set to $DATE)"
@@ -115,25 +141,28 @@ esac
 
 # --- DO THE WORK ---
 
-basename=rl-$VERSION.md
-file=doc/manual/src/release-notes/$basename
+# menu
 title="Release $VERSION ($DATE)"
+# section on page
+section_title="Release $FULL_VERSION ($DATE)"
 
 (
   # TODO add minor number, and append?
-  echo "# $title"
+  echo "# $section_title"
   echo
   changelog-d doc/manual/rl-next | sed -e 's/ *$//'
-) > $file
+) | tee -a $file
 
 log "Wrote $file"
 
-NEW_SUMMARY_LINE="  - [$title](release-notes/$basename)"
+if ! $IS_PATCH; then
+  NEW_SUMMARY_LINE="  - [$title](release-notes/$basename)"
 
-# find the marker line, insert new link after it
-escaped_marker="$(echo "$SUMMARY_MARKER_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
-escaped_line="$(echo "$NEW_SUMMARY_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
-logcmd sed -i -e "/$escaped_marker/a $escaped_line" doc/manual/src/SUMMARY.md.in
+  # find the marker line, insert new link after it
+  escaped_marker="$(echo "$SUMMARY_MARKER_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
+  escaped_line="$(echo "$NEW_SUMMARY_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
+  logcmd sed -i -e "/$escaped_marker/a $escaped_line" doc/manual/src/SUMMARY.md.in
+fi
 
 for f in doc/manual/rl-next/*.md; do
   if [[ config != "$(basename $f)" ]]; then
