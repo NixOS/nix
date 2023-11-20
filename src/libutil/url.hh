@@ -19,6 +19,11 @@ struct ParsedURL
     std::string to_string() const;
 
     bool operator ==(const ParsedURL & other) const;
+
+    /**
+     * Remove `.` and `..` path elements.
+     */
+    ParsedURL canonicalise();
 };
 
 MakeError(BadURL, Error);

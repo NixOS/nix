@@ -2,6 +2,7 @@
 #include "url-parts.hh"
 #include "util.hh"
 #include "split.hh"
+#include "canon-path.hh"
 
 namespace nix {
 
@@ -139,6 +140,13 @@ bool ParsedURL::operator ==(const ParsedURL & other) const
         && path == other.path
         && query == other.query
         && fragment == other.fragment;
+}
+
+ParsedURL ParsedURL::canonicalise()
+{
+    ParsedURL res(*this);
+    res.path = CanonPath(res.path).abs();
+    return res;
 }
 
 /**

@@ -7,8 +7,9 @@
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, libgit2 }:
 
     let
       inherit (nixpkgs) lib;
@@ -198,6 +199,11 @@
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
+            (pkgs.libgit2.overrideAttrs (attrs: {
+              src = libgit2;
+              version = libgit2.lastModifiedDate;
+              cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
+            }))
             boost
             lowdown-nix
             libsodium

@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include <set>
+#include <vector>
 
 namespace nix {
 
@@ -45,6 +46,11 @@ public:
     CanonPath(unchecked_t _, std::string path)
         : path(std::move(path))
     { }
+
+    /**
+     * Construct a canon path from a vector of elements.
+     */
+    CanonPath(const std::vector<std::string> & elems);
 
     static CanonPath fromCwd(std::string_view path = ".");
 

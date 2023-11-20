@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "input-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -219,6 +220,16 @@ std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
     return {std::move(storePath), input};
 }
 
+std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+{
+    try {
+        return scheme->getAccessor(store, *this);
+    } catch (Error & e) {
+        e.addTrace({}, "while fetching the input '%s'", to_string());
+        throw;
+    }
+}
+
 Input Input::applyOverrides(
     std::optional<std::string> ref,
     std::optional<Hash> rev) const
@@ -353,6 +364,18 @@ void InputScheme::putFile(
 void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
+{
+    auto [accessor, input2] = getAccessor(store, input);
+    auto storePath = accessor->root().fetchToStore(store, input2.getName());
+    return {storePath, input2};
+}
+
+std::pair<ref<InputAccessor>, Input> InputScheme::getAccessor(ref<Store> store, const Input & input) const
+{
+    throw UnimplementedError("InputScheme must implement fetch() or getAccessor()");
 }
 
 std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
