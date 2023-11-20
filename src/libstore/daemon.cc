@@ -1007,11 +1007,15 @@ void processConnection(
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
 
-    auto tunnelLogger = new TunnelLogger(to, clientVersion);
-    auto prevLogger = nix::logger;
     // FIXME
-    if (!recursive)
-        logger = tunnelLogger;
+    auto tunnelLogger_ = std::make_unique<TunnelLogger>(to, clientVersion);
+    auto tunnelLogger = tunnelLogger_.get();
+    std::unique_ptr<Logger> prevLogger_;
+    auto prevLogger = logger.get();
+    if (!recursive) {
+        prevLogger_ = std::move(logger);
+        logger = std::move(tunnelLogger_);
+    }
 
     unsigned int opCount = 0;
 
