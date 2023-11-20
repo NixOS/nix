@@ -2803,6 +2803,52 @@ static RegisterPrimOp primop_functionArgs({
     .fun = prim_functionArgs,
 });
 
+static void prim_functionInfo(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
+        v.mkAttrs(&state.emptyBindings);
+        return;
+    }
+    if (!args[0]->isLambda())
+        state.debugThrowLastTrace(TypeError({
+            .msg = hintfmt("'functionArgs' requires a function"),
+            .errPos = state.positions[pos]
+        }));
+
+    if (!args[0]->lambda.fun->hasFormals()) {
+        v.mkAttrs(&state.emptyBindings);
+        return;
+    }
+
+    auto formals = state.buildBindings(args[0]->lambda.fun->formals->formals.size());
+    for (auto & i : args[0]->lambda.fun->formals->formals)
+        // !!! should optimise booleans (allocate only once)
+        formals.alloc(i.name, i.pos).mkBool(i.def);
+    auto attrs = state.buildBindings(3);
+    if(args[0]->lambda.fun->arg) attrs.alloc("arg").mkString(state.symbols[args[0]->lambda.fun->arg]);
+    attrs.alloc("ellipsis").mkBool(args[0]->lambda.fun->formals->ellipsis);
+    attrs.alloc("formals").mkAttrs(formals);
+    v.mkAttrs(attrs);
+}
+
+static RegisterPrimOp primop_functionInfo({
+    .name = "__functionInfo",
+    .args = {"f"},
+    .doc = R"(
+      Return information about the function including the following:
+
+        * arg - The name of the argument, this value is present for functions
+                that don't use attrset matching(i.e. `x: true`) and functions
+                that use an @-pattern(i.e. `{...}@argName`). Otherwise this
+                attr is absent.
+        * ellipsis - Set to true for functions of the form `{ a, b, ... }`.
+        * formals - Returns formal arguments, identical to
+          `builtins.functionArgs`.
+    )",
+    .fun = prim_functionInfo,
+});
+
 /*  */
 static void prim_mapAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
