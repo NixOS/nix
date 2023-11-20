@@ -4,6 +4,7 @@
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
+#include "gc-small-vector.hh"
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
@@ -2729,7 +2730,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.catAttrs"));
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
-    Value * res[args[1]->listSize()];
+    SmallValueVector<nonRecursiveStackReservation> res(args[1]->listSize());
     size_t found = 0;
 
     for (auto v2 : args[1]->listItems()) {
@@ -3064,8 +3065,7 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    // FIXME: putting this on the stack is risky.
-    Value * vs[args[1]->listSize()];
+    SmallValueVector<nonRecursiveStackReservation> vs(args[1]->listSize());
     size_t k = 0;
 
     bool same = true;
@@ -3454,7 +3454,8 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
     auto nrLists = args[1]->listSize();
 
-    Value lists[nrLists];
+    // List of returned lists before concatenation. References to these Values must NOT be persisted.
+    SmallTemporaryValueVector<conservativeStackReservation> lists(nrLists);
     size_t len = 0;
 
     for (unsigned int n = 0; n < nrLists; ++n) {

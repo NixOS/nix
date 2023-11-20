@@ -230,6 +230,9 @@
             }).overrideAttrs(o: {
               patches = (o.patches or []) ++ [
                 ./boehmgc-coroutine-sp-fallback.diff
+
+                # https://github.com/ivmai/bdwgc/pull/586
+                ./boehmgc-traceable_allocator-public.diff
               ];
             })
             )
