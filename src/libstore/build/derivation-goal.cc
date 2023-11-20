@@ -1317,9 +1317,26 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
                     auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
                     // ensure that logs from a builder using `ssh-ng://` as protocol
                     // are also available to `nix log`.
-                    if (s && !isWrittenToLog && logSink && (*json)["type"] == resBuildLogLine) {
-                        auto f = (*json)["fields"];
-                        (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
+                    if (s && !isWrittenToLog && logSink) {
+                        const auto type = (*json)["type"];
+                        const auto fields = (*json)["fields"];
+                        if (type == resBuildLogLine) {
+                            (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                        } else if (type == resSetPhase && ! fields.is_null()) {
+                            const auto phase = fields[0];
+                            if (! phase.is_null()) {
+                                // nixpkgs' stdenv produces lines in the log to signal
+                                // phase changes.
+                                // We want to get the same lines in case of remote builds.
+                                // The format is:
+                                //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                const auto logLine = nlohmann::json::object({
+                                    {"action", "setPhase"},
+                                    {"phase", phase}
+                                });
+                                (*logSink)("@nix " + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n");
+                            }
+                        }
                     }
                 }
                 currentHookLine.clear();
@@ -1474,6 +1491,7 @@ void DerivationGoal::done(
     SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
+    outputLocks.unlock();
     buildResult.status = status;
     if (ex)
         buildResult.errorMsg = fmt("%s", normaltxt(ex->info().msg));

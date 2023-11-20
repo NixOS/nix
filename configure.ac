@@ -167,6 +167,18 @@ AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
   ENABLE_TESTS=$enableval, ENABLE_TESTS=yes)
 AC_SUBST(ENABLE_TESTS)
 
+AC_ARG_ENABLE(install-unit-tests, AS_HELP_STRING([--enable-install-unit-tests],[Install the unit tests for running later (default no)]),
+  INSTALL_UNIT_TESTS=$enableval, INSTALL_UNIT_TESTS=no)
+AC_SUBST(INSTALL_UNIT_TESTS)
+
+AC_ARG_WITH(check-bin-dir, AS_HELP_STRING([--with-check-bin-dir=PATH],[path to install unit tests for running later (defaults to $libexecdir/nix)]),
+  checkbindir=$withval, checkbindir=$libexecdir/nix)
+AC_SUBST(checkbindir)
+
+AC_ARG_WITH(check-lib-dir, AS_HELP_STRING([--with-check-lib-dir=PATH],[path to install unit tests for running later (defaults to $libdir)]),
+  checklibdir=$withval, checklibdir=$libdir)
+AC_SUBST(checklibdir)
+
 # Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
 AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
   internal_api_docs=$enableval, internal_api_docs=no)

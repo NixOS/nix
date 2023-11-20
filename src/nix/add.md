@@ -19,7 +19,7 @@ Add a directory to the store:
 # mkdir dir
 # echo foo > dir/bar
 
-# nix store add-path ./dir
+# nix store add ./dir
 /nix/store/6pmjx56pm94n66n4qw1nff0y1crm8nqg-dir
 
 # cat /nix/store/6pmjx56pm94n66n4qw1nff0y1crm8nqg-dir/bar

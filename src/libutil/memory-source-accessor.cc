@@ -121,4 +121,60 @@ CanonPath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
     return path;
 }
 
+
+using File = MemorySourceAccessor::File;
+
+void MemorySink::createDirectory(const Path & path)
+{
+    auto * f = dst.open(CanonPath{path}, File { File::Directory { } });
+    if (!f)
+        throw Error("file '%s' cannot be made because some parent file is not a directory", path);
+
+    if (!std::holds_alternative<File::Directory>(f->raw))
+        throw Error("file '%s' is not a directory", path);
+};
+
+void MemorySink::createRegularFile(const Path & path)
+{
+    auto * f = dst.open(CanonPath{path}, File { File::Regular {} });
+    if (!f)
+        throw Error("file '%s' cannot be made because some parent file is not a directory", path);
+    if (!(r = std::get_if<File::Regular>(&f->raw)))
+        throw Error("file '%s' is not a regular file", path);
+}
+
+void MemorySink::closeRegularFile()
+{
+    r = nullptr;
+}
+
+void MemorySink::isExecutable()
+{
+    assert(r);
+    r->executable = true;
+}
+
+void MemorySink::preallocateContents(uint64_t len)
+{
+    assert(r);
+    r->contents.reserve(len);
+}
+
+void MemorySink::receiveContents(std::string_view data)
+{
+    assert(r);
+    r->contents += data;
+}
+
+void MemorySink::createSymlink(const Path & path, const std::string & target)
+{
+    auto * f = dst.open(CanonPath{path}, File { File::Symlink { } });
+    if (!f)
+        throw Error("file '%s' cannot be made because some parent file is not a directory", path);
+    if (auto * s = std::get_if<File::Symlink>(&f->raw))
+        s->target = target;
+    else
+        throw Error("file '%s' is not a symbolic link", path);
+}
+
 }

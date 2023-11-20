@@ -26,3 +26,20 @@ hash2=$(nix-hash --type sha256 --base32 ./dummy)
 echo $hash2
 
 test "$hash1" = "sha256:$hash2"
+
+#### New style commands
+
+clearStore
+
+(
+    path1=$(nix store add ./dummy)
+    path2=$(nix store add --mode nar ./dummy)
+    path3=$(nix store add-path ./dummy)
+    [[ "$path1" == "$path2" ]]
+    [[ "$path1" == "$path3" ]]
+)
+(
+    path1=$(nix store add --mode flat ./dummy)
+    path2=$(nix store add-file ./dummy)
+    [[ "$path1" == "$path2" ]]
+)
