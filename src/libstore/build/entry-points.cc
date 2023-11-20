@@ -1,6 +1,7 @@
 #include "worker.hh"
 #include "substitution-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
+#  include "derivation-creation-and-realisation-goal.hh"
 #  include "derivation-goal.hh"
 #endif
 #include "local-store.hh"
@@ -29,8 +30,8 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         }
         if (i->exitCode != Goal::ecSuccess) {
 #ifndef _WIN32 // TODO Enable building on Windows
-            if (auto i2 = dynamic_cast<DerivationGoal *>(i.get()))
-                failed.insert(printStorePath(i2->drvPath));
+            if (auto i2 = dynamic_cast<DerivationCreationAndRealisationGoal *>(i.get()))
+                failed.insert(i2->drvReq->to_string(*this));
             else
 #endif
             if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
