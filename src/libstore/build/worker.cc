@@ -199,8 +199,16 @@ void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
     if (inBuildSlot) {
-        if (goal->jobCategory() == JobCategory::Substitution) nrSubstitutions++;
-        else nrLocalBuilds++;
+        switch (goal->jobCategory()) {
+        case JobCategory::Substitution:
+            nrSubstitutions++;
+            break;
+        case JobCategory::Build:
+            nrLocalBuilds++;
+            break;
+        default:
+            abort();
+        }
     }
 }
 
@@ -212,12 +220,17 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
     if (i == children.end()) return;
 
     if (i->inBuildSlot) {
-        if (goal->jobCategory() == JobCategory::Substitution) {
+        switch (goal->jobCategory()) {
+        case JobCategory::Substitution:
             assert(nrSubstitutions > 0);
             nrSubstitutions--;
-        } else {
+            break;
+        case JobCategory::Build:
             assert(nrLocalBuilds > 0);
             nrLocalBuilds--;
+            break;
+        default:
+            abort();
         }
     }
 
