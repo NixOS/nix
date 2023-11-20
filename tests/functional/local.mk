@@ -58,6 +58,7 @@ nix_tests = \
   secure-drv-outputs.sh \
   restricted.sh \
   fetchGitSubmodules.sh \
+  fetchGitVerification.sh \
   flakes/search-root.sh \
   readfile-context.sh \
   nix-channel.sh \
@@ -122,6 +123,7 @@ nix_tests = \
   flakes/show.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
+  path-info.sh \
   toString-path.sh \
   read-only-store.sh \
   nested-sandboxing.sh \

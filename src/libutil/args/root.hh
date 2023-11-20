@@ -29,13 +29,25 @@ struct Completions final : AddCompletions
  */
 class RootArgs : virtual public Args
 {
+    /**
+     * @brief The command's "working directory", but only set when top level.
+     *
+     * Use getCommandBaseDir() to get the directory regardless of whether this
+     * is a top-level command or subcommand.
+     *
+     * @see getCommandBaseDir()
+     */
+    Path commandBaseDir = ".";
+
 public:
     /** Parse the command line, throwing a UsageError if something goes
      * wrong.
      */
-    void parseCmdline(const Strings & cmdline);
+    void parseCmdline(const Strings & cmdline, bool allowShebang = false);
 
     std::shared_ptr<Completions> completions;
+
+    Path getCommandBaseDir() const override;
 
 protected:
 

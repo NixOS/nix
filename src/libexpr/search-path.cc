@@ -1,5 +1,4 @@
 #include "search-path.hh"
-#include "util.hh"
 
 namespace nix {
 

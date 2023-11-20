@@ -10,6 +10,7 @@
 #include "path-references.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "processes.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
@@ -28,7 +29,6 @@
 #include <dlfcn.h>
 
 #include <cmath>
-
 
 namespace nix {
 
@@ -827,9 +827,10 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         v = *args[1];
     } catch (Error & e) {
         NixStringContext context;
-        e.addTrace(nullptr, state.decodePaths(*state.coerceToString(pos, *args[0], context,
-                    "while evaluating the error message passed to 'builtins.addErrorContext'",
-                    false, false)), true);
+        auto message = state.decodePaths(*state.coerceToString(pos, *args[0], context,
+                "while evaluating the error message passed to 'builtins.addErrorContext'",
+                false, false));
+        e.addTrace(nullptr, hintfmt(message), true);
         throw;
     }
 }
@@ -2399,7 +2400,7 @@ static RegisterPrimOp primop_path({
           like `@`.
 
         - filter\
-          A function of the type expected by `builtins.filterSource`,
+          A function of the type expected by [`builtins.filterSource`](#builtins-filterSource),
           with the same semantics.
 
         - recursive\
@@ -2574,6 +2575,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     /* Get the attribute names to be removed.
        We keep them as Attrs instead of Symbols so std::set_difference
        can be used to remove them from attrs[0]. */
+    // 64: large enough to fit the attributes of a derivation
     boost::container::small_vector<Attr, 64> names;
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
@@ -2754,7 +2756,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
     Value * res[args[1]->listSize()];
-    unsigned int found = 0;
+    size_t found = 0;
 
     for (auto v2 : args[1]->listItems()) {
         state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
@@ -3090,7 +3092,7 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     // FIXME: putting this on the stack is risky.
     Value * vs[args[1]->listSize()];
-    unsigned int k = 0;
+    size_t k = 0;
 
     bool same = true;
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
@@ -3215,10 +3217,14 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
     state.forceFunction(*args[0], pos, std::string("while evaluating the first argument passed to builtins.") + (any ? "any" : "all"));
     state.forceList(*args[1], pos, std::string("while evaluating the second argument passed to builtins.") + (any ? "any" : "all"));
 
+    std::string_view errorCtx = any
+        ? "while evaluating the return value of the function passed to builtins.any"
+        : "while evaluating the return value of the function passed to builtins.all";
+
     Value vTmp;
     for (auto elem : args[1]->listItems()) {
         state.callFunction(*args[0], *elem, vTmp, pos);
-        bool res = state.forceBool(vTmp, pos, std::string("while evaluating the return value of the function passed to builtins.") + (any ? "any" : "all"));
+        bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
             v.mkBool(any);
             return;
@@ -3480,7 +3486,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to buitlins.concatMap");
+        state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
         len += lists[n].listSize();
     }
 

@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
 #include "derivations.hh"
@@ -11,7 +12,6 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"
-#include "util.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
@@ -172,7 +172,7 @@ static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v
        directory). */
     else if (st.type == InputAccessor::tDirectory) {
         auto attrs = state.buildBindings(maxAttrs);
-        attrs.alloc("_combineChannels").mkList(0);
+        state.mkList(attrs.alloc("_combineChannels"), 0);
         StringSet seen;
         getAllExprs(state, path, seen, attrs);
         v.mkAttrs(attrs);
@@ -481,12 +481,12 @@ static void printMissing(EvalState & state, DrvInfos & elems)
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
         if (auto drvPath = i.queryDrvPath())
-            targets.push_back(DerivedPath::Built{
+            targets.emplace_back(DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(*drvPath),
                 .outputs = OutputsSpec::All { },
             });
         else
-            targets.push_back(DerivedPath::Opaque{
+            targets.emplace_back(DerivedPath::Opaque{
                 .path = i.queryOutPath(),
             });
 

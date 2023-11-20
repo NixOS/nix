@@ -46,8 +46,16 @@ echo '"expression in root repo"' > $rootRepo/root.nix
 git -C $rootRepo add root.nix
 git -C $rootRepo commit -m "Add root.nix"
 
-# FIXME
+flakeref=git+file://$rootRepo\?submodules=1\&dir=submodule
+
 # Flake can live inside a submodule and can be accessed via ?dir=submodule
-#[[ $(nix eval --json git+file://$rootRepo\?submodules=1\&dir=submodule#sub ) = '"expression in submodule"' ]]
+[[ $(nix eval --json $flakeref#sub ) = '"expression in submodule"' ]]
+
 # The flake can access content outside of the submodule
-#[[ $(nix eval --json git+file://$rootRepo\?submodules=1\&dir=submodule#root ) = '"expression in root repo"' ]]
+[[ $(nix eval --json $flakeref#root ) = '"expression in root repo"' ]]
+
+# Check that dirtying a submodule makes the entire thing dirty.
+[[ $(nix flake metadata --json $flakeref | jq -r .locked.rev) != null ]]
+echo '"foo"' > $rootRepo/submodule/sub.nix
+[[ $(nix eval --json $flakeref#sub ) = '"foo"' ]]
+[[ $(nix flake metadata --json $flakeref | jq -r .locked.rev) = null ]]

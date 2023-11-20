@@ -1,4 +1,6 @@
 #include "fetchers.hh"
+#include "processes.hh"
+#include "users.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"

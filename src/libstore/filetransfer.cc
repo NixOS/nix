@@ -1,11 +1,12 @@
 #include "filetransfer.hh"
-#include "util.hh"
+#include "namespaces.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "s3.hh"
 #include "compression.hh"
 #include "finally.hh"
 #include "callback.hh"
+#include "signals.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>

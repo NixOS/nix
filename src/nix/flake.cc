@@ -15,6 +15,7 @@
 #include "registry.hh"
 #include "eval-cache.hh"
 #include "markdown.hh"
+#include "users.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>

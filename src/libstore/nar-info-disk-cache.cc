@@ -1,4 +1,5 @@
 #include "nar-info-disk-cache.hh"
+#include "users.hh"
 #include "sync.hh"
 #include "sqlite.hh"
 #include "globals.hh"

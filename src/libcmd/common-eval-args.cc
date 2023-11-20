@@ -2,7 +2,6 @@
 #include "common-eval-args.hh"
 #include "shared.hh"
 #include "filetransfer.hh"
-#include "util.hh"
 #include "eval.hh"
 #include "fetchers.hh"
 #include "registry.hh"
@@ -166,7 +165,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s)
+SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto accessor = fetchers::downloadTarball(
@@ -188,7 +187,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else
-        return state.rootPath(CanonPath::fromCwd(s));
+        return state.rootPath(CanonPath(s, baseDir));
 }
 
 }

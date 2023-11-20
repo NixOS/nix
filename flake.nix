@@ -1,14 +1,13 @@
 {
   description = "The purely functional package manager";
 
-  # FIXME go back to nixos-23.05-small once
-  # https://github.com/NixOS/nixpkgs/pull/264875 is included.
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, libgit2 }:
 
     let
       inherit (nixpkgs) lib;
@@ -164,6 +163,10 @@
 
         testConfigureFlags = [
           "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+        ] ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+          "--enable-install-unit-tests"
+          "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+          "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
         ];
 
         internalApiDocsConfigureFlags = [
@@ -185,6 +188,7 @@
             buildPackages.git
             buildPackages.mercurial # FIXME: remove? only needed for tests
             buildPackages.jq # Also for custom mdBook preprocessor.
+            buildPackages.openssh # only needed for tests (ssh-keygen)
           ]
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
@@ -193,7 +197,11 @@
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
-            libgit2
+            (pkgs.libgit2.overrideAttrs (attrs: {
+              src = libgit2;
+              version = libgit2.lastModifiedDate;
+              cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
+            }))
             boost
             lowdown-nix
             libsodium
@@ -404,7 +412,8 @@
             src = nixSrc;
             VERSION_SUFFIX = versionSuffix;
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (currentStdenv.hostPlatform != currentStdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps;
             buildInputs = buildDeps
@@ -710,7 +719,8 @@
           stdenv.mkDerivation {
             name = "nix";
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (stdenv.hostPlatform != stdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps
               ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear

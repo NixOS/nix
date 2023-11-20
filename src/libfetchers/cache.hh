@@ -6,14 +6,15 @@
 
 namespace nix::fetchers {
 
+/**
+ * A cache for arbitrary `Attrs` -> `Attrs` mappings with a timestamp
+ * for expiration.
+ */
 struct Cache
 {
     virtual ~Cache() { }
 
-    /* A cache for arbitrary Attrs -> Attrs mappings with a timestamp
-       for expiration. */
-
-    /*
+    /**
      * Add a value to the cache. The cache is an arbitrary mapping of
      * Attrs to Attrs.
      */
@@ -21,13 +22,13 @@ struct Cache
         const Attrs & inAttrs,
         const Attrs & infoAttrs) = 0;
 
-    /*
+    /**
      * Look up a key with infinite TTL.
      */
     virtual std::optional<Attrs> lookup(
         const Attrs & inAttrs) = 0;
 
-    /*
+    /**
      * Look up a key. Return nothing if its TTL has exceeded
      * `settings.tarballTTL`.
      */
@@ -40,7 +41,7 @@ struct Cache
         Attrs infoAttrs;
     };
 
-    /*
+    /**
      * Look up a key. Return a bool denoting whether its TTL has
      * exceeded `settings.tarballTTL`.
      */

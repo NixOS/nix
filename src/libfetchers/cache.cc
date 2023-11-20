@@ -1,4 +1,5 @@
 #include "cache.hh"
+#include "users.hh"
 #include "sqlite.hh"
 #include "sync.hh"
 #include "store-api.hh"

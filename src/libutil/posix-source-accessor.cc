@@ -1,4 +1,5 @@
 #include "posix-source-accessor.hh"
+#include "signals.hh"
 
 namespace nix {
 

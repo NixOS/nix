@@ -349,6 +349,11 @@ std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
     return {};
 }
 
+std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
+{
+    return ((nlohmann::json) publicKeys).dump();
+}
+
 std::optional<std::string> InputScheme::getFingerprint(ref<Store> store, const Input & input) const
 {
     if (auto rev = input.getRev())

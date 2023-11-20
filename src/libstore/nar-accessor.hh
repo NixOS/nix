@@ -25,7 +25,7 @@ ref<SourceAccessor> makeNarAccessor(Source & source);
  * readFile() method of the accessor to get the contents of files
  * inside the NAR.
  */
-typedef std::function<std::string(uint64_t, uint64_t)> GetNarBytes;
+using GetNarBytes = std::function<std::string(uint64_t, uint64_t)>;
 
 ref<SourceAccessor> makeLazyNarAccessor(
     const std::string & listing,

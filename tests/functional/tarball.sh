@@ -18,7 +18,7 @@ test_tarball() {
     local compressor="$2"
 
     tarball=$TEST_ROOT/tarball.tar$ext
-    (cd $TEST_ROOT && tar cf - tarball) | $compressor > $tarball
+    (cd $TEST_ROOT && GNUTAR_REPRODUCIBLE= tar --mtime=$tarroot/default.nix --owner=0 --group=0 --numeric-owner --sort=name -c -f - tarball) | $compressor > $tarball
 
     nix-env -f file://$tarball -qa --out-path | grepQuiet dependencies
 

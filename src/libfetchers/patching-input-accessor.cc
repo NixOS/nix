@@ -1,4 +1,5 @@
 #include "input-accessor.hh"
+#include "processes.hh"
 
 namespace nix {
 

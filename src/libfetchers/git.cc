@@ -1,13 +1,15 @@
 #include "fetchers.hh"
+#include "users.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
-#include "util.hh"
+#include "processes.hh"
 #include "git.hh"
 #include "fs-input-accessor.hh"
+#include "mounted-input-accessor.hh"
 #include "git-utils.hh"
 
 #include "fetch-settings.hh"
@@ -134,9 +136,17 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl)
     return std::nullopt;
 }
 
-bool isNotDotGitDirectory(const Path & path)
+std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 {
-    return baseNameOf(path) != ".git";
+    std::vector<PublicKey> publicKeys;
+    if (attrs.contains("publicKeys")) {
+        nlohmann::json publicKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
+        ensureType(publicKeysJson, nlohmann::json::value_t::array);
+        publicKeys = publicKeysJson.get<std::vector<PublicKey>>();
+    }
+    if (attrs.contains("publicKey"))
+        publicKeys.push_back(PublicKey{maybeGetStrAttr(attrs, "keytype").value_or("ssh-ed25519"),getStrAttr(attrs, "publicKey")});
+    return publicKeys;
 }
 
 }  // end namespace
@@ -159,9 +169,9 @@ struct GitInputScheme : InputScheme
         attrs.emplace("type", "git");
 
         for (auto & [name, value] : url.query) {
-            if (name == "rev" || name == "ref")
+            if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "allRefs")
+            else if (name == "shallow" || name == "submodules" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -193,14 +203,23 @@ struct GitInputScheme : InputScheme
             "name",
             "dirtyRev",
             "dirtyShortRev",
+            "verifyCommit",
+            "keytype",
+            "publicKey",
+            "publicKeys",
         };
     }
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        maybeGetBoolAttr(attrs, "shallow");
-        maybeGetBoolAttr(attrs, "submodules");
-        maybeGetBoolAttr(attrs, "allRefs");
+        for (auto & [name, _] : attrs)
+            if (name == "verifyCommit"
+                || name == "keytype"
+                || name == "publicKey"
+                || name == "publicKeys")
+                experimentalFeatureSettings.require(Xp::VerifiedFetches);
+
+        maybeGetBoolAttr(attrs, "verifyCommit");
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
             if (std::regex_search(*ref, badGitRefRegex))
@@ -212,6 +231,9 @@ struct GitInputScheme : InputScheme
         auto url = fixGitURL(getStrAttr(attrs, "url"));
         parseURL(url);
         input.attrs["url"] = url;
+        getShallowAttr(input);
+        getSubmodulesAttr(input);
+        getAllRefsAttr(input);
         return input;
     }
 
@@ -221,8 +243,19 @@ struct GitInputScheme : InputScheme
         if (url.scheme != "git") url.scheme = "git+" + url.scheme;
         if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
-        if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
+        if (getShallowAttr(input))
             url.query.insert_or_assign("shallow", "1");
+        if (getSubmodulesAttr(input))
+            url.query.insert_or_assign("submodules", "1");
+        if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
+            url.query.insert_or_assign("verifyCommit", "1");
+        auto publicKeys = getPublicKeys(input.attrs);
+        if (publicKeys.size() == 1) {
+            url.query.insert_or_assign("keytype", publicKeys.at(0).type);
+            url.query.insert_or_assign("publicKey", publicKeys.at(0).key);
+        }
+        else if (publicKeys.size() > 1)
+            url.query.insert_or_assign("publicKeys", publicKeys_to_string(publicKeys));
         return url;
     }
 
@@ -281,12 +314,6 @@ struct GitInputScheme : InputScheme
 
     struct RepoInfo
     {
-        bool shallow = false;
-        bool submodules = false;
-        bool allRefs = false;
-
-        std::string cacheType;
-
         /* Whether this is a local, non-bare repository. */
         bool isLocal = false;
 
@@ -294,7 +321,7 @@ struct GitInputScheme : InputScheme
            whether the working directory is dirty compared to HEAD. */
         GitRepo::WorkdirInfo workdirInfo;
 
-        /* URL of the repo, or its path if isLocal. */
+        /* URL of the repo, or its path if isLocal. Never a `file` URL. */
         std::string url;
 
         void warnDirty() const
@@ -311,9 +338,19 @@ struct GitInputScheme : InputScheme
         std::string gitDir = ".git";
     };
 
+    bool getShallowAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+    }
+
     bool getSubmodulesAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    }
+
+    bool getAllRefsAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
     }
 
     RepoInfo getRepoInfo(const Input & input) const
@@ -327,16 +364,7 @@ struct GitInputScheme : InputScheme
         if (auto rev = input.getRev())
             checkHashType(rev);
 
-        RepoInfo repoInfo {
-            .shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false),
-            .submodules = getSubmodulesAttr(input),
-            .allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false)
-        };
-
-        repoInfo.cacheType = "git";
-        if (repoInfo.shallow) repoInfo.cacheType += "-shallow";
-        if (repoInfo.submodules) repoInfo.cacheType += "-submodules";
-        if (repoInfo.allRefs) repoInfo.cacheType += "-all-refs";
+        RepoInfo repoInfo;
 
         // file:// URIs are normally not cloned (but otherwise treated the
         // same as remote URIs, i.e. we don't use the working tree or
@@ -413,6 +441,19 @@ struct GitInputScheme : InputScheme
         };
     }
 
+    void verifyCommit(const Input & input, std::shared_ptr<GitRepo> repo) const
+    {
+        auto publicKeys = getPublicKeys(input.attrs);
+        auto verifyCommit = maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(!publicKeys.empty());
+
+        if (verifyCommit) {
+            if (input.getRev() && repo)
+                repo->verifyCommit(*input.getRev(), publicKeys);
+            else
+                throw Error("commit verification is required for Git repository '%s', but it's dirty", input.to_string());
+        }
+    }
+
     std::pair<ref<InputAccessor>, Input> getAccessorFromCommit(
         ref<Store> store,
         RepoInfo & repoInfo,
@@ -423,30 +464,6 @@ struct GitInputScheme : InputScheme
         auto origRev = input.getRev();
 
         std::string name = input.getName();
-
-        auto makeResult2 = [&](const Attrs & infoAttrs, ref<InputAccessor> accessor) -> std::pair<ref<InputAccessor>, Input>
-        {
-            assert(input.getRev());
-            assert(!origRev || origRev == input.getRev());
-            if (!repoInfo.shallow)
-                input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-            input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-
-            accessor->setPathDisplay("«" + input.to_string() + "»");
-            return {accessor, std::move(input)};
-        };
-
-        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> std::pair<ref<InputAccessor>, Input>
-        {
-            // FIXME: remove?
-            //input.attrs.erase("narHash");
-            auto narHash = store->queryPathInfo(storePath)->narHash;
-            input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-
-            auto accessor = makeStorePathAccessor(store, storePath, makeNotAllowedError(repoInfo.url));
-
-            return makeResult2(infoAttrs, accessor);
-        };
 
         auto originalRef = input.getRef();
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
@@ -481,7 +498,7 @@ struct GitInputScheme : InputScheme
             if (auto rev = input.getRev()) {
                 doFetch = !repo->hasObject(*rev);
             } else {
-                if (repoInfo.allRefs) {
+                if (getAllRefsAttr(input)) {
                     doFetch = true;
                 } else {
                     /* If the local ref is older than ‘tarball-ttl’ seconds, do a
@@ -493,10 +510,8 @@ struct GitInputScheme : InputScheme
             }
 
             if (doFetch) {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", repoInfo.url));
-
                 try {
-                    auto fetchRef = repoInfo.allRefs
+                    auto fetchRef = getAllRefsAttr(input)
                         ? "refs/*"
                         : ref.compare(0, 5, "refs/") == 0
                         ? ref
@@ -504,7 +519,7 @@ struct GitInputScheme : InputScheme
                         ? ref
                         : "refs/heads/" + ref;
 
-                    repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef));
+                    repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     logError(e.info());
@@ -534,9 +549,11 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        auto isShallow = GitRepo::openRepo(CanonPath(repoDir))->isShallow();
+        auto repo = GitRepo::openRepo(CanonPath(repoDir));
 
-        if (isShallow && !repoInfo.shallow)
+        auto isShallow = repo->isShallow();
+
+        if (isShallow && !getShallowAttr(input))
             throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified", repoInfo.url);
 
         // FIXME: check whether rev is an ancestor of ref?
@@ -548,86 +565,106 @@ struct GitInputScheme : InputScheme
             {"lastModified", getLastModified(repoInfo, repoDir, rev)},
         });
 
-        if (!repoInfo.shallow)
+        if (!getShallowAttr(input))
             infoAttrs.insert_or_assign("revCount",
                 getRevCount(repoInfo, repoDir, rev));
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.url);
 
-        if (!repoInfo.submodules) {
-            auto accessor = GitRepo::openRepo(CanonPath(repoDir))->getAccessor(rev);
-            return makeResult2(infoAttrs, accessor);
+        verifyCommit(input, repo);
+
+        auto accessor = repo->getAccessor(rev);
+
+        accessor->setPathDisplay("«" + input.to_string() + "»");
+
+        /* If the repo has submodules, fetch them and return a mounted
+           input accessor consisting of the accessor for the top-level
+           repo and the accessors for the submodules. */
+        if (getSubmodulesAttr(input)) {
+            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+
+            for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev)) {
+                auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
+                debug("Git submodule %s: %s %s %s -> %s",
+                    submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
+                fetchers::Attrs attrs;
+                attrs.insert_or_assign("type", "git");
+                attrs.insert_or_assign("url", resolved);
+                if (submodule.branch != "")
+                    attrs.insert_or_assign("ref", submodule.branch);
+                attrs.insert_or_assign("rev", submoduleRev.gitRev());
+                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] =
+                    submoduleInput.getAccessor(store);
+                mounts.insert_or_assign(submodule.path, submoduleAccessor);
+            }
+
+            if (!mounts.empty()) {
+                mounts.insert_or_assign(CanonPath::root, accessor);
+                accessor = makeMountedInputAccessor(std::move(mounts));
+            }
         }
 
-        else {
-            Path tmpDir = createTempDir();
-            AutoDelete delTmpDir(tmpDir, true);
-            PathFilter filter = defaultPathFilter;
+        assert(!origRev || origRev == rev);
+        if (!getShallowAttr(input))
+            input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
+        input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
-            Activity act(*logger, lvlChatty, actUnknown, fmt("copying Git tree '%s' to the store", input.to_string()));
-
-            Path tmpGitDir = createTempDir();
-            AutoDelete delTmpGitDir(tmpGitDir, true);
-
-            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
-
-            {
-                // TODO: repoDir might lack the ref (it only checks if rev
-                // exists, see FIXME above) so use a big hammer and fetch
-                // everything to ensure we get the rev.
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
-                runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" }, {}, true);
-            }
-
-            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", rev.gitRev() });
-
-            /* Ensure that we use the correct origin for fetching
-               submodules. This matters for submodules with relative
-               URLs. */
-            if (repoInfo.isLocal) {
-                writeFile(tmpGitDir + "/config", readFile(repoDir + "/" + repoInfo.gitDir + "/config"));
-
-                /* Restore the config.bare setting we may have just
-                   copied erroneously from the user's repo. */
-                runProgram("git", true, { "-C", tmpDir, "config", "core.bare", "false" });
-            } else
-                runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.url", repoInfo.url });
-
-            /* As an optimisation, copy the modules directory of the
-               source repo if it exists. */
-            auto modulesPath = repoDir + "/" + repoInfo.gitDir + "/modules";
-            if (pathExists(modulesPath)) {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("copying submodules of '%s'", repoInfo.url));
-                runProgram("cp", true, { "-R", "--", modulesPath, tmpGitDir + "/modules" });
-            }
-
-            {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", repoInfo.url));
-                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" }, {}, true);
-            }
-
-            filter = isNotDotGitDirectory;
-
-            auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
-
-            return makeResult(infoAttrs, std::move(storePath));
-        }
+        return {accessor, std::move(input)};
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
+        ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
     {
+        if (getSubmodulesAttr(input))
+            /* Create mountpoints for the submodules. */
+            for (auto & submodule : repoInfo.workdirInfo.submodules)
+                repoInfo.workdirInfo.files.insert(submodule.path);
+
+        ref<InputAccessor> accessor =
+            makeFSInputAccessor(CanonPath(repoInfo.url), repoInfo.workdirInfo.files, makeNotAllowedError(repoInfo.url));
+
+        /* If the repo has submodules, return a mounted input accessor
+           consisting of the accessor for the top-level repo and the
+           accessors for the submodule workdirs. */
+        if (getSubmodulesAttr(input) && !repoInfo.workdirInfo.submodules.empty()) {
+            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+
+            for (auto & submodule : repoInfo.workdirInfo.submodules) {
+                auto submodulePath = CanonPath(repoInfo.url) + submodule.path;
+                fetchers::Attrs attrs;
+                attrs.insert_or_assign("type", "git");
+                attrs.insert_or_assign("url", submodulePath.abs());
+                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] =
+                    submoduleInput.getAccessor(store);
+
+                /* If the submodule is dirty, mark this repo dirty as
+                   well. */
+                if (!submoduleInput2.getRev())
+                    repoInfo.workdirInfo.isDirty = true;
+
+                mounts.insert_or_assign(submodule.path, submoduleAccessor);
+            }
+
+            mounts.insert_or_assign(CanonPath::root, accessor);
+            accessor = makeMountedInputAccessor(std::move(mounts));
+        }
+
         if (!repoInfo.workdirInfo.isDirty) {
-            if (auto ref = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirRef())
+            auto repo = GitRepo::openRepo(CanonPath(repoInfo.url));
+
+            if (auto ref = repo->getWorkdirRef())
                 input.attrs.insert_or_assign("ref", *ref);
 
             auto rev = repoInfo.workdirInfo.headRev.value();
 
             input.attrs.insert_or_assign("rev", rev.gitRev());
-
             input.attrs.insert_or_assign("revCount", getRevCount(repoInfo, repoInfo.url, rev));
+
+            verifyCommit(input, repo);
         } else {
             repoInfo.warnDirty();
 
@@ -637,6 +674,8 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("dirtyShortRev",
                     repoInfo.workdirInfo.headRev->gitShortRev() + "-dirty");
             }
+
+            verifyCommit(input, nullptr);
         }
 
         input.attrs.insert_or_assign(
@@ -645,10 +684,7 @@ struct GitInputScheme : InputScheme
             ? getLastModified(repoInfo, repoInfo.url, *repoInfo.workdirInfo.headRev)
             : 0);
 
-        return {
-            makeFSInputAccessor(CanonPath(repoInfo.url), repoInfo.workdirInfo.files, makeNotAllowedError(repoInfo.url)),
-            std::move(input)
-        };
+        return {accessor, std::move(input)};
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
@@ -657,10 +693,10 @@ struct GitInputScheme : InputScheme
 
         auto repoInfo = getRepoInfo(input);
 
-        if (input.getRef() || input.getRev() || !repoInfo.isLocal)
-            return getAccessorFromCommit(store, repoInfo, std::move(input));
-        else
-            return getAccessorFromWorkdir(repoInfo, std::move(input));
+        return
+            input.getRef() || input.getRev() || !repoInfo.isLocal
+            ? getAccessorFromCommit(store, repoInfo, std::move(input))
+            : getAccessorFromWorkdir(store, repoInfo, std::move(input));
     }
 
     bool isLocked(const Input & input) const override

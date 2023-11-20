@@ -1,8 +1,10 @@
 #pragma once
+///@file
 
 #include "source-accessor.hh"
 #include "ref.hh"
 #include "types.hh"
+#include "file-system.hh"
 #include "repair-flag.hh"
 #include "content-address.hh"
 #include "hash.hh"

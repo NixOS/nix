@@ -1,5 +1,7 @@
 #include "machines.hh"
 #include "globals.hh"
+#include "file-system.hh"
+#include "util.hh"
 
 #include <gmock/gmock-matchers.h>
 

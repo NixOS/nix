@@ -1,11 +1,16 @@
 #include "git-utils.hh"
 #include "input-accessor.hh"
 #include "cache.hh"
+#include "finally.hh"
+#include "processes.hh"
+#include "signals.hh"
+#include "users.hh"
 
 #include <boost/core/span.hpp>
 
 #include <git2/blob.h>
 #include <git2/commit.h>
+#include <git2/config.h>
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
@@ -14,6 +19,7 @@
 #include <git2/remote.h>
 #include <git2/repository.h>
 #include <git2/status.h>
+#include <git2/submodule.h>
 #include <git2/tree.h>
 
 #include "tarfile.hh"
@@ -21,6 +27,7 @@
 
 #include <unordered_set>
 #include <queue>
+#include <regex>
 
 namespace std {
 
@@ -66,6 +73,8 @@ typedef std::unique_ptr<git_reference, Deleter<git_reference_free>> Reference;
 typedef std::unique_ptr<git_describe_result, Deleter<git_describe_result_free>> DescribeResult;
 typedef std::unique_ptr<git_status_list, Deleter<git_status_list_free>> StatusList;
 typedef std::unique_ptr<git_remote, Deleter<git_remote_free>> Remote;
+typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
+typedef std::unique_ptr<git_config_iterator, Deleter<git_config_iterator_free>> ConfigIterator;
 
 // A helper to ensure that we don't leak objects returned by libgit2.
 template<typename T>
@@ -124,11 +133,6 @@ T peelObject(git_repository * repo, git_object * obj, git_object_t type)
         throw Error("peeling Git object '%s': %s", git_object_id(obj), err->message);
     }
     return obj2;
-}
-
-int statusCallbackTrampoline(const char * path, unsigned int statusFlags, void * payload)
-{
-    return (*((std::function<int(const char * path, unsigned int statusFlags)> *) payload))(path, statusFlags);
 }
 
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
@@ -214,6 +218,49 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return toHash(*oid);
     }
 
+    std::vector<Submodule> parseSubmodules(const CanonPath & configFile)
+    {
+        GitConfig config;
+        if (git_config_open_ondisk(Setter(config), configFile.abs().c_str()))
+            throw Error("parsing .gitmodules file: %s", git_error_last()->message);
+
+        ConfigIterator it;
+        if (git_config_iterator_glob_new(Setter(it), config.get(), "^submodule\\..*\\.(path|url|branch)$"))
+            throw Error("iterating over .gitmodules: %s", git_error_last()->message);
+
+        std::map<std::string, std::string> entries;
+
+        while (true) {
+            git_config_entry * entry = nullptr;
+            if (auto err = git_config_next(&entry, it.get())) {
+                if (err == GIT_ITEROVER) break;
+                throw Error("iterating over .gitmodules: %s", git_error_last()->message);
+            }
+            entries.emplace(entry->name + 10, entry->value);
+        }
+
+        std::vector<Submodule> result;
+
+        for (auto & [key, value] : entries) {
+            if (!hasSuffix(key, ".path")) continue;
+            std::string key2(key, 0, key.size() - 5);
+            auto path = CanonPath(value);
+            result.push_back(Submodule {
+                .path = path,
+                .url = entries[key2 + ".url"],
+                .branch = entries[key2 + ".branch"],
+            });
+        }
+
+        return result;
+    }
+
+    // Helper for statusCallback below.
+    static int statusCallbackTrampoline(const char * path, unsigned int statusFlags, void * payload)
+    {
+        return (*((std::function<int(const char * path, unsigned int statusFlags)> *) payload))(path, statusFlags);
+    }
+
     WorkdirInfo getWorkdirInfo() override
     {
         WorkdirInfo info;
@@ -243,6 +290,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         options.flags |= GIT_STATUS_OPT_EXCLUDE_SUBMODULES;
         if (git_status_foreach_ext(*this, &options, &statusCallbackTrampoline, &statusCallback))
             throw Error("getting working directory status: %s", git_error_last()->message);
+
+        /* Get submodule info. */
+        auto modulesFile = path + ".gitmodules";
+        if (pathExists(modulesFile.abs()))
+            info.submodules = parseSubmodules(modulesFile);
 
         return info;
     }
@@ -411,6 +463,25 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         };
     }
 
+    std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) override;
+
+    std::string resolveSubmoduleUrl(
+        const std::string & url,
+        const std::string & base) override
+    {
+        git_buf buf = GIT_BUF_INIT;
+        if (git_submodule_resolve_url(&buf, *this, url.c_str()))
+            throw Error("resolving Git submodule URL '%s'", url);
+        Finally cleanup = [&]() { git_buf_dispose(&buf); };
+
+        std::string res(buf.ptr);
+
+        if (!hasPrefix(res, "/") && res.find("://") == res.npos)
+            res = parseURL(base + "/" + res).canonicalise().to_string();
+
+        return res;
+    }
+
     bool hasObject(const Hash & oid_) override
     {
         auto oid = hashToOID(oid_);
@@ -427,13 +498,33 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     ref<InputAccessor> getAccessor(const Hash & rev) override;
 
+    static int sidebandProgressCallback(const char * str, int len, void * payload)
+    {
+        auto act = (Activity *) payload;
+        act->result(resFetchStatus, trim(std::string_view(str, len)));
+        return _isInterrupted ? -1 : 0;
+    }
+
+    static int transferProgressCallback(const git_indexer_progress * stats, void * payload)
+    {
+        auto act = (Activity *) payload;
+        act->result(resFetchStatus,
+            fmt("%d/%d objects received, %d/%d deltas indexed, %.1f MiB",
+                stats->received_objects,
+                stats->total_objects,
+                stats->indexed_deltas,
+                stats->total_deltas,
+                stats->received_bytes / (1024.0 * 1024.0)));
+        return _isInterrupted ? -1 : 0;
+    }
+
     void fetch(
         const std::string & url,
-        const std::string & refspec) override
+        const std::string & refspec,
+        bool shallow) override
     {
-        /* FIXME: use libgit2. Unfortunately, it doesn't support
-           ssh_config at the moment. */
-        #if 0
+        Activity act(*logger, lvlTalkative, actFetchTree, fmt("fetching Git repository '%s'", url));
+
         Remote remote;
 
         if (git_remote_create_anonymous(Setter(remote), *this, url.c_str()))
@@ -445,22 +536,72 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             .count = 1
         };
 
-        if (git_remote_fetch(remote.get(), &refspecs2, nullptr, nullptr))
-            throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
-        #endif
+        git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
+        opts.depth = shallow ? 1 : GIT_FETCH_DEPTH_FULL;
+        opts.callbacks.payload = &act;
+        opts.callbacks.sideband_progress = sidebandProgressCallback;
+        opts.callbacks.transfer_progress = transferProgressCallback;
 
-        // FIXME: git stderr messes up our progress indicator, so
-        // we're using --quiet for now. Should process its stderr.
-        runProgram("git", true,
-            { "-C", path.abs(),
-              "--bare",
-              "fetch",
-              "--quiet",
-              "--force",
-              "--",
-              url,
-              refspec
-            }, {}, true);
+        if (git_remote_fetch(remote.get(), &refspecs2, &opts, nullptr))
+            throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
+    }
+
+    void verifyCommit(
+        const Hash & rev,
+        const std::vector<fetchers::PublicKey> & publicKeys) override
+    {
+        // Create ad-hoc allowedSignersFile and populate it with publicKeys
+        auto allowedSignersFile = createTempFile().second;
+        std::string allowedSigners;
+        for (const fetchers::PublicKey & k : publicKeys) {
+            if (k.type != "ssh-dsa"
+                && k.type != "ssh-ecdsa"
+                && k.type != "ssh-ecdsa-sk"
+                && k.type != "ssh-ed25519"
+                && k.type != "ssh-ed25519-sk"
+                && k.type != "ssh-rsa")
+                throw Error("Unknown key type '%s'.\n"
+                    "Please use one of\n"
+                    "- ssh-dsa\n"
+                    "  ssh-ecdsa\n"
+                    "  ssh-ecdsa-sk\n"
+                    "  ssh-ed25519\n"
+                    "  ssh-ed25519-sk\n"
+                    "  ssh-rsa", k.type);
+            allowedSigners += "* " + k.type + " " + k.key + "\n";
+        }
+        writeFile(allowedSignersFile, allowedSigners);
+
+        // Run verification command
+        auto [status, output] = runProgram(RunOptions {
+                .program = "git",
+                .args = {
+                    "-c",
+                    "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
+                    "-C", path.abs(),
+                    "verify-commit",
+                    rev.gitRev()
+                },
+                .mergeStderrToStdout = true,
+        });
+
+        /* Evaluate result through status code and checking if public
+           key fingerprints appear on stderr. This is neccessary
+           because the git command might also succeed due to the
+           commit being signed by gpg keys that are present in the
+           users key agent. */
+        std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
+        for (const fetchers::PublicKey & k : publicKeys){
+            // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
+            auto fingerprint = trim(hashString(htSHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+            auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
+            re += "(" + escaped_fingerprint + ")";
+        }
+        re += "]";
+        if (status == 0 && std::regex_search(output, std::regex(re)))
+            printTalkative("Signature verification on commit %s succeeded.", rev.gitRev());
+        else
+            throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
     }
 
     Hash treeHashToNarHash(const Hash & treeHash) override
@@ -544,7 +685,6 @@ struct GitInputAccessor : InputAccessor
 
         else
             throw Error("file '%s' has an unsupported Git file type");
-
     }
 
     DirEntries readDirectory(const CanonPath & path) override
@@ -572,6 +712,16 @@ struct GitInputAccessor : InputAccessor
     std::string readLink(const CanonPath & path) override
     {
         return readBlob(path, true);
+    }
+
+    Hash getSubmoduleRev(const CanonPath & path)
+    {
+        auto entry = need(path);
+
+        if (git_tree_entry_type(entry) != GIT_OBJECT_COMMIT)
+            throw Error("'%s' is not a submodule", showPath(path));
+
+        return toHash(*git_tree_entry_id(entry));
     }
 
     std::map<CanonPath, TreeEntry> lookupCache;
@@ -667,6 +817,30 @@ struct GitInputAccessor : InputAccessor
 ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev)
 {
     return make_ref<GitInputAccessor>(ref<GitRepoImpl>(shared_from_this()), rev);
+}
+
+std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev)
+{
+    /* Read the .gitmodules files from this revision. */
+    CanonPath modulesFile(".gitmodules");
+
+    auto accessor = getAccessor(rev);
+    if (!accessor->pathExists(modulesFile)) return {};
+
+    /* Parse it and get the revision of each submodule. */
+    auto configS = accessor->readFile(modulesFile);
+
+    auto [fdTemp, pathTemp] = createTempFile("nix-git-submodules");
+    writeFull(fdTemp.get(), configS);
+
+    std::vector<std::tuple<Submodule, Hash>> result;
+
+    for (auto & submodule : parseSubmodules(CanonPath(pathTemp))) {
+        auto rev = accessor.dynamic_pointer_cast<GitInputAccessor>()->getSubmoduleRev(submodule.path);
+        result.push_back({std::move(submodule), rev});
+    }
+
+    return result;
 }
 
 ref<GitRepo> getTarballCache()

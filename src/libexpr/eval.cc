@@ -1,6 +1,7 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "hash.hh"
+#include "primops.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -14,6 +15,7 @@
 #include "print.hh"
 #include "fs-input-accessor.hh"
 #include "memory-input-accessor.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -670,6 +672,23 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         baseEnv.values[baseEnvDispl++] = v;
         baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
     }
+}
+
+
+void PrimOp::check()
+{
+    if (arity > maxPrimOpArity) {
+        throw Error("primop arity must not exceed %1%", maxPrimOpArity);
+    }
+}
+
+
+void Value::mkPrimOp(PrimOp * p)
+{
+    p->check();
+    clearValue();
+    internalType = tPrimOp;
+    primOp = p;
 }
 
 
@@ -1698,6 +1717,12 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     Value vFun;
     fun->eval(state, env, vFun);
 
+    // Empirical arity of Nixpkgs lambdas by regex e.g. ([a-zA-Z]+:(\s|(/\*.*\/)|(#.*\n))*){5}
+    // 2: over 4000
+    // 3: about 300
+    // 4: about 60
+    // 5: under 10
+    // This excluded attrset lambdas (`{...}:`). Contributions of mixed lambdas appears insignificant at ~150 total.
     Value * vArgs[args.size()];
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
