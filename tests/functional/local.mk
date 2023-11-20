@@ -38,6 +38,7 @@ nix_tests = \
   gc-runtime.sh \
   tarball.sh \
   fetchGit.sh \
+  fetchGit-shallowRev.sh \
   fetchurl.sh \
   fetchPath.sh \
   fetchTree-file.sh \

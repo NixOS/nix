@@ -423,9 +423,16 @@ static RegisterPrimOp primop_fetchGit({
 
         A Boolean parameter that specifies whether submodules should be checked out.
 
+      - `shallowRev` (default: `false`)
+
+        A Boolean parameter that specifies whether to perform a shallow clone.
+        This reduces the amount of data transmitted while fetching.
+
       - `shallow` (default: `false`)
 
-        A Boolean parameter that specifies whether fetching a shallow clone is allowed.
+        A Boolean parameter that specifies whether fetching from a shallow remote repository is allowed.
+        This still performs a full clone of what is available on the remote.
+        For most cases 'shallowRev = true' should be used instead.
 
       - `allRefs`
 

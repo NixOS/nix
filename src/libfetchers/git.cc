@@ -362,6 +362,7 @@ struct GitInputScheme : InputScheme
             "ref",
             "rev",
             "shallow",
+            "shallowRev",
             "submodules",
             "lastModified",
             "revCount",
@@ -387,6 +388,7 @@ struct GitInputScheme : InputScheme
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
 
         maybeGetBoolAttr(attrs, "shallow");
+        maybeGetBoolAttr(attrs, "shallowRev");
         maybeGetBoolAttr(attrs, "submodules");
         maybeGetBoolAttr(attrs, "allRefs");
         maybeGetBoolAttr(attrs, "verifyCommit");
@@ -412,6 +414,8 @@ struct GitInputScheme : InputScheme
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
             url.query.insert_or_assign("shallow", "1");
+        if (maybeGetBoolAttr(input.attrs, "shallowRev").value_or(false))
+            url.query.insert_or_assign("shallowRev", "1");
         if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
             url.query.insert_or_assign("verifyCommit", "1");
         auto publicKeys = getPublicKeys(input.attrs);
@@ -500,6 +504,80 @@ struct GitInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
+
+    std::pair<StorePath, Input> fetchShallowRev(
+        ref<Store> store,
+        Input & input,
+        const Path & actualUrl,
+        const bool verifyCommit,
+        std::vector<PublicKey> publicKeys,
+        const Attrs & inAttrs) const
+    {
+        auto gitDir = ".git";
+        std::string name = input.getName();
+
+        Path repoDir = createTempDir();
+        AutoDelete delTmpRepoDir(repoDir, true);
+        gitDir = ".";
+        createDirs(dirOf(repoDir));
+        PathLocks repoDirLock({repoDir + ".lock"});
+        runProgram("git", true, { "init", "--bare", repoDir });
+
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", actualUrl));
+
+        // FIXME: git stderr messes up our progress indicator, so
+        // we're using --quiet for now. Should process its stderr.
+        try {
+            runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--depth", "1", "--", actualUrl, input.getRev()->gitRev()}, {}, true);
+        } catch (Error & e) {
+            throw Error(
+                "Could not fetch single revision of Git repository '%s'. "
+                "One reason could be that the remote does not support or allow shallow revision fetching. "
+                "In this case, try removing 'shallowRev = true' from fetchGit",
+                actualUrl
+            );
+        }
+
+        if (verifyCommit)
+            doCommitVerification(repoDir, gitDir, input.getRev()->gitRev(), publicKeys);
+
+        // FIXME: should pipe this, or find some better way to extract a
+        // revision.
+        auto source = sinkToSource([&](Sink & sink) {
+            runProgram2({
+                .program = "git",
+                .args = { "-C", repoDir, "--git-dir", gitDir, "archive", input.getRev()->gitRev() },
+                .standardOut = &sink
+            });
+        });
+
+        Path tmpDir = createTempDir();
+        AutoDelete delTmpDir(tmpDir, true);
+        PathFilter filter = defaultPathFilter;
+
+        unpackTarfile(*source, tmpDir);
+
+        auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
+
+        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
+
+        Attrs infoAttrs({
+            {"rev", input.getRev()->gitRev()},
+            {"lastModified", lastModified},
+        });
+
+        getCache()->add(
+            store,
+            inAttrs,
+            infoAttrs,
+            storePath,
+            true);
+
+        input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
+        return {std::move(storePath), input};
+    }
+
+
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
@@ -512,9 +590,11 @@ struct GitInputScheme : InputScheme
         bool allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
         std::vector<PublicKey> publicKeys = getPublicKeys(input.attrs);
         bool verifyCommit = maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(!publicKeys.empty());
+        bool shallowRev = maybeGetBoolAttr(input.attrs, "shallowRev").value_or(false);
 
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
+        if (shallowRev) cacheType += "-shallowRev";
         if (submodules) cacheType += "-submodules";
         if (allRefs) cacheType += "-all-refs";
 
@@ -542,7 +622,7 @@ struct GitInputScheme : InputScheme
         {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
-            if (!shallow)
+            if (!shallow && !shallowRev)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
             return {std::move(storePath), input};
@@ -578,7 +658,20 @@ struct GitInputScheme : InputScheme
 
         Path repoDir;
 
-        if (isLocal) {
+        if (shallowRev) {
+            // sanity checks
+            if (!input.getRev())
+                throw Error("Error fetching git repo '%s'. 'rev' must be specified if 'shallowRev = true' is used", actualUrl);
+            // ensure shallow is not used when shallowRev is used
+            if (shallow)
+                throw Error("Error fetching git repo '%s'. Set either 'shallow' or 'shallowRev', not both", actualUrl);
+            // TODO: add support for submodules
+            // For the purpose of this POC implementation omitting submodules is fine
+            if (submodules)
+                throw Error("Error fetching git repo '%s'. 'submodules' cannot be used if 'shallowRev = true' is used", actualUrl);
+            return fetchShallowRev(store, input, actualUrl, verifyCommit, publicKeys, getLockedAttrs());
+
+        } else if (isLocal) {
             if (!input.getRef()) {
                 auto head = readHead(actualUrl);
                 if (!head) {
