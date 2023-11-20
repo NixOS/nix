@@ -229,6 +229,14 @@ struct GitArchiveInputScheme : InputScheme
     {
         return Xp::Flakes;
     }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev())
+            return rev->gitRev();
+        else
+            return std::nullopt;
+    }
 };
 
 struct GitHubInputScheme : GitArchiveInputScheme

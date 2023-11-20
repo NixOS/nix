@@ -18,6 +18,8 @@ class Store;
 
 struct InputAccessor : virtual SourceAccessor, std::enable_shared_from_this<InputAccessor>
 {
+    std::optional<std::string> fingerprint;
+
     /**
      * Return the maximum last-modified time of the files in this
      * tree, if available.

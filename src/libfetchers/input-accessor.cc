@@ -1,5 +1,6 @@
 #include "input-accessor.hh"
 #include "store-api.hh"
+#include "cache.hh"
 
 namespace nix {
 
@@ -11,6 +12,30 @@ StorePath InputAccessor::fetchToStore(
     PathFilter * filter,
     RepairFlag repair)
 {
+    // FIXME: add an optimisation for the case where the accessor is
+    // an FSInputAccessor pointing to a store path.
+
+    std::optional<fetchers::Attrs> cacheKey;
+
+    if (!filter && fingerprint) {
+        cacheKey = fetchers::Attrs{
+            {"_what", "fetchToStore"},
+            {"store", store->storeDir},
+            {"name", std::string(name)},
+            {"fingerprint", *fingerprint},
+            {"method", (uint8_t) method},
+            {"path", path.abs()}
+        };
+        if (auto res = fetchers::getCache()->lookup(*cacheKey)) {
+            StorePath storePath(fetchers::getStrAttr(*res, "storePath"));
+            if (store->isValidPath(storePath)) {
+                debug("store path cache hit for '%s'", showPath(path));
+                return storePath;
+            }
+        }
+    } else
+        debug("source path '%s' is uncacheable", showPath(path));
+
     Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", showPath(path)));
 
     auto source = sinkToSource([&](Sink & sink) {
@@ -24,6 +49,11 @@ StorePath InputAccessor::fetchToStore(
         settings.readOnlyMode
         ? store->computeStorePathFromDump(*source, name, method, htSHA256).first
         : store->addToStoreFromDump(*source, name, method, htSHA256, repair);
+
+    if (cacheKey)
+        fetchers::getCache()->upsert(
+            *cacheKey,
+            fetchers::Attrs{{"storePath", std::string(storePath.to_string())}});
 
     return storePath;
 }
