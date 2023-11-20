@@ -31,6 +31,8 @@ nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
 nix-instantiate --eval -E 'let x = { repeating = x; tracing = builtins.trace x true; }; in x.tracing'\
   2>&1 | grepQuiet -F 'trace: { repeating = «repeated»; tracing = «potential infinite recursion»; }'
 
+source lang/memoize-despite-exception.sh
+
 set +x
 
 badDiff=0

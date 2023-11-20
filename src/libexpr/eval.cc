@@ -1398,7 +1398,16 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
-    body->eval(state, env2, v);
+    try {
+        body->eval(state, env2, v);
+    }
+    catch (Error &e) {
+        if (e.validThunk != &v) {
+            v.mkThunk(&env2, body);
+            e.validThunk = &v;
+        }
+        throw;
+    }
 }
 
 
@@ -1542,6 +1551,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
     Value vCur(fun);
 
+    /* Prepare to return a partial application of the remaining arguments. */
     auto makeAppChain = [&]()
     {
         vRes = vCur;
@@ -1549,6 +1559,19 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             auto fun2 = allocValue();
             *fun2 = vRes;
             vRes.mkPrimOpApp(fun2, args[i]);
+        }
+    };
+
+    /* Like makeAppChain, but produces regular applications that don't come with
+       the implicit assumption that they're partial applications to a primop.
+       When recovering from an exception, the chain may well be complete. */
+    auto makeAppChain2 = [&]()
+    {
+        vRes = vCur;
+        for (size_t i = 0; i < nrArgs; ++i) {
+            auto fun2 = allocValue();
+            *fun2 = vRes;
+            vRes.mkApp(fun2, args[i]);
         }
     };
 
@@ -1644,6 +1667,26 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
+
+                { /* Preserve partially completed evaluation in vRes */
+
+                    if (e.validThunk == &vCur) {
+                        /* vCur is in a good state, so we get to keep the progress
+                        we made in body->eval() */
+                    } else {
+                        /* At least retain what we were able to compute in env2 */
+                        vCur.mkThunk(&env2, lambda.body);
+                    }
+                    /* vCur already contains a "succesful" application, so we
+                    complete this iteration... */
+                    nrArgs--;
+                    args += 1;
+                    /* ... and then preserve any remaining arguments as mkApp thunks.
+                    from vRes (root) to vCur (leaf in this context). */
+                    makeAppChain2();
+                    e.validThunk = &vRes;
+                }
+
                 if (loggerSettings.showTrace.get()) {
                     addErrorTrace(
                         e,
@@ -1673,6 +1716,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             } else {
                 /* We have all the arguments, so call the primop. */
                 auto name = vCur.primOp->name;
+                Value vCurOrig = vCur;
 
                 nrPrimOpCalls++;
                 if (countCalls) primOpCalls[name]++;
@@ -1680,6 +1724,19 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     vCur.primOp->fun(*this, noPos, args, vCur);
                 } catch (Error & e) {
+
+                    /* Preserve partially completed evaluation */
+                    if (e.validThunk == &vCur) {
+                        /* vCur already contains a good representation of the
+                           partially evaluated result. */
+                        vRes = vCur;
+                    } else {
+                        /* vCur is garbage. Reinitialize it and wrap it in mkApp. */
+                        vCur = vCurOrig;
+                        makeAppChain2(); // assigns vRes
+                    }
+                    e.validThunk = &vRes;
+
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
                 }
@@ -1728,6 +1785,13 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     primOp->primOp->fun(*this, noPos, vArgs, vCur);
                 } catch (Error & e) {
+
+                    // TODO:
+                    // Preserve partially completed evaluation like above?
+                    // I haven't managed to reproduce this in memoize-despite-exception.sh,
+                    // and it seems to be covered by the other logic.
+                    // Maybe it's because of the redundancy described in the TODO above?
+
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
                 }
@@ -1746,6 +1810,20 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             try {
                 callFunction(*functor->value, 2, args2, vCur, functor->pos);
             } catch (Error & e) {
+
+                /* Preserve partially completed evaluation */
+                if (e.validThunk == &vCur) {
+                    /* vCur already contains a good representation of the
+                        partially evaluated result. We pass it through. */
+                    vRes = vCur;
+                    e.validThunk = &vRes;
+                } else {
+                    /* callFunction should be able to preserve the partial
+                       evaluation in vCur, so this branch should not be entered.
+                       If it is, e.validThunk ensures that the thunk is reset
+                       for a possible retry. */
+                }
+
                 e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
             }

@@ -98,6 +98,10 @@ void EvalState::forceValue(Value & v, Callable getPos)
             v.mkBlackhole();
             //checkInterrupt();
             expr->eval(*this, *env, v);
+        } catch (Error & e) {
+            if (e.validThunk != &v)
+                v.mkThunk(env, expr);
+            throw;
         } catch (...) {
             v.mkThunk(env, expr);
             throw;
