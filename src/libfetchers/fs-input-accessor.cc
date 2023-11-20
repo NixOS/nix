@@ -18,6 +18,7 @@ struct FSInputAccessorImpl : FSInputAccessor, PosixSourceAccessor
         , allowedPaths(std::move(allowedPaths))
         , makeNotAllowedError(std::move(makeNotAllowedError))
     {
+        displayPrefix = root.isRoot() ? "" : root.abs();
     }
 
     void readFile(
