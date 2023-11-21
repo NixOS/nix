@@ -5,10 +5,7 @@
 # For documentation on this mechanism, see https://help.github.com/articles/about-codeowners/
 
 # Default reviewers if nothing else matches
-* @edolstra
-
-# This file
-.github/CODEOWNERS @edolstra
+* @NixOS/nix-team
 
 # Public documentation
 /doc @fricklerhandwerk
