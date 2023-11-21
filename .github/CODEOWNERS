@@ -14,5 +14,12 @@
 /doc @fricklerhandwerk
 *.md @fricklerhandwerk
 
+# Documentation of built-in functions
+src/libexpr/primops.cc @fricklerhandwerk @NixOS/nix-team
+# Documentation on experimental features
+src/libuitl/experimental-features.cc @fricklerhandwerk @NixOS/nix-team
+# Documentation on configuration settings
+src/libstore/globals.hh @fricklerhandwerk @NixOS/nix-team
+
 # Libstore layer
 /src/libstore @thufschmitt
