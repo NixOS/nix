@@ -1433,22 +1433,26 @@ LocalStore::AccessStatus LocalStore::getAccessStatus(const StoreObject & storeOb
 
 void LocalStore::grantBuildUserAccess(const StorePath & storePath, const LocalStore::AccessControlEntity & buildUser)
 {
-    auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
-    std::visit(overloaded {
-        [&](ACL::User u) { createDirs(basePath + "/users/" + std::to_string(u.uid)); },
-        [&](ACL::Group g) { createDirs(basePath + "/groups/" + std::to_string(g.gid)); },
-    }, buildUser);
-    addAllowedEntities(storePath, {buildUser});
+    // The builder-permissions directory remembers permissions to remove at the end of the build.
+    auto status = getAccessStatus(storePath);
+    if (! status.entities.contains(buildUser)){
+        auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
+        std::visit(overloaded {
+            [&](ACL::User u) { createDirs(basePath + "/users/" + std::to_string(u.uid)); },
+            [&](ACL::Group g) { createDirs(basePath + "/groups/" + std::to_string(g.gid)); },
+        }, buildUser);
+        addAllowedEntities(storePath, {buildUser});
+    }
 }
 
 void LocalStore::revokeBuildUserAccess(const StorePath & storePath, const LocalStore::AccessControlEntity & buildUser)
 {
     auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
-    std::visit(overloaded {
-        [&](ACL::User u) { std::filesystem::remove((basePath + "/users/" + std::to_string(u.uid)).c_str()); },
-        [&](ACL::Group g) { std::filesystem::remove((basePath + "/groups/" + std::to_string(g.gid)).c_str()); },
+    auto builderPermissionExisted = std::visit(overloaded {
+        [&](ACL::User u) { return std::filesystem::remove((basePath + "/users/" + std::to_string(u.uid)).c_str()); },
+        [&](ACL::Group g) { return std::filesystem::remove((basePath + "/groups/" + std::to_string(g.gid)).c_str()); },
     }, buildUser);
-    removeAllowedEntities(storePath, {buildUser});
+    if (builderPermissionExisted) removeAllowedEntities(storePath, {buildUser});
 }
 
 void LocalStore::revokeBuildUserAccess(const StorePath & storePath)
