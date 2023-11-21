@@ -518,8 +518,11 @@ struct GitInputScheme : InputScheme
 
             if (doFetch) {
                 try {
-                    auto fetchRef = getAllRefsAttr(input)
+                    auto fetchRef =
+                        getAllRefsAttr(input)
                         ? "refs/*"
+                        : input.getRev()
+                        ? input.getRev()->gitRev()
                         : ref.compare(0, 5, "refs/") == 0
                         ? ref
                         : ref == "HEAD"
