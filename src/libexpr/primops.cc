@@ -1,4 +1,5 @@
 #include "archive.hh"
+#include "comment.hh"
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
 #include "eval-inline.hh"
@@ -14,6 +15,7 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "value.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -709,8 +711,16 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .args = {"attrset"},
     .arity = 1,
     .doc = R"(
-      Take an *attrset* with values named `startSet` and `operator` in order to
-      return a *list of attrsets* by starting with the `startSet` and recursively
+      Takes an *attrset* with the following attributes:
+
+      - `startSet` [ Item ]
+        - A list of start items. Each item must be an attrset containing a `key`. The `key` must be comparable.
+      - `operator` Item -> [ Item ]
+        - A function
+
+      returns a *list of attrsets*
+
+      GenericClosure starts with the `startSet` and recursively
       applying the `operator` function to each `item`. The *attrsets* in the
       `startSet` and the *attrsets* produced by `operator` must contain a value
       named `key` which is comparable. The result is produced by calling `operator`
@@ -2504,6 +2514,175 @@ static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .name = "__unsafeGetAttrPos",
     .arity = 2,
     .fun = prim_unsafeGetAttrPos,
+});
+
+void prim_unsafeGetLambdaDoc(EvalState &state, const PosIdx pos, Value **args, Value &v)
+{
+  Value value = *args[0];
+  state.forceFunction(
+      value, pos,
+      "while evaluating the first argument to builtins.unsafeGetLambdaDoc");
+  auto lambda = value.lambda;
+
+  // TODO: Rewind the position so there is no outer lambda anymore.
+  // TODO: Rewind the position so there is no attr path anymore.
+  auto attrs = state.buildBindings(9);
+  int countApplied = 0;
+  bool isPrimOp = false;
+  Comment::Doc doc = Comment::emptyDoc;
+
+  if (value.isLambda()) {
+    auto posIdx = lambda.fun->getPos();
+    Pos funPos = state.positions[posIdx];
+
+    doc = Comment::lookupDoc(funPos, false);
+    state.mkPos(attrs.alloc("position"), posIdx);
+    countApplied = doc.timesApplied;
+    // TODO: place the cursor before the outermost lambda.
+    // Expr *root =
+    // state.parseExprFromFile(std::get<SourcePath>(funPos.origin)); auto root =
+    // state.findInASTChache(funPos.origin);
+    // dynamic_cast<Expr *>(root) != nullptr;
+  }
+  if (value.isPrimOp() || value.isPrimOpApp()) {
+    // Primops dont have source position"
+    isPrimOp = true;
+    attrs.alloc("position").mkNull();
+  }
+
+  if (value.isPrimOp()) {
+    // Primops should have documentation"
+    auto primDoc = value.primOp->doc;
+    if (primDoc != nullptr) {
+      std::string s(primDoc);
+      doc = Comment::Doc(s);
+    }
+    auto args = value.primOp->args;
+    auto arity = value.primOp->arity;
+    auto experimentalFeature = value.primOp->experimentalFeature;
+    auto name = value.primOp->name;
+    attrs.alloc("name").mkString(name);
+
+    auto & argsList = attrs.alloc("args");
+
+    state.mkList(argsList, args.size());
+    for (unsigned int n = 0; n < args.size(); ++n){
+        std::string arg = args[n];
+        (argsList.listElems()[n] = state.allocValue())->mkString(arg);
+    }
+
+    attrs.alloc("arity").mkInt(NixInt(arity));
+    attrs.alloc("experimental").mkBool(experimentalFeature.has_value());
+  }
+
+  if (value.isPrimOpApp()) {
+    Value *maybePrimop = value.primOpApp.left;
+    countApplied = 1;
+    // Find the primop by traversing left
+    while (maybePrimop != nullptr && !maybePrimop->isPrimOp() && maybePrimop->isPrimOpApp()) {
+      maybePrimop = maybePrimop->primOpApp.left;
+      countApplied++;
+    }
+    if (maybePrimop->isPrimOp()) {
+      doc = Comment::Doc(maybePrimop->primOp->doc);
+    }
+  }
+
+  attrs.alloc("isPrimop").mkBool(isPrimOp);
+  attrs.alloc("countApplied").mkInt(countApplied);
+  attrs.alloc("content").mkString(doc.comment);
+
+  v.mkAttrs(attrs);
+}
+
+static RegisterPrimOp primop_unsafeGetLambdaDoc(PrimOp{
+    .name = "__unsafeGetLambdaDoc",
+    .args = {"f"},
+    .doc = R"(
+        Returns an attribute set containing the `content` of a multiline doc-comment.
+
+        Example:
+        ```nix
+        builtins.unsafeGetLambdaDoc
+            {
+                /**
+                  # The id function
+                  * Bullet item
+                  * another item
+                  ## h2 markdown heading
+                  some more docs
+                */
+                foo = x: x;
+            }.foo
+        ```
+        evaluates to
+        ```nix
+        { content = "# The id function\n..."; isPrimop = false; position = { column = 23; file = "<...>.nix"; line = 14; }; }
+        ```
+    )",
+    .fun = prim_unsafeGetLambdaDoc,
+});
+
+void prim_unsafeGetAttrDoc(EvalState &state, const PosIdx pos, Value **args,
+                           Value &v) {
+  auto attr = state.forceStringNoCtx(*args[0], pos,
+                                     "while evaluating the first argument "
+                                     "passed to builtins.unsafeGetAttrDoc");
+  state.forceAttrs(*args[1], pos,
+                   "while evaluating the second argument passed to "
+                   "builtins.unsafeGetAttrDoc");
+  Symbol attrName = state.symbols.create(attr);
+  auto attribute = (*args[1]).attrs->find(attrName);
+
+  // Reserve space for an attribute set with 3 nameValuePairs
+  // { position :: mkPos; content :: String; isPrimop :: Bool }
+  // isPrimop type cannot be determined from lambdas in nix code but it is
+  // important for references in documentation
+  auto retAttrs = state.buildBindings(2);
+
+  if (attribute == args[1]->attrs->end()) {
+    // There is no position
+    // Therefore there is no doc-comment that could be retrieved
+    retAttrs.alloc("position").mkNull();
+    retAttrs.alloc("content").mkNull();
+  } else {
+    state.mkPos(retAttrs.alloc("position"), attribute->pos);
+
+    Pos position = state.positions[attribute->pos];
+    Comment::Doc doc = Comment::lookupDoc(position, true);
+
+    retAttrs.alloc("content").mkString(doc.comment);
+  }
+
+  v.mkAttrs(retAttrs);
+}
+
+static RegisterPrimOp primop_unsafeGetAttrDoc(PrimOp{
+    .name = "__unsafeGetAttrDoc",
+    .args = {"name", "set"},
+    .doc = R"(
+        For attribute `name` in `set` returns the doc-comment.
+
+        Example:
+        ```nix
+        builtins.unsafeGetAttrDoc "foo"
+            {
+                /**
+                  # The id function
+                  * Bullet item
+                  * another item
+                  ## h2 markdown heading
+                  some more docs
+                */
+                foo = x: x;
+            }
+        ```
+        evaluates to
+        ```nix
+        { content = "# The id function\n..."; position = { column = 15; file = "<...>.nix"; line = 14; }; }
+        ```
+    )",
+    .fun = prim_unsafeGetAttrDoc,
 });
 
 /* Dynamic version of the `?' operator. */
