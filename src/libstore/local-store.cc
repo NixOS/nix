@@ -193,8 +193,6 @@ LocalStore::LocalStore(const Params & params)
     createDirs(realStoreDir);
     if (readOnly) {
         experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
-    } else {
-        makeStoreWritable();
     }
     createDirs(linksDir);
     Path profilesDir = stateDir + "/profiles";
@@ -559,25 +557,6 @@ void LocalStore::openDB(State & state, bool create)
             ;
         db.exec(schema);
     }
-}
-
-
-/* To improve purity, users may want to make the Nix store a read-only
-   bind mount.  So make the Nix store writable for this process. */
-void LocalStore::makeStoreWritable()
-{
-#if __linux__
-    if (getuid() != 0) return;
-    /* Check if /nix/store is on a read-only mount. */
-    struct statvfs stat;
-    if (statvfs(realStoreDir.get().c_str(), &stat) != 0)
-        throw SysError("getting info about the Nix store mount point");
-
-    if (stat.f_flag & ST_RDONLY) {
-        if (mount(0, realStoreDir.get().c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
-            throw SysError("remounting %1% writable", realStoreDir);
-    }
-#endif
 }
 
 
