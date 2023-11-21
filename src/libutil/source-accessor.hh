@@ -17,6 +17,8 @@ struct SourceAccessor
 {
     const size_t number;
 
+    std::string displayPrefix, displaySuffix;
+
     SourceAccessor();
 
     virtual ~SourceAccessor()
@@ -116,6 +118,8 @@ struct SourceAccessor
     {
         return number < x.number;
     }
+
+    void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
 
     virtual std::string showPath(const CanonPath & path);
 };

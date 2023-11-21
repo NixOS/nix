@@ -7,7 +7,7 @@ namespace nix {
 /**
  * A source accessor that uses the Unix filesystem.
  */
-struct PosixSourceAccessor : SourceAccessor
+struct PosixSourceAccessor : virtual SourceAccessor
 {
     /**
      * The most recent mtime seen by lstat(). This is a hack to

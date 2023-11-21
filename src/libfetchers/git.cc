@@ -585,6 +585,8 @@ struct GitInputScheme : InputScheme
 
         auto accessor = repo->getAccessor(rev);
 
+        accessor->setPathDisplay("«" + input.to_string() + "»");
+
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
            repo and the accessors for the submodules. */
