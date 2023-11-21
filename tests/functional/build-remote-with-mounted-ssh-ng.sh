@@ -3,7 +3,7 @@ source common.sh
 requireSandboxSupport
 [[ $busybox =~ busybox ]] || skipTest "no busybox"
 
-enableFeatures mounted-ssh-store
+enableFeatures remote-store-mount-variations
 
 nix build -Lvf simple.nix \
   --arg busybox $busybox \
