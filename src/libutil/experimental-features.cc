@@ -263,6 +263,13 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         )",
     },
     {
+        .tag = Xp::MountedSSHStore,
+        .name = "mounted-ssh-store",
+        .description = R"(
+            Allow the use of the [`mounted SSH store`](@docroot@/command-ref/new-cli/nix3-help-stores.html#experimental-ssh-store-with-filesytem-mounted).
+        )",
+    },
+    {
         .tag = Xp::VerifiedFetches,
         .name = "verified-fetches",
         .description = R"(
