@@ -705,10 +705,22 @@ struct GitInputScheme : InputScheme
 
         auto repoInfo = getRepoInfo(input);
 
-        return
+        auto [accessor, final] =
             input.getRef() || input.getRev() || !repoInfo.isLocal
             ? getAccessorFromCommit(store, repoInfo, std::move(input))
             : getAccessorFromWorkdir(store, repoInfo, std::move(input));
+
+        accessor->fingerprint = final.getFingerprint(store);
+
+        return {accessor, std::move(final)};
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev())
+            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "");
+        else
+            return std::nullopt;
     }
 };
 

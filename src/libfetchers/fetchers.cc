@@ -108,6 +108,11 @@ Input Input::fromAttrs(Attrs && attrs)
     return std::move(*res);
 }
 
+std::optional<std::string> Input::getFingerprint(ref<Store> store) const
+{
+    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
+}
+
 ParsedURL Input::toURL() const
 {
     if (!scheme)
