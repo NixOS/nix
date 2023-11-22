@@ -27,7 +27,7 @@ StorePath InputAccessor::fetchToStore(
             {"path", path.abs()}
         };
         if (auto res = fetchers::getCache()->lookup(*cacheKey)) {
-            StorePath storePath(fetchers::getStrAttr(*res, "storePath"));
+            StorePath storePath{fetchers::getStrAttr(*res, "storePath")};
             if (store->isValidPath(storePath)) {
                 debug("store path cache hit for '%s'", showPath(path));
                 return storePath;
