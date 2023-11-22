@@ -571,11 +571,6 @@ EvalState::EvalState(
         #include "fetchurl.nix.gen.hh"
     );
 
-    corepkgsFS->addFile(
-        CanonPath("fetchurl.nix"),
-        #include "fetchurl.nix.gen.hh"
-    );
-
     createBaseEnv();
 }
 
