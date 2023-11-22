@@ -15,6 +15,8 @@ namespace flake {
 struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
+void setOverride(FlakeInputs & overrides, const InputPath & path, const FlakeRef & ref);
+void warnUnusedOverrides(const FlakeInputs & overrides, const InputPath & inputPathPrefix);
 
 /**
  * FlakeInput is the 'Flake'-level parsed form of the "input" entries
@@ -36,6 +38,11 @@ typedef std::map<FlakeId, FlakeInput> FlakeInputs;
  * set.  If not otherwise specified, a "ref" will be generated to a
  * 'type="indirect"' flake, which is treated as simply the name of a
  * flake to be resolved in the registry.
+ *
+ * FlakeInputs (a map from FlakeId to FlakeInput) is used to represent
+ * overrides, and in that case, a FlakeInput may have neither "ref"
+ * nor "follows", in which case it is an empty node in the override
+ * graph.
  */
 
 struct FlakeInput
@@ -49,6 +56,7 @@ struct FlakeInput
     bool isFlake = true;
     std::optional<InputPath> follows;
     FlakeInputs overrides;
+    void setOverrides(FlakeInputs && overrides);
 };
 
 struct ConfigFile
