@@ -14,6 +14,7 @@
 #include "graphml.hh"
 #include "legacy.hh"
 #include "path-with-outputs.hh"
+#include "posix-fs-canonicalise.hh"
 
 #include <iostream>
 #include <algorithm>
