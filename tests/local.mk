@@ -139,7 +139,8 @@ nix_tests = \
   toString-path.sh \
   read-only-store.sh \
   acls.sh \
-  acls/protect_dep.sh
+  acls/protect_dep.sh \
+  acls/revoke_runtime_dep.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
