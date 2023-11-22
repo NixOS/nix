@@ -511,8 +511,11 @@ struct GitInputScheme : InputScheme
 
             if (doFetch) {
                 try {
-                    auto fetchRef = getAllRefsAttr(input)
+                    auto fetchRef =
+                        getAllRefsAttr(input)
                         ? "refs/*"
+                        : input.getRev()
+                        ? input.getRev()->gitRev()
                         : ref.compare(0, 5, "refs/") == 0
                         ? ref
                         : ref == "HEAD"
@@ -693,25 +696,28 @@ struct GitInputScheme : InputScheme
 
         auto repoInfo = getRepoInfo(input);
 
-        return
+        auto [accessor, final] =
             input.getRef() || input.getRev() || !repoInfo.isLocal
             ? getAccessorFromCommit(store, repoInfo, std::move(input))
             : getAccessorFromWorkdir(store, repoInfo, std::move(input));
+
+        accessor->fingerprint = final.getFingerprint(store);
+
+        return {accessor, std::move(final)};
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev())
+            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "");
+        else
+            return std::nullopt;
     }
 
     bool isLocked(const Input & input) const override
     {
         return (bool) input.getRev();
     }
-
-    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
-    {
-        if (auto rev = input.getRev()) {
-            return fmt("%s;%s", rev->gitRev(), getSubmodulesAttr(input) ? "1" : "0");
-        } else
-            return std::nullopt;
-    }
-
 };
 
 static auto rGitInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });

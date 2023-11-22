@@ -104,6 +104,11 @@ Input Input::fromAttrs(Attrs && attrs)
     return std::move(*res);
 }
 
+std::optional<std::string> Input::getFingerprint(ref<Store> store) const
+{
+    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
+}
+
 ParsedURL Input::toURL() const
 {
     if (!scheme)
@@ -308,11 +313,6 @@ std::optional<time_t> Input::getLastModified() const
     return {};
 }
 
-std::optional<std::string> Input::getFingerprint(ref<Store> store) const
-{
-    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
-}
-
 ParsedURL InputScheme::toURL(const Input & input) const
 {
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
@@ -352,14 +352,6 @@ std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
 std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
 {
     return ((nlohmann::json) publicKeys).dump();
-}
-
-std::optional<std::string> InputScheme::getFingerprint(ref<Store> store, const Input & input) const
-{
-    if (auto rev = input.getRev())
-        return rev->gitRev();
-    else
-        return std::nullopt;
 }
 
 }

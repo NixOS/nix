@@ -657,6 +657,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case WorkerProto::Op::AddPermRoot: {
+        if (!trusted)
+            throw Error(
+                "you are not privileged to create perm roots\n\n"
+                "hint: you can just do this client-side without special privileges, and probably want to do that instead.");
+        auto storePath = WorkerProto::Serialise<StorePath>::read(*store, rconn);
+        Path gcRoot = absPath(readString(from));
+        logger->startWork();
+        auto & localFSStore = require<LocalFSStore>(*store);
+        localFSStore.addPermRoot(storePath, gcRoot);
+        logger->stopWork();
+        to << gcRoot;
+        break;
+    }
+
     case WorkerProto::Op::AddIndirectRoot: {
         Path path = absPath(readString(from));
 

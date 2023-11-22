@@ -922,7 +922,7 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
+static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printDrvPath, bool printMeta)
 {
     using nlohmann::json;
     json topObj = json::object();
@@ -951,6 +951,11 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                     else
                         outputObj[j.first] = nullptr;
                 }
+            }
+
+            if (printDrvPath) {
+                auto drvPath = i.queryDrvPath();
+                if (drvPath) pkgObj["drvPath"] = globals.state->store->printStorePath(*drvPath);
             }
 
             if (printMeta) {
@@ -1079,7 +1084,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
-        queryJSON(globals, elems, printOutPath, printMeta);
+        queryJSON(globals, elems, printOutPath, printDrvPath, printMeta);
         cout << '\n';
         return;
     }

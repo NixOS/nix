@@ -344,6 +344,14 @@ struct MercurialInputScheme : InputScheme
     {
         return (bool) input.getRev();
     }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev())
+            return rev->gitRev();
+        else
+            return std::nullopt;
+    }
 };
 
 static auto rMercurialInputScheme = OnStartup([] { registerInputScheme(std::make_unique<MercurialInputScheme>()); });

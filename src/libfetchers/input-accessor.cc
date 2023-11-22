@@ -3,8 +3,6 @@
 #include "store-api.hh"
 #include "cache.hh"
 
-#include <atomic>
-
 namespace nix {
 
 StorePath InputAccessor::fetchToStore(
@@ -20,20 +18,18 @@ StorePath InputAccessor::fetchToStore(
 
     std::optional<fetchers::Attrs> cacheKey;
 
-    if (!filter && fingerprint && method == FileIngestionMethod::Recursive) {
+    if (!filter && fingerprint) {
         cacheKey = fetchers::Attrs{
             {"_what", "fetchToStore"},
             {"store", store->storeDir},
             {"name", std::string(name)},
             {"fingerprint", *fingerprint},
+            {"method", (uint8_t) method},
             {"path", path.abs()}
         };
-        if (auto res = fetchers::getCache()->lookup(*cacheKey)) {
-            StorePath storePath(fetchers::getStrAttr(*res, "storePath"));
-            if (store->isValidPath(storePath)) {
-                debug("store path cache hit for '%s'", showPath(path));
-                return storePath;
-            }
+        if (auto res = fetchers::getCache()->lookup(store, *cacheKey)) {
+            debug("store path cache hit for '%s'", showPath(path));
+            return res->second;
         }
     } else
         debug("source path '%s' is uncacheable", showPath(path));
@@ -53,9 +49,7 @@ StorePath InputAccessor::fetchToStore(
         : store->addToStoreFromDump(*source, name, method, htSHA256, repair);
 
     if (cacheKey)
-        fetchers::getCache()->upsert(
-            *cacheKey,
-            fetchers::Attrs{{"storePath", std::string(storePath.to_string())}});
+        fetchers::getCache()->add(store, *cacheKey, {}, storePath, true);
 
     return storePath;
 }
