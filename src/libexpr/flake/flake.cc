@@ -358,10 +358,13 @@ LockedFlake lockFlake(
         debug("old lock file: %s", oldLockFile);
 
         std::map<InputPath, FlakeInput> overrides;
+        std::set<InputPath> explicitCliOverrides;
         std::set<InputPath> overridesUsed, updatesUsed;
 
-        for (auto & i : lockFlags.inputOverrides)
+        for (auto & i : lockFlags.inputOverrides) {
             overrides.insert_or_assign(i.first, FlakeInput { .ref = i.second });
+            explicitCliOverrides.insert(i.first);
+        }
 
         LockFile newLockFile;
 
@@ -432,6 +435,7 @@ LockedFlake lockFlake(
                        ancestors? */
                     auto i = overrides.find(inputPath);
                     bool hasOverride = i != overrides.end();
+                    bool hasCliOverride = explicitCliOverrides.contains(inputPath);
                     if (hasOverride) {
                         overridesUsed.insert(inputPath);
                         // Respect the “flakeness” of the input even if we
@@ -467,7 +471,7 @@ LockedFlake lockFlake(
 
                     if (oldLock
                         && oldLock->originalRef == *input.ref
-                        && !hasOverride)
+                        && !hasCliOverride)
                     {
                         debug("keeping existing input '%s'", inputPathS);
 
@@ -547,7 +551,7 @@ LockedFlake lockFlake(
                             nuked the next time we update the lock
                             file. That is, overrides are sticky unless you
                             use --no-write-lock-file. */
-                        auto ref = input2.ref ? *input2.ref : *input.ref;
+                        auto ref = (input2.ref && explicitCliOverrides.contains(inputPath)) ? *input2.ref : *input.ref;
 
                         if (input.isFlake) {
                             Path localPath = parentPath;
