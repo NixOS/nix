@@ -146,7 +146,13 @@ $(d)/language.json: $(bindir)/nix
 
 # Generate "Upcoming release" notes (or clear it and remove from menu)
 $(d)/src/release-notes/rl-next.md: $(d)/rl-next $(d)/rl-next/*
-	$(trace-gen) changelog-d doc/manual/rl-next > $@
+	@if type -p changelog-d > /dev/null; then \
+		echo "  GEN   " $@; \
+		changelog-d doc/manual/rl-next > $@; \
+	else \
+		echo "  NULL  " $@; \
+		true > $@; \
+	fi
 
 $(d)/src/SUMMARY-rl-next.md: $(d)/src/release-notes/rl-next.md
 	$(trace-gen) true
