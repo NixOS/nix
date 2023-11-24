@@ -3185,7 +3185,7 @@ static RegisterPrimOp primop_foldlStrict({
       to `6` and `foldl' (acc: elem: { "${elem}" = elem; } // acc) {}
       ["a" "b"]` evaluates to `{ a = "a"; b = "b"; }`.
 
-      The first argument of `op` is the accumulator wheres the second
+      The first argument of `op` is the accumulator whereas the second
       argument is the current element being processed. The return value
       of each application of `op` is evaluated immediately, even for
       intermediate values.
