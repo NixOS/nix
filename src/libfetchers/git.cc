@@ -11,6 +11,8 @@
 #include "fs-input-accessor.hh"
 #include "mounted-input-accessor.hh"
 #include "git-utils.hh"
+#include "logging.hh"
+#include "finally.hh"
 
 #include "fetch-settings.hh"
 
@@ -314,6 +316,9 @@ struct GitInputScheme : InputScheme
         runProgram("git", true,
             { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
 
+        // Pause the logger to allow for user input (such as a gpg passphrase) in `git commit`
+        logger->pause();
+        Finally restoreLogger([]() { logger->resume(); });
         if (commitMsg)
             runProgram("git", true,
                 { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
