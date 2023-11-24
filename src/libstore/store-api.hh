@@ -167,7 +167,10 @@ struct StoreConfig : public Config
           Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
 
           Example: `"kvm"`
-        )" };
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 };
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
