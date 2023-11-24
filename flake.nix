@@ -176,9 +176,7 @@
           "--enable-internal-api-docs"
         ];
 
-        # TODO: after backport of https://github.com/NixOS/nixpkgs/pull/268487, remove `haskellPackages.` -
-        #       vastly improves output closure, and adds shell completions
-        changelog-d = pkgs.buildPackages.haskellPackages.changelog-d;
+        changelog-d = pkgs.buildPackages.changelog-d;
 
         nativeBuildDeps =
           [
