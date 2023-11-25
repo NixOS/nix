@@ -52,7 +52,7 @@ struct Hash
     /**
      * Create a zero-filled hash object.
      */
-    Hash(HashType type);
+    explicit Hash(HashType type);
 
     /**
      * Parse the hash from a string representation in the format
@@ -103,7 +103,7 @@ public:
     /**
      * Returns the length of a base-16 representation of this hash.
      */
-    size_t base16Len() const
+    [[nodiscard]] size_t base16Len() const
     {
         return hashSize * 2;
     }
@@ -111,7 +111,7 @@ public:
     /**
      * Returns the length of a base-32 representation of this hash.
      */
-    size_t base32Len() const
+    [[nodiscard]] size_t base32Len() const
     {
         return (hashSize * 8 - 1) / 5 + 1;
     }
@@ -119,7 +119,7 @@ public:
     /**
      * Returns the length of a base-64 representation of this hash.
      */
-    size_t base64Len() const
+    [[nodiscard]] size_t base64Len() const
     {
         return ((4 * hashSize / 3) + 3) & ~3;
     }
@@ -129,14 +129,14 @@ public:
      * or base-64. By default, this is prefixed by the hash type
      * (e.g. "sha256:").
      */
-    std::string to_string(HashFormat hashFormat, bool includeType) const;
+    [[nodiscard]] std::string to_string(HashFormat hashFormat, bool includeType) const;
 
-    std::string gitRev() const
+    [[nodiscard]] std::string gitRev() const
     {
         return to_string(HashFormat::Base16, false);
     }
 
-    std::string gitShortRev() const
+    [[nodiscard]] std::string gitShortRev() const
     {
         return std::string(to_string(HashFormat::Base16, false), 0, 7);
     }

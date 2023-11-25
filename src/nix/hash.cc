@@ -17,7 +17,7 @@ struct CmdHashBase : Command
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
-    CmdHashBase(FileIngestionMethod mode) : mode(mode)
+    explicit CmdHashBase(FileIngestionMethod mode) : mode(mode)
     {
         addFlag({
             .longName = "sri",
