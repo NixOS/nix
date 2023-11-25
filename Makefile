@@ -1,5 +1,7 @@
--include Makefile.config
-clean-files += Makefile.config
+include mk/build-dir.mk
+
+-include $(buildprefix)Makefile.config
+clean-files += $(buildprefix)Makefile.config
 
 ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
