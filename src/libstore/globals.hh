@@ -778,6 +778,11 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
+          DEPRECATED:  This option is now ignored. It used to be a list of 
+          additional subsituters a user could request. However there were
+          many ways around this option and signed packages provide much
+          better security.
+
           A list of [Nix store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format), separated by whitespace.
           These are not used by default, but users of the Nix daemon can enable them by specifying [`substituters`](#conf-substituters).
 
