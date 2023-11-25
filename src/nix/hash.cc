@@ -8,6 +8,11 @@
 
 using namespace nix;
 
+/**
+ * Base for `nix hash file` (deprecated), `nix hash path` and `nix-hash` (legacy).
+ *
+ * Deprecation Issue: https://github.com/NixOS/nix/issues/8876
+ */
 struct CmdHashBase : Command
 {
     FileIngestionMethod mode;
