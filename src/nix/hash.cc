@@ -132,12 +132,75 @@ struct CmdToBase : Command
     }
 };
 
+/**
+ * `nix hash convert`
+ */
+struct CmdHashConvert : Command
+{
+    std::optional<HashFormat> from;
+    HashFormat to;
+    std::optional<HashType> type;
+    std::vector<std::string> hashStrings;
+
+    CmdHashConvert(): to(HashFormat::SRI) {
+        addFlag({
+            .longName = "from",
+            // TODO: List format choices. Maybe introduce a constant?
+            .description = "The format of the input hash.",
+            .labels = {"hash format"},
+            .handler = {[this](std::string str) {
+                from = parseHashFormat(str);
+            }},
+        });
+        addFlag({
+            .longName = "to",
+            // TODO: List format choices. Maybe introduce a constant?
+            .description = "The format of the output hash.",
+            .labels = {"hash format"},
+            .handler = {[this](std::string str) {
+                to = parseHashFormat(str);
+            }},
+        });
+        addFlag({
+            .longName = "type",
+            .description = "Specify the type if it can't be auto-detected.",
+            .labels = {"hash type"},
+            .handler = {[this](std::string str) {
+                type = parseHashType(str);
+            }},
+        });
+        expectArgs({
+           .label = "hashes",
+           .handler = {&hashStrings},
+        });
+    }
+
+    std::string description() override
+    {
+        return "convert between different hash formats, e.g. base16 and sri.";
+    }
+
+    Category category() override { return catUtility; }
+
+    void run() override {
+        for (const auto& s: hashStrings) {
+            Hash h = Hash::parseAny(s, type);
+            if (from && h.to_string(*from, from == HashFormat::SRI) != s) {
+                auto from_as_string = printHashFormat(*from);
+                throw BadHash("input hash '%s' does not have the expected format '--from %s'", s, from_as_string);
+            }
+            logger->cout(h.to_string(to, to == HashFormat::SRI));
+        }
+    }
+};
+
 struct CmdHash : NixMultiCommand
 {
     CmdHash()
         : NixMultiCommand(
             "hash",
             {
+                {"convert", []() { return make_ref<CmdHashConvert>();}},
                 {"file", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Flat);; }},
                 {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
                 {"to-base16", []() { return make_ref<CmdToBase>(HashFormat::Base16); }},

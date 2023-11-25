@@ -81,23 +81,40 @@ rm $TEST_ROOT/hash-path/hello
 ln -s x $TEST_ROOT/hash-path/hello
 try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
 
-# Conversion.
+# Conversion with `nix hash` `nix-hash` and `nix hash convert`
 try3() {
+    # $1 = hash type
+    # $2 = expected hash in base16
+    # $3 = expected hash in base32
+    # $4 = expected hash in base64
+    h64=$(nix hash convert --type "$1" --to base64 "$2")
+    [ "$h64" = "$4" ]
     h64=$(nix-hash --type "$1" --to-base64 "$2")
     [ "$h64" = "$4" ]
+    # Deprecated experiment
     h64=$(nix hash to-base64 --type "$1" "$2")
     [ "$h64" = "$4" ]
+
+    sri=$(nix hash convert --type "$1" --to sri "$2")
+    [ "$sri" = "$1-$4" ]
     sri=$(nix-hash --type "$1" --to-sri "$2")
     [ "$sri" = "$1-$4" ]
     sri=$(nix hash to-sri --type "$1" "$2")
     [ "$sri" = "$1-$4" ]
+    h32=$(nix hash convert --type "$1" --to base32 "$2")
+    [ "$h32" = "$3" ]
     h32=$(nix-hash --type "$1" --to-base32 "$2")
     [ "$h32" = "$3" ]
     h32=$(nix hash to-base32 --type "$1" "$2")
     [ "$h32" = "$3" ]
     h16=$(nix-hash --type "$1" --to-base16 "$h32")
     [ "$h16" = "$2" ]
+
+    h16=$(nix hash convert --type "$1" --to base16 "$h64")
+    [ "$h16" = "$2" ]
     h16=$(nix hash to-base16 --type "$1" "$h64")
+    [ "$h16" = "$2" ]
+    h16=$(nix hash convert --to base16 "$sri")
     [ "$h16" = "$2" ]
     h16=$(nix hash to-base16 "$sri")
     [ "$h16" = "$2" ]
