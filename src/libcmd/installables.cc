@@ -48,6 +48,16 @@ MixFlakeOptions::MixFlakeOptions()
     auto category = "Common flake-related options";
 
     addFlag({
+        .longName = "recreate-lock-file",
+        .description = "Recreate the flake's lock file from scratch.",
+        .category = category,
+        .handler = {[&]() {
+            lockFlags.recreateLockFile = true;
+            warn("'--recreate-lock-file' is deprecated and will be removed in a future version; use 'nix flake update' instead.");
+        }}
+    });
+
+    addFlag({
         .longName = "no-update-lock-file",
         .description = "Do not allow any updates to the flake's lock file.",
         .category = category,
@@ -77,6 +87,20 @@ MixFlakeOptions::MixFlakeOptions()
         .description = "Commit changes to the flake's lock file.",
         .category = category,
         .handler = {&lockFlags.commitLockFile, true}
+    });
+
+    addFlag({
+        .longName = "update-input",
+        .description = "Update a specific flake input (ignoring its previous entry in the lock file).",
+        .category = category,
+        .labels = {"input-path"},
+        .handler = {[&](std::string s) {
+            warn("'--update-input' is a deprecated alias for 'flake update' and will be removed in a future version.");
+            lockFlags.inputUpdates.insert(flake::parseInputPath(s));
+        }},
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
+        }}
     });
 
     addFlag({
