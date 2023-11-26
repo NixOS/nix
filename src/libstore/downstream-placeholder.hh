@@ -3,6 +3,7 @@
 
 #include "hash.hh"
 #include "path.hh"
+#include "derived-path.hh"
 
 namespace nix {
 
@@ -57,7 +58,7 @@ public:
      */
     static DownstreamPlaceholder unknownCaOutput(
         const StorePath & drvPath,
-        std::string_view outputName,
+        OutputNameView outputName,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**
@@ -71,7 +72,19 @@ public:
      */
     static DownstreamPlaceholder unknownDerivation(
         const DownstreamPlaceholder & drvPlaceholder,
-        std::string_view outputName,
+        OutputNameView outputName,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Convenience constructor that handles both cases (unknown
+     * content-addressed output and unknown derivation), delegating as
+     * needed to `unknownCaOutput` and `unknownDerivation`.
+     *
+     * Recursively builds up a placeholder from a
+     * `SingleDerivedPath::Built.drvPath` chain.
+     */
+    static DownstreamPlaceholder fromSingleDerivedPathBuilt(
+        const SingleDerivedPath::Built & built,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
 

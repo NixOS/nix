@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "globals.hh"
 #include "profiles.hh"
 #include "eval.hh"
@@ -63,7 +64,7 @@ Strings EvalSettings::getDefaultNixPath()
     };
 
     if (!evalSettings.restrictEval && !evalSettings.pureEval) {
-        add(settings.useXDGBaseDirectories ? getStateDir() + "/nix/defexpr/channels" : getHome() + "/.nix-defexpr/channels");
+        add(getNixDefExpr() + "/channels");
         add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
         add(rootChannelsDir());
     }
@@ -91,5 +92,12 @@ std::string EvalSettings::resolvePseudoUrl(std::string_view url)
 EvalSettings evalSettings;
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);
+
+Path getNixDefExpr()
+{
+    return settings.useXDGBaseDirectories
+        ? getStateDir() + "/nix/defexpr"
+        : getHome() + "/.nix-defexpr";
+}
 
 }

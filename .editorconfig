@@ -17,7 +17,7 @@ indent_style = space
 indent_size = 2
 
 # Match c++/shell/perl, set indent to spaces with width of four
-[*.{hpp,cc,hh,sh,pl}]
+[*.{hpp,cc,hh,sh,pl,xs}]
 indent_style = space
 indent_size = 4
 

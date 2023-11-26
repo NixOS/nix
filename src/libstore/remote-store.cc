@@ -172,7 +172,24 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
     auto ex = handle->processStderr(sink, source, flush);
     if (ex) {
         daemonException = true;
-        std::rethrow_exception(ex);
+        try {
+            std::rethrow_exception(ex);
+        } catch (const Error & e) {
+            // Nix versions before #4628 did not have an adequate behavior for reporting that the derivation format was upgraded.
+            // To avoid having to add compatibility logic in many places, we expect to catch almost all occurrences of the
+            // old incomprehensible error here, so that we can explain to users what's going on when their daemon is
+            // older than #4628 (2023).
+            if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations) &&
+                GET_PROTOCOL_MINOR(handle->daemonVersion) <= 35)
+            {
+                auto m = e.msg();
+                if (m.find("parsing derivation") != std::string::npos &&
+                    m.find("expected string") != std::string::npos &&
+                    m.find("Derive([") != std::string::npos)
+                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw dervation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
+            }
+            throw;
+        }
     }
 }
 
@@ -315,7 +332,8 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
             info = std::make_shared<ValidPathInfo>(
-                ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion), StorePath{path}));
+                StorePath{path},
+                WorkerProto::Serialise<UnkeyedValidPathInfo>::read(*this, *conn));
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
@@ -428,7 +446,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         }
 
         return make_ref<ValidPathInfo>(
-            ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion)));
+            WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
     }
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
@@ -524,7 +542,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << WorkerProto::Op::AddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(Base16, false);
+                 << info.narHash.to_string(HashFormat::Base16, false);
         WorkerProto::write(*this, *conn, info.references);
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
@@ -553,7 +571,12 @@ void RemoteStore::addMultipleToStore(
     auto source = sinkToSource([&](Sink & sink) {
         sink << pathsToCopy.size();
         for (auto & [pathInfo, pathSource] : pathsToCopy) {
-            pathInfo.write(sink, *this, 16);
+            WorkerProto::Serialise<ValidPathInfo>::write(*this,
+                 WorkerProto::WriteConn {
+                     .to = sink,
+                     .version = 16,
+                 },
+                 pathInfo);
             pathSource->drainInto(sink);
         }
     });
@@ -638,30 +661,6 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     } catch (...) { return callback.rethrow(); }
 }
 
-static void writeDerivedPaths(RemoteStore & store, RemoteStore::Connection & conn, const std::vector<DerivedPath> & reqs)
-{
-    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 30) {
-        WorkerProto::write(store, conn, reqs);
-    } else {
-        Strings ss;
-        for (auto & p : reqs) {
-            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
-            std::visit(overloaded {
-                [&](const StorePathWithOutputs & s) {
-                    ss.push_back(s.to_string(store));
-                },
-                [&](const StorePath & drvPath) {
-                    throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
-                        store.printStorePath(drvPath),
-                        GET_PROTOCOL_MAJOR(conn.daemonVersion),
-                        GET_PROTOCOL_MINOR(conn.daemonVersion));
-                },
-            }, sOrDrvPath);
-        }
-        conn.to << ss;
-    }
-}
-
 void RemoteStore::copyDrvsFromEvalStore(
     const std::vector<DerivedPath> & paths,
     std::shared_ptr<Store> evalStore)
@@ -670,9 +669,16 @@ void RemoteStore::copyDrvsFromEvalStore(
         /* The remote doesn't have a way to access evalStore, so copy
            the .drvs. */
         RealisedPath::Set drvPaths2;
-        for (auto & i : paths)
-            if (auto p = std::get_if<DerivedPath::Built>(&i))
-                drvPaths2.insert(p->drvPath);
+        for (const auto & i : paths) {
+            std::visit(overloaded {
+                [&](const DerivedPath::Opaque & bp) {
+                    // Do nothing, path is hopefully there already
+                },
+                [&](const DerivedPath::Built & bp) {
+                    drvPaths2.insert(bp.drvPath->getBaseStorePath());
+                },
+            }, i.raw());
+        }
         copyClosure(*evalStore, *this, drvPaths2);
     }
 }
@@ -684,7 +690,7 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
     auto conn(getConnection());
     conn->to << WorkerProto::Op::BuildPaths;
     assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
-    writeDerivedPaths(*this, *conn, drvPaths);
+    WorkerProto::write(*this, *conn, drvPaths);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
         conn->to << buildMode;
     else
@@ -708,7 +714,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
         conn->to << WorkerProto::Op::BuildPathsWithResults;
-        writeDerivedPaths(*this, *conn, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to << buildMode;
         conn.processStderr();
         return WorkerProto::Serialise<std::vector<KeyedBuildResult>>::read(*this, *conn);
@@ -742,7 +748,8 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                         };
 
                         OutputPathMap outputs;
-                        auto drv = evalStore->readDerivation(bfd.drvPath);
+                        auto drvPath = resolveDerivedPath(*evalStore, *bfd.drvPath);
+                        auto drv = evalStore->readDerivation(drvPath);
                         const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
                         auto built = resolveDerivedPath(*this, bfd, &*evalStore);
                         for (auto & [output, outputPath] : built) {
@@ -750,7 +757,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                             if (!outputHash)
                                 throw Error(
                                     "the derivation '%s' doesn't have an output named '%s'",
-                                    printStorePath(bfd.drvPath), output);
+                                    printStorePath(drvPath), output);
                             auto outputId = DrvOutput{ *outputHash, output };
                             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                                 auto realisation =
@@ -787,20 +794,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res;
-    res.status = (BuildResult::Status) readInt(conn->from);
-    conn->from >> res.errorMsg;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
-        conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
-    }
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
-        auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, *conn);
-        for (auto && [output, realisation] : builtOutputs)
-            res.builtOutputs.insert_or_assign(
-                std::move(output.outputName),
-                std::move(realisation));
-    }
-    return res;
+    return WorkerProto::Serialise<BuildResult>::read(*this, *conn);
 }
 
 
@@ -901,7 +895,7 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
             // to prevent a deadlock.
             goto fallback;
         conn->to << WorkerProto::Op::QueryMissing;
-        writeDerivedPaths(*this, *conn, targets);
+        WorkerProto::write(*this, *conn, targets);
         conn.processStderr();
         willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
         willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
@@ -976,7 +970,7 @@ void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
     copyNAR(conn->from, sink);
 }
 
-ref<FSAccessor> RemoteStore::getFSAccessor()
+ref<SourceAccessor> RemoteStore::getFSAccessor(bool requireValidPath)
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
 }

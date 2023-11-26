@@ -4,6 +4,7 @@
 #include "sync.hh"
 #include "thread-pool.hh"
 #include "references.hh"
+#include "signals.hh"
 
 #include <atomic>
 
@@ -108,8 +109,8 @@ struct CmdVerify : StorePathsCommand
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
                         printError("path '%s' was modified! expected hash '%s', got '%s'",
                             store->printStorePath(info->path),
-                            info->narHash.to_string(Base32, true),
-                            hash.first.to_string(Base32, true));
+                            info->narHash.to_string(HashFormat::Base32, true),
+                            hash.first.to_string(HashFormat::Base32, true));
                     }
                 }
 

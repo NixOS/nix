@@ -11,6 +11,30 @@ namespace nix {
  * reference.
  *
  * See methods for details on the operations it represents.
+ *
+ * @note
+ * To understand the purpose of this class, it might help to do some
+ * "closed-world" rather than "open-world" reasoning, and consider the
+ * problem it solved for us. This class was factored out from
+ * `LocalFSStore` in order to support the following table, which
+ * contains 4 concrete store types (non-abstract classes, exposed to the
+ * user), and how they implemented the two GC root methods:
+ *
+ * @note
+ * |                   | `addPermRoot()` | `addIndirectRoot()` |
+ * |-------------------|-----------------|---------------------|
+ * | `LocalStore`      | local           | local               |
+ * | `UDSRemoteStore`  | local           | remote              |
+ * | `SSHStore`        | doesn't have    | doesn't have        |
+ * | `MountedSSHStore` | remote          | doesn't have        |
+ *
+ * @note
+ * Note how only the local implementations of `addPermRoot()` need
+ * `addIndirectRoot()`; that is what this class enforces. Without it,
+ * and with `addPermRoot()` and `addIndirectRoot()` both `virtual`, we
+ * would accidentally be allowing for a combinatorial explosion of
+ * possible implementations many of which make no sense. Having this and
+ * that invariant enforced cuts down that space.
  */
 struct IndirectRootStore : public virtual LocalFSStore
 {

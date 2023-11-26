@@ -70,7 +70,7 @@ MakeError(InvalidStoreURI, Error);
 
 struct BasicDerivation;
 struct Derivation;
-class FSAccessor;
+struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
 
@@ -80,7 +80,6 @@ typedef std::map<std::string, StorePath> OutputPathMap;
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
-enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 
 /**
  * Magic header of exportPath() output (obsolete).
@@ -153,19 +152,25 @@ struct StoreConfig : public Config
 
     Setting<int> priority{this, 0, "priority",
         R"(
-          Priority of this store when used as a substituter. A lower value means a higher priority.
+          Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
+          A lower value means a higher priority.
         )"};
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query",
         R"(
-          Whether this store (when used as a substituter) can be
-          queried efficiently for path validity.
+          Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
         )"};
 
     Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
-        "Optional features that the system this store builds on implements (like \"kvm\")."};
+        R"(
+          Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
 
+          Example: `"kvm"`
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 };
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
@@ -289,14 +294,15 @@ public:
     StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
 
     /**
-     * Preparatory part of addToStore().
-     *
-     * @return the store path to which srcPath is to be copied
-     * and the cryptographic hash of the contents of srcPath.
+     * Read-only variant of addToStoreFromDump(). It returns the store
+     * path to which a NAR or flat file would be written.
      */
-    std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
-        const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
+    std::pair<StorePath, Hash> computeStorePathFromDump(
+        Source & dump,
+        std::string_view name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        HashType hashAlgo = htSHA256,
+        const StorePathSet & references = {}) const;
 
     /**
      * Preparatory part of addTextToStore().
@@ -662,28 +668,6 @@ public:
         bool showDerivers, bool showHash);
 
     /**
-     * Write a JSON representation of store path metadata, such as the
-     * hash and the references.
-     *
-     * @param includeImpureInfo If true, variable elements such as the
-     * registration time are included.
-     *
-     * @param showClosureSize If true, the closure size of each path is
-     * included.
-     */
-    nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
-        bool includeImpureInfo, bool showClosureSize,
-        Base hashBase = Base32,
-        AllowInvalidFlag allowInvalid = DisallowInvalid);
-
-    /**
-     * @return the size of the closure of the specified path, that is,
-     * the sum of the size of the NAR serialisation of each path in the
-     * closure.
-     */
-    std::pair<uint64_t, uint64_t> getClosureSize(const StorePath & storePath);
-
-    /**
      * Optimise the disk space usage of the Nix store by hard-linking files
      * with the same contents.
      */
@@ -699,7 +683,7 @@ public:
     /**
      * @return An object to access files in the Nix store.
      */
-    virtual ref<FSAccessor> getFSAccessor() = 0;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) = 0;
 
     /**
      * Repair the contents of the given path by redownloading it using
@@ -945,6 +929,7 @@ void removeTempRoots();
  * Resolve the derived path completely, failing if any derivation output
  * is unknown.
  */
+StorePath resolveDerivedPath(Store &, const SingleDerivedPath &, Store * evalStore = nullptr);
 OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
 
 

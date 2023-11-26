@@ -114,7 +114,8 @@ TEST_F(ValuePrintingTests, vLambda)
 TEST_F(ValuePrintingTests, vPrimOp)
 {
     Value vPrimOp;
-    vPrimOp.mkPrimOp(nullptr);
+    PrimOp primOp{};
+    vPrimOp.mkPrimOp(&primOp);
 
     test(vPrimOp, "<PRIMOP>");
 }

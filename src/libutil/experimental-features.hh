@@ -20,7 +20,9 @@ enum struct ExperimentalFeature
     CaDerivations,
     ImpureDerivations,
     Flakes,
+    FetchTree,
     NixCommand,
+    GitHashing,
     RecursiveNix,
     NoUrlLiterals,
     FetchClosure,
@@ -31,6 +33,9 @@ enum struct ExperimentalFeature
     DynamicDerivations,
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
+    ConfigurableImpureEnv,
+    MountedSSHStore,
+    VerifiedFetches,
 };
 
 /**

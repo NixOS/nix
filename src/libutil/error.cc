@@ -1,4 +1,7 @@
 #include "error.hh"
+#include "environment-variables.hh"
+#include "signals.hh"
+#include "terminal.hh"
 
 #include <iostream>
 #include <optional>
@@ -7,11 +10,14 @@
 
 namespace nix {
 
-const std::string nativeSystem = SYSTEM;
-
 void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame)
 {
     err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
+}
+
+void throwExceptionSelfCheck(){
+    // This is meant to be caught in initLibUtil()
+    throw SysError("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -150,6 +156,36 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
     return res;
 }
 
+/**
+ * A development aid for finding missing positions, to improve error messages. Example use:
+ *
+ *     NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS=1 _NIX_TEST_ACCEPT=1 make tests/lang.sh.test
+ *     git diff -U20 tests
+ *
+ */
+static bool printUnknownLocations = getEnv("_NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS").has_value();
+
+/**
+ * Print a position, if it is known.
+ *
+ * @return true if a position was printed.
+ */
+static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<AbstractPos> & pos) {
+    bool hasPos = pos && *pos;
+    if (hasPos) {
+        oss << "\n" << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
+
+        if (auto loc = pos->getCodeLines()) {
+            oss << "\n";
+            printCodeLines(oss, "", *pos, *loc);
+            oss << "\n";
+        }
+    } else if (printUnknownLocations) {
+        oss << "\n" << indent << ANSI_BLUE << "at " ANSI_RED << "UNKNOWN LOCATION" << ANSI_NORMAL << "\n";
+    }
+    return hasPos;
+}
+
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
 {
     std::string prefix;
@@ -197,8 +233,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         prefix += ":" ANSI_NORMAL " ";
 
     std::ostringstream oss;
-
-    auto noSource = ANSI_ITALIC " (source not available)" ANSI_NORMAL "\n";
 
     /*
      * Traces
@@ -315,34 +349,15 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
             oss << "\n" << "… " << trace.hint.str() << "\n";
 
-            if (trace.pos) {
+            if (printPosMaybe(oss, ellipsisIndent, trace.pos))
                 count++;
-
-                oss << "\n" << ellipsisIndent << ANSI_BLUE << "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL << ":";
-
-                if (auto loc = trace.pos->getCodeLines()) {
-                    oss << "\n";
-                    printCodeLines(oss, "", *trace.pos, *loc);
-                    oss << "\n";
-                } else
-                    oss << noSource;
-            }
         }
         oss << "\n" << prefix;
     }
 
     oss << einfo.msg << "\n";
 
-    if (einfo.errPos) {
-        oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *einfo.errPos << ANSI_NORMAL << ":";
-
-        if (auto loc = einfo.errPos->getCodeLines()) {
-            oss << "\n";
-            printCodeLines(oss, "", *einfo.errPos, *loc);
-            oss << "\n";
-        } else
-            oss << noSource;
-    }
+    printPosMaybe(oss, "", einfo.errPos);
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {

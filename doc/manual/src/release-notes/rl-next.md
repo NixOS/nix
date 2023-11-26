@@ -1,21 +1,9 @@
 # Release X.Y (202?-??-??)
 
-- Two new builtin functions,
-  [`builtins.parseFlakeRef`](@docroot@/language/builtins.md#builtins-parseFlakeRef)
-  and
-  [`builtins.flakeRefToString`](@docroot@/language/builtins.md#builtins-flakeRefToString),
-  have been added.
-  These functions are useful for converting between flake references encoded as attribute sets and URLs.
+- Fixed a bug where `nix-env --query` ignored `--drv-path` when `--json` was set.
 
-- [`builtins.toJSON`](@docroot@/language/builtins.md#builtins-parseFlakeRef) now prints [--show-trace](@docroot@/command-ref/conf-file.html#conf-show-trace) items for the path in which it finds an evaluation error.
-
-- Error messages regarding malformed input to [`derivation add`](@docroot@/command-ref/new-cli/nix3-derivation-add.md) are now clearer and more detailed.
-
-- The `discard-references` feature has been stabilized.
-  This means that the
-  [unsafeDiscardReferences](@docroot@/contributing/experimental-features.md#xp-feature-discard-references)
-  attribute is no longer guarded by an experimental flag and can be used
-  freely.
+- Introduced the store [`mounted-ssh-ng://`](@docroot@/command-ref/new-cli/nix3-help-stores.md).
+  This store allows full access to a Nix store on a remote machine and additionally requires that the store be mounted in the local filesystem.
 
 - `nix search` now omits `{packages.legacyPackages}.${system}` from the attribute path
   Specifically, those attribute path prefixes will no longer match the search

@@ -6,7 +6,6 @@
 #include "attr-path.hh"
 #include "value-to-xml.hh"
 #include "value-to-json.hh"
-#include "util.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
@@ -189,7 +188,7 @@ static int main_nix_instantiate(int argc, char * * argv)
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
-        state->printStats();
+        state->maybePrintStats();
 
         return 0;
     }

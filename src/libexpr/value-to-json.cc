@@ -1,7 +1,7 @@
 #include "value-to-json.hh"
 #include "eval-inline.hh"
-#include "util.hh"
 #include "store-api.hh"
+#include "signals.hh"
 
 #include <cstdlib>
 #include <iomanip>
@@ -31,7 +31,7 @@ json printValueAsJSON(EvalState & state, bool strict,
 
         case nString:
             copyContext(v, context);
-            out = v.string.s;
+            out = v.c_str();
             break;
 
         case nPath:

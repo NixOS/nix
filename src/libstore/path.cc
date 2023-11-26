@@ -11,6 +11,8 @@ static void checkName(std::string_view path, std::string_view name)
     if (name.size() > StorePath::MaxPathLen)
         throw BadStorePath("store path '%s' has a name longer than %d characters",
             path, StorePath::MaxPathLen);
+    if (name[0] == '.')
+        throw BadStorePath("store path '%s' starts with illegal character '.'", path);
     // See nameRegexStr for the definition
     for (auto c : name)
         if (!((c >= '0' && c <= '9')
@@ -33,7 +35,7 @@ StorePath::StorePath(std::string_view _baseName)
 }
 
 StorePath::StorePath(const Hash & hash, std::string_view _name)
-    : baseName((hash.to_string(Base32, false) + "-").append(std::string(_name)))
+    : baseName((hash.to_string(HashFormat::Base32, false) + "-").append(std::string(_name)))
 {
     checkName(baseName, name());
 }

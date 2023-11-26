@@ -29,12 +29,13 @@ std::string ContentAddressMethod::renderPrefix() const
 
 ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
 {
-    ContentAddressMethod method = FileIngestionMethod::Flat;
-    if (splitPrefix(m, "r:"))
-        method = FileIngestionMethod::Recursive;
-    else if (splitPrefix(m, "text:"))
-        method = TextIngestionMethod {};
-    return method;
+    if (splitPrefix(m, "r:")) {
+        return FileIngestionMethod::Recursive;
+    }
+    else if (splitPrefix(m, "text:")) {
+        return TextIngestionMethod {};
+    }
+    return FileIngestionMethod::Flat;
 }
 
 std::string ContentAddressMethod::render(HashType ht) const
@@ -60,7 +61,7 @@ std::string ContentAddress::render() const
                 + makeFileIngestionPrefix(method);
         },
     }, method.raw)
-        + this->hash.to_string(Base32, true);
+        + this->hash.to_string(HashFormat::Base32, true);
 }
 
 /**
@@ -83,7 +84,7 @@ static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix
         if (!hashTypeRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
         HashType hashType = parseHashType(*hashTypeRaw);
-        return std::move(hashType);
+        return hashType;
     };
 
     // Switch on prefix
@@ -115,7 +116,7 @@ ContentAddress ContentAddress::parse(std::string_view rawCa)
     auto [caMethod, hashType] = parseContentAddressMethodPrefix(rest);
 
     return ContentAddress {
-        .method = std::move(caMethod).raw,
+        .method = std::move(caMethod),
         .hash = Hash::parseNonSRIUnprefixed(rest, hashType),
     };
 }

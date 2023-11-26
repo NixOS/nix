@@ -18,12 +18,20 @@
 
 namespace nix {
 
+/**
+ * We put a limit on primop arity because it lets us use a fixed size array on
+ * the stack. 8 is already an impractical number of arguments. Use an attrset
+ * argument for such overly complicated functions.
+ */
+constexpr size_t maxPrimOpArity = 8;
 
 class Store;
 class EvalState;
 class StorePath;
-struct DerivedPath;
+struct SingleDerivedPath;
 enum RepairFlag : bool;
+struct FSInputAccessor;
+struct MemoryInputAccessor;
 
 
 /**
@@ -69,6 +77,12 @@ struct PrimOp
      * Optional experimental for this to be gated on.
      */
     std::optional<ExperimentalFeature> experimentalFeature;
+
+    /**
+     * Validity check to be performed by functions that introduce primops,
+     * such as RegisterPrimOp() and Value::mkPrimOp().
+     */
+    void check();
 };
 
 /**
@@ -211,7 +225,25 @@ public:
 
     Bindings emptyBindings;
 
+    /**
+     * The accessor for the root filesystem.
+     */
+    const ref<FSInputAccessor> rootFS;
+
+    /**
+     * The in-memory filesystem for <nix/...> paths.
+     */
+    const ref<MemoryInputAccessor> corepkgsFS;
+
+    /**
+     * In-memory filesystem for internal, non-user-callable Nix
+     * expressions like call-flake.nix.
+     */
+    const ref<MemoryInputAccessor> internalFS;
+
     const SourcePath derivationInternal;
+
+    const SourcePath callFlakeInternal;
 
     /**
      * Store used to materialise .drv files.
@@ -223,7 +255,6 @@ public:
      */
     const ref<Store> buildStore;
 
-    RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
     /**
@@ -341,8 +372,6 @@ public:
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    void addToSearchPath(SearchPath::Elem && elem);
-
     SearchPath getSearchPath() { return searchPath; }
 
     /**
@@ -407,16 +436,6 @@ public:
      */
     void evalFile(const SourcePath & path, Value & v, bool mustBeTrivial = false);
 
-    /**
-     * Like `evalFile`, but with an already parsed expression.
-     */
-    void cacheFile(
-        const SourcePath & path,
-        const SourcePath & resolvedPath,
-        Expr * e,
-        Value & v,
-        bool mustBeTrivial = false);
-
     void resetFileCache();
 
     /**
@@ -426,7 +445,7 @@ public:
     SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
-     * Try to resolve a search path value (not the optinal key part)
+     * Try to resolve a search path value (not the optional key part)
      *
      * If the specified search path element is a URI, download it.
      *
@@ -532,12 +551,12 @@ public:
     StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
     /**
-     * Part of `coerceToDerivedPath()` without any store IO which is exposed for unit testing only.
+     * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
      */
-    std::pair<DerivedPath, std::string_view> coerceToDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
+    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
 
     /**
-     * Coerce to `DerivedPath`.
+     * Coerce to `SingleDerivedPath`.
      *
      * Must be a string which is either a literal store path or a
      * "placeholder (see `DownstreamPlaceholder`).
@@ -551,7 +570,7 @@ public:
      * source of truth, and ultimately tells us what we want, and then
      * we ensure the string corresponds to it.
      */
-    DerivedPath coerceToDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
+    SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
 
 public:
 
@@ -668,43 +687,68 @@ public:
     /**
      * Create a string representing a store path.
      *
-     * The string is the printed store path with a context containing a single
-     * `NixStringContextElem::Opaque` element of that store path.
+     * The string is the printed store path with a context containing a
+     * single `NixStringContextElem::Opaque` element of that store path.
      */
     void mkStorePathString(const StorePath & storePath, Value & v);
 
     /**
-     * Create a string representing a `DerivedPath::Built`.
+     * Create a string representing a `SingleDerivedPath::Built`.
      *
-     * The string is the printed store path with a context containing a single
-     * `NixStringContextElem::Built` element of the drv path and output name.
+     * The string is the printed store path with a context containing a
+     * single `NixStringContextElem::Built` element of the drv path and
+     * output name.
      *
      * @param value Value we are settings
      *
-     * @param drvPath Path the drv whose output we are making a string for
+     * @param b the drv whose output we are making a string for, and the
+     * output
      *
-     * @param outputName Name of the output
-     *
-     * @param optOutputPath Optional output path for that string. Must
-     * be passed if and only if output store object is input-addressed.
-     * Will be printed to form string if passed, otherwise a placeholder
-     * will be used (see `DownstreamPlaceholder`).
+     * @param optStaticOutputPath Optional output path for that string.
+     * Must be passed if and only if output store object is
+     * input-addressed or fixed output. Will be printed to form string
+     * if passed, otherwise a placeholder will be used (see
+     * `DownstreamPlaceholder`).
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     void mkOutputString(
         Value & value,
-        const StorePath & drvPath,
-        const std::string outputName,
-        std::optional<StorePath> optOutputPath,
+        const SingleDerivedPath::Built & b,
+        std::optional<StorePath> optStaticOutputPath,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Create a string representing a `SingleDerivedPath`.
+     *
+     * A combination of `mkStorePathString` and `mkOutputString`.
+     */
+    void mkSingleDerivedPathString(
+        const SingleDerivedPath & p,
+        Value & v);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
-     * Print statistics.
+     * Print statistics, if enabled.
+     *
+     * Performs a full memory GC before printing the statistics, so that the
+     * GC statistics are more accurate.
      */
-    void printStats();
+    void maybePrintStats();
+
+    /**
+     * Print statistics, unconditionally, cheaply, without performing a GC first.
+     */
+    void printStatistics();
+
+    /**
+     * Perform a full memory garbage collection - not incremental.
+     *
+     * @return true if Nix was built with GC and a GC was performed, false if not.
+     *              The return value is currently not thread safe - just the return value.
+     */
+    bool fullGC();
 
     /**
      * Realise the given context, and return a mapping from the placeholders
@@ -713,6 +757,22 @@ public:
     [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
 
 private:
+
+    /**
+     * Like `mkOutputString` but just creates a raw string, not an
+     * string Value, which would also have a string context.
+     */
+    std::string mkOutputStringRaw(
+        const SingleDerivedPath::Built & b,
+        std::optional<StorePath> optStaticOutputPath,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Like `mkSingleDerivedPathStringRaw` but just creates a raw string
+     * Value, which would also have a string context.
+     */
+    std::string mkSingleDerivedPathStringRaw(
+        const SingleDerivedPath & p);
 
     unsigned long nrEnvs = 0;
     unsigned long nrValuesInEnvs = 0;
@@ -779,7 +839,7 @@ std::string showType(const Value & v);
 /**
  * If `path` refers to a directory, then append "/default.nix".
  */
-SourcePath resolveExprPath(const SourcePath & path);
+SourcePath resolveExprPath(SourcePath path);
 
 struct InvalidPathError : EvalError
 {
@@ -789,8 +849,6 @@ struct InvalidPathError : EvalError
     ~InvalidPathError() throw () { };
 #endif
 };
-
-static const std::string corepkgsPrefix{"/__corepkgs__/"};
 
 template<class ErrorType>
 void ErrorBuilder::debugThrow()

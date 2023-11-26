@@ -314,7 +314,7 @@ connected:
             //
             // 2. Changing the `inputSrcs` set changes the associated
             //    output ids, which break CA derivations
-            if (!drv.inputDrvs.empty())
+            if (!drv.inputDrvs.map.empty())
                 drv.inputSrcs = store->parseStorePathSet(inputs);
             optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
             auto & result = *optResult;
@@ -322,7 +322,12 @@ connected:
                 throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
         } else {
             copyClosure(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
-            auto res = sshStore->buildPathsWithResults({ DerivedPath::Built { *drvPath, OutputsSpec::All {} } });
+            auto res = sshStore->buildPathsWithResults({
+                DerivedPath::Built {
+                    .drvPath = makeConstantStorePathRef(*drvPath),
+                    .outputs = OutputsSpec::All {},
+                }
+            });
             // One path to build should produce exactly one build result
             assert(res.size() == 1);
             optResult = std::move(res[0]);

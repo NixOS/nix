@@ -72,7 +72,7 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     { callback(nullptr); }
 
-    virtual ref<FSAccessor> getFSAccessor() override
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     { unsupported("getFSAccessor"); }
 };
 

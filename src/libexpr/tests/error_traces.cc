@@ -310,7 +310,7 @@ namespace nix {
         ASSERT_TRACE2("storePath true",
                       TypeError,
                       hintfmt("cannot coerce %s to a string", "a Boolean"),
-                      hintfmt("while evaluating the first argument passed to builtins.storePath"));
+                      hintfmt("while evaluating the first argument passed to 'builtins.storePath'"));
 
     }
 
@@ -378,12 +378,12 @@ namespace nix {
         ASSERT_TRACE2("filterSource [] []",
                       TypeError,
                       hintfmt("cannot coerce %s to a string", "a list"),
-                      hintfmt("while evaluating the second argument (the path to filter) passed to builtins.filterSource"));
+                      hintfmt("while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'"));
 
         ASSERT_TRACE2("filterSource [] \"foo\"",
                       EvalError,
                       hintfmt("string '%s' doesn't represent an absolute path", "foo"),
-                      hintfmt("while evaluating the second argument (the path to filter) passed to builtins.filterSource"));
+                      hintfmt("while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'"));
 
         ASSERT_TRACE2("filterSource [] ./.",
                       TypeError,
@@ -906,12 +906,12 @@ namespace nix {
         ASSERT_TRACE2("concatMap (x: 1) [ \"foo\" ] # TODO",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "an integer"),
-                      hintfmt("while evaluating the return value of the function passed to buitlins.concatMap"));
+                      hintfmt("while evaluating the return value of the function passed to builtins.concatMap"));
 
         ASSERT_TRACE2("concatMap (x: \"foo\") [ 1 2 ] # TODO",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "a string"),
-                      hintfmt("while evaluating the return value of the function passed to buitlins.concatMap"));
+                      hintfmt("while evaluating the return value of the function passed to builtins.concatMap"));
 
     }
 
@@ -1084,7 +1084,7 @@ namespace nix {
 
         ASSERT_TRACE1("hashString \"foo\" \"content\"",
                       UsageError,
-                      hintfmt("unknown hash algorithm '%s'", "foo"));
+                      hintfmt("unknown hash algorithm '%s', expect 'md5', 'sha1', 'sha256', or 'sha512'", "foo"));
 
         ASSERT_TRACE2("hashString \"sha256\" {}",
                       TypeError,
