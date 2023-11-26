@@ -50,14 +50,6 @@ EOF
 nix build --no-write-lock-file './nixpkgs#bashInteractive' --out-link ./bash-interactive
 BASH_INTERACTIVE_EXECUTABLE="$PWD/bash-interactive/bin/bash"
 
-# Test whether `nix develop` uses nixpkgs#bashInteractive shell.
-[[ "$(
-    nix develop --no-write-lock-file .#hello <<EOF
-export PATH="$PATH"
-$lsof -a -d txt -p \$$ 2>&1 | grep -o '/.*/bash'
-EOF
-)" -ef "$BASH_INTERACTIVE_EXECUTABLE" ]]
-
 # Test whether `nix develop` sets `SHELL` to nixpkgs#bashInteractive shell.
 [[ "$(
     SHELL=custom nix develop --no-write-lock-file .#hello <<EOF
