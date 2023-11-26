@@ -16,3 +16,7 @@
   [unsafeDiscardReferences](@docroot@/contributing/experimental-features.md#xp-feature-discard-references)
   attribute is no longer guarded by an experimental flag and can be used
   freely.
+
+- `nix search` now omits `{packages.legacyPackages}.${system}` from the attribute path
+  Specifically, those attribute path prefixes will no longer match the search
+  query, nor will they show up in the search results.
