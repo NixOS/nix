@@ -21,6 +21,7 @@ const redirects = {
     "chap-distributed-builds": "advanced-topics/distributed-builds.html",
     "chap-post-build-hook": "advanced-topics/post-build-hook.html",
     "chap-post-build-hook-caveats": "advanced-topics/post-build-hook.html#implementation-caveats",
+    "chap-writing-nix-expressions": "language/index.html",
     "part-command-ref": "command-ref/command-ref.html",
     "conf-allow-import-from-derivation": "command-ref/conf-file.html#conf-allow-import-from-derivation",
     "conf-allow-new-privileges": "command-ref/conf-file.html#conf-allow-new-privileges",
