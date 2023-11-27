@@ -1,0 +1,4 @@
+#! @ENV_PROG@ nix-shell
+#! nix-shell -E "with (import ./shell.nix {}); runCommand \"hi\" {buildInputs = [ruby];} \"\""
+#! nix-shell --pure -i ruby
+puts ARGV[1]
