@@ -25,7 +25,7 @@ void emitTreeAttrs(
 {
     assert(input.isLocked());
 
-    auto attrs = state.buildBindings(10);
+    auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
