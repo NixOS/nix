@@ -174,7 +174,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "allRefs" || name == "verifyCommit")
+            else if (name == "shallow" || name == "submodules" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -199,6 +199,7 @@ struct GitInputScheme : InputScheme
             "rev",
             "shallow",
             "submodules",
+            "exportIgnore",
             "lastModified",
             "revCount",
             "narHash",
@@ -250,6 +251,8 @@ struct GitInputScheme : InputScheme
             url.query.insert_or_assign("shallow", "1");
         if (getSubmodulesAttr(input))
             url.query.insert_or_assign("submodules", "1");
+        if (maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false))
+            url.query.insert_or_assign("exportIgnore", "1");
         if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
             url.query.insert_or_assign("verifyCommit", "1");
         auto publicKeys = getPublicKeys(input.attrs);
@@ -370,6 +373,11 @@ struct GitInputScheme : InputScheme
     bool getSubmodulesAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    }
+
+    bool getExportIgnoreAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false);
     }
 
     bool getAllRefsAttr(const Input & input) const
@@ -600,7 +608,8 @@ struct GitInputScheme : InputScheme
 
         verifyCommit(input, repo);
 
-        auto accessor = repo->getAccessor(rev);
+        bool exportIgnore = getExportIgnoreAttr(input);
+        auto accessor = repo->getAccessor(rev, exportIgnore);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
@@ -610,7 +619,7 @@ struct GitInputScheme : InputScheme
         if (getSubmodulesAttr(input)) {
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
-            for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev)) {
+            for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
                 auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
                 debug("Git submodule %s: %s %s %s -> %s",
                     submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);

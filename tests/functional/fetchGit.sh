@@ -231,12 +231,15 @@ unset _NIX_FORCE_HTTP
 
 # Ensure .gitattributes is respected
 touch $repo/not-exported-file
+touch $repo/exported-wonky
 echo "/not-exported-file export-ignore" >> $repo/.gitattributes
-git -C $repo add not-exported-file .gitattributes
+echo "/exported-wonky export-ignore=wonk" >> $repo/.gitattributes
+git -C $repo add not-exported-file exported-wonky .gitattributes
 git -C $repo commit -m 'Bla6'
 rev5=$(git -C $repo rev-parse HEAD)
 path12=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev5\"; }).outPath")
 [[ ! -e $path12/not-exported-file ]]
+[[ -e $path12/exported-wonky ]]
 
 # should fail if there is no repo
 rm -rf $repo/.git

@@ -7,6 +7,7 @@
 
 #include <boost/core/span.hpp>
 
+#include <git2/attr.h>
 #include <git2/blob.h>
 #include <git2/commit.h>
 #include <git2/config.h>
@@ -21,6 +22,7 @@
 #include <git2/submodule.h>
 #include <git2/tree.h>
 
+#include <iostream>
 #include <unordered_set>
 #include <queue>
 #include <regex>
@@ -307,7 +309,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return std::nullopt;
     }
 
-    std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) override;
+    std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
     std::string resolveSubmoduleUrl(
         const std::string & url,
@@ -340,7 +342,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return true;
     }
 
-    ref<InputAccessor> getAccessor(const Hash & rev) override;
+    ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
 
     static int sidebandProgressCallback(const char * str, int len, void * payload)
     {
@@ -460,10 +462,12 @@ struct GitInputAccessor : InputAccessor
 {
     ref<GitRepoImpl> repo;
     Tree root;
+    bool exportIgnore;
 
-    GitInputAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
+    GitInputAccessor(ref<GitRepoImpl> repo_, const Hash & rev, bool exportIgnore)
         : repo(repo_)
         , root(peelObject<Tree>(*repo, lookupObject(*repo, hashToOID(rev)).get(), GIT_OBJECT_TREE))
+        , exportIgnore(exportIgnore)
     {
     }
 
@@ -492,7 +496,7 @@ struct GitInputAccessor : InputAccessor
             return Stat { .type = tDirectory };
 
         auto entry = lookup(path);
-        if (!entry)
+        if (!entry || isExportIgnored(path))
             return std::nullopt;
 
         auto mode = git_tree_entry_filemode(entry);
@@ -527,6 +531,12 @@ struct GitInputAccessor : InputAccessor
 
                 for (size_t n = 0; n < count; ++n) {
                     auto entry = git_tree_entry_byindex(tree.get(), n);
+                    if (exportIgnore) {
+                        if (isExportIgnored(path + git_tree_entry_name(entry))) {
+                            continue;
+                        }
+                    }
+
                     // FIXME: add to cache
                     res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
                 }
@@ -556,6 +566,33 @@ struct GitInputAccessor : InputAccessor
 
     std::unordered_map<CanonPath, TreeEntry> lookupCache;
 
+    bool isExportIgnored(const CanonPath & path) {
+        if (!exportIgnore)
+            return false;
+
+        const char *exportIgnoreEntry = nullptr;
+
+        // GIT_ATTR_CHECK_INDEX_ONLY:
+        // > It will use index only for creating archives or for a bare repo
+        // > (if an index has been specified for the bare repo).
+        // -- https://github.com/libgit2/libgit2/blob/HEAD/include/git2/attr.h#L113C62-L115C48
+        if (git_attr_get(&exportIgnoreEntry,
+                *repo,
+                GIT_ATTR_CHECK_INDEX_ONLY,
+                std::string(path.rel()).c_str(),
+                "export-ignore")) {
+            if (git_error_last()->klass == GIT_ENOTFOUND)
+                return false;
+            else
+                throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
+        }
+        else {
+            // Official git will silently reject export-ignore lines that have
+            // values. We do the same.
+            return GIT_ATTR_IS_TRUE(exportIgnoreEntry);
+        }
+    }
+
     /* Recursively look up 'path' relative to the root. */
     git_tree_entry * lookup(const CanonPath & path)
     {
@@ -567,6 +604,10 @@ struct GitInputAccessor : InputAccessor
             if (auto err = git_tree_entry_bypath(Setter(entry), root.get(), std::string(path.rel()).c_str())) {
                 if (err != GIT_ENOTFOUND)
                     throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
+            }
+
+            if (entry && isExportIgnored(path)) {
+                entry.reset();
             }
 
             i = lookupCache.emplace(path, std::move(entry)).first;
@@ -644,17 +685,17 @@ struct GitInputAccessor : InputAccessor
     }
 };
 
-ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev)
+ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 {
-    return make_ref<GitInputAccessor>(ref<GitRepoImpl>(shared_from_this()), rev);
+    return make_ref<GitInputAccessor>(ref<GitRepoImpl>(shared_from_this()), rev, exportIgnore);
 }
 
-std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev)
+std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev, bool exportIgnore)
 {
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
 
-    auto accessor = getAccessor(rev);
+    auto accessor = getAccessor(rev, exportIgnore);
     if (!accessor->pathExists(modulesFile)) return {};
 
     /* Parse it and get the revision of each submodule. */

@@ -39,6 +39,10 @@ void emitTreeAttrs(
         attrs.alloc("submodules").mkBool(
             fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
+    if (input.getType() == "git")
+        attrs.alloc("exportIgnore").mkBool(
+            fetchers::maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false));
+
     if (!forceDirty) {
 
         if (auto rev = input.getRev()) {
@@ -111,6 +115,11 @@ static void fetchTree(
             }));
 
         attrs.emplace("type", type.value());
+
+        if (params.isFetchGit) {
+            // Default value; user attrs are assigned later.
+            attrs.emplace("exportIgnore", Explicit<bool>{true});
+        }
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
@@ -592,6 +601,11 @@ static RegisterPrimOp primop_fetchGit({
       - `submodules` (default: `false`)
 
         A Boolean parameter that specifies whether submodules should be checked out.
+
+      - `exportIgnore` (default: `true`)
+
+        A Boolean parameter that specifies whether `export-ignore` from `.gitattributes` should be applied.
+        This approximates part of the `git archive` behavior.
 
       - `shallow` (default: `false`)
 
