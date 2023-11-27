@@ -22,3 +22,17 @@ for IMPORTED_STORE_PATH in $IMPORTED_STORE_PATHS; do
     nix path-info "$IMPORTED_STORE_PATH" ||
         fail "path $BUILT_STORE_PATH should have been imported but isn't valid"
 done
+
+faketty () {
+    # Run a command in a pseudo-terminal.
+    script -qefc "$(printf "%q " "$@")" /dev/null
+}
+
+! faketty nix store export --format binary --recursive $BUILT_STORE_PATHS > /dev/null || \
+    fail "nix store export should refuse to write in a tty by default"
+faketty nix store export --format binary --recursive $BUILT_STORE_PATHS --output-file - > /dev/null || \
+    fail "nix store export should accept to write in a tty if explicitly asked to"
+
+nix store export --format binary --recursive $BUILT_STORE_PATHS --output-file "$TEST_ROOT/store-export2"
+diff "$TEST_ROOT/store-export" "$TEST_ROOT/store-export2" || \
+    fail '`nix store export --output-file blah` should be equivalent to `nix store export > blah`'

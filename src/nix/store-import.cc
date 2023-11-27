@@ -44,6 +44,19 @@ struct CmdStoreExport : StorePathsCommand, MixImportExport
         ;
     }
 
+    std::optional<Path> outputFile = std::nullopt;
+
+    CmdStoreExport()
+    {
+        addFlag({
+            .longName = "output-file",
+            .description = "Write the archive to the given file instead of stdout.",
+            .labels = {"file"},
+            .handler = {&outputFile},
+        });
+
+    }
+
     void run(ref<Store> store, StorePaths && storePaths) override
     {
 
@@ -54,7 +67,22 @@ struct CmdStoreExport : StorePathsCommand, MixImportExport
 
         StorePathSet pathsAsSet;
         pathsAsSet.insert(storePaths.begin(), storePaths.end());
-        FdSink sink(STDOUT_FILENO);
+
+        auto sink = [&]() -> FdSink {
+            if (outputFile) {
+                if (*outputFile == "-") {
+                    return FdSink(STDOUT_FILENO);
+                } else {
+                    auto fd = open(outputFile->c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+                    return FdSink(fd);
+                }
+            } else if (isatty(STDOUT_FILENO)) {
+                throw Error("Refusing to write binary data to a terminal. Use `--output-file` to specify a file to write to.");
+            } else {
+                return FdSink(STDOUT_FILENO);
+            }
+        }();
+
         store->exportPaths(pathsAsSet, sink);
         sink.flush();
     }
@@ -73,9 +101,27 @@ struct CmdStoreImport : StoreCommand, MixImportExport
         ;
     }
 
+    std::optional<Path> inputFile = std::nullopt;
+
+    CmdStoreImport() {
+        addFlag({
+            .longName = "input-file",
+            .description = "Read the archive from the given file instead of stdin.",
+            .labels = {"file"},
+            .handler = {&inputFile},
+        });
+    }
+
     void run(ref<Store> store) override
     {
-        FdSource source(STDIN_FILENO);
+        FdSource source = [&]() -> FdSource {
+            if (inputFile && *inputFile != "-") {
+                auto fd = open(inputFile->c_str(), O_RDONLY);
+                return FdSource(fd);
+            } else {
+                return FdSource(STDIN_FILENO);
+            }
+        }();
         auto paths = store->importPaths(source, NoCheckSigs);
 
         for (auto & path : paths)
