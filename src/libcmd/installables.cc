@@ -49,7 +49,13 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "recreate-lock-file",
-        .description = "Recreate the flake's lock file from scratch.",
+        .description = R"(
+    Recreate the flake's lock file from scratch.
+
+    > **DEPRECATED**
+    >
+    > Use [`nix flake update`](@docroot@/command-ref/new-cli/nix3-flake-update.md) instead.
+        )",
         .category = category,
         .handler = {[&]() {
             lockFlags.recreateLockFile = true;
@@ -73,8 +79,13 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "no-registries",
-        .description =
-          "Don't allow lookups in the flake registries. This option is deprecated; use `--no-use-registries`.",
+        .description = R"(
+    Don't allow lookups in the flake registries.
+
+    > **DEPRECATED**
+    >
+    > Use [`--no-use-registries`](#opt-no-use-registries) instead.
+        )",
         .category = category,
         .handler = {[&]() {
             lockFlags.useRegistries = false;
@@ -91,7 +102,13 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "update-input",
-        .description = "Update a specific flake input (ignoring its previous entry in the lock file).",
+        .description = R"(
+    Update a specific flake input (ignoring its previous entry in the lock file).
+
+    > **DEPRECATED**
+    >
+    > Use [`nix flake update`](@docroot@/command-ref/new-cli/nix3-flake-update.md) instead.
+        )",
         .category = category,
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
