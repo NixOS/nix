@@ -154,7 +154,7 @@
 
         configureFlags =
           lib.optionals stdenv.isLinux [
-            "--with-boost=${boost}/lib"
+            "--with-boost=${boost-nix}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
           ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
@@ -202,7 +202,7 @@
               version = libgit2.lastModifiedDate;
               cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
             }))
-            boost
+            boost-nix
             lowdown-nix
             libsodium
           ]
@@ -423,14 +423,14 @@
 
             propagatedBuildInputs = propagatedDeps;
 
-            disallowedReferences = [ boost ];
+            disallowedReferences = [ boost-nix ];
 
             preConfigure = lib.optionalString (! currentStdenv.hostPlatform.isStatic)
               ''
                 # Copy libboost_context so we don't get all of Boost in our closure.
                 # https://github.com/NixOS/nixpkgs/issues/45462
                 mkdir -p $out/lib
-                cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
+                cp -pd ${boost-nix}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
                 rm -f $out/lib/*.a
                 ${lib.optionalString currentStdenv.hostPlatform.isLinux ''
                   chmod u+w $out/lib/*.so.*
@@ -440,9 +440,9 @@
                   for LIB in $out/lib/*.dylib; do
                     chmod u+w $LIB
                     install_name_tool -id $LIB $LIB
-                    install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
+                    install_name_tool -delete_rpath ${boost-nix}/lib/ $LIB || true
                   done
-                  install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
+                  install_name_tool -change ${boost-nix}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
                 ''}
               '';
 
@@ -470,9 +470,13 @@
               ''}
               ${lib.optionalString currentStdenv.isDarwin ''
               install_name_tool \
-                -change ${boost}/lib/libboost_context.dylib \
+                -change ${boost-nix}/lib/libboost_context.dylib \
                 $out/lib/libboost_context.dylib \
                 $out/lib/libnixutil.dylib
+              install_name_tool \
+                -change ${boost-nix}/lib/libboost_regex.dylib \
+                $out/lib/libboost_regex.dylib \
+                $out/lib/libnixexpr.dylib
               ''}
             '';
 
@@ -494,6 +498,10 @@
             meta.platforms = lib.platforms.unix;
             meta.mainProgram = "nix";
           });
+
+          boost-nix = final.boost.override {
+            enableIcu = false;
+          };
 
           lowdown-nix = with final; currentStdenv.mkDerivation rec {
             name = "lowdown-0.9.0";
