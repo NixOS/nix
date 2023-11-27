@@ -117,7 +117,16 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     auto aDescription = aMeta ? aMeta->maybeGetAttr(state->sDescription) : nullptr;
                     auto description = aDescription ? aDescription->getString() : "";
                     std::replace(description.begin(), description.end(), '\n', ' ');
-                    auto attrPath2 = concatStringsSep(".", attrPathS);
+                    std::vector<std::string> attrPathS2;
+                    for (auto&& elem : attrPathS) {
+                        if (!(
+                            elem == "legacyPackages"
+                            || elem == "packages"
+                            || elem == settings.thisSystem.get())) {
+                            attrPathS2.push_back(elem);
+                        }
+                    }
+                    auto attrPath2 = concatStringsSep(".", attrPathS2);
 
                     std::vector<std::smatch> attrPathMatches;
                     std::vector<std::smatch> descriptionMatches;
