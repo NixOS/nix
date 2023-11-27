@@ -500,8 +500,6 @@
           });
 
           boost-nix = final.boost.override {
-            # enableIcu arg is not yet supported
-            # but will be with next nixpkgs update
             enableIcu = false;
           };
 
