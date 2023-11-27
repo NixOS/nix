@@ -51,5 +51,6 @@ source common.sh
 repoDir="$TEST_ROOT/repo-$RANDOM"
 createGitRepo "$repoDir"
 createSimpleGitFlake "$repoDir"
+nix flake show "$repoDir" # TODO: Remove when https://github.com/NixOS/nix/issues/9479 was fixed
 [[ "$(nix search "$repoDir" hello --json | jq -c 'keys')" == '["hello"]' ]]
 popd
