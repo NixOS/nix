@@ -134,7 +134,7 @@ if [[ ! -n "${DATE:-}" ]]; then
 fi
 
 case "$DATE" in
-  [0-9]*-[0-9]*-[0-9]*)
+  [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9])
     ;;
   *)
     die "DATE must be YYYY-MM-DD, e.g. 2021-12-31 (DATE was set to $DATE)"
