@@ -7,11 +7,31 @@
 
 using namespace nix;
 
-struct CmdShowConfig : Command, MixJSON
+struct CmdConfig : virtual NixMultiCommand
+{
+    CmdConfig() : MultiCommand(RegisterCommand::getCommandsFor({"config"}))
+    { }
+
+    std::string description() override
+    {
+        return "manipulate the Nix configuration";
+    }
+
+    Category category() override { return catUtility; }
+
+    void run() override
+    {
+        if (!command)
+            throw UsageError("'nix config' requires a sub-command.");
+        command->second->run();
+    }
+};
+
+struct CmdConfigShow : Command, MixJSON
 {
     std::optional<std::string> name;
 
-    CmdShowConfig() {
+    CmdConfigShow() {
         expectArgs({
             .label = {"name"},
             .optional = true,
@@ -56,4 +76,5 @@ struct CmdShowConfig : Command, MixJSON
     }
 };
 
-static auto rShowConfig = registerCommand<CmdShowConfig>("show-config");
+static auto rCmdConfig = registerCommand<CmdConfig>("config");
+static auto rShowConfig = registerCommand2<CmdConfigShow>({"config", "show"});
