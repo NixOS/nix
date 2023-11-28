@@ -279,7 +279,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             }}
         });
 
-        addFlag(Flag::mkHashTypeFlag("hash-type", &hashAlgo));
+        addFlag(Flag::mkHashAlgoFlag("hash-type", &hashAlgo));
 
         addFlag({
             .longName = "executable",

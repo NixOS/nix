@@ -48,7 +48,7 @@ struct CmdHashBase : Command
             .handler = {&hashFormat, HashFormat::Base16},
         });
 
-        addFlag(Flag::mkHashTypeFlag("type", &ha));
+        addFlag(Flag::mkHashAlgoFlag("type", &ha));
 
         #if 0
         addFlag({
@@ -112,7 +112,7 @@ struct CmdToBase : Command
 
     CmdToBase(HashFormat hashFormat) : hashFormat(hashFormat)
     {
-        addFlag(Flag::mkHashTypeOptFlag("type", &ht));
+        addFlag(Flag::mkHashAlgoOptFlag("type", &ht));
         expectArgs("strings", &args);
     }
 
@@ -139,7 +139,7 @@ struct CmdHashConvert : Command
 {
     std::optional<HashFormat> from;
     HashFormat to;
-    std::optional<HashAlgorithm> type;
+    std::optional<HashAlgorithm> algo;
     std::vector<std::string> hashStrings;
 
     CmdHashConvert(): to(HashFormat::SRI) {
@@ -161,14 +161,7 @@ struct CmdHashConvert : Command
                 to = parseHashFormat(str);
             }},
         });
-        addFlag({
-            .longName = "algo",
-            .description = "Specify the algorithm if it can't be auto-detected.",
-            .labels = {"hash algorithm"},
-            .handler = {[this](std::string str) {
-                type = parseHashAlgo(str);
-            }},
-        });
+        addFlag(Args::Flag::mkHashAlgoOptFlag("algo", &algo));
         expectArgs({
            .label = "hashes",
            .handler = {&hashStrings},
@@ -184,7 +177,7 @@ struct CmdHashConvert : Command
 
     void run() override {
         for (const auto& s: hashStrings) {
-            Hash h = Hash::parseAny(s, type);
+            Hash h = Hash::parseAny(s, algo);
             if (from && h.to_string(*from, from == HashFormat::SRI) != s) {
                 auto from_as_string = printHashFormat(*from);
                 throw BadHash("input hash '%s' does not have the expected format '--from %s'", s, from_as_string);

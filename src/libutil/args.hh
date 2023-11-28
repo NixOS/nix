@@ -175,8 +175,8 @@ protected:
 
         std::optional<ExperimentalFeature> experimentalFeature;
 
-        static Flag mkHashTypeFlag(std::string && longName, HashAlgorithm * ha);
-        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
+        static Flag mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha);
+        static Flag mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
     };
 
     /**

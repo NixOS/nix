@@ -544,36 +544,36 @@ nlohmann::json Args::toJSON()
     return res;
 }
 
-static void hashTypeCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
+static void hashAlgoCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
     for (auto & type : hashAlgorithms)
         if (hasPrefix(type, prefix))
             completions.add(type);
 }
 
-Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashAlgorithm * ha)
+Args::Flag Args::Flag::mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha)
 {
-    return Flag {
-        .longName = std::move(longName),
-        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
-        .labels = {"hash-algo"},
-        .handler = {[ha](std::string s) {
-            *ha = parseHashAlgo(s);
-        }},
-        .completer = hashTypeCompleter,
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
+            .labels = {"hash-algo"},
+            .handler = {[ha](std::string s) {
+                *ha = parseHashAlgo(s);
+            }},
+            .completer = hashAlgoCompleter,
     };
 }
 
-Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha)
+Args::Flag Args::Flag::mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha)
 {
-    return Flag {
-        .longName = std::move(longName),
-        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
-        .labels = {"hash-algo"},
-        .handler = {[oha](std::string s) {
-            *oha = std::optional<HashAlgorithm> {parseHashAlgo(s) };
-        }},
-        .completer = hashTypeCompleter,
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
+            .labels = {"hash-algo"},
+            .handler = {[oha](std::string s) {
+                *oha = std::optional<HashAlgorithm>{parseHashAlgo(s)};
+            }},
+            .completer = hashAlgoCompleter,
     };
 }
 
