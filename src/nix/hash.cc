@@ -162,9 +162,9 @@ struct CmdHashConvert : Command
             }},
         });
         addFlag({
-            .longName = "type",
-            .description = "Specify the type if it can't be auto-detected.",
-            .labels = {"hash type"},
+            .longName = "algo",
+            .description = "Specify the algorithm if it can't be auto-detected.",
+            .labels = {"hash algorithm"},
             .handler = {[this](std::string str) {
                 type = parseHashType(str);
             }},
@@ -177,7 +177,7 @@ struct CmdHashConvert : Command
 
     std::string description() override
     {
-        return "convert between different hash formats, e.g. base16 and sri.";
+        return "convert between different hash formats, e.g. base16, nix32, base64 and sri.";
     }
 
     Category category() override { return catUtility; }

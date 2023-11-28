@@ -40,7 +40,6 @@ enum struct HashFormat : int {
     SRI
 };
 
-
 struct Hash
 {
     constexpr static size_t maxHashSize = 64;
