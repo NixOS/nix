@@ -123,9 +123,9 @@ Mode dump(
  * A smaller wrapper around `dump`.
  */
 TreeEntry dumpHash(
-    HashType ht,
-    SourceAccessor & accessor, const CanonPath & path,
-    PathFilter & filter = defaultPathFilter);
+            HashAlgorithm ha,
+            SourceAccessor & accessor, const CanonPath & path,
+            PathFilter & filter = defaultPathFilter);
 
 /**
  * A line from the output of `git ls-remote --symref`.

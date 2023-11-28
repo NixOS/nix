@@ -98,7 +98,7 @@ struct CmdVerify : StorePathsCommand
 
                 if (!noContents) {
 
-                    auto hashSink = HashSink(info->narHash.type);
+                    auto hashSink = HashSink(info->narHash.algo);
 
                     store->narFromPath(info->path, hashSink);
 

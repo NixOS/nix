@@ -124,16 +124,16 @@ public:
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
+                                 FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references) override;
 
     StorePath addToStore(
-        std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashType hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references) override;
+            std::string_view name,
+            const Path & srcPath,
+            FileIngestionMethod method,
+            HashAlgorithm hashAlgo,
+            PathFilter & filter,
+            RepairFlag repair,
+            const StorePathSet & references) override;
 
     StorePath addTextToStore(
         std::string_view name,

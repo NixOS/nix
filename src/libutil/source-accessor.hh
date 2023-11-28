@@ -97,9 +97,9 @@ struct SourceAccessor
         PathFilter & filter = defaultPathFilter);
 
     Hash hashPath(
-        const CanonPath & path,
-        PathFilter & filter = defaultPathFilter,
-        HashType ht = htSHA256);
+            const CanonPath & path,
+            PathFilter & filter = defaultPathFilter,
+            HashAlgorithm ha = HashAlgorithm::SHA256);
 
     /**
      * Return a corresponding path in the root filesystem, if

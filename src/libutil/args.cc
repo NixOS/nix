@@ -546,32 +546,32 @@ nlohmann::json Args::toJSON()
 
 static void hashTypeCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
-    for (auto & type : hashTypes)
+    for (auto & type : hashAlgorithms)
         if (hasPrefix(type, prefix))
             completions.add(type);
 }
 
-Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
+Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashAlgorithm * ha)
 {
     return Flag {
         .longName = std::move(longName),
         .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
         .labels = {"hash-algo"},
-        .handler = {[ht](std::string s) {
-            *ht = parseHashType(s);
+        .handler = {[ha](std::string s) {
+            *ha = parseHashAlgo(s);
         }},
         .completer = hashTypeCompleter,
     };
 }
 
-Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht)
+Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha)
 {
     return Flag {
         .longName = std::move(longName),
         .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
         .labels = {"hash-algo"},
-        .handler = {[oht](std::string s) {
-            *oht = std::optional<HashType> { parseHashType(s) };
+        .handler = {[oha](std::string s) {
+            *oha = std::optional<HashAlgorithm> {parseHashAlgo(s) };
         }},
         .completer = hashTypeCompleter,
     };

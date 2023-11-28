@@ -110,8 +110,8 @@ void RewritingSink::flush()
     prev.clear();
 }
 
-HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
-    : hashSink(ht)
+HashModuloSink::HashModuloSink(HashAlgorithm ha, const std::string & modulus)
+    : hashSink(ha)
     , rewritingSink(modulus, std::string(modulus.size(), 0), hashSink)
 {
 }

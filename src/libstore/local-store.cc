@@ -955,7 +955,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         StorePathSet paths;
 
         for (auto & [_, i] : infos) {
-            assert(i.narHash.type == htSHA256);
+            assert(i.narHash.algo == HashAlgorithm::SHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
@@ -1069,7 +1069,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
-            HashSink hashSink(htSHA256);
+            HashSink hashSink(HashAlgorithm::SHA256);
 
             TeeSource wrapperSource { source, hashSink };
 
@@ -1090,7 +1090,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 auto & specified = *info.ca;
                 auto actualHash = hashCAPath(
                     specified.method,
-                    specified.hash.type,
+                    specified.hash.algo,
                     info.path
                 );
                 if (specified.hash != actualHash.hash) {
@@ -1116,7 +1116,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
+                                         FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
@@ -1220,8 +1220,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
             auto narHash = std::pair { hash, size };
-            if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256) {
-                HashSink narSink { htSHA256 };
+            if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+                HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
             }
@@ -1252,7 +1252,7 @@ StorePath LocalStore::addTextToStore(
     std::string_view s,
     const StorePathSet & references, RepairFlag repair)
 {
-    auto hash = hashString(htSHA256, s);
+    auto hash = hashString(HashAlgorithm::SHA256, s);
     auto dstPath = makeTextPath(name, TextInfo {
         .hash = hash,
         .references = references,
@@ -1278,7 +1278,7 @@ StorePath LocalStore::addTextToStore(
 
             StringSink sink;
             dumpString(s, sink);
-            auto narHash = hashString(htSHA256, sink.s);
+            auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
 
             optimisePath(realPath, repair);
 
@@ -1389,7 +1389,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             printMsg(lvlTalkative, "checking contents of '%s'", link.name);
             Path linkPath = linksDir + "/" + link.name;
-            std::string hash = hashPath(htSHA256, linkPath).first.to_string(HashFormat::Base32, false);
+            std::string hash = hashPath(HashAlgorithm::SHA256, linkPath).first.to_string(HashFormat::Base32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);
@@ -1406,7 +1406,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking store hashes...");
 
-        Hash nullHash(htSHA256);
+        Hash nullHash(HashAlgorithm::SHA256);
 
         for (auto & i : validPaths) {
             try {
@@ -1415,7 +1415,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
 
-                auto hashSink = HashSink(info->narHash.type);
+                auto hashSink = HashSink(info->narHash.algo);
 
                 dumpPath(Store::toRealPath(i), hashSink);
                 auto current = hashSink.finish();
@@ -1697,20 +1697,20 @@ void LocalStore::queryRealisationUncached(const DrvOutput & id,
 }
 
 ContentAddress LocalStore::hashCAPath(
-    const ContentAddressMethod & method, const HashType & hashType,
+    const ContentAddressMethod & method, const HashAlgorithm & hashAlgo,
     const StorePath & path)
 {
-    return hashCAPath(method, hashType, Store::toRealPath(path), path.hashPart());
+    return hashCAPath(method, hashAlgo, Store::toRealPath(path), path.hashPart());
 }
 
 ContentAddress LocalStore::hashCAPath(
     const ContentAddressMethod & method,
-    const HashType & hashType,
+    const HashAlgorithm & hashAlgo,
     const Path & path,
     const std::string_view pathHash
 )
 {
-    HashModuloSink caSink ( hashType, std::string(pathHash) );
+    HashModuloSink caSink ( hashAlgo, std::string(pathHash) );
     std::visit(overloaded {
         [&](const TextIngestionMethod &) {
             readFile(path, caSink);

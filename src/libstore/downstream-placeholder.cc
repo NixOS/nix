@@ -19,7 +19,7 @@ DownstreamPlaceholder DownstreamPlaceholder::unknownCaOutput(
     auto drvName = drvNameWithExtension.substr(0, drvNameWithExtension.size() - 4);
     auto clearText = "nix-upstream-output:" + std::string { drvPath.hashPart() } + ":" + outputPathName(drvName, outputName);
     return DownstreamPlaceholder {
-        hashString(htSHA256, clearText)
+        hashString(HashAlgorithm::SHA256, clearText)
     };
 }
 
@@ -34,7 +34,7 @@ DownstreamPlaceholder DownstreamPlaceholder::unknownDerivation(
         + compressed.to_string(HashFormat::Base32, false)
         + ":" + std::string { outputName };
     return DownstreamPlaceholder {
-        hashString(htSHA256, clearText)
+        hashString(HashAlgorithm::SHA256, clearText)
     };
 }
 

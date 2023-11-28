@@ -205,7 +205,7 @@ void importPaths(int fd, int dontCheckSigs)
 SV * hashPath(char * algo, int base32, char * path)
     PPCODE:
         try {
-            Hash h = hashPath(parseHashType(algo), path).first;
+            Hash h = hashPath(parseHashAlgo(algo), path).first;
             auto s = h.to_string(base32 ? HashFormat::Base32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -216,7 +216,7 @@ SV * hashPath(char * algo, int base32, char * path)
 SV * hashFile(char * algo, int base32, char * path)
     PPCODE:
         try {
-            Hash h = hashFile(parseHashType(algo), path);
+            Hash h = hashFile(parseHashAlgo(algo), path);
             auto s = h.to_string(base32 ? HashFormat::Base32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -227,7 +227,7 @@ SV * hashFile(char * algo, int base32, char * path)
 SV * hashString(char * algo, int base32, char * s)
     PPCODE:
         try {
-            Hash h = hashString(parseHashType(algo), s);
+            Hash h = hashString(parseHashAlgo(algo), s);
             auto s = h.to_string(base32 ? HashFormat::Base32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -238,7 +238,7 @@ SV * hashString(char * algo, int base32, char * s)
 SV * convertHash(char * algo, char * s, int toBase32)
     PPCODE:
         try {
-            auto h = Hash::parseAny(s, parseHashType(algo));
+            auto h = Hash::parseAny(s, parseHashAlgo(algo));
             auto s = h.to_string(toBase32 ? HashFormat::Base32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -281,7 +281,7 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            auto path = store()->addToStore(std::string(baseNameOf(srcPath)), srcPath, method, parseHashType(algo));
+            auto path = store()->addToStore(std::string(baseNameOf(srcPath)), srcPath, method, parseHashAlgo(algo));
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -291,7 +291,7 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
 SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
-            auto h = Hash::parseAny(hash, parseHashType(algo));
+            auto h = Hash::parseAny(hash, parseHashAlgo(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
                 .method = method,

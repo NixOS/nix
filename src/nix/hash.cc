@@ -18,7 +18,7 @@ struct CmdHashBase : Command
     FileIngestionMethod mode;
     HashFormat hashFormat = HashFormat::SRI;
     bool truncate = false;
-    HashType ht = htSHA256;
+    HashAlgorithm ha = HashAlgorithm::SHA256;
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
@@ -48,7 +48,7 @@ struct CmdHashBase : Command
             .handler = {&hashFormat, HashFormat::Base16},
         });
 
-        addFlag(Flag::mkHashTypeFlag("type", &ht));
+        addFlag(Flag::mkHashTypeFlag("type", &ha));
 
         #if 0
         addFlag({
@@ -84,9 +84,9 @@ struct CmdHashBase : Command
 
             std::unique_ptr<AbstractHashSink> hashSink;
             if (modulus)
-                hashSink = std::make_unique<HashModuloSink>(ht, *modulus);
+                hashSink = std::make_unique<HashModuloSink>(ha, *modulus);
             else
-                hashSink = std::make_unique<HashSink>(ht);
+                hashSink = std::make_unique<HashSink>(ha);
 
             switch (mode) {
             case FileIngestionMethod::Flat:
@@ -107,7 +107,7 @@ struct CmdHashBase : Command
 struct CmdToBase : Command
 {
     HashFormat hashFormat;
-    std::optional<HashType> ht;
+    std::optional<HashAlgorithm> ht;
     std::vector<std::string> args;
 
     CmdToBase(HashFormat hashFormat) : hashFormat(hashFormat)
@@ -139,7 +139,7 @@ struct CmdHashConvert : Command
 {
     std::optional<HashFormat> from;
     HashFormat to;
-    std::optional<HashType> type;
+    std::optional<HashAlgorithm> type;
     std::vector<std::string> hashStrings;
 
     CmdHashConvert(): to(HashFormat::SRI) {
@@ -166,7 +166,7 @@ struct CmdHashConvert : Command
             .description = "Specify the algorithm if it can't be auto-detected.",
             .labels = {"hash algorithm"},
             .handler = {[this](std::string str) {
-                type = parseHashType(str);
+                type = parseHashAlgo(str);
             }},
         });
         expectArgs({
@@ -223,7 +223,7 @@ static auto rCmdHash = registerCommand<CmdHash>("hash");
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
 {
-    std::optional<HashType> ht;
+    std::optional<HashAlgorithm> ha;
     bool flat = false;
     HashFormat hashFormat = HashFormat::Base16;
     bool truncate = false;
@@ -243,7 +243,7 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--truncate") truncate = true;
         else if (*arg == "--type") {
             std::string s = getArg(*arg, arg, end);
-            ht = parseHashType(s);
+            ha = parseHashAlgo(s);
         }
         else if (*arg == "--to-base16") {
             op = opTo;
@@ -270,8 +270,8 @@ static int compatNixHash(int argc, char * * argv)
 
     if (op == opHash) {
         CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
-        if (!ht.has_value()) ht = htMD5;
-        cmd.ht = ht.value();
+        if (!ha.has_value()) ha = HashAlgorithm::MD5;
+        cmd.ha = ha.value();
         cmd.hashFormat = hashFormat;
         cmd.truncate = truncate;
         cmd.paths = ss;
@@ -281,7 +281,7 @@ static int compatNixHash(int argc, char * * argv)
     else {
         CmdToBase cmd(hashFormat);
         cmd.args = ss;
-        if (ht.has_value()) cmd.ht = ht;
+        if (ha.has_value()) cmd.ht = ha;
         cmd.run();
     }
 

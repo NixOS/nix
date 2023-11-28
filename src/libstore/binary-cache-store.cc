@@ -143,9 +143,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     /* Read the NAR simultaneously into a CompressionSink+FileSink (to
        write the compressed NAR to disk), into a HashSink (to get the
        NAR hash), and into a NarAccessor (to get the NAR listing). */
-    HashSink fileHashSink { htSHA256 };
+    HashSink fileHashSink { HashAlgorithm::SHA256 };
     std::shared_ptr<SourceAccessor> narAccessor;
-    HashSink narHashSink { htSHA256 };
+    HashSink narHashSink { HashAlgorithm::SHA256 };
     {
     FdSink fileSink(fdTemp.get());
     TeeSink teeSinkCompressed { fileSink, fileHashSink };
@@ -301,9 +301,9 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 }
 
 StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
+                                               FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
-    if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)
+    if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
@@ -399,13 +399,13 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(
-    std::string_view name,
-    const Path & srcPath,
-    FileIngestionMethod method,
-    HashType hashAlgo,
-    PathFilter & filter,
-    RepairFlag repair,
-    const StorePathSet & references)
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashAlgorithm hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
@@ -448,7 +448,7 @@ StorePath BinaryCacheStore::addTextToStore(
     const StorePathSet & references,
     RepairFlag repair)
 {
-    auto textHash = hashString(htSHA256, s);
+    auto textHash = hashString(HashAlgorithm::SHA256, s);
     auto path = makeTextPath(name, TextInfo { { textHash }, references });
 
     if (!repair && isValidPath(path))

@@ -400,22 +400,22 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashType_] = ContentAddressMethod::parse(camStr);
-                auto hashType = hashType_; // work around clang bug
+                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parse(camStr);
+                auto hashAlgo = hashAlgo_; // work around clang bug
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
                     [&](const TextIngestionMethod &) {
-                        if (hashType != htSHA256)
+                        if (hashAlgo != HashAlgorithm::SHA256)
                             throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
-                                name, printHashType(hashType));
+                                name, printHashAlgo(hashAlgo));
                         // We could stream this by changing Store
                         std::string contents = source.drain();
                         auto path = store->addTextToStore(name, contents, refs, repair);
                         return store->queryPathInfo(path);
                     },
                     [&](const FileIngestionMethod & fim) {
-                        auto path = store->addToStoreFromDump(source, name, fim, hashType, repair, refs);
+                        auto path = store->addToStoreFromDump(source, name, fim, hashAlgo, repair, refs);
                         return store->queryPathInfo(path);
                     },
                 }, contentAddressMethod.raw);
@@ -424,7 +424,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
             WorkerProto::Serialise<ValidPathInfo>::write(*store, wconn, *pathInfo);
         } else {
-            HashType hashAlgo;
+            HashAlgorithm hashAlgo;
             std::string baseName;
             FileIngestionMethod method;
             {
@@ -440,7 +440,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     hashAlgoRaw = "sha256";
                     method = FileIngestionMethod::Recursive;
                 }
-                hashAlgo = parseHashType(hashAlgoRaw);
+                hashAlgo = parseHashAlgo(hashAlgoRaw);
             }
 
             auto dumpSource = sinkToSource([&](Sink & saved) {
@@ -883,7 +883,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         bool repair, dontCheckSigs;
         auto path = store->parseStorePath(readString(from));
         auto deriver = readString(from);
-        auto narHash = Hash::parseAny(readString(from), htSHA256);
+        auto narHash = Hash::parseAny(readString(from), HashAlgorithm::SHA256);
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);

@@ -49,7 +49,7 @@ StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
 
 StorePath StorePath::random(std::string_view name)
 {
-    Hash hash(htSHA1);
+    Hash hash(HashAlgorithm::SHA1);
     randombytes_buf(hash.hash, hash.hashSize);
     return StorePath(hash, name);
 }

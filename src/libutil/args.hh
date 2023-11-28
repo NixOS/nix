@@ -14,7 +14,7 @@
 
 namespace nix {
 
-enum HashType : char;
+enum struct HashAlgorithm : char;
 
 class MultiCommand;
 
@@ -175,8 +175,8 @@ protected:
 
         std::optional<ExperimentalFeature> experimentalFeature;
 
-        static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
-        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
+        static Flag mkHashTypeFlag(std::string && longName, HashAlgorithm * ha);
+        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
     };
 
     /**

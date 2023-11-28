@@ -1066,7 +1066,7 @@ void LocalDerivationGoal::initTmpDir() {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
-                auto hash = hashString(htSHA256, i.first);
+                auto hash = hashString(HashAlgorithm::SHA256, i.first);
                 std::string fn = ".attr-" + hash.to_string(HashFormat::Base32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
@@ -1290,13 +1290,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
     { throw Error("queryPathFromHashPart"); }
 
     StorePath addToStore(
-        std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashType hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references) override
+            std::string_view name,
+            const Path & srcPath,
+            FileIngestionMethod method,
+            HashAlgorithm hashAlgo,
+            PathFilter & filter,
+            RepairFlag repair,
+            const StorePathSet & references) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1318,12 +1318,12 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
     }
 
     StorePath addToStoreFromDump(
-        Source & dump,
-        std::string_view name,
-        FileIngestionMethod method,
-        HashType hashAlgo,
-        RepairFlag repair,
-        const StorePathSet & references) override
+            Source & dump,
+            std::string_view name,
+            FileIngestionMethod method,
+            HashAlgorithm hashAlgo,
+            RepairFlag repair,
+            const StorePathSet & references) override
     {
         auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
         goal.addDependency(path);
@@ -2466,7 +2466,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             rewriteOutput(outputRewrites);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
-            HashModuloSink caSink { outputHash.hashType, oldHashPart };
+            HashModuloSink caSink {outputHash.hashAlgo, oldHashPart };
             std::visit(overloaded {
                 [&](const TextIngestionMethod &) {
                     readFile(actualPath, caSink);
@@ -2511,7 +2511,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                                std::string(newInfo0.path.hashPart())}});
             }
 
-            HashResult narHashAndSize = hashPath(htSHA256, actualPath);
+            HashResult narHashAndSize = hashPath(HashAlgorithm::SHA256, actualPath);
             newInfo0.narHash = narHashAndSize.first;
             newInfo0.narSize = narHashAndSize.second;
 
@@ -2531,7 +2531,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput(outputRewrites);
-                auto narHashAndSize = hashPath(htSHA256, actualPath);
+                auto narHashAndSize = hashPath(HashAlgorithm::SHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
@@ -2546,7 +2546,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.ca.method,
-                    .hashType = wanted.type,
+                    .hashAlgo = wanted.algo,
                 });
 
                 /* Check wanted hash */
@@ -2583,7 +2583,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             [&](const DerivationOutput::Impure & doi) {
                 return newInfoFromCA(DerivationOutput::CAFloating {
                     .method = doi.method,
-                    .hashType = doi.hashType,
+                    .hashAlgo = doi.hashAlgo,
                 });
             },
 
@@ -2945,7 +2945,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),
-        Hash(htSHA256), outputPathName(drv->name, outputName));
+        Hash(HashAlgorithm::SHA256), outputPathName(drv->name, outputName));
 }
 
 
@@ -2953,7 +2953,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string()),
-        Hash(htSHA256), path.name());
+        Hash(HashAlgorithm::SHA256), path.name());
 }
 
 

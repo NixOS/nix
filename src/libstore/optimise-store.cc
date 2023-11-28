@@ -146,7 +146,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = hashPath(htSHA256, path).first;
+    Hash hash = hashPath(HashAlgorithm::SHA256, path).first;
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Base32, true));
 
     /* Check if this is a known hash. */
@@ -156,7 +156,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (pathExists(linkPath)) {
         auto stLink = lstat(linkPath);
         if (st.st_size != stLink.st_size
-            || (repair && hash != hashPath(htSHA256, linkPath).first))
+            || (repair && hash != hashPath(HashAlgorithm::SHA256, linkPath).first))
         {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link '%s'", linkPath);
