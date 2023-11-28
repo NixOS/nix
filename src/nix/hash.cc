@@ -127,6 +127,7 @@ struct CmdToBase : Command
 
     void run() override
     {
+        warn("The old format conversion sub commands of `nix hash` where deprecated in favor of `nix hash convert`.");
         for (auto s : args)
             logger->cout(Hash::parseAny(s, ht).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }
@@ -208,6 +209,9 @@ static auto rCmdHash = registerCommand<CmdHash>("hash");
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
 {
+    // Wait until `nix hash convert` is not hidden behind experimental flags anymore.
+    // warn("`nix-hash` has been deprecated in favor of `nix hash convert`.");
+
     std::optional<HashAlgorithm> ha;
     bool flat = false;
     HashFormat hashFormat = HashFormat::Base16;
