@@ -269,3 +269,79 @@ EOF
 
 checkRes=$(nix flake lock "$flakeFollowCycle" 2>&1 && fail "nix flake lock should have failed." || true)
 echo $checkRes | grep -F "error: follow cycle detected: [baz -> foo -> bar -> baz]"
+
+
+# Test transitive input url locking
+# This tests the following lockfile issue: https://github.com/NixOS/nix/issues/9143
+#
+# We construct the following graph, where p->q means p has input q.
+#
+# A -> B -> C
+#
+# And override B/C to flake D, first in A's flake.nix and then with --override-input.
+#
+# A -> B -> D
+flakeFollowsCustomUrlA="$TEST_ROOT/follows/custom-url/flakeA"
+flakeFollowsCustomUrlB="$TEST_ROOT/follows/custom-url/flakeA/flakeB"
+flakeFollowsCustomUrlC="$TEST_ROOT/follows/custom-url/flakeA/flakeB/flakeC"
+flakeFollowsCustomUrlD="$TEST_ROOT/follows/custom-url/flakeA/flakeB/flakeD"
+
+
+createGitRepo "$flakeFollowsCustomUrlA"
+mkdir -p "$flakeFollowsCustomUrlB"
+mkdir -p "$flakeFollowsCustomUrlC"
+mkdir -p "$flakeFollowsCustomUrlD"
+
+cat > "$flakeFollowsCustomUrlD/flake.nix" <<EOF
+{
+    description = "Flake D";
+    inputs = {};
+    outputs = { ... }: {};
+}
+EOF
+
+cat > "$flakeFollowsCustomUrlC/flake.nix" <<EOF
+{
+    description = "Flake C";
+    inputs = {};
+    outputs = { ... }: {};
+}
+EOF
+
+cat > "$flakeFollowsCustomUrlB/flake.nix" <<EOF
+{
+    description = "Flake B";
+    inputs = {
+        C = {
+            url = "path:./flakeC";
+        };
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+cat > "$flakeFollowsCustomUrlA/flake.nix" <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        B = {
+            url = "path:./flakeB";
+            inputs.C.url = "path:./flakeB/flakeD";
+        };
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+git -C "$flakeFollowsCustomUrlA" add flake.nix flakeB/flake.nix \
+  flakeB/flakeC/flake.nix flakeB/flakeD/flake.nix
+
+# lock "original" entry should contain overridden url
+json=$(nix flake metadata "$flakeFollowsCustomUrlA" --json)
+[[ $(echo "$json" | jq -r .locks.nodes.C.original.path) = './flakeB/flakeD' ]]
+rm "$flakeFollowsCustomUrlA"/flake.lock
+
+# if override-input is specified, lock "original" entry should contain original url
+json=$(nix flake metadata "$flakeFollowsCustomUrlA" --override-input B/C "path:./flakeB/flakeD" --json)
+echo "$json" | jq .locks.nodes.C.original
+[[ $(echo "$json" | jq -r .locks.nodes.C.original.path) = './flakeC' ]]

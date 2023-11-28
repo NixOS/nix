@@ -17,6 +17,7 @@
 #include "fs-input-accessor.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <boost/regex.hpp>
 #include <nlohmann/json.hpp>
 
 #include <sys/types.h>
@@ -25,7 +26,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <regex>
 #include <dlfcn.h>
 
 #include <cmath>
@@ -3205,9 +3205,16 @@ static RegisterPrimOp primop_foldlStrict({
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
       e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
-      ...`. For example, `foldl' (x: y: x + y) 0 [1 2 3]` evaluates to 6.
-      The return value of each application of `op` is evaluated immediately,
-      even for intermediate values.
+      ...`.
+
+      For example, `foldl' (acc: elem: acc + elem) 0 [1 2 3]` evaluates
+      to `6` and `foldl' (acc: elem: { "${elem}" = elem; } // acc) {}
+      ["a" "b"]` evaluates to `{ a = "a"; b = "b"; }`.
+
+      The first argument of `op` is the accumulator whereas the second
+      argument is the current element being processed. The return value
+      of each application of `op` is evaluated immediately, even for
+      intermediate values.
     )",
     .fun = prim_foldlStrict,
 });
@@ -3904,19 +3911,30 @@ static RegisterPrimOp primop_convertHash({
     .fun = prim_convertHash,
 });
 
+// regex aliases, switch between boost and std
+using regex = boost::regex;
+using regex_error = boost::regex_error;
+using cmatch = boost::cmatch;
+using cregex_iterator = boost::cregex_iterator;
+namespace regex_constants = boost::regex_constants;
+// overloaded function alias
+constexpr auto regex_match = [] (auto &&...args) {
+    return boost::regex_match(std::forward<decltype(args)>(args)...);
+ };
+
 struct RegexCache
 {
     // TODO use C++20 transparent comparison when available
-    std::unordered_map<std::string_view, std::regex> cache;
+    std::unordered_map<std::string_view, regex> cache;
     std::list<std::string> keys;
 
-    std::regex get(std::string_view re)
+    regex get(std::string_view re)
     {
         auto it = cache.find(re);
         if (it != cache.end())
             return it->second;
         keys.emplace_back(re);
-        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
+        return cache.emplace(keys.back(), regex(keys.back(), regex::extended)).first->second;
     }
 };
 
@@ -3936,8 +3954,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.match");
 
-        std::cmatch match;
-        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
+        cmatch match;
+        if (!regex_match(str.begin(), str.end(), match, regex)) {
             v.mkNull();
             return;
         }
@@ -3952,8 +3970,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
 
-    } catch (std::regex_error & e) {
-        if (e.code() == std::regex_constants::error_space) {
+    } catch (regex_error & e) {
+        if (e.code() == regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -4016,8 +4034,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.split");
 
-        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
-        auto end = std::cregex_iterator();
+        auto begin = cregex_iterator(str.begin(), str.end(), regex);
+        auto end = cregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
@@ -4056,8 +4074,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         assert(idx == 2 * len + 1);
 
-    } catch (std::regex_error & e) {
-        if (e.code() == std::regex_constants::error_space) {
+    } catch (regex_error & e) {
+        if (e.code() == regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),

@@ -19,6 +19,7 @@
 #include "namespaces.hh"
 #include "child.hh"
 #include "unix-domain-socket.hh"
+#include "posix-fs-canonicalise.hh"
 
 #include <regex>
 #include <queue>
