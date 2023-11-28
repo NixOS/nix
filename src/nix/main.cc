@@ -134,6 +134,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         {"ping-store", {"store", "ping"}},
         {"sign-paths", {"store", "sign"}},
         {"show-derivation", {"derivation", "show"}},
+        {"show-config", {"config", "show"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
