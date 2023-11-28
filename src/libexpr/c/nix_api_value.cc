@@ -171,7 +171,7 @@ const char * nix_get_string(nix_c_context * context, const Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nString);
-        return v.string.s;
+        return v.c_str();
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -183,7 +183,7 @@ const char * nix_get_path_string(nix_c_context * context, const Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nPath);
-        return v._path;
+        return v.path().to_string().c_str();
     }
     NIXC_CATCH_ERRS_NULL
 }
