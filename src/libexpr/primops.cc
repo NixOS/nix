@@ -1339,7 +1339,7 @@ drvName, Bindings * attrs, Value & v)
                 .errPos = state.positions[noPos]
             });
 
-        auto ht = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
+        auto ha = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
         auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
 
         for (auto & i : outputs) {
@@ -1348,13 +1348,13 @@ drvName, Bindings * attrs, Value & v)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
                         .method = method,
-                        .hashAlgo = ht,
+                        .hashAlgo = ha,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
                         .method = method,
-                        .hashAlgo = ht,
+                        .hashAlgo = ha,
                     });
         }
     }
@@ -3837,7 +3837,7 @@ static RegisterPrimOp primop_convertHash({
 
         The format of the resulting hash. Must be one of
         - `"base16"`
-        - `"base32"`
+        - `"nix32"`
         - `"base64"`
         - `"sri"`
 

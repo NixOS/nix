@@ -118,7 +118,7 @@ struct CmdToBase : Command
 
     std::string description() override
     {
-        return fmt("convert a hash to %s representation",
+        return fmt("convert a hash to %s representation (deprecated, use `nix hash convert` instead)",
             hashFormat == HashFormat::Base16 ? "base-16" :
             hashFormat == HashFormat::Nix32 ? "base-32" :
             hashFormat == HashFormat::Base64 ? "base-64" :
