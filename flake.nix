@@ -766,6 +766,8 @@
 
                 # Make bash completion work.
                 XDG_DATA_DIRS+=:$out/share
+
+                export RAPIDCHECK_HEADERS=${lib.getDev pkgs.rapidcheck}/extras/gtest/include
               '';
           };
         in
