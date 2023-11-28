@@ -23,8 +23,8 @@ static void search(
     static bool isBase32[256];
     std::call_once(initialised, [](){
         for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
-        for (unsigned int i = 0; i < base32Chars.size(); ++i)
-            isBase32[(unsigned char) base32Chars[i]] = true;
+        for (unsigned int i = 0; i < nix32Chars.size(); ++i)
+            isBase32[(unsigned char) nix32Chars[i]] = true;
     });
 
     for (size_t i = 0; i + refLength <= s.size(); ) {

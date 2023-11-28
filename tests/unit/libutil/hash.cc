@@ -80,7 +80,7 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(hashFormat, testRoundTripPrintParse) {
-        for (const HashFormat hashFormat: { HashFormat::Base64, HashFormat::Base32, HashFormat::Base16, HashFormat::SRI}) {
+        for (const HashFormat hashFormat: { HashFormat::Base64, HashFormat::Nix32, HashFormat::Base16, HashFormat::SRI}) {
             ASSERT_EQ(parseHashFormat(printHashFormat(hashFormat)), hashFormat);
             ASSERT_EQ(*parseHashFormatOpt(printHashFormat(hashFormat)), hashFormat);
         }

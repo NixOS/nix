@@ -163,7 +163,7 @@ try3() {
 
     sri=$(nix hash convert --algo "$1" --from base16 "$2")
     [ "$sri" = "$1-$4" ]
-    sri=$(nix hash convert --algo "$1" --from base32 "$3")
+    sri=$(nix hash convert --algo "$1" --from nix32 "$3")
     [ "$sri" = "$1-$4" ]
     sri=$(nix hash convert --algo "$1" --from base64 "$4")
     [ "$sri" = "$1-$4" ]
@@ -172,11 +172,11 @@ try3() {
     # Asserting input format fails.
     #
 
-    fail=$(nix hash convert --algo "$1" --from base32 "$2" 2>&1 || echo "exit: $?")
+    fail=$(nix hash convert --algo "$1" --from nix32 "$2" 2>&1 || echo "exit: $?")
     [[ "$fail" == "error: input hash"*"exit: 1" ]]
     fail=$(nix hash convert --algo "$1" --from base16 "$3" 2>&1 || echo "exit: $?")
     [[ "$fail" == "error: input hash"*"exit: 1" ]]
-    fail=$(nix hash convert --algo "$1" --from base32 "$4" 2>&1 || echo "exit: $?")
+    fail=$(nix hash convert --algo "$1" --from nix32 "$4" 2>&1 || echo "exit: $?")
     [[ "$fail" == "error: input hash"*"exit: 1" ]]
 
 }

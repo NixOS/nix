@@ -61,7 +61,7 @@ std::string ContentAddress::render() const
                 + makeFileIngestionPrefix(method);
         },
     }, method.raw)
-        + this->hash.to_string(HashFormat::Base32, true);
+        + this->hash.to_string(HashFormat::Nix32, true);
 }
 
 /**

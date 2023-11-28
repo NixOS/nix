@@ -27,8 +27,9 @@ static size_t regularHashSize(HashAlgorithm type) {
 }
 
 
-std::set<std::string> hashAlgorithms = {"md5", "sha1", "sha256", "sha512" };
+const std::set<std::string> hashAlgorithms = {"md5", "sha1", "sha256", "sha512" };
 
+const std::set<std::string> hashFormats = {"base64", "nix32", "base16", "sri" };
 
 Hash::Hash(HashAlgorithm algo) : algo(algo)
 {
@@ -81,7 +82,7 @@ static std::string printHash16(const Hash & hash)
 
 
 // omitted: E O U T
-const std::string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
+const std::string nix32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
 
 static std::string printHash32(const Hash & hash)
@@ -100,7 +101,7 @@ static std::string printHash32(const Hash & hash)
         unsigned char c =
             (hash.hash[i] >> j)
             | (i >= hash.hashSize - 1 ? 0 : hash.hash[i + 1] << (8 - j));
-        s.push_back(base32Chars[c & 0x1f]);
+        s.push_back(nix32Chars[c & 0x1f]);
     }
 
     return s;
@@ -110,7 +111,7 @@ static std::string printHash32(const Hash & hash)
 std::string printHash16or32(const Hash & hash)
 {
     assert(static_cast<char>(hash.algo));
-    return hash.to_string(hash.algo == HashAlgorithm::MD5 ? HashFormat::Base16 : HashFormat::Base32, false);
+    return hash.to_string(hash.algo == HashAlgorithm::MD5 ? HashFormat::Base16 : HashFormat::Nix32, false);
 }
 
 
@@ -125,7 +126,7 @@ std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
     case HashFormat::Base16:
         s += printHash16(*this);
         break;
-    case HashFormat::Base32:
+    case HashFormat::Nix32:
         s += printHash32(*this);
         break;
     case HashFormat::Base64:
@@ -230,8 +231,8 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
         for (unsigned int n = 0; n < rest.size(); ++n) {
             char c = rest[rest.size() - n - 1];
             unsigned char digit;
-            for (digit = 0; digit < base32Chars.size(); ++digit) /* !!! slow */
-                if (base32Chars[digit] == c) break;
+            for (digit = 0; digit < nix32Chars.size(); ++digit) /* !!! slow */
+                if (nix32Chars[digit] == c) break;
             if (digit >= 32)
                 throw BadHash("invalid base-32 hash '%s'", rest);
             unsigned int b = n * 5;
@@ -388,7 +389,11 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName)
 {
     if (hashFormatName == "base16") return HashFormat::Base16;
-    if (hashFormatName == "base32") return HashFormat::Base32;
+    if (hashFormatName == "nix32") return HashFormat::Nix32;
+    if (hashFormatName == "base32") {
+        warn(R"("base32" is a deprecated alias for hash format "nix32".)");
+        return HashFormat::Nix32;
+    }
     if (hashFormatName == "base64") return HashFormat::Base64;
     if (hashFormatName == "sri") return HashFormat::SRI;
     return std::nullopt;
@@ -407,8 +412,8 @@ std::string_view printHashFormat(HashFormat HashFormat)
     switch (HashFormat) {
     case HashFormat::Base64:
         return "base64";
-    case HashFormat::Base32:
-        return "base32";
+    case HashFormat::Nix32:
+        return "nix32";
     case HashFormat::Base16:
         return "base16";
     case HashFormat::SRI:

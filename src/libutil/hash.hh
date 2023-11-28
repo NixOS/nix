@@ -20,9 +20,9 @@ const int sha1HashSize = 20;
 const int sha256HashSize = 32;
 const int sha512HashSize = 64;
 
-extern std::set<std::string> hashAlgorithms;
+extern const std::set<std::string> hashAlgorithms;
 
-extern const std::string base32Chars;
+extern const std::string nix32Chars;
 
 /**
  * @brief Enumeration representing the hash formats.
@@ -31,14 +31,16 @@ enum struct HashFormat : int {
     /// @brief Base 64 encoding.
     /// @see [IETF RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4).
     Base64,
-    /// @brief Nix-specific base-32 encoding. @see base32Chars
-    Base32,
+    /// @brief Nix-specific base-32 encoding. @see nix32Chars
+    Nix32,
     /// @brief Lowercase hexadecimal encoding. @see base16Chars
     Base16,
     /// @brief "<hash algo>:<Base 64 hash>", format of the SRI integrity attribute.
     /// @see W3C recommendation [Subresource Intergrity](https://www.w3.org/TR/SRI/).
     SRI
 };
+
+extern const std::set<std::string> hashFormats;
 
 struct Hash
 {

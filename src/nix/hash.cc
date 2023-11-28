@@ -39,7 +39,7 @@ struct CmdHashBase : Command
         addFlag({
             .longName = "base32",
             .description = "Print the hash in base-32 (Nix-specific) format.",
-            .handler = {&hashFormat, HashFormat::Base32},
+            .handler = {&hashFormat, HashFormat::Nix32},
         });
 
         addFlag({
@@ -120,7 +120,7 @@ struct CmdToBase : Command
     {
         return fmt("convert a hash to %s representation",
             hashFormat == HashFormat::Base16 ? "base-16" :
-            hashFormat == HashFormat::Base32 ? "base-32" :
+            hashFormat == HashFormat::Nix32 ? "base-32" :
             hashFormat == HashFormat::Base64 ? "base-64" :
             "SRI");
     }
@@ -143,24 +143,8 @@ struct CmdHashConvert : Command
     std::vector<std::string> hashStrings;
 
     CmdHashConvert(): to(HashFormat::SRI) {
-        addFlag({
-            .longName = "from",
-            // TODO: List format choices. Maybe introduce a constant?
-            .description = "The format of the input hash.",
-            .labels = {"hash format"},
-            .handler = {[this](std::string str) {
-                from = parseHashFormat(str);
-            }},
-        });
-        addFlag({
-            .longName = "to",
-            // TODO: List format choices. Maybe introduce a constant?
-            .description = "The format of the output hash.",
-            .labels = {"hash format"},
-            .handler = {[this](std::string str) {
-                to = parseHashFormat(str);
-            }},
-        });
+        addFlag(Args::Flag::mkHashFormatOptFlag("from", &from));
+        addFlag(Args::Flag::mkHashFormatFlagWithDefault("to", &to));
         addFlag(Args::Flag::mkHashAlgoOptFlag("algo", &algo));
         expectArgs({
            .label = "hashes",
@@ -170,7 +154,15 @@ struct CmdHashConvert : Command
 
     std::string description() override
     {
-        return "convert between different hash formats, e.g. base16, nix32, base64 and sri.";
+        std::string descr( "convert between different hash formats. Choose from: ");
+        auto iter = hashFormats.begin();
+        assert(iter != hashFormats.end());
+        descr += *iter++;
+        while (iter != hashFormats.end()) {
+            descr += ", " + *iter++;
+        }
+
+        return descr;
     }
 
     Category category() override { return catUtility; }
@@ -197,7 +189,7 @@ struct CmdHash : NixMultiCommand
                 {"file", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Flat);; }},
                 {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
                 {"to-base16", []() { return make_ref<CmdToBase>(HashFormat::Base16); }},
-                {"to-base32", []() { return make_ref<CmdToBase>(HashFormat::Base32); }},
+                {"to-base32", []() { return make_ref<CmdToBase>(HashFormat::Nix32); }},
                 {"to-base64", []() { return make_ref<CmdToBase>(HashFormat::Base64); }},
                 {"to-sri", []() { return make_ref<CmdToBase>(HashFormat::SRI); }},
           })
@@ -230,7 +222,7 @@ static int compatNixHash(int argc, char * * argv)
             printVersion("nix-hash");
         else if (*arg == "--flat") flat = true;
         else if (*arg == "--base16") hashFormat = HashFormat::Base16;
-        else if (*arg == "--base32") hashFormat = HashFormat::Base32;
+        else if (*arg == "--base32") hashFormat = HashFormat::Nix32;
         else if (*arg == "--base64") hashFormat = HashFormat::Base64;
         else if (*arg == "--sri") hashFormat = HashFormat::SRI;
         else if (*arg == "--truncate") truncate = true;
@@ -244,7 +236,7 @@ static int compatNixHash(int argc, char * * argv)
         }
         else if (*arg == "--to-base32") {
             op = opTo;
-            hashFormat = HashFormat::Base32;
+            hashFormat = HashFormat::Nix32;
         }
         else if (*arg == "--to-base64") {
             op = opTo;

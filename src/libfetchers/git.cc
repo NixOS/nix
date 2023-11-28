@@ -52,7 +52,7 @@ bool touchCacheFile(const Path & path, time_t touch_time)
 Path getCachePath(std::string_view key)
 {
     return getCacheDir() + "/nix/gitv3/" +
-        hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Base32, false);
+        hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false);
 }
 
 // Returns the name of the HEAD branch.

@@ -15,6 +15,7 @@
 namespace nix {
 
 enum struct HashAlgorithm : char;
+enum struct HashFormat : int;
 
 class MultiCommand;
 
@@ -177,6 +178,8 @@ protected:
 
         static Flag mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha);
         static Flag mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
+        static Flag mkHashFormatFlagWithDefault(std::string && longName, HashFormat * hf);
+        static Flag mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf);
     };
 
     /**

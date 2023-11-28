@@ -304,7 +304,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
             state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                *url, expectedHash->to_string(HashFormat::Base32, true), hash.to_string(HashFormat::Base32, true)));
+                                                *url, expectedHash->to_string(HashFormat::Nix32, true), hash.to_string(HashFormat::Nix32, true)));
     }
 
     state.allowAndSetStorePathString(storePath, v);

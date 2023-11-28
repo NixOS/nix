@@ -1067,7 +1067,7 @@ void LocalDerivationGoal::initTmpDir() {
                 env[i.first] = i.second;
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
-                std::string fn = ".attr-" + hash.to_string(HashFormat::Base32, false);
+                std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);

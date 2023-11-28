@@ -544,11 +544,45 @@ nlohmann::json Args::toJSON()
     return res;
 }
 
+static void hashFormatCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
+{
+    for (auto & format : hashFormats) {
+        if (hasPrefix(format, prefix)) {
+            completions.add(format);
+        }
+    }
+}
+
+Args::Flag Args::Flag::mkHashFormatFlagWithDefault(std::string &&longName, HashFormat * hf) {
+    assert(*hf == nix::HashFormat::SRI);
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash format ('base16', 'nix32', 'base64', 'sri'). Default: 'sri'",
+            .labels = {"hash-format"},
+            .handler = {[hf](std::string s) {
+                *hf = parseHashFormat(s);
+            }},
+            .completer = hashFormatCompleter,
+    };
+}
+
+Args::Flag Args::Flag::mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf) {
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash format ('base16', 'nix32', 'base64', 'sri').",
+            .labels = {"hash-format"},
+            .handler = {[ohf](std::string s) {
+                *ohf = std::optional<HashFormat>{parseHashFormat(s)};
+            }},
+            .completer = hashFormatCompleter,
+    };
+}
+
 static void hashAlgoCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
-    for (auto & type : hashAlgorithms)
-        if (hasPrefix(type, prefix))
-            completions.add(type);
+    for (auto & algo : hashAlgorithms)
+        if (hasPrefix(algo, prefix))
+            completions.add(algo);
 }
 
 Args::Flag Args::Flag::mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha)

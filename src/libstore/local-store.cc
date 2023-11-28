@@ -1080,7 +1080,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             if (hashResult.first != info.narHash)
                 throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                    printStorePath(info.path), info.narHash.to_string(HashFormat::Base32, true), hashResult.first.to_string(HashFormat::Base32, true));
+                            printStorePath(info.path), info.narHash.to_string(HashFormat::Nix32, true), hashResult.first.to_string(HashFormat::Nix32, true));
 
             if (hashResult.second != info.narSize)
                 throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
@@ -1096,8 +1096,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                 if (specified.hash != actualHash.hash) {
                     throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                         printStorePath(info.path),
-                        specified.hash.to_string(HashFormat::Base32, true),
-                        actualHash.hash.to_string(HashFormat::Base32, true));
+                        specified.hash.to_string(HashFormat::Nix32, true),
+                        actualHash.hash.to_string(HashFormat::Nix32, true));
                 }
             }
 
@@ -1389,7 +1389,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             printMsg(lvlTalkative, "checking contents of '%s'", link.name);
             Path linkPath = linksDir + "/" + link.name;
-            std::string hash = hashPath(HashAlgorithm::SHA256, linkPath).first.to_string(HashFormat::Base32, false);
+            std::string hash = hashPath(HashAlgorithm::SHA256, linkPath).first.to_string(HashFormat::Nix32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);
@@ -1422,7 +1422,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     printError("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(HashFormat::Base32, true), current.first.to_string(HashFormat::Base32, true));
+                               printStorePath(i), info->narHash.to_string(HashFormat::Nix32, true), current.first.to_string(HashFormat::Nix32, true));
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
