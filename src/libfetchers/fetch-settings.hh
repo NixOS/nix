@@ -70,18 +70,18 @@ struct FetchSettings : public Config
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
 
-    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
+    Setting<std::string> fetcherRegistry{this, "https://channels.nixos.org/fetcher-registry.json", "fetcher-registry",
         R"(
-          Path or URI of the global flake registry.
+          Path or URI of the global fetcerh registry.
 
-          When empty, disables the global flake registry.
+          When empty, disables the global fetcher registry.
         )",
-        {}, true, Xp::Flakes};
+        {}, true, Xp::FetcherRegistry};
 
 
     Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries to resolve flake references.",
-        {}, true, Xp::Flakes};
+        "Whether to use fetcher registries to resolve fetcher references.",
+        {}, true, Xp::FetcherRegistry};
 
     Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
         "Whether to accept nix configuration from a flake without prompting.",

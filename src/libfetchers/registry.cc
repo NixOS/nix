@@ -46,12 +46,12 @@ std::shared_ptr<Registry> Registry::read(
         }
 
         else
-            throw Error("flake registry '%s' has unsupported version %d", path, version);
+            throw Error("fetcher registry '%s' has unsupported version %d", path, version);
 
     } catch (nlohmann::json::exception & e) {
-        warn("cannot parse flake registry '%s': %s", path, e.what());
+        warn("cannot parse fetcher registry '%s': %s", path, e.what());
     } catch (Error & e) {
-        warn("cannot read flake registry '%s': %s", path, e.what());
+        warn("cannot read fetcher registry '%s': %s", path, e.what());
     }
 
     return registry;
@@ -152,15 +152,15 @@ void overrideRegistry(
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
     static auto reg = [&]() {
-        auto path = fetchSettings.flakeRegistry.get();
+        auto path = fetchSettings.fetcherRegistry.get();
         if (path == "") {
             return std::make_shared<Registry>(Registry::Global); // empty registry
         }
 
         if (!hasPrefix(path, "/")) {
-            auto storePath = downloadFile(store, path, "flake-registry.json", false).storePath;
+            auto storePath = downloadFile(store, path, "fetcher-registry.json", false).storePath;
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(storePath, getCacheDir() + "/nix/flake-registry.json");
+                store2->addPermRoot(storePath, getCacheDir() + "/nix/fetcher-registry.json");
             path = store->toRealPath(storePath);
         }
 
@@ -191,7 +191,7 @@ std::pair<Input, Attrs> lookupInRegistries(
  restart:
 
     n++;
-    if (n > 100) throw Error("cycle detected in flake registry for '%s'", input.to_string());
+    if (n > 100) throw Error("cycle detected in fetcher registry for '%s'", input.to_string());
 
     for (auto & registry : getRegistries(store)) {
         // FIXME: O(n)
@@ -215,7 +215,7 @@ std::pair<Input, Attrs> lookupInRegistries(
     }
 
     if (!input.isDirect())
-        throw Error("cannot find flake '%s' in the flake registries", input.to_string());
+        throw Error("cannot find '%s' in the fetcher registries", input.to_string());
 
     debug("looked up '%s' -> '%s'", _input.to_string(), input.to_string());
 

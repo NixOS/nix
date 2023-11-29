@@ -19,6 +19,7 @@ enum struct ExperimentalFeature
 {
     CaDerivations,
     ImpureDerivations,
+    FetcherRegistry,
     Flakes,
     FetchTree,
     NixCommand,
