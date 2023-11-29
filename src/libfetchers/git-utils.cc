@@ -6,8 +6,6 @@
 #include "signals.hh"
 #include "users.hh"
 
-#include <boost/core/span.hpp>
-
 #include <git2/blob.h>
 #include <git2/commit.h>
 #include <git2/config.h>
@@ -28,6 +26,7 @@
 #include <unordered_set>
 #include <queue>
 #include <regex>
+#include <span>
 
 namespace std {
 
@@ -350,7 +349,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 throw Error("adding a file to a tree builder: %s", git_error_last()->message);
         };
 
-        auto updateBuilders = [&](boost::span<const std::string> names)
+        auto updateBuilders = [&](std::span<const std::string> names)
         {
             // Find the common prefix of pendingDirs and names.
             size_t prefixLen = 0;
@@ -392,7 +391,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
             auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
 
-            boost::span<const std::string> pathComponents2{pathComponents};
+            std::span<const std::string> pathComponents2{pathComponents};
 
             if (pathComponents2.size() <= componentsToStrip) continue;
             pathComponents2 = pathComponents2.subspan(componentsToStrip);
