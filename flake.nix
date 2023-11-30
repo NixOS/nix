@@ -7,7 +7,7 @@
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, libgit2 }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, libgit2 }:
 
     let
       inherit (nixpkgs) lib;
@@ -34,7 +34,14 @@
         "x86_64-freebsd13" "x86_64-netbsd"
       ];
 
-      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
+      stdenvs = [
+        "ccacheStdenv"
+        "clang11Stdenv"
+        "clangStdenv"
+        "gccStdenv"
+        "libcxxStdenv"
+        "stdenv"
+      ];
 
       forAllSystems = lib.genAttrs systems;
 
@@ -326,82 +333,18 @@
         '';
       };
 
-      binaryTarball = nix: pkgs:
-        let
-          inherit (pkgs) buildPackages;
-          inherit (pkgs) cacert;
-          installerClosureInfo = buildPackages.closureInfo { rootPaths = [ nix cacert ]; };
-        in
-
-        buildPackages.runCommand "nix-binary-tarball-${version}"
-          { #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
-            meta.description = "Distribution-independent Nix bootstrap binaries for ${pkgs.system}";
-          }
-          ''
-            cp ${installerClosureInfo}/registration $TMPDIR/reginfo
-            cp ${./scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-            substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-
-            substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-            substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-            substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-
-            if type -p shellcheck; then
-              # SC1090: Don't worry about not being able to find
-              #         $nix/etc/profile.d/nix.sh
-              shellcheck --exclude SC1090 $TMPDIR/install
-              shellcheck $TMPDIR/create-darwin-volume.sh
-              shellcheck $TMPDIR/install-darwin-multi-user.sh
-              shellcheck $TMPDIR/install-systemd-multi-user.sh
-
-              # SC1091: Don't panic about not being able to source
-              #         /etc/profile
-              # SC2002: Ignore "useless cat" "error", when loading
-              #         .reginfo, as the cat is a much cleaner
-              #         implementation, even though it is "useless"
-              # SC2116: Allow ROOT_HOME=$(echo ~root) for resolving
-              #         root's home directory
-              shellcheck --external-sources \
-                --exclude SC1091,SC2002,SC2116 $TMPDIR/install-multi-user
-            fi
-
-            chmod +x $TMPDIR/install
-            chmod +x $TMPDIR/create-darwin-volume.sh
-            chmod +x $TMPDIR/install-darwin-multi-user.sh
-            chmod +x $TMPDIR/install-systemd-multi-user.sh
-            chmod +x $TMPDIR/install-multi-user
-            dir=nix-${version}-${pkgs.system}
-            fn=$out/$dir.tar.xz
-            mkdir -p $out/nix-support
-            echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
-            tar cvfJ $fn \
-              --owner=0 --group=0 --mode=u+rw,uga+r \
-              --mtime='1970-01-01' \
-              --absolute-names \
-              --hard-dereference \
-              --transform "s,$TMPDIR/install,$dir/install," \
-              --transform "s,$TMPDIR/create-darwin-volume.sh,$dir/create-darwin-volume.sh," \
-              --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
-              --transform "s,$NIX_STORE,$dir/store,S" \
-              $TMPDIR/install \
-              $TMPDIR/create-darwin-volume.sh \
-              $TMPDIR/install-darwin-multi-user.sh \
-              $TMPDIR/install-systemd-multi-user.sh \
-              $TMPDIR/install-multi-user \
-              $TMPDIR/reginfo \
-              $(cat ${installerClosureInfo}/store-paths)
-          '';
+      binaryTarball = nix: pkgs: pkgs.callPackage ./binary-tarball.nix {
+        inherit nix;
+      };
 
       overlayFor = getStdenv: final: prev:
-        let currentStdenv = getStdenv final; in
+        let
+          stdenv = getStdenv final;
+
+          lowdown-nix = final.callPackage ./lowdown.nix {
+            inherit lowdown-src stdenv;
+          };
+        in
         {
           nixStable = prev.nix;
 
@@ -409,128 +352,69 @@
           nixUnstable = prev.nixUnstable;
 
           nix =
-          with final;
-          with commonDeps {
-            inherit pkgs;
-            inherit (currentStdenv.hostPlatform) isStatic;
-          };
-          let
-            canRunInstalled = currentStdenv.buildPlatform.canExecute currentStdenv.hostPlatform;
-          in currentStdenv.mkDerivation (finalAttrs: {
-            name = "nix-${version}";
-            inherit version;
+            let
+              officialRelease = false;
+              versionSuffix =
+                if officialRelease
+                then ""
+                else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
-            src = nixSrc;
-            VERSION_SUFFIX = versionSuffix;
+              sh = final.busybox-sandbox-shell or (final.busybox.override {
+                useMusl = true;
+                enableStatic = true;
+                enableMinimal = true;
+                extraConfig = ''
+                  CONFIG_FEATURE_FANCY_ECHO y
+                  CONFIG_FEATURE_SH_MATH y
+                  CONFIG_FEATURE_SH_MATH_64 y
 
-            outputs = [ "out" "dev" "doc" ]
-              ++ lib.optional (currentStdenv.hostPlatform != currentStdenv.buildPlatform) "check";
+                  CONFIG_ASH y
+                  CONFIG_ASH_OPTIMIZE_FOR_SIZE y
 
-            nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps
-              # There have been issues building these dependencies
-              ++ lib.optionals (currentStdenv.hostPlatform == currentStdenv.buildPlatform) awsDeps
-              ++ lib.optionals finalAttrs.doCheck checkDeps;
+                  CONFIG_ASH_ALIAS y
+                  CONFIG_ASH_BASH_COMPAT y
+                  CONFIG_ASH_CMDCMD y
+                  CONFIG_ASH_ECHO y
+                  CONFIG_ASH_GETOPTS y
+                  CONFIG_ASH_INTERNAL_GLOB y
+                  CONFIG_ASH_JOB_CONTROL y
+                  CONFIG_ASH_PRINTF y
+                  CONFIG_ASH_TEST y
+                '';
+              });
 
-            propagatedBuildInputs = propagatedDeps;
+              boehmgc = (final.boehmgc.override {
+                enableLargeConfig = true;
+              }).overrideAttrs(o: {
+                patches = (o.patches or []) ++ [
+                  ./boehmgc-coroutine-sp-fallback.diff
 
-            disallowedReferences = [ boost-nix ];
+                  # https://github.com/ivmai/bdwgc/pull/586
+                  ./boehmgc-traceable_allocator-public.diff
+                ];
+              });
 
-            preConfigure = lib.optionalString (! currentStdenv.hostPlatform.isStatic)
-              ''
-                # Copy libboost_context so we don't get all of Boost in our closure.
-                # https://github.com/NixOS/nixpkgs/issues/45462
-                mkdir -p $out/lib
-                cp -pd ${boost-nix}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
-                rm -f $out/lib/*.a
-                ${lib.optionalString currentStdenv.hostPlatform.isLinux ''
-                  chmod u+w $out/lib/*.so.*
-                  patchelf --set-rpath $out/lib:${currentStdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
-                ''}
-                ${lib.optionalString currentStdenv.hostPlatform.isDarwin ''
-                  for LIB in $out/lib/*.dylib; do
-                    chmod u+w $LIB
-                    install_name_tool -id $LIB $LIB
-                    install_name_tool -delete_rpath ${boost-nix}/lib/ $LIB || true
-                  done
-                  install_name_tool -change ${boost-nix}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
-                ''}
-              '';
-
-            configureFlags = configureFlags ++
-              [ "--sysconfdir=/etc" ] ++
-              lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell" ++
-              [ (lib.enableFeature finalAttrs.doCheck "tests") ] ++
-              lib.optionals finalAttrs.doCheck testConfigureFlags ++
-              lib.optional (!canRunInstalled) "--disable-doc-gen";
-
-            enableParallelBuilding = true;
-
-            makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
-
-            doCheck = true;
-
-            installFlags = "sysconfdir=$(out)/etc";
-
-            postInstall = ''
-              mkdir -p $doc/nix-support
-              echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-              ${lib.optionalString currentStdenv.hostPlatform.isStatic ''
-              mkdir -p $out/nix-support
-              echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
-              ''}
-              ${lib.optionalString currentStdenv.isDarwin ''
-              install_name_tool \
-                -change ${boost-nix}/lib/libboost_context.dylib \
-                $out/lib/libboost_context.dylib \
-                $out/lib/libnixutil.dylib
-              install_name_tool \
-                -change ${boost-nix}/lib/libboost_regex.dylib \
-                $out/lib/libboost_regex.dylib \
-                $out/lib/libnixexpr.dylib
-              ''}
-            '';
-
-            doInstallCheck = finalAttrs.doCheck;
-            installCheckFlags = "sysconfdir=$(out)/etc";
-            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
-
-            separateDebugInfo = !currentStdenv.hostPlatform.isStatic;
-
-            strictDeps = true;
-
-            hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
-
-            passthru.perl-bindings = final.callPackage ./perl {
-              inherit fileset;
-              stdenv = currentStdenv;
+            in final.callPackage ./package.nix {
+              inherit
+                boehmgc
+                fileset
+                sh
+                stdenv
+                versionSuffix
+                ;
+              boost = final.boost.override { enableIcu = false; };
+              libgit2 = final.libgit2.overrideAttrs (attrs: {
+                src = libgit2;
+                version = libgit2.lastModifiedDate;
+                cmakeFlags = attrs.cmakeFlags or []
+                  ++ [ "-DUSE_SSH=exec" ];
+              });
+              lowdown = lowdown-nix;
+              officialRelease = false;
             };
 
-            meta.platforms = lib.platforms.unix;
-            meta.mainProgram = "nix";
-          });
-
-          boost-nix = final.boost.override {
-            enableIcu = false;
+            inherit lowdown-nix;
           };
-
-          lowdown-nix = with final; currentStdenv.mkDerivation rec {
-            name = "lowdown-0.9.0";
-
-            src = lowdown-src;
-
-            outputs = [ "out" "bin" "dev" ];
-
-            nativeBuildInputs = [ buildPackages.which ];
-
-            configurePhase = ''
-                ${if (currentStdenv.isDarwin && currentStdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
-                ./configure \
-                  PREFIX=${placeholder "dev"} \
-                  BINDIR=${placeholder "bin"}/bin
-            '';
-          };
-        };
 
     in {
       # A Nixpkgs overlay that overrides the 'nix' and
