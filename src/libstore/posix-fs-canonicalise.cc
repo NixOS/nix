@@ -1,3 +1,6 @@
+#if HAVE_SYS_EXTATTR_H
+# include <sys/extattr.h>
+#endif
 #if HAVE_SYS_XATTR_H
 # include <sys/xattr.h>
 #endif
@@ -55,6 +58,62 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
+/**
+ * Remove extended attributes / ACLs.
+ *
+ * Only works if have one of `sys/xattr.h` or `sys/extattr.h`,
+ * otherwise does nothing.
+ */
+static void removeExtendedAttributes(const Path & path)
+{
+#if defined(HAVE_SYS_XATTR_H) || defined(HAVE_SYS_EXTATTR_H)
+    ssize_t eaSize =
+    #ifdef HAVE_SYS_XATTR_H
+        llistxattr(path.c_str(), nullptr, 0);
+    #elif defined(HAVE_SYS_EXTATTR_H)
+        extattr_list_link(path.c_str(), EXTATTR_NAMESPACE_USER, nullptr, 0);
+    #endif
+
+    if (eaSize < 0) {
+        if (errno != ENOTSUP && errno != ENODATA)
+            throw SysError("querying extended attributes of '%s'", path);
+    } else if (eaSize > 0) {
+        std::vector<char> eaBuf(eaSize);
+
+        #ifdef HAVE_SYS_XATTR_H
+        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
+        #elif defined(HAVE_SYS_EXTATTR_H)
+        if ((eaSize = extattr_list_link(path.c_str(), EXTATTR_NAMESPACE_USER, eaBuf.data(), eaBuf.size())) < 0)
+        #endif
+            throw SysError("querying extended attributes of '%s'", path);
+
+        #ifdef HAVE_SYS_XATTR_H
+        for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
+            if (settings.ignoredAcls.get().count(eaName)) continue;
+
+            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
+                throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
+        }
+        #elif defined(HAVE_SYS_EXTATTR_H)
+        size_t offset = 0;
+        while (offset < eaSize) {
+            size_t attrLen = *reinterpret_cast<size_t *>(&eaBuf[offset]);
+            offset += sizeof(size_t);
+
+            std::string eaName { eaBuf.data() + offset, attrLen };
+            offset += attrLen;
+
+            if (settings.ignoredAcls.get().count(eaName)) continue;
+
+            if (extattr_delete_link(path.c_str(), EXTATTR_NAMESPACE_USER, eaName.c_str()) == -1)
+                throw SysError("Error removing extended attribute '%s' from '%s'", eaName, path);
+        }
+        #endif
+    }
+#endif
+}
+
+
 static void canonicalisePathMetaData_(
     const Path & path,
     std::optional<std::pair<uid_t, uid_t>> uidRange,
@@ -78,26 +137,7 @@ static void canonicalisePathMetaData_(
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
         throw Error("file '%1%' has an unsupported type", path);
 
-#ifdef HAVE_SYS_XATTR_H
-    /* Remove extended attributes / ACLs. */
-    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
-
-    if (eaSize < 0) {
-        if (errno != ENOTSUP && errno != ENODATA)
-            throw SysError("querying extended attributes of '%s'", path);
-    } else if (eaSize > 0) {
-        std::vector<char> eaBuf(eaSize);
-
-        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
-            throw SysError("querying extended attributes of '%s'", path);
-
-        for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            if (settings.ignoredAcls.get().count(eaName)) continue;
-            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
-                throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
-        }
-     }
-#endif
+    removeExtendedAttributes(path);
 
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
