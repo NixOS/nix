@@ -13,7 +13,7 @@ to subsequent chapters.
    The install script will use `sudo`, so make sure you have sufficient rights.
    On Linux, `--daemon` can be omitted for a single-user install.
 
-   For other installation methods, see [here](installation/installation.md).
+   For other installation methods, see [here](installation/index.md).
 
 1. See what installable packages are currently available in the
    channel:
