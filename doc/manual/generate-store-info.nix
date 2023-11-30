@@ -1,6 +1,6 @@
 let
   inherit (builtins) attrValues mapAttrs;
-  inherit (import <nix/utils.nix>) concatStrings optionalString;
+  inherit (import <nix/utils.nix>) concatStrings optionalString squash;
   showSettings = import <nix/generate-settings.nix>;
 in
 
@@ -10,36 +10,36 @@ let
 
   showStore = name: { settings, doc, experimentalFeature }:
     let
+      result = squash ''
+        # ${name}
 
-    result = ''
-      ## ${name}
+        ${doc}
 
-      ${doc}
+        ${experimentalFeatureNote}
 
-      ${experimentalFeatureNote}
+        ## Settings
 
-      ### Settings
-
-      ${showSettings { prefix = "store-${slug}"; inherit inlineHTML; } settings}
-    '';
+        ${showSettings { prefix = "store-${slug}"; inherit inlineHTML; } settings}
+      '';
 
       # markdown doesn't like spaces in URLs
       slug = builtins.replaceStrings [ " " ] [ "-" ] name;
 
-    experimentalFeatureNote = optionalString (experimentalFeature != null) ''
-      > **Warning**
-      > This store is part of an
-      > [experimental feature](@docroot@/contributing/experimental-features.md).
-
-      To use this store, you need to make sure the corresponding experimental feature,
-      [`${experimentalFeature}`](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature}),
-      is enabled.
-      For example, include the following in [`nix.conf`](#):
-
-      ```
-      extra-experimental-features = ${experimentalFeature}
-      ```
-    '';
-  in result;
+      experimentalFeatureNote = optionalString (experimentalFeature != null) ''
+        > **Warning**
+        >
+        > This store is part of an
+        > [experimental feature](@docroot@/contributing/experimental-features.md).
+        >
+        > To use this store, make sure the
+        > [`${experimentalFeature}` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature})
+        > is enabled.
+        > For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
+        >
+        > ```
+        > extra-experimental-features = ${experimentalFeature}
+        > ```
+      '';
+    in result;
 
 in concatStrings (attrValues (mapAttrs showStore storesInfo))
