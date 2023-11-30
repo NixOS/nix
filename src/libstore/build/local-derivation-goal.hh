@@ -3,6 +3,7 @@
 
 #include "derivation-goal.hh"
 #include "local-store.hh"
+#include "processes.hh"
 
 namespace nix {
 
@@ -86,8 +87,8 @@ struct LocalDerivationGoal : public DerivationGoal
             : source(source), optional(optional)
         { }
     };
-    typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
-    DirsInChroot dirsInChroot;
+    typedef map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+    PathsInChroot pathsInChroot;
 
     typedef map<std::string, std::string> Environment;
     Environment env;

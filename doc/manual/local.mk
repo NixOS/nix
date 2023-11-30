@@ -24,7 +24,7 @@ man-pages += $(foreach subcommand, \
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 # Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
-# Set cores to 0 because otherwise nix show-config resolves the cores based on the current machine
+# Set cores to 0 because otherwise `nix config show` resolves the cores based on the current machine
 dummy-env = env -i \
 	HOME=/dummy \
 	NIX_CONF_DIR=/dummy \
@@ -32,7 +32,7 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
+nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix=doc/manual --store dummy:// --impure --raw
 
 # re-implement mdBook's include directive to make it usable for terminal output and for proper @docroot@ substitution
 define process-includes
@@ -92,7 +92,7 @@ $(d)/nix-profiles.5: $(d)/src/command-ref/files/profiles.md
 	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
-$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/SUMMARY-rl-next.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
 	@cp $< $@
 	@$(call process-includes,$@,$@)
 
@@ -103,7 +103,7 @@ $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/generate-settings.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-settings.nix { prefix = "opt-"; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-settings.nix { prefix = "conf"; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
@@ -111,7 +111,7 @@ $(d)/nix.json: $(bindir)/nix
 	@mv $@.tmp $@
 
 $(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix config show --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/contributing/experimental-feature-descriptions.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features.nix $(bindir)/nix
@@ -125,7 +125,7 @@ $(d)/src/command-ref/experimental-features-shortlist.md: $(d)/xp-features.json $
 	@mv $@.tmp $@
 
 $(d)/xp-features.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-xp-features > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-xp-features > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/language/builtins.md: $(d)/language.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
@@ -141,8 +141,26 @@ $(d)/src/language/builtin-constants.md: $(d)/language.json $(d)/generate-builtin
 	@mv $@.tmp $@
 
 $(d)/language.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-language > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-language > $@.tmp
 	@mv $@.tmp $@
+
+# Generate "Upcoming release" notes (or clear it and remove from menu)
+$(d)/src/release-notes/rl-next.md: $(d)/rl-next $(d)/rl-next/*
+	@if type -p changelog-d > /dev/null; then \
+		echo "  GEN   " $@; \
+		changelog-d doc/manual/rl-next > $@; \
+	else \
+		echo "  NULL  " $@; \
+		true > $@; \
+	fi
+
+$(d)/src/SUMMARY-rl-next.md: $(d)/src/release-notes/rl-next.md
+	$(trace-gen) true
+	@if [ -s $< ]; then \
+		echo '  - [Upcoming release](release-notes/rl-next.md)' > $@; \
+	else \
+	  true > $@; \
+	fi
 
 # Generate the HTML manual.
 .PHONY: manual-html
@@ -177,7 +195,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 # `@docroot@` is to be preserved for documenting the mechanism
 # FIXME: maybe contributing guides should live right next to the code
 # instead of in the manual
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md $(d)/src/release-notes/rl-next.md
 	$(trace-gen) \
 		tmp="$$(mktemp -d)"; \
 		cp -r doc/manual "$$tmp"; \

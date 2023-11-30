@@ -6,7 +6,11 @@ libexpr-tests_NAME := libnixexpr-tests
 
 libexpr-tests_DIR := $(d)
 
-libexpr-tests_INSTALL_DIR :=
+ifeq ($(INSTALL_UNIT_TESTS), yes)
+  libexpr-tests_INSTALL_DIR := $(checkbindir)
+else
+  libexpr-tests_INSTALL_DIR :=
+endif
 
 libexpr-tests_SOURCES := \
     $(wildcard $(d)/*.cc) \
@@ -16,4 +20,4 @@ libexpr-tests_CXXFLAGS += -I src/libexpr -I src/libutil -I src/libstore -I src/l
 
 libexpr-tests_LIBS = libstore-tests libutils-tests libexpr libutil libstore libfetchers
 
-libexpr-tests_LDFLAGS := $(GTEST_LIBS) -lgmock
+libexpr-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS) -lgmock

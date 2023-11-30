@@ -23,6 +23,7 @@ nix-instantiate --trace-verbose --eval -E 'builtins.traceVerbose "Hello" 123' 2>
 nix-instantiate --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grepQuietInverse Hello
 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grepQuietInverse Hello
 expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' | grepQuiet Hello
+expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello %" (throw "Foo")' | grepQuiet 'Hello %'
 
 nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
   2>&1 | grepQuiet -E 'trace: { x = «potential infinite recursion»; }'

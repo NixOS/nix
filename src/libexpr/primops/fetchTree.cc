@@ -7,6 +7,7 @@
 #include "registry.hh"
 #include "tarball.hh"
 #include "url.hh"
+#include "value-to-json.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -125,6 +126,10 @@ static void fetchTree(
                 attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean});
             else if (attr.value->type() == nInt)
                 attrs.emplace(state.symbols[attr.name], uint64_t(attr.value->integer));
+            else if (state.symbols[attr.name] == "publicKeys") {
+                experimentalFeatureSettings.require(Xp::VerifiedFetches);
+                attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
+            }
             else
                 state.debugThrowLastTrace(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     state.symbols[attr.name], showType(*attr.value)));
@@ -223,6 +228,7 @@ static RegisterPrimOp primop_fetchTree({
           ```
     )",
     .fun = prim_fetchTree,
+    .experimentalFeature = Xp::FetchTree,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
@@ -392,7 +398,7 @@ static RegisterPrimOp primop_fetchGit({
 
         The URL of the repo.
 
-      - `name` (default: *basename of the URL*)
+      - `name` (default: `source`)
 
         The name of the directory the repo should be exported to in the store.
 
@@ -419,13 +425,50 @@ static RegisterPrimOp primop_fetchGit({
 
       - `shallow` (default: `false`)
 
-        A Boolean parameter that specifies whether fetching a shallow clone is allowed.
+        A Boolean parameter that specifies whether fetching from a shallow remote repository is allowed.
+        This still performs a full clone of what is available on the remote.
 
       - `allRefs`
 
         Whether to fetch all references of the repository.
         With this argument being true, it's possible to load a `rev` from *any* `ref`
         (by default only `rev`s from the specified `ref` are supported).
+
+      - `verifyCommit` (default: `true` if `publicKey` or `publicKeys` are provided, otherwise `false`)
+
+        Whether to check `rev` for a signature matching `publicKey` or `publicKeys`.
+        If `verifyCommit` is enabled, then `fetchGit` cannot use a local repository with uncommitted changes.
+        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+
+      - `publicKey`
+
+        The public key against which `rev` is verified if `verifyCommit` is enabled.
+        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+
+      - `keytype` (default: `"ssh-ed25519"`)
+
+        The key type of `publicKey`.
+        Possible values:
+        - `"ssh-dsa"`
+        - `"ssh-ecdsa"`
+        - `"ssh-ecdsa-sk"`
+        - `"ssh-ed25519"`
+        - `"ssh-ed25519-sk"`
+        - `"ssh-rsa"`
+        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+
+      - `publicKeys`
+
+        The public keys against which `rev` is verified if `verifyCommit` is enabled.
+        Must be given as a list of attribute sets with the following form:
+        ```nix
+        {
+          key = "<public key>";
+          type = "<key type>"; # optional, default: "ssh-ed25519"
+        }
+        ```
+        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+
 
       Here are some examples of how to use `fetchGit`.
 
@@ -498,6 +541,21 @@ static RegisterPrimOp primop_fetchGit({
           builtins.fetchGit {
             url = "ssh://git@github.com/nixos/nix.git";
             ref = "master";
+          }
+          ```
+
+        - To verify the commit signature:
+
+          ```nix
+          builtins.fetchGit {
+            url = "ssh://git@github.com/nixos/nix.git";
+            verifyCommit = true;
+            publicKeys = [
+                {
+                  type = "ssh-ed25519";
+                  key = "AAAAC3NzaC1lZDI1NTE5AAAAIArPKULJOid8eS6XETwUjO48/HKBWl7FTCK0Z//fplDi";
+                }
+            ];
           }
           ```
 

@@ -19,6 +19,7 @@
 #include <variant>
 
 #include "util.hh"
+#include "users.hh"
 
 #include "nixexpr.hh"
 #include "eval.hh"
@@ -520,7 +521,7 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(std::move(path));
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   | HPATH {
     if (evalSettings.pureEval) {
@@ -530,7 +531,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(std::move(path));
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   ;
 
@@ -649,6 +650,8 @@ formal
 #include "tarball.hh"
 #include "store-api.hh"
 #include "flake/flake.hh"
+#include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
 
 
 namespace nix {
@@ -683,17 +686,25 @@ Expr * EvalState::parse(
 }
 
 
-SourcePath resolveExprPath(const SourcePath & path)
+SourcePath resolveExprPath(SourcePath path)
 {
+    unsigned int followCount = 0, maxFollow = 1024;
+
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    auto path2 = path.resolveSymlinks();
+    while (true) {
+        // Basic cycle/depth limit to avoid infinite loops.
+        if (++followCount >= maxFollow)
+            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+        if (path.lstat().type != InputAccessor::tSymlink) break;
+        path = {path.accessor, CanonPath(path.readLink(), path.path.parent().value_or(CanonPath::root))};
+    }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path2.lstat().type == InputAccessor::tDirectory)
-        return path2 + "default.nix";
+    if (path.lstat().type == InputAccessor::tDirectory)
+        return path + "default.nix";
 
-    return path2;
+    return path;
 }
 
 
@@ -756,11 +767,11 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
         auto r = *rOpt;
 
         Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return CanonPath(canonPath(res));
+        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
     }
 
     if (hasPrefix(path, "nix/"))
-        return CanonPath(concatStrings(corepkgsPrefix, path.substr(4)));
+        return {corepkgsFS, CanonPath(path.substr(3))};
 
     debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval

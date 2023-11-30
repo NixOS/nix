@@ -1,6 +1,7 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "hash.hh"
+#include "primops.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -12,6 +13,9 @@
 #include "function-trace.hh"
 #include "profiles.hh"
 #include "print.hh"
+#include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -503,7 +507,17 @@ EvalState::EvalState(
     , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
-    , derivationInternal(rootPath(CanonPath("/builtin/derivation.nix")))
+    , rootFS(makeFSInputAccessor(CanonPath::root))
+    , corepkgsFS(makeMemoryInputAccessor())
+    , internalFS(makeMemoryInputAccessor())
+    , derivationInternal{corepkgsFS->addFile(
+        CanonPath("derivation-internal.nix"),
+        #include "primops/derivation.nix.gen.hh"
+    )}
+    , callFlakeInternal{internalFS->addFile(
+        CanonPath("call-flake.nix"),
+        #include "flake/call-flake.nix.gen.hh"
+    )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(nullptr)
@@ -518,6 +532,9 @@ EvalState::EvalState(
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
+    corepkgsFS->setPathDisplay("<nix", ">");
+    internalFS->setPathDisplay("«nix-internal»", "");
+
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     assert(gcInitialised);
@@ -555,6 +572,11 @@ EvalState::EvalState(
         }
     }
 
+    corepkgsFS->addFile(
+        CanonPath("fetchurl.nix"),
+        #include "fetchurl.nix.gen.hh"
+    );
+
     createBaseEnv();
 }
 
@@ -585,6 +607,9 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
 
 SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 {
+    // Don't check non-rootFS accessors, they're in a different namespace.
+    if (path_.accessor != ref<InputAccessor>(rootFS)) return path_;
+
     if (!allowedPaths) return path_;
 
     auto i = resolvedPaths.find(path_.path.abs());
@@ -598,8 +623,6 @@ SourcePath EvalState::checkSourcePath(const SourcePath & path_)
      * and thus leak symlink targets.
      */
     Path abspath = canonPath(path_.path.abs());
-
-    if (hasPrefix(abspath, corepkgsPrefix)) return CanonPath(abspath);
 
     for (auto & i : *allowedPaths) {
         if (isDirOrInDir(abspath, i)) {
@@ -617,7 +640,7 @@ SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 
     /* Resolve symlinks. */
     debug("checking access to '%s'", abspath);
-    SourcePath path = CanonPath(canonPath(abspath, true));
+    SourcePath path = rootPath(CanonPath(canonPath(abspath, true)));
 
     for (auto & i : *allowedPaths) {
         if (isDirOrInDir(path.path.abs(), i)) {
@@ -649,12 +672,12 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        checkSourcePath(CanonPath(uri));
+        checkSourcePath(rootPath(CanonPath(uri)));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        checkSourcePath(CanonPath(std::string(uri, 7)));
+        checkSourcePath(rootPath(CanonPath(std::string(uri, 7))));
         return;
     }
 
@@ -700,6 +723,23 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         baseEnv.values[baseEnvDispl++] = v;
         baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
     }
+}
+
+
+void PrimOp::check()
+{
+    if (arity > maxPrimOpArity) {
+        throw Error("primop arity must not exceed %1%", maxPrimOpArity);
+    }
+}
+
+
+void Value::mkPrimOp(PrimOp * p)
+{
+    p->check();
+    clearValue();
+    internalType = tPrimOp;
+    primOp = p;
 }
 
 
@@ -950,7 +990,7 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
 
 void Value::mkPath(const SourcePath & path)
 {
-    mkPath(makeImmutableString(path.path.abs()));
+    mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
 }
 
 
@@ -1165,24 +1205,6 @@ void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial
     if (!e)
         e = parseExprFromFile(checkSourcePath(resolvedPath));
 
-    cacheFile(path, resolvedPath, e, v, mustBeTrivial);
-}
-
-
-void EvalState::resetFileCache()
-{
-    fileEvalCache.clear();
-    fileParseCache.clear();
-}
-
-
-void EvalState::cacheFile(
-    const SourcePath & path,
-    const SourcePath & resolvedPath,
-    Expr * e,
-    Value & v,
-    bool mustBeTrivial)
-{
     fileParseCache[resolvedPath] = e;
 
     try {
@@ -1208,6 +1230,13 @@ void EvalState::cacheFile(
 
     fileEvalCache[resolvedPath] = v;
     if (path != resolvedPath) fileEvalCache[path] = v;
+}
+
+
+void EvalState::resetFileCache()
+{
+    fileEvalCache.clear();
+    fileParseCache.clear();
 }
 
 
@@ -1740,6 +1769,12 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     Value vFun;
     fun->eval(state, env, vFun);
 
+    // Empirical arity of Nixpkgs lambdas by regex e.g. ([a-zA-Z]+:(\s|(/\*.*\/)|(#.*\n))*){5}
+    // 2: over 4000
+    // 3: about 300
+    // 4: about 60
+    // 5: under 10
+    // This excluded attrset lambdas (`{...}:`). Contributions of mixed lambdas appears insignificant at ~150 total.
     Value * vArgs[args.size()];
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
@@ -2037,7 +2072,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.error("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow<EvalError>();
-        v.mkPath(CanonPath(canonPath(str())));
+        v.mkPath(state.rootPath(CanonPath(canonPath(str()))));
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2236,7 +2271,7 @@ BackedStringView EvalState::coerceToString(
             !canonicalizePath && !copyToStore
             ? // FIXME: hack to preserve path literals that end in a
               // slash, as in /foo/${x}.
-              v._path
+              v._path.path
             : copyToStore
             ? store->printStorePath(copyPathToStore(context, v.path()))
             : std::string(v.path().path.abs());
@@ -2310,7 +2345,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            auto dstPath = path.fetchToStore(store, path.baseName(), nullptr, repair);
+            auto dstPath = path.fetchToStore(store, path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
@@ -2326,10 +2361,34 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
+    try {
+        forceValue(v, pos);
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx);
+        throw;
+    }
+
+    /* Handle path values directly, without coercing to a string. */
+    if (v.type() == nPath)
+        return v.path();
+
+    /* Similarly, handle __toString where the result may be a path
+       value. */
+    if (v.type() == nAttrs) {
+        auto i = v.attrs->find(sToString);
+        if (i != v.attrs->end()) {
+            Value v1;
+            callFunction(*i->value, v, v1, pos);
+            return coerceToPath(pos, v1, context, errorCtx);
+        }
+    }
+
+    /* Any other value should be coercable to a string, interpreted
+       relative to the root filesystem. */
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
         error("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow<EvalError>();
-    return CanonPath(path);
+    return rootPath(CanonPath(path));
 }
 
 
@@ -2429,7 +2488,10 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return v1.string_view().compare(v2.string_view()) == 0;
 
         case nPath:
-            return strcmp(v1._path, v2._path) == 0;
+            return
+                // FIXME: compare accessors by their fingerprint.
+                v1._path.accessor == v2._path.accessor
+                && strcmp(v1._path.path, v2._path.path) == 0;
 
         case nNull:
             return true;

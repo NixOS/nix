@@ -17,10 +17,10 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program",
+    const Setting<Path> remoteProgram{this, "nix-store", "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+    const Setting<int> maxConnections{this, 1, "max-connections",
         "Maximum number of concurrent SSH connections."};
 
     const std::string name() override { return "SSH Store"; }
@@ -38,7 +38,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
     // the documentation
-    const Setting<int> logFD{(StoreConfig*) this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
 
     struct Connection
     {
@@ -319,20 +319,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult status;
-        status.status = (BuildResult::Status) readInt(conn->from);
-        conn->from >> status.errorMsg;
-
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
-            conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(*this, *conn);
-            for (auto && [output, realisation] : builtOutputs)
-                status.builtOutputs.insert_or_assign(
-                    std::move(output.outputName),
-                    std::move(realisation));
-        }
-        return status;
+        return ServeProto::Serialise<BuildResult>::read(*this, *conn);
     }
 
     void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
@@ -376,7 +363,7 @@ public:
     void ensurePath(const StorePath & path) override
     { unsupported("ensurePath"); }
 
-    virtual ref<FSAccessor> getFSAccessor() override
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     { unsupported("getFSAccessor"); }
 
     /**

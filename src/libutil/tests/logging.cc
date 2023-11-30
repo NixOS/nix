@@ -2,7 +2,6 @@
 
 #include "logging.hh"
 #include "nixexpr.hh"
-#include "util.hh"
 #include <fstream>
 
 #include <gtest/gtest.h>

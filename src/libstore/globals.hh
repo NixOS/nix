@@ -3,7 +3,7 @@
 
 #include "types.hh"
 #include "config.hh"
-#include "util.hh"
+#include "environment-variables.hh"
 #include "experimental-features.hh"
 
 #include <map>
@@ -183,7 +183,9 @@ public:
           command line switch and defaults to `1`. The value `0` means that
           the builder should use all available CPU cores in the system.
         )",
-        {"build-cores"}, false};
+        {"build-cores"},
+        // Don't document the machine-specific default value
+        false};
 
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
@@ -699,7 +701,10 @@ public:
 
           Build systems will usually detect the target platform to be the current physical system and therefore produce machine code incompatible with what may be intended in the derivation.
           You should design your derivation's `builder` accordingly and cross-check the results when using this option against natively-built versions of your derivation.
-        )", {}, false};
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
     Setting<StringSet> systemFeatures{
         this,
@@ -716,7 +721,7 @@ public:
 
           - `apple-virt`
 
-            Included on darwin if virtualization is available.
+            Included on Darwin if virtualization is available.
 
           - `kvm`
 
@@ -744,7 +749,10 @@ public:
             [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
 
             Included by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
-        )", {}, false};
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
     Setting<Strings> substituters{
         this,
@@ -1083,6 +1091,16 @@ public:
         {}, // aliases
         true, // document default
         Xp::ConfigurableImpureEnv
+    };
+
+    Setting<std::string> upgradeNixStorePathUrl{
+        this,
+        "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix",
+        "upgrade-nix-store-path-url",
+        R"(
+          Used by `nix upgrade-nix`, the URL of the file that contains the
+          store paths of the latest Nix release.
+        )"
     };
 };
 

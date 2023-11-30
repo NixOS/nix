@@ -97,8 +97,6 @@ struct MixFlakeOptions : virtual Args, EvalCommand
 {
     flake::LockFlags lockFlags;
 
-    std::optional<std::string> needsFlakeInputCompletion = {};
-
     MixFlakeOptions();
 
     /**
@@ -109,12 +107,8 @@ struct MixFlakeOptions : virtual Args, EvalCommand
      * command is operating with (presumably specified via some other
      * arguments) so that the completions for these flags can use them.
      */
-    virtual std::vector<std::string> getFlakesForCompletion()
+    virtual std::vector<FlakeRef> getFlakeRefsForCompletion()
     { return {}; }
-
-    void completeFlakeInput(std::string_view prefix);
-
-    void completionHook() override;
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
@@ -137,7 +131,13 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     /**
      * Complete an installable from the given prefix.
      */
-    void completeInstallable(std::string_view prefix);
+    void completeInstallable(AddCompletions & completions, std::string_view prefix);
+
+    /**
+     * Convenience wrapper around the underlying function to make setting the
+     * callback easier.
+     */
+    CompleterClosure getCompleteInstallable();
 };
 
 /**
@@ -170,7 +170,7 @@ struct RawInstallablesCommand : virtual Args, SourceExprCommand
 
     bool readFromStdIn = false;
 
-    std::vector<std::string> getFlakesForCompletion() override;
+    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
 
 private:
 
@@ -199,10 +199,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
     void run(ref<Store> store) override;
 
-    std::vector<std::string> getFlakesForCompletion() override
-    {
-        return {_installable};
-    }
+    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
 
 private:
 
@@ -329,9 +326,16 @@ struct MixEnvironment : virtual Args {
     void setEnviron();
 };
 
-void completeFlakeRef(ref<Store> store, std::string_view prefix);
+void completeFlakeInputPath(
+    AddCompletions & completions,
+    ref<EvalState> evalState,
+    const std::vector<FlakeRef> & flakeRefs,
+    std::string_view prefix);
+
+void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::string_view prefix);
 
 void completeFlakeRefWithFragment(
+    AddCompletions & completions,
     ref<EvalState> evalState,
     flake::LockFlags lockFlags,
     Strings attrPathPrefixes,

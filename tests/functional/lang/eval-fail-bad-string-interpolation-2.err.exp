@@ -1,1 +1,1 @@
-error: getting status of '/pwd/lang/fnord': No such file or directory
+error: path '/pwd/lang/fnord' does not exist

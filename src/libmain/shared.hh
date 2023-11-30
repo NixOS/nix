@@ -1,8 +1,9 @@
 #pragma once
 ///@file
 
-#include "util.hh"
+#include "processes.hh"
 #include "args.hh"
+#include "args/root.hh"
 #include "common-args.hh"
 #include "path.hh"
 #include "derived-path.hh"
@@ -66,7 +67,7 @@ template<class N> N getIntArg(const std::string & opt,
 }
 
 
-struct LegacyArgs : public MixCommonArgs
+struct LegacyArgs : public MixCommonArgs, public RootArgs
 {
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
 

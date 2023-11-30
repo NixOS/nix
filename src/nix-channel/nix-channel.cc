@@ -5,7 +5,7 @@
 #include "store-api.hh"
 #include "legacy.hh"
 #include "eval-settings.hh" // for defexpr
-#include "util.hh"
+#include "users.hh"
 #include "tarball.hh"
 
 #include <fcntl.h>

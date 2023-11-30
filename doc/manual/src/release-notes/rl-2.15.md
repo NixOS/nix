@@ -44,7 +44,7 @@
   (The store always had to check whether it trusts the client, but now the client is informed of the store's decision.)
   This is useful for scripting interactions with (non-legacy-ssh) remote Nix stores.
 
-  `nix store info` and `nix doctor` now display this information.
+  `nix store ping` and `nix doctor` now display this information.
 
 * The new command `nix derivation add` allows adding derivations to the store without involving the Nix language.
   It exists to round out our collection of basic utility/plumbing commands, and allow for a low barrier-to-entry way of experimenting with alternative front-ends to the Nix Store.

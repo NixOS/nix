@@ -6,7 +6,6 @@
 #include "split.hh"
 #include "common-protocol.hh"
 #include "common-protocol-impl.hh"
-#include "fs-accessor.hh"
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
 
@@ -152,11 +151,10 @@ StorePath writeDerivation(Store & store,
 /* Read string `s' from stream `str'. */
 static void expect(std::istream & str, std::string_view s)
 {
-    char s2[s.size()];
-    str.read(s2, s.size());
-    std::string_view s2View { s2, s.size() };
-    if (s2View != s)
-        throw FormatError("expected string '%s', got '%s'", s, s2View);
+    for (auto & c : s) {
+        if (str.get() != c)
+            throw FormatError("expected string '%1%'", s);
+    }
 }
 
 
@@ -353,7 +351,7 @@ Derivation parseDerivation(
         expect(str, "erive(");
         version = DerivationATermVersion::Traditional;
         break;
-    case 'r':
+    case 'r': {
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
         if (versionS == "xp-dyn-drv") {
@@ -365,6 +363,9 @@ Derivation parseDerivation(
         }
         expect(str, ",");
         break;
+    }
+    default:
+        throw Error("derivation does not start with 'Derive' or 'DrvWithVersion'");
     }
 
     /* Parse the list of outputs. */

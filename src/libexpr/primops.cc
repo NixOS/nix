@@ -10,11 +10,13 @@
 #include "path-references.hh"
 #include "store-api.hh"
 #include "util.hh"
+#include "processes.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <boost/regex.hpp>
 #include <nlohmann/json.hpp>
 
 #include <sys/types.h>
@@ -23,11 +25,9 @@
 
 #include <algorithm>
 #include <cstring>
-#include <regex>
 #include <dlfcn.h>
 
 #include <cmath>
-
 
 namespace nix {
 
@@ -121,13 +121,15 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        StringMap rewrites = state.realiseContext(context);
-
-        auto realPath = state.rootPath(CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context)));
+        if (!context.empty()) {
+            auto rewrites = state.realiseContext(context);
+            auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
+            return {path.accessor, CanonPath(realPath)};
+        }
 
         return flags.checkForPureEval
-            ? state.checkSourcePath(realPath)
-            : realPath;
+            ? state.checkSourcePath(path)
+            : path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -202,18 +204,12 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , CanonPath::root), **state.vImportedDrvToDerivation);
+                , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
         }
 
         state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
         v.mkApp(*state.vImportedDrvToDerivation, w);
         state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
-    }
-
-    else if (path2 == corepkgsPrefix + "fetchurl.nix") {
-        state.eval(state.parseExprFromString(
-            #include "fetchurl.nix.gen.hh"
-            , CanonPath::root), v);
     }
 
     else {
@@ -599,7 +595,10 @@ struct CompareValues
                 case nString:
                     return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
-                    return strcmp(v1->_path, v2->_path) < 0;
+                    // Note: we don't take the accessor into account
+                    // since it's not obvious how to compare them in a
+                    // reproducible way.
+                    return strcmp(v1->_path.path, v2->_path.path) < 0;
                 case nList:
                     // Lexicographic comparison
                     for (size_t i = 0;; i++) {
@@ -825,7 +824,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         auto message = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.addErrorContext",
                 false, false).toOwned();
-        e.addTrace(nullptr, message, true);
+        e.addTrace(nullptr, hintfmt(message), true);
         throw;
     }
 }
@@ -1493,7 +1492,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
         }));
 
     NixStringContext context;
-    auto path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to builtins.storePath")).path;
+    auto path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'")).path;
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -1549,10 +1548,8 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
 
     try {
         auto checked = state.checkSourcePath(path);
-        auto exists = checked.pathExists();
-        if (exists && mustBeDir) {
-            exists = checked.lstat().type == InputAccessor::tDirectory;
-        }
+        auto st = checked.maybeLstat();
+        auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
@@ -2211,7 +2208,7 @@ static void addPath(
 
         path = evalSettings.pureEval && expectedHash
             ? path
-            : state.checkSourcePath(CanonPath(path)).path.abs();
+            : state.checkSourcePath(state.rootPath(CanonPath(path))).path.abs();
 
         PathFilter filter = filterFun ? ([&](const Path & path) {
             auto st = lstat(path);
@@ -2244,9 +2241,7 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            StorePath dstPath = settings.readOnlyMode
-                ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs);
+            auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, method, &filter, state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
@@ -2263,7 +2258,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
 {
     NixStringContext context;
     auto path = state.coerceToPath(pos, *args[1], context,
-        "while evaluating the second argument (the path to filter) passed to builtins.filterSource");
+        "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
     addPath(state, pos, path.baseName(), path.path.abs(), args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
@@ -2379,7 +2374,7 @@ static RegisterPrimOp primop_path({
           like `@`.
 
         - filter\
-          A function of the type expected by `builtins.filterSource`,
+          A function of the type expected by [`builtins.filterSource`](#builtins-filterSource),
           with the same semantics.
 
         - recursive\
@@ -2554,6 +2549,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     /* Get the attribute names to be removed.
        We keep them as Attrs instead of Symbols so std::set_difference
        can be used to remove them from attrs[0]. */
+    // 64: large enough to fit the attributes of a derivation
     boost::container::small_vector<Attr, 64> names;
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
@@ -2734,7 +2730,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
     Value * res[args[1]->listSize()];
-    unsigned int found = 0;
+    size_t found = 0;
 
     for (auto v2 : args[1]->listItems()) {
         state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
@@ -3070,7 +3066,7 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     // FIXME: putting this on the stack is risky.
     Value * vs[args[1]->listSize()];
-    unsigned int k = 0;
+    size_t k = 0;
 
     bool same = true;
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
@@ -3183,9 +3179,16 @@ static RegisterPrimOp primop_foldlStrict({
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
       e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
-      ...`. For example, `foldl' (x: y: x + y) 0 [1 2 3]` evaluates to 6.
-      The return value of each application of `op` is evaluated immediately,
-      even for intermediate values.
+      ...`.
+
+      For example, `foldl' (acc: elem: acc + elem) 0 [1 2 3]` evaluates
+      to `6` and `foldl' (acc: elem: { "${elem}" = elem; } // acc) {}
+      ["a" "b"]` evaluates to `{ a = "a"; b = "b"; }`.
+
+      The first argument of `op` is the accumulator whereas the second
+      argument is the current element being processed. The return value
+      of each application of `op` is evaluated immediately, even for
+      intermediate values.
     )",
     .fun = prim_foldlStrict,
 });
@@ -3195,10 +3198,14 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
     state.forceFunction(*args[0], pos, std::string("while evaluating the first argument passed to builtins.") + (any ? "any" : "all"));
     state.forceList(*args[1], pos, std::string("while evaluating the second argument passed to builtins.") + (any ? "any" : "all"));
 
+    std::string_view errorCtx = any
+        ? "while evaluating the return value of the function passed to builtins.any"
+        : "while evaluating the return value of the function passed to builtins.all";
+
     Value vTmp;
     for (auto elem : args[1]->listItems()) {
         state.callFunction(*args[0], *elem, vTmp, pos);
-        bool res = state.forceBool(vTmp, pos, std::string("while evaluating the return value of the function passed to builtins.") + (any ? "any" : "all"));
+        bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
             v.mkBool(any);
             return;
@@ -3460,7 +3467,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to buitlins.concatMap");
+        state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
         len += lists[n].listSize();
     }
 
@@ -3723,10 +3730,11 @@ static RegisterPrimOp primop_substring({
     .doc = R"(
       Return the substring of *s* from character position *start*
       (zero-based) up to but not including *start + len*. If *start* is
-      greater than the length of the string, an empty string is returned,
-      and if *start + len* lies beyond the end of the string, only the
-      substring up to the end of the string is returned. *start* must be
-      non-negative. For example,
+      greater than the length of the string, an empty string is returned.
+      If *start + len* lies beyond the end of the string or *len* is `-1`,
+      only the substring up to the end of the string is returned.
+      *start* must be non-negative.
+      For example,
 
       ```nix
       builtins.substring 0 3 "nixos"
@@ -3877,19 +3885,30 @@ static RegisterPrimOp primop_convertHash({
     .fun = prim_convertHash,
 });
 
+// regex aliases, switch between boost and std
+using regex = boost::regex;
+using regex_error = boost::regex_error;
+using cmatch = boost::cmatch;
+using cregex_iterator = boost::cregex_iterator;
+namespace regex_constants = boost::regex_constants;
+// overloaded function alias
+constexpr auto regex_match = [] (auto &&...args) {
+    return boost::regex_match(std::forward<decltype(args)>(args)...);
+ };
+
 struct RegexCache
 {
     // TODO use C++20 transparent comparison when available
-    std::unordered_map<std::string_view, std::regex> cache;
+    std::unordered_map<std::string_view, regex> cache;
     std::list<std::string> keys;
 
-    std::regex get(std::string_view re)
+    regex get(std::string_view re)
     {
         auto it = cache.find(re);
         if (it != cache.end())
             return it->second;
         keys.emplace_back(re);
-        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
+        return cache.emplace(keys.back(), regex(keys.back(), regex::extended)).first->second;
     }
 };
 
@@ -3909,8 +3928,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.match");
 
-        std::cmatch match;
-        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
+        cmatch match;
+        if (!regex_match(str.begin(), str.end(), match, regex)) {
             v.mkNull();
             return;
         }
@@ -3925,8 +3944,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
 
-    } catch (std::regex_error & e) {
-        if (e.code() == std::regex_constants::error_space) {
+    } catch (regex_error & e) {
+        if (e.code() == regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -3989,8 +4008,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.split");
 
-        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
-        auto end = std::cregex_iterator();
+        auto begin = cregex_iterator(str.begin(), str.end(), regex);
+        auto end = cregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
@@ -4029,8 +4048,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         assert(idx == 2 * len + 1);
 
-    } catch (std::regex_error & e) {
-        if (e.code() == std::regex_constants::error_space) {
+    } catch (regex_error & e) {
+        if (e.code() == regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -4545,12 +4564,7 @@ void EvalState::createBaseEnv()
 
     /* Note: we have to initialize the 'derivation' constant *after*
        building baseEnv/staticBaseEnv because it uses 'builtins'. */
-    char code[] =
-        #include "primops/derivation.nix.gen.hh"
-        // the parser needs two NUL bytes as terminators; one of them
-        // is implied by being a C string.
-        "\0";
-    eval(parse(code, sizeof(code), derivationInternal, {CanonPath::root}, staticBaseEnv), *vDerivation);
+    evalFile(derivationInternal, *vDerivation);
 }
 
 

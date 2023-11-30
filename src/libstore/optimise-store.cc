@@ -1,6 +1,7 @@
-#include "util.hh"
 #include "local-store.hh"
 #include "globals.hh"
+#include "signals.hh"
+#include "posix-fs-canonicalise.hh"
 
 #include <cstdlib>
 #include <cstring>

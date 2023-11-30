@@ -39,12 +39,12 @@ enum struct FileIngestionMethod : uint8_t {
     /**
      * Flat-file hashing. Directly ingest the contents of a single file
      */
-    Flat = false,
+    Flat = 0,
     /**
      * Recursive (or NAR) hashing. Serializes the file-system object in Nix
      * Archive format and ingest that
      */
-    Recursive = true
+    Recursive = 1
 };
 
 /**

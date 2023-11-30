@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include "signals.hh"
+
 namespace nix {
 
 

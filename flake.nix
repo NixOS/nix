@@ -5,13 +5,17 @@
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, libgit2 }:
 
     let
       inherit (nixpkgs) lib;
 
       officialRelease = false;
+
+      # Set to true to build the release notes for the next release.
+      buildUnreleasedNotes = false;
 
       version = lib.fileContents ./.version + versionSuffix;
       versionSuffix =
@@ -153,7 +157,7 @@
 
         configureFlags =
           lib.optionals stdenv.isLinux [
-            "--with-boost=${boost}/lib"
+            "--with-boost=${boost-nix}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
           ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
@@ -162,11 +166,17 @@
 
         testConfigureFlags = [
           "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+        ] ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+          "--enable-install-unit-tests"
+          "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+          "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
         ];
 
         internalApiDocsConfigureFlags = [
           "--enable-internal-api-docs"
         ];
+
+        changelog-d = pkgs.buildPackages.changelog-d;
 
         nativeBuildDeps =
           [
@@ -183,15 +193,24 @@
             buildPackages.git
             buildPackages.mercurial # FIXME: remove? only needed for tests
             buildPackages.jq # Also for custom mdBook preprocessor.
+            buildPackages.openssh # only needed for tests (ssh-keygen)
           ]
-          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
+          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)]
+          # Official releases don't have rl-next, so we don't need to compile a changelog
+          ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d
+          ;
 
         buildDeps =
           [ curl
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
-            boost
+            (pkgs.libgit2.overrideAttrs (attrs: {
+              src = libgit2;
+              version = libgit2.lastModifiedDate;
+              cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
+            }))
+            boost-nix
             lowdown-nix
             libsodium
           ]
@@ -401,7 +420,8 @@
             src = nixSrc;
             VERSION_SUFFIX = versionSuffix;
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (currentStdenv.hostPlatform != currentStdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps;
             buildInputs = buildDeps
@@ -411,14 +431,14 @@
 
             propagatedBuildInputs = propagatedDeps;
 
-            disallowedReferences = [ boost ];
+            disallowedReferences = [ boost-nix ];
 
             preConfigure = lib.optionalString (! currentStdenv.hostPlatform.isStatic)
               ''
                 # Copy libboost_context so we don't get all of Boost in our closure.
                 # https://github.com/NixOS/nixpkgs/issues/45462
                 mkdir -p $out/lib
-                cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
+                cp -pd ${boost-nix}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
                 rm -f $out/lib/*.a
                 ${lib.optionalString currentStdenv.hostPlatform.isLinux ''
                   chmod u+w $out/lib/*.so.*
@@ -428,9 +448,9 @@
                   for LIB in $out/lib/*.dylib; do
                     chmod u+w $LIB
                     install_name_tool -id $LIB $LIB
-                    install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
+                    install_name_tool -delete_rpath ${boost-nix}/lib/ $LIB || true
                   done
-                  install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
+                  install_name_tool -change ${boost-nix}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
                 ''}
               '';
 
@@ -458,9 +478,13 @@
               ''}
               ${lib.optionalString currentStdenv.isDarwin ''
               install_name_tool \
-                -change ${boost}/lib/libboost_context.dylib \
+                -change ${boost-nix}/lib/libboost_context.dylib \
                 $out/lib/libboost_context.dylib \
                 $out/lib/libnixutil.dylib
+              install_name_tool \
+                -change ${boost-nix}/lib/libboost_regex.dylib \
+                $out/lib/libboost_regex.dylib \
+                $out/lib/libnixexpr.dylib
               ''}
             '';
 
@@ -482,6 +506,10 @@
             meta.platforms = lib.platforms.unix;
             meta.mainProgram = "nix";
           });
+
+          boost-nix = final.boost.override {
+            enableIcu = false;
+          };
 
           lowdown-nix = with final; currentStdenv.mkDerivation rec {
             name = "lowdown-0.9.0";
@@ -707,13 +735,16 @@
           stdenv.mkDerivation {
             name = "nix";
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (stdenv.hostPlatform != stdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps
               ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
               ++ lib.optional
                 (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform)
                 pkgs.buildPackages.clang-tools
+              # We want changelog-d in the shell even if the current build doesn't need it
+              ++ lib.optional (officialRelease || ! buildUnreleasedNotes) changelog-d
               ;
 
             buildInputs = buildDeps ++ propagatedDeps

@@ -16,6 +16,9 @@ namespace nix {
 class Store;
 struct Source;
 
+// items being serialised
+struct BuildResult;
+
 
 /**
  * The "serve protocol", used by ssh:// stores.
@@ -135,6 +138,9 @@ inline std::ostream & operator << (std::ostream & s, ServeProto::Command op)
         static T read(const Store & store, ServeProto::ReadConn conn); \
         static void write(const Store & store, ServeProto::WriteConn conn, const T & t); \
     };
+
+template<>
+DECLARE_SERVE_SERIALISER(BuildResult);
 
 template<typename T>
 DECLARE_SERVE_SERIALISER(std::vector<T>);

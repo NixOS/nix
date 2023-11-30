@@ -69,12 +69,44 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
-    derivedPath,
-    "derived-path",
-    defaultVersion,
-    (std::tuple<DerivedPath, DerivedPath> {
+    derivedPath_1_29,
+    "derived-path-1.29",
+    1 << 8 | 29,
+    (std::tuple<DerivedPath, DerivedPath, DerivedPath> {
         DerivedPath::Opaque {
             .path = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+        },
+        DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            }),
+            .outputs = OutputsSpec::All { },
+        },
+        DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            }),
+            .outputs = OutputsSpec::Names { "x", "y" },
+        },
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    derivedPath_1_30,
+    "derived-path-1.30",
+    1 << 8 | 30,
+    (std::tuple<DerivedPath, DerivedPath, DerivedPath, DerivedPath> {
+        DerivedPath::Opaque {
+            .path = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+        },
+        DerivedPath::Opaque {
+            .path = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv" },
+        },
+        DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            }),
+            .outputs = OutputsSpec::All { },
         },
         DerivedPath::Built {
             .drvPath = makeConstantStorePathRef(StorePath {
@@ -135,9 +167,77 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
-    buildResult,
-    "build-result",
-    defaultVersion,
+    buildResult_1_27,
+    "build-result-1.27",
+    1 << 8 | 27,
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t {
+            BuildResult {
+                .status = BuildResult::OutputRejected,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::NotDeterministic,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::Built,
+            },
+        };
+        t;
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_1_28,
+    "build-result-1.28",
+    1 << 8 | 28,
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t {
+            BuildResult {
+                .status = BuildResult::OutputRejected,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::NotDeterministic,
+                .errorMsg = "no idea why",
+            },
+            BuildResult {
+                .status = BuildResult::Built,
+                .builtOutputs = {
+                    {
+                        "foo",
+                        {
+                            .id = DrvOutput {
+                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                .outputName = "foo",
+                            },
+                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+                        },
+                    },
+                    {
+                        "bar",
+                        {
+                            .id = DrvOutput {
+                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                .outputName = "bar",
+                            },
+                            .outPath = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar" },
+                        },
+                    },
+                },
+            },
+        };
+        t;
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_1_29,
+    "build-result-1.29",
+    1 << 8 | 29,
     ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t {
@@ -194,9 +294,9 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
-    keyedBuildResult,
-    "keyed-build-result",
-    defaultVersion,
+    keyedBuildResult_1_29,
+    "keyed-build-result-1.29",
+    1 << 8 | 29,
     ({
         using namespace std::literals::chrono_literals;
         std::tuple<KeyedBuildResult, KeyedBuildResult/*, KeyedBuildResult*/> t {
@@ -227,6 +327,159 @@ VERSIONED_CHARACTERIZATION_TEST(
             },
         };
         t;
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    unkeyedValidPathInfo_1_15,
+    "unkeyed-valid-path-info-1.15",
+    1 << 8 | 15,
+    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo> {
+        ({
+            UnkeyedValidPathInfo info {
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+        ({
+            UnkeyedValidPathInfo info {
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv",
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    validPathInfo_1_15,
+    "valid-path-info-1.15",
+    1 << 8 | 15,
+    (std::tuple<ValidPathInfo, ValidPathInfo> {
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                // other reference
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo",
+                },
+                // self reference
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    validPathInfo_1_16,
+    "valid-path-info-1.16",
+    1 << 8 | 16,
+    (std::tuple<ValidPathInfo, ValidPathInfo, ValidPathInfo> {
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info.ultimate = true;
+            info;
+        }),
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                // other reference
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo",
+                },
+                // self reference
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info.sigs = {
+                "fake-sig-1",
+                "fake-sig-2",
+            },
+            info;
+        }),
+        ({
+            ValidPathInfo info {
+                *LibStoreTest::store,
+                "foo",
+                FixedOutputInfo {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = hashString(HashType::htSHA256, "(...)"),
+                    .references = {
+                        .others = {
+                            StorePath {
+                                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                            },
+                        },
+                        .self = true,
+                    },
+                },
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
     }))
 
 VERSIONED_CHARACTERIZATION_TEST(
