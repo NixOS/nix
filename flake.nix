@@ -7,7 +7,7 @@
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, libgit2 }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, libgit2, ... }:
 
     let
       inherit (nixpkgs) lib;
@@ -183,7 +183,7 @@
           "--enable-internal-api-docs"
         ];
 
-        changelog-d = pkgs.buildPackages.changelog-d;
+        inherit (pkgs.buildPackages) changelog-d;
 
         nativeBuildDeps =
           [
@@ -349,7 +349,7 @@
           nixStable = prev.nix;
 
           # Forward from the previous stage as we don’t want it to pick the lowdown override
-          nixUnstable = prev.nixUnstable;
+          inherit (prev) nixUnstable;
 
           nix =
             let

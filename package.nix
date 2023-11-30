@@ -141,10 +141,10 @@ stdenv.mkDerivation (finalAttrs: {
       apis = ["s3" "transfer"];
       customMemoryManagement = false;
     }))
-  ++ lib.optionals finalAttrs.doCheck ([
+  ++ lib.optionals finalAttrs.doCheck [
     gtest
     rapidcheck
-  ]);
+  ];
 
   propagatedBuildInputs = [
     boehmgc
