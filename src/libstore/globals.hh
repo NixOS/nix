@@ -1005,6 +1005,15 @@ public:
           ```
         )"
     };
+
+    Setting<bool> protectByDefault{
+      this, false, "protect-by-default",
+      R"(
+        If set to `true`, protects all newly added (either directly or as a result of a derivation build) paths by default, making them unreadable to the world.
+
+        Requires the `acls` experimental feature.
+      )"
+    };
 };
 
 

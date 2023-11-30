@@ -1242,7 +1242,10 @@ Path DerivationGoal::openLogFile()
     if (experimentalFeatureSettings.isEnabled(Xp::ACLs) && !logFileExisted)
         if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
             auto storeObject = StoreObjectDerivationLog {drvPath};
-            auto status = localStore->futurePermissions.contains(storeObject) ? localStore->futurePermissions.at(storeObject) : LocalGranularAccessStore::AccessStatus {};
+            auto status =
+                    localStore->futurePermissions.contains(storeObject)
+                    ? localStore->futurePermissions.at(storeObject)
+                    : LocalGranularAccessStore::AccessStatus {settings.protectByDefault.get(), {}};
             localStore->setCurrentAccessStatus(logFileName, status);
         }
 

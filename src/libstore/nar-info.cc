@@ -82,7 +82,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             ca = ContentAddress::parseOpt(value);
         } else if (experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
             if (name == "Protected") {
-                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus {};
+                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus();
                 if (value == "true")
                     accessStatus->isProtected = true;
                 else if (value == "false")
@@ -91,11 +91,11 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
                     throw corrupt("invalid Protected value");
             }
             else if (name == "AllowedUser") {
-                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus {};
+                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus();
                 accessStatus->entities.insert(ACL::User{getpwnam(value.c_str())->pw_uid});
             }
             else if (name == "AllowedGroup") {
-                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus {};
+                if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus();
                 accessStatus->entities.insert(ACL::Group{getgrnam(value.c_str())->gr_gid});
             }
         }

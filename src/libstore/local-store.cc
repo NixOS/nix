@@ -1169,7 +1169,7 @@ void LocalStore::syncPathPermissions(const ValidPathInfo & info)
             setCurrentAccessStatus(realPath, *info.accessStatus);
         } else {
             // TODO: a mode where all new paths are protected by default
-            setCurrentAccessStatus(realPath, {false, {}});
+            setCurrentAccessStatus(realPath, AccessStatus());
         }
     }
 }
@@ -1401,7 +1401,7 @@ LocalStore::AccessStatus LocalStore::getAccessStatus(const StoreObject & storeOb
                 return getCurrentAccessStatus(path);
             else if (futurePermissions.contains(p))
                 return futurePermissions[p];
-            return AccessStatus {};
+            return AccessStatus();
         },
         [&](StoreObjectDerivationOutput p) {
             auto drv = readDerivation(p.drvPath);
@@ -1415,7 +1415,7 @@ LocalStore::AccessStatus LocalStore::getAccessStatus(const StoreObject & storeOb
             }
             else if (futurePermissions.contains(p))
                 return futurePermissions[p];
-            return AccessStatus {};
+            return AccessStatus();
         },
         [&](StoreObjectDerivationLog l) {
             auto baseName = l.drvPath.to_string();
@@ -1426,7 +1426,7 @@ LocalStore::AccessStatus LocalStore::getAccessStatus(const StoreObject & storeOb
                 return getCurrentAccessStatus(logPath);
             else if (futurePermissions.contains(l))
                 return getFutureAccessStatus(l);
-            return AccessStatus {};
+            return AccessStatus();
         }
     }, storeObject);
 }
