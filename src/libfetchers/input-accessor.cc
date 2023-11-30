@@ -53,11 +53,6 @@ StorePath InputAccessor::fetchToStore(
     return storePath;
 }
 
-SourcePath InputAccessor::root()
-{
-    return {ref(shared_from_this()), CanonPath::root};
-}
-
 std::ostream & operator << (std::ostream & str, const SourcePath & path)
 {
     str << path.to_string();
@@ -88,7 +83,7 @@ SourcePath SourcePath::parent() const
 
 SourcePath SourcePath::resolveSymlinks() const
 {
-    auto res = accessor->root();
+    auto res = SourcePath(accessor);
 
     int linksAllowed = 1024;
 

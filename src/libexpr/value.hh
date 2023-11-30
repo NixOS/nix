@@ -424,10 +424,9 @@ public:
     SourcePath path() const
     {
         assert(internalType == tPath);
-        return SourcePath {
-            .accessor = ref(_path.accessor->shared_from_this()),
-            .path = CanonPath(CanonPath::unchecked_t(), _path.path)
-        };
+        return SourcePath(
+            ref(_path.accessor->shared_from_this()),
+            CanonPath(CanonPath::unchecked_t(), _path.path));
     }
 
     std::string_view string_view() const
