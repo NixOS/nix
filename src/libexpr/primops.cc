@@ -15,6 +15,7 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "fs-input-accessor.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <boost/regex.hpp>
@@ -90,8 +91,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         for (auto & [outputName, outputPath] : outputs) {
             /* Add the output of this derivations to the allowed
                paths. */
-            if (allowedPaths) {
-                allowPath(outputPath);
+            if (rootFS->hasAccessControl()) {
+                allowPath(store->toRealPath(outputPath));
             }
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
@@ -110,27 +111,19 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     return res;
 }
 
-struct RealisePathFlags {
-    // Whether to check that the path is allowed in pure eval mode
-    bool checkForPureEval = true;
-};
-
-static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, const RealisePathFlags flags = {})
+static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v)
 {
     NixStringContext context;
 
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        if (!context.empty()) {
+        if (!context.empty() && path.accessor == state.rootFS) {
             auto rewrites = state.realiseContext(context);
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
             return {path.accessor, CanonPath(realPath)};
-        }
-
-        return flags.checkForPureEval
-            ? state.checkSourcePath(path)
-            : path;
+        } else
+            return path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -1493,7 +1486,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
         }));
 
     NixStringContext context;
-    auto path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'")).path;
+    auto path = state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'").path;
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -1535,12 +1528,7 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
 {
     auto & arg = *args[0];
 
-    /* We don’t check the path right now, because we don’t want to
-       throw if the path isn’t allowed, but just return false (and we
-       can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `arg` tries to
-       access an unauthorized path). */
-    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
+    auto path = realisePath(state, pos, arg);
 
     /* SourcePath doesn't know about trailing slash. */
     auto mustBeDir = arg.type() == nString
@@ -1548,14 +1536,9 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
             || arg.string_view().ends_with("/."));
 
     try {
-        auto checked = state.checkSourcePath(path);
-        auto st = checked.maybeLstat();
+        auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);
-    } catch (SysError & e) {
-        /* Don't give away info from errors while canonicalising
-           ‘path’ in restricted mode. */
-        v.mkBool(false);
     } catch (RestrictedPathError & e) {
         v.mkBool(false);
     }
@@ -1699,7 +1682,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     auto path = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.findFile");
 
-    v.mkPath(state.checkSourcePath(state.findFile(searchPath, path, pos)));
+    v.mkPath(state.findFile(searchPath, path, pos));
 }
 
 static RegisterPrimOp primop_findFile(PrimOp {
@@ -2178,11 +2161,35 @@ static RegisterPrimOp primop_toFile({
     .fun = prim_toFile,
 });
 
+bool EvalState::callPathFilter(
+    Value * filterFun,
+    const SourcePath & path,
+    std::string_view pathArg,
+    PosIdx pos)
+{
+    auto st = path.lstat();
+
+    /* Call the filter function.  The first argument is the path, the
+       second is a string indicating the type of the file. */
+    Value arg1;
+    arg1.mkString(pathArg);
+
+    Value arg2;
+    // assert that type is not "unknown"
+    arg2.mkString(fileTypeToString(st.type));
+
+    Value * args []{&arg1, &arg2};
+    Value res;
+    callFunction(*filterFun, 2, args, res, pos);
+
+    return forceBool(res, pos, "while evaluating the return value of the path filter function");
+}
+
 static void addPath(
     EvalState & state,
     const PosIdx pos,
     std::string_view name,
-    Path path,
+    SourcePath path,
     Value * filterFun,
     FileIngestionMethod method,
     const std::optional<Hash> expectedHash,
@@ -2190,48 +2197,29 @@ static void addPath(
     const NixStringContext & context)
 {
     try {
-        // FIXME: handle CA derivation outputs (where path needs to
-        // be rewritten to the actual output).
-        auto rewrites = state.realiseContext(context);
-        path = state.toRealPath(rewriteStrings(path, rewrites), context);
-
         StorePathSet refs;
 
-        if (state.store->isInStore(path)) {
+        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
+            // FIXME: handle CA derivation outputs (where path needs to
+            // be rewritten to the actual output).
+            auto rewrites = state.realiseContext(context);
+            path = {state.rootFS, CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context))};
+
             try {
-                auto [storePath, subPath] = state.store->toStorePath(path);
+                auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
                 // FIXME: we should scanForReferences on the path before adding it
                 refs = state.store->queryPathInfo(storePath)->references;
-                path = state.store->toRealPath(storePath) + subPath;
+                path = {state.rootFS, CanonPath(state.store->toRealPath(storePath) + subPath)};
             } catch (Error &) { // FIXME: should be InvalidPathError
             }
         }
 
-        path = evalSettings.pureEval && expectedHash
-            ? path
-            : state.checkSourcePath(state.rootPath(CanonPath(path))).path.abs();
-
-        PathFilter filter = filterFun ? ([&](const Path & path) {
-            auto st = lstat(path);
-
-            /* Call the filter function.  The first argument is the path,
-               the second is a string indicating the type of the file. */
-            Value arg1;
-            arg1.mkString(path);
-
-            Value arg2;
-            arg2.mkString(
-                S_ISREG(st.st_mode) ? "regular" :
-                S_ISDIR(st.st_mode) ? "directory" :
-                S_ISLNK(st.st_mode) ? "symlink" :
-                "unknown" /* not supported, will fail! */);
-
-            Value * args []{&arg1, &arg2};
-            Value res;
-            state.callFunction(*filterFun, 2, args, res, pos);
-
-            return state.forceBool(res, pos, "while evaluating the return value of the path filter function");
-        }) : defaultPathFilter;
+        std::unique_ptr<PathFilter> filter;
+        if (filterFun)
+            filter = std::make_unique<PathFilter>([&](const Path & p) {
+                auto p2 = CanonPath(p);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
+            });
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
@@ -2242,7 +2230,7 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, method, &filter, state.repair);
+            auto dstPath = path.fetchToStore(state.store, name, method, filter.get(), state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
@@ -2261,7 +2249,8 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
     auto path = state.coerceToPath(pos, *args[1], context,
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
-    addPath(state, pos, path.baseName(), path.path.abs(), args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+
+    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2356,7 +2345,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     if (name.empty())
         name = path->baseName();
 
-    addPath(state, pos, name, path->path.abs(), filterFun, method, expectedHash, v, context);
+    addPath(state, pos, name, *path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({

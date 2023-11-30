@@ -783,7 +783,7 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0)
+std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = searchPathResolved.find(value);
@@ -800,7 +800,6 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
             });
-            res = std::nullopt;
         }
     }
 
@@ -814,6 +813,20 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
 
     else {
         auto path = absPath(value);
+
+        /* Allow access to paths in the search path. */
+        if (initAccessControl) {
+            allowPath(path);
+            if (store->isInStore(path)) {
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    for (auto & p : closure)
+                        allowPath(p);
+                } catch (InvalidPath &) { }
+            }
+        }
+
         if (pathExists(path))
             res = { path };
         else {
@@ -829,7 +842,7 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
     else
         debug("failed to resolve search path element '%s'", value);
 
-    searchPathResolved[value] = res;
+    searchPathResolved.emplace(value, res);
     return res;
 }
 
