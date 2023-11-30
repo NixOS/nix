@@ -14,6 +14,7 @@
 #include "profiles.hh"
 #include "print.hh"
 #include "fs-input-accessor.hh"
+#include "filtering-input-accessor.hh"
 #include "memory-input-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
@@ -510,17 +511,15 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
-        makeFSInputAccessor(
-            CanonPath::root,
-            evalSettings.restrictEval || evalSettings.pureEval
-            ? std::optional<std::set<CanonPath>>(std::set<CanonPath>())
-            : std::nullopt,
+        evalSettings.restrictEval || evalSettings.pureEval
+        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(CanonPath::root), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
+        : makeFSInputAccessor(CanonPath::root))
     , corepkgsFS(makeMemoryInputAccessor())
     , internalFS(makeMemoryInputAccessor())
     , derivationInternal{corepkgsFS->addFile(
@@ -563,7 +562,7 @@ EvalState::EvalState(
     }
 
     /* Allow access to all paths in the search path. */
-    if (rootFS->hasAccessControl())
+    if (rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
         for (auto & i : searchPath.elements)
             resolveSearchPathPath(i.path, true);
 
@@ -583,12 +582,14 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    rootFS->allowPath(CanonPath(path));
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    rootFS->allowPath(CanonPath(store->toRealPath(storePath)));
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(store->toRealPath(storePath)));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
@@ -617,12 +618,14 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        rootFS->checkAllowed(CanonPath(uri));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        rootFS->checkAllowed(CanonPath(uri.substr(7)));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri.substr(7)));
         return;
     }
 
