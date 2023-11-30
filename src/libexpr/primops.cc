@@ -2353,8 +2353,6 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
 
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to 'builtins.path'");
 
-    state.forceAttrs(*args[0], pos, "while evaluating the argument passed to 'builtins.path'");
-
     for (auto & attr : *args[0]->attrs) {
         auto n = state.symbols[attr.name];
         if (n == "path")
