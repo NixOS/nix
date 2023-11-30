@@ -91,9 +91,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         for (auto & [outputName, outputPath] : outputs) {
             /* Add the output of this derivations to the allowed
                paths. */
-            if (rootFS->hasAccessControl()) {
-                allowPath(store->toRealPath(outputPath));
-            }
+            allowPath(store->toRealPath(outputPath));
+
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                 res.insert_or_assign(
