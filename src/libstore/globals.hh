@@ -788,10 +788,16 @@ public:
     Setting<unsigned int> ttlNegativeNarInfoCache{
         this, 3600, "narinfo-cache-negative-ttl",
         R"(
-          The TTL in seconds for negative lookups. If a store path is queried
-          from a substituter but was not found, there will be a negative
-          lookup cached in the local disk cache database for the specified
-          duration.
+          The TTL in seconds for negative lookups.
+          If a store path is queried from a [substituter](#conf-substituters) but was not found, there will be a negative lookup cached in the local disk cache database for the specified duration.
+
+          Set to `0` to force updating the lookup cache.
+
+          To wipe the lookup cache completely:
+
+          ```shell-session
+          $ rm $HOME/.cache/nix/binary-cache-v*.sqlite*
+          ```
         )"};
 
     Setting<unsigned int> ttlPositiveNarInfoCache{
