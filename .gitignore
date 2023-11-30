@@ -54,7 +54,7 @@ perl/Makefile.config
 
 /src/nix/nix
 
-/src/nix/doc
+/src/nix/generated-doc
 
 # /src/nix-env/
 /src/nix-env/nix-env
