@@ -97,9 +97,16 @@ $(d)/nix-profiles.5: $(d)/src/command-ref/files/profiles.md
 	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
-$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/SUMMARY-rl-next.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/SUMMARY-rl-next.md $(d)/src/store/types $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
 	@cp $< $@
 	@$(call process-includes,$@,$@)
+
+$(d)/src/store/types: $(d)/nix.json $(d)/utils.nix $(d)/generate-store-info.nix  $(d)/generate-store-types.nix $(d)/src/store/types/index.md.in $(doc_nix)
+	@# FIXME: build out of tree!
+	@rm -rf $@.tmp
+	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-store-types.nix (builtins.fromJSON (builtins.readFile $<)).stores'
+	@# do not destroy existing contents
+	@mv $@.tmp/* $@/
 
 $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage.nix $(d)/generate-settings.nix $(d)/generate-store-info.nix $(doc_nix)
 	@rm -rf $@ $@.tmp
@@ -200,7 +207,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 # `@docroot@` is to be preserved for documenting the mechanism
 # FIXME: maybe contributing guides should live right next to the code
 # instead of in the manual
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md $(d)/src/release-notes/rl-next.md
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/store/types $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md $(d)/src/release-notes/rl-next.md
 	$(trace-gen) \
 		tmp="$$(mktemp -d)"; \
 		cp -r doc/manual "$$tmp"; \

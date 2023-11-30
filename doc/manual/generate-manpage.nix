@@ -51,7 +51,7 @@ let
 
         ${maybeSubcommands}
 
-        ${maybeStoreDocs}
+        ${maybeProse}
 
         ${maybeOptions}
       '';
@@ -91,25 +91,55 @@ let
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
 
-      # FIXME: this is a hack.
-      # store parameters should not be part of command documentation to begin
-      # with, but instead be rendered on separate pages.
-      maybeStoreDocs = optionalString (details ? doc)
-        (replaceStrings [ "@stores@" ] [ (showStoreDocs inlineHTML commandInfo.stores) ] details.doc);
+      maybeProse =
+        # FIXME: this is a horrible hack to keep `nix help-stores` working.
+        # the correct answer to this is to remove that command and replace it
+        # by statically generated manpages or the output of something like `nix
+        # store info <store type>`.
+        let
+          help-stores = ''
+            ${index}
 
-      maybeOptions = let
-        allVisibleOptions = filterAttrs
-          (_: o: ! o.hiddenCategory)
-          (details.flags // toplevel.flags);
-      in optionalString (allVisibleOptions != {}) ''
-        # Options
+            ${allStores}
+          '';
+          index = replaceStrings
+            [ "@store-types@" ] [ storesOverview ]
+            details.doc;
+          storesOverview =
+            let
+              showEntry = store:
+                "- [${store.name}](#${store.slug})";
+            in
+            concatStringsSep "\n" (map showEntry storesList) + "\n";
+          allStores = concatStringsSep "\n" (attrValues storePages);
+          storePages = listToAttrs
+            (map (s: { name = s.filename; value = s.page; }) storesList);
+          storesList = showStoreDocs {
+            storeInfo = commandInfo.stores;
+            inherit inlineHTML;
+          };
+        in
+        optionalString (details ? doc) (
+          if match "@store-types@" details.doc != [ ]
+          then help-stores
+          else details.doc
+        );
 
-        ${showOptions inlineHTML allVisibleOptions}
+      maybeOptions =
+        let
+          allVisibleOptions = filterAttrs
+            (_: o: ! o.hiddenCategory)
+            (details.flags // toplevel.flags);
+        in
+        optionalString (allVisibleOptions != { }) ''
+          # Options
 
-        > **Note**
-        >
-        > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
-      '';
+          ${showOptions inlineHTML allVisibleOptions}
+
+          > **Note**
+          >
+          > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
+        '';
 
       showOptions = inlineHTML: allOptions:
         let

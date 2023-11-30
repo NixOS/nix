@@ -426,7 +426,7 @@ This leads to the following guidelines:
 ### Examples
 
 
-This is bad, because all keys must be assumed to be store implementations:
+This is bad, because all keys must be assumed to be store types:
 
 ```json
 {

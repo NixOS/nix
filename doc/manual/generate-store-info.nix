@@ -1,14 +1,20 @@
 let
-  inherit (builtins) attrValues mapAttrs;
-  inherit (import <nix/utils.nix>) concatStrings optionalString squash;
+  inherit (builtins) attrNames listToAttrs concatStringsSep readFile replaceStrings;
+  inherit (import <nix/utils.nix>) optionalString filterAttrs trim squash toLower unique indent;
   showSettings = import <nix/generate-settings.nix>;
 in
 
-inlineHTML: storesInfo:
+{
+  # data structure describing all stores and their parameters
+  storeInfo,
+  # whether to add inline HTML tags
+  # `lowdown` does not eat those for one of the output modes
+  inlineHTML,
+}:
 
 let
 
-  showStore = name: { settings, doc, experimentalFeature }:
+  showStore = { name, slug }: { settings, doc, experimentalFeature }:
     let
       result = squash ''
         # ${name}
@@ -21,9 +27,6 @@ let
 
         ${showSettings { prefix = "store-${slug}"; inherit inlineHTML; } settings}
       '';
-
-      # markdown doesn't like spaces in URLs
-      slug = builtins.replaceStrings [ " " ] [ "-" ] name;
 
       experimentalFeatureNote = optionalString (experimentalFeature != null) ''
         > **Warning**
@@ -42,4 +45,13 @@ let
       '';
     in result;
 
-in concatStrings (attrValues (mapAttrs showStore storesInfo))
+  storesList = map
+    (name: rec {
+      inherit name;
+      slug = replaceStrings [ " " ] [ "-" ] (toLower name);
+      filename = "${slug}.md";
+      page = showStore { inherit name slug; } storeInfo.${name};
+    })
+    (attrNames storeInfo);
+
+in storesList

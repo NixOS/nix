@@ -1,4 +1,6 @@
-Nix supports different types of stores. These are described below.
+Nix supports different types of stores:
+
+@store-types@
 
 ## Store URL format
 
@@ -39,4 +41,3 @@ store as follows:
 
 * Otherwise, use the [local store](#local-store) `/nix/store`.
 
-@stores@
