@@ -1,9 +1,29 @@
 let
   inherit (builtins)
-    attrNames attrValues fromJSON listToAttrs mapAttrs groupBy
-    concatStringsSep concatMap length lessThan replaceStrings sort;
-  inherit (import <nix/utils.nix>) attrsToList concatStrings optionalString filterAttrs trim squash unique;
-  showStoreDocs = import ./generate-store-info.nix;
+    attrNames
+    attrValues
+    concatMap
+    concatStringsSep
+    fromJSON
+    groupBy
+    length
+    lessThan
+    listToAttrs
+    mapAttrs
+    match
+    replaceStrings
+    sort
+    ;
+  inherit (import <nix/utils.nix>)
+    attrsToList
+    concatStrings
+    filterAttrs
+    optionalString
+    squash
+    trim
+    unique
+    ;
+  showStoreDocs = import <nix/generate-store-info.nix>;
 in
 
 inlineHTML: commandDump:
@@ -97,7 +117,7 @@ let
             ${optionalString (cat != "") "## ${cat}"}
 
             ${concatStringsSep "\n" (attrValues (mapAttrs showOption opts))}
-            '';
+          '';
           showOption = name: option:
             let
               result = trim ''
