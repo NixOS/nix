@@ -1,6 +1,6 @@
 let
   inherit (builtins) concatStringsSep attrValues mapAttrs;
-  inherit (import ./utils.nix) optionalString squash;
+  inherit (import <nix/utils.nix>) optionalString squash;
 in
 
 builtinsInfo:
