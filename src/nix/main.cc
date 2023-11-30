@@ -297,7 +297,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "help-stores.md"
+          #include "generated-doc/help-stores.md"
           ;
     }
 

@@ -1,5 +1,3 @@
-R"(
-
 Nix supports different types of stores. These are described below.
 
 ## Store URL format
@@ -42,5 +40,3 @@ store as follows:
 * Otherwise, use the [local store](#local-store) `/nix/store`.
 
 @stores@
-
-)"
