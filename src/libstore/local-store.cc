@@ -861,8 +861,6 @@ uint64_t LocalStore::addValidPath(State & state,
         throw Error("cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
-    syncPathPermissions(info);
-
     state.stmts->RegisterValidPath.use()
         (printStorePath(info.path))
         (info.narHash.to_string(Base16, true))
@@ -1174,19 +1172,21 @@ void LocalStore::syncPathPermissions(const ValidPathInfo & info)
     }
 }
 
-void LocalStore::registerValidPath(const ValidPathInfo & info)
+void LocalStore::registerValidPath(const ValidPathInfo & info, bool syncPermissions)
 {
-    registerValidPaths({{info.path, info}});
+    registerValidPaths({{info.path, info}}, syncPermissions);
 }
 
 
-void LocalStore::registerValidPaths(const ValidPathInfos & infos)
+void LocalStore::registerValidPaths(const ValidPathInfos & infos, bool syncPermissions)
 {
     /* SQLite will fsync by default, but the new valid paths may not
        be fsync-ed.  So some may want to fsync them before registering
        the validity, at the expense of some speed of the path
        registering operation. */
     if (settings.syncBeforeRegistering) sync();
+
+    std::vector<StorePath> sortedPaths;
 
     retrySQLite<void>([&]() {
         auto state(_state.lock());
@@ -1222,7 +1222,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        topoSort(paths,
+        sortedPaths = topoSort(paths,
             {[&](const StorePath & path) {
                 auto i = infos.find(path);
                 return i == infos.end() ? StorePathSet() : i->second.references;
@@ -1236,11 +1236,54 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 
         txn.commit();
     });
+
+    std::reverse(sortedPaths.begin(), sortedPaths.end());
+
+    if (syncPermissions)
+        for (auto path : sortedPaths)
+            syncPathPermissions(infos.at(path));
 }
 
 void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::AccessStatus & status)
 {
     experimentalFeatureSettings.require(Xp::ACLs);
+
+    if (isInStore(path)) {
+        StorePath storePath(baseNameOf(path));
+
+        // FIXME(acls): cache is broken when called from registerValidPaths
+
+        std::promise<ref<const ValidPathInfo>> promise;
+
+        queryPathInfoUncached(storePath,
+            {[&](std::future<std::shared_ptr<const ValidPathInfo>> result) {
+                try {
+                    promise.set_value(ref(result.get()));
+                } catch (...) {
+                    promise.set_exception(std::current_exception());
+                }
+            }});
+
+        auto info = promise.get_future().get();
+
+        for (auto reference : info->references) {
+            if (reference == storePath) continue;
+            auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
+            if (!otherStatus.isProtected) continue;
+            if (!status.isProtected)
+                throw AccessDenied("can not make %s non-protected because it references a protected path %s", path, printStorePath(reference));
+            std::vector<AccessControlEntity> difference;
+            std::set_difference(status.entities.begin(), status.entities.end(), otherStatus.entities.begin(), otherStatus.entities.end(), difference.begin());
+
+            if (! difference.empty()) {
+                std::string entities;
+                for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
+                throw AccessDenied("can not allow %s access to %s because it references path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(reference));
+            }
+        }
+    }
+
+    debug("setting access status %s on %s", status.json().dump(), path);
 
     using namespace ACL;
 

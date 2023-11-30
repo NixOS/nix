@@ -2763,7 +2763,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
            isn't statically known so that we can safely unlock the path before
            the next iteration */
         if (newInfo.ca)
-            localStore.registerValidPaths({{newInfo.path, newInfo}});
+            localStore.registerValidPaths({{newInfo.path, newInfo}}, false);
 
         infos.emplace(outputName, std::move(newInfo));
     }

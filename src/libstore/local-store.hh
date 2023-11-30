@@ -257,9 +257,9 @@ public:
      * register the hash of the file system contents of the path.  The
      * hash must be a SHA-256 hash.
      */
-    void registerValidPath(const ValidPathInfo & info);
+    void registerValidPath(const ValidPathInfo & info, bool syncPermissions = true);
 
-    void registerValidPaths(const ValidPathInfos & infos);
+    void registerValidPaths(const ValidPathInfos & infos, bool syncPermissions = true);
 
     unsigned int getProtocol() override;
 

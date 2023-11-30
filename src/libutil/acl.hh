@@ -65,6 +65,8 @@ struct Group
  */
 typedef std::variant<User, Group> Tag;
 
+std::string printTag(Tag t);
+
 namespace Native {
 #ifdef __APPLE__
 

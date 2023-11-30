@@ -355,6 +355,19 @@ void Permissions::allowExecute(bool allow)
         erase(perms.begin(), perms.end());
 }
 
+std::string printTag(Tag tag)
+{
+    return std::visit(overloaded {
+        [&](User u){
+            return fmt("user with uid %d", u.uid);
+        },
+        [&](Group g){
+            return fmt("group with gid %d", g.gid);
+        },
+    }, tag);
+}
+
+
 AccessControlList::AccessControlList(std::filesystem::path p)
 {
     auto native = Native::AccessControlList(p);
@@ -384,6 +397,7 @@ void AccessControlList::set(std::filesystem::path p)
     native[Other {}] = current[Other {}];
     if (!empty())
         native[Mask {}] = {Permission::Read, Permission::Write, Permission::Execute};
+    if (current == native) return;
 #endif
     native.set(p);
 }

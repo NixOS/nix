@@ -52,7 +52,7 @@ testRepl () {
 # Simple test, try building a drv
 testRepl
 # Same thing (kind-of), but with a remote store.
-testRepl --store "$TEST_ROOT/store?real=$NIX_STORE_DIR"
+testRepl --store "$TEST_ROOT/repl-store?real=$NIX_STORE_DIR"
 
 testReplResponse () {
     local commands="$1"; shift
