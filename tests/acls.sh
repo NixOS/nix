@@ -1,5 +1,9 @@
 source common.sh
 
+USER=$(whoami)
+
+setfacl -m "u:$USER:r" example || skipTest "ACLs not supported"
+
 # Adds the "dummy" file to the nix store and check that we can access it
 EXAMPLE_PATH=$(nix store add-path dummy)
 nix store access info "$EXAMPLE_PATH" --json | grep '"protected":false'
@@ -11,8 +15,6 @@ nix store access protect "$EXAMPLE_PATH"
 ! cat "$EXAMPLE_PATH"
 nix store access info "$EXAMPLE_PATH" --json | grep '"protected":true'
 nix store access info "$EXAMPLE_PATH" --json | grep '"users":\[\]'
-
-USER=$(whoami)
 
 # Grant permission and check that we can access the file
 nix store access grant "$EXAMPLE_PATH" --user "$USER"

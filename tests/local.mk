@@ -137,7 +137,8 @@ nix_tests = \
   path-from-hash-part.sh \
   test-libstoreconsumer.sh \
   toString-path.sh \
-  read-only-store.sh
+  read-only-store.sh \
+  acls.sh
 
 acls_test = \
   acls.sh \
