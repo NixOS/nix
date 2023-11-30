@@ -40,11 +40,8 @@ struct CmdStoreAccessInfo : StorePathCommand, MixJSON
             }, entity);
         }
         if (json) {
-            nlohmann::json j;
+            nlohmann::json j = status.json();
             j["exists"] = isValid;
-            j["protected"] = status.isProtected;
-            j["users"] = users;
-            j["groups"] = groups;
             logger->cout(j.dump());
         }
         else {
