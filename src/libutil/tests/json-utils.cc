@@ -20,16 +20,17 @@ TEST(to_json, optionalInt) {
 
 TEST(to_json, vectorOfOptionalInts) {
     std::vector<std::optional<int>> vals = {
-      std::make_optional(420)
-    , std::nullopt
+        std::make_optional(420),
+        std::nullopt,
     };
     ASSERT_EQ(nlohmann::json(vals), nlohmann::json::parse("[420,null]"));
 }
 
 TEST(to_json, optionalVectorOfInts) {
-    std::optional<std::vector<int>> val = std::make_optional(
-        std::vector<int> { -420, 420 }
-        );
+    std::optional<std::vector<int>> val = std::make_optional(std::vector<int> {
+        -420,
+        420,
+    });
     ASSERT_EQ(nlohmann::json(val), nlohmann::json::parse("[-420,420]"));
     val = std::nullopt;
     ASSERT_EQ(nlohmann::json(val), nlohmann::json(nullptr));
