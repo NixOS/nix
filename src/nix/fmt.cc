@@ -49,7 +49,7 @@ struct CmdFmt : SourceExprCommand {
             }
         }
 
-        runProgramInStore(store, app.program, programArgs);
+        runProgramInStore(store, false, app.program, programArgs);
     };
 };
 
