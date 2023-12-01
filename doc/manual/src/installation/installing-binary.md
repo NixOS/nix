@@ -6,8 +6,7 @@ To install the latest version Nix, run the following command:
 $ curl -L https://nixos.org/nix/install | sh
 ```
 
-This will run the installer interactively, that will explain what it is doing.
-It will perform the default type of installation for your platform:
+This performs the default type of installation for your platform:
 
 - [Multi-user](#multi-user-installation):
   - Linux with systemd and without SELinux
