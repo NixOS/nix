@@ -34,6 +34,13 @@ nlohmann::json NixMultiCommand::toJSON()
     return MultiCommand::toJSON();
 }
 
+void NixMultiCommand::run()
+{
+    if (!command)
+        throw UsageError("'nix %s' requires a sub-command.", commandName);
+    command->second->run();
+}
+
 StoreCommand::StoreCommand()
 {
 }
