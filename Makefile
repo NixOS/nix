@@ -64,4 +64,4 @@ $(eval $(call include-sub-makefile, doc/manual/local.mk))
 $(eval $(call include-sub-makefile, doc/internal-api/local.mk))
 endif
 
-GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++2a -I src
+GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src
