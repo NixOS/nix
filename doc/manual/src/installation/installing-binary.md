@@ -89,7 +89,7 @@ You can also download a binary tarball that contains Nix and all its dependencie
 > $ export SYSTEM=x86_64-linux
 > $ curl -LO https://releases.nixos.org/nix/nix-$VERSION/nix-$VERSION-$SYSTEM.tar.xz
 > $ tar xfj nix-$VERSION-$SYSTEM.tar.xz
-> $ cd nix-$VERSION-$SYSTEM-darwin
+> $ cd nix-$VERSION-$SYSTEM
 > $ ./install
 > $ popd
 > ```
