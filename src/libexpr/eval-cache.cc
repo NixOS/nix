@@ -22,7 +22,7 @@ struct AttrDb
 {
     std::atomic_bool failed{false};
 
-    const Store & cfg;
+    const StoreDirConfig & cfg;
 
     struct State
     {
@@ -39,7 +39,7 @@ struct AttrDb
     SymbolTable & symbols;
 
     AttrDb(
-        const Store & cfg,
+        const StoreDirConfig & cfg,
         const Hash & fingerprint,
         SymbolTable & symbols)
         : cfg(cfg)
@@ -323,7 +323,7 @@ struct AttrDb
 };
 
 static std::shared_ptr<AttrDb> makeAttrDb(
-    const Store & cfg,
+    const StoreDirConfig & cfg,
     const Hash & fingerprint,
     SymbolTable & symbols)
 {

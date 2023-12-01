@@ -1,6 +1,8 @@
 #include "crypto.hh"
 #include "source-accessor.hh"
 #include "globals.hh"
+#include "derived-path.hh"
+#include "realisation.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "util.hh"
@@ -25,13 +27,13 @@ using json = nlohmann::json;
 namespace nix {
 
 
-bool Store::isInStore(PathView path) const
+bool StoreDirConfig::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
 
-std::pair<StorePath, Path> Store::toStorePath(PathView path) const
+std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
@@ -145,7 +147,7 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 */
 
 
-StorePath Store::makeStorePath(std::string_view type,
+StorePath StoreDirConfig::makeStorePath(std::string_view type,
     std::string_view hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
@@ -156,14 +158,14 @@ StorePath Store::makeStorePath(std::string_view type,
 }
 
 
-StorePath Store::makeStorePath(std::string_view type,
+StorePath StoreDirConfig::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
     return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
 }
 
 
-StorePath Store::makeOutputPath(std::string_view id,
+StorePath StoreDirConfig::makeOutputPath(std::string_view id,
     const Hash & hash, std::string_view name) const
 {
     return makeStorePath("output:" + std::string { id }, hash, outputPathName(name, id));
@@ -174,7 +176,7 @@ StorePath Store::makeOutputPath(std::string_view id,
    hacky, but we can't put them in, say, <s2> (per the grammar above)
    since that would be ambiguous. */
 static std::string makeType(
-    const Store & store,
+    const StoreDirConfig & store,
     std::string && type,
     const StoreReferences & references)
 {
@@ -187,7 +189,7 @@ static std::string makeType(
 }
 
 
-StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
+StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
     if (info.hash.type == htSHA256 && info.method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
@@ -203,7 +205,7 @@ StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInf
 }
 
 
-StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) const
+StorePath StoreDirConfig::makeTextPath(std::string_view name, const TextInfo & info) const
 {
     assert(info.hash.type == htSHA256);
     return makeStorePath(
@@ -216,7 +218,7 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 }
 
 
-StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
+StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
 {
     // New template
     return std::visit(overloaded {
@@ -230,7 +232,7 @@ StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentA
 }
 
 
-std::pair<StorePath, Hash> Store::computeStorePathFromDump(
+std::pair<StorePath, Hash> StoreDirConfig::computeStorePathFromDump(
     Source & dump,
     std::string_view name,
     FileIngestionMethod method,
@@ -249,7 +251,7 @@ std::pair<StorePath, Hash> Store::computeStorePathFromDump(
 }
 
 
-StorePath Store::computeStorePathForText(
+StorePath StoreDirConfig::computeStorePathForText(
     std::string_view name,
     std::string_view s,
     const StorePathSet & references) const
@@ -1227,7 +1229,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
 }
 
 
-std::string Store::showPaths(const StorePathSet & paths)
+std::string StoreDirConfig::showPaths(const StorePathSet & paths)
 {
     std::string s;
     for (auto & i : paths) {
