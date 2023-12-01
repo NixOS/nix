@@ -39,7 +39,7 @@ $ VERSION=2.19.2 curl -L https://releases.nixos.org/nix/nix-$VERSION/install | s
 
 # Multi User Installation
 
-The multi-user Nix installation creates system users, and a system service for the Nix daemon.
+The multi-user Nix installation creates system users and a system service for the Nix daemon.
 
 Supported systems:
 
