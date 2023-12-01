@@ -479,60 +479,25 @@
         dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
         # Line coverage analysis.
-        coverage =
-          with nixpkgsFor.x86_64-linux.native;
-          with commonDeps { inherit pkgs; };
-
-          releaseTools.coverageAnalysis {
-            name = "nix-coverage-${version}";
-
-            src = nixSrc;
-
-            configureFlags = testConfigureFlags;
-
-            enableParallelBuilding = true;
-
-            nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
-
-            dontInstall = false;
-
-            doInstallCheck = true;
-            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
-
-            lcovFilter = [ "*/boost/*" "*-tab.*" ];
-
-            hardeningDisable = ["fortify"];
-
-            NIX_CFLAGS_COMPILE = "-DCOVERAGE=1";
-          };
+        coverage = nixpkgsFor.x86_64-linux.native.callPackage ./coverage.nix {};
 
         # API docs for Nix's unstable internal C++ interfaces.
-        internal-api-docs =
-          with nixpkgsFor.x86_64-linux.native;
-          with commonDeps { inherit pkgs; };
+        internal-api-docs = nixpkgsFor.x86_64-linux.native.nix.overrideAttrs (old: {
+          pname = "nix-internal-api-docs";
 
-          stdenv.mkDerivation {
-            pname = "nix-internal-api-docs";
-            inherit version;
+          configureFlags = old.configureFlags ++ [ "--enable-internal-api-docs" ];
+          nativeBuildInputs = old.nativeBuildInputs ++ [ nixpkgsFor.x86_64-linux.native.doxygen ];
 
-            src = nixSrc;
+          dontBuild = true;
+          doCheck = false;
 
-            configureFlags = testConfigureFlags ++ internalApiDocsConfigureFlags;
+          installTargets = [ "internal-api-html" ];
 
-            nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps ++ propagatedDeps
-              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
-
-            dontBuild = true;
-
-            installTargets = [ "internal-api-html" ];
-
-            postInstall = ''
-              mkdir -p $out/nix-support
-              echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> $out/nix-support/hydra-build-products
-            '';
-          };
+          postInstall = ''
+            mkdir -p $out/nix-support
+            echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> $out/nix-support/hydra-build-products
+          '';
+        });
 
         # System tests.
         tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
@@ -540,7 +505,9 @@
           # Make sure that nix-env still produces the exact same result
           # on a particular version of Nixpkgs.
           evalNixpkgs =
-            with nixpkgsFor.x86_64-linux.native;
+            let
+              inherit (nixpkgsFor.x86_64-linux.native) runCommand nix nixpkgs-regression;
+            in
             runCommand "eval-nixos" { buildInputs = [ nix ]; }
               ''
                 type -p nix-env
@@ -627,47 +594,17 @@
           stdenvs)));
 
       devShells = let
-        makeShell = pkgs: stdenv:
-          let
-            canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
-          in
-          with commonDeps { inherit pkgs; };
-          stdenv.mkDerivation {
-            name = "nix";
+        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; }).overrideAttrs (_: {
+          installFlags = "sysconfdir=$(out)/etc";
+          shellHook = ''
+            PATH=$prefix/bin:$PATH
+            unset PYTHONPATH
+            export MANPATH=$out/share/man:$MANPATH
 
-            outputs = [ "out" "dev" "doc" ]
-              ++ lib.optional (stdenv.hostPlatform != stdenv.buildPlatform) "check";
-
-            nativeBuildInputs = nativeBuildDeps
-              ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
-              ++ lib.optional
-                (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform)
-                pkgs.buildPackages.clang-tools
-              # We want changelog-d in the shell even if the current build doesn't need it
-              ++ lib.optional (officialRelease || ! buildUnreleasedNotes) changelog-d
-              ;
-
-            buildInputs = buildDeps ++ propagatedDeps
-              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
-
-            configureFlags = configureFlags
-              ++ testConfigureFlags ++ internalApiDocsConfigureFlags
-              ++ lib.optional (!canRunInstalled) "--disable-doc-gen";
-
-            enableParallelBuilding = true;
-
-            installFlags = "sysconfdir=$(out)/etc";
-
-            shellHook =
-              ''
-                PATH=$prefix/bin:$PATH
-                unset PYTHONPATH
-                export MANPATH=$out/share/man:$MANPATH
-
-                # Make bash completion work.
-                XDG_DATA_DIRS+=:$out/share
-              '';
-          };
+            # Make bash completion work.
+            XDG_DATA_DIRS+=:$out/share
+          '';
+        });
         in
         forAllSystems (system:
           let

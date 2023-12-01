@@ -41,16 +41,12 @@
 }:
 
 let
-
   version = lib.fileContents ./.version + versionSuffix;
-
-  inherit (stdenv.hostPlatform) isStatic;
-
   canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
 in
 
 stdenv.mkDerivation (finalAttrs: {
-  name = "nix-${version}";
+  pname = "nix";
   inherit version;
 
   src =
@@ -103,17 +99,12 @@ stdenv.mkDerivation (finalAttrs: {
     bison
     flex
     (lib.getBin lowdown)
+    jq # Also for custom mdBook preprocessor.
     mdbook
     mdbook-linkcheck
     autoconf-archive
     autoreconfHook
     pkg-config
-
-    # Tests
-    git
-    mercurial # FIXME: remove? only needed for tests
-    jq # Also for custom mdBook preprocessor.
-    openssh # only needed for tests (ssh-keygen)
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux util-linux
   # Official releases don't have rl-next, so we don't need to compile a changelog
@@ -133,17 +124,27 @@ stdenv.mkDerivation (finalAttrs: {
     sqlite
     xz
   ]
-  ++ lib.optionals stdenv.isLinux [libseccomp]
+  ++ lib.optional stdenv.isLinux libseccomp
   ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
   # There have been issues building these dependencies
-  ++ lib.optionals (stdenv.hostPlatform == stdenv.buildPlatform) (lib.optional (stdenv.isLinux || stdenv.isDarwin)
+  ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
     (aws-sdk-cpp.override {
       apis = ["s3" "transfer"];
       customMemoryManagement = false;
-    }))
-  ++ lib.optionals finalAttrs.doCheck [
+    })
+  ;
+
+  doCheck = true;
+
+  checkInputs = [
     gtest
     rapidcheck
+  ];
+
+  nativeCheckInputs = [
+    git
+    mercurial # FIXME: remove? only needed for tests
+    openssh # only needed for tests (ssh-keygen)
   ];
 
   propagatedBuildInputs = [
@@ -153,51 +154,48 @@ stdenv.mkDerivation (finalAttrs: {
 
   disallowedReferences = [ boost ];
 
-  preConfigure = lib.optionalString (! stdenv.hostPlatform.isStatic)
-    ''
-      # Copy libboost_context so we don't get all of Boost in our closure.
-      # https://github.com/NixOS/nixpkgs/issues/45462
-      mkdir -p $out/lib
-      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
-      rm -f $out/lib/*.a
-      ${lib.optionalString stdenv.hostPlatform.isLinux ''
-        chmod u+w $out/lib/*.so.*
-        patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
-      ''}
-      ${lib.optionalString stdenv.hostPlatform.isDarwin ''
-        for LIB in $out/lib/*.dylib; do
-          chmod u+w $LIB
-          install_name_tool -id $LIB $LIB
-          install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
-        done
-        install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
-      ''}
-    '';
+  preConfigure = lib.optionalString (! stdenv.hostPlatform.isStatic) ''
+    # Copy libboost_context so we don't get all of Boost in our closure.
+    # https://github.com/NixOS/nixpkgs/issues/45462
+    mkdir -p $out/lib
+    cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
+    rm -f $out/lib/*.a
+    ${lib.optionalString stdenv.hostPlatform.isLinux ''
+      chmod u+w $out/lib/*.so.*
+      patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
+    ''}
+    ${lib.optionalString stdenv.hostPlatform.isDarwin ''
+      for LIB in $out/lib/*.dylib; do
+        chmod u+w $LIB
+        install_name_tool -id $LIB $LIB
+        install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
+      done
+      install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
+    ''}
+  '';
 
   configureFlags =
     lib.optionals stdenv.isLinux [
       "--with-boost=${boost}/lib"
       "--with-sandbox-shell=${sh}/bin/busybox"
     ]
-    ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
+    ++ lib.optional (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
       "LDFLAGS=-fuse-ld=gold"
-    ]
     ++ [ "--sysconfdir=/etc" ]
     ++ lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell"
     ++ [ (lib.enableFeature finalAttrs.doCheck "tests") ]
-    ++ lib.optionals finalAttrs.doCheck ([ "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include" ]
-    ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
-      "--enable-install-unit-tests"
-      "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
-      "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
-    ])
+    ++ lib.optionals finalAttrs.doCheck (
+      [ "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include" ]
+      ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+        "--enable-install-unit-tests"
+        "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+        "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
+      ])
     ++ lib.optional (!canRunInstalled) "--disable-doc-gen";
 
   enableParallelBuilding = true;
 
   makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
-
-  doCheck = true;
 
   installFlags = "sysconfdir=$(out)/etc";
 

@@ -1,8 +1,8 @@
 { runCommand
-, version
 , system
-, nix
+, buildPackages
 , cacert
+, nix
 }:
 
 let
@@ -10,6 +10,8 @@ let
   installerClosureInfo = buildPackages.closureInfo {
     rootPaths = [ nix cacert ];
   };
+
+  inherit (nix) version;
 
   env = {
     meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
