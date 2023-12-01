@@ -38,7 +38,7 @@ void checkInfo(const std::string & msg) {
 
 }
 
-struct CmdDoctor : StoreCommand
+struct CmdConfigCheck : StoreCommand
 {
     bool success = true;
 
@@ -152,4 +152,4 @@ struct CmdDoctor : StoreCommand
     }
 };
 
-static auto rCmdDoctor = registerCommand<CmdDoctor>("doctor");
+static auto rCmdConfigCheck = registerCommand2<CmdConfigCheck>({ "config", "check" });
