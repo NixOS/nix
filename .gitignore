@@ -41,14 +41,14 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
-/src/libexpr/tests/libnixexpr-tests
+/tests/unit/libexpr/libnixexpr-tests
 
 # /src/libstore/
 *.gen.*
-/src/libstore/tests/libnixstore-tests
+/tests/unit/libstore/libnixstore-tests
 
 # /src/libutil/
-/src/libutil/tests/libnixutil-tests
+/tests/unit/libutil/libnixutil-tests
 
 /src/nix/nix
 
@@ -79,24 +79,24 @@ perl/Makefile.config
 
 /src/build-remote/build-remote
 
-# /tests/
-/tests/test-tmp
-/tests/common/vars-and-functions.sh
-/tests/result*
-/tests/restricted-innocent
-/tests/shell
-/tests/shell.drv
-/tests/config.nix
-/tests/ca/config.nix
-/tests/dyn-drv/config.nix
-/tests/repl-result-out
-/tests/test-libstoreconsumer/test-libstoreconsumer
+# /tests/functional/
+/tests/functional/test-tmp
+/tests/functional/common/vars-and-functions.sh
+/tests/functional/result*
+/tests/functional/restricted-innocent
+/tests/functional/shell
+/tests/functional/shell.drv
+/tests/functional/config.nix
+/tests/functional/ca/config.nix
+/tests/functional/dyn-drv/config.nix
+/tests/functional/repl-result-out
+/tests/functional/test-libstoreconsumer/test-libstoreconsumer
 
-# /tests/lang/
-/tests/lang/*.out
-/tests/lang/*.out.xml
-/tests/lang/*.err
-/tests/lang/*.ast
+# /tests/functional/lang/
+/tests/functional/lang/*.out
+/tests/functional/lang/*.out.xml
+/tests/functional/lang/*.err
+/tests/functional/lang/*.ast
 
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
