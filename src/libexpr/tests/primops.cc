@@ -814,6 +814,14 @@ namespace nix {
         ASSERT_THAT(*v.listElems()[0], IsStringEq("FOO"));
     }
 
+    TEST_F(PrimOpTest, match5) {
+        // The regex "\\{}" is valid and matches the string "{}".
+        // Caused a regression before when trying to switch from std::regex to boost::regex.
+        // See https://github.com/NixOS/nix/pull/7762#issuecomment-1834303659
+        auto v = eval("builtins.match \"\\\\{}\" \"{}\"");
+        ASSERT_THAT(v, IsListOfSize(0));
+    }
+
     TEST_F(PrimOpTest, attrNames) {
         auto v = eval("builtins.attrNames { x = 1; y = 2; z = 3; a = 2; }");
         ASSERT_THAT(v, IsListOfSize(4));
