@@ -19,7 +19,7 @@ PublicKeys getDefaultPublicKeys()
         try {
             SecretKey secretKey(readFile(secretKeyFile));
             publicKeys.emplace(secretKey.name, secretKey.toPublicKey());
-        } catch (SysError & e) {
+        } catch (SystemError & e) {
             /* Ignore unreadable key files. That's normal in a
                multi-user installation. */
         }

@@ -304,7 +304,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 for (auto pos = savedArgs.begin(); pos != savedArgs.end();pos++)
                     cmdline.push_back(*pos);
             }
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 

@@ -148,7 +148,7 @@ static void main_nix_build(int argc, char * * argv)
                             args.push_back(word);
                 }
             }
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
 
     struct MyArgs : LegacyArgs, MixEvalArgs

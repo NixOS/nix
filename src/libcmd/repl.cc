@@ -254,7 +254,7 @@ void NixRepl::mainLoop()
     rl_readline_name = "nix-repl";
     try {
         createDirs(dirOf(historyFile));
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         logWarning(e.info());
     }
 #ifndef USE_READLINE

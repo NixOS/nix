@@ -124,7 +124,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
                 try {
                     std::string includedContents = readFile(path);
                     applyConfigInner(includedContents, p, parsedContents);
-                } catch (SysError &) {
+                } catch (SystemError &) {
                     // TODO: Do we actually want to ignore this? Or is it better to fail?
                 }
             } else if (!ignoreMissing) {

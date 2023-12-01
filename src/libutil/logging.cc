@@ -116,7 +116,7 @@ void writeToStderr(std::string_view s)
 {
     try {
         writeFull(STDERR_FILENO, s, false);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
            errors to ensure that cleanup code that logs to stderr runs
            to completion if the other side of stderr has been closed

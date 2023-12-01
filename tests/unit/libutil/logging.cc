@@ -73,7 +73,7 @@ namespace nix {
 
     }
 
-    TEST(logEI, picksUpSysErrorExitCode) {
+    TEST(logEI, picksUpSystemErrorExitCode) {
 
         MakeError(TestError, Error);
         ErrorInfo::programName = std::optional("error-unit-test");
@@ -81,12 +81,12 @@ namespace nix {
         try {
             auto x = readFile(-1);
         }
-        catch (SysError &e) {
+        catch (SystemError &e) {
             testing::internal::CaptureStderr();
             logError(e.info());
             auto str = testing::internal::GetCapturedStderr();
 
-            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SysError --- error-unit-test\x1B[0m\nstatting file: \x1B[33;1mBad file descriptor\x1B[0m\n");
+            ASSERT_STREQ(str.c_str(), "\x1B[31;1merror:\x1B[0m\x1B[34;1m --- SystemError --- error-unit-test\x1B[0m\nstatting file: \x1B[33;1mBad file descriptor\x1B[0m\n");
         }
     }
 
