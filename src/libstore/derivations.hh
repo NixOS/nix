@@ -17,7 +17,7 @@
 
 namespace nix {
 
-class Store;
+struct StoreDirConfig;
 
 /* Abstract syntax of derivations. */
 
@@ -55,7 +55,7 @@ struct DerivationOutput
          * @param drvName The name of the derivation this is an output of, without the `.drv`.
          * @param outputName The name of this output.
          */
-        StorePath path(const Store & store, std::string_view drvName, OutputNameView outputName) const;
+        StorePath path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 
         GENERATE_CMP(CAFixed, me->ca);
     };
@@ -132,17 +132,17 @@ struct DerivationOutput
      * the safer interface provided by
      * BasicDerivation::outputsAndOptPaths
      */
-    std::optional<StorePath> path(const Store & store, std::string_view drvName, OutputNameView outputName) const;
+    std::optional<StorePath> path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 
     nlohmann::json toJSON(
-        const Store & store,
+        const StoreDirConfig & store,
         std::string_view drvName,
         OutputNameView outputName) const;
     /**
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DerivationOutput fromJSON(
-        const Store & store,
+        const StoreDirConfig & store,
         std::string_view drvName,
         OutputNameView outputName,
         const nlohmann::json & json,
@@ -304,7 +304,7 @@ struct BasicDerivation
      * augmented with knowledge of the Store paths they would be written
      * into.
      */
-    DerivationOutputsAndOptPaths outputsAndOptPaths(const Store & store) const;
+    DerivationOutputsAndOptPaths outputsAndOptPaths(const StoreDirConfig & store) const;
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
@@ -318,6 +318,8 @@ struct BasicDerivation
         me->name);
 };
 
+class Store;
+
 struct Derivation : BasicDerivation
 {
     /**
@@ -328,7 +330,7 @@ struct Derivation : BasicDerivation
     /**
      * Print a derivation.
      */
-    std::string unparse(const Store & store, bool maskOutputs,
+    std::string unparse(const StoreDirConfig & store, bool maskOutputs,
         DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
 
     /**
@@ -365,9 +367,9 @@ struct Derivation : BasicDerivation
     Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
     Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
 
-    nlohmann::json toJSON(const Store & store) const;
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
     static Derivation fromJSON(
-        const Store & store,
+        const StoreDirConfig & store,
         const nlohmann::json & json,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
@@ -391,7 +393,7 @@ StorePath writeDerivation(Store & store,
  * Read a derivation from a file.
  */
 Derivation parseDerivation(
-    const Store & store,
+    const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
@@ -493,8 +495,8 @@ extern Sync<DrvHashes> drvHashes;
 struct Source;
 struct Sink;
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name);
-void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv);
+Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivation & drv, std::string_view name);
+void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv);
 
 /**
  * This creates an opaque and almost certainly unique string

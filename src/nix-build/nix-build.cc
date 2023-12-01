@@ -14,6 +14,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
+#include "realisation.hh"
 #include "derivations.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"

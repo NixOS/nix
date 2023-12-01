@@ -12,7 +12,7 @@ namespace nix {
 
 /* protocol-specific definitions */
 
-BuildResult ServeProto::Serialise<BuildResult>::read(const Store & store, ServeProto::ReadConn conn)
+BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & store, ServeProto::ReadConn conn)
 {
     BuildResult status;
     status.status = (BuildResult::Status) readInt(conn.from);
@@ -34,7 +34,7 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const Store & store, ServeP
     return status;
 }
 
-void ServeProto::Serialise<BuildResult>::write(const Store & store, ServeProto::WriteConn conn, const BuildResult & status)
+void ServeProto::Serialise<BuildResult>::write(const StoreDirConfig & store, ServeProto::WriteConn conn, const BuildResult & status)
 {
     conn.to
         << status.status
