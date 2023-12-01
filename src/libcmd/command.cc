@@ -36,8 +36,13 @@ nlohmann::json NixMultiCommand::toJSON()
 
 void NixMultiCommand::run()
 {
-    if (!command)
-        throw UsageError("'nix %s' requires a sub-command.", commandName);
+    if (!command) {
+        std::set<std::string> subCommandNames;
+        for (auto & [name, _] : commands)
+            subCommandNames.insert(name);
+        throw UsageError("'nix %s' requires a sub-command.\nAvailable sub-commands: %s",
+                commandName, concatStringsSep(", ", subCommandNames));
+    }
     command->second->run();
 }
 
