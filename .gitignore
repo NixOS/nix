@@ -22,6 +22,8 @@ perl/Makefile.config
 /doc/manual/xp-features.json
 /doc/manual/src/SUMMARY.md
 /doc/manual/src/SUMMARY-rl-next.md
+/doc/manual/src/store/types/*
+!/doc/manual/src/store/types/index.md.in
 /doc/manual/src/command-ref/new-cli
 /doc/manual/src/command-ref/conf-file.md
 /doc/manual/src/command-ref/experimental-features-shortlist.md
@@ -54,7 +56,7 @@ perl/Makefile.config
 
 /src/nix/nix
 
-/src/nix/doc
+/src/nix/generated-doc
 
 # /src/nix-env/
 /src/nix-env/nix-env

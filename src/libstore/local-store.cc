@@ -34,7 +34,6 @@
 #include <sys/statvfs.h>
 #include <sys/mount.h>
 #include <sys/ioctl.h>
-#include <sys/xattr.h>
 #endif
 
 #ifdef __CYGWIN__

@@ -4,6 +4,7 @@
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
+#include "gc-small-vector.hh"
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
@@ -17,7 +18,6 @@
 #include "fs-input-accessor.hh"
 
 #include <boost/container/small_vector.hpp>
-#include <boost/regex.hpp>
 #include <nlohmann/json.hpp>
 
 #include <sys/types.h>
@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <regex>
 #include <dlfcn.h>
 
 #include <cmath>
@@ -2753,7 +2754,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.catAttrs"));
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
-    Value * res[args[1]->listSize()];
+    SmallValueVector<nonRecursiveStackReservation> res(args[1]->listSize());
     size_t found = 0;
 
     for (auto v2 : args[1]->listItems()) {
@@ -3088,8 +3089,7 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    // FIXME: putting this on the stack is risky.
-    Value * vs[args[1]->listSize()];
+    SmallValueVector<nonRecursiveStackReservation> vs(args[1]->listSize());
     size_t k = 0;
 
     bool same = true;
@@ -3485,7 +3485,8 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
     auto nrLists = args[1]->listSize();
 
-    Value lists[nrLists];
+    // List of returned lists before concatenation. References to these Values must NOT be persisted.
+    SmallTemporaryValueVector<conservativeStackReservation> lists(nrLists);
     size_t len = 0;
 
     for (unsigned int n = 0; n < nrLists; ++n) {
@@ -3909,30 +3910,19 @@ static RegisterPrimOp primop_convertHash({
     .fun = prim_convertHash,
 });
 
-// regex aliases, switch between boost and std
-using regex = boost::regex;
-using regex_error = boost::regex_error;
-using cmatch = boost::cmatch;
-using cregex_iterator = boost::cregex_iterator;
-namespace regex_constants = boost::regex_constants;
-// overloaded function alias
-constexpr auto regex_match = [] (auto &&...args) {
-    return boost::regex_match(std::forward<decltype(args)>(args)...);
- };
-
 struct RegexCache
 {
     // TODO use C++20 transparent comparison when available
-    std::unordered_map<std::string_view, regex> cache;
+    std::unordered_map<std::string_view, std::regex> cache;
     std::list<std::string> keys;
 
-    regex get(std::string_view re)
+    std::regex get(std::string_view re)
     {
         auto it = cache.find(re);
         if (it != cache.end())
             return it->second;
         keys.emplace_back(re);
-        return cache.emplace(keys.back(), regex(keys.back(), regex::extended)).first->second;
+        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
     }
 };
 
@@ -3952,8 +3942,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.match");
 
-        cmatch match;
-        if (!regex_match(str.begin(), str.end(), match, regex)) {
+        std::cmatch match;
+        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
             v.mkNull();
             return;
         }
@@ -3968,8 +3958,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
 
-    } catch (regex_error & e) {
-        if (e.code() == regex_constants::error_space) {
+    } catch (std::regex_error & e) {
+        if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -4032,8 +4022,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.split");
 
-        auto begin = cregex_iterator(str.begin(), str.end(), regex);
-        auto end = cregex_iterator();
+        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
+        auto end = std::cregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
@@ -4072,8 +4062,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         assert(idx == 2 * len + 1);
 
-    } catch (regex_error & e) {
-        if (e.code() == regex_constants::error_space) {
+    } catch (std::regex_error & e) {
+        if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -4483,7 +4473,7 @@ void EvalState::createBaseEnv()
         .doc = R"(
           Logical file system location of the [Nix store](@docroot@/glossary.md#gloss-store) currently in use.
 
-          This value is determined by the `store` parameter in [Store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md):
+          This value is determined by the `store` parameter in [Store URLs](@docroot@/store/types/index.md#store-url-format):
 
           ```shell-session
           $ nix-instantiate --store 'dummy://?store=/blah' --eval --expr builtins.storeDir

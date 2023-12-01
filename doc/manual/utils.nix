@@ -1,5 +1,11 @@
 with builtins;
 
+let
+  lowerChars = stringToCharacters "abcdefghijklmnopqrstuvwxyz";
+  upperChars = stringToCharacters "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  stringToCharacters = s: genList (p: substring p 1 s) (stringLength s);
+in
+
 rec {
   splitLines = s: filter (x: !isList x) (split "\n" s);
 
@@ -17,6 +23,8 @@ rec {
       replaced = replaceStrings [ from ] [ to ] string;
     in
       if replaced == string then string else replaceStringsRec from to replaced;
+
+  toLower = replaceStrings upperChars lowerChars;
 
   squash = replaceStringsRec "\n\n\n" "\n\n";
 

@@ -10,7 +10,7 @@ $ cd nix
 
 The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment. If you don't have it installed, follow the [installation instructions].
 
-[installation instructions]: ../installation/installation.md
+[installation instructions]: ../installation/index.md
 
 ## Building Nix with flakes
 
@@ -145,6 +145,31 @@ $ nix build .#packages.aarch64-linux.default
 
 Cross-compiled builds are available for ARMv6 (`armv6l-linux`) and ARMv7 (`armv7l-linux`).
 Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootstrap Nix on unsupported platforms.
+
+### Building for multiple platforms at once
+
+It is useful to perform multiple cross and native builds on the same source tree,
+for example to ensure that better support for one platform doesn't break the build for another.
+In order to facilitate this, Nix has some support for being built out of tree – that is, placing build artefacts in a different directory than the source code:
+
+1. Create a directory for the build, e.g.
+
+   ```bash
+   mkdir build
+   ```
+
+2. Run the configure script from that directory, e.g.
+
+   ```bash
+   cd build
+   ../configure <configure flags>
+   ```
+
+3. Run make from the source directory, but with the build directory specified, e.g.
+
+   ```bash
+   make builddir=build <make flags>
+   ```
 
 ## System type
 

@@ -43,7 +43,6 @@ extern "C" {
 #include "finally.hh"
 #include "markdown.hh"
 #include "local-fs-store.hh"
-#include "progress-bar.hh"
 #include "print.hh"
 
 #if HAVE_BOEHMGC
@@ -262,13 +261,11 @@ void NixRepl::mainLoop()
     rl_set_list_possib_func(listPossibleCallback);
 #endif
 
-    /* Stop the progress bar because it interferes with the display of
-       the repl. */
-    stopProgressBar();
-
     std::string input;
 
     while (true) {
+        // Hide the progress bar while waiting for user input, so that it won't interfere.
+        logger->pause();
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
         if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
@@ -278,6 +275,7 @@ void NixRepl::mainLoop()
             logger->cout("");
             break;
         }
+        logger->resume();
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {

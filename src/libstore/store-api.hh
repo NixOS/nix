@@ -30,7 +30,7 @@
 namespace nix {
 
 /**
- * About the class hierarchy of the store implementations:
+ * About the class hierarchy of the store types:
  *
  * Each store type `Foo` consists of two classes:
  *
@@ -962,7 +962,7 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
  * - ‘ssh://[user@]<host>’: A remote Nix store accessed by running
  *   ‘nix-store --serve’ via SSH.
  *
- * You can pass parameters to the store implementation by appending
+ * You can pass parameters to the store type by appending
  * ‘?key=value&key=value&...’ to the URI.
  */
 ref<Store> openStore(const std::string & uri = settings.storeUri.get(),

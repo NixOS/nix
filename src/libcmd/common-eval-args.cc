@@ -142,7 +142,7 @@ MixEvalArgs::MixEvalArgs()
         .longName = "eval-store",
         .description =
           R"(
-            The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+            The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
             to use for evaluation, i.e. to store derivations (`.drv` files) and inputs referenced by them.
           )",
         .category = category,

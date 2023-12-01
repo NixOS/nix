@@ -143,9 +143,9 @@ ifeq ($(ENABLE_BUILD), yes)
 endif
 
 $(d)/test-libstoreconsumer.sh.test $(d)/test-libstoreconsumer.sh.test-debug: \
-  $(d)/test-libstoreconsumer/test-libstoreconsumer
+  $(buildprefix)$(d)/test-libstoreconsumer/test-libstoreconsumer
 $(d)/plugins.sh.test $(d)/plugins.sh.test-debug: \
-  $(d)/plugins/libplugintest.$(SO_EXT)
+  $(buildprefix)$(d)/plugins/libplugintest.$(SO_EXT)
 
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
