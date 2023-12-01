@@ -797,6 +797,7 @@ public:
 
           ```shell-session
           $ rm $HOME/.cache/nix/binary-cache-v*.sqlite*
+          # rm /root/.cache/nix/binary-cache-v*.sqlite*
           ```
         )"};
 
