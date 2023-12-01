@@ -63,7 +63,7 @@ To explicitly select a single-user installation on your system:
 $ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
 ```
 
-This will perform a single-user installation of Nix, meaning that `/nix` is owned by the invoking user.
+In a single-user installation, `/nix` is owned by the invoking user.
 You can run this under your usual user account or `root`.
 The script will invoke `sudo` to create `/nix` if it doesn’t already exist.
 If you don’t have `sudo`, manually create `/nix` as `root`:
