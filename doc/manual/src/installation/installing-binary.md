@@ -29,7 +29,7 @@ To check what it does and how it can be customised further, [download and edit t
 # Installing a pinned Nix version from a URL
 
 Version-specific installation URLs for all Nix versions since 1.11.16 can be found at [releases.nixos.org](https://releases.nixos.org/?prefix=nix/).
-The corresponding SHA-256 hash can be found in the directory for the given version.
+The directory for each version contains the corresponding SHA-256 hash.
 
 These installation scripts can be used the same as usual:
 
