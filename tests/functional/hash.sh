@@ -173,11 +173,11 @@ try3() {
     #
 
     fail=$(nix hash convert --algo "$1" --from nix32 "$2" 2>&1 || echo "exit: $?")
-    [[ "$fail" == "error: input hash"*"exit: 1" ]]
+    [[ "$fail" == *"error: input hash"*"exit: 1" ]]
     fail=$(nix hash convert --algo "$1" --from base16 "$3" 2>&1 || echo "exit: $?")
-    [[ "$fail" == "error: input hash"*"exit: 1" ]]
+    [[ "$fail" == *"error: input hash"*"exit: 1" ]]
     fail=$(nix hash convert --algo "$1" --from nix32 "$4" 2>&1 || echo "exit: $?")
-    [[ "$fail" == "error: input hash"*"exit: 1" ]]
+    [[ "$fail" == *"error: input hash"*"exit: 1" ]]
 
 }
 
