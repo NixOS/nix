@@ -482,22 +482,7 @@
         coverage = nixpkgsFor.x86_64-linux.native.callPackage ./coverage.nix {};
 
         # API docs for Nix's unstable internal C++ interfaces.
-        internal-api-docs = nixpkgsFor.x86_64-linux.native.nix.overrideAttrs (old: {
-          pname = "nix-internal-api-docs";
-
-          configureFlags = old.configureFlags ++ [ "--enable-internal-api-docs" ];
-          nativeBuildInputs = old.nativeBuildInputs ++ [ nixpkgsFor.x86_64-linux.native.doxygen ];
-
-          dontBuild = true;
-          doCheck = false;
-
-          installTargets = [ "internal-api-html" ];
-
-          postInstall = ''
-            mkdir -p $out/nix-support
-            echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> $out/nix-support/hydra-build-products
-          '';
-        });
+        internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./internal-api-docs.nix {};
 
         # System tests.
         tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
