@@ -175,14 +175,21 @@ public:
         getDefaultCores(),
         "cores",
         R"(
-          Sets the value of the `NIX_BUILD_CORES` environment variable in the
-          invocation of builders. Builders can use this variable at their
-          discretion to control the maximum amount of parallelism. For
-          instance, in Nixpkgs, if the derivation attribute
-          `enableParallelBuilding` is set to `true`, the builder passes the
-          `-jN` flag to GNU Make. It can be overridden using the `--cores`
-          command line switch and defaults to `1`. The value `0` means that
-          the builder should use all available CPU cores in the system.
+          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
+          The executable can use this variable to control the maximum amount of parallelism.
+
+          <!--
+          FIXME(@fricklerhandwerk): I don't think this should even be mentioned here.
+          A very generic example using `derivation` and `xargs` may be more appropriate to explain the mechanism.
+          Using `mkDerivation` as an example requires being aware of that there are multiple independent layers that are completely opaque here.
+          -->
+          For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it will pass the `-j${NIX_BUILD_CORES}` flag to GNU Make.
+
+          The value `0` means that the `builder` should use all available CPU cores in the system.
+
+          > **Note**
+          >
+          > The number of parallel local build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
         )",
         {"build-cores"},
         // Don't document the machine-specific default value
