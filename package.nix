@@ -43,6 +43,30 @@
 let
   version = lib.fileContents ./.version + versionSuffix;
   canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+
+  filesets = {
+    baseFiles = fileset.fileFilter (f: f.name != ".gitignore") ./.;
+
+    configureFiles = fileset.unions [
+      ./.version
+      ./configure.ac
+      ./m4
+      # TODO: do we really need README.md? It doesn't seem used in the build.
+      ./README.md
+    ];
+
+    topLevelBuildFiles = fileset.unions [
+      ./local.mk
+      ./Makefile
+      ./Makefile.config.in
+      ./mk
+    ];
+
+    functionalTestFiles = fileset.unions [
+      ./tests/functional
+      (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+    ];
+  };
 in
 
 stdenv.mkDerivation (finalAttrs: {
@@ -51,33 +75,13 @@ stdenv.mkDerivation (finalAttrs: {
 
   src =
     let
-      baseFiles = fileset.fileFilter (f: f.name != ".gitignore") ./.;
-      configureFiles = fileset.unions [
-        ./.version
-        ./configure.ac
-        ./m4
-        # TODO: do we really need README.md? It doesn't seem used in the build.
-        ./README.md
-      ];
-
-      topLevelBuildFiles = fileset.unions [
-        ./local.mk
-        ./Makefile
-        ./Makefile.config.in
-        ./mk
-      ];
-
-      functionalTestFiles = fileset.unions [
-        ./tests/functional
-        (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-      ];
 
     in
       fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect baseFiles (fileset.unions [
-          configureFiles
-          topLevelBuildFiles
+        fileset = fileset.intersect filesets.baseFiles (fileset.unions [
+          filesets.configureFiles
+          filesets.topLevelBuildFiles
           ./boehmgc-coroutine-sp-fallback.diff
           ./doc
           ./misc
@@ -86,7 +90,7 @@ stdenv.mkDerivation (finalAttrs: {
           ./unit-test-data
           ./COPYING
           ./scripts/local.mk
-          functionalTestFiles
+          filesets.functionalTestFiles
         ]);
       };
 
@@ -231,8 +235,12 @@ stdenv.mkDerivation (finalAttrs: {
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
-  passthru.perl-bindings = callPackage ./perl {
-    inherit fileset stdenv;
+  passthru ={
+    inherit filesets;
+
+    perl-bindings = callPackage ./perl {
+      inherit fileset stdenv;
+    };
   };
 
   meta.platforms = lib.platforms.unix;

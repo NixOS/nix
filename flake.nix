@@ -12,6 +12,14 @@
     let
       inherit (nixpkgs) lib;
 
+      # Experimental fileset library: https://github.com/NixOS/nixpkgs/pull/222981
+      # Not an "idiomatic" flake input because:
+      #  - Propagation to dependent locks: https://github.com/NixOS/nix/issues/7730
+      #  - Subflake would download redundant and huge parent flake
+      #  - No git tree hash support: https://github.com/NixOS/nix/issues/6044
+      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nix/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
+        fileset;
+
       officialRelease = false;
 
       # Set to true to build the release notes for the next release.
@@ -56,57 +64,6 @@
             })
             stdenvs);
 
-      # Experimental fileset library: https://github.com/NixOS/nixpkgs/pull/222981
-      # Not an "idiomatic" flake input because:
-      #  - Propagation to dependent locks: https://github.com/NixOS/nix/issues/7730
-      #  - Subflake would download redundant and huge parent flake
-      #  - No git tree hash support: https://github.com/NixOS/nix/issues/6044
-      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nix/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
-        fileset;
-
-      baseFiles =
-        # .gitignore has already been processed, so any changes in it are irrelevant
-        # at this point. It is not represented verbatim for test purposes because
-        # that would interfere with repo semantics.
-        fileset.fileFilter (f: f.name != ".gitignore") ./.;
-
-      configureFiles = fileset.unions [
-        ./.version
-        ./configure.ac
-        ./m4
-        # TODO: do we really need README.md? It doesn't seem used in the build.
-        ./README.md
-      ];
-
-      topLevelBuildFiles = fileset.unions [
-        ./local.mk
-        ./Makefile
-        ./Makefile.config.in
-        ./mk
-      ];
-
-      functionalTestFiles = fileset.unions [
-        ./tests/functional
-        (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-      ];
-
-      nixSrc = fileset.toSource {
-        root = ./.;
-        fileset = fileset.intersect baseFiles (fileset.unions [
-          configureFiles
-          topLevelBuildFiles
-          ./boehmgc-coroutine-sp-fallback.diff
-          ./doc
-          ./misc
-          ./precompiled-headers.h
-          ./src
-          ./unit-test-data
-          ./COPYING
-          ./scripts/local.mk
-          functionalTestFiles
-        ]);
-      };
-
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
         (system: let
@@ -130,130 +87,6 @@
           static = native.pkgsStatic;
           cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
-
-      commonDeps =
-        { pkgs
-        , isStatic ? pkgs.stdenv.hostPlatform.isStatic
-        }:
-        with pkgs; rec {
-        # Use "busybox-sandbox-shell" if present,
-        # if not (legacy) fallback and hope it's sufficient.
-        sh = pkgs.busybox-sandbox-shell or (busybox.override {
-          useMusl = true;
-          enableStatic = true;
-          enableMinimal = true;
-          extraConfig = ''
-            CONFIG_FEATURE_FANCY_ECHO y
-            CONFIG_FEATURE_SH_MATH y
-            CONFIG_FEATURE_SH_MATH_64 y
-
-            CONFIG_ASH y
-            CONFIG_ASH_OPTIMIZE_FOR_SIZE y
-
-            CONFIG_ASH_ALIAS y
-            CONFIG_ASH_BASH_COMPAT y
-            CONFIG_ASH_CMDCMD y
-            CONFIG_ASH_ECHO y
-            CONFIG_ASH_GETOPTS y
-            CONFIG_ASH_INTERNAL_GLOB y
-            CONFIG_ASH_JOB_CONTROL y
-            CONFIG_ASH_PRINTF y
-            CONFIG_ASH_TEST y
-          '';
-        });
-
-        configureFlags =
-          lib.optionals stdenv.isLinux [
-            "--with-boost=${boost-nix}/lib"
-            "--with-sandbox-shell=${sh}/bin/busybox"
-          ]
-          ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
-            "LDFLAGS=-fuse-ld=gold"
-          ];
-
-        testConfigureFlags = [
-          "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
-        ] ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
-          "--enable-install-unit-tests"
-          "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
-          "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
-        ];
-
-        internalApiDocsConfigureFlags = [
-          "--enable-internal-api-docs"
-        ];
-
-        inherit (pkgs.buildPackages) changelog-d;
-
-        nativeBuildDeps =
-          [
-            buildPackages.bison
-            buildPackages.flex
-            (lib.getBin buildPackages.lowdown-nix)
-            buildPackages.mdbook
-            buildPackages.mdbook-linkcheck
-            buildPackages.autoconf-archive
-            buildPackages.autoreconfHook
-            buildPackages.pkg-config
-
-            # Tests
-            buildPackages.git
-            buildPackages.mercurial # FIXME: remove? only needed for tests
-            buildPackages.jq # Also for custom mdBook preprocessor.
-            buildPackages.openssh # only needed for tests (ssh-keygen)
-          ]
-          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)]
-          # Official releases don't have rl-next, so we don't need to compile a changelog
-          ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d
-          ;
-
-        buildDeps =
-          [ curl
-            bzip2 xz brotli editline
-            openssl sqlite
-            libarchive
-            (pkgs.libgit2.overrideAttrs (attrs: {
-              src = libgit2;
-              version = libgit2.lastModifiedDate;
-              cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
-            }))
-            boost-nix
-            lowdown-nix
-            libsodium
-          ]
-          ++ lib.optionals stdenv.isLinux [libseccomp]
-          ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
-
-        checkDeps = [
-          gtest
-          rapidcheck
-        ];
-
-        internalApiDocsDeps = [
-          buildPackages.doxygen
-        ];
-
-        awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
-          (aws-sdk-cpp.override {
-            apis = ["s3" "transfer"];
-            customMemoryManagement = false;
-          });
-
-        propagatedDeps =
-          [ ((boehmgc.override {
-              enableLargeConfig = true;
-            }).overrideAttrs(o: {
-              patches = (o.patches or []) ++ [
-                ./boehmgc-coroutine-sp-fallback.diff
-
-                # https://github.com/ivmai/bdwgc/pull/586
-                ./boehmgc-traceable_allocator-public.diff
-              ];
-            })
-            )
-            nlohmann_json
-          ];
-      };
 
       installScriptFor = systems:
         with nixpkgsFor.x86_64-linux.native;
@@ -289,49 +122,10 @@
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
           '';
 
-      testNixVersions = pkgs: client: daemon: with commonDeps { inherit pkgs; }; with pkgs.lib; pkgs.stdenv.mkDerivation {
-        NIX_DAEMON_PACKAGE = daemon;
-        NIX_CLIENT_PACKAGE = client;
-        name =
-          "nix-tests"
-          + optionalString
-            (versionAtLeast daemon.version "2.4pre20211005" &&
-             versionAtLeast client.version "2.4pre20211005")
-            "-${client.version}-against-${daemon.version}";
-        inherit version;
-
-        src = fileset.toSource {
-          root = ./.;
-          fileset = fileset.intersect baseFiles (fileset.unions [
-            configureFiles
-            topLevelBuildFiles
-            functionalTestFiles
-          ]);
+      testNixVersions = pkgs: client: daemon:
+        pkgs.callPackage ./test-nix-versions.nix {
+          inherit client daemon fileset;
         };
-
-        VERSION_SUFFIX = versionSuffix;
-
-        nativeBuildInputs = nativeBuildDeps;
-        buildInputs = buildDeps ++ awsDeps ++ checkDeps;
-        propagatedBuildInputs = propagatedDeps;
-
-        enableParallelBuilding = true;
-
-        configureFlags =
-          testConfigureFlags # otherwise configure fails
-          ++ [ "--disable-build" ];
-        dontBuild = true;
-        doInstallCheck = true;
-
-        installPhase = ''
-          mkdir -p $out
-        '';
-
-        installCheckPhase = ''
-          mkdir -p src/nix-channel
-          make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
-        '';
-      };
 
       binaryTarball = nix: pkgs: pkgs.callPackage ./binary-tarball.nix {
         inherit nix;
@@ -491,7 +285,7 @@
           # on a particular version of Nixpkgs.
           evalNixpkgs =
             let
-              inherit (nixpkgsFor.x86_64-linux.native) runCommand nix nixpkgs-regression;
+              inherit (nixpkgsFor.x86_64-linux.native) runCommand nix;
             in
             runCommand "eval-nixos" { buildInputs = [ nix ]; }
               ''
