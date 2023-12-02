@@ -3838,6 +3838,7 @@ static RegisterPrimOp primop_convertHash({
         The format of the resulting hash. Must be one of
         - `"base16"`
         - `"nix32"`
+        - `"base32"` (deprecated alias for `"nix32"`)
         - `"base64"`
         - `"sri"`
 
