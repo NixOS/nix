@@ -31,10 +31,11 @@ To check what it does and how it can be customised further, [download and edit t
 Version-specific installation URLs for all Nix versions since 1.11.16 can be found at [releases.nixos.org](https://releases.nixos.org/?prefix=nix/).
 The directory for each version contains the corresponding SHA-256 hash.
 
-These installation scripts can be used the same as usual:
+All installation scripts are invoked the same way:
 
 ```console
-$ VERSION=2.19.2 curl -L https://releases.nixos.org/nix/nix-$VERSION/install | sh
+$ export VERSION=2.19.2 
+$ curl -L https://releases.nixos.org/nix/nix-$VERSION/install | sh
 ```
 
 # Multi User Installation
@@ -46,7 +47,7 @@ Supported systems:
 - Linux running systemd, with SELinux disabled
 - macOS
 
-You can explicitly instruct the installer to perform a multi-user installation on your system:
+To explicitly instruct the installer to perform a multi-user installation on your system:
 
 ```console
 $ curl -L https://nixos.org/nix/install | sh -s -- --daemon
@@ -64,7 +65,6 @@ $ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
 ```
 
 In a single-user installation, `/nix` is owned by the invoking user.
-You can run this under your usual user account or `root`.
 The script will invoke `sudo` to create `/nix` if it doesn’t already exist.
 If you don’t have `sudo`, manually create `/nix` as `root`:
 
@@ -94,7 +94,7 @@ You can also download a binary tarball that contains Nix and all its dependencie
 > $ popd
 > ```
 
-The installer can be customised using environment varibales set in the file named `install-multi-user`.
+The installer can be customised with the environment variables declared in the file named `install-multi-user`.
 
 ## Native packages for Linux distributions
 
