@@ -4400,7 +4400,7 @@ void EvalState::createBaseEnv()
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
-          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-system).
 
           It can be used to set the `system` attribute for [`builtins.derivation`](@docroot@/language/derivations.md) such that the resulting derivation can be built on the same system that evaluates the Nix expression:
 
