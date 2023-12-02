@@ -201,7 +201,7 @@ public:
           Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
-          The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
+          The following system types are widely used, as Nix is actively supported on these platforms:
 
           - `x86_64-linux`
           - `x86_64-darwin`
@@ -761,7 +761,7 @@ public:
         "substituters",
         R"(
           A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store]{@docroot@/glossary.md##gloss-store} from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
