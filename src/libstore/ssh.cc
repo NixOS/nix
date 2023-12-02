@@ -26,8 +26,6 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 {
     auto state(state_.lock());
 
-    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
-        args.push_back(i);
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
     if (!sshPublicHostKey.empty()) {
@@ -42,6 +40,9 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 
     args.push_back("-oPermitLocalCommand=yes");
     args.push_back("-oLocalCommand=echo started");
+
+    for (auto & i : tokenizeString<Strings>(getEnv("NIX_SSHOPTS").value_or("")))
+        args.push_back(i);
 }
 
 bool SSHMaster::isMasterRunning() {
