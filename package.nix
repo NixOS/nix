@@ -123,6 +123,10 @@ stdenv.mkDerivation (finalAttrs: {
     openssl
     sqlite
     xz
+
+    # These could be checkInputs but the configure phase fails w/o them
+    gtest
+    rapidcheck
   ]
   ++ lib.optional stdenv.isLinux libseccomp
   ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
@@ -137,14 +141,13 @@ stdenv.mkDerivation (finalAttrs: {
   doCheck = true;
 
   checkInputs = [
-    gtest
-    rapidcheck
+    # see buildInputs. The configure script always wants its test libs
   ];
 
   nativeCheckInputs = [
     git
-    mercurial # FIXME: remove? only needed for tests
-    openssh # only needed for tests (ssh-keygen)
+    mercurial
+    openssh
   ];
 
   propagatedBuildInputs = [
