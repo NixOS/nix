@@ -14,18 +14,20 @@ releaseTools.coverageAnalysis {
 
   inherit (nix)
     src
-    configureFlags
-    nativeBuildInputs
     buildInputs
-    #checkInputs
+    nativeBuildInputs
+    propagatedBuildInputs
+    configureFlags
+    makeFlags
+    installFlags
+    doInstallCheck
+    installCheckFlags
+    installCheckTarget
     ;
 
   enableParallelBuilding = true;
 
   dontInstall = false;
-
-  doInstallCheck = true;
-  installCheckTarget = "installcheck"; # work around buggy detection in stdenv
 
   lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
