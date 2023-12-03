@@ -26,12 +26,4 @@ releaseTools.coverageAnalysis {
     ;
 
   enableParallelBuilding = true;
-
-  dontInstall = false;
-
-  lcovFilter = [ "*/boost/*" "*-tab.*" ];
-
-  hardeningDisable = ["fortify"];
-
-  NIX_CFLAGS_COMPILE = "-DCOVERAGE=1";
 }

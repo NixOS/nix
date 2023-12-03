@@ -276,7 +276,12 @@
         coverage = nixpkgsFor.x86_64-linux.native.callPackage ./coverage.nix {};
 
         # API docs for Nix's unstable internal C++ interfaces.
-        internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./internal-api-docs.nix {};
+        internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+          doBuild = false;
+          doCheck = false;
+          doInstallCheck = false;
+          enableInternalAPIDocs = true;
+        };
 
         # System tests.
         tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {

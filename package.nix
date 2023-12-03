@@ -1,6 +1,7 @@
 { lib
 , callPackage
 , stdenv
+, releaseTools
 , versionSuffix ? ""
 , officialRelease ? false
 , buildUnreleasedNotes ? false
@@ -21,6 +22,7 @@
 , git
 , gtest
 , jq
+, doxygen
 , libarchive
 , libcpuid
 , libgit2
@@ -45,15 +47,34 @@
 # faithfully reflects how the underlying configure + make build system
 # work. The top-level flake.nix will choose useful combinations.
 
+, pname ? "nix"
+
+, doBuild ? true
+, doCheck ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
+, doInstallCheck ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
+
+, withCoverageChecks ? false
+
+# Whether to build the internal API docs, can be done separately from
+# everything else.
+, enableInternalAPIDocs ? false
+
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
 # later.
 , installUnitTests ? stdenv.hostPlatform != stdenv.buildPlatform
+
+, test-daemon ? null
+, test-client ? null
 }:
 
 let
   version = lib.fileContents ./.version + versionSuffix;
   canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+
+  attrs = {
+    inherit doBuild doCheck doInstallCheck;
+  };
 
   filesets = {
     baseFiles = fileset.fileFilter (f: f.name != ".gitignore") ./.;
@@ -78,17 +99,30 @@ let
       (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
     ];
   };
+
+  mkDerivation =
+    if withCoverageChecks
+    then releaseTools.coverageAnalysis
+    else stdenv.mkDerivation;
 in
 
-stdenv.mkDerivation (finalAttrs: let
+mkDerivation (finalAttrs: let
+
+  inherit (finalAttrs)
+    doCheck
+    doInstallCheck
+    ;
+
+  doBuild = !finalAttrs.dontBuild;
 
   # Either running the unit tests during the build, or installing them
   # to be run later, requiresthe unit tests to be built.
-  buildUnitTests = finalAttrs.doCheck || installUnitTests;
+  buildUnitTests = doCheck || installUnitTests;
+
+  anySortOfTesting = buildUnitTests || doInstallCheck;
 
 in {
-  pname = "nix";
-  inherit version;
+  inherit pname version;
 
   src =
     let
@@ -96,9 +130,10 @@ in {
     in
       fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect filesets.baseFiles (fileset.unions [
+        fileset = fileset.intersect filesets.baseFiles (fileset.unions ([
           filesets.configureFiles
           filesets.topLevelBuildFiles
+        ] ++ lib.optionals doBuild [
           ./boehmgc-coroutine-sp-fallback.diff
           ./doc
           ./misc
@@ -107,8 +142,9 @@ in {
           ./unit-test-data
           ./COPYING
           ./scripts/local.mk
+        ] ++ lib.optionals anySortOfTesting [
           filesets.functionalTestFiles
-        ]);
+        ]));
       };
 
   VERSION_SUFFIX = versionSuffix;
@@ -159,7 +195,13 @@ in {
     })
   ;
 
-  doCheck = stdenv.hostPlatform != stdenv.buildPlatform;
+  propagatedBuildInputs = [
+    boehmgc
+    nlohmann_json
+  ];
+
+  dontBuild = !attrs.doBuild;
+  doCheck = attrs.doCheck;
 
   checkInputs = [
     # see buildInputs. The configure script always wants its test libs
@@ -169,11 +211,8 @@ in {
     git
     mercurial
     openssh
-  ];
-
-  propagatedBuildInputs = [
-    boehmgc
-    nlohmann_json
+  ] ++ lib.optionals enableInternalAPIDocs [
+    doxygen
   ];
 
   disallowedReferences = [ boost ];
@@ -198,30 +237,41 @@ in {
     ''}
   '';
 
-  configureFlags =
-    lib.optionals stdenv.isLinux [
-      "--with-boost=${boost}/lib"
-      "--with-sandbox-shell=${sh}/bin/busybox"
-    ]
-    ++ lib.optional (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
-      "LDFLAGS=-fuse-ld=gold"
-    ++ [ "--sysconfdir=/etc" ]
+  configureFlags = [
+    "--sysconfdir=/etc"
+    (lib.enableFeature doBuild "build")
+    (lib.enableFeature anySortOfTesting "test")
+    (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
+    (lib.enableFeature canRunInstalled "doc-gen")
+    (lib.enableFeature installUnitTests "install-unit-tests")
+  ] ++ lib.optionals installUnitTests [
+    "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+    "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
+  ] ++ lib.optionals stdenv.isLinux [
+    "--with-boost=${boost}/lib"
+    "--with-sandbox-shell=${sh}/bin/busybox"
+  ] ++ lib.optional (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+       "LDFLAGS=-fuse-ld=gold"
     ++ lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell"
-    ++ lib.optional buildUnitTests "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
-    ++ lib.optionals installUnitTests [
-      "--enable-install-unit-tests"
-      "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
-      "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
-    ]
-    ++ lib.optional (!canRunInstalled) "--disable-doc-gen";
+    ++ lib.optional buildUnitTests "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include";
 
   enableParallelBuilding = true;
 
   makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
+  installTargets = lib.optional doBuild "install"
+    ++ lib.optional enableInternalAPIDocs "internal-api-html";
+
   installFlags = "sysconfdir=$(out)/etc";
 
-  postInstall = ''
+  # In this case we are probably just running tests, and so there isn't
+  # anything to install, we just make an empty directory to signify tests
+  # succeeded.
+  installPhase = if finalAttrs.installTargets != [] then null else ''
+    mkdir -p $out
+  '';
+
+  postInstall = lib.optionalString doBuild ''
     mkdir -p $doc/nix-support
     echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
     ${lib.optionalString stdenv.hostPlatform.isStatic ''
@@ -238,11 +288,21 @@ in {
       $out/lib/libboost_regex.dylib \
       $out/lib/libnixexpr.dylib
     ''}
+  '' + lib.optionalString enableInternalAPIDocs ''
+    mkdir -p $out/nix-support
+    echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> $out/nix-support/hydra-build-products
   '';
 
-  doInstallCheck = finalAttrs.doCheck;
+  doInstallCheck = attrs.doInstallCheck;
+
   installCheckFlags = "sysconfdir=$(out)/etc";
   installCheckTarget = "installcheck"; # work around buggy detection in stdenv
+
+  # Needed for tests if we are not doing a build, but testing existing
+  # built Nix.
+  preInstallCheck = lib.optionalString (! doBuild) ''
+    mkdir -p src/nix-channel
+  '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
@@ -250,7 +310,7 @@ in {
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
-  passthru ={
+  passthru = {
     inherit filesets;
 
     perl-bindings = callPackage ./perl {
@@ -258,6 +318,25 @@ in {
     };
   };
 
-  meta.platforms = lib.platforms.unix;
-  meta.mainProgram = "nix";
+  meta = {
+    platforms = lib.platforms.unix;
+    mainProgram = "nix";
+    broken = !(lib.all (a: a) [
+      (installUnitTests -> doBuild)
+      (doCheck -> doBuild)
+    ]);
+  };
+
+} // lib.optionalAttrs withCoverageChecks {
+  lcovFilter = [ "*/boost/*" "*-tab.*" ];
+
+  hardeningDisable = ["fortify"];
+
+  NIX_CFLAGS_COMPILE = "-DCOVERAGE=1";
+
+  dontInstall = false;
+} // lib.optionalAttrs (test-daemon != null) {
+  NIX_DAEMON_PACKAGE = test-daemon;
+} // lib.optionalAttrs (test-client != null) {
+  NIX_CLIENT_PACKAGE = test-client;
 })
