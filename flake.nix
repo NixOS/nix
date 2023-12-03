@@ -188,6 +188,17 @@
               ++ [ "-DUSE_SSH=exec" ];
           });
 
+          boehmgc-nix = (final.boehmgc.override {
+            enableLargeConfig = true;
+          }).overrideAttrs(o: {
+            patches = (o.patches or []) ++ [
+              ./boehmgc-coroutine-sp-fallback.diff
+
+              # https://github.com/ivmai/bdwgc/pull/586
+              ./boehmgc-traceable_allocator-public.diff
+            ];
+          });
+
           nix =
             let
               officialRelease = false;
@@ -196,25 +207,14 @@
                 then ""
                 else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
-              boehmgc = (final.boehmgc.override {
-                enableLargeConfig = true;
-              }).overrideAttrs(o: {
-                patches = (o.patches or []) ++ [
-                  ./boehmgc-coroutine-sp-fallback.diff
-
-                  # https://github.com/ivmai/bdwgc/pull/586
-                  ./boehmgc-traceable_allocator-public.diff
-                ];
-              });
-
             in final.callPackage ./package.nix {
               inherit
-                boehmgc
                 fileset
                 stdenv
                 versionSuffix
                 ;
               officialRelease = false;
+              boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
               lowdown = final.lowdown-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
