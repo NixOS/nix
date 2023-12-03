@@ -139,6 +139,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
         {"verify", {"store", "verify"}},
+        {"doctor", {"config", "check"}},
     };
 
     bool aliasUsed = false;

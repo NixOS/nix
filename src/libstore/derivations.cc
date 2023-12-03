@@ -11,7 +11,7 @@
 
 namespace nix {
 
-std::optional<StorePath> DerivationOutput::path(const Store & store, std::string_view drvName, OutputNameView outputName) const
+std::optional<StorePath> DerivationOutput::path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const
 {
     return std::visit(overloaded {
         [](const DerivationOutput::InputAddressed & doi) -> std::optional<StorePath> {
@@ -35,7 +35,7 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
 }
 
 
-StorePath DerivationOutput::CAFixed::path(const Store & store, std::string_view drvName, OutputNameView outputName) const
+StorePath DerivationOutput::CAFixed::path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const
 {
     return store.makeFixedOutputPathFromCA(
         outputPathName(drvName, outputName),
@@ -214,7 +214,7 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 
 
 static DerivationOutput parseDerivationOutput(
-    const Store & store,
+    const StoreDirConfig & store,
     std::string_view pathS, std::string_view hashAlgo, std::string_view hashS,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -261,7 +261,7 @@ static DerivationOutput parseDerivationOutput(
 }
 
 static DerivationOutput parseDerivationOutput(
-    const Store & store, std::istringstream & str,
+    const StoreDirConfig & store, std::istringstream & str,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings)
 {
     expect(str, ","); const auto pathS = parseString(str);
@@ -290,7 +290,7 @@ enum struct DerivationATermVersion {
 };
 
 static DerivedPathMap<StringSet>::ChildNode parseDerivedPathMapNode(
-    const Store & store,
+    const StoreDirConfig & store,
     std::istringstream & str,
     DerivationATermVersion version)
 {
@@ -337,7 +337,7 @@ static DerivedPathMap<StringSet>::ChildNode parseDerivedPathMapNode(
 
 
 Derivation parseDerivation(
-    const Store & store, std::string && s, std::string_view name,
+    const StoreDirConfig & store, std::string && s, std::string_view name,
     const ExperimentalFeatureSettings & xpSettings)
 {
     Derivation drv;
@@ -470,7 +470,7 @@ static void printUnquotedStrings(std::string & res, ForwardIterator i, ForwardIt
 }
 
 
-static void unparseDerivedPathMapNode(const Store & store, std::string & s, const DerivedPathMap<StringSet>::ChildNode & node)
+static void unparseDerivedPathMapNode(const StoreDirConfig & store, std::string & s, const DerivedPathMap<StringSet>::ChildNode & node)
 {
     s += ',';
     if (node.childMap.empty()) {
@@ -511,7 +511,7 @@ static bool hasDynamicDrvDep(const Derivation & drv)
 }
 
 
-std::string Derivation::unparse(const Store & store, bool maskOutputs,
+std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
     DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const
 {
     std::string s;
@@ -845,7 +845,7 @@ std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation &
 }
 
 
-static DerivationOutput readDerivationOutput(Source & in, const Store & store)
+static DerivationOutput readDerivationOutput(Source & in, const StoreDirConfig & store)
 {
     const auto pathS = readString(in);
     const auto hashAlgo = readString(in);
@@ -862,7 +862,7 @@ StringSet BasicDerivation::outputNames() const
     return names;
 }
 
-DerivationOutputsAndOptPaths BasicDerivation::outputsAndOptPaths(const Store & store) const
+DerivationOutputsAndOptPaths BasicDerivation::outputsAndOptPaths(const StoreDirConfig & store) const
 {
     DerivationOutputsAndOptPaths outsAndOptPaths;
     for (auto & [outputName, output] : outputs)
@@ -884,7 +884,7 @@ std::string_view BasicDerivation::nameFromPath(const StorePath & drvPath)
 }
 
 
-Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv, std::string_view name)
+Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivation & drv, std::string_view name)
 {
     drv.name = name;
 
@@ -912,7 +912,7 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
 }
 
 
-void writeDerivation(Sink & out, const Store & store, const BasicDerivation & drv)
+void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv)
 {
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
@@ -1153,7 +1153,7 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 const Hash impureOutputHash = hashString(htSHA256, "impure");
 
 nlohmann::json DerivationOutput::toJSON(
-    const Store & store, std::string_view drvName, OutputNameView outputName) const
+    const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const
 {
     nlohmann::json res = nlohmann::json::object();
     std::visit(overloaded {
@@ -1180,7 +1180,7 @@ nlohmann::json DerivationOutput::toJSON(
 
 
 DerivationOutput DerivationOutput::fromJSON(
-    const Store & store, std::string_view drvName, OutputNameView outputName,
+    const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName,
     const nlohmann::json & _json,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -1249,7 +1249,7 @@ DerivationOutput DerivationOutput::fromJSON(
 }
 
 
-nlohmann::json Derivation::toJSON(const Store & store) const
+nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
 {
     nlohmann::json res = nlohmann::json::object();
 
@@ -1302,7 +1302,7 @@ nlohmann::json Derivation::toJSON(const Store & store) const
 
 
 Derivation Derivation::fromJSON(
-    const Store & store,
+    const StoreDirConfig & store,
     const nlohmann::json & json,
     const ExperimentalFeatureSettings & xpSettings)
 {

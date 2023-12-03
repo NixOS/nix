@@ -1,5 +1,6 @@
 #include "primops.hh"
 #include "store-api.hh"
+#include "realisation.hh"
 #include "make-content-addressed.hh"
 #include "url.hh"
 

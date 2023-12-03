@@ -152,7 +152,7 @@ in {
           ./misc
           ./precompiled-headers.h
           ./src
-          ./unit-test-data
+          ./tests/unit
           ./COPYING
           ./scripts/local.mk
         ] ++ lib.optionals anySortOfTesting [
@@ -297,10 +297,7 @@ in {
       -change ${boost}/lib/libboost_context.dylib \
       $out/lib/libboost_context.dylib \
       $out/lib/libnixutil.dylib
-      install_name_tool \
-      -change ${boost}/lib/libboost_regex.dylib \
-      $out/lib/libboost_regex.dylib \
-      $out/lib/libnixexpr.dylib
+      install_name_tool
     ''
   ) + lib.optionalString enableInternalAPIDocs ''
     mkdir -p ''${!outputDoc}/nix-support

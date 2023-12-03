@@ -17,7 +17,6 @@
 #include "primops.hh"
 
 #include <boost/container/small_vector.hpp>
-#include <boost/regex.hpp>
 #include <nlohmann/json.hpp>
 
 #include <sys/types.h>
@@ -26,6 +25,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <regex>
 #include <dlfcn.h>
 
 #include <cmath>
@@ -3886,30 +3886,19 @@ static RegisterPrimOp primop_convertHash({
     .fun = prim_convertHash,
 });
 
-// regex aliases, switch between boost and std
-using regex = boost::regex;
-using regex_error = boost::regex_error;
-using cmatch = boost::cmatch;
-using cregex_iterator = boost::cregex_iterator;
-namespace regex_constants = boost::regex_constants;
-// overloaded function alias
-constexpr auto regex_match = [] (auto &&...args) {
-    return boost::regex_match(std::forward<decltype(args)>(args)...);
- };
-
 struct RegexCache
 {
     // TODO use C++20 transparent comparison when available
-    std::unordered_map<std::string_view, regex> cache;
+    std::unordered_map<std::string_view, std::regex> cache;
     std::list<std::string> keys;
 
-    regex get(std::string_view re)
+    std::regex get(std::string_view re)
     {
         auto it = cache.find(re);
         if (it != cache.end())
             return it->second;
         keys.emplace_back(re);
-        return cache.emplace(keys.back(), regex(keys.back(), regex::extended)).first->second;
+        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
     }
 };
 
@@ -3929,8 +3918,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.match");
 
-        cmatch match;
-        if (!regex_match(str.begin(), str.end(), match, regex)) {
+        std::cmatch match;
+        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
             v.mkNull();
             return;
         }
@@ -3945,8 +3934,8 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                 (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
         }
 
-    } catch (regex_error & e) {
-        if (e.code() == regex_constants::error_space) {
+    } catch (std::regex_error & e) {
+        if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -4009,8 +3998,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         NixStringContext context;
         const auto str = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.split");
 
-        auto begin = cregex_iterator(str.begin(), str.end(), regex);
-        auto end = cregex_iterator();
+        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
+        auto end = std::cregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
@@ -4049,8 +4038,8 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         assert(idx == 2 * len + 1);
 
-    } catch (regex_error & e) {
-        if (e.code() == regex_constants::error_space) {
+    } catch (std::regex_error & e) {
+        if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("memory limit exceeded by regular expression '%s'", re),
@@ -4411,7 +4400,7 @@ void EvalState::createBaseEnv()
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
-          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-system).
 
           It can be used to set the `system` attribute for [`builtins.derivation`](@docroot@/language/derivations.md) such that the resulting derivation can be built on the same system that evaluates the Nix expression:
 
@@ -4460,7 +4449,7 @@ void EvalState::createBaseEnv()
         .doc = R"(
           Logical file system location of the [Nix store](@docroot@/glossary.md#gloss-store) currently in use.
 
-          This value is determined by the `store` parameter in [Store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md):
+          This value is determined by the `store` parameter in [Store URLs](@docroot@/store/types/index.md#store-url-format):
 
           ```shell-session
           $ nix-instantiate --store 'dummy://?store=/blah' --eval --expr builtins.storeDir

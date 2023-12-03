@@ -1,4 +1,4 @@
-#include "store-api.hh"
+#include "store-dir-config.hh"
 
 #include <sodium.h>
 
@@ -54,7 +54,7 @@ StorePath StorePath::random(std::string_view name)
     return StorePath(hash, name);
 }
 
-StorePath Store::parseStorePath(std::string_view path) const
+StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 {
     auto p = canonPath(std::string(path));
     if (dirOf(p) != storeDir)
@@ -62,7 +62,7 @@ StorePath Store::parseStorePath(std::string_view path) const
     return StorePath(baseNameOf(p));
 }
 
-std::optional<StorePath> Store::maybeParseStorePath(std::string_view path) const
+std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
 {
     try {
         return parseStorePath(path);
@@ -71,24 +71,24 @@ std::optional<StorePath> Store::maybeParseStorePath(std::string_view path) const
     }
 }
 
-bool Store::isStorePath(std::string_view path) const
+bool StoreDirConfig::isStorePath(std::string_view path) const
 {
     return (bool) maybeParseStorePath(path);
 }
 
-StorePathSet Store::parseStorePathSet(const PathSet & paths) const
+StorePathSet StoreDirConfig::parseStorePathSet(const PathSet & paths) const
 {
     StorePathSet res;
     for (auto & i : paths) res.insert(parseStorePath(i));
     return res;
 }
 
-std::string Store::printStorePath(const StorePath & path) const
+std::string StoreDirConfig::printStorePath(const StorePath & path) const
 {
     return (storeDir + "/").append(path.to_string());
 }
 
-PathSet Store::printStorePathSet(const StorePathSet & paths) const
+PathSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
 {
     PathSet res;
     for (auto & i : paths) res.insert(printStorePath(i));

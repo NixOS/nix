@@ -8,4 +8,6 @@ let
 
       ${doc}
     '';
-in xps: (concatStringsSep "\n" (attrValues (mapAttrs showExperimentalFeature xps)))
+in
+
+xps: (concatStringsSep "\n" (attrValues (mapAttrs showExperimentalFeature xps)))

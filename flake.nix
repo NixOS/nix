@@ -196,7 +196,6 @@
                 versionSuffix
                 ;
               busybox-sandbox-shell = final.busybox-sandbox-shell or default-busybox-sandbox-shell;
-              boost = final.boost.override { enableIcu = false; };
               libgit2 = final.libgit2.overrideAttrs (attrs: {
                 src = libgit2;
                 version = libgit2.lastModifiedDate;

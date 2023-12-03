@@ -117,10 +117,11 @@ public:
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
         R"(
-          The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
           to use for most operations.
-          See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md)
-          for supported store types and settings.
+          See the
+          [Store Types](@docroot@/store/types/index.md)
+          section of the manual for supported store types and settings.
         )"};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
@@ -200,7 +201,7 @@ public:
           Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
-          The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
+          The following system types are widely used, as Nix is actively supported on these platforms:
 
           - `x86_64-linux`
           - `x86_64-darwin`
@@ -759,8 +760,8 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store]{@docroot@/glossary.md##gloss-store} from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
@@ -778,7 +779,7 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
-          A list of [Nix store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format), separated by whitespace.
+          A list of [Nix store URLs](@docroot@/store/types/index.md#store-url-format), separated by whitespace.
           These are not used by default, but users of the Nix daemon can enable them by specifying [`substituters`](#conf-substituters).
 
           Unprivileged users (those set in only [`allowed-users`](#conf-allowed-users) but not [`trusted-users`](#conf-trusted-users)) can pass as `substituters` only those URLs listed in `trusted-substituters`.

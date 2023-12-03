@@ -13,7 +13,7 @@ namespace nix {
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
 
-class Store;
+struct StoreDirConfig;
 struct Source;
 
 // items being serialised
@@ -72,8 +72,8 @@ struct ServeProto
     // See `worker-protocol.hh` for a longer explanation.
 #if 0
     {
-        static T read(const Store & store, ReadConn conn);
-        static void write(const Store & store, WriteConn conn, const T & t);
+        static T read(const StoreDirConfig & store, ReadConn conn);
+        static void write(const StoreDirConfig & store, WriteConn conn, const T & t);
     };
 #endif
 
@@ -82,7 +82,7 @@ struct ServeProto
      * infer the type instead of having to write it down explicitly.
      */
     template<typename T>
-    static void write(const Store & store, WriteConn conn, const T & t)
+    static void write(const StoreDirConfig & store, WriteConn conn, const T & t)
     {
         ServeProto::Serialise<T>::write(store, conn, t);
     }
@@ -135,8 +135,8 @@ inline std::ostream & operator << (std::ostream & s, ServeProto::Command op)
 #define DECLARE_SERVE_SERIALISER(T) \
     struct ServeProto::Serialise< T > \
     { \
-        static T read(const Store & store, ServeProto::ReadConn conn); \
-        static void write(const Store & store, ServeProto::WriteConn conn, const T & t); \
+        static T read(const StoreDirConfig & store, ServeProto::ReadConn conn); \
+        static void write(const StoreDirConfig & store, ServeProto::WriteConn conn, const T & t); \
     };
 
 template<>
