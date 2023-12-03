@@ -363,6 +363,9 @@ in {
       # We have to build the manual to build unreleased notes, as those
       # are part of the manual
       (buildUnreleasedNotes -> enableManual)
+      # The build process for the manual currently requires extracting
+      # data from the Nix executable we are trying to document.
+      (enableManual -> doBuild)
     ]);
   };
 
