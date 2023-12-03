@@ -2,9 +2,6 @@
 , callPackage
 , stdenv
 , releaseTools
-, versionSuffix ? ""
-, officialRelease ? false
-, buildUnreleasedNotes ? false
 , autoconf-archive
 , autoreconfHook
 , aws-sdk-cpp
@@ -43,21 +40,25 @@
 , busybox-sandbox-shell ? null
 
 # Configuration Options
-#
+#:
 # This probably seems like too many degrees of freedom, but it
 # faithfully reflects how the underlying configure + make build system
 # work. The top-level flake.nix will choose useful combinations.
 
 , pname ? "nix"
 
+, versionSuffix ? ""
+, officialRelease ? false
+
 , doBuild ? true
 , doCheck ? __forDefaults.canRunInstalled
-, doInstallCheck ? __forDefaults.canRunInstalled
+, doInstallCheck ? test-client != null || __forDefaults.canRunInstalled
 
 , withCoverageChecks ? false
 
 # Whether to build the regular manual
 , enableManual ? __forDefaults.canRunInstalled
+, buildUnreleasedNotes ? false
 # Whether to build the internal API docs, can be done separately from
 # everything else.
 , enableInternalAPIDocs ? false
@@ -115,7 +116,11 @@ let
 
   mkDerivation =
     if withCoverageChecks
-    then releaseTools.coverageAnalysis
+    then
+      # TODO support `finalAttrs` args function in
+      # `releaseTools.coverageAnalysis`.
+      argsFun:
+         releaseTools.coverageAnalysis (let args = argsFun args; in args)
     else stdenv.mkDerivation;
 in
 
@@ -146,6 +151,7 @@ in {
         fileset = fileset.intersect filesets.baseFiles (fileset.unions ([
           filesets.configureFiles
           filesets.topLevelBuildFiles
+          ./doc/internal-api
         ] ++ lib.optionals doBuild [
           ./boehmgc-coroutine-sp-fallback.diff
           ./doc
@@ -170,20 +176,24 @@ in {
     ++ lib.optional installUnitTests "check";
 
   nativeBuildInputs = [
-    bison
-    flex
-    (lib.getBin lowdown)
-    jq # Also for custom mdBook preprocessor.
-    mdbook
-    mdbook-linkcheck
     autoconf-archive
     autoreconfHook
     pkg-config
-  ]
-  ++ lib.optional stdenv.hostPlatform.isLinux util-linux
-  # Official releases don't have rl-next, so we don't need to compile a
-  # changelog
-  ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d;
+  ] ++ lib.optionals doBuild [
+    bison
+    flex
+  ] ++ lib.optionals enableManual [
+    (lib.getBin lowdown)
+    mdbook
+    mdbook-linkcheck
+  ] ++ lib.optionals (doInstallCheck || enableManual) [
+    jq # Also for custom mdBook preprocessor.
+  ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
+    # Official releases don't have rl-next, so we don't need to compile a
+    # changelog
+    ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d
+    ++ lib.optional enableInternalAPIDocs doxygen
+  ;
 
   buildInputs = lib.optionals doBuild [
     boost
@@ -225,13 +235,11 @@ in {
     git
     mercurial
     openssh
-  ] ++ lib.optionals enableInternalAPIDocs [
-    doxygen
   ];
 
   disallowedReferences = [ boost ];
 
-  preConfigure = lib.optionalString (! stdenv.hostPlatform.isStatic) ''
+  preConfigure = lib.optionalString (doBuild && ! stdenv.hostPlatform.isStatic) ''
     # Copy libboost_context so we don't get all of Boost in our closure.
     # https://github.com/NixOS/nixpkgs/issues/45462
     mkdir -p $out/lib
@@ -307,7 +315,14 @@ in {
   doInstallCheck = attrs.doInstallCheck;
 
   installCheckFlags = "sysconfdir=$(out)/etc";
-  installCheckTarget = "installcheck"; # work around buggy detection in stdenv
+  # work around buggy detection in stdenv
+  installCheckTarget = "installcheck";
+
+  # work around weird bug where it doesn't want to do anything
+  installCheckPhase = if (!doBuild && doInstallCheck) then ''
+    mkdir -p src/nix-channel
+    make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
+  '' else null;
 
   # Needed for tests if we are not doing a build, but testing existing
   # built Nix.
@@ -317,7 +332,9 @@ in {
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
-  strictDeps = true;
+  # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
+  # to work with `strictDeps`.
+  strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 

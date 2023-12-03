@@ -123,8 +123,20 @@
           '';
 
       testNixVersions = pkgs: client: daemon:
-        pkgs.callPackage ./test-nix-versions.nix {
-          inherit client daemon fileset;
+        pkgs.callPackage ./package.nix {
+          pname =
+            "nix-tests"
+            + lib.optionalString
+              (lib.versionAtLeast daemon.version "2.4pre20211005" &&
+               lib.versionAtLeast client.version "2.4pre20211005")
+              "-${client.version}-against-${daemon.version}";
+
+          inherit fileset;
+
+          test-client = client;
+          test-daemon = daemon;
+
+          doBuild = false;
         };
 
       binaryTarball = nix: pkgs: pkgs.callPackage ./binary-tarball.nix {
@@ -134,16 +146,47 @@
       overlayFor = getStdenv: final: prev:
         let
           stdenv = getStdenv final;
-
-          lowdown-nix = final.callPackage ./lowdown.nix {
-            inherit lowdown-src stdenv;
-          };
         in
         {
           nixStable = prev.nix;
 
           # Forward from the previous stage as we don’t want it to pick the lowdown override
           inherit (prev) nixUnstable;
+
+          default-busybox-sandbox-shell = final.busybox.override {
+            useMusl = true;
+            enableStatic = true;
+            enableMinimal = true;
+            extraConfig = ''
+              CONFIG_FEATURE_FANCY_ECHO y
+              CONFIG_FEATURE_SH_MATH y
+              CONFIG_FEATURE_SH_MATH_64 y
+
+              CONFIG_ASH y
+              CONFIG_ASH_OPTIMIZE_FOR_SIZE y
+
+              CONFIG_ASH_ALIAS y
+              CONFIG_ASH_BASH_COMPAT y
+              CONFIG_ASH_CMDCMD y
+              CONFIG_ASH_ECHO y
+              CONFIG_ASH_GETOPTS y
+              CONFIG_ASH_INTERNAL_GLOB y
+              CONFIG_ASH_JOB_CONTROL y
+              CONFIG_ASH_PRINTF y
+              CONFIG_ASH_TEST y
+            '';
+          };
+
+          lowdown-nix = final.callPackage ./lowdown.nix {
+            inherit lowdown-src stdenv;
+          };
+
+          libgit2-nix = final.libgit2.overrideAttrs (attrs: {
+            src = libgit2;
+            version = libgit2.lastModifiedDate;
+            cmakeFlags = attrs.cmakeFlags or []
+              ++ [ "-DUSE_SSH=exec" ];
+          });
 
           nix =
             let
@@ -152,30 +195,6 @@
                 if officialRelease
                 then ""
                 else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
-
-              default-busybox-sandbox-shell = final.busybox.override {
-                useMusl = true;
-                enableStatic = true;
-                enableMinimal = true;
-                extraConfig = ''
-                  CONFIG_FEATURE_FANCY_ECHO y
-                  CONFIG_FEATURE_SH_MATH y
-                  CONFIG_FEATURE_SH_MATH_64 y
-
-                  CONFIG_ASH y
-                  CONFIG_ASH_OPTIMIZE_FOR_SIZE y
-
-                  CONFIG_ASH_ALIAS y
-                  CONFIG_ASH_BASH_COMPAT y
-                  CONFIG_ASH_CMDCMD y
-                  CONFIG_ASH_ECHO y
-                  CONFIG_ASH_GETOPTS y
-                  CONFIG_ASH_INTERNAL_GLOB y
-                  CONFIG_ASH_JOB_CONTROL y
-                  CONFIG_ASH_PRINTF y
-                  CONFIG_ASH_TEST y
-                '';
-              };
 
               boehmgc = (final.boehmgc.override {
                 enableLargeConfig = true;
@@ -195,18 +214,11 @@
                 stdenv
                 versionSuffix
                 ;
-              busybox-sandbox-shell = final.busybox-sandbox-shell or default-busybox-sandbox-shell;
-              libgit2 = final.libgit2.overrideAttrs (attrs: {
-                src = libgit2;
-                version = libgit2.lastModifiedDate;
-                cmakeFlags = attrs.cmakeFlags or []
-                  ++ [ "-DUSE_SSH=exec" ];
-              });
-              lowdown = lowdown-nix;
               officialRelease = false;
+              libgit2 = final.libgit2-nix;
+              lowdown = final.lowdown-nix;
+              busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
             };
-
-            inherit lowdown-nix;
           };
 
     in {
@@ -272,7 +284,10 @@
         dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
         # Line coverage analysis.
-        coverage = nixpkgsFor.x86_64-linux.native.callPackage ./coverage.nix {};
+        coverage = nixpkgsFor.x86_64-linux.native.nix.override {
+          pname = "nix-coverage";
+          withCoverageChecks = true;
+        };
 
         # API docs for Nix's unstable internal C++ interfaces.
         internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
