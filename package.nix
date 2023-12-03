@@ -38,6 +38,17 @@
 , sqlite
 , util-linux
 , xz
+
+# Configuration Options
+#
+# This probably seems like too many degrees of freedom, but it
+# faithfully reflects how the underlying configure + make build system
+# work. The top-level flake.nix will choose useful combinations.
+
+# Whether to install unit tests. This is useful when cross compiling
+# since we cannot run them natively during the build, but can do so
+# later.
+, installUnitTests ? stdenv.hostPlatform != stdenv.buildPlatform
 }:
 
 let
@@ -69,7 +80,13 @@ let
   };
 in
 
-stdenv.mkDerivation (finalAttrs: {
+stdenv.mkDerivation (finalAttrs: let
+
+  # Either running the unit tests during the build, or installing them
+  # to be run later, requiresthe unit tests to be built.
+  buildUnitTests = finalAttrs.doCheck || installUnitTests;
+
+in {
   pname = "nix";
   inherit version;
 
@@ -97,7 +114,7 @@ stdenv.mkDerivation (finalAttrs: {
   VERSION_SUFFIX = versionSuffix;
 
   outputs = [ "out" "dev" "doc" ]
-    ++ lib.optional (stdenv.hostPlatform != stdenv.buildPlatform) "check";
+    ++ lib.optional installUnitTests "check";
 
   nativeBuildInputs = [
     bison
@@ -142,7 +159,7 @@ stdenv.mkDerivation (finalAttrs: {
     })
   ;
 
-  doCheck = true;
+  doCheck = stdenv.hostPlatform != stdenv.buildPlatform;
 
   checkInputs = [
     # see buildInputs. The configure script always wants its test libs
@@ -190,14 +207,12 @@ stdenv.mkDerivation (finalAttrs: {
       "LDFLAGS=-fuse-ld=gold"
     ++ [ "--sysconfdir=/etc" ]
     ++ lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell"
-    ++ [ (lib.enableFeature finalAttrs.doCheck "tests") ]
-    ++ lib.optionals finalAttrs.doCheck (
-      [ "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include" ]
-      ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
-        "--enable-install-unit-tests"
-        "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
-        "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
-      ])
+    ++ lib.optional buildUnitTests "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+    ++ lib.optionals installUnitTests [
+      "--enable-install-unit-tests"
+      "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+      "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
+    ]
     ++ lib.optional (!canRunInstalled) "--disable-doc-gen";
 
   enableParallelBuilding = true;
