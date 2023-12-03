@@ -89,38 +89,17 @@
         });
 
       installScriptFor = systems:
-        with nixpkgsFor.x86_64-linux.native;
-        runCommand "installer-script"
-          { buildInputs = [ nix ];
-          }
-          ''
-            mkdir -p $out/nix-support
-
-            # Converts /nix/store/50p3qk8k...-nix-2.4pre20201102_550e11f/bin/nix to 50p3qk8k.../bin/nix.
-            tarballPath() {
-              # Remove the store prefix
-              local path=''${1#${builtins.storeDir}/}
-              # Get the path relative to the derivation root
-              local rest=''${path#*/}
-              # Get the derivation hash
-              local drvHash=''${path%%-*}
-              echo "$drvHash/$rest"
-            }
-
-            substitute ${./scripts/install.in} $out/install \
-              ${pkgs.lib.concatMapStrings
-                (system: let
-                    tarball = if builtins.elem system crossSystems then self.hydraJobs.binaryTarballCross.x86_64-linux.${system} else self.hydraJobs.binaryTarball.${system};
-                  in '' \
-                  --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
-                  --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
-                  ''
-                )
-                systems
-              } --replace '@nixVersion@' ${version}
-
-            echo "file installer $out/install" >> $out/nix-support/hydra-build-products
-          '';
+        nixpkgsFor.x86_64-linux.native.callPackage ./scripts/installer.nix {
+          systemTarballPairs = map
+            (system: {
+              inherit system;
+              tarball =
+                if builtins.elem system crossSystems
+                then self.hydraJobs.binaryTarballCross.x86_64-linux.${system}
+                else self.hydraJobs.binaryTarball.${system};
+            })
+            systems;
+        };
 
       testNixVersions = pkgs: client: daemon:
         pkgs.callPackage ./package.nix {
