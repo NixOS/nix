@@ -139,7 +139,7 @@
           doBuild = false;
         };
 
-      binaryTarball = nix: pkgs: pkgs.callPackage ./binary-tarball.nix {
+      binaryTarball = nix: pkgs: pkgs.callPackage ./scripts/binary-tarball.nix {
         inherit nix;
       };
 

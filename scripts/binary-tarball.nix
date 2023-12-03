@@ -21,18 +21,18 @@ in
 
 runCommand "nix-binary-tarball-${version}" env ''
   cp ${installerClosureInfo}/registration $TMPDIR/reginfo
-  cp ${./scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-  substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
+  cp ${./create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
+  substitute ${./install-nix-from-closure.sh} $TMPDIR/install \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
 
-  substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
+  substitute ${./install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
-  substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
+  substitute ${./install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
-  substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
+  substitute ${./install-multi-user.sh} $TMPDIR/install-multi-user \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
 
