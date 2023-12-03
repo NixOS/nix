@@ -354,8 +354,6 @@ in {
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   passthru = {
-    inherit filesets;
-
     perl-bindings = callPackage ./perl {
       inherit fileset stdenv;
     };
