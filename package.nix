@@ -36,10 +36,11 @@
 , openssl
 , pkg-config
 , rapidcheck
-, sh
 , sqlite
 , util-linux
 , xz
+
+, busybox-sandbox-shell ? null
 
 # Configuration Options
 #
@@ -50,11 +51,13 @@
 , pname ? "nix"
 
 , doBuild ? true
-, doCheck ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
-, doInstallCheck ? stdenv.buildPlatform.canExecute stdenv.hostPlatform
+, doCheck ? __forDefaults.canRunInstalled
+, doInstallCheck ? __forDefaults.canRunInstalled
 
 , withCoverageChecks ? false
 
+# Whether to build the regular manual
+, enableManual ? __forDefaults.canRunInstalled
 # Whether to build the internal API docs, can be done separately from
 # everything else.
 , enableInternalAPIDocs ? false
@@ -62,16 +65,26 @@
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
 # later.
-, installUnitTests ? stdenv.hostPlatform != stdenv.buildPlatform
+, installUnitTests ? __forDefaults.canRunInstalled
 
+# For running the functional tests against a pre-built Nix. Probably
+# want to use in conjunction with `doBuild = false;`.
 , test-daemon ? null
 , test-client ? null
-}:
+
+# Not a real argument, just the only way to approximate let-binding some
+# stuff for argument defaults.
+, __forDefaults ? {
+    canRunInstalled = doBuild && stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+  }
+} @ attrs0:
 
 let
   version = lib.fileContents ./.version + versionSuffix;
-  canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
 
+  # selected attributes with defaults, will be used to define some
+  # things which should instead be gotten via `finalAttrs` in order to
+  # work with overriding.
   attrs = {
     inherit doBuild doCheck doInstallCheck;
   };
@@ -149,7 +162,11 @@ in {
 
   VERSION_SUFFIX = versionSuffix;
 
-  outputs = [ "out" "dev" "doc" ]
+  outputs = [ "out" ]
+    ++ lib.optional doBuild "dev"
+    # If we are doing just build or just docs, the one thing will use
+    # "out". We only need additional outputs if we are doing both.
+    ++ lib.optional (doBuild && (enableManual || enableInternalAPIDocs)) "doc"
     ++ lib.optional installUnitTests "check";
 
   nativeBuildInputs = [
@@ -164,10 +181,11 @@ in {
     pkg-config
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux util-linux
-  # Official releases don't have rl-next, so we don't need to compile a changelog
+  # Official releases don't have rl-next, so we don't need to compile a
+  # changelog
   ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d;
 
-  buildInputs = [
+  buildInputs = lib.optionals doBuild [
     boost
     brotli
     bzip2
@@ -180,19 +198,14 @@ in {
     openssl
     sqlite
     xz
-
-    # These could be checkInputs but the configure phase fails w/o them
-    gtest
-    rapidcheck
-  ]
-  ++ lib.optional stdenv.isLinux libseccomp
-  ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
-  # There have been issues building these dependencies
-  ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
-    (aws-sdk-cpp.override {
-      apis = ["s3" "transfer"];
-      customMemoryManagement = false;
-    })
+  ] ++ lib.optional stdenv.isLinux libseccomp
+    ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
+    # There have been issues building these dependencies
+    ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
+      (aws-sdk-cpp.override {
+        apis = ["s3" "transfer"];
+        customMemoryManagement = false;
+      })
   ;
 
   propagatedBuildInputs = [
@@ -204,7 +217,8 @@ in {
   doCheck = attrs.doCheck;
 
   checkInputs = [
-    # see buildInputs. The configure script always wants its test libs
+    gtest
+    rapidcheck
   ];
 
   nativeCheckInputs = [
@@ -242,17 +256,17 @@ in {
     (lib.enableFeature doBuild "build")
     (lib.enableFeature anySortOfTesting "test")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
-    (lib.enableFeature canRunInstalled "doc-gen")
+    (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature installUnitTests "install-unit-tests")
   ] ++ lib.optionals installUnitTests [
     "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
     "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
-  ] ++ lib.optionals stdenv.isLinux [
+  ] ++ lib.optionals (doBuild && stdenv.isLinux) [
     "--with-boost=${boost}/lib"
-    "--with-sandbox-shell=${sh}/bin/busybox"
-  ] ++ lib.optional (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
+    "--with-sandbox-shell=${busybox-sandbox-shell}/bin/busybox"
+  ] ++ lib.optional (doBuild && stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
        "LDFLAGS=-fuse-ld=gold"
-    ++ lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell"
+    ++ lib.optional (doBuild && stdenv.hostPlatform.isStatic) "--enable-embedded-sandbox-shell"
     ++ lib.optional buildUnitTests "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include";
 
   enableParallelBuilding = true;
@@ -271,14 +285,14 @@ in {
     mkdir -p $out
   '';
 
-  postInstall = lib.optionalString doBuild ''
-    mkdir -p $doc/nix-support
-    echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-    ${lib.optionalString stdenv.hostPlatform.isStatic ''
+  postInstall = lib.optionalString doBuild (
+    ''
+      mkdir -p $doc/nix-support
+      echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+    '' + lib.optionalString stdenv.hostPlatform.isStatic ''
       mkdir -p $out/nix-support
       echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
-    ''}
-    ${lib.optionalString stdenv.isDarwin ''
+    '' + lib.optionalString stdenv.isDarwin ''
       install_name_tool \
       -change ${boost}/lib/libboost_context.dylib \
       $out/lib/libboost_context.dylib \
@@ -287,10 +301,10 @@ in {
       -change ${boost}/lib/libboost_regex.dylib \
       $out/lib/libboost_regex.dylib \
       $out/lib/libnixexpr.dylib
-    ''}
-  '' + lib.optionalString enableInternalAPIDocs ''
-    mkdir -p $out/nix-support
-    echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> $out/nix-support/hydra-build-products
+    ''
+  ) + lib.optionalString enableInternalAPIDocs ''
+    mkdir -p ''${!outputDoc}/nix-support
+    echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
 
   doInstallCheck = attrs.doInstallCheck;

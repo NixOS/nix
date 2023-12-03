@@ -153,7 +153,7 @@
                 then ""
                 else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
-              sh = final.busybox-sandbox-shell or (final.busybox.override {
+              default-busybox-sandbox-shell = final.busybox.override {
                 useMusl = true;
                 enableStatic = true;
                 enableMinimal = true;
@@ -175,7 +175,7 @@
                   CONFIG_ASH_PRINTF y
                   CONFIG_ASH_TEST y
                 '';
-              });
+              };
 
               boehmgc = (final.boehmgc.override {
                 enableLargeConfig = true;
@@ -192,10 +192,10 @@
               inherit
                 boehmgc
                 fileset
-                sh
                 stdenv
                 versionSuffix
                 ;
+              busybox-sandbox-shell = final.busybox-sandbox-shell or default-busybox-sandbox-shell;
               boost = final.boost.override { enableIcu = false; };
               libgit2 = final.libgit2.overrideAttrs (attrs: {
                 src = libgit2;
@@ -277,9 +277,8 @@
 
         # API docs for Nix's unstable internal C++ interfaces.
         internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+          inherit fileset;
           doBuild = false;
-          doCheck = false;
-          doInstallCheck = false;
           enableInternalAPIDocs = true;
         };
 
