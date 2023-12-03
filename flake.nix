@@ -197,7 +197,16 @@
               libgit2 = final.libgit2-nix;
               lowdown = final.lowdown-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+            } // {
+              # this is a proper separate downstream package, but put
+              # here also for back compat reasons.
+              perl-bindings = final.nix-perl-bindings;
             };
+
+            nix-perl-bindings = final.callPackage ./perl {
+              inherit fileset stdenv;
+            };
+
           };
 
     in {

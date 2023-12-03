@@ -1,5 +1,4 @@
 { lib
-, callPackage
 , stdenv
 , releaseTools
 , autoconf-archive
@@ -352,12 +351,6 @@ in {
   strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
-
-  passthru = {
-    perl-bindings = callPackage ./perl {
-      inherit fileset stdenv;
-    };
-  };
 
   meta = {
     platforms = lib.platforms.unix;
