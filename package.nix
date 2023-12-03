@@ -329,10 +329,10 @@ in {
   doInstallCheck = attrs.doInstallCheck;
 
   installCheckFlags = "sysconfdir=$(out)/etc";
-  # work around buggy detection in stdenv
+  # Work around buggy detection in stdenv.
   installCheckTarget = "installcheck";
 
-  # work around weird bug where it doesn't want to do anything
+  # Work around weird bug where it doesn't think there is a Makefile.
   installCheckPhase = if (!doBuild && doInstallCheck) then ''
     mkdir -p src/nix-channel
     make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
