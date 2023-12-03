@@ -254,7 +254,7 @@ in {
   configureFlags = [
     "--sysconfdir=/etc"
     (lib.enableFeature doBuild "build")
-    (lib.enableFeature anySortOfTesting "test")
+    (lib.enableFeature anySortOfTesting "tests")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature installUnitTests "install-unit-tests")
