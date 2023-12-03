@@ -43,22 +43,37 @@
 #:
 # This probably seems like too many degrees of freedom, but it
 # faithfully reflects how the underlying configure + make build system
-# work. The top-level flake.nix will choose useful combinations.
+# work. The top-level flake.nix will choose useful combinations of these
+# options to CI.
 
 , pname ? "nix"
 
 , versionSuffix ? ""
 , officialRelease ? false
 
+# Whether to build Nix. Useful to skip for tasks like (a) just
+# generating API docs or (b) testing existing pre-built versions of Nix
 , doBuild ? true
+
+# Run the unit tests as part of the build. See `installUnitTests` for an
+# alternative to this.
 , doCheck ? __forDefaults.canRunInstalled
+
+# Run the functional tests as part of the build.
 , doInstallCheck ? test-client != null || __forDefaults.canRunInstalled
 
+# Check test coverage of Nix. Probably want to use with with at least
+# one of `doCHeck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
 
 # Whether to build the regular manual
 , enableManual ? __forDefaults.canRunInstalled
+
+# Whether to compile `rl-next.md`, the release notes for the next
+# not-yet-released version of Nix in the manul, from the individual
+# change log entries in the directory.
 , buildUnreleasedNotes ? false
+
 # Whether to build the internal API docs, can be done separately from
 # everything else.
 , enableInternalAPIDocs ? false
@@ -350,8 +365,13 @@ in {
     platforms = lib.platforms.unix;
     mainProgram = "nix";
     broken = !(lib.all (a: a) [
+      # We cannot run or install unit tests if we don't build them or
+      # Nix proper (which they depend on).
       (installUnitTests -> doBuild)
       (doCheck -> doBuild)
+      # We have to build the manual to build unreleased notes, as those
+      # are part of the manual
+      (buildUnreleasedNotes -> enableManual)
     ]);
   };
 
