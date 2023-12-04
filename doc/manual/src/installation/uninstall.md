@@ -33,7 +33,7 @@ sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix 
 Remove build users and their group:
 
 ```console
-for i in $(seq 1 32); do
+for i in $(seq -w 1 32); do
   sudo userdel nixbld$i
 done
 sudo groupdel nixbld
