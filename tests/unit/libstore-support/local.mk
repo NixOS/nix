@@ -18,4 +18,4 @@ libstore-test-support_LIBS = \
     libutil-test-support \
     libstore libutil
 
-libstore-test-support_LDFLAGS := -lrapidcheck
+libstore-test-support_LDFLAGS := -pthread -lrapidcheck
