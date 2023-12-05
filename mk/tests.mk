@@ -2,17 +2,24 @@
 
 test-deps =
 
-define run-install-test
+define run-bash
 
-  installcheck: $1.test
+  .PHONY: $1
+  $1: $2
+	@env BASH=$(bash) $(bash) $3 < /dev/null
 
-  .PHONY: $1.test
-  $1.test: $1 $(test-deps)
-	@env BASH=$(bash) $(bash) mk/run-test.sh $1 < /dev/null
+endef
 
-  .PHONY: $1.test-debug
-  $1.test-debug: $1 $(test-deps)
-	@env BASH=$(bash) $(bash) mk/debug-test.sh $1 < /dev/null
+define run-test
+
+  $(eval $(call run-bash,$1.test,$1 $(test-deps),mk/run-test.sh $1 $2))
+  $(eval $(call run-bash,$1.test-debug,$1 $(test-deps),mk/debug-test.sh $1 $2))
+
+endef
+
+define run-test-group
+
+  .PHONY: $1.test-group
 
 endef
 

@@ -1,7 +1,7 @@
 #include "value-to-json.hh"
 #include "eval-inline.hh"
-#include "util.hh"
 #include "store-api.hh"
+#include "signals.hh"
 
 #include <cstdlib>
 #include <iomanip>
@@ -31,7 +31,7 @@ json printValueAsJSON(EvalState & state, bool strict,
 
         case nString:
             copyContext(v, context);
-            out = v.string.s;
+            out = v.c_str();
             break;
 
         case nPath:
@@ -43,6 +43,7 @@ json printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case nNull:
+            // already initialized as null
             break;
 
         case nAttrs: {
@@ -59,7 +60,13 @@ json printValueAsJSON(EvalState & state, bool strict,
                     names.emplace(state.symbols[j.name]);
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
-                    out[j] = printValueAsJSON(state, strict, *a.value, a.pos, context, copyToStore);
+                    try {
+                        out[j] = printValueAsJSON(state, strict, *a.value, a.pos, context, copyToStore);
+                    } catch (Error & e) {
+                        e.addTrace(state.positions[a.pos],
+                            hintfmt("while evaluating attribute '%1%'", j));
+                        throw;
+                    }
                 }
             } else
                 return printValueAsJSON(state, strict, *i->value, i->pos, context, copyToStore);
@@ -68,8 +75,17 @@ json printValueAsJSON(EvalState & state, bool strict,
 
         case nList: {
             out = json::array();
-            for (auto elem : v.listItems())
-                out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
+            int i = 0;
+            for (auto elem : v.listItems()) {
+                try {
+                    out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
+                } catch (Error & e) {
+                    e.addTrace({},
+                        hintfmt("while evaluating list element at index %1%", i));
+                    throw;
+                }
+                i++;
+            }
             break;
         }
 

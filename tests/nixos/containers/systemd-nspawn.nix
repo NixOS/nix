@@ -73,6 +73,8 @@ runCommand "test"
       --resolv-conf=off \
       --bind-ro=/nix/store \
       --bind=$out \
+      --bind=/proc:/run/host/proc \
+      --bind=/sys:/run/host/sys \
       --private-network \
       $toplevel/init
   ''

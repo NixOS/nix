@@ -44,6 +44,11 @@ inline std::string fmt(const std::string & s)
     return s;
 }
 
+inline std::string fmt(std::string_view s)
+{
+    return std::string(s);
+}
+
 inline std::string fmt(const char * s)
 {
     return s;

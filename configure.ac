@@ -5,7 +5,14 @@ AC_CONFIG_AUX_DIR(config)
 
 AC_PROG_SED
 
-# Construct a Nix system name (like "i686-linux").
+# Construct a Nix system name (like "i686-linux"):
+# https://www.gnu.org/software/autoconf/manual/html_node/Canonicalizing.html#index-AC_005fCANONICAL_005fHOST-1
+# The inital value is produced by the `config/config.guess` script:
+# upstream: https://git.savannah.gnu.org/cgit/config.git/tree/config.guess
+# It has the following form, which is not documented anywhere:
+# <cpu>-<vendor>-<os>[<version>][-<abi>]
+# If `./configure` is passed any of the `--host`, `--build`, `--target` options, the value comes from `config/config.sub` instead:
+# upstream: https://git.savannah.gnu.org/cgit/config.git/tree/config.sub
 AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
 
@@ -59,6 +66,9 @@ case "$host_os" in
     LDFLAGS="-lsocket -lnsl $LDFLAGS"
     ;;
 esac
+
+
+ENSURE_NO_GCC_BUG_80431
 
 
 # Check for pubsetbuf.
@@ -145,12 +155,29 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
+# Running the functional tests without building Nix is useful for testing
+# different pre-built versions of Nix against each other.
+AC_ARG_ENABLE(build, AS_HELP_STRING([--disable-build],[Do not build nix]),
+  ENABLE_BUILD=$enableval, ENABLE_BUILD=yes)
+AC_SUBST(ENABLE_BUILD)
 # Building without tests is useful for bootstrapping with a smaller footprint
 # or running the tests in a separate derivation. Otherwise, we do compile and
 # run them.
 AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
-  tests=$enableval, tests=yes)
-AC_SUBST(tests)
+  ENABLE_TESTS=$enableval, ENABLE_TESTS=yes)
+AC_SUBST(ENABLE_TESTS)
+
+AC_ARG_ENABLE(install-unit-tests, AS_HELP_STRING([--enable-install-unit-tests],[Install the unit tests for running later (default no)]),
+  INSTALL_UNIT_TESTS=$enableval, INSTALL_UNIT_TESTS=no)
+AC_SUBST(INSTALL_UNIT_TESTS)
+
+AC_ARG_WITH(check-bin-dir, AS_HELP_STRING([--with-check-bin-dir=PATH],[path to install unit tests for running later (defaults to $libexecdir/nix)]),
+  checkbindir=$withval, checkbindir=$libexecdir/nix)
+AC_SUBST(checkbindir)
+
+AC_ARG_WITH(check-lib-dir, AS_HELP_STRING([--with-check-lib-dir=PATH],[path to install unit tests for running later (defaults to $libdir)]),
+  checklibdir=$withval, checklibdir=$libdir)
+AC_SUBST(checklibdir)
 
 # Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
 AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
@@ -255,6 +282,8 @@ case "$host_os" in
 esac
 AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
+# Optional dependencies for better normalizing file system data
+AC_CHECK_HEADERS[sys/xattr.h]
 
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)
@@ -282,7 +311,7 @@ if test "$gc" = yes; then
 fi
 
 
-if test "$tests" = yes; then
+if test "$ENABLE_TESTS" = yes; then
 
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])
@@ -320,8 +349,14 @@ AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
+
 # Look for lowdown library.
 PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"])
+
+
+# Look for libgit2.
+PKG_CHECK_MODULES([LIBGIT2], [libgit2])
+
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])

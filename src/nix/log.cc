@@ -33,6 +33,17 @@ struct CmdLog : InstallableCommand
 
         auto b = installable->toDerivedPath();
 
+        // For compat with CLI today, TODO revisit
+        auto oneUp = std::visit(overloaded {
+            [&](const DerivedPath::Opaque & bo) {
+                return make_ref<SingleDerivedPath>(bo);
+            },
+            [&](const DerivedPath::Built & bfd) {
+                return bfd.drvPath;
+            },
+        }, b.path.raw());
+        auto path = resolveDerivedPath(*store, *oneUp);
+
         RunPager pager;
         for (auto & sub : subs) {
             auto * logSubP = dynamic_cast<LogStore *>(&*sub);
@@ -42,14 +53,7 @@ struct CmdLog : InstallableCommand
             }
             auto & logSub = *logSubP;
 
-            auto log = std::visit(overloaded {
-                [&](const DerivedPath::Opaque & bo) {
-                    return logSub.getBuildLog(bo.path);
-                },
-                [&](const DerivedPath::Built & bfd) {
-                    return logSub.getBuildLog(bfd.drvPath);
-                },
-            }, b.path.raw());
+            auto log = logSub.getBuildLog(path);
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());

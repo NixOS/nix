@@ -1,3 +1,9 @@
+include mk/build-dir.mk
+
+-include $(buildprefix)Makefile.config
+clean-files += $(buildprefix)Makefile.config
+
+ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
   mk/precompiled-headers.mk \
   local.mk \
@@ -15,20 +21,24 @@ makefiles = \
   misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
-  misc/upstart/local.mk \
-  doc/manual/local.mk \
-  doc/internal-api/local.mk
+  misc/upstart/local.mk
+endif
 
--include Makefile.config
-
-ifeq ($(tests), yes)
+ifeq ($(ENABLE_BUILD)_$(ENABLE_TESTS), yes_yes)
+UNIT_TEST_ENV = _NIX_TEST_UNIT_DATA=unit-test-data
 makefiles += \
   src/libutil/tests/local.mk \
   src/libstore/tests/local.mk \
-  src/libexpr/tests/local.mk \
-  tests/local.mk \
-  tests/test-libstoreconsumer/local.mk \
-  tests/plugins/local.mk
+  src/libexpr/tests/local.mk
+endif
+
+ifeq ($(ENABLE_TESTS), yes)
+makefiles += \
+  tests/functional/local.mk \
+  tests/functional/ca/local.mk \
+  tests/functional/dyn-drv/local.mk \
+  tests/functional/test-libstoreconsumer/local.mk \
+  tests/functional/plugins/local.mk
 else
 makefiles += \
   mk/disable-tests.mk
@@ -44,5 +54,12 @@ else
 endif
 
 include mk/lib.mk
+
+# Must be included after `mk/lib.mk` so rules refer to variables defined
+# by the library. Rules are not "lazy" like variables, unfortunately.
+ifeq ($(ENABLE_BUILD), yes)
+$(eval $(call include-sub-makefile, doc/manual/local.mk))
+$(eval $(call include-sub-makefile, doc/internal-api/local.mk))
+endif
 
 GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++2a -I src

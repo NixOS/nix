@@ -52,17 +52,18 @@ The following [concept map] shows its main components (rectangles), the objects 
                                             '---------------'
 ```
 
-At the top is the [command line interface](../command-ref/command-ref.md) that drives the underlying layers.
+At the top is the [command line interface](../command-ref/index.md) that drives the underlying layers.
 
 The [Nix language](../language/index.md) evaluator transforms Nix expressions into self-contained *build plans*, which are used to derive *build results* from referenced *build inputs*.
 
 The command line interface and Nix expressions are what users deal with most.
 
 > **Note**
+>
 > The Nix language itself does not have a notion of *packages* or *configurations*.
 > As far as we are concerned here, the inputs and results of a build plan are just data.
 
-Underlying the command line interface and the Nix language evaluator is the [Nix store](../glossary.md#gloss-store), a mechanism to keep track of build plans, data, and references between them.
+Underlying the command line interface and the Nix language evaluator is the [Nix store](../store/index.md), a mechanism to keep track of build plans, data, and references between them.
 It can also execute build plans to produce new data, which are made available to the operating system as files.
 
 A build plan itself is a series of *build tasks*, together with their build inputs.

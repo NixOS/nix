@@ -5,10 +5,9 @@
 
 #include "pathlocks.hh"
 #include "store-api.hh"
-#include "local-fs-store.hh"
-#include "gc-store.hh"
+#include "indirect-root-store.hh"
 #include "sync.hh"
-#include "util.hh"
+#include "granular-access-store.hh"
 
 #include <chrono>
 #include <future>
@@ -41,12 +40,12 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
-    Setting<bool> requireSigs{(StoreConfig*) this,
+    Setting<bool> requireSigs{this,
         settings.requireSigs,
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
 
-    Setting<bool> readOnly{(StoreConfig*) this,
+    Setting<bool> readOnly{this,
         false,
         "read-only",
         R"(
@@ -68,7 +67,11 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
     std::string doc() override;
 };
 
-class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore, public virtual LocalGranularAccessStore
+class LocalStore : public virtual LocalStoreConfig
+    , public virtual LocalFSStore
+    , public virtual GcStore
+    , public virtual LocalGranularAccessStore
+    , public virtual IndirectRootStore
 {
 private:
 
@@ -175,7 +178,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryStaticPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -219,6 +222,12 @@ private:
 
 public:
 
+    /**
+     * Implementation of IndirectRootStore::addIndirectRoot().
+     *
+     * The weak reference merely is a symlink to `path' from
+     * /nix/var/nix/gcroots/auto/<hash of `path'>.
+     */
     void addIndirectRoot(const Path & path) override;
 
 private:
@@ -330,8 +339,8 @@ private:
      */
     void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const StringSet & store,
-        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(const StorePath & path, const StorePathSet & store,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
@@ -368,13 +377,13 @@ private:
     void signRealisation(Realisation &);
 
     // XXX: Make a generic `Store` method
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const StorePath & path);
 
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const Path & path,
         const std::string_view pathHash
@@ -387,39 +396,5 @@ private:
     friend struct SubstitutionGoal;
     friend struct DerivationGoal;
 };
-
-
-typedef std::pair<dev_t, ino_t> Inode;
-typedef std::set<Inode> InodesSeen;
-
-
-/**
- * "Fix", or canonicalise, the meta-data of the files in a store path
- * after it has been built.  In particular:
- *
- * - the last modification date on each file is set to 1 (i.e.,
- *   00:00:01 1/1/1970 UTC)
- *
- * - the permissions are set of 444 or 555 (i.e., read-only with or
- *   without execute permission; setuid bits etc. are cleared)
- *
- * - the owner and group are set to the Nix user and group, if we're
- *   running as root.
- *
- * If uidRange is not empty, this function will throw an error if it
- * encounters files owned by a user outside of the closed interval
- * [uidRange->first, uidRange->second].
- */
-void canonicalisePathMetaData(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-    InodesSeen & inodesSeen);
-void canonicalisePathMetaData(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange);
-
-void canonicaliseTimestampAndPermissions(const Path & path);
-
-MakeError(PathInUse, Error);
 
 }

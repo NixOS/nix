@@ -1,10 +1,10 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "derived-path.hh"
+#include "built-path.hh"
 #include "store-api.hh"
 #include "build-result.hh"
 

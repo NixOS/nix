@@ -65,8 +65,6 @@ struct LockFile
 
     static LockFile read(const Path & path);
 
-    void write(const Path & path) const;
-
     /**
      * Check whether this lock file has any unlocked inputs.
      */

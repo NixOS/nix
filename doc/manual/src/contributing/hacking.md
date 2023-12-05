@@ -10,7 +10,7 @@ $ cd nix
 
 The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment. If you don't have it installed, follow the [installation instructions].
 
-[installation instructions]: ../installation/installation.md
+[installation instructions]: ../installation/index.md
 
 ## Building Nix with flakes
 
@@ -42,8 +42,8 @@ $ nix develop .#native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[nix-shell]$ autoreconfPhase
+[nix-shell]$ configurePhase
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
 
@@ -86,7 +86,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
+[nix-shell]$ autoreconfPhase
 [nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
@@ -110,41 +110,97 @@ You can also build Nix for one of the [supported platforms](#platforms).
 
 ## Platforms
 
-As specified in [`flake.nix`], Nix can be built for various platforms:
-
-- `aarch64-linux`
-- `i686-linux`
-- `x86_64-darwin`
-- `x86_64-linux`
+Nix can be built for various platforms, as specified in [`flake.nix`]:
 
 [`flake.nix`]: https://github.com/nixos/nix/blob/master/flake.nix
 
+- `x86_64-linux`
+- `x86_64-darwin`
+- `i686-linux`
+- `aarch64-linux`
+- `aarch64-darwin`
+- `armv6l-linux`
+- `armv7l-linux`
+
 In order to build Nix for a different platform than the one you're currently
-on, you need to have some way for your system Nix to build code for that
-platform. Common solutions include [remote builders] and [binfmt emulation]
+on, you need a way for your current Nix installation to build code for that
+platform. Common solutions include [remote builders] and [binary format emulation]
 (only supported on NixOS).
 
 [remote builders]: ../advanced-topics/distributed-builds.md
-[binfmt emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
+[binary format emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
-These solutions let Nix perform builds as if you're on the native platform, so
-executing the build is as simple as
-
-```console
-$ nix build .#packages.aarch64-linux.default
-```
-
-for flake-enabled Nix, or
+Given such a setup, executing the build only requires selecting the respective attribute.
+For example, to compile for `aarch64-linux`:
 
 ```console
 $ nix-build --attr packages.aarch64-linux.default
 ```
 
-for classic Nix.
+or for Nix with the [`flakes`] and [`nix-command`] experimental features enabled:
 
-You can use any of the other supported platforms in place of `aarch64-linux`.
+```console
+$ nix build .#packages.aarch64-linux.default
+```
 
-Cross-compiled builds are available for ARMv6 and ARMv7, and Nix on unsupported platforms can be bootstrapped by adding more `crossSystems` in `flake.nix`.
+Cross-compiled builds are available for ARMv6 (`armv6l-linux`) and ARMv7 (`armv7l-linux`).
+Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootstrap Nix on unsupported platforms.
+
+### Building for multiple platforms at once
+
+It is useful to perform multiple cross and native builds on the same source tree,
+for example to ensure that better support for one platform doesn't break the build for another.
+In order to facilitate this, Nix has some support for being built out of tree – that is, placing build artefacts in a different directory than the source code:
+
+1. Create a directory for the build, e.g.
+
+   ```bash
+   mkdir build
+   ```
+
+2. Run the configure script from that directory, e.g.
+
+   ```bash
+   cd build
+   ../configure <configure flags>
+   ```
+
+3. Run make from the source directory, but with the build directory specified, e.g.
+
+   ```bash
+   make builddir=build <make flags>
+   ```
+
+## System type
+
+Nix uses a string with he following format to identify the *system type* or *platform* it runs on:
+
+```
+<cpu>-<os>[-<abi>]
+```
+
+It is set when Nix is compiled for the given system, and based on the output of [`config.guess`](https://github.com/nixos/nix/blob/master/config/config.guess) ([upstream](https://git.savannah.gnu.org/cgit/config.git/tree/config.guess)):
+
+```
+<cpu>-<vendor>-<os>[<version>][-<abi>]
+```
+
+When Nix is built such that `./configure` is passed any of the `--host`, `--build`, `--target` options, the value is based on the output of [`config.sub`](https://github.com/nixos/nix/blob/master/config/config.sub) ([upstream](https://git.savannah.gnu.org/cgit/config.git/tree/config.sub)):
+
+```
+<cpu>-<vendor>[-<kernel>]-<os>
+```
+
+For historic reasons and backward-compatibility, some CPU and OS identifiers are translated from the GNU Autotools naming convention in [`configure.ac`](https://github.com/nixos/nix/blob/master/configure.ac) as follows:
+
+| `config.guess`             | Nix                 |
+|----------------------------|---------------------|
+| `amd64`                    | `x86_64`            |
+| `i*86`                     | `i686`              |
+| `arm6`                     | `arm6l`             |
+| `arm7`                     | `arm7l`             |
+| `linux-gnu*`               | `linux`             |
+| `linux-musl*`              | `linux`             |
 
 ## Compilation environments
 
@@ -179,7 +235,7 @@ See [supported compilation environments](#compilation-environments) and instruct
 To use the LSP with your editor, you first need to [set up `clangd`](https://clangd.llvm.org/installation#project-setup) by running:
 
 ```console
-make clean && bear -- make -j$NIX_BUILD_CORES install
+make clean && bear -- make -j$NIX_BUILD_CORES default check install
 ```
 
 Configure your editor to use the `clangd` from the shell, either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
@@ -190,67 +246,40 @@ Configure your editor to use the `clangd` from the shell, either by running it i
 > Some other editors (e.g. Emacs, Vim) need a plugin to support LSP servers in general (e.g. [lsp-mode](https://github.com/emacs-lsp/lsp-mode) for Emacs and [vim-lsp](https://github.com/prabirshrestha/vim-lsp) for vim).
 > Editor-specific setup is typically opinionated, so we will not cover it here in more detail.
 
-### Checking links in the manual
+## Add a release note
 
-The build checks for broken internal links.
-This happens late in the process, so `nix build` is not suitable for iterating.
-To build the manual incrementally, run:
+`doc/manual/rl-next` contains release notes entries for all unreleased changes.
 
-```console
-make html -j $NIX_BUILD_CORES
-```
+User-visible changes should come with a release note.
 
-In order to reflect changes to the [Makefile], clear all generated files before re-building:
+### Add an entry
 
-[Makefile]: https://github.com/NixOS/nix/blob/master/doc/manual/local.mk
-
-```console
-rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make html -j $NIX_BUILD_CORES
-```
-
-[`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
-
-[`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
-[URI fragments]: https://en.wikipedia.org/wiki/URI_fragment
-
-#### `@docroot@` variable
-
-`@docroot@` provides a base path for links that occur in reusable snippets or other documentation that doesn't have a base path of its own.
-
-If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
-
-If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
-See existing `@docroot@` logic in the [Makefile].
-Regular markdown files used for the manual have a base path of their own and they can use relative paths instead of `@docroot@`.
-
-## API documentation
-
-Doxygen API documentation is [available
-online](https://hydra.nixos.org/job/nix/master/internal-api-docs/latest/download-by-type/doc/internal-api-docs). You
-can also build and view it yourself:
-
-```console
-# nix build .#hydraJobs.internal-api-docs
-# xdg-open ./result/share/doc/nix/internal-api/html/index.html
-```
-
-or inside a `nix develop` shell by running:
+Here's what a complete entry looks like. The file name is not incorporated in the document.
 
 ```
-# make internal-api-html
-# xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+synopsis: Basically a title
+issues: #1234
+prs: #1238
+description: {
+
+Here's one or more paragraphs that describe the change.
+
+- It's markdown
+- Add references to the manual using @docroot@
+
+}
 ```
 
-## Coverage analysis
-
-A coverage analysis report is [available
-online](https://hydra.nixos.org/job/nix/master/coverage/latest/download-by-type/report/coverage). You
-can build it yourself:
+Significant changes should add the following header, which moves them to the top.
 
 ```
-# nix build .#hydraJobs.coverage
-# xdg-open ./result/coverage/index.html
+significance: significant
 ```
 
-Metrics about the change in line/function coverage over time are also
-[available](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts).
+<!-- Keep an eye on https://codeberg.org/fgaz/changelog-d/issues/1 -->
+See also the [format documentation](https://github.com/haskell/cabal/blob/master/CONTRIBUTING.md#changelog).
+
+### Build process
+
+Releases have a precomputed `rl-MAJOR.MINOR.md`, and no `rl-next.md`.
+Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on the fly.

@@ -12,7 +12,26 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
+/**
+ * If two different PRs both add an experimental feature, and we just
+ * used a number for this, we *woudln't* get merge conflict and the
+ * counter will be incremented once instead of twice, causing a build
+ * failure.
+ *
+ * By instead defining this instead as 1 + the bottom experimental
+ * feature, we either have no issue at all if few features are not added
+ * at the end of the list, or a proper merge conflict if they are.
+ */
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::VerifiedFetches);
+
+constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
+    {
+        .tag = Xp::ACLs,
+        .name = "acls",
+        .description = R"(
+            Allow protection of store paths with the use of [POSIX ACLs](https://man7.org/linux/man-pages/man5/acl.5.html).
+        )",
+    },
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -63,11 +82,33 @@ constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
         )",
     },
     {
+        .tag = Xp::FetchTree,
+        .name = "fetch-tree",
+        .description = R"(
+            Enable the use of the [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) built-in function in the Nix language.
+
+            `fetchTree` exposes a large suite of fetching functionality in a more systematic way.
+            The [`flakes`](#xp-feature-flakes) feature flag always enables `fetch-tree`.
+
+            This built-in was previously guarded by the `flakes` experimental feature because of that overlap,
+            but since the plan is to work on stabilizing this first (due 2024 Q1), we are putting it underneath a separate feature.
+            Once we've made the changes we want to make, enabling just this feature will serve as a "release candidate" --- allowing users to try out the functionality we want to stabilize and not any other functionality we don't yet want to, in isolation.
+        )",
+    },
+    {
         .tag = Xp::NixCommand,
         .name = "nix-command",
         .description = R"(
             Enable the new `nix` subcommands. See the manual on
             [`nix`](@docroot@/command-ref/new-cli/nix.md) for details.
+        )",
+    },
+    {
+        .tag = Xp::GitHashing,
+        .name = "git-hashing",
+        .description = R"(
+            Allow creating (content-addressed) store objects which are hashed via Git's hashing algorithm.
+            These store objects will not be understandable by older versions of Nix.
         )",
     },
     {
@@ -163,6 +204,8 @@ constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
         .tag = Xp::ReplFlake,
         .name = "repl-flake",
         .description = R"(
+            *Enabled with [`flakes`](#xp-feature-flakes) since 2.19*
+
             Allow passing [installables](@docroot@/command-ref/new-cli/nix.md#installables) to `nix repl`, making its interface consistent with the other experimental commands.
         )",
     },
@@ -171,7 +214,7 @@ constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
         .name = "auto-allocate-uids",
         .description = R"(
             Allows Nix to automatically pick UIDs for builds, rather than creating
-            `nixbld*` user accounts. See the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting for details.
+            `nixbld*` user accounts. See the [`auto-allocate-uids`](@docroot@/command-ref/conf-file.md#conf-auto-allocate-uids) setting for details.
         )",
     },
     {
@@ -179,16 +222,7 @@ constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
         .name = "cgroups",
         .description = R"(
             Allows Nix to execute builds inside cgroups. See
-            the [`use-cgroups`](#conf-use-cgroups) setting for details.
-        )",
-    },
-    {
-        .tag = Xp::DiscardReferences,
-        .name = "discard-references",
-        .description = R"(
-            Allow the use of the [`unsafeDiscardReferences`](@docroot@/language/advanced-attributes.html#adv-attr-unsafeDiscardReferences) attribute in derivations
-            that use [structured attributes](@docroot@/language/advanced-attributes.html#adv-attr-structuredAttrs). This disables scanning of outputs for
-            runtime dependencies.
+            the [`use-cgroups`](@docroot@/command-ref/conf-file.md#conf-use-cgroups) setting for details.
         )",
     },
     {
@@ -225,14 +259,28 @@ constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
         .tag = Xp::ReadOnlyLocalStore,
         .name = "read-only-local-store",
         .description = R"(
-            Allow the use of the `read-only` parameter in [local store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) URIs.
+            Allow the use of the `read-only` parameter in [local store](@docroot@/store/types/local-store.md) URIs.
         )",
     },
     {
-        .tag = Xp::ACLs,
-        .name = "acls",
+        .tag = Xp::ConfigurableImpureEnv,
+        .name = "configurable-impure-env",
         .description = R"(
-            Allow protection of store paths with the use of [POSIX ACLs](https://man7.org/linux/man-pages/man5/acl.5.html).
+            Allow the use of the [impure-env](@docroot@/command-ref/conf-file.md#conf-impure-env) setting.
+        )",
+    },
+    {
+        .tag = Xp::MountedSSHStore,
+        .name = "mounted-ssh-store",
+        .description = R"(
+            Allow the use of the [`mounted SSH store`](@docroot@/command-ref/new-cli/nix3-help-stores.html#experimental-ssh-store-with-filesytem-mounted).
+        )",
+    },
+    {
+        .tag = Xp::VerifiedFetches,
+        .name = "verified-fetches",
+        .description = R"(
+            Enables verification of git commit signatures through the [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) built-in.
         )",
     },
 }};
@@ -288,7 +336,7 @@ std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFea
 }
 
 MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature)
-    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override", showExperimentalFeature(feature))
+    : Error("experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it", showExperimentalFeature(feature))
     , missingFeature(feature)
 {}
 

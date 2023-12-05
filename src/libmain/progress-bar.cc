@@ -1,5 +1,5 @@
 #include "progress-bar.hh"
-#include "util.hh"
+#include "terminal.hh"
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
@@ -108,7 +108,8 @@ public:
         stop();
     }
 
-    void stop() override
+    /* Called by destructor, can't be overridden */
+    void stop() override final
     {
         {
             auto state(state_.lock());
@@ -337,6 +338,14 @@ public:
             state->activitiesByType[type].expected -= j;
             j = getI(fields, 1);
             state->activitiesByType[type].expected += j;
+            update(*state);
+        }
+
+        else if (type == resFetchStatus) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.lastLine = getS(fields, 0);
             update(*state);
         }
     }

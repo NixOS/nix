@@ -8,6 +8,7 @@
 #include "store-api.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
+#include "granular-access-store.hh"
 
 
 namespace nix {
@@ -18,16 +19,15 @@ class Pid;
 struct FdSink;
 struct FdSource;
 template<typename T> class Pool;
-struct ConnectionHandle;
 
 struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+    const Setting<int> maxConnections{this, 1, "max-connections",
         "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this,
+    const Setting<unsigned int> maxConnectionAge{this,
         std::numeric_limits<unsigned int>::max(),
         "max-connection-age",
         "Maximum age of a connection before it is closed."};
@@ -65,7 +65,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
@@ -129,8 +129,6 @@ public:
 
     void addTempRoot(const StorePath & path) override;
 
-    void addIndirectRoot(const Path & path) override;
-
     Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
@@ -189,11 +187,13 @@ protected:
 
     void setOptions() override;
 
+    struct ConnectionHandle;
+
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
 
-    virtual ref<FSAccessor> getFSAccessor() override;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 
@@ -205,6 +205,5 @@ private:
         const std::vector<DerivedPath> & paths,
         std::shared_ptr<Store> evalStore);
 };
-
 
 }

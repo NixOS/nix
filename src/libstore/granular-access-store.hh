@@ -14,16 +14,17 @@ struct StoreObjectDerivationOutput
     StorePath drvPath;
     std::string output;
 
-    StoreObjectDerivationOutput(DerivedPath::Built p) : drvPath(p.drvPath)
+    StoreObjectDerivationOutput(DerivedPath::Built p) : drvPath(p.drvPath->getBaseStorePath())
     {
-        if (auto names = std::get_if<OutputsSpec::Names>(&p.outputs))
+        if (auto names = std::get_if<OutputsSpec::Names>(&p.outputs.raw))
             if (names->size() == 1) {
                 output = *names->begin();
                 return;
             }
         throw Error("StoreObjectDerivationOutput requires a DerivedPathBuilt with just one named output");
-    }
-    StoreObjectDerivationOutput(StorePath drvPath, std::string output = "out") : drvPath(drvPath), output(output) { };
+    };
+    StoreObjectDerivationOutput(SingleDerivedPathBuilt p) : drvPath(p.drvPath->getBaseStorePath()), output(p.output) { };
+    StoreObjectDerivationOutput(StorePath drvPath, std::string output) : drvPath(drvPath), output(output) { };
 
     GENERATE_CMP(StoreObjectDerivationOutput, me->drvPath, me->output);
 };

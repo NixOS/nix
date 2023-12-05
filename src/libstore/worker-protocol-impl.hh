@@ -10,8 +10,52 @@
 
 #include "worker-protocol.hh"
 #include "granular-access-store.hh"
+#include "length-prefixed-protocol-helper.hh"
 
 namespace nix {
+
+/* protocol-agnostic templates */
+
+#define WORKER_USE_LENGTH_PREFIX_SERIALISER(TEMPLATE, T) \
+    TEMPLATE T WorkerProto::Serialise< T >::read(const Store & store, WorkerProto::ReadConn conn) \
+    { \
+        return LengthPrefixedProtoHelper<WorkerProto, T >::read(store, conn); \
+    } \
+    TEMPLATE void WorkerProto::Serialise< T >::write(const Store & store, WorkerProto::WriteConn conn, const T & t) \
+    { \
+        LengthPrefixedProtoHelper<WorkerProto, T >::write(store, conn, t); \
+    }
+
+WORKER_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
+WORKER_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::set<T>)
+WORKER_USE_LENGTH_PREFIX_SERIALISER(template<typename... Ts>, std::tuple<Ts...>)
+
+#define COMMA_ ,
+WORKER_USE_LENGTH_PREFIX_SERIALISER(
+    template<typename K COMMA_ typename V>,
+    std::map<K COMMA_ V>)
+#undef COMMA_
+
+/**
+ * Use `CommonProto` where possible.
+ */
+template<typename T>
+struct WorkerProto::Serialise
+{
+    static T read(const Store & store, WorkerProto::ReadConn conn)
+    {
+        return CommonProto::Serialise<T>::read(store,
+            CommonProto::ReadConn { .from = conn.from });
+    }
+    static void write(const Store & store, WorkerProto::WriteConn conn, const T & t)
+    {
+        CommonProto::Serialise<T>::write(store,
+            CommonProto::WriteConn { .to = conn.to },
+            t);
+    }
+};
+
+/* protocol-specific templates */
 
 template<typename T>
 AccessStatusFor<T> WorkerProto::Serialise<AccessStatusFor<T>>::read(const Store & store, WorkerProto::ReadConn conn) {
@@ -26,46 +70,6 @@ void WorkerProto::Serialise<AccessStatusFor<T>>::write(const Store & store, Work
 {
     conn.to << status.isProtected;
     WorkerProto::Serialise<std::set<T>>::write(store, conn, status.entities);
-}
-
-template<typename T>
-std::vector<T> WorkerProto::Serialise<std::vector<T>>::read(const Store & store, WorkerProto::ReadConn conn)
-{
-    std::vector<T> resSet;
-    auto size = readNum<size_t>(conn.from);
-    while (size--) {
-        resSet.push_back(WorkerProto::Serialise<T>::read(store, conn));
-    }
-    return resSet;
-}
-
-template<typename T>
-void WorkerProto::Serialise<std::vector<T>>::write(const Store & store, WorkerProto::WriteConn conn, const std::vector<T> & resSet)
-{
-    conn.to << resSet.size();
-    for (auto & key : resSet) {
-        WorkerProto::Serialise<T>::write(store, conn, key);
-    }
-}
-
-template<typename T>
-std::set<T> WorkerProto::Serialise<std::set<T>>::read(const Store & store, WorkerProto::ReadConn conn)
-{
-    std::set<T> resSet;
-    auto size = readNum<size_t>(conn.from);
-    while (size--) {
-        resSet.insert(WorkerProto::Serialise<T>::read(store, conn));
-    }
-    return resSet;
-}
-
-template<typename T>
-void WorkerProto::Serialise<std::set<T>>::write(const Store & store, WorkerProto::WriteConn conn, const std::set<T> & resSet)
-{
-    conn.to << resSet.size();
-    for (auto & key : resSet) {
-        WorkerProto::Serialise<T>::write(store, conn, key);
-    }
 }
 
 template<typename A, typename B>
@@ -136,44 +140,6 @@ void WorkerProto::Serialise<std::variant<A, B, C>>::write(const Store & store, W
             default:
                 throw Error("Invalid variant index");
         }
-}
-
-template<typename K, typename V>
-std::map<K, V> WorkerProto::Serialise<std::map<K, V>>::read(const Store & store, WorkerProto::ReadConn conn)
-{
-    std::map<K, V> resMap;
-    auto size = readNum<size_t>(conn.from);
-    while (size--) {
-        auto k = WorkerProto::Serialise<K>::read(store, conn);
-        auto v = WorkerProto::Serialise<V>::read(store, conn);
-        resMap.insert_or_assign(std::move(k), std::move(v));
-    }
-    return resMap;
-}
-
-template<typename K, typename V>
-void WorkerProto::Serialise<std::map<K, V>>::write(const Store & store, WorkerProto::WriteConn conn, const std::map<K, V> & resMap)
-{
-    conn.to << resMap.size();
-    for (auto & i : resMap) {
-        WorkerProto::Serialise<K>::write(store, conn, i.first);
-        WorkerProto::Serialise<V>::write(store, conn, i.second);
-    }
-}
-
-template<typename A, typename B>
-std::pair<A, B> WorkerProto::Serialise<std::pair<A, B>>::read(const Store & store, WorkerProto::ReadConn conn)
-{
-    auto a = WorkerProto::Serialise<A>::read(store, conn);
-    auto b = WorkerProto::Serialise<B>::read(store, conn);
-    return {a, b};
-}
-
-template<typename A, typename B>
-void WorkerProto::Serialise<std::pair<A, B>>::write(const Store & store, WorkerProto::WriteConn conn, const std::pair<A, B> & p)
-{
-    WorkerProto::Serialise<A>::write(store, conn, p.first);
-    WorkerProto::Serialise<B>::write(store, conn, p.second);
 }
 
 }

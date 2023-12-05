@@ -1,11 +1,12 @@
 #include "filetransfer.hh"
-#include "util.hh"
+#include "namespaces.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "s3.hh"
 #include "compression.hh"
 #include "finally.hh"
 #include "callback.hh"
+#include "signals.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -863,6 +864,8 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
             }
 
             chunk = std::move(state->data);
+            /* Reset state->data after the move, since we check data.empty() */
+            state->data = "";
 
             state->request.notify_one();
         }

@@ -1,5 +1,5 @@
-#include "util.hh"
 #include "editor-for.hh"
+#include "environment-variables.hh"
 
 namespace nix {
 

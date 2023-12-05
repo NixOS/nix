@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "store-cast.hh"
+#include "granular-access-store.hh"
 
 using namespace nix;
 

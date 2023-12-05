@@ -711,14 +711,14 @@ namespace nix {
         // FIXME: add a test that verifies the string context is as expected
         auto v = eval("builtins.replaceStrings [\"oo\" \"a\"] [\"a\" \"i\"] \"foobar\"");
         ASSERT_EQ(v.type(), nString);
-        ASSERT_EQ(v.string.s, std::string_view("fabir"));
+        ASSERT_EQ(v.string_view(), "fabir");
     }
 
     TEST_F(PrimOpTest, concatStringsSep) {
         // FIXME: add a test that verifies the string context is as expected
         auto v = eval("builtins.concatStringsSep \"%\" [\"foo\" \"bar\" \"baz\"]");
         ASSERT_EQ(v.type(), nString);
-        ASSERT_EQ(std::string_view(v.string.s), "foo%bar%baz");
+        ASSERT_EQ(v.string_view(), "foo%bar%baz");
     }
 
     TEST_F(PrimOpTest, split1) {
@@ -812,6 +812,14 @@ namespace nix {
         auto v = eval("builtins.match \"[[:space:]]+([[:upper:]]+)[[:space:]]+\" \"  FOO   \"");
         ASSERT_THAT(v, IsListOfSize(1));
         ASSERT_THAT(*v.listElems()[0], IsStringEq("FOO"));
+    }
+
+    TEST_F(PrimOpTest, match5) {
+        // The regex "\\{}" is valid and matches the string "{}".
+        // Caused a regression before when trying to switch from std::regex to boost::regex.
+        // See https://github.com/NixOS/nix/pull/7762#issuecomment-1834303659
+        auto v = eval("builtins.match \"\\\\{}\" \"{}\"");
+        ASSERT_THAT(v, IsListOfSize(0));
     }
 
     TEST_F(PrimOpTest, attrNames) {

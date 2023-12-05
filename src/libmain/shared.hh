@@ -1,8 +1,9 @@
 #pragma once
 ///@file
 
-#include "util.hh"
+#include "processes.hh"
 #include "args.hh"
+#include "args/root.hh"
 #include "common-args.hh"
 #include "path.hh"
 #include "derived-path.hh"
@@ -66,7 +67,7 @@ template<class N> N getIntArg(const std::string & opt,
 }
 
 
-struct LegacyArgs : public MixCommonArgs
+struct LegacyArgs : public MixCommonArgs, public RootArgs
 {
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
 
@@ -85,8 +86,9 @@ struct LegacyArgs : public MixCommonArgs
 void showManPage(const std::string & name);
 
 /**
- * The constructor of this class starts a pager if stdout is a
- * terminal and $PAGER is set. Stdout is redirected to the pager.
+ * The constructor of this class starts a pager if standard output is a
+ * terminal and $PAGER is set. Standard output is redirected to the
+ * pager.
  */
 class RunPager
 {
@@ -96,7 +98,7 @@ public:
 
 private:
     Pid pid;
-    int stdout;
+    int std_out;
 };
 
 extern volatile ::sig_atomic_t blockInt;

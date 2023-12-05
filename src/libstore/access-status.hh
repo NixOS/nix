@@ -7,6 +7,7 @@
 #include "comparator.hh"
 #include "globals.hh"
 #include "acl.hh"
+#include "util.hh"
 
 namespace nix {
 template<typename AccessControlEntity>
@@ -27,12 +28,10 @@ struct AccessStatusFor {
         for (auto entity : entities) {
             std::visit(overloaded {
                 [&](ACL::User user) {
-                    struct passwd * pw = getpwuid(user.uid);
-                    users.insert(pw->pw_name);
+                    users.insert(getUserName(user.uid));
                 },
                 [&](ACL::Group group) {
-                    struct group * gr = getgrgid(group.gid);
-                    groups.insert(gr->gr_name);
+                    groups.insert(getGroupName(group.gid));
                 }
             }, entity);
         }

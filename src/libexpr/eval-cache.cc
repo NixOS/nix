@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "eval-cache.hh"
 #include "sqlite.hh"
 #include "eval.hh"
@@ -50,7 +51,7 @@ struct AttrDb
         Path cacheDir = getCacheDir() + "/nix/eval-cache-v5";
         createDirs(cacheDir);
 
-        Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
+        Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
 
         state->db = SQLite(dbPath);
         state->db.isCache();
@@ -440,8 +441,8 @@ Value & AttrCursor::forceValue()
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type() == nString)
-            cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
-                           string_t{v.string.s, {}}};
+            cachedValue = {root->db->setString(getKey(), v.c_str(), v.context()),
+                           string_t{v.c_str(), {}}};
         else if (v.type() == nPath) {
             auto path = v.path().path;
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
@@ -582,7 +583,7 @@ std::string AttrCursor::getString()
     if (v.type() != nString && v.type() != nPath)
         root->state.error("'%s' is not a string but %s", getAttrPathStr()).debugThrow<TypeError>();
 
-    return v.type() == nString ? v.string.s : v.path().to_string();
+    return v.type() == nString ? v.c_str() : v.path().to_string();
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -599,12 +600,12 @@ string_t AttrCursor::getStringWithContext()
                             return d.drvPath;
                         },
                         [&](const NixStringContextElem::Built & b) -> const StorePath & {
-                            return b.drvPath;
+                            return b.drvPath->getBaseStorePath();
                         },
                         [&](const NixStringContextElem::Opaque & o) -> const StorePath & {
                             return o.path;
                         },
-                    }, c.raw());
+                    }, c.raw);
                     if (!root->state.store->isValidPath(path)) {
                         valid = false;
                         break;
@@ -624,7 +625,7 @@ string_t AttrCursor::getStringWithContext()
     if (v.type() == nString) {
         NixStringContext context;
         copyContext(v, context);
-        return {v.string.s, std::move(context)};
+        return {v.c_str(), std::move(context)};
     }
     else if (v.type() == nPath)
         return {v.path().to_string(), {}};

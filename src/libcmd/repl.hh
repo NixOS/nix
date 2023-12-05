@@ -25,7 +25,7 @@ struct AbstractNixRepl
     typedef std::vector<std::pair<Value*,std::string>> AnnotatedValues;
 
     static std::unique_ptr<AbstractNixRepl> create(
-        const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
+        const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
         std::function<AnnotatedValues()> getValues);
 
     static void runSimple(

@@ -3,6 +3,7 @@
 
 #include "serialise.hh"
 #include "tarfile.hh"
+#include "file-system.hh"
 
 namespace nix {
 

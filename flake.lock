@@ -16,6 +16,22 @@
         "type": "github"
       }
     },
+    "libgit2": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1697646580,
+        "narHash": "sha256-oX4Z3S9WtJlwvj0uH9HlYcWv+x1hqp8mhXl7HsLu2f0=",
+        "owner": "libgit2",
+        "repo": "libgit2",
+        "rev": "45fd9ed7ae1a9b74b957ef4f337bc3c8b3df01b5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "libgit2",
+        "repo": "libgit2",
+        "type": "github"
+      }
+    },
     "lowdown-src": {
       "flake": false,
       "locked": {
@@ -34,16 +50,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1670461440,
-        "narHash": "sha256-jy1LB8HOMKGJEGXgzFRLDU1CBGL0/LlkolgnqIsF0D8=",
+        "lastModified": 1700748986,
+        "narHash": "sha256-/nqLrNU297h3PCw4QyDpZKZEUHmialJdZW2ceYFobds=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "04a75b2eecc0acf6239acf9dd04485ff8d14f425",
+        "rev": "9ba29e2346bc542e9909d1021e8fd7d4b3f64db0",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixos-22.11-small",
+        "ref": "nixos-23.05-small",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -67,6 +83,7 @@
     "root": {
       "inputs": {
         "flake-compat": "flake-compat",
+        "libgit2": "libgit2",
         "lowdown-src": "lowdown-src",
         "nixpkgs": "nixpkgs",
         "nixpkgs-regression": "nixpkgs-regression"

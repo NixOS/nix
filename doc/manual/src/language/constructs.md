@@ -92,10 +92,10 @@ In this fragment from `all-packages.nix`,
 ```nix
 graphviz = (import ../tools/graphics/graphviz) {
   inherit fetchurl stdenv libpng libjpeg expat x11 yacc;
-  inherit (xlibs) libXaw;
+  inherit (xorg) libXaw;
 };
 
-xlibs = {
+xorg = {
   libX11 = ...;
   libXaw = ...;
   ...
@@ -109,7 +109,7 @@ libjpg = ...;
 the set used in the function call to the function defined in
 `../tools/graphics/graphviz` inherits a number of variables from the
 surrounding scope (`fetchurl` ... `yacc`), but also inherits `libXaw`
-(the X Athena Widgets) from the `xlibs` (X11 client-side libraries) set.
+(the X Athena Widgets) from the `xorg` set.
 
 Summarizing the fragment
 
@@ -132,6 +132,32 @@ a = src-set.a; b = src-set.b; c = src-set.c;
 when used while defining local variables in a let-expression or while
 defining a set.
 
+In a `let` expression, `inherit` can be used to selectively bring specific attributes of a set into scope. For example
+
+
+```nix
+let
+  x = { a = 1; b = 2; };
+  inherit (builtins) attrNames;
+in
+{
+  names = attrNames x;
+}
+```
+
+is equivalent to
+
+```nix
+let
+  x = { a = 1; b = 2; };
+in
+{
+  names = builtins.attrNames x;
+}
+```
+
+both evaluate to `{ names = [ "a" "b" ]; }`.
+
 ## Functions
 
 Functions have the following form:
@@ -146,92 +172,103 @@ three kinds of patterns:
 
   - If a pattern is a single identifier, then the function matches any
     argument. Example:
-    
+
     ```nix
     let negate = x: !x;
         concat = x: y: x + y;
     in if negate true then concat "foo" "bar" else ""
     ```
-    
+
     Note that `concat` is a function that takes one argument and returns
     a function that takes another argument. This allows partial
     parameterisation (i.e., only filling some of the arguments of a
     function); e.g.,
-    
+
     ```nix
     map (concat "foo") [ "bar" "bla" "abc" ]
     ```
-    
+
     evaluates to `[ "foobar" "foobla" "fooabc" ]`.
 
   - A *set pattern* of the form `{ name1, name2, …, nameN }` matches a
     set containing the listed attributes, and binds the values of those
     attributes to variables in the function body. For example, the
     function
-    
+
     ```nix
     { x, y, z }: z + y + x
     ```
-    
+
     can only be called with a set containing exactly the attributes `x`,
     `y` and `z`. No other attributes are allowed. If you want to allow
     additional arguments, you can use an ellipsis (`...`):
-    
+
     ```nix
     { x, y, z, ... }: z + y + x
     ```
-    
+
     This works on any set that contains at least the three named
     attributes.
-    
+
     It is possible to provide *default values* for attributes, in
     which case they are allowed to be missing. A default value is
     specified by writing `name ?  e`, where *e* is an arbitrary
     expression. For example,
-    
+
     ```nix
     { x, y ? "foo", z ? "bar" }: z + y + x
     ```
-    
+
     specifies a function that only requires an attribute named `x`, but
     optionally accepts `y` and `z`.
 
   - An `@`-pattern provides a means of referring to the whole value
     being matched:
-    
+
     ```nix
     args@{ x, y, z, ... }: z + y + x + args.a
     ```
-    
+
     but can also be written as:
-    
+
     ```nix
     { x, y, z, ... } @ args: z + y + x + args.a
     ```
-    
-    Here `args` is bound to the entire argument, which is further
-    matched against the pattern `{ x, y, z,
-            ... }`. `@`-pattern makes mainly sense with an ellipsis(`...`) as
+
+    Here `args` is bound to the argument *as passed*, which is further
+    matched against the pattern `{ x, y, z, ... }`.
+    The `@`-pattern makes mainly sense with an ellipsis(`...`) as
     you can access attribute names as `a`, using `args.a`, which was
     given as an additional attribute to the function.
-    
+
     > **Warning**
-    > 
-    > The `args@` expression is bound to the argument passed to the
-    > function which means that attributes with defaults that aren't
-    > explicitly specified in the function call won't cause an
-    > evaluation error, but won't exist in `args`.
-    > 
+    >
+    > `args@` binds the name `args` to the attribute set that is passed to the function.
+    > In particular, `args` does *not* include any default values specified with `?` in the function's set pattern.
+    >
     > For instance
-    > 
+    >
     > ```nix
     > let
-    >   function = args@{ a ? 23, ... }: args;
+    >   f = args@{ a ? 23, ... }: [ a args ];
     > in
-    >   function {}
-    > ````
-    > 
-    > will evaluate to an empty attribute set.
+    >   f {}
+    > ```
+    >
+    > is equivalent to
+    >
+    > ```nix
+    > let
+    >   f = args @ { ... }: [ (args.a or 23) args ];
+    > in
+    >   f {}
+    > ```
+    >
+    > and both expressions will evaluate to:
+    >
+    > ```nix
+    > [ 23 {} ]
+    > ```
 
 Note that functions do not have names. If you want to give them a name,
 you can bind them to an attribute, e.g.,

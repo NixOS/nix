@@ -1,5 +1,11 @@
 with builtins;
 
+let
+  lowerChars = stringToCharacters "abcdefghijklmnopqrstuvwxyz";
+  upperChars = stringToCharacters "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  stringToCharacters = s: genList (p: substring p 1 s) (stringLength s);
+in
+
 rec {
   splitLines = s: filter (x: !isList x) (split "\n" s);
 
@@ -17,6 +23,8 @@ rec {
       replaced = replaceStrings [ from ] [ to ] string;
     in
       if replaced == string then string else replaceStringsRec from to replaced;
+
+  toLower = replaceStrings upperChars lowerChars;
 
   squash = replaceStringsRec "\n\n\n" "\n\n";
 
@@ -44,63 +52,6 @@ rec {
 
   optionalString = cond: string: if cond then string else "";
 
-  showSetting = { useAnchors }: name: { description, documentDefault, defaultValue, aliases, value, experimentalFeature }:
-    let
-      result = squash ''
-          - ${if useAnchors
-              then ''<span id="conf-${name}">[`${name}`](#conf-${name})</span>''
-              else ''`${name}`''}
-
-          ${indent "  " body}
-        '';
-
-      experimentalFeatureNote = optionalString (experimentalFeature != null) ''
-          > **Warning**
-          > This setting is part of an
-          > [experimental feature](@docroot@/contributing/experimental-features.md).
-
-          To change this setting, you need to make sure the corresponding experimental feature,
-          [`${experimentalFeature}`](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature}),
-          is enabled.
-          For example, include the following in [`nix.conf`](#):
-
-          ```
-          extra-experimental-features = ${experimentalFeature}
-          ${name} = ...
-          ```
-        '';
-
-      # separate body to cleanly handle indentation
-      body = ''
-          ${description}
-
-          ${experimentalFeatureNote}
-
-          **Default:** ${showDefault documentDefault defaultValue}
-
-          ${showAliases aliases}
-        '';
-
-      showDefault = documentDefault: defaultValue:
-        if documentDefault then
-          # a StringMap value type is specified as a string, but
-          # this shows the value type. The empty stringmap is `null` in
-          # JSON, but that converts to `{ }` here.
-          if defaultValue == "" || defaultValue == [] || isAttrs defaultValue
-            then "*empty*"
-            else if isBool defaultValue then
-              if defaultValue then "`true`" else "`false`"
-            else "`${toString defaultValue}`"
-        else "*machine-specific*";
-
-      showAliases = aliases:
-          optionalString (aliases != [])
-            "**Deprecated alias:** ${(concatStringsSep ", " (map (s: "`${s}`") aliases))}";
-
-    in result;
-
   indent = prefix: s:
     concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
-
-  showSettings = args: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting args) settingsInfo));
 }

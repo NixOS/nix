@@ -17,22 +17,26 @@ namespace nix {
  */
 enum struct ExperimentalFeature
 {
+    ACLs,
     CaDerivations,
     ImpureDerivations,
     Flakes,
+    FetchTree,
     NixCommand,
+    GitHashing,
     RecursiveNix,
     NoUrlLiterals,
     FetchClosure,
     ReplFlake,
     AutoAllocateUids,
     Cgroups,
-    DiscardReferences,
     DaemonTrustOverride,
     DynamicDerivations,
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
-    ACLs,
+    ConfigurableImpureEnv,
+    MountedSSHStore,
+    VerifiedFetches,
 };
 
 /**
