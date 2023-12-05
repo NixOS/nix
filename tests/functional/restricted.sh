@@ -40,13 +40,16 @@ nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT -
 [[ $(nix eval --raw --impure --restrict-eval -I . --expr 'builtins.readFile "${import ./simple.nix}/hello"') == 'Hello World!' ]]
 
 # Check that we can't follow a symlink outside of the allowed paths.
-mkdir -p $TEST_ROOT/tunnel.d
+mkdir -p $TEST_ROOT/tunnel.d $TEST_ROOT/foo2
 ln -sfn .. $TEST_ROOT/tunnel.d/tunnel
 echo foo > $TEST_ROOT/bar
 
 expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readFile <foo/tunnel/bar>" -I $TEST_ROOT/tunnel.d | grepQuiet "forbidden in restricted mode"
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel>" -I $TEST_ROOT/tunnel.d | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel/foo2>" -I $TEST_ROOT/tunnel.d | grepQuiet "forbidden in restricted mode"
+
+# Reading the parents of allowed paths should show only the ancestors of the allowed paths.
+[[ $(nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel>" -I $TEST_ROOT/tunnel.d) == '{ "tunnel.d" = "directory"; }' ]]
 
 # Check whether we can leak symlink information through directory traversal.
 traverseDir="$(pwd)/restricted-traverse-me"

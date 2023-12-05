@@ -110,7 +110,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     return res;
 }
 
-static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v)
+static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bool resolveSymlinks = true)
 {
     NixStringContext context;
 
@@ -120,9 +120,9 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v)
         if (!context.empty() && path.accessor == state.rootFS) {
             auto rewrites = state.realiseContext(context);
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
-            return {path.accessor, CanonPath(realPath)};
-        } else
-            return path;
+            path = {path.accessor, CanonPath(realPath)};
+        }
+        return resolveSymlinks ? path.resolveSymlinks() : path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -162,7 +162,7 @@ static void mkOutputString(
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath);
+    auto path = realisePath(state, pos, vPath, false);
     auto path2 = path.path.abs();
 
     // FIXME
@@ -1525,16 +1525,16 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto & arg = *args[0];
-
-    auto path = realisePath(state, pos, arg);
-
-    /* SourcePath doesn't know about trailing slash. */
-    auto mustBeDir = arg.type() == nString
-        && (arg.string_view().ends_with("/")
-            || arg.string_view().ends_with("/."));
-
     try {
+        auto & arg = *args[0];
+
+        auto path = realisePath(state, pos, arg);
+
+        /* SourcePath doesn't know about trailing slash. */
+        auto mustBeDir = arg.type() == nString
+            && (arg.string_view().ends_with("/")
+                || arg.string_view().ends_with("/."));
+
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);
@@ -1771,7 +1771,7 @@ static std::string_view fileTypeToString(InputAccessor::Type type)
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = realisePath(state, pos, *args[0], false);
     /* Retrieve the directory entry type and stringize it. */
     v.mkString(fileTypeToString(path.lstat().type));
 }

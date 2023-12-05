@@ -29,6 +29,11 @@ struct PosixSourceAccessor : virtual SourceAccessor
     std::string readLink(const CanonPath & path) override;
 
     std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override;
+
+    /**
+     * Throw an error if `path` or any of its ancestors are symlinks.
+     */
+    void assertNoSymlinks(CanonPath path);
 };
 
 }

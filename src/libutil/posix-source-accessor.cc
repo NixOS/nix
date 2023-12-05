@@ -8,9 +8,9 @@ void PosixSourceAccessor::readFile(
     Sink & sink,
     std::function<void(uint64_t)> sizeCallback)
 {
-    // FIXME: add O_NOFOLLOW since symlinks should be resolved by the
-    // caller?
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    assertNoSymlinks(path);
+
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
@@ -42,14 +42,16 @@ void PosixSourceAccessor::readFile(
 
 bool PosixSourceAccessor::pathExists(const CanonPath & path)
 {
+    if (auto parent = path.parent()) assertNoSymlinks(*parent);
     return nix::pathExists(path.abs());
 }
 
 std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
 {
+    if (auto parent = path.parent()) assertNoSymlinks(*parent);
     struct stat st;
     if (::lstat(path.c_str(), &st)) {
-        if (errno == ENOENT) return std::nullopt;
+        if (errno == ENOENT || errno == ENOTDIR) return std::nullopt;
         throw SysError("getting status of '%s'", showPath(path));
     }
     mtime = std::max(mtime, st.st_mtime);
@@ -66,6 +68,7 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
 
 SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & path)
 {
+    assertNoSymlinks(path);
     DirEntries res;
     for (auto & entry : nix::readDirectory(path.abs())) {
         std::optional<Type> type;
@@ -81,12 +84,28 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 
 std::string PosixSourceAccessor::readLink(const CanonPath & path)
 {
+    if (auto parent = path.parent()) assertNoSymlinks(*parent);
     return nix::readLink(path.abs());
 }
 
 std::optional<CanonPath> PosixSourceAccessor::getPhysicalPath(const CanonPath & path)
 {
     return path;
+}
+
+void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
+{
+    // FIXME: cache this since it potentially causes a lot of lstat calls.
+    while (!path.isRoot()) {
+        struct stat st;
+        if (::lstat(path.c_str(), &st)) {
+            if (errno != ENOENT)
+                throw SysError("getting status of '%s'", showPath(path));
+        }
+        if (S_ISLNK(st.st_mode))
+            throw Error("path '%s' is a symlink", showPath(path));
+        path.pop();
+    }
 }
 
 }
