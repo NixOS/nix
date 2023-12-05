@@ -72,7 +72,8 @@ Your account will need an IAM policy to support uploading to the bucket:
         "s3:ListBucket",
         "s3:ListBucketMultipartUploads",
         "s3:ListMultipartUploadParts",
-        "s3:PutObject"
+        "s3:PutObject",
+        "s3:PutObjectTagging"
       ],
       "Resource": [
         "arn:aws:s3:::example-nix-cache",
@@ -101,4 +102,15 @@ With bucket policies and authentication set up as described above, uploading wor
     's3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com'
   ```
 
+### Tagging
+
+It is possible for a derivation output to be tagged, so that a retention policy can remove some derivations sooner than others from the S3 bucket backing the cache.
+
+Specifically, if a derivation output contains a file `nix-support/tags.json` of the form `{ key1 = "value1"; key2 = "value2"; }`, then all files associated with this output (`.nar`, `.narinfo`, `.ls`...) will be tagged with key-value pairs `("nix:key1", "value1")` and `("nix:key2", "value2")`.
+
+> **Note**
+>
+> There may be restrictions on tags enforced by your cloud provider. See the [S3 documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-tagging.html) for example.
+
 )"
+
