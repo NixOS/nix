@@ -1348,6 +1348,21 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
 
 void LocalStore::setFutureAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
 {
+    // If adding future permissions to a StoreObjectDerivationOutput,
+    // also add permissions to the paths that will exist in the future.
+    std::visit(overloaded {
+        [&](StorePath p) {},
+        [&](StoreObjectDerivationOutput p) {
+                auto drv = readDerivation(p.drvPath);
+                auto outputHashes = staticOutputHashes(*this, drv);
+                auto drvOutputs = drv.outputsAndOptPaths(*this);
+                if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                    auto path = *drvOutputs.at(p.output).second;
+                    futurePermissions[path] = status;
+                }
+        },
+        [&](StoreObjectDerivationLog l){}
+    }, storePathstoreObject);
     futurePermissions[storePathstoreObject] = status;
 }
 
