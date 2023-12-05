@@ -12,15 +12,35 @@ let
         path = /tmp/bar;
         permissions = {
           protected = true;
-          # TODO remove the "test" user once the example-package-diff-permissions tests succeeds without it.
-          users = ["root" "test"];
+          users = ["root"];
         };
       };
       buildCommand = "echo Example > $out; cat $exampleSource >> $out";
       allowSubstitutes = false;
       __permissions = {
-        outputs.out = { protected = true; users = ["root" "test"]; };
-        drv = { protected = true; users = ["root" "test"]; groups = ["root"]; };
+        outputs.out = { protected = true; users = ["root"]; };
+        drv = { protected = true; users = ["root"]; groups = ["root"]; };
+        log.protected = false;
+      };
+    }
+  '';
+
+  test-unaccessible = builtins.toFile "unaccessible.nix" ''
+    with import <nixpkgs> {};
+    stdenvNoCC.mkDerivation {
+      name = "example";
+      exampleSource = builtins.path {
+        path = /tmp/unaccessible;
+        permissions = {
+          protected = true;
+          users = ["root"];
+        };
+      };
+      buildCommand = "echo Example > $out; cat $exampleSource >> $out";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["root"]; };
+        drv = { protected = true; users = ["root"]; groups = ["root"]; };
         log.protected = false;
       };
     }
@@ -161,6 +181,19 @@ let
 
     assert_info(path, {"exists": True, "protected": False, "users": [], "groups": []}, "after nix store access unprotect")
   '';
+  testNonAccessible = ''
+    machine.succeed("touch /tmp/unaccessible")
+    machine.succeed("chmod 700 /tmp/unaccessible")
+
+    machine.fail("""
+     sudo -u test nix store add-file /tmp/unaccessible
+    """)
+
+    machine.fail("""
+      sudo -u test nix-build ${test-unaccessible} --no-out-link --debug
+    """)
+
+  '';
   testFoo = ''
     # fmt: off
     machine.succeed("touch foo")
@@ -177,15 +210,13 @@ let
       nix eval -f ${example-package} --apply "x: x.drvPath" --raw
     """).strip()
 
-    # TODO: uncomment when the test user is removed from the permissions of the example-package derivation.
-    # assert_info(examplePackageDrvPath, {"exists": True, "protected": True, "users": [], "groups": ["root"]}, "after nix eval with __permissions")
+    assert_info(examplePackageDrvPath, {"exists": True, "protected": True, "users": ["root"], "groups": ["root"]}, "after nix eval with __permissions")
 
     examplePackagePath = machine.succeed("""
       nix-build ${example-package}
     """).strip()
 
-    # TODO: uncomment when the test user is removed from the permissions of the example-package derivation.
-    # assert_info(examplePackagePath, {"exists": True, "protected": True, "users": ["root"], "groups": []}, "after nix-build with __permissions")
+    assert_info(examplePackagePath, {"exists": True, "protected": True, "users": ["root"], "groups": []}, "after nix-build with __permissions")
 
     examplePackagePathDiffPermissions = machine.succeed("""
       sudo -u test nix-build ${example-package-diff-permissions} --no-out-link
@@ -195,12 +226,11 @@ let
 
     assert(examplePackagePath == examplePackagePathDiffPermissions), "Derivation outputs differ when __permissions change"
 
-    # TODO: a bug currently prevents the permissions to be added back after revoking them: uncomment when this is fixed.
-    # machine.succeed(f"""
-    #   nix store access revoke --user test {examplePackagePath}
-    # """)
+    machine.succeed(f"""
+      nix store access revoke --user test {examplePackagePath}
+    """)
 
-    # assert_info(examplePackagePath, {"exists": True, "protected": True, "users": ["root"], "groups": []}, "after nix store access revoke")
+    assert_info(examplePackagePath, {"exists": True, "protected": True, "users": ["root"], "groups": []}, "after nix store access revoke")
 
     exampleDependenciesPackagePath = machine.succeed("""
       sudo -u test nix-build ${example-dependencies} --no-out-link --show-trace
@@ -240,7 +270,132 @@ let
       sudo -u test nix-build ${runtime_dep_no_perm} --no-out-link
     """)
  '';
-    in
+
+  # A private package only root can access
+  private-package = builtins.toFile "private.nix" ''
+    with import <nixpkgs> {};
+    stdenvNoCC.mkDerivation {
+      name = "private";
+      privateSource = builtins.path {
+        path = /tmp/secret;
+        sha256 = "f90af0f74a205cadaad0f17854805cae15652ba2afd7992b73c4823765961533";
+        permissions = {
+          protected = true;
+          users = ["root"];
+        };
+      };
+      buildCommand = "cat $privateSource > $out";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["root"]; };
+        drv = { protected = true; users = ["root"]; groups = ["root"]; };
+        log.protected = true;
+        log.users = ["root"];
+      };
+    }
+  '';
+
+  # Test depending on a private output, which should fail.
+  depend-on-private = builtins.toFile "depend_on_private.nix" ''
+    with import <nixpkgs> {};
+    let private = import ${private-package}; in
+    stdenvNoCC.mkDerivation {
+      name = "public";
+      buildCommand = "cat ''${private} > $out ";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["test"]; };
+        drv = { protected = true; users = ["test"]; };
+        log.protected = true;
+      };
+    }
+  '';
+
+  # Test adding a private runtime dependency, which should fail.
+  runtime-depend-on-private = builtins.toFile "depend_on_private.nix" ''
+    with import <nixpkgs> {};
+    let private = import ${private-package}; in
+    stdenvNoCC.mkDerivation {
+      name = "public";
+      buildCommand = "echo ''${private} > $out ";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["test"]; };
+        drv = { protected = true; users = ["test"]; };
+        log.protected = true;
+      };
+    }
+  '';
+
+  # Test depending on a public derivation which depends on a private import
+  depend-on-public = builtins.toFile "depend_on_public.nix" ''
+    with import <nixpkgs> {};
+    let public = import ${depend-on-private}; in
+    stdenvNoCC.mkDerivation {
+      name = "public";
+      buildCommand = "cat ''${public} > $out ";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["test"]; };
+        drv = { protected = true; users = ["test"]; };
+        log.protected = true;
+      };
+    }
+  '';
+
+
+  # Only root can access /tmp/secret and the output of the private-package.
+  # The `test` user cannot read it nor depend on it in a derivation
+  testDependOnPrivate = ''
+    # fmt: off
+    machine.succeed("""echo "secret_string" > /tmp/secret""");
+    machine.succeed("""chmod 700 /tmp/secret""");
+    print(machine.succeed("""nix-hash --type sha256 /tmp/secret"""));
+
+    private_output = machine.succeed("""
+      sudo nix-build ${private-package} --no-out-link
+    """)
+
+    machine.succeed(f"""cat {private_output}""")
+
+    machine.fail(f"""sudo -u test cat {private_output}""")
+
+    machine.fail("""
+      sudo -u test nix-build ${depend-on-private} --no-out-link
+    """)
+
+    machine.fail(f"""sudo -u test cat {private_output}""")
+    machine.fail("""
+      sudo -u test nix-build ${runtime-depend-on-private} --no-out-link
+    """)
+
+    machine.fail(f"""sudo -u test cat {private_output}""")
+    # Root builds the derivation to give access to test
+    public_output = machine.succeed("""
+      sudo nix-build ${depend-on-private} --no-out-link
+    """)
+
+    print(machine.succeed(f"""sudo -u test cat {public_output}"""))
+    print(machine.succeed(f"""getfacl {public_output}"""))
+    print(machine.succeed(f"""getfacl {private_output}"""))
+
+    # Once it's already built test is able to run the build command
+    machine.succeed("""
+     sudo -u test nix-build ${depend-on-private} --no-out-link
+    """)
+
+    # But it is still unable to read the output.
+    machine.fail(f"""sudo -u test cat {private_output}""")
+
+    print(machine.succeed(f"""sudo -u test cat {public_output}"""))
+
+    # Can test depend on it in a derivation ?
+    machine.succeed("""
+      sudo -u test nix-build ${depend-on-public} --no-out-link
+    """)
+  '';
+
+in
 {
   name = "acls";
 
@@ -259,8 +414,10 @@ let
   testScript = { nodes }: testInit + lib.strings.concatStrings
     [
       testCli
+      testNonAccessible
       testFoo
       testExamples
+      testDependOnPrivate
       # [TODO] uncomment once access to the runtime closure is unforced
       # testRuntimeDepNoPermScript
     ];
