@@ -176,8 +176,10 @@ void ensureAccess(LocalGranularAccessStore::AccessStatus * accessStatus, std::st
         }, entity))
             return;
     }
-    warn("adding you (%s) to the list of users allowed to access %s; otherwise you would not be able to access it", pw->pw_name, description);
-    accessStatus->entities.insert(ACL::User {uid});
+    // Is this needed ?
+    // Commented out because with it, the depend-on-private test unexpectidly succeeds, because the `test` user get access to the private input.
+    // warn("adding you (%s) to the list of users allowed to access %s; otherwise you would not be able to access it", pw->pw_name, description);
+    // accessStatus->entities.insert(ACL::User {uid});
 }
 
 /**
@@ -2274,11 +2276,16 @@ static void addPath(
                 .references = {},
             });
 
-        if (accessStatus && !settings.readOnlyMode) {
-            StorePath dstPath = state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first;
-            ensureAccess(&*accessStatus, state.store->printStorePath(dstPath));
-            require<LocalGranularAccessStore>(*state.store).setAccessStatus(dstPath, *accessStatus);
-        }
+        // Commented out because computeStorePathForPath needs reading access to the path.
+        // But this should not be needed if the path is already in the store and is fixed output derivation.
+        // For the case where the file is private but a public derivation depends on it.
+
+        // TODO: why is this needed ?
+        // if (accessStatus && !settings.readOnlyMode) {
+        //     StorePath dstPath = state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first;
+        //     ensureAccess(&*accessStatus, state.store->printStorePath(dstPath));
+        //     require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(dstPath, *accessStatus);
+        // }
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             StorePath dstPath = settings.readOnlyMode
