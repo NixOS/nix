@@ -163,8 +163,10 @@ enum struct WorkerProto::Op : uint64_t
     AddMultipleToStore = 44,
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
-    GetAccessStatus = 47,
-    SetAccessStatus = 48,
+    GetCurrentAccessStatus = 47,
+    GetFutureAccessStatus = 48,
+    SetCurrentAccessStatus = 49,
+    SetFutureAccessStatus = 50,
 };
 
 /**

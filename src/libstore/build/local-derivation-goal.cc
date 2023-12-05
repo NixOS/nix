@@ -240,7 +240,7 @@ void LocalDerivationGoal::tryLocalBuild()
     if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
         if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
             for (auto path : inputPaths) {
-                if (localStore->getAccessStatus(path).isProtected) {
+                if (localStore->getCurrentAccessStatus(path).isProtected) {
                     if (!localStore->canAccess(path))
                         throw AccessDenied(
                             "%s (uid %d) does not have access to path %s",
@@ -2736,8 +2736,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 localStore.signPathInfo(oldInfo);
                 localStore.registerValidPaths({{oldInfo.path, oldInfo}});
             }
-            if (localStore.effectiveUser && !localStore.canAccess(oldInfo.path))
-                localStore.addAllowedEntities(oldInfo.path, {*localStore.effectiveUser});
+            if (localStore.effectiveUser && !localStore.canAccess(oldInfo.path)){
+                // Is this needed ?
+                // Can give to many permission, if test user tries to build a path that already exists
+                // but on which it does not have permission.
+                // localStore.addAllowedEntitiesCurrent(oldInfo.path, {*localStore.effectiveUser});
+            }
 
             continue;
         }
@@ -2773,7 +2777,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         StoreObjectDerivationLog log { drvPath };
         /* Since all outputs are known to be matching, give access to the log */
         if (localStore.effectiveUser && !localStore.canAccess(log))
-            localStore.addAllowedEntities(log, {*localStore.effectiveUser});
+            localStore.addAllowedEntitiesFuture(log, {*localStore.effectiveUser});
 
         /* In case of fixed-output derivations, if there are
            mismatches on `--check` an error must be thrown as this is

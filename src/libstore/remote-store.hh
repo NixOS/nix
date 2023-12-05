@@ -172,8 +172,10 @@ public:
 
     ref<Connection> openConnectionWrapper();
 
-    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
-    AccessStatus getAccessStatus(const StoreObject & storeObject) override;
+    void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    void setFutureAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    AccessStatus getCurrentAccessStatus(const StoreObject & storeObject) override;
+    AccessStatus getFutureAccessStatus(const StoreObject & storeObject) override;
 
     std::set<ACL::Group> getSubjectGroups(ACL::User user) override;
 

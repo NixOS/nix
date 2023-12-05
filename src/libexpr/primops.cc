@@ -1443,7 +1443,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *derivation, &status, "__permissions.drv", "builtins.derivationStrict");
                 ensureAccess(&status, state.store->printStorePath(drvPath));
-                require<LocalGranularAccessStore>(*state.store).setAccessStatus(drvPath, status);
+                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(drvPath, status);
             }
         }
     }
@@ -1471,7 +1471,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                     LocalGranularAccessStore::AccessStatus status;
                     readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
                     ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS));
-                    require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
+                    require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
                 }
             }
             auto log = attr->value->attrs->find(state.sLog);
@@ -1479,7 +1479,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *log, &status, "__permissions.log", "builtins.derivationStrict");
                 ensureAccess(&status, fmt("log of derivation %s", drvPathS));
-                require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationLog {drvPath}, status);
+                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationLog {drvPath}, status);
             }
         }
     }

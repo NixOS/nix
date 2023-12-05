@@ -23,12 +23,12 @@ struct CmdStoreAccessUnprotect : StorePathsCommand
     {
         auto & localStore = require<LocalGranularAccessStore>(*store);
         for (auto & path : storePaths) {
-            auto status = localStore.getAccessStatus(path);
+            auto status = localStore.getCurrentAccessStatus(path);
             if (!status.entities.empty())
                 warn("There are still some users or groups who have access to path %s; consider removing them with \n" ANSI_BOLD "nix store access revoke --all-entities %s" ANSI_NORMAL, localStore.printStorePath(path), localStore.printStorePath(path));
             if (!localStore.isValidPath(path)) warn("Path %s does not exist yet; permissions will be applied as soon as it is added to the store", localStore.printStorePath(path));
             status.isProtected = false;
-            localStore.setAccessStatus(path, status);
+            localStore.setCurrentAccessStatus(path, status);
         }
     }
 };
