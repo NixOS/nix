@@ -370,7 +370,7 @@ TEST_F(ValuePrintingTests, ansiColorsStringElided)
     v.mkString("puppy");
 
     test(v,
-         ANSI_MAGENTA "\"pup\"" ANSI_FAINT " «2 bytes elided»" ANSI_NORMAL,
+         ANSI_MAGENTA "\"pup\" " ANSI_FAINT "«2 bytes elided»" ANSI_NORMAL,
          PrintOptions {
              .ansiColors = true,
              .maxStringLength = 3
@@ -756,7 +756,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
     vAttrs.mkAttrs(builder.finish());
 
     test(vAttrs,
-         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT " «1 attribute elided»" ANSI_NORMAL "}",
+         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«1 attribute elided»" ANSI_NORMAL "}",
          PrintOptions {
              .ansiColors = true,
              .maxAttrs = 1
@@ -769,7 +769,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
     vAttrs.mkAttrs(builder.finish());
 
     test(vAttrs,
-         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT " «2 attributes elided»" ANSI_NORMAL "}",
+         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«2 attributes elided»" ANSI_NORMAL "}",
          PrintOptions {
              .ansiColors = true,
              .maxAttrs = 1
@@ -793,7 +793,7 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
     vList.bigList.size = 2;
 
     test(vList,
-         "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT " «1 item elided»" ANSI_NORMAL "]",
+         "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«1 item elided»" ANSI_NORMAL "]",
          PrintOptions {
              .ansiColors = true,
              .maxListItems = 1
@@ -806,7 +806,7 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
     vList.bigList.size = 3;
 
     test(vList,
-         "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT " «2 items elided»" ANSI_NORMAL "]",
+         "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«2 items elided»" ANSI_NORMAL "]",
          PrintOptions {
              .ansiColors = true,
              .maxListItems = 1

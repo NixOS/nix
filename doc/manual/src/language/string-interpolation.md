@@ -189,7 +189,7 @@ If neither is present, an error is thrown.
 > "${a}"
 > ```
 >
->     error: cannot coerce a set to a string
+>     error: cannot coerce a set to a string: { }
 >
 >            at «string»:4:2:
 >
