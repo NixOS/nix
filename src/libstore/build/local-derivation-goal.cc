@@ -241,7 +241,7 @@ void LocalDerivationGoal::tryLocalBuild()
         if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
             for (auto path : inputPaths) {
                 if (localStore->getCurrentAccessStatus(path).isProtected) {
-                    if (!localStore->canAccess(path))
+                    if (!localStore->canAccess(path, false))
                         throw AccessDenied(
                             "%s (uid %d) does not have access to path %s",
                             getUserName(localStore->effectiveUser->uid),
@@ -2736,7 +2736,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 localStore.signPathInfo(oldInfo);
                 localStore.registerValidPaths({{oldInfo.path, oldInfo}});
             }
-            if (localStore.effectiveUser && !localStore.canAccess(oldInfo.path)){
+            if (localStore.effectiveUser && !localStore.canAccess(oldInfo.path, false)){
                 // Is this needed ?
                 // Can give to many permission, if test user tries to build a path that already exists
                 // but on which it does not have permission.
@@ -2776,7 +2776,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         auto & localStore = getLocalStore();
         StoreObjectDerivationLog log { drvPath };
         /* Since all outputs are known to be matching, give access to the log */
-        if (localStore.effectiveUser && !localStore.canAccess(log))
+        if (localStore.effectiveUser && !localStore.canAccess(log, false))
             localStore.addAllowedEntitiesFuture(log, {*localStore.effectiveUser});
 
         /* In case of fixed-output derivations, if there are

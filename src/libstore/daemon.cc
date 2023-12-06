@@ -512,7 +512,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case WorkerProto::Op::ExportPath: {
         auto path = store->parseStorePath(readString(from));
-        if (!require<LocalGranularAccessStore>(*store).canAccess(path)) throw AccessDenied("Access Denied");
+        if (!require<LocalGranularAccessStore>(*store).canAccess(path, false)) throw AccessDenied("Access Denied");
         readInt(from); // obsolete
         logger->startWork();
         TunnelSink sink(to);
@@ -1059,10 +1059,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 if (exists && ! std::includes(status.entities.begin(), status.entities.end(), curStatus.entities.begin(), curStatus.entities.end())){
                     throw AccessDenied("Only trusted users can revoke permissions on %s", description);
                 }
-
-                if (localStore->canAccess(object, user.uid))
+                if (localStore->canAccess(object, user.uid, false)){
                      localStore->setCurrentAccessStatus(object, status);
-                throw Error("daemon.cc setCurrentAccessStatus");
+                } else {
+                    throw AccessDenied(fmt("setCurrentAccessStatus: User %s does not have permission on path %s", user.uid, description));
+                }
             }
         }
         logger->stopWork();

@@ -63,7 +63,7 @@ struct GranularAccessStore : public virtual Store
     /**
      * Whether any of the given @entities@ can access the path
      */
-    bool canAccess(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities, bool use_future = false)
+    bool canAccess(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities, bool use_future)
     {
         if (! experimentalFeatureSettings.isEnabled(Xp::ACLs) || trusted) return true;
         AccessStatus status;
@@ -84,7 +84,7 @@ struct GranularAccessStore : public virtual Store
     /**
      * Whether a subject can access the store path
      */
-    bool canAccess(const StoreObject & storeObject, AccessControlSubject subject, bool use_future = false)
+    bool canAccess(const StoreObject & storeObject, AccessControlSubject subject, bool use_future)
     {
         std::set<AccessControlEntity> entities;
         auto groups = getSubjectGroups(subject);
@@ -98,7 +98,7 @@ struct GranularAccessStore : public virtual Store
     /**
      * Whether the effective subject can access the store path
      */
-    bool canAccess(const StoreObject & storeObject, bool use_future = false) {
+    bool canAccess(const StoreObject & storeObject, bool use_future) {
         if (!experimentalFeatureSettings.isEnabled(Xp::ACLs) || trusted) return true;
         if (effectiveUser){
             return canAccess(storeObject, *effectiveUser, use_future);
