@@ -603,8 +603,7 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
 {
     /* 'uri' should be equal to a prefix, or in a subdirectory of a
        prefix. Thus, the prefix https://github.co does not permit
-       access to https://github.com. Note: this allows 'http://' and
-       'https://' as prefixes for any http/https URI. */
+       access to https://github.com. */
     for (auto & prefix : allowedUris) {
         if (uri == prefix ||
             (uri.size() > prefix.size()
