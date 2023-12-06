@@ -657,11 +657,14 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
        prefix. Thus, the prefix https://github.co does not permit
        access to https://github.com. */
     for (auto & prefix : allowedUris) {
-        if (uri == prefix ||
-            (uri.size() > prefix.size()
-            && prefix.size() > 0
-            && hasPrefix(uri, prefix)
-            && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
+        if (uri == prefix
+            // Allow access to subdirectories of the prefix.
+            || (uri.size() > prefix.size()
+                && prefix.size() > 0
+                && hasPrefix(uri, prefix)
+                && (
+                    prefix[prefix.size() - 1] == '/'
+                    || uri[prefix.size()] == '/')))
             return true;
     }
 
