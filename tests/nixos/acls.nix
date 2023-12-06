@@ -232,9 +232,24 @@ let
 
     assert_info(examplePackagePath, {"exists": True, "protected": True, "users": ["root"], "groups": []}, "after nix store access revoke")
 
+    machine.succeed(f"""
+      nix store access grant --user test {examplePackagePath}
+    """)
+
+    assert_info(examplePackagePathDiffPermissions, {"exists": True, "protected": True, "users": ["root", "test"], "groups": []}, "after nix-build as a different user")
+
+    # Trying to revoke permissions fails as a non trusted user.
+    machine.fail(f"""
+      sudo -u test nix store access revoke --user test {examplePackagePath}
+    """)
+
     exampleDependenciesPackagePath = machine.succeed("""
       sudo -u test nix-build ${example-dependencies} --no-out-link --show-trace
     """).strip()
+
+    print(machine.succeed(f"""
+      cat {exampleDependenciesPackagePath}
+    """))
 
     assert_info(exampleDependenciesPackagePath, {"exists": True, "protected": False, "users": [], "groups": []}, "after nix-build with dependencies")
     assert_info(examplePackagePath, {"exists": True, "protected": True, "users": ["root", "test"], "groups": []}, "after nix-build with dependencies")
@@ -395,6 +410,51 @@ let
     """)
   '';
 
+  # Non trusted user gives permission to another one.
+  test-user-private = builtins.toFile "private.nix" ''
+    with import <nixpkgs> {};
+    stdenvNoCC.mkDerivation {
+      name = "test-user-private";
+      privateSource = builtins.path {
+        path = /tmp/test_secret;
+        sha256 = "f90af0f74a205cadaad0f17854805cae15652ba2afd7992b73c4823765961533";
+        permissions = {
+          protected = true;
+          users = ["test"];
+        };
+      };
+      buildCommand = "cat $privateSource > $out";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["test" "test2"]; };
+        drv = { protected = true; users = ["test" "test2"]; };
+        log.protected = true;
+        log.users = ["test" "test2"];
+      };
+    }
+  '';
+
+  # Non trusted user grants access to its private file
+  testTestUserPrivate = ''
+    # fmt: off
+    machine.succeed("""sudo -u test bash -c 'echo secret_string > /tmp/test_secret'""");
+    machine.succeed("""sudo -u test chmod 700 /tmp/test_secret""");
+    print(machine.succeed("""getfacl /tmp/test_secret"""));
+    userPrivatePath = machine.succeed("""
+     sudo -u test nix-build ${test-user-private} --no-out-link
+    """)
+    assert_info(userPrivatePath, {"exists": True, "protected": True, "users": ["test", "test2"], "groups": []}, "after nix-build test-user-private")
+    machine.succeed(f"""
+      sudo -u test2 cat {userPrivatePath}
+    """)
+    machine.fail(f"""
+     sudo -u test nix store access revoke --user test2 {userPrivatePath}
+    """)
+    machine.succeed(f"""
+     sudo -u test2 nix store access grant --user test3 {userPrivatePath}
+    """)
+  '';
+
 in
 {
   name = "acls";
@@ -409,6 +469,12 @@ in
       users.users.test = {
         isNormalUser = true;
       };
+      users.users.test2 = {
+        isNormalUser = true;
+      };
+      users.users.test3 = {
+        isNormalUser = true;
+      };
     };
 
   testScript = { nodes }: testInit + lib.strings.concatStrings
@@ -418,6 +484,7 @@ in
       testFoo
       testExamples
       testDependOnPrivate
+      testTestUserPrivate
       # [TODO] uncomment once access to the runtime closure is unforced
       # testRuntimeDepNoPermScript
     ];
