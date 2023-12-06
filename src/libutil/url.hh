@@ -55,4 +55,13 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme);
    changes absolute paths into file:// URLs. */
 std::string fixGitURL(const std::string & url);
 
+/**
+ * Whether a string is valid as RFC 3986 scheme name.
+ * Colon `:` is part of the URI; not the scheme name, and therefore rejected.
+ * See https://www.rfc-editor.org/rfc/rfc3986#section-3.1
+ *
+ * Does not check whether the scheme is understood, as that's context-dependent.
+ */
+bool isValidSchemeName(std::string_view scheme);
+
 }
