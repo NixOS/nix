@@ -30,10 +30,14 @@ struct PosixSourceAccessor : virtual SourceAccessor
 
     std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override;
 
+private:
+
     /**
      * Throw an error if `path` or any of its ancestors are symlinks.
      */
     void assertNoSymlinks(CanonPath path);
+
+    std::optional<struct stat> cachedLstat(const CanonPath & path);
 };
 
 }

@@ -1,5 +1,8 @@
 #include "posix-source-accessor.hh"
 #include "signals.hh"
+#include "sync.hh"
+
+#include <unordered_map>
 
 namespace nix {
 
@@ -46,23 +49,45 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
     return nix::pathExists(path.abs());
 }
 
+std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
+{
+    static Sync<std::unordered_map<CanonPath, std::optional<struct stat>>> _cache;
+
+    {
+        auto cache(_cache.lock());
+        auto i = cache->find(path);
+        if (i != cache->end()) return i->second;
+    }
+
+    std::optional<struct stat> st{std::in_place};
+    if (::lstat(path.c_str(), &*st)) {
+        if (errno == ENOENT || errno == ENOTDIR)
+            st.reset();
+        else
+            throw SysError("getting status of '%s'", showPath(path));
+    }
+
+    auto cache(_cache.lock());
+    if (cache->size() >= 16384) cache->clear();
+    cache->emplace(path, st);
+
+    return st;
+}
+
 std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
 {
     if (auto parent = path.parent()) assertNoSymlinks(*parent);
-    struct stat st;
-    if (::lstat(path.c_str(), &st)) {
-        if (errno == ENOENT || errno == ENOTDIR) return std::nullopt;
-        throw SysError("getting status of '%s'", showPath(path));
-    }
-    mtime = std::max(mtime, st.st_mtime);
+    auto st = cachedLstat(path);
+    if (!st) return std::nullopt;
+    mtime = std::max(mtime, st->st_mtime);
     return Stat {
         .type =
-            S_ISREG(st.st_mode) ? tRegular :
-            S_ISDIR(st.st_mode) ? tDirectory :
-            S_ISLNK(st.st_mode) ? tSymlink :
+            S_ISREG(st->st_mode) ? tRegular :
+            S_ISDIR(st->st_mode) ? tDirectory :
+            S_ISLNK(st->st_mode) ? tSymlink :
             tMisc,
-        .fileSize = S_ISREG(st.st_mode) ? std::optional<uint64_t>(st.st_size) : std::nullopt,
-        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR,
+        .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
     };
 }
 
@@ -95,14 +120,9 @@ std::optional<CanonPath> PosixSourceAccessor::getPhysicalPath(const CanonPath & 
 
 void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
 {
-    // FIXME: cache this since it potentially causes a lot of lstat calls.
     while (!path.isRoot()) {
-        struct stat st;
-        if (::lstat(path.c_str(), &st)) {
-            if (errno != ENOENT)
-                throw SysError("getting status of '%s'", showPath(path));
-        }
-        if (S_ISLNK(st.st_mode))
+        auto st = cachedLstat(path);
+        if (st && S_ISLNK(st->st_mode))
             throw Error("path '%s' is a symlink", showPath(path));
         path.pop();
     }
