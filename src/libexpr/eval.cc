@@ -599,21 +599,29 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     mkStorePathString(storePath, v);
 }
 
-void EvalState::checkURI(const std::string & uri)
+bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
 {
-    if (!evalSettings.restrictEval) return;
-
     /* 'uri' should be equal to a prefix, or in a subdirectory of a
        prefix. Thus, the prefix https://github.co does not permit
        access to https://github.com. Note: this allows 'http://' and
        'https://' as prefixes for any http/https URI. */
-    for (auto & prefix : evalSettings.allowedUris.get())
+    for (auto & prefix : allowedUris) {
         if (uri == prefix ||
             (uri.size() > prefix.size()
             && prefix.size() > 0
             && hasPrefix(uri, prefix)
             && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
-            return;
+            return true;
+    }
+
+    return false;
+}
+
+void EvalState::checkURI(const std::string & uri)
+{
+    if (!evalSettings.restrictEval) return;
+
+    if (isAllowedURI(uri, evalSettings.allowedUris.get())) return;
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
