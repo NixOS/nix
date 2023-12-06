@@ -13,8 +13,8 @@ typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowe
 
 /**
  * An abstract wrapping `InputAccessor` that performs access
- * control. Subclasses should override `checkAccess()` to implement an
- * access control policy.
+ * control. Subclasses should override `isAllowed()` to implement an
+ * access control policy. The error message is customized at construction.
  */
 struct FilteringInputAccessor : InputAccessor
 {
