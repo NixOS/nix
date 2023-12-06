@@ -183,7 +183,14 @@ const char * nix_get_path_string(nix_c_context * context, const Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nPath);
-        return v.path().to_string().c_str();
+        // NOTE (from @yorickvP)
+        // v._path.path should work but may not be how Eelco intended it.
+        // Long-term this function should be rewritten to copy some data into a
+        // user-allocated string.
+        // We could use v.path().to_string().c_str(), but I'm concerned this
+        // crashes. Looks like .path() allocates a CanonPath with a copy of the
+        // string, then it gets the underlying data from that.
+        return v._path.path;
     }
     NIXC_CATCH_ERRS_NULL
 }
