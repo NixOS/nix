@@ -1,13 +1,13 @@
 #pragma once
 ///@file
 
-#include "installables.hh"
+#include "store-installables.hh"
 #include "flake/flake.hh"
 
 namespace nix {
 
 struct DrvInfo;
-struct SourceExprCommand;
+struct ParseInstallableValueArgs;
 
 namespace eval_cache { class EvalCache; class AttrCursor; }
 

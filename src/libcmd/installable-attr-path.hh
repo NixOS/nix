@@ -27,14 +27,14 @@ namespace nix {
 
 class InstallableAttrPath : public InstallableValue
 {
-    SourceExprCommand & cmd;
+    ParseInstallableValueArgs & cmd;
     RootValue v;
     std::string attrPath;
     ExtendedOutputsSpec extendedOutputsSpec;
 
     InstallableAttrPath(
         ref<EvalState> state,
-        SourceExprCommand & cmd,
+        ParseInstallableValueArgs & cmd,
         Value * v,
         const std::string & attrPath,
         ExtendedOutputsSpec extendedOutputsSpec);
@@ -49,7 +49,7 @@ public:
 
     static InstallableAttrPath parse(
         ref<EvalState> state,
-        SourceExprCommand & cmd,
+        ParseInstallableValueArgs & cmd,
         Value * v,
         std::string_view prefix,
         ExtendedOutputsSpec extendedOutputsSpec);

@@ -26,7 +26,7 @@ namespace nix {
 
 InstallableAttrPath::InstallableAttrPath(
     ref<EvalState> state,
-    SourceExprCommand & cmd,
+    ParseInstallableValueArgs & cmd,
     Value * v,
     const std::string & attrPath,
     ExtendedOutputsSpec extendedOutputsSpec)
@@ -107,7 +107,7 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 
 InstallableAttrPath InstallableAttrPath::parse(
     ref<EvalState> state,
-    SourceExprCommand & cmd,
+    ParseInstallableValueArgs & cmd,
     Value * v,
     std::string_view prefix,
     ExtendedOutputsSpec extendedOutputsSpec)

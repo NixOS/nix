@@ -483,7 +483,7 @@ bool Args::processArgs(const Strings & args, bool finish)
         if (!anyCompleted)
             exp.handler.fun(ss);
 
-        /* Move the list element to the processedArgs. This is almost the same as 
+        /* Move the list element to the processedArgs. This is almost the same as
            `processedArgs.push_back(expectedArgs.front()); expectedArgs.pop_front()`,
            except that it will only adjust the next and prev pointers of the list
            elements, meaning the actual contents don't move in memory. This is
@@ -599,12 +599,12 @@ static void _completePath(AddCompletions & completions, std::string_view prefix,
     globfree(&globbuf);
 }
 
-void Args::completePath(AddCompletions & completions, size_t, std::string_view prefix)
+void AbstractArgs::completePath(AddCompletions & completions, size_t, std::string_view prefix)
 {
     _completePath(completions, prefix, false);
 }
 
-void Args::completeDir(AddCompletions & completions, size_t, std::string_view prefix)
+void AbstractArgs::completeDir(AddCompletions & completions, size_t, std::string_view prefix)
 {
     _completePath(completions, prefix, true);
 }
@@ -638,8 +638,9 @@ MultiCommand::MultiCommand(const Commands & commands_)
                 auto suggestions = Suggestions::bestMatches(commandNames, s);
                 throw UsageError(suggestions, "'%s' is not a recognised command", s);
             }
-            command = {s, i->second()};
-            command->second->parent = this;
+            auto sub = i->second();
+            sub->parent = this;
+            command = {std::move(s), std::move(sub)};
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             for (auto & [name, command] : commands)

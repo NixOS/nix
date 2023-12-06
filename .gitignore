@@ -54,9 +54,11 @@ perl/Makefile.config
 # /src/libutil/
 /tests/unit/libutil/libnixutil-tests
 
-/src/nix/nix
+/src/nix/store/mini-nix
+/src/nix/full/nix
 
 /src/nix/generated-doc
+/src/nix/full/generated-doc
 
 # /src/nix-env/
 /src/nix-env/nix-env

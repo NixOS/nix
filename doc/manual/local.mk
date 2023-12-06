@@ -101,6 +101,8 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/SUMMARY-rl-next.md $(d)/src
 	@cp $< $@
 	@$(call process-includes,$@,$@)
 
+ifeq ($(NIX_FULL), 1)
+
 $(d)/src/store/types: $(d)/nix.json $(d)/utils.nix $(d)/generate-store-info.nix  $(d)/generate-store-types.nix $(d)/src/store/types/index.md.in $(doc_nix)
 	@# FIXME: build out of tree!
 	@rm -rf $@.tmp
@@ -122,9 +124,13 @@ $(d)/nix.json: $(doc_nix)
 	$(trace-gen) $(dummy-env) $(doc_nix) __dump-cli > $@.tmp
 	@mv $@.tmp $@
 
+endif
+
 $(d)/conf-file.json: $(doc_nix)
 	$(trace-gen) $(dummy-env) $(doc_nix) config show --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
+
+ifeq ($(NIX_FULL), 1)
 
 $(d)/src/contributing/experimental-feature-descriptions.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features.nix $(doc_nix)
 	@rm -rf $@ $@.tmp
@@ -155,6 +161,8 @@ $(d)/src/language/builtin-constants.md: $(d)/language.json $(d)/generate-builtin
 $(d)/language.json: $(doc_nix)
 	$(trace-gen) $(dummy-env) $(doc_nix) __dump-language > $@.tmp
 	@mv $@.tmp $@
+
+endif
 
 # Generate "Upcoming release" notes (or clear it and remove from menu)
 $(d)/src/release-notes/rl-next.md: $(d)/rl-next $(d)/rl-next/*

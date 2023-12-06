@@ -12,9 +12,10 @@
 
 namespace nix {
 
-MixEvalArgs::MixEvalArgs()
+MixEvalArgs::MixEvalArgs(AbstractArgs & args)
+    : MixRepair(args)
 {
-    addFlag({
+    args.addFlag({
         .longName = "arg",
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .category = category,
@@ -22,7 +23,7 @@ MixEvalArgs::MixEvalArgs()
         .handler = {[&](std::string name, std::string expr) { autoArgs[name] = 'E' + expr; }}
     });
 
-    addFlag({
+    args.addFlag({
         .longName = "argstr",
         .description = "Pass the string *string* as the argument *name* to Nix functions.",
         .category = category,
@@ -30,7 +31,7 @@ MixEvalArgs::MixEvalArgs()
         .handler = {[&](std::string name, std::string s) { autoArgs[name] = 'S' + s; }},
     });
 
-    addFlag({
+    args.addFlag({
         .longName = "include",
         .shortName = 'I',
         .description = R"(
@@ -111,7 +112,7 @@ MixEvalArgs::MixEvalArgs()
         }}
     });
 
-    addFlag({
+    args.addFlag({
         .longName = "impure",
         .description = "Allow access to mutable paths and repositories.",
         .category = category,
@@ -120,7 +121,7 @@ MixEvalArgs::MixEvalArgs()
         }},
     });
 
-    addFlag({
+    args.addFlag({
         .longName = "override-flake",
         .description = "Override the flake registries, redirecting *original-ref* to *resolved-ref*.",
         .category = category,
@@ -137,7 +138,7 @@ MixEvalArgs::MixEvalArgs()
         }}
     });
 
-    addFlag({
+    args.addFlag({
         .longName = "eval-store",
         .description =
           R"(

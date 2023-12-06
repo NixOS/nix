@@ -104,7 +104,12 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
-            using LegacyArgs::LegacyArgs;
+            MyArgs(const std::string & programName,
+                std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+                : MixRepair(static_cast<LegacyArgs &>(*this))
+                , LegacyArgs(programName, parseArg)
+                , MixEvalArgs(static_cast<LegacyArgs &>(*this))
+            { }
         };
 
         MyArgs myArgs(std::string(baseNameOf(argv[0])), [&](Strings::iterator & arg, const Strings::iterator & end) {

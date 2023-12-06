@@ -22,41 +22,15 @@ class RootArgs;
 
 class AddCompletions;
 
-class Args
+struct AbstractArgs
 {
-
-public:
-
-    /**
-     * Return a short one-line description of the command.
-    */
-    virtual std::string description() { return ""; }
-
-    virtual bool forceImpureByDefault() { return false; }
-
-    /**
-     * Return documentation about this command, in Markdown format.
-     */
-    virtual std::string doc() { return ""; }
-
-    /**
-     * @brief Get the base directory for the command.
-     *
-     * @return Generally the working directory, but in case of a shebang
-     *         interpreter, returns the directory of the script.
-     *
-     * This only returns the correct value after parseCmdline() has run.
-     */
-    virtual Path getCommandBaseDir() const;
-
-protected:
 
     /**
      * The largest `size_t` is used to indicate the "any" arity, for
      * handlers/flags/arguments that accept an arbitrary number of
      * arguments.
      */
-    static const size_t ArityAny = std::numeric_limits<size_t>::max();
+    static constexpr size_t ArityAny = std::numeric_limits<size_t>::max();
 
     /**
      * Arguments (flags/options and positional) have a "handler" which is
@@ -179,6 +153,57 @@ protected:
         static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
     };
 
+    virtual void addFlag(Flag && flag) = 0;
+
+    /**
+     * Description of positional arguments
+     *
+     * These are arguments that do not start with a `-`, and for which
+     * the order does matter.
+     */
+    struct ExpectedArg
+    {
+        std::string label;
+        bool optional = false;
+        Handler handler;
+        CompleterClosure completer;
+    };
+
+    virtual void expectArgs(ExpectedArg && arg) = 0;
+
+    /**
+     * @brief Get the base directory for the command.
+     *
+     * @return Generally the working directory, but in case of a shebang
+     *         interpreter, returns the directory of the script.
+     *
+     * This only returns the correct value after parseCmdline() has run.
+     */
+    virtual Path getCommandBaseDir() const = 0;
+
+    static CompleterFun completePath;
+
+    static CompleterFun completeDir;
+};
+
+class Args : public virtual AbstractArgs
+{
+public:
+
+    /**
+     * Return a short one-line description of the command.
+     */
+    virtual std::string description() { return ""; }
+
+    virtual bool forceImpureByDefault() { return false; }
+
+    /**
+     * Return documentation about this command, in Markdown format.
+     */
+    virtual std::string doc() { return ""; }
+
+protected:
+
     /**
      * Index of all registered "long" flag descriptions (flags like
      * `--long`).
@@ -198,20 +223,6 @@ protected:
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
 
     /**
-     * Description of positional arguments
-     *
-     * These are arguments that do not start with a `-`, and for which
-     * the order does matter.
-     */
-    struct ExpectedArg
-    {
-        std::string label;
-        bool optional = false;
-        Handler handler;
-        CompleterClosure completer;
-    };
-
-    /**
      * Queue of expected positional argument forms.
      *
      * Positional argument descriptions are inserted on the back.
@@ -223,11 +234,11 @@ protected:
     std::list<ExpectedArg> expectedArgs;
     /**
      * List of processed positional argument forms.
-     * 
+     *
      * All items removed from `expectedArgs` are added here. After all
      * arguments were processed, this list should be exactly the same as
      * `expectedArgs` was before.
-     * 
+     *
      * This list is used to extend the lifetime of the argument forms.
      * If this is not done, some closures that reference the command
      * itself will segfault.
@@ -256,14 +267,16 @@ protected:
 
 public:
 
-    void addFlag(Flag && flag);
+    void addFlag(Flag && flag) override;
 
     void removeFlag(const std::string & longName);
 
-    void expectArgs(ExpectedArg && arg)
+    void expectArgs(ExpectedArg && arg) override final
     {
         expectedArgs.emplace_back(std::move(arg));
     }
+
+    virtual Path getCommandBaseDir() const override;
 
     /**
      * Expect a string argument.
@@ -287,10 +300,6 @@ public:
             .handler = {dest}
         });
     }
-
-    static CompleterFun completePath;
-
-    static CompleterFun completeDir;
 
     virtual nlohmann::json toJSON();
 
