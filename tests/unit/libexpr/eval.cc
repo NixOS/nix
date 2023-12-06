@@ -103,4 +103,39 @@ TEST(nix_isAllowedURI, file_url) {
     ASSERT_FALSE(isAllowedURI("file://", allowed));
 }
 
+TEST(nix_isAllowedURI, github_all) {
+    Strings allowed;
+    allowed.push_back("github:");
+    ASSERT_TRUE(isAllowedURI("github:", allowed));
+    ASSERT_TRUE(isAllowedURI("github:foo/bar", allowed));
+    ASSERT_TRUE(isAllowedURI("github:foo/bar/feat-multi-bar", allowed));
+    ASSERT_TRUE(isAllowedURI("github:foo/bar?ref=refs/heads/feat-multi-bar", allowed));
+    ASSERT_TRUE(isAllowedURI("github://foo/bar", allowed));
+    ASSERT_FALSE(isAllowedURI("https://github:443/foo/bar/archive/master.tar.gz", allowed));
+    ASSERT_FALSE(isAllowedURI("file://github:foo/bar/archive/master.tar.gz", allowed));
+    ASSERT_FALSE(isAllowedURI("file:///github:foo/bar/archive/master.tar.gz", allowed));
+    ASSERT_FALSE(isAllowedURI("github", allowed));
+}
+
+TEST(nix_isAllowedURI, github_org) {
+    Strings allowed;
+    allowed.push_back("github:foo");
+    ASSERT_FALSE(isAllowedURI("github:", allowed));
+    ASSERT_TRUE(isAllowedURI("github:foo/bar", allowed));
+    ASSERT_TRUE(isAllowedURI("github:foo/bar/feat-multi-bar", allowed));
+    ASSERT_TRUE(isAllowedURI("github:foo/bar?ref=refs/heads/feat-multi-bar", allowed));
+    ASSERT_FALSE(isAllowedURI("github://foo/bar", allowed));
+    ASSERT_FALSE(isAllowedURI("https://github:443/foo/bar/archive/master.tar.gz", allowed));
+    ASSERT_FALSE(isAllowedURI("file://github:foo/bar/archive/master.tar.gz", allowed));
+    ASSERT_FALSE(isAllowedURI("file:///github:foo/bar/archive/master.tar.gz", allowed));
+}
+
+TEST(nix_isAllowedURI, non_scheme_colon) {
+    Strings allowed;
+    allowed.push_back("https://foo/bar:");
+    ASSERT_TRUE(isAllowedURI("https://foo/bar:", allowed));
+    ASSERT_TRUE(isAllowedURI("https://foo/bar:/baz", allowed));
+    ASSERT_FALSE(isAllowedURI("https://foo/bar:baz", allowed));
+}
+
 } // namespace nix

@@ -16,6 +16,7 @@
 #include "fs-input-accessor.hh"
 #include "memory-input-accessor.hh"
 #include "signals.hh"
+#include "url.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -602,6 +603,14 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     mkStorePathString(storePath, v);
 }
 
+inline static bool isJustSchemePrefix(std::string_view prefix)
+{
+    return
+        !prefix.empty()
+        && prefix[prefix.size() - 1] == ':'
+        && isValidSchemeName(prefix.substr(0, prefix.size() - 1));
+}
+
 
 SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 {
@@ -663,8 +672,14 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
                 && prefix.size() > 0
                 && hasPrefix(uri, prefix)
                 && (
+                    // Allow access to subdirectories of the prefix.
                     prefix[prefix.size() - 1] == '/'
-                    || uri[prefix.size()] == '/')))
+                    || uri[prefix.size()] == '/'
+
+                    // Allow access to whole schemes
+                    || isJustSchemePrefix(prefix)
+                    )
+                ))
             return true;
     }
 
