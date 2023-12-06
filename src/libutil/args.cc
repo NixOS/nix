@@ -483,7 +483,7 @@ bool Args::processArgs(const Strings & args, bool finish)
         if (!anyCompleted)
             exp.handler.fun(ss);
 
-        /* Move the list element to the processedArgs. This is almost the same as 
+        /* Move the list element to the processedArgs. This is almost the same as
            `processedArgs.push_back(expectedArgs.front()); expectedArgs.pop_front()`,
            except that it will only adjust the next and prev pointers of the list
            elements, meaning the actual contents don't move in memory. This is
@@ -622,8 +622,9 @@ std::optional<ExperimentalFeature> Command::experimentalFeature ()
     return { Xp::NixCommand };
 }
 
-MultiCommand::MultiCommand(const Commands & commands_)
+MultiCommand::MultiCommand(std::string_view commandName, const Commands & commands_)
     : commands(commands_)
+    , commandName(commandName)
 {
     expectArgs({
         .label = "subcommand",

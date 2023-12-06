@@ -825,7 +825,9 @@ struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRu
 struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
-        : MultiCommand({
+        : NixMultiCommand(
+            "profile",
+            {
               {"install", []() { return make_ref<CmdProfileInstall>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
@@ -847,13 +849,6 @@ struct CmdProfile : NixMultiCommand
         return
           #include "profile.md"
           ;
-    }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix profile' requires a sub-command.");
-        command->second->run();
     }
 };
 

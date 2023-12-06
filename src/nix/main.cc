@@ -67,7 +67,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
     bool helpRequested = false;
     bool showVersion = false;
 
-    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
+    NixArgs() : MultiCommand("", RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
         categories.clear();
         categories[catHelp] = "Help commands";

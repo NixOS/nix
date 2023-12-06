@@ -130,7 +130,9 @@ struct CmdToBase : Command
 struct CmdHash : NixMultiCommand
 {
     CmdHash()
-        : MultiCommand({
+        : NixMultiCommand(
+            "hash",
+            {
                 {"file", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Flat);; }},
                 {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
                 {"to-base16", []() { return make_ref<CmdToBase>(HashFormat::Base16); }},
@@ -146,13 +148,6 @@ struct CmdHash : NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix hash' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdHash = registerCommand<CmdHash>("hash");

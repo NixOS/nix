@@ -26,9 +26,13 @@ static constexpr Command::Category catNixInstallation = 102;
 
 static constexpr auto installablesCategory = "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
 
-struct NixMultiCommand : virtual MultiCommand, virtual Command
+struct NixMultiCommand : MultiCommand, virtual Command
 {
     nlohmann::json toJSON() override;
+
+    using MultiCommand::MultiCommand;
+
+    virtual void run() override;
 };
 
 // For the overloaded run methods
