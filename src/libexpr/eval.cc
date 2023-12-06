@@ -18,6 +18,7 @@
 #include "memory-input-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
+#include "url.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -599,6 +600,14 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     mkStorePathString(storePath, v);
 }
 
+inline static bool isJustSchemePrefix(std::string_view prefix)
+{
+    return
+        !prefix.empty()
+        && prefix[prefix.size() - 1] == ':'
+        && isValidSchemeName(prefix.substr(0, prefix.size() - 1));
+}
+
 bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
 {
     /* 'uri' should be equal to a prefix, or in a subdirectory of a
@@ -611,8 +620,14 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
                 && prefix.size() > 0
                 && hasPrefix(uri, prefix)
                 && (
+                    // Allow access to subdirectories of the prefix.
                     prefix[prefix.size() - 1] == '/'
-                    || uri[prefix.size()] == '/')))
+                    || uri[prefix.size()] == '/'
+
+                    // Allow access to whole schemes
+                    || isJustSchemePrefix(prefix)
+                    )
+                ))
             return true;
     }
 
