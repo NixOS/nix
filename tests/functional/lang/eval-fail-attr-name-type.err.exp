@@ -13,4 +13,4 @@ error:
              |                 ^
             8|
 
-       error: value is an integer while a string was expected
+       error: expected a string but found an integer: 1

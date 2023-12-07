@@ -38,5 +38,5 @@ error:
              |           ^
             5|
 
-       error: value is a set while a string was expected
+       error: expected a string but found a set
 ```

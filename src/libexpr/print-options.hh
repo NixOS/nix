@@ -49,4 +49,16 @@ struct PrintOptions
     size_t maxStringLength = std::numeric_limits<size_t>::max();
 };
 
+/**
+ * `PrintOptions` for unknown and therefore potentially large values in error messages,
+ * to avoid printing "too much" output.
+ */
+static PrintOptions errorPrintOptions = PrintOptions {
+    .ansiColors = true,
+    .maxDepth = 10,
+    .maxAttrs = 10,
+    .maxListItems = 10,
+    .maxStringLength = 1024
+};
+
 }

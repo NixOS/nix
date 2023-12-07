@@ -7,4 +7,4 @@ error:
 
        … while evaluating the first argument passed to builtins.length
 
-       error: value is an integer while a list was expected
+       error: expected a list but found an integer: 1

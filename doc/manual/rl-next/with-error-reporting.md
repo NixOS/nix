@@ -8,7 +8,7 @@ prs: 9658
 Previously an incorrect `with` expression would report no position at all, making it hard to determine where the error originated:
 
 ```
-nix-repl> with 1; a  
+nix-repl> with 1; a
 error:
        … <borked>
 
@@ -27,5 +27,5 @@ error:
             1| with 1; a
              | ^
 
-       error: value is an integer while a set was expected
+       error: expected a set but found an integer
 ```
