@@ -193,7 +193,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
 
-    HashType hashAlgo = parseHashType(opArgs.front());
+    HashAlgorithm hashAlgo = parseHashAlgo(opArgs.front());
     opArgs.pop_front();
 
     for (auto & i : opArgs)
@@ -214,7 +214,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
         throw UsageError("'--print-fixed-path' requires three arguments");
 
     Strings::iterator i = opArgs.begin();
-    HashType hashAlgo = parseHashType(*i++);
+    HashAlgorithm hashAlgo = parseHashAlgo(*i++);
     std::string hash = *i++;
     std::string name = *i++;
 
@@ -405,8 +405,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(HashFormat::Base32, true));
+                        assert(info->narHash.algo == HashAlgorithm::SHA256);
+                        cout << fmt("%s\n", info->narHash.to_string(HashFormat::Nix32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -541,7 +541,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             if (canonicalise)
                 canonicalisePathMetaData(store->printStorePath(info->path), {});
             if (!hashGiven) {
-                HashResult hash = hashPath(htSHA256, store->printStorePath(info->path));
+                HashResult hash = hashPath(HashAlgorithm::SHA256, store->printStorePath(info->path));
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }
@@ -763,14 +763,14 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(info->narHash.type);
+        HashSink sink(info->narHash.algo);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
             printError("path '%s' was modified! expected hash '%s', got '%s'",
                 store->printStorePath(path),
-                info->narHash.to_string(HashFormat::Base32, true),
-                current.first.to_string(HashFormat::Base32, true));
+                info->narHash.to_string(HashFormat::Nix32, true),
+                current.first.to_string(HashFormat::Nix32, true));
             status = 1;
         }
     }
@@ -898,7 +898,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << info->narHash.to_string(HashFormat::Base32, true)
+                            out << info->narHash.to_string(HashFormat::Nix32, true)
                                 << renderContentAddress(info->ca)
                                 << info->sigs;
                     } catch (InvalidPath &) {
@@ -979,7 +979,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 auto deriver = readString(in);
                 ValidPathInfo info {
                     store->parseStorePath(path),
-                    Hash::parseAny(readString(in), htSHA256),
+                    Hash::parseAny(readString(in), HashAlgorithm::SHA256),
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);

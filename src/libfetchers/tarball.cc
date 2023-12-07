@@ -75,7 +75,7 @@ DownloadFileResult downloadFile(
     } else {
         StringSink sink;
         dumpString(res.data, sink);
-        auto hash = hashString(htSHA256, res.data);
+        auto hash = hashString(HashAlgorithm::SHA256, res.data);
         ValidPathInfo info {
             *store,
             name,
@@ -84,7 +84,7 @@ DownloadFileResult downloadFile(
                 .hash = hash,
                 .references = {},
             },
-            hashString(htSHA256, sink.s),
+            hashString(HashAlgorithm::SHA256, sink.s),
         };
         info.narSize = sink.s.size();
         auto source = StringSource { sink.s };

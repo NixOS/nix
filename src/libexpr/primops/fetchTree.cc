@@ -43,7 +43,7 @@ static void emitTreeAttrs(
             attrs.alloc("shortRev").mkString(rev->gitShortRev());
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
-            auto emptyHash = Hash(htSHA1);
+            auto emptyHash = Hash(HashAlgorithm::SHA1);
             attrs.alloc("rev").mkString(emptyHash.gitRev());
             attrs.alloc("shortRev").mkString(emptyHash.gitShortRev());
         }
@@ -282,7 +282,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
             else if (n == "sha256")
-                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), htSHA256);
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), HashAlgorithm::SHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             else
@@ -312,7 +312,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         state.debugThrowLastTrace(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
 
     // early exit if pinned and already in the store
-    if (expectedHash && expectedHash->type == htSHA256) {
+    if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
@@ -337,10 +337,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, state.store->toRealPath(storePath));
+            : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
             state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                *url, expectedHash->to_string(HashFormat::Base32, true), hash.to_string(HashFormat::Base32, true)));
+                                                *url, expectedHash->to_string(HashFormat::Nix32, true), hash.to_string(HashFormat::Nix32, true)));
     }
 
     state.allowAndSetStorePathString(storePath, v);

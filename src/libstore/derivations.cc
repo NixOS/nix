@@ -215,25 +215,25 @@ static StringSet parseStrings(std::istream & str, bool arePaths)
 
 static DerivationOutput parseDerivationOutput(
     const StoreDirConfig & store,
-    std::string_view pathS, std::string_view hashAlgo, std::string_view hashS,
+    std::string_view pathS, std::string_view hashAlgoStr, std::string_view hashS,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    if (hashAlgo != "") {
-        ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgo);
+    if (hashAlgoStr != "") {
+        ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
         if (method == TextIngestionMethod {})
             xpSettings.require(Xp::DynamicDerivations);
-        const auto hashType = parseHashType(hashAlgo);
+        const auto hashAlgo = parseHashAlgo(hashAlgoStr);
         if (hashS == "impure") {
             xpSettings.require(Xp::ImpureDerivations);
             if (pathS != "")
                 throw FormatError("impure derivation output should not specify output path");
             return DerivationOutput::Impure {
                 .method = std::move(method),
-                .hashType = std::move(hashType),
+                .hashAlgo = std::move(hashAlgo),
             };
         } else if (hashS != "") {
             validatePath(pathS);
-            auto hash = Hash::parseNonSRIUnprefixed(hashS, hashType);
+            auto hash = Hash::parseNonSRIUnprefixed(hashS, hashAlgo);
             return DerivationOutput::CAFixed {
                 .ca = ContentAddress {
                     .method = std::move(method),
@@ -246,7 +246,7 @@ static DerivationOutput parseDerivationOutput(
                 throw FormatError("content-addressed derivation output should not specify output path");
             return DerivationOutput::CAFloating {
                 .method = std::move(method),
-                .hashType = std::move(hashType),
+                .hashAlgo = std::move(hashAlgo),
             };
         }
     } else {
@@ -547,7 +547,7 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, dof.method.renderPrefix() + printHashType(dof.hashType));
+                s += ','; printUnquotedString(s, dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo));
                 s += ','; printUnquotedString(s, "");
             },
             [&](const DerivationOutput::Deferred &) {
@@ -558,7 +558,7 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
             [&](const DerivationOutput::Impure & doi) {
                 // FIXME
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, doi.method.renderPrefix() + printHashType(doi.hashType));
+                s += ','; printUnquotedString(s, doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo));
                 s += ','; printUnquotedString(s, "impure");
             }
         }, i.second.raw);
@@ -631,7 +631,7 @@ DerivationType BasicDerivation::type() const
         floatingCAOutputs,
         deferredIAOutputs,
         impureOutputs;
-    std::optional<HashType> floatingHashType;
+    std::optional<HashAlgorithm> floatingHashAlgo;
 
     for (auto & i : outputs) {
         std::visit(overloaded {
@@ -643,10 +643,10 @@ DerivationType BasicDerivation::type() const
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 floatingCAOutputs.insert(i.first);
-                if (!floatingHashType) {
-                    floatingHashType = dof.hashType;
+                if (!floatingHashAlgo) {
+                    floatingHashAlgo = dof.hashAlgo;
                 } else {
-                    if (*floatingHashType != dof.hashType)
+                    if (*floatingHashAlgo != dof.hashAlgo)
                         throw Error("all floating outputs must use the same hash type");
                 }
             },
@@ -774,7 +774,7 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw);
-            auto hash = hashString(htSHA256, "fixed:out:"
+            auto hash = hashString(HashAlgorithm::SHA256, "fixed:out:"
                 + dof.ca.printMethodAlgo() + ":"
                 + dof.ca.hash.to_string(HashFormat::Base16, false) + ":"
                 + store.printStorePath(dof.path(store, drv.name, i.first)));
@@ -825,7 +825,7 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
         }
     }
 
-    auto hash = hashString(htSHA256, drv.unparse(store, maskOutputs, &inputs2));
+    auto hash = hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2));
 
     std::map<std::string, Hash> outputHashes;
     for (const auto & [outputName, _] : drv.outputs) {
@@ -930,7 +930,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 out << ""
-                    << (dof.method.renderPrefix() + printHashType(dof.hashType))
+                    << (dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo))
                     << "";
             },
             [&](const DerivationOutput::Deferred &) {
@@ -940,7 +940,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
             },
             [&](const DerivationOutput::Impure & doi) {
                 out << ""
-                    << (doi.method.renderPrefix() + printHashType(doi.hashType))
+                    << (doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo))
                     << "impure";
             },
         }, i.second.raw);
@@ -958,7 +958,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
 std::string hashPlaceholder(const OutputNameView outputName)
 {
     // FIXME: memoize?
-    return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(HashFormat::Base32, false);
+    return "/" + hashString(HashAlgorithm::SHA256, concatStrings("nix-output:", outputName)).to_string(HashFormat::Nix32, false);
 }
 
 
@@ -1150,7 +1150,7 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 }
 
 
-const Hash impureOutputHash = hashString(htSHA256, "impure");
+const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
 nlohmann::json DerivationOutput::toJSON(
     const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const
@@ -1167,11 +1167,11 @@ nlohmann::json DerivationOutput::toJSON(
             // FIXME print refs?
         },
         [&](const DerivationOutput::CAFloating & dof) {
-            res["hashAlgo"] = dof.method.renderPrefix() + printHashType(dof.hashType);
+            res["hashAlgo"] = dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo);
         },
         [&](const DerivationOutput::Deferred &) {},
         [&](const DerivationOutput::Impure & doi) {
-            res["hashAlgo"] = doi.method.renderPrefix() + printHashType(doi.hashType);
+            res["hashAlgo"] = doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo);
             res["impure"] = true;
         },
     }, raw);
@@ -1191,15 +1191,15 @@ DerivationOutput DerivationOutput::fromJSON(
     for (const auto & [key, _] : json)
         keys.insert(key);
 
-    auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashType> {
-        std::string hashAlgo = json["hashAlgo"];
+    auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
+        std::string hashAlgoStr = json["hashAlgo"];
         // remaining to parse, will be mutated by parsers
-        std::string_view s = hashAlgo;
+        std::string_view s = hashAlgoStr;
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(s);
         if (method == TextIngestionMethod {})
             xpSettings.require(Xp::DynamicDerivations);
-        auto hashType = parseHashType(s);
-        return { std::move(method), std::move(hashType) };
+        auto hashAlgo = parseHashAlgo(s);
+        return { std::move(method), std::move(hashAlgo) };
     };
 
     if (keys == (std::set<std::string_view> { "path" })) {
@@ -1209,11 +1209,11 @@ DerivationOutput DerivationOutput::fromJSON(
     }
 
     else if (keys == (std::set<std::string_view> { "path", "hashAlgo", "hash" })) {
-        auto [method, hashType] = methodAlgo();
+        auto [method, hashAlgo] = methodAlgo();
         auto dof = DerivationOutput::CAFixed {
             .ca = ContentAddress {
                 .method = std::move(method),
-                .hash = Hash::parseNonSRIUnprefixed((std::string) json["hash"], hashType),
+                .hash = Hash::parseNonSRIUnprefixed((std::string) json["hash"], hashAlgo),
             },
         };
         if (dof.path(store, drvName, outputName) != store.parseStorePath((std::string) json["path"]))
@@ -1223,10 +1223,10 @@ DerivationOutput DerivationOutput::fromJSON(
 
     else if (keys == (std::set<std::string_view> { "hashAlgo" })) {
         xpSettings.require(Xp::CaDerivations);
-        auto [method, hashType] = methodAlgo();
+        auto [method, hashAlgo] = methodAlgo();
         return DerivationOutput::CAFloating {
             .method = std::move(method),
-            .hashType = std::move(hashType),
+            .hashAlgo = std::move(hashAlgo),
         };
     }
 
@@ -1236,10 +1236,10 @@ DerivationOutput DerivationOutput::fromJSON(
 
     else if (keys == (std::set<std::string_view> { "hashAlgo", "impure" })) {
         xpSettings.require(Xp::ImpureDerivations);
-        auto [method, hashType] = methodAlgo();
+        auto [method, hashAlgo] = methodAlgo();
         return DerivationOutput::Impure {
             .method = std::move(method),
-            .hashType = hashType,
+            .hashAlgo = hashAlgo,
         };
     }
 

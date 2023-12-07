@@ -25,11 +25,13 @@ makefiles = \
 endif
 
 ifeq ($(ENABLE_BUILD)_$(ENABLE_TESTS), yes_yes)
-UNIT_TEST_ENV = _NIX_TEST_UNIT_DATA=unit-test-data
 makefiles += \
-  src/libutil/tests/local.mk \
-  src/libstore/tests/local.mk \
-  src/libexpr/tests/local.mk
+  tests/unit/libutil/local.mk \
+  tests/unit/libutil-support/local.mk \
+  tests/unit/libstore/local.mk \
+  tests/unit/libstore-support/local.mk \
+  tests/unit/libexpr/local.mk \
+  tests/unit/libexpr-support/local.mk
 endif
 
 ifeq ($(ENABLE_TESTS), yes)
@@ -62,4 +64,4 @@ $(eval $(call include-sub-makefile, doc/manual/local.mk))
 $(eval $(call include-sub-makefile, doc/internal-api/local.mk))
 endif
 
-GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++2a -I src
+GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src

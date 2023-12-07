@@ -14,7 +14,8 @@
 
 namespace nix {
 
-enum HashType : char;
+enum struct HashAlgorithm : char;
+enum struct HashFormat : int;
 
 class MultiCommand;
 
@@ -175,8 +176,10 @@ protected:
 
         std::optional<ExperimentalFeature> experimentalFeature;
 
-        static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
-        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
+        static Flag mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha);
+        static Flag mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
+        static Flag mkHashFormatFlagWithDefault(std::string && longName, HashFormat * hf);
+        static Flag mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf);
     };
 
     /**
@@ -223,11 +226,11 @@ protected:
     std::list<ExpectedArg> expectedArgs;
     /**
      * List of processed positional argument forms.
-     * 
+     *
      * All items removed from `expectedArgs` are added here. After all
      * arguments were processed, this list should be exactly the same as
      * `expectedArgs` was before.
-     * 
+     *
      * This list is used to extend the lifetime of the argument forms.
      * If this is not done, some closures that reference the command
      * itself will segfault.
@@ -356,13 +359,16 @@ public:
      */
     std::optional<std::pair<std::string, ref<Command>>> command;
 
-    MultiCommand(const Commands & commands);
+    MultiCommand(std::string_view commandName, const Commands & commands);
 
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
 
     nlohmann::json toJSON() override;
+
+protected:
+    std::string commandName = "";
 };
 
 Strings argvToStrings(int argc, char * * argv);

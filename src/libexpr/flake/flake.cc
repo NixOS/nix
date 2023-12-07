@@ -969,7 +969,7 @@ std::optional<Fingerprint> LockedFlake::getFingerprint(ref<Store> store) const
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
-    return hashString(htSHA256, fmt("%s;%s;%s", *fingerprint, flake.lockedRef.subdir, lockFile));
+    return hashString(HashAlgorithm::SHA256, fmt("%s;%s;%s", *fingerprint, flake.lockedRef.subdir, lockFile));
 }
 
 Flake::~Flake() { }

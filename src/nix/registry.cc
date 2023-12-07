@@ -198,10 +198,12 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     }
 };
 
-struct CmdRegistry : virtual NixMultiCommand
+struct CmdRegistry : NixMultiCommand
 {
     CmdRegistry()
-        : MultiCommand({
+        : NixMultiCommand(
+            "registry",
+            {
                 {"list", []() { return make_ref<CmdRegistryList>(); }},
                 {"add", []() { return make_ref<CmdRegistryAdd>(); }},
                 {"remove", []() { return make_ref<CmdRegistryRemove>(); }},
@@ -223,14 +225,6 @@ struct CmdRegistry : virtual NixMultiCommand
     }
 
     Category category() override { return catSecondary; }
-
-    void run() override
-    {
-        experimentalFeatureSettings.require(Xp::Flakes);
-        if (!command)
-            throw UsageError("'nix registry' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");

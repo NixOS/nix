@@ -267,8 +267,8 @@ std::string Input::getType() const
 std::optional<Hash> Input::getNarHash() const
 {
     if (auto s = maybeGetStrAttr(attrs, "narHash")) {
-        auto hash = s->empty() ? Hash(htSHA256) : Hash::parseSRI(*s);
-        if (hash.type != htSHA256)
+        auto hash = s->empty() ? Hash(HashAlgorithm::SHA256) : Hash::parseSRI(*s);
+        if (hash.algo != HashAlgorithm::SHA256)
             throw UsageError("narHash must use SHA-256");
         return hash;
     }
@@ -292,7 +292,7 @@ std::optional<Hash> Input::getRev() const
         } catch (BadHash &e) {
             // Default to sha1 for backwards compatibility with existing
             // usages (e.g. `builtins.fetchTree` calls or flake inputs).
-            hash = Hash::parseAny(*s, htSHA1);
+            hash = Hash::parseAny(*s, HashAlgorithm::SHA1);
         }
     }
 

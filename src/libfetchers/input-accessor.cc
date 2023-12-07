@@ -45,8 +45,8 @@ StorePath InputAccessor::fetchToStore(
 
     auto storePath =
         settings.readOnlyMode
-        ? store->computeStorePathFromDump(*source, name, method, htSHA256).first
-        : store->addToStoreFromDump(*source, name, method, htSHA256, repair);
+        ? store->computeStorePathFromDump(*source, name, method, HashAlgorithm::SHA256).first
+        : store->addToStoreFromDump(*source, name, method, HashAlgorithm::SHA256, repair);
 
     if (cacheKey)
         fetchers::getCache()->add(store, *cacheKey, {}, storePath, true);

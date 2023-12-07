@@ -1323,7 +1323,7 @@ drvName, Bindings * attrs, Value & v)
                 .errPos = state.positions[noPos]
             }));
 
-        auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
+        auto h = newHashAllowEmpty(*outputHash, parseHashAlgoOpt(outputHashAlgo));
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
@@ -1345,7 +1345,7 @@ drvName, Bindings * attrs, Value & v)
                 .errPos = state.positions[noPos]
             });
 
-        auto ht = parseHashTypeOpt(outputHashAlgo).value_or(htSHA256);
+        auto ha = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
         auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
 
         for (auto & i : outputs) {
@@ -1354,13 +1354,13 @@ drvName, Bindings * attrs, Value & v)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
                         .method = method,
-                        .hashType = ht,
+                        .hashAlgo = ha,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
                         .method = method,
-                        .hashType = ht,
+                        .hashAlgo = ha,
                     });
         }
     }
@@ -1762,17 +1762,17 @@ static RegisterPrimOp primop_findFile(PrimOp {
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto type = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashFile");
-    std::optional<HashType> ht = parseHashType(type);
-    if (!ht)
+    auto algo = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashFile");
+    std::optional<HashAlgorithm> ha = parseHashAlgo(algo);
+    if (!ha)
         state.debugThrowLastTrace(Error({
-            .msg = hintfmt("unknown hash type '%1%'", type),
+            .msg = hintfmt("unknown hash algo '%1%'", algo),
             .errPos = state.positions[pos]
         }));
 
     auto path = realisePath(state, pos, *args[1]);
 
-    v.mkString(hashString(*ht, path.readFile()).to_string(HashFormat::Base16, false));
+    v.mkString(hashString(*ha, path.readFile()).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -2365,7 +2365,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
         else if (n == "recursive")
             method = FileIngestionMethod { state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path") };
         else if (n == "sha256")
-            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), htSHA256);
+            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("unsupported argument '%1%' to 'addPath'", state.symbols[attr.name]),
@@ -3790,18 +3790,18 @@ static RegisterPrimOp primop_stringLength({
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto type = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashString");
-    std::optional<HashType> ht = parseHashType(type);
-    if (!ht)
+    auto algo = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashString");
+    std::optional<HashAlgorithm> ha = parseHashAlgo(algo);
+    if (!ha)
         state.debugThrowLastTrace(Error({
-            .msg = hintfmt("unknown hash type '%1%'", type),
+            .msg = hintfmt("unknown hash algo '%1%'", algo),
             .errPos = state.positions[pos]
         }));
 
     NixStringContext context; // discarded
     auto s = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.hashString");
 
-    v.mkString(hashString(*ht, s).to_string(HashFormat::Base16, false));
+    v.mkString(hashString(*ha, s).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({
@@ -3824,15 +3824,15 @@ static void prim_convertHash(EvalState & state, const PosIdx pos, Value * * args
     auto hash = state.forceStringNoCtx(*iteratorHash->value, pos, "while evaluating the attribute 'hash'");
 
     Bindings::iterator iteratorHashAlgo = inputAttrs->find(state.symbols.create("hashAlgo"));
-    std::optional<HashType> ht = std::nullopt;
+    std::optional<HashAlgorithm> ha = std::nullopt;
     if (iteratorHashAlgo != inputAttrs->end()) {
-        ht = parseHashType(state.forceStringNoCtx(*iteratorHashAlgo->value, pos, "while evaluating the attribute 'hashAlgo'"));
+        ha = parseHashAlgo(state.forceStringNoCtx(*iteratorHashAlgo->value, pos, "while evaluating the attribute 'hashAlgo'"));
     }
 
     Bindings::iterator iteratorToHashFormat = getAttr(state, state.symbols.create("toHashFormat"), args[0]->attrs, "while locating the attribute 'toHashFormat'");
     HashFormat hf = parseHashFormat(state.forceStringNoCtx(*iteratorToHashFormat->value, pos, "while evaluating the attribute 'toHashFormat'"));
 
-    v.mkString(Hash::parseAny(hash, ht).to_string(hf, hf == HashFormat::SRI));
+    v.mkString(Hash::parseAny(hash, ha).to_string(hf, hf == HashFormat::SRI));
 }
 
 static RegisterPrimOp primop_convertHash({
@@ -3861,7 +3861,8 @@ static RegisterPrimOp primop_convertHash({
 
         The format of the resulting hash. Must be one of
         - `"base16"`
-        - `"base32"`
+        - `"nix32"`
+        - `"base32"` (deprecated alias for `"nix32"`)
         - `"base64"`
         - `"sri"`
 
@@ -4424,7 +4425,7 @@ void EvalState::createBaseEnv()
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
-          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-system).
 
           It can be used to set the `system` attribute for [`builtins.derivation`](@docroot@/language/derivations.md) such that the resulting derivation can be built on the same system that evaluates the Nix expression:
 
