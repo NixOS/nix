@@ -36,8 +36,10 @@
       systems = linuxSystems ++ darwinSystems;
 
       crossSystems = [
-        "armv6l-linux" "armv7l-linux"
-        "x86_64-freebsd13" "x86_64-netbsd"
+        "armv6l-linux"
+        "armv7l-linux"
+        "x86_64-freebsd13"
+        "x86_64-netbsd"
       ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
@@ -575,8 +577,25 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "armv6l-linux" "armv7l-linux" ];
-        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
+        installerScript = installScriptFor [
+          # Native
+          "x86_64-linux"
+          "i686-linux"
+          "aarch64-linux"
+          "x86_64-darwin"
+          "aarch64-darwin"
+          # Cross
+          "armv6l-linux"
+          "armv7l-linux"
+        ];
+        installerScriptForGHA = installScriptFor [
+          # Native
+          "x86_64-linux"
+          "x86_64-darwin"
+          # Cross
+          "armv6l-linux"
+          "armv7l-linux"
+        ];
 
         # docker image with Nix inside
         dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
