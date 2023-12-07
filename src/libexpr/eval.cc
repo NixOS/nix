@@ -26,9 +26,9 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <iostream>
 #include <fstream>
 #include <functional>
+#include <strstream>
 
 #include <sys/resource.h>
 #include <nlohmann/json.hpp>
@@ -1254,7 +1254,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
         Value v;
         e->eval(*this, env, v);
         if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+            error("value is %1% while a Boolean was expected: %2%", showType(v), printValue(*this, v)).withFrame(env, *e).debugThrow<TypeError>();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -1268,7 +1268,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
-            error("value is %1% while a set was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+            error("value is %1% while a set was expected: %2%", showType(v), printValue(*this, v)).withFrame(env, *e).debugThrow<TypeError>();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -2129,7 +2129,7 @@ NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCt
     try {
         forceValue(v, pos);
         if (v.type() != nInt)
-            error("value is %1% while an integer was expected", showType(v)).debugThrow<TypeError>();
+            error("value is %1% while an integer was expected: %2%", showType(v), printValue(*this, v)).debugThrow<TypeError>();
         return v.integer;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2145,7 +2145,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
         if (v.type() == nInt)
             return v.integer;
         else if (v.type() != nFloat)
-            error("value is %1% while a float was expected", showType(v)).debugThrow<TypeError>();
+            error("value is %1% while a float was expected: %2%", showType(v), printValue(*this, v)).debugThrow<TypeError>();
         return v.fpoint;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2159,7 +2159,7 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
     try {
         forceValue(v, pos);
         if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).debugThrow<TypeError>();
+            error("value is %1% while a Boolean was expected: %2%", showType(v), printValue(*this, v)).debugThrow<TypeError>();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2179,7 +2179,7 @@ void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view erro
     try {
         forceValue(v, pos);
         if (v.type() != nFunction && !isFunctor(v))
-            error("value is %1% while a function was expected", showType(v)).debugThrow<TypeError>();
+            error("value is %1% while a function was expected: %2%", showType(v), printValue(*this, v)).debugThrow<TypeError>();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -2192,7 +2192,7 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
     try {
         forceValue(v, pos);
         if (v.type() != nString)
-            error("value is %1% while a string was expected", showType(v)).debugThrow<TypeError>();
+            error("value is %1% while a string was expected: %2%", showType(v), printValue(*this, v)).debugThrow<TypeError>();
         return v.string_view();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
