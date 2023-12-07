@@ -11,7 +11,7 @@ using namespace nix;
 
 Gen<Hash> Arbitrary<Hash>::arbitrary()
 {
-    Hash hash(htSHA1);
+    Hash hash(HashAlgorithm::SHA1);
     for (size_t i = 0; i < hash.hashSize; ++i)
         hash.hash[i] = *gen::arbitrary<uint8_t>();
     return gen::just(hash);

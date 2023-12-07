@@ -160,7 +160,7 @@ void WorkerProto::Serialise<ValidPathInfo>::write(const StoreDirConfig & store, 
 UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
 {
     auto deriver = readString(conn.from);
-    auto narHash = Hash::parseAny(readString(conn.from), htSHA256);
+    auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
     UnkeyedValidPathInfo info(narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);

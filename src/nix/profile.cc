@@ -216,7 +216,7 @@ struct ProfileManifest
         StringSink sink;
         dumpPath(tempDir, sink);
 
-        auto narHash = hashString(htSHA256, sink.s);
+        auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
 
         ValidPathInfo info {
             *store,

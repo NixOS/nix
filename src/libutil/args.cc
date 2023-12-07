@@ -544,36 +544,70 @@ nlohmann::json Args::toJSON()
     return res;
 }
 
-static void hashTypeCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
+static void hashFormatCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
-    for (auto & type : hashTypes)
-        if (hasPrefix(type, prefix))
-            completions.add(type);
+    for (auto & format : hashFormats) {
+        if (hasPrefix(format, prefix)) {
+            completions.add(format);
+        }
+    }
 }
 
-Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
-{
-    return Flag {
-        .longName = std::move(longName),
-        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
-        .labels = {"hash-algo"},
-        .handler = {[ht](std::string s) {
-            *ht = parseHashType(s);
-        }},
-        .completer = hashTypeCompleter,
+Args::Flag Args::Flag::mkHashFormatFlagWithDefault(std::string &&longName, HashFormat * hf) {
+    assert(*hf == nix::HashFormat::SRI);
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash format ('base16', 'nix32', 'base64', 'sri'). Default: 'sri'",
+            .labels = {"hash-format"},
+            .handler = {[hf](std::string s) {
+                *hf = parseHashFormat(s);
+            }},
+            .completer = hashFormatCompleter,
     };
 }
 
-Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht)
+Args::Flag Args::Flag::mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf) {
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash format ('base16', 'nix32', 'base64', 'sri').",
+            .labels = {"hash-format"},
+            .handler = {[ohf](std::string s) {
+                *ohf = std::optional<HashFormat>{parseHashFormat(s)};
+            }},
+            .completer = hashFormatCompleter,
+    };
+}
+
+static void hashAlgoCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
-    return Flag {
-        .longName = std::move(longName),
-        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
-        .labels = {"hash-algo"},
-        .handler = {[oht](std::string s) {
-            *oht = std::optional<HashType> { parseHashType(s) };
-        }},
-        .completer = hashTypeCompleter,
+    for (auto & algo : hashAlgorithms)
+        if (hasPrefix(algo, prefix))
+            completions.add(algo);
+}
+
+Args::Flag Args::Flag::mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha)
+{
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
+            .labels = {"hash-algo"},
+            .handler = {[ha](std::string s) {
+                *ha = parseHashAlgo(s);
+            }},
+            .completer = hashAlgoCompleter,
+    };
+}
+
+Args::Flag Args::Flag::mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha)
+{
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
+            .labels = {"hash-algo"},
+            .handler = {[oha](std::string s) {
+                *oha = std::optional<HashAlgorithm>{parseHashAlgo(s)};
+            }},
+            .completer = hashAlgoCompleter,
     };
 }
 

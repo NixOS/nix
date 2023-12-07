@@ -95,7 +95,7 @@ const static Tree tree = {
         {
             .mode = Mode::Regular,
             // hello world with special chars from above
-            .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", htSHA1),
+            .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", HashAlgorithm::SHA1),
         },
     },
     {
@@ -103,7 +103,7 @@ const static Tree tree = {
         {
             .mode = Mode::Executable,
             // ditto
-            .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", htSHA1),
+            .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", HashAlgorithm::SHA1),
         },
     },
     {
@@ -111,7 +111,7 @@ const static Tree tree = {
         {
             .mode = Mode::Directory,
             // Empty directory hash
-            .hash = Hash::parseAny("4b825dc642cb6eb9a060e54bf8d69288fbee4904", htSHA1),
+            .hash = Hash::parseAny("4b825dc642cb6eb9a060e54bf8d69288fbee4904", HashAlgorithm::SHA1),
         },
     },
 };
@@ -174,7 +174,7 @@ TEST_F(GitTest, both_roundrip) {
     std::function<DumpHook> dumpHook;
     dumpHook = [&](const CanonPath & path) {
         StringSink s;
-        HashSink hashSink { htSHA1 };
+        HashSink hashSink { HashAlgorithm::SHA1 };
         TeeSink s2 { s, hashSink };
         auto mode = dump(
             files, path, s2, dumpHook,

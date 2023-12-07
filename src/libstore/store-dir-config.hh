@@ -98,7 +98,7 @@ struct StoreDirConfig : public Config
         Source & dump,
         std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = {}) const;
 
     /**

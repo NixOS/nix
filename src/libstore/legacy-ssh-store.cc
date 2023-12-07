@@ -267,13 +267,13 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     { unsupported("queryPathFromHashPart"); }
 
     StorePath addToStore(
-        std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashType hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references) override
+            std::string_view name,
+            const Path & srcPath,
+            FileIngestionMethod method,
+            HashAlgorithm hashAlgo,
+            PathFilter & filter,
+            RepairFlag repair,
+            const StorePathSet & references) override
     { unsupported("addToStore"); }
 
     StorePath addTextToStore(

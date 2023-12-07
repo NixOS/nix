@@ -427,13 +427,13 @@ public:
      * libutil/archive.hh).
      */
     virtual StorePath addToStore(
-        std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter,
-        RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet());
+            std::string_view name,
+            const Path & srcPath,
+            FileIngestionMethod method = FileIngestionMethod::Recursive,
+            HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+            PathFilter & filter = defaultPathFilter,
+            RepairFlag repair = NoRepair,
+            const StorePathSet & references = StorePathSet());
 
     /**
      * Copy the contents of a path to the store and register the
@@ -441,8 +441,8 @@ public:
      * memory.
      */
     ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        std::optional<Hash> expectedCAHash = {});
+                                 FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+                                 std::optional<Hash> expectedCAHash = {});
 
     /**
      * Like addToStore(), but the contents of the path are contained
@@ -454,8 +454,8 @@ public:
      * \todo remove?
      */
     virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet())
+                                         FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256, RepairFlag repair = NoRepair,
+                                         const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }
 
     /**

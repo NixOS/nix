@@ -91,7 +91,7 @@ Hash toHash(const git_oid & oid)
     #ifdef GIT_EXPERIMENTAL_SHA256
     assert(oid.type == GIT_OID_SHA1);
     #endif
-    Hash hash(htSHA1);
+    Hash hash(HashAlgorithm::SHA1);
     memcpy(hash.hash, oid.id, hash.hashSize);
     return hash;
 }
@@ -439,7 +439,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
         for (const fetchers::PublicKey & k : publicKeys){
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
-            auto fingerprint = trim(hashString(htSHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+            auto fingerprint = trim(hashString(HashAlgorithm::SHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
             auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
             re += "(" + escaped_fingerprint + ")";
         }
