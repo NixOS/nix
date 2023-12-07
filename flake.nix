@@ -256,7 +256,7 @@
           ];
       };
 
-      installScriptFor = systems:
+      installScriptFor = tarballs:
         with nixpkgsFor.x86_64-linux.native;
         runCommand "installer-script"
           { buildInputs = [ nix ];
@@ -277,14 +277,14 @@
 
             substitute ${./scripts/install.in} $out/install \
               ${pkgs.lib.concatMapStrings
-                (system: let
-                    tarball = if builtins.elem system crossSystems then self.hydraJobs.binaryTarballCross.x86_64-linux.${system} else self.hydraJobs.binaryTarball.${system};
+                (tarball: let
+                    inherit (tarball.stdenv.hostPlatform) system;
                   in '' \
                   --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
                   --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
                   ''
                 )
-                systems
+                tarballs
               } --replace '@nixVersion@' ${version}
 
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
@@ -341,7 +341,7 @@
           installerClosureInfo = buildPackages.closureInfo { rootPaths = [ nix cacert ]; };
         in
 
-        buildPackages.runCommand "nix-binary-tarball-${version}"
+        pkgs.runCommand "nix-binary-tarball-${version}"
           { #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
             meta.description = "Distribution-independent Nix bootstrap binaries for ${pkgs.system}";
           }
@@ -579,22 +579,22 @@
         # installation script.
         installerScript = installScriptFor [
           # Native
-          "x86_64-linux"
-          "i686-linux"
-          "aarch64-linux"
-          "x86_64-darwin"
-          "aarch64-darwin"
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."i686-linux"
+          self.hydraJobs.binaryTarball."aarch64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          self.hydraJobs.binaryTarball."aarch64-darwin"
           # Cross
-          "armv6l-linux"
-          "armv7l-linux"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-linux"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-linux"
         ];
         installerScriptForGHA = installScriptFor [
           # Native
-          "x86_64-linux"
-          "x86_64-darwin"
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
           # Cross
-          "armv6l-linux"
-          "armv7l-linux"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-linux"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-linux"
         ];
 
         # docker image with Nix inside
