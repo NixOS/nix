@@ -25,6 +25,7 @@ enum struct PathStatus {
     Absent,
     Valid,
     Inaccessible,
+    ShouldSync,
 };
 
 struct InitialOutputStatus {
@@ -42,6 +43,7 @@ struct InitialOutputStatus {
     bool isPresent() const {
         return status == PathStatus::Corrupt
             || status == PathStatus::Inaccessible
+            || status == PathStatus::ShouldSync
             || status == PathStatus::Valid;
     }
 };

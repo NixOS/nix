@@ -726,6 +726,10 @@ void DerivationGoal::tryToBuild()
             } else if (status.known->status == PathStatus::Inaccessible) {
                 logger->cout("don't have access to path %s; checking outputs", worker.store.printStorePath(status.known->path));
                 buildMode = bmCheck;
+            } else if (status.known->status == PathStatus::ShouldSync) {
+                logger->cout("permissions should be synced for path %s; repairing",
+                            worker.store.printStorePath(status.known->path));
+                buildMode = bmRepair;
             }
         }
     }
@@ -1447,15 +1451,24 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
         if (i.second) {
             auto outputPath = *i.second;
             bool canAccess = true;
-            if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
-                if (auto aclStore = dynamic_cast<LocalGranularAccessStore *>(&worker.store))
-                    canAccess = aclStore->canAccess(outputPath);
+            bool shouldSyncPermissions = false;
+            bool isValid = worker.store.isValidPath(outputPath);
+            if (experimentalFeatureSettings.isEnabled(Xp::ACLs) && isValid)
+                // We only need to look at permissions if the path is valid.
+                // So we can assume that the path exists here.
+                if (auto aclStore = dynamic_cast<LocalStore *>(&worker.store)){
+                  // Todo: to cast to LocalGranularAccessStore instead of LocalStore we need to implement shouldSyncPermissions for the remote store.
+                    canAccess = aclStore->canAccess(outputPath, false);
+                    shouldSyncPermissions = aclStore->shouldSyncPermissions(outputPath);
+                }
             info.known = {
                 .path = outputPath,
-                .status = !worker.store.isValidPath(outputPath)
+                .status = !isValid
                     ? PathStatus::Absent
                     : checkHash && !worker.pathContentsGood(outputPath)
                     ? PathStatus::Corrupt
+                    : shouldSyncPermissions
+                    ? PathStatus::ShouldSync
                     : !canAccess
                     ? PathStatus::Inaccessible
                     : PathStatus::Valid,
@@ -1465,12 +1478,17 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 bool canAccess = true;
+                bool shouldSyncPermissions = false;
                 if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
-                    if (auto aclStore = dynamic_cast<LocalGranularAccessStore *>(&worker.store))
-                        canAccess = aclStore->canAccess(real->outPath);
+                    if (auto aclStore = dynamic_cast<LocalStore *>(&worker.store)){
+                        // Todo: to cast to LocalGranularAccessStore instead of LocalStore we need to implement shouldSyncPermissions for the remote store.
+                        // Todo: do we need to check for the path existence here before calling shouldSyncPermissions ?
+                        canAccess = aclStore->canAccess(real->outPath, false);
+                        shouldSyncPermissions = aclStore->shouldSyncPermissions(real->outPath);
+                    }
                 info.known = {
                     .path = real->outPath,
-                    .status = canAccess ? PathStatus::Valid : PathStatus::Inaccessible,
+                    .status = shouldSyncPermissions ? PathStatus::ShouldSync : !canAccess ? PathStatus::Inaccessible : PathStatus::Valid,
                 };
             } else if (info.known && info.known->isValid()) {
                 // We know the output because it's a static output of the

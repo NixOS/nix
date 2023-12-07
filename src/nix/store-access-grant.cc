@@ -50,13 +50,13 @@ struct CmdStoreAccessGrant : StorePathsCommand
         } else {
             auto & localStore = require<LocalGranularAccessStore>(*store);
             for (auto & path : storePaths) {
-                auto status = localStore.getAccessStatus(path);
+                auto status = localStore.getCurrentAccessStatus(path);
                 if (!status.isProtected) warn("Path '%s' is not protected; all users can access it regardless of permissions", store->printStorePath(path));
                 if (!localStore.isValidPath(path)) warn("Path %s does not exist yet; permissions will be applied as soon as it is added to the store", localStore.printStorePath(path));
 
                 for (auto user : users) status.entities.insert(nix::ACL::User(user));
                 for (auto group : groups) status.entities.insert(nix::ACL::Group(group));
-                localStore.setAccessStatus(path, status);
+                localStore.setCurrentAccessStatus(path, status);
             }
         }
     }

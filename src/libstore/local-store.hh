@@ -301,12 +301,15 @@ public:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
     void setFutureAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
+    void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
     void setCurrentAccessStatus(const Path & path, const AccessStatus & status);
-    AccessStatus getAccessStatus(const StoreObject & storeObject) override;
-    AccessStatus getFutureAccessStatus(const StoreObject & storeObject);
+    AccessStatus getFutureAccessStatus(const StoreObject & storeObject) override;
+    std::optional<AccessStatus> getFutureAccessStatusOpt(const StoreObject & storeObject);
     AccessStatus getCurrentAccessStatus(const Path & path);
+    AccessStatus getCurrentAccessStatus(const StoreObject & storeObject) override;
+    bool shouldSyncPermissions(const StoreObject &storeObject);
+    bool pathOfStoreObjectExists(const StoreObject & storeObject);
 
     void grantBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);
     void revokeBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);

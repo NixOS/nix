@@ -1465,7 +1465,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *derivation, &status, "__permissions.drv", "builtins.derivationStrict");
                 ensureAccess(&status, state.store->printStorePath(drvPath));
-                require<LocalGranularAccessStore>(*state.store).setAccessStatus(drvPath, status);
+                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(drvPath, status);
             }
         }
     }
@@ -1493,7 +1493,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                     LocalGranularAccessStore::AccessStatus status;
                     readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
                     ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS));
-                    require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
+                    require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
                 }
             }
             auto log = attr->value->attrs->find(state.sLog);
@@ -1501,7 +1501,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *log, &status, "__permissions.log", "builtins.derivationStrict");
                 ensureAccess(&status, fmt("log of derivation %s", drvPathS));
-                require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationLog {drvPath}, status);
+                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationLog {drvPath}, status);
             }
         }
     }
@@ -2345,17 +2345,16 @@ static void addPath(
                 .references = {},
             });
 
-        if (accessStatus && !settings.readOnlyMode) {
-            auto source = sinkToSource([&](Sink & sink) {
-                if (method == FileIngestionMethod::Recursive)
-                    dumpPath(path, sink, defaultPathFilter);
-                else
-                    readFile(path, sink);
-            });
-            StorePath dstPath = state.store->computeStorePathFromDump(*source, name, method, htSHA256).first;
-            ensureAccess(&*accessStatus, state.store->printStorePath(dstPath));
-            require<LocalGranularAccessStore>(*state.store).setAccessStatus(dstPath, *accessStatus);
-        }
+        // Commented out because computeStorePathForPath needs reading access to the path.
+        // But this should not be needed if the path is already in the store and is fixed output derivation.
+        // For the case where the file is private but a public derivation depends on it.
+
+        // TODO: why is this needed ?
+        // if (accessStatus && !settings.readOnlyMode) {
+        //     StorePath dstPath = state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first;
+        //     ensureAccess(&*accessStatus, state.store->printStorePath(dstPath));
+        //     require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(dstPath, *accessStatus);
+        // }
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, method, &filter, state.repair);

@@ -23,7 +23,7 @@ struct CmdStoreAccessInfo : StorePathCommand, MixJSON
     void run(ref<Store> store, const StorePath & path) override
     {
         auto & aclStore = require<LocalGranularAccessStore>(*store);
-        auto status = aclStore.getAccessStatus(path);
+        auto status = aclStore.getCurrentAccessStatus(path);
         bool isValid = aclStore.isValidPath(path);
         std::set<std::string> users;
         std::set<std::string> groups;
