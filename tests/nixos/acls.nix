@@ -465,6 +465,7 @@ in
       nix.settings.substituters = lib.mkForce [ ];
       nix.settings.experimental-features = lib.mkForce [ "nix-command" "acls" ];
       nix.nixPath = [ "nixpkgs=${lib.cleanSource pkgs.path}" ];
+      nix.checkConfig = false;
       virtualisation.additionalPaths = [ pkgs.stdenvNoCC pkgs.pkgsi686Linux.stdenvNoCC ];
       users.users.test = {
         isNormalUser = true;
