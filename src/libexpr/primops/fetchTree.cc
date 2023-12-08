@@ -393,7 +393,7 @@ static RegisterPrimOp primop_fetchTree({
       >
       > Fetch the same GitHub repository using the URL-like syntax:
       >
-      >   ```
+      >   ```nix
       >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
       >   ```
     )",
