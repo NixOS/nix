@@ -275,20 +275,14 @@ private:
 
     void putBuildSettings(Connection & conn)
     {
-        conn.to
-            << settings.maxSilentTime
-            << settings.buildTimeout;
-        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 2)
-            conn.to
-                << settings.maxLogSize;
-        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
-            conn.to
-                << 0 // buildRepeat hasn't worked for ages anyway
-                << 0;
-
-        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
-            conn.to << ((int) settings.keepFailed);
-        }
+        ServeProto::write(*this, conn, ServeProto::BuildOptions {
+            .maxSilentTime = settings.maxSilentTime,
+            .buildTimeout = settings.buildTimeout,
+            .maxLogSize = settings.maxLogSize,
+            .nrRepeats = 0, // buildRepeat hasn't worked for ages anyway
+            .enforceDeterminism = 0,
+            .keepFailed = settings.keepFailed,
+        });
     }
 
 public:

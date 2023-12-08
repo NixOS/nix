@@ -835,27 +835,33 @@ static void opServe(Strings opFlags, Strings opArgs)
         verbosity = lvlError;
         settings.keepLog = false;
         settings.useSubstitutes = false;
-        settings.maxSilentTime = readInt(in);
-        settings.buildTimeout = readInt(in);
+
+        auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
+
+        // Only certain feilds get initialized based on the protocol
+        // version. This is why not all the code below is unconditional.
+        // See how the serialization logic in
+        // `ServeProto::Serialise<ServeProto::BuildOptions>` matches
+        // these conditions.
+        settings.maxSilentTime = options.maxSilentTime;
+        settings.buildTimeout = options.buildTimeout;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
-            settings.maxLogSize = readNum<unsigned long>(in);
+            settings.maxLogSize = options.maxLogSize;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
-            auto nrRepeats = readInt(in);
-            if (nrRepeats != 0) {
+            if (options.nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
             }
-            // Ignore 'enforceDeterminism'. It used to be true by
-            // default, but also only never had any effect when
-            // `nrRepeats == 0`.  We have already asserted that
-            // `nrRepeats` in fact is 0, so we can safely ignore this
-            // without doing something other than what the client
-            // asked for.
-            readInt(in);
-
+            // Ignore 'options.enforceDeterminism'.
+            //
+            // It used to be true by default, but also only never had
+            // any effect when `nrRepeats == 0`.  We have already
+            // checked that `nrRepeats` in fact is 0, so we can safely
+            // ignore this without doing something other than what the
+            // client asked for.
             settings.runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
-            settings.keepFailed = (bool) readInt(in);
+            settings.keepFailed = options.keepFailed;
         }
     };
 

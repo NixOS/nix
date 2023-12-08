@@ -98,4 +98,40 @@ void ServeProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & s
             << info.sigs;
 }
 
+
+ServeProto::BuildOptions ServeProto::Serialise<ServeProto::BuildOptions>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    BuildOptions options;
+    options.maxSilentTime = readInt(conn.from);
+    options.buildTimeout = readInt(conn.from);
+    if (GET_PROTOCOL_MINOR(conn.version) >= 2)
+        options.maxLogSize = readNum<unsigned long>(conn.from);
+    if (GET_PROTOCOL_MINOR(conn.version) >= 3) {
+        options.nrRepeats = readInt(conn.from);
+        options.enforceDeterminism = readInt(conn.from);
+    }
+    if (GET_PROTOCOL_MINOR(conn.version) >= 7) {
+        options.keepFailed = (bool) readInt(conn.from);
+    }
+    return options;
+}
+
+void ServeProto::Serialise<ServeProto::BuildOptions>::write(const StoreDirConfig & store, WriteConn conn, const ServeProto::BuildOptions & options)
+{
+    conn.to
+        << options.maxSilentTime
+        << options.buildTimeout;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 2)
+        conn.to
+            << options.maxLogSize;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 3)
+        conn.to
+            << options.nrRepeats
+            << options.enforceDeterminism;
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 7) {
+        conn.to << ((int) options.keepFailed);
+    }
+}
+
 }

@@ -87,6 +87,13 @@ struct ServeProto
     {
         ServeProto::Serialise<T>::write(store, conn, t);
     }
+
+    /**
+     * Options for building shared between
+     * `ServeProto::Command::BuildPaths` and
+     * `ServeProto::Command::BuildDerivation`.
+     */
+    struct BuildOptions;
 };
 
 enum struct ServeProto::Command : uint64_t
@@ -100,6 +107,22 @@ enum struct ServeProto::Command : uint64_t
     QueryClosure = 7,
     BuildDerivation = 8,
     AddToStoreNar = 9,
+};
+
+
+struct ServeProto::BuildOptions {
+    /**
+     * Default value in this and every other field is so tests pass when
+     * testing older deserialisers which do not set all the fields.
+     */
+    time_t maxSilentTime = -1;
+    time_t buildTimeout = -1;
+    size_t maxLogSize = -1;
+    size_t nrRepeats = -1;
+    bool enforceDeterminism = -1;
+    bool keepFailed = -1;
+
+    bool operator == (const ServeProto::BuildOptions &) const = default;
 };
 
 /**
@@ -144,6 +167,8 @@ template<>
 DECLARE_SERVE_SERIALISER(BuildResult);
 template<>
 DECLARE_SERVE_SERIALISER(UnkeyedValidPathInfo);
+template<>
+DECLARE_SERVE_SERIALISER(ServeProto::BuildOptions);
 
 template<typename T>
 DECLARE_SERVE_SERIALISER(std::vector<T>);
