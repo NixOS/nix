@@ -28,7 +28,7 @@
 #include <sys/resource.h>
 #include <fstream>
 #include <functional>
-#include <strstream>
+#include <sstream>
 
 #include <sys/resource.h>
 #include <nlohmann/json.hpp>
@@ -2691,7 +2691,7 @@ void EvalState::printStatistics()
 
 std::string ExternalValueBase::coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
-    std::strstream printed;
+    std::stringstream printed;
     print(printed);
     throw TypeError({
         .msg = hintfmt("cannot coerce %1% to a string: %2%", showType(), printed.str())
