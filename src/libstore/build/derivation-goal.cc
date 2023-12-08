@@ -558,7 +558,7 @@ void DerivationGoal::inputsRealised()
                  inputDrvOutputs statefully, sometimes it gets out of sync with
                  the real source of truth (store). So we query the store
                  directly if there's a problem. */
-              attempt = fullDrv.tryResolve(worker.store);
+              attempt = fullDrv.tryResolve(worker.store, &worker.evalStore);
             }
             assert(attempt);
             Derivation drvResolved { std::move(*attempt) };

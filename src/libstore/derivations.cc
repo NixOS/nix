@@ -1002,13 +1002,13 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 
 }
 
-std::optional<BasicDerivation> Derivation::tryResolve(Store & store) const
+std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
 {
     std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
 
     std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accum;
     accum = [&](auto & inputDrv, auto & node) {
-        for (auto & [outputName, outputPath] : store.queryPartialDerivationOutputMap(inputDrv)) {
+        for (auto & [outputName, outputPath] : store.queryPartialDerivationOutputMap(inputDrv, evalStore)) {
             if (outputPath) {
                 inputDrvOutputs.insert_or_assign({inputDrv, outputName}, *outputPath);
                 if (auto p = get(node.childMap, outputName))
