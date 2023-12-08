@@ -3,73 +3,48 @@ issues: #561
 prs: #9553
 description: {
 
-The `error: cannot coerce a <TYPE> to a string` message now includes the value
-which caused the error. This makes debugging much easier:
+The `error: cannot coerce a <TYPE> to a string` message now includes the value which caused the error.
 
-```
-$ cat bad.nix
-let
-  pkgs = import <nixpkgs> {};
-  system = pkgs.lib.systems.elaborate "x86_64-linux";
-in
-  import <nixpkgs> {inherit system;}
-```
+Previously, a failed string coercion produced a confusing error message if the trace didn't show where the offending value was defined:
 
-Previously, attempting to evaluate this expression would produce a confusing error message:
+```bash
+$ nix-instantiate --eval --expr '
+let x = { a = 1; }; in
 
-```
-$ nix-instantiate --eval bad.nix
+"${x}"
+'
 error:
-       … while evaluating a branch condition
+       … while evaluating a path segment
 
-         at /nix/store/m8ah0r1ih2shq35vp3hj1k0m1c4hsfga-nixpkgs/nixpkgs/pkgs/stdenv/booter.nix:64:9:
+         at «string»:4:2:
 
-           63|       go = pred: n:
-           64|         if n == len
-             |         ^
-           65|         then rnul pred
-
-       … while calling the 'length' builtin
-
-         at /nix/store/m8ah0r1ih2shq35vp3hj1k0m1c4hsfga-nixpkgs/nixpkgs/pkgs/stdenv/booter.nix:62:13:
-
-           61|     let
-           62|       len = builtins.length list;
-             |             ^
-           63|       go = pred: n:
-
-       (stack trace truncated; use '--show-trace' to show the full trace)
+            3|
+            4| "${x}"
+             |  ^
+            5|
 
        error: cannot coerce a set to a string
 ```
 
-Now, the error message includes the set itself. This makes debugging much
-simpler, especially when the trace doesn't show the failing expression:
+Now, the error message includes the value itself:
 
-```
-$ nix-instantiate --eval bad.nix
+```bash
+$ nix-instantiate --eval --expr '
+let x = { a = 1; }; in
+
+"${x}"
+'
 error:
-       … while evaluating a branch condition
+       … while evaluating a path segment
 
-         at /nix/store/m8ah0r1ih2shq35vp3hj1k0m1c4hsfga-nixpkgs/nixpkgs/pkgs/stdenv/booter.nix:64:9:
+         at «string»:4:2:
 
-           63|       go = pred: n:
-           64|         if n == len
-             |         ^
-           65|         then rnul pred
+            3|
+            4| "${x}"
+             |  ^
+            5|
 
-       … while calling the 'length' builtin
-
-         at /nix/store/m8ah0r1ih2shq35vp3hj1k0m1c4hsfga-nixpkgs/nixpkgs/pkgs/stdenv/booter.nix:62:13:
-
-           61|     let
-           62|       len = builtins.length list;
-             |             ^
-           63|       go = pred: n:
-
-       (stack trace truncated; use '--show-trace' to show the full trace)
-
-       error: cannot coerce a set to a string: { system = "x86_64-linux"; ... }
+       error: cannot coerce a set to a string: { a = 1; }
 ```
 
 }
