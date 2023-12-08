@@ -59,7 +59,16 @@ struct GranularAccessStore : public virtual Store
     virtual AccessStatus getFutureAccessStatus(const StoreObject & storeObject) = 0;
     virtual AccessStatus getCurrentAccessStatus(const StoreObject & storeObject) = 0;
 
-    virtual std::set<AccessControlGroup> getSubjectGroups(AccessControlSubject subject) = 0;
+    virtual std::set<AccessControlGroup> getSubjectGroupsUncached(AccessControlSubject subject) = 0;
+
+    std::set<AccessControlGroup> getSubjectGroups(AccessControlSubject subject)
+    {
+        if (!settings.cacheUserGroups) return getSubjectGroupsUncached(subject);
+        if (subjectGroupCache.contains(subject)) return subjectGroupCache[subject];
+        auto groups = getSubjectGroupsUncached(subject);
+        subjectGroupCache[subject] = groups;
+        return groups;
+    }
 
     /**
      * Whether any of the given @entities@ can access the path
@@ -135,6 +144,9 @@ struct GranularAccessStore : public virtual Store
         for (auto entity : entities) status.entities.erase(entity);
         setCurrentAccessStatus(storeObject, status);
     }
+
+private:
+    std::map<AccessControlSubject, std::set<AccessControlGroup>> subjectGroupCache;
 };
 
 using LocalGranularAccessStore = GranularAccessStore<ACL::User, ACL::Group>;

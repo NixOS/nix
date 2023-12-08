@@ -301,8 +301,8 @@ public:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void setFutureAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
-    void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
+    void setFutureAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
     void setCurrentAccessStatus(const Path & path, const AccessStatus & status);
     AccessStatus getFutureAccessStatus(const StoreObject & storeObject) override;
     std::optional<AccessStatus> getFutureAccessStatusOpt(const StoreObject & storeObject);
@@ -316,7 +316,7 @@ public:
     void revokeBuildUserAccess(const StorePath & path);
     void revokeBuildUserAccess();
 
-    std::set<ACL::Group> getSubjectGroups(ACL::User user) override;
+    std::set<ACL::Group> getSubjectGroupsUncached(ACL::User user) override;
 
     std::optional<std::string> getVersion() override;
 private:

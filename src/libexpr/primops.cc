@@ -168,22 +168,19 @@ void readAccessStatus(EvalState & state, Attr & attr, LocalGranularAccessStore::
     }
 }
 
-void ensureAccess(LocalGranularAccessStore::AccessStatus * accessStatus, std::string_view description)
+void ensureAccess(LocalGranularAccessStore::AccessStatus * accessStatus, std::string_view description, LocalGranularAccessStore & store)
 {
-    if (!accessStatus->isProtected) return;
+    if (!accessStatus->isProtected || store.trusted) return;
     uid_t uid = getuid();
-    struct passwd * pw = getpwuid(uid);
-    auto groups_vec = getUserGroups(pw->pw_uid);
+    auto groups = store.getSubjectGroups(uid);
     for (auto entity : accessStatus->entities) {
         if (std::visit(overloaded {
             [&](ACL::User u) { return u.uid == uid; },
-            [&](ACL::Group g) {
-                return std::find(groups_vec.begin(), groups_vec.end(), g.gid) != groups_vec.end();
-            }
+            [&](ACL::Group g) { return groups.contains(g); }
         }, entity))
             return;
     }
-    throw AccessDenied("you (%s) would not have access to %s; ensure that you do by adding yourself or a group you're in to the list", pw->pw_name, description);
+    throw AccessDenied("you (%s) would not have access to %s; ensure that you do by adding yourself or a group you're in to the list", getUserName(uid), description);
 }
 
 /**
@@ -1464,7 +1461,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
             if (derivation != attr->value->attrs->end()) {
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *derivation, &status, "__permissions.drv", "builtins.derivationStrict");
-                ensureAccess(&status, state.store->printStorePath(drvPath));
+                ensureAccess(&status, state.store->printStorePath(drvPath), require<LocalGranularAccessStore>(*state.store));
                 require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(drvPath, status);
             }
         }
@@ -1492,7 +1489,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                         }));
                     LocalGranularAccessStore::AccessStatus status;
                     readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
-                    ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS));
+                    ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS), require<LocalGranularAccessStore>(*state.store));
                     require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
                 }
             }
@@ -1500,7 +1497,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
             if (log != attr->value->attrs->end()) {
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *log, &status, "__permissions.log", "builtins.derivationStrict");
-                ensureAccess(&status, fmt("log of derivation %s", drvPathS));
+                ensureAccess(&status, fmt("log of derivation %s", drvPathS), require<LocalGranularAccessStore>(*state.store));
                 require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationLog {drvPath}, status);
             }
         }

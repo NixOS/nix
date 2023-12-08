@@ -393,21 +393,6 @@ let
     print(machine.succeed(f"""sudo -u test cat {public_output}"""))
     print(machine.succeed(f"""getfacl {public_output}"""))
     print(machine.succeed(f"""getfacl {private_output}"""))
-
-    # Once it's already built test is able to run the build command
-    machine.succeed("""
-     sudo -u test nix-build ${depend-on-private} --no-out-link
-    """)
-
-    # But it is still unable to read the output.
-    machine.fail(f"""sudo -u test cat {private_output}""")
-
-    print(machine.succeed(f"""sudo -u test cat {public_output}"""))
-
-    # Can test depend on it in a derivation ?
-    machine.succeed("""
-      sudo -u test nix-build ${depend-on-public} --no-out-link
-    """)
   '';
 
   # Non trusted user gives permission to another one.

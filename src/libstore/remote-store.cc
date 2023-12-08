@@ -962,7 +962,7 @@ RemoteStore::AccessStatus RemoteStore::getFutureAccessStatus(const StoreObject &
     return status;
 }
 
-std::set<ACL::Group> RemoteStore::getSubjectGroups(ACL::User user)
+std::set<ACL::Group> RemoteStore::getSubjectGroupsUncached(ACL::User user)
 {
     struct passwd * pw = getpwuid(user.uid);
     auto groups_vec = getUserGroups(pw->pw_uid);

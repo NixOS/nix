@@ -1405,7 +1405,7 @@ void LocalStore::revokeBuildUserAccess()
     }
 }
 
-std::set<ACL::Group> LocalStore::getSubjectGroups(ACL::User user)
+std::set<ACL::Group> LocalStore::getSubjectGroupsUncached(ACL::User user)
 {
     struct passwd * pw = getpwuid(user.uid);
     auto groups_vec = getUserGroups(pw->pw_uid);

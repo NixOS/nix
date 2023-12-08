@@ -1084,6 +1084,13 @@ public:
       )"
     };
 
+    Setting<bool> cacheUserGroups{
+      this, false, "cache-user-groups",
+      R"(
+        If set to `true`, caches the group lists of users upon first fetch. Useful for situations in which group memberships are stored on a remote server.
+      )"
+    };
+
     Setting<StringMap> impureEnv {this, {}, "impure-env",
         R"(
           A list of items, each in the format of:

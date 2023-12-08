@@ -175,7 +175,7 @@ public:
     AccessStatus getCurrentAccessStatus(const StoreObject & storeObject) override;
     AccessStatus getFutureAccessStatus(const StoreObject & storeObject) override;
 
-    std::set<ACL::Group> getSubjectGroups(ACL::User user) override;
+    std::set<ACL::Group> getSubjectGroupsUncached(ACL::User user) override;
 
 protected:
 
