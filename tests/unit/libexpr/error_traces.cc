@@ -295,7 +295,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, toPath) {
         ASSERT_TRACE2("toPath []",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a list"),
+                      hintfmt("cannot coerce %s to a string: %s", "a list", "[ ]"),
                       hintfmt("while evaluating the first argument passed to builtins.toPath"));
 
         ASSERT_TRACE2("toPath \"foo\"",
@@ -309,7 +309,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, storePath) {
         ASSERT_TRACE2("storePath true",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a Boolean"),
+                      hintfmt("cannot coerce %s to a string: %s", "a Boolean", "true"),
                       hintfmt("while evaluating the first argument passed to 'builtins.storePath'"));
 
     }
@@ -318,7 +318,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, pathExists) {
         ASSERT_TRACE2("pathExists []",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a list"),
+                      hintfmt("cannot coerce %s to a string: %s", "a list", "[ ]"),
                       hintfmt("while realising the context of a path"));
 
         ASSERT_TRACE2("pathExists \"zorglub\"",
@@ -332,7 +332,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, baseNameOf) {
         ASSERT_TRACE2("baseNameOf []",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a list"),
+                      hintfmt("cannot coerce %s to a string: %s", "a list", "[ ]"),
                       hintfmt("while evaluating the first argument passed to builtins.baseNameOf"));
 
     }
@@ -377,7 +377,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, filterSource) {
         ASSERT_TRACE2("filterSource [] []",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a list"),
+                      hintfmt("cannot coerce %s to a string: %s", "a list", "[ ]"),
                       hintfmt("while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'"));
 
         ASSERT_TRACE2("filterSource [] \"foo\"",
@@ -1038,7 +1038,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, toString) {
         ASSERT_TRACE2("toString { a = 1; }",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ a = 1; }"),
                       hintfmt("while evaluating the first argument passed to builtins.toString"));
 
     }
@@ -1057,7 +1057,7 @@ namespace nix {
 
         ASSERT_TRACE2("substring 0 3 {}",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ }"),
                       hintfmt("while evaluating the third argument (the string) passed to builtins.substring"));
 
         ASSERT_TRACE1("substring (-3) 3 \"sometext\"",
@@ -1070,7 +1070,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, stringLength) {
         ASSERT_TRACE2("stringLength {} # TODO: context is missing ???",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ }"),
                       hintfmt("while evaluating the argument passed to builtins.stringLength"));
 
     }
@@ -1143,7 +1143,7 @@ namespace nix {
 
         ASSERT_TRACE2("concatStringsSep \"foo\" [ 1 2 {} ] # TODO: coerce to string is buggy",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "an integer"),
+                      hintfmt("cannot coerce %s to a string: %s", "an integer", "1"),
                       hintfmt("while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep"));
 
     }
@@ -1229,12 +1229,12 @@ namespace nix {
 
         ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = {}; }",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ }"),
                       hintfmt("while evaluating the attribute 'system' of derivation 'foo'"));
 
         ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = {}; }",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ }"),
                       hintfmt("while evaluating the attribute 'outputs' of derivation 'foo'"));
 
         ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"drv\"; }",
@@ -1279,17 +1279,17 @@ namespace nix {
 
         ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = [ {} ]; }",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ }"),
                       hintfmt("while evaluating an element of the argument list"));
 
         ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = [ \"a\" {} ]; }",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ }"),
                       hintfmt("while evaluating an element of the argument list"));
 
         ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; FOO = {}; }",
                       TypeError,
-                      hintfmt("cannot coerce %s to a string", "a set"),
+                      hintfmt("cannot coerce %s to a string: %s", "a set", "{ }"),
                       hintfmt("while evaluating the attribute 'FOO' of derivation 'foo'"));
 
     }

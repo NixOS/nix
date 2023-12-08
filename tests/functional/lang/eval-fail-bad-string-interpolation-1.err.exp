@@ -7,4 +7,4 @@ error:
              |  ^
             2|
 
-       error: cannot coerce a function to a string
+       error: cannot coerce a function to a string: <LAMBDA>
