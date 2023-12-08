@@ -340,7 +340,7 @@ struct Derivation : BasicDerivation
      * 2. Input placeholders are replaced with realized input store
      *    paths.
      */
-    std::optional<BasicDerivation> tryResolve(Store & store) const;
+    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const;
 
     /**
      * Like the above, but instead of querying the Nix database for
