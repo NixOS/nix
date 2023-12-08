@@ -172,24 +172,12 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             if (p.empty()) return callback(nullptr);
             auto path2 = parseStorePath(p);
             assert(path == path2);
-            /* Hash will be set below. FIXME construct ValidPathInfo at end. */
-            auto info = std::make_shared<ValidPathInfo>(path, Hash::dummy);
+            auto info = std::make_shared<ValidPathInfo>(
+                path,
+                ServeProto::Serialise<UnkeyedValidPathInfo>::read(*this, *conn));
 
-            auto deriver = readString(conn->from);
-            if (deriver != "")
-                info->deriver = parseStorePath(deriver);
-            info->references = ServeProto::Serialise<StorePathSet>::read(*this, *conn);
-            readLongLong(conn->from); // download size
-            info->narSize = readLongLong(conn->from);
-
-            {
-                auto s = readString(conn->from);
-                if (s == "")
-                    throw Error("NAR hash is now mandatory");
-                info->narHash = Hash::parseAnyPrefixed(s);
-            }
-            info->ca = ContentAddress::parseOpt(readString(conn->from));
-            info->sigs = readStrings<StringSet>(conn->from);
+            if (info->narHash == Hash::dummy)
+                throw Error("NAR hash is now mandatory");
 
             auto s = readString(conn->from);
             assert(s == "");

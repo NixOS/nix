@@ -891,16 +891,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
-                        out << store->printStorePath(info->path)
-                            << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        ServeProto::write(*store, wconn, info->references);
-                        // !!! Maybe we want compression?
-                        out << info->narSize // downloadSize
-                            << info->narSize;
-                        if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << info->narHash.to_string(HashFormat::Nix32, true)
-                                << renderContentAddress(info->ca)
-                                << info->sigs;
+                        out << store->printStorePath(info->path);
+                        ServeProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
                     } catch (InvalidPath &) {
                     }
                 }

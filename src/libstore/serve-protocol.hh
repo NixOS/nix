@@ -18,6 +18,7 @@ struct Source;
 
 // items being serialised
 struct BuildResult;
+struct UnkeyedValidPathInfo;
 
 
 /**
@@ -141,6 +142,8 @@ inline std::ostream & operator << (std::ostream & s, ServeProto::Command op)
 
 template<>
 DECLARE_SERVE_SERIALISER(BuildResult);
+template<>
+DECLARE_SERVE_SERIALISER(UnkeyedValidPathInfo);
 
 template<typename T>
 DECLARE_SERVE_SERIALISER(std::vector<T>);
