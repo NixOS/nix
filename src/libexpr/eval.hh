@@ -30,7 +30,6 @@ class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
-struct FSInputAccessor;
 struct MemoryInputAccessor;
 
 
@@ -217,18 +216,12 @@ public:
      */
     RepairFlag repair;
 
-    /**
-     * The allowed filesystem paths in restricted or pure evaluation
-     * mode.
-     */
-    std::optional<PathSet> allowedPaths;
-
     Bindings emptyBindings;
 
     /**
      * The accessor for the root filesystem.
      */
-    const ref<FSInputAccessor> rootFS;
+    const ref<InputAccessor> rootFS;
 
     /**
      * The in-memory filesystem for <nix/...> paths.
@@ -396,12 +389,6 @@ public:
      */
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
-    /**
-     * Check whether access to a path is allowed and throw an error if
-     * not. Otherwise return the canonicalised path.
-     */
-    SourcePath checkSourcePath(const SourcePath & path);
-
     void checkURI(const std::string & uri);
 
     /**
@@ -445,13 +432,15 @@ public:
     SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
-     * Try to resolve a search path value (not the optional key part)
+     * Try to resolve a search path value (not the optional key part).
      *
      * If the specified search path element is a URI, download it.
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(const SearchPath::Path & path);
+    std::optional<std::string> resolveSearchPathPath(
+        const SearchPath::Path & elem,
+        bool initAccessControl = false);
 
     /**
      * Evaluate an expression to normal form
@@ -755,6 +744,13 @@ public:
      * used to construct the associated value to their final store path
      */
     [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
+
+    /* Call the binary path filter predicate used builtins.path etc. */
+    bool callPathFilter(
+        Value * filterFun,
+        const SourcePath & path,
+        std::string_view pathArg,
+        PosIdx pos);
 
 private:
 

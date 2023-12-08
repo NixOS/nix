@@ -14,6 +14,7 @@
 #include "profiles.hh"
 #include "print.hh"
 #include "fs-input-accessor.hh"
+#include "filtering-input-accessor.hh"
 #include "memory-input-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
@@ -509,7 +510,16 @@ EvalState::EvalState(
     , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
-    , rootFS(makeFSInputAccessor(CanonPath::root))
+    , rootFS(
+        evalSettings.restrictEval || evalSettings.pureEval
+        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(CanonPath::root), {},
+            [](const CanonPath & path) -> RestrictedPathError {
+                auto modeInformation = evalSettings.pureEval
+                    ? "in pure evaluation mode (use '--impure' to override)"
+                    : "in restricted mode";
+                throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+            }))
+        : makeFSInputAccessor(CanonPath::root))
     , corepkgsFS(makeMemoryInputAccessor())
     , internalFS(makeMemoryInputAccessor())
     , derivationInternal{corepkgsFS->addFile(
@@ -551,28 +561,10 @@ EvalState::EvalState(
             searchPath.elements.emplace_back(SearchPath::Elem::parse(i));
     }
 
-    if (evalSettings.restrictEval || evalSettings.pureEval) {
-        allowedPaths = PathSet();
-
-        for (auto & i : searchPath.elements) {
-            auto r = resolveSearchPathPath(i.path);
-            if (!r) continue;
-
-            auto path = std::move(*r);
-
-            if (store->isInStore(path)) {
-                try {
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
-                    for (auto & path : closure)
-                        allowPath(path);
-                } catch (InvalidPath &) {
-                    allowPath(path);
-                }
-            } else
-                allowPath(path);
-        }
-    }
+    /* Allow access to all paths in the search path. */
+    if (rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        for (auto & i : searchPath.elements)
+            resolveSearchPathPath(i.path, true);
 
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
@@ -590,14 +582,14 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    if (allowedPaths)
-        allowedPaths->insert(path);
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    if (allowedPaths)
-        allowedPaths->insert(store->toRealPath(storePath));
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(store->toRealPath(storePath)));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
@@ -606,54 +598,6 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
 
     mkStorePathString(storePath, v);
 }
-
-SourcePath EvalState::checkSourcePath(const SourcePath & path_)
-{
-    // Don't check non-rootFS accessors, they're in a different namespace.
-    if (path_.accessor != ref<InputAccessor>(rootFS)) return path_;
-
-    if (!allowedPaths) return path_;
-
-    auto i = resolvedPaths.find(path_.path.abs());
-    if (i != resolvedPaths.end())
-        return i->second;
-
-    bool found = false;
-
-    /* First canonicalize the path without symlinks, so we make sure an
-     * attacker can't append ../../... to a path that would be in allowedPaths
-     * and thus leak symlink targets.
-     */
-    Path abspath = canonPath(path_.path.abs());
-
-    for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(abspath, i)) {
-            found = true;
-            break;
-        }
-    }
-
-    if (!found) {
-        auto modeInformation = evalSettings.pureEval
-            ? "in pure eval mode (use '--impure' to override)"
-            : "in restricted mode";
-        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", abspath, modeInformation);
-    }
-
-    /* Resolve symlinks. */
-    debug("checking access to '%s'", abspath);
-    SourcePath path = rootPath(CanonPath(canonPath(abspath, true)));
-
-    for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(path.path.abs(), i)) {
-            resolvedPaths.insert_or_assign(path_.path.abs(), path);
-            return path;
-        }
-    }
-
-    throw RestrictedPathError("access to canonical path '%1%' is forbidden in restricted mode", path);
-}
-
 
 void EvalState::checkURI(const std::string & uri)
 {
@@ -674,12 +618,14 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        checkSourcePath(rootPath(CanonPath(uri)));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        checkSourcePath(rootPath(CanonPath(std::string(uri, 7))));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri.substr(7)));
         return;
     }
 
@@ -1181,10 +1127,8 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial)
+void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    auto path = checkSourcePath(path_);
-
     FileEvalCache::iterator i;
     if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
         v = i->second;
@@ -1205,7 +1149,7 @@ void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial
         e = j->second;
 
     if (!e)
-        e = parseExprFromFile(checkSourcePath(resolvedPath));
+        e = parseExprFromFile(resolvedPath);
 
     fileParseCache[resolvedPath] = e;
 
