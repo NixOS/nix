@@ -378,7 +378,7 @@ static RegisterPrimOp primop_fetchTree({
       >
       > This evaluates to the following attribute set:
       >
-      > ```
+      > ```nix
       > {
       >   lastModified = 1686503798;
       >   lastModifiedDate = "20230611171638";
