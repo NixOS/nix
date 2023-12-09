@@ -1,6 +1,7 @@
+---
 synopsis: Add `nix hash convert`
-prs: #9452
-description: {
+prs: 9452
+---
 
 New [`nix hash convert`](https://github.com/NixOS/nix/issues/8876) sub command with a fast track
 to stabilization! Examples:
@@ -44,4 +45,3 @@ The following commands are still available but will emit a deprecation warning. 
 - `nix hash to-base64 $hash1 $hash2`: Use `nix hash convert --to base64 $hash1 $hash2` instead.
 - `nix hash to-sri $hash1 $hash2`: : Use `nix hash convert --to sri $hash1 $hash2`
   or even just `nix hash convert $hash1 $hash2` instead.
-}
