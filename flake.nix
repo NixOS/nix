@@ -182,7 +182,7 @@
           "--enable-internal-api-docs"
         ];
 
-        changelog-d = pkgs.buildPackages.changelog-d;
+        changelog-d = pkgs.buildPackages.callPackage ./misc/changelog-d.nix { };
 
         nativeBuildDeps =
           [
