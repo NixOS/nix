@@ -257,17 +257,16 @@ User-visible changes should come with a release note.
 Here's what a complete entry looks like. The file name is not incorporated in the document.
 
 ```
+---
 synopsis: Basically a title
-issues: #1234
-prs: #1238
-description: {
+issues: 1234
+prs: 1238
+---
 
 Here's one or more paragraphs that describe the change.
 
 - It's markdown
 - Add references to the manual using @docroot@
-
-}
 ```
 
 Significant changes should add the following header, which moves them to the top.

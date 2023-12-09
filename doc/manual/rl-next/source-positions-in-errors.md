@@ -1,7 +1,8 @@
+---
 synopsis: Source locations are printed more consistently in errors
-issues: #561
-prs: #9555
-description: {
+issues: 561
+prs: 9555
+---
 
 Source location information is now included in error messages more
 consistently. Given this code:
@@ -39,5 +40,3 @@ error:
 
        error: value is a set while a string was expected
 ```
-
-}
