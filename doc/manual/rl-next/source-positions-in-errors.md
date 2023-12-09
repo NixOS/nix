@@ -21,8 +21,6 @@ it:
 error:
        … while evaluating an attribute name
 
-         at «none»:0: (source not available)
-
        error: value is a set while a string was expected
 ```
 
