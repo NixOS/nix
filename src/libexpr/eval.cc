@@ -345,7 +345,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Value nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue, noPos, "while evaluating an attribute name");
+        state.forceStringNoCtx(nameValue, name.expr->getPos(), "while evaluating an attribute name");
         return state.symbols.create(nameValue.string_view());
     }
 }
@@ -1458,7 +1458,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     for (auto & i : attrPath) {
-        state.forceValue(*vAttrs, noPos);
+        state.forceValue(*vAttrs, getPos());
         Bindings::iterator j;
         auto name = getName(i, state, env);
         if (vAttrs->type() != nAttrs ||
@@ -1627,7 +1627,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[name]++;
 
                 try {
-                    vCur.primOp->fun(*this, noPos, args, vCur);
+                    vCur.primOp->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
@@ -1675,7 +1675,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    primOp->primOp->fun(*this, noPos, vArgs, vCur);
+                    primOp->primOp->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
@@ -1783,7 +1783,7 @@ https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbo
         }
     }
 
-    callFunction(fun, allocValue()->mkAttrs(attrs), res, noPos);
+    callFunction(fun, allocValue()->mkAttrs(attrs), res, pos);
 }
 
 
@@ -1819,7 +1819,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e, noPos, "in the argument of the not operator")); // XXX: FIXME: !
+    v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
 }
 
 
@@ -2260,7 +2260,7 @@ BackedStringView EvalState::coerceToString(
             std::string result;
             for (auto [n, v2] : enumerate(v.listItems())) {
                 try {
-                    result += *coerceToString(noPos, *v2, context,
+                    result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
                             coerceMore, copyToStore, canonicalizePath);
                 } catch (Error & e) {
@@ -2407,8 +2407,8 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
 
 bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx)
 {
-    forceValue(v1, noPos);
-    forceValue(v2, noPos);
+    forceValue(v1, pos);
+    forceValue(v2, pos);
 
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls
