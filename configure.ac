@@ -289,7 +289,8 @@ esac
 AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
 # Optional dependencies for better normalizing file system data
-AC_CHECK_HEADERS[sys/xattr.h]
+AC_CHECK_HEADERS([sys/xattr.h])
+AC_CHECK_FUNCS([llistxattr lremovexattr])
 
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)
