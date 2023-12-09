@@ -27,9 +27,9 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <iostream>
 #include <fstream>
 #include <functional>
-#include <sstream>
 
 #include <sys/resource.h>
 #include <nlohmann/json.hpp>
@@ -2230,7 +2230,7 @@ BackedStringView EvalState::coerceToString(
             return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) {
-            error("cannot coerce %1% to a string: %2%", showType(v), printValue(*this, v))
+            error("cannot coerce %1% to a string", showType(v))
                 .withTrace(pos, errorCtx)
                 .debugThrow<TypeError>();
         }
@@ -2276,7 +2276,7 @@ BackedStringView EvalState::coerceToString(
         }
     }
 
-    error("cannot coerce %1% to a string: %2%", showType(v), printValue(*this, v))
+    error("cannot coerce %1% to a string", showType(v))
         .withTrace(pos, errorCtx)
         .debugThrow<TypeError>();
 }
@@ -2635,10 +2635,8 @@ void EvalState::printStatistics()
 
 std::string ExternalValueBase::coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
-    std::stringstream printed;
-    print(printed);
     throw TypeError({
-        .msg = hintfmt("cannot coerce %1% to a string: %2%", showType(), printed.str())
+        .msg = hintfmt("cannot coerce %1% to a string", showType())
     });
 }
 
