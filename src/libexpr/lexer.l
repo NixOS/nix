@@ -36,9 +36,6 @@ static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
 
 #define CUR_POS makeCurPos(*yylloc, data)
 
-// backup to recover from yyless(0)
-thread_local YYLTYPE prev_yylloc;
-
 static void initLoc(YYLTYPE * loc)
 {
     loc->first_line = loc->last_line = 1;
@@ -47,7 +44,7 @@ static void initLoc(YYLTYPE * loc)
 
 static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
 {
-    prev_yylloc = *loc;
+    loc->stash();
 
     loc->first_line = loc->last_line;
     loc->first_column = loc->last_column;
@@ -231,7 +228,7 @@ or          { return OR_KW; }
 {HPATH_START}\$\{ {
   PUSH_STATE(PATH_START);
   yyless(0);
-  *yylloc = prev_yylloc;
+  yylloc->unstash();
 }
 
 <PATH_START>{PATH_SEG} {
@@ -287,7 +284,7 @@ or          { return OR_KW; }
      context (it may be ')', ';', or something of that sort) */
   POP_STATE();
   yyless(0);
-  *yylloc = prev_yylloc;
+  yylloc->unstash();
   return PATH_END;
 }
 

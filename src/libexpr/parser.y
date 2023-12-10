@@ -28,6 +28,31 @@
 
 namespace nix {
 
+#define YYLTYPE ::nix::ParserLocation
+    struct ParserLocation
+    {
+        int first_line, first_column;
+        int last_line, last_column;
+
+        // backup to recover from yyless(0)
+        int stashed_first_line, stashed_first_column;
+        int stashed_last_line, stashed_last_column;
+
+        void stash() {
+          stashed_first_line = first_line;
+          stashed_first_column = first_column;
+          stashed_last_line = last_line;
+          stashed_last_column = last_column;
+        }
+
+        void unstash() {
+          first_line = stashed_first_line;
+          first_column = stashed_first_column;
+          last_line = stashed_last_line;
+          last_column = stashed_last_column;
+        }
+    };
+
     struct ParseData
     {
         EvalState & state;
