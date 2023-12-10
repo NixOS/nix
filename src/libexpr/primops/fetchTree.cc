@@ -315,7 +315,7 @@ static RegisterPrimOp primop_fetchTree({
 
         - `rev` (String, optional)
 
-          A Git revision, typically a commit hash.
+          A Git revision; a commit hash.
 
           Default: the tip of `ref`
 
