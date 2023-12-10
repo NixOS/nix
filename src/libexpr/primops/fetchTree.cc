@@ -305,7 +305,7 @@ static RegisterPrimOp primop_fetchTree({
 
           > **Note**
           >
-          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix will only consider files added to the Git index, as listed by `git ls-files` but use the *current file contents of the Git working directory().
+          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix will only consider files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
 
         - `ref` (String, optional)
 
