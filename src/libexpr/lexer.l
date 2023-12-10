@@ -1,4 +1,5 @@
 %option reentrant bison-bridge bison-locations
+%option align
 %option noyywrap
 %option never-interactive
 %option stack
