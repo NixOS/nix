@@ -314,3 +314,13 @@ Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on 
 - _other_
 
   Branches that do not conform to the above patterns should be feature branches.
+
+## Reverting
+
+If a change turns out to be merged by mistake, or contain a regression, it may be reverted.
+A revert is not a rejection; just part of an effective development process.
+It makes sure that development keeps running smoothly, with minimal uncertainty, less overhead.
+If maintainers have to worry too much about avoiding reverts, they would not be able to merge as much.
+By embracing reverts as a good part of the development process, everyone wins.
+
+However, taking a step back may feel un-fun, so we will try to be extra supportive on the next try.
