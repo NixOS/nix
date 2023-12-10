@@ -282,3 +282,35 @@ See also the [format documentation](https://github.com/haskell/cabal/blob/master
 
 Releases have a precomputed `rl-MAJOR.MINOR.md`, and no `rl-next.md`.
 Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on the fly.
+
+## Branches
+
+- `master`
+
+  The main development branch. All changes are approved and merged here.
+  When developing a change, create a branch based on the latest `master`.
+
+  It is [kept](#reverting) in a release-worthy state.
+
+- `maintenance-*.*`
+
+  These branches are the subject of backports only, and are
+  also [kept](#reverting) in a release-worthy state.
+
+  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
+
+- `latest-release`
+
+  The latest patch release of the latest minor version.
+
+  See [`maintainers/release-process.md`](https://github.com/NixOS/nix/blob/master/maintainers/release-process.md)
+
+- `backport-*-to-*`
+
+  Generally branches created by the backport action.
+
+  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
+
+- _other_
+
+  Branches that do not conform to the above patterns should be feature branches.
