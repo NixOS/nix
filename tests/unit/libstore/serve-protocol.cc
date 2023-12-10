@@ -304,6 +304,54 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
+    build_options_2_1,
+    "build-options-2.1",
+    2 << 8 | 1,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    build_options_2_2,
+    "build-options-2.2",
+    2 << 8 | 2,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+        .maxLogSize = 7,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    build_options_2_3,
+    "build-options-2.3",
+    2 << 8 | 3,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+        .maxLogSize = 7,
+        .nrRepeats = 8,
+        .enforceDeterminism = true,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    build_options_2_7,
+    "build-options-2.7",
+    2 << 8 | 7,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+        .maxLogSize = 7,
+        .nrRepeats = 8,
+        .enforceDeterminism = false,
+        .keepFailed = true,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
     vector,
     "vector",
     defaultVersion,
