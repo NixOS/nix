@@ -2436,7 +2436,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return v1.boolean == v2.boolean;
 
         case nString:
-            return v1.string_view().compare(v2.string_view()) == 0;
+            return strcmp(v1.c_str(), v2.c_str()) == 0;
 
         case nPath:
             return
