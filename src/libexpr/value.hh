@@ -32,7 +32,6 @@ typedef enum {
     tThunk,
     tApp,
     tLambda,
-    tBlackhole,
     tPrimOp,
     tPrimOpApp,
     tExternal,
@@ -151,7 +150,7 @@ public:
     // type() == nThunk
     inline bool isThunk() const { return internalType == tThunk; };
     inline bool isApp() const { return internalType == tApp; };
-    inline bool isBlackhole() const { return internalType == tBlackhole; };
+    inline bool isBlackhole() const;
 
     // type() == nFunction
     inline bool isLambda() const { return internalType == tLambda; };
@@ -248,7 +247,7 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: case tBlackhole: return nThunk;
+            case tThunk: case tApp: return nThunk;
         }
         if (invalidIsThunk)
             return nThunk;
@@ -356,11 +355,7 @@ public:
         lambda.fun = f;
     }
 
-    inline void mkBlackhole()
-    {
-        internalType = tBlackhole;
-        // Value will be overridden anyways
-    }
+    inline void mkBlackhole();
 
     void mkPrimOp(PrimOp * p);
 
@@ -445,6 +440,19 @@ public:
         return string.context;
     }
 };
+
+
+extern Value prim_blackHole;
+
+inline bool Value::isBlackhole() const
+{
+    return internalType == tApp && app.left == &prim_blackHole;
+}
+
+inline void Value::mkBlackhole()
+{
+    mkApp(&prim_blackHole, &prim_blackHole);
+}
 
 
 #if HAVE_BOEHMGC

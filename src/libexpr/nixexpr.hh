@@ -21,6 +21,13 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 
+class InfiniteRecursionError : public EvalError
+{
+    friend class EvalState;
+public:
+    using EvalError::EvalError;
+};
+
 /**
  * Position objects.
  */

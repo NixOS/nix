@@ -4263,6 +4263,29 @@ static RegisterPrimOp primop_splitVersion({
 });
 
 
+static void prim_blackHoleFn(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.error("infinite recursion encountered")
+        .debugThrow<InfiniteRecursionError>();
+}
+
+static PrimOp primop_blackHole = {
+    .name = "«blackHole»",
+    .args = {},
+    .fun = prim_blackHoleFn,
+    .hideInDiagnostics = true,
+};
+
+static Value makeBlackHole()
+{
+    Value v;
+    v.mkPrimOp(&primop_blackHole);
+    return v;
+}
+
+Value prim_blackHole = makeBlackHole();
+
+
 /*************************************************************
  * Primop registration
  *************************************************************/

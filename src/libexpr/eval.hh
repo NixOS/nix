@@ -78,6 +78,14 @@ struct PrimOp
     std::optional<ExperimentalFeature> experimentalFeature;
 
     /**
+     * Whether to hide this primop in diagnostics.
+     *
+     * Used to hide the fact that black holes are primop applications from
+     * stack traces.
+     */
+    bool hideInDiagnostics;
+
+    /**
      * Validity check to be performed by functions that introduce primops,
      * such as RegisterPrimOp() and Value::mkPrimOp().
      */

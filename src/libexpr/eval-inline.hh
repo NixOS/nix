@@ -104,11 +104,16 @@ void EvalState::forceValue(Value & v, Callable getPos)
         }
     }
     else if (v.isApp()) {
-        PosIdx pos = getPos();
-        callFunction(*v.app.left, *v.app.right, v, pos);
+        try {
+            callFunction(*v.app.left, *v.app.right, v, noPos);
+        } catch (InfiniteRecursionError & e) {
+            // only one black hole can *throw* in any given eval stack so we need not
+            // check whether the position is set already.
+            if (v.isBlackhole())
+                e.err.errPos = positions[getPos()];
+            throw;
+        }
     }
-    else if (v.isBlackhole())
-        error("infinite recursion encountered").atPos(getPos()).template debugThrow<EvalError>();
 }
 
 
