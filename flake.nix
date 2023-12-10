@@ -540,6 +540,8 @@
         # Binary package for various platforms.
         build = forAllSystems (system: self.packages.${system}.nix);
 
+        shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
+
         buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
         buildCross = forAllCrossSystems (crossSystem:
