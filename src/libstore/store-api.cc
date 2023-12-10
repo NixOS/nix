@@ -545,8 +545,8 @@ std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOut
     return outputs;
 }
 
-OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
-    auto resp = queryPartialDerivationOutputMap(path);
+OutputPathMap Store::queryDerivationOutputMap(const StorePath & path, Store * evalStore) {
+    auto resp = queryPartialDerivationOutputMap(path, evalStore);
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
