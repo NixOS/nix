@@ -373,6 +373,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::Flakes,
             Xp::FetchClosure,
             Xp::DynamicDerivations,
+            Xp::FetchTree,
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
