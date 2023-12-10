@@ -874,8 +874,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 bool substitute = readInt(in);
                 auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 if (lock && writeAllowed)
-                    for (auto & path : paths)
-                        store->addTempRoot(path);
+                    store->addTempRoots(paths);
 
                 if (substitute && writeAllowed) {
                     store->substitutePaths(paths);

@@ -113,9 +113,16 @@ void LocalStore::createTempRootsFile()
     }
 }
 
-
-void LocalStore::addTempRoot(const StorePath & path)
+void Store::addTempRoot(const StorePath & path)
 {
+    addTempRoots({path});
+}
+
+void LocalStore::addTempRoots(const StorePathSet & paths)
+{
+    if (paths.empty())
+        return;
+
     if (readOnly) {
       debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
       return;
@@ -161,12 +168,16 @@ void LocalStore::addTempRoot(const StorePath & path)
         }
 
         try {
-            debug("sending GC root '%s'", printStorePath(path));
-            writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
-            char c;
-            readFull(fdRootsSocket->get(), &c, 1);
-            assert(c == '1');
-            debug("got ack for GC root '%s'", printStorePath(path));
+            for (auto & path : paths) {
+                debug("sending GC root '%s'", printStorePath(path));
+                writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
+            }
+            for (auto & path : paths) {
+                char c;
+                readFull(fdRootsSocket->get(), &c, 1);
+                assert(c == '1');
+                debug("got ack for GC root '%s'", printStorePath(path));
+            }
         } catch (SysError & e) {
             /* The garbage collector may have exited, so we need to
                restart. */
@@ -185,8 +196,10 @@ void LocalStore::addTempRoot(const StorePath & path)
 
     /* Record the store path in the temporary roots file so it will be
        seen by a future run of the garbage collector. */
-    auto s = printStorePath(path) + '\0';
-    writeFull(_fdTempRoots.lock()->get(), s);
+    for (auto & path : paths) {
+        auto s = printStorePath(path) + '\0';
+        writeFull(_fdTempRoots.lock()->get(), s);
+    }
 }
 
 

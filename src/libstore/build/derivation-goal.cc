@@ -237,9 +237,13 @@ void DerivationGoal::haveDerivation()
         return;
     }
 
-    for (auto & i : drv->outputsAndOptPaths(worker.store))
-        if (i.second.second)
-            worker.store.addTempRoot(*i.second.second);
+    {
+        StorePathSet tempRootsRequest;
+        for (auto & i : drv->outputsAndOptPaths(worker.store))
+            if (i.second.second)
+                tempRootsRequest.emplace(*i.second.second);
+        worker.store.addTempRoots(tempRootsRequest);
+    }
 
     auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
     for (auto & [outputName, outputHash] : outputHashes)

@@ -657,6 +657,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case WorkerProto::Op::AddTempRoots: {
+        Strings pathNames (readStrings<Strings>(from));
+        StorePathSet paths;
+        for (auto & pathName : pathNames) {
+            paths.emplace(pathName);
+        }
+        logger->startWork();
+        store->addTempRoots(paths);
+        logger->stopWork();
+        to << 1;
+        break;
+    }
+
     case WorkerProto::Op::AddPermRoot: {
         if (!trusted)
             throw Error(

@@ -807,12 +807,27 @@ void RemoteStore::ensurePath(const StorePath & path)
 }
 
 
-void RemoteStore::addTempRoot(const StorePath & path)
+void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
+    if (paths.empty())
+        return;
+
     auto conn(getConnection());
-    conn->to << WorkerProto::Op::AddTempRoot << printStorePath(path);
-    conn.processStderr();
-    readInt(conn->from);
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 37) {
+        Strings pathStrings;
+        for (const auto & path : paths)
+            pathStrings.emplace_back(path.to_string());
+        conn->to << WorkerProto::Op::AddTempRoots << pathStrings;
+        conn.processStderr();
+        readInt(conn->from);
+    }
+    else {
+        for (const auto & path : paths) {
+            conn->to << WorkerProto::Op::AddTempRoot << printStorePath(path);
+            conn.processStderr();
+            readInt(conn->from);
+        }
+    }
 }
 
 

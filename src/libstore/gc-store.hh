@@ -80,7 +80,7 @@ struct GCResults
  *
  * The notion of GC roots actually not part of this class.
  *
- *  - The base `Store` class has `Store::addTempRoot()` because for a store
+ *  - The base `Store` class has `Store::addTempRoots()` because for a store
  *    that doesn't support garbage collection at all, a temporary GC root is
  *    safely implementable as no-op.
  *
