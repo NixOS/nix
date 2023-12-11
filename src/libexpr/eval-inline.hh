@@ -81,15 +81,7 @@ Env & EvalState::allocEnv(size_t size)
 }
 
 
-[[gnu::always_inline]]
 void EvalState::forceValue(Value & v, const PosIdx pos)
-{
-    forceValue(v, [&]() { return pos; });
-}
-
-
-template<typename Callable>
-void EvalState::forceValue(Value & v, Callable getPos)
 {
     if (v.isThunk()) {
         Env * env = v.thunk.env;
@@ -110,7 +102,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
             // only one black hole can *throw* in any given eval stack so we need not
             // check whether the position is set already.
             if (v.isBlackhole())
-                e.err.errPos = positions[getPos()];
+                e.err.errPos = positions[pos];
             throw;
         }
     }

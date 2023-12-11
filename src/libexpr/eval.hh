@@ -473,9 +473,6 @@ public:
      */
     inline void forceValue(Value & v, const PosIdx pos);
 
-    template <typename Callable>
-    inline void forceValue(Value & v, Callable getPos);
-
     /**
      * Force a value, then recursively force list elements and
      * attributes.

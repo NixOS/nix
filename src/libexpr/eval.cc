@@ -2044,7 +2044,7 @@ void EvalState::forceValueDeep(Value & v)
     recurse = [&](Value & v) {
         if (!seen.insert(&v).second) return;
 
-        forceValue(v, [&]() { return v.determinePos(noPos); });
+        forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
