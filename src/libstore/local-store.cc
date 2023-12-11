@@ -1443,7 +1443,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-std::pair<bool, StorePathSet> LocalStore::verifyAllValidPaths(RepairFlag repair)
+LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair)
 {
     StorePathSet storePathsInStoreDir;
     /* Why aren't we using `queryAllValidPaths`? Because that would
@@ -1476,7 +1476,10 @@ std::pair<bool, StorePathSet> LocalStore::verifyAllValidPaths(RepairFlag repair)
     for (auto & i : queryAllValidPaths())
         verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
 
-    return { errors, validPaths };
+    return {
+        .errors = errors,
+        .validPaths = validPaths,
+    };
 }
 
 

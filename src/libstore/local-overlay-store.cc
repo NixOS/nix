@@ -252,7 +252,7 @@ void LocalOverlayStore::optimiseStore()
 }
 
 
-std::pair<bool, StorePathSet> LocalOverlayStore::verifyAllValidPaths(RepairFlag repair)
+LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag repair)
 {
     StorePathSet done;
 
@@ -266,7 +266,10 @@ std::pair<bool, StorePathSet> LocalOverlayStore::verifyAllValidPaths(RepairFlag 
     for (auto & i : queryAllValidPaths())
         verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
 
-    return { errors, validPaths };
+    return {
+        .errors = errors,
+        .validPaths = validPaths,
+    };
 }
 
 

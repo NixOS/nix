@@ -188,7 +188,7 @@ private:
      * We don't verify the contents of both layers on the assumption that the lower layer is far bigger,
      * and also the observation that anything not in the upper db the overlayfs doesn't yet care about.
      */
-    std::pair<bool, StorePathSet> verifyAllValidPaths(RepairFlag repair) override;
+    VerificationResult verifyAllValidPaths(RepairFlag repair) override;
 
     /**
      * Deletion only effects the upper layer, so we ignore lower-layer referrers.
