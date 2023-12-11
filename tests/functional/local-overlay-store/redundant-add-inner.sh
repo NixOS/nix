@@ -18,9 +18,10 @@ mountOverlayfs
 
 ### Do a redundant add
 
-# upper layer should not have it
-path=$(nix-store --store "$storeA" ../dummy)
+# (Already done in `initLowerStore`, but repeated here for clarity.)
+path=$(nix-store --store "$storeA" --add ../dummy)
 
+# upper layer should not have it
 expect 1 stat $(toRealPath "$storeBTop/nix/store" "$path")
 
 pathFromB=$(nix-store --store "$storeB" --add ../dummy)
