@@ -19,9 +19,13 @@ mountOverlayfs
 ### Do a redundant add
 
 # upper layer should not have it
+path=$(nix-store --store "$storeA" ../dummy)
+
 expect 1 stat $(toRealPath "$storeBTop/nix/store" "$path")
 
-path=$(nix-store --store "$storeB" --add ../dummy)
+pathFromB=$(nix-store --store "$storeB" --add ../dummy)
+
+[[ $path == $pathFromB ]]
 
 # lower store should have it from before
 stat $(toRealPath "$storeA/nix/store" "$path")
