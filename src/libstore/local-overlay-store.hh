@@ -24,7 +24,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     const PathSetting upperLayer{(StoreConfig*) this, "", "upper-layer",
         R"(
-          Must be used as OverlayFS upper layer for this store's store dir.
+          Directory containing the OverlayFS upper layer for this store's store dir.
         )"};
 
     Setting<bool> checkMount{(StoreConfig*) this, true, "check-mount",
@@ -60,6 +60,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     std::string doc() override;
 
+protected:
     /**
      * Given a store path, get its location (if it is exists) in the
      * upper layer of the overlayfs.
@@ -167,7 +168,7 @@ private:
      * Deduplicate by removing store objects from the upper layer that
      * are now in the lower layer.
      *
-     * This implementation will not cause duplications, but addition of
+     * Operations on a layered store will not cause duplications, but addition of
      * new store objects to the lower layer can instill induce them
      * (there is no way to prevent that). This cleans up those
      * duplications.
