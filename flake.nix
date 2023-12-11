@@ -42,6 +42,13 @@
         "x86_64-unknown-netbsd"
       ];
 
+      # Nix doesn't yet build on this platform, so we put it in a
+      # separate list. We just use this for `devShells` and
+      # `nixpkgsFor`, which this depends on.
+      shellCrossSystems = crossSystems ++ [
+        "x86_64-w64-mingw32"
+      ];
+
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
       forAllSystems = lib.genAttrs systems;
@@ -129,7 +136,7 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
-          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          cross = lib.genAttrs shellCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
       commonDeps =
@@ -808,7 +815,7 @@
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
             (makeShells "static" nixpkgsFor.${system}.static) //
-            (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+            (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }
