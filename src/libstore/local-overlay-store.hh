@@ -62,8 +62,12 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
 protected:
     /**
-     * Given a store path, get its location (if it is exists) in the
-     * upper layer of the overlayfs.
+     * @return The host OS path corresponding to the store path for the
+     * upper layer.
+     *
+     * @note The there is no guarantee a store object is actually stored
+     * at that file path. It might be stored in the lower layer instead,
+     * or it might not be part of this store at all.
      */
     Path toUpperPath(const StorePath & path);
 };
