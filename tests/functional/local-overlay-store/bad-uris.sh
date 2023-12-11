@@ -2,7 +2,7 @@ source common.sh
 
 requireEnvironment
 setupConfig
-storeDirs
+setupStoreDirs
 
 mkdir -p $TEST_ROOT/bad_test
 badTestRoot=$TEST_ROOT/bad_test
@@ -18,7 +18,7 @@ for i in "${storesBad[@]}"; do
     echo $i
     unshare --mount --map-root-user bash <<EOF
         source common.sh
-        storeDirs
+        setupStoreDirs
         mountOverlayfs
         expectStderr 1 nix doctor --store "$i" | grepQuiet "overlay filesystem .* mounted incorrectly"
 EOF

@@ -10,7 +10,7 @@ source common.sh
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
 
-storeDirs
+setupStoreDirs
 
 initLowerStore
 

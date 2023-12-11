@@ -18,7 +18,7 @@ setupConfig () {
 
 enableFeatures "local-overlay-store"
 
-storeDirs () {
+setupStoreDirs () {
   # Attempt to create store dirs on tmpfs volume.
   # This ensures lowerdir, upperdir and workdir will be on
   # a consistent filesystem that fully supports OverlayFS.
