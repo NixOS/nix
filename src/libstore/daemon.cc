@@ -574,6 +574,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::BuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;
+        /*
+         * Note: unlike wopEnsurePath, this operation reads a
+         * derivation-to-be-realized from the client with
+         * readDerivation(Source,Store) rather than reading it from
+         * the local store with Store::readDerivation().  Since the
+         * derivation-to-be-realized is not registered in the store
+         * it cannot be trusted that its outPath was calculated
+         * correctly.
+         */
         readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
