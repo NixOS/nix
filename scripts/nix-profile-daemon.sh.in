@@ -9,11 +9,9 @@ else
     NIX_LINK_NEW=$HOME/.local/state/nix/profile
 fi
 if [ -e "$NIX_LINK_NEW" ]; then
-    NIX_LINK="$NIX_LINK_NEW"
-else
-    if [ -t 2 ] && [ -e "$NIX_LINK_NEW" ]; then
+    if [ -t 2 ] && [ -e "$NIX_LINK" ]; then
         warning="\033[1;35mwarning:\033[0m"
-        printf "$warning Both %s and legacy %s exist; using the latter.\n" "$NIX_LINK_NEW" "$NIX_LINK" 1>&2
+        printf "$warning Both %s and legacy %s exist; using the former.\n" "$NIX_LINK_NEW" "$NIX_LINK" 1>&2
         if [ "$(realpath "$NIX_LINK")" = "$(realpath "$NIX_LINK_NEW")" ]; then
             printf "         Since the profiles match, you can safely delete either of them.\n" 1>&2
         else
@@ -26,6 +24,7 @@ else
             printf "$warning Profiles do not match. You should manually migrate from %s to %s.\n" "$NIX_LINK" "$NIX_LINK_NEW" 1>&2
         fi
     fi
+    NIX_LINK="$NIX_LINK_NEW"
 fi
 
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_LINK"
