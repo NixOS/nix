@@ -1,8 +1,14 @@
 #include "args.hh"
 #include "args/root.hh"
 #include "hash.hh"
+#include "environment-variables.hh"
+#include "signals.hh"
+#include "users.hh"
 #include "json-utils.hh"
 
+#include <fstream>
+#include <string>
+#include <regex>
 #include <glob.h>
 
 namespace nix {
@@ -74,7 +80,178 @@ std::optional<std::string> RootArgs::needsCompletion(std::string_view s)
     return {};
 }
 
-void RootArgs::parseCmdline(const Strings & _cmdline)
+/**
+ * Basically this is `typedef std::optional<Parser> Parser(std::string_view s, Strings & r);`
+ *
+ * Except we can't recursively reference the Parser typedef, so we have to write a class.
+ */
+struct Parser {
+    std::string_view remaining;
+
+    /**
+     * @brief Parse the next character(s)
+     *
+     * @param r
+     * @return std::shared_ptr<Parser>
+     */
+    virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) = 0;
+
+    Parser(std::string_view s) : remaining(s) {};
+
+    virtual ~Parser() { };
+};
+
+struct ParseQuoted : public Parser {
+    /**
+     * @brief Accumulated string
+     *
+     * Parsed argument up to this point.
+     */
+    std::string acc;
+
+    ParseQuoted(std::string_view s) : Parser(s) {};
+
+    virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) override;
+};
+
+
+struct ParseUnquoted : public Parser {
+    /**
+     * @brief Accumulated string
+     *
+     * Parsed argument up to this point. Empty string is not representable in
+     * unquoted syntax, so we use it for the initial state.
+     */
+    std::string acc;
+
+    ParseUnquoted(std::string_view s) : Parser(s) {};
+
+    virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) override {
+        if (remaining.empty()) {
+            if (!acc.empty())
+                r.push_back(acc);
+            state = nullptr; // done
+            return;
+        }
+        switch (remaining[0]) {
+            case ' ': case '\t': case '\n': case '\r':
+                if (!acc.empty())
+                    r.push_back(acc);
+                state = std::make_shared<ParseUnquoted>(ParseUnquoted(remaining.substr(1)));
+                return;
+            case '`':
+                if (remaining.size() > 1 && remaining[1] == '`') {
+                    state = std::make_shared<ParseQuoted>(ParseQuoted(remaining.substr(2)));
+                    return;
+                }
+                else
+                    throw Error("single backtick is not a supported syntax in the nix shebang.");
+
+            // reserved characters
+            // meaning to be determined, or may be reserved indefinitely so that
+            // #!nix syntax looks unambiguous
+            case '$':
+            case '*':
+            case '~':
+            case '<':
+            case '>':
+            case '|':
+            case ';':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '\'':
+            case '"':
+            case '\\':
+                throw Error("unsupported unquoted character in nix shebang: " + std::string(1, remaining[0]) + ". Use double backticks to escape?");
+
+            case '#':
+                if (acc.empty()) {
+                    throw Error ("unquoted nix shebang argument cannot start with #. Use double backticks to escape?");
+                } else {
+                    acc += remaining[0];
+                    remaining = remaining.substr(1);
+                    return;
+                }
+
+            default:
+                acc += remaining[0];
+                remaining = remaining.substr(1);
+                return;
+        }
+        assert(false);
+    }
+};
+
+void ParseQuoted::operator()(std::shared_ptr<Parser> &state, Strings & r) {
+    if (remaining.empty()) {
+        throw Error("unterminated quoted string in nix shebang");
+    }
+    switch (remaining[0]) {
+        case ' ':
+            if ((remaining.size() == 3 && remaining[1] == '`' && remaining[2] == '`')
+                || (remaining.size() > 3 && remaining[1] == '`' && remaining[2] == '`' && remaining[3] != '`')) {
+                // exactly two backticks mark the end of a quoted string, but a preceding space is ignored if present.
+                state = std::make_shared<ParseUnquoted>(ParseUnquoted(remaining.substr(3)));
+                r.push_back(acc);
+                return;
+            }
+            else {
+                // just a normal space
+                acc += remaining[0];
+                remaining = remaining.substr(1);
+                return;
+            }
+        case '`':
+            // exactly two backticks mark the end of a quoted string
+            if ((remaining.size() == 2 && remaining[1] == '`')
+                || (remaining.size() > 2 && remaining[1] == '`' && remaining[2] != '`')) {
+                state = std::make_shared<ParseUnquoted>(ParseUnquoted(remaining.substr(2)));
+                r.push_back(acc);
+                return;
+            }
+
+            // a sequence of at least 3 backticks is one escape-backtick which is ignored, followed by any number of backticks, which are verbatim
+            else if (remaining.size() >= 3 && remaining[1] == '`' && remaining[2] == '`') {
+                // ignore "escape" backtick
+                remaining = remaining.substr(1);
+                // add the rest
+                while (remaining.size() > 0 && remaining[0] == '`') {
+                    acc += '`';
+                    remaining = remaining.substr(1);
+                }
+                return;
+            }
+            else {
+                acc += remaining[0];
+                remaining = remaining.substr(1);
+                return;
+            }
+        default:
+            acc += remaining[0];
+            remaining = remaining.substr(1);
+            return;
+    }
+    assert(false);
+}
+
+Strings parseShebangContent(std::string_view s) {
+    Strings result;
+    std::shared_ptr<Parser> parserState(std::make_shared<ParseUnquoted>(ParseUnquoted(s)));
+
+    // trampoline == iterated strategy pattern
+    while (parserState) {
+        auto currentState = parserState;
+        (*currentState)(parserState, result);
+    }
+
+    return result;
+}
+
+void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 {
     Strings pendingArgs;
     bool dashDash = false;
@@ -90,6 +267,45 @@ void RootArgs::parseCmdline(const Strings & _cmdline)
     }
 
     bool argsSeen = false;
+
+    // Heuristic to see if we're invoked as a shebang script, namely,
+    // if we have at least one argument, it's the name of an
+    // executable file, and it starts with "#!".
+    Strings savedArgs;
+    if (allowShebang){
+        auto script = *cmdline.begin();
+        try {
+            std::ifstream stream(script);
+            char shebang[3]={0,0,0};
+            stream.get(shebang,3);
+            if (strncmp(shebang,"#!",2) == 0){
+                for (auto pos = std::next(cmdline.begin()); pos != cmdline.end();pos++)
+                    savedArgs.push_back(*pos);
+                cmdline.clear();
+
+                std::string line;
+                std::getline(stream,line);
+                static const std::string commentChars("#/\\%@*-");
+                std::string shebangContent;
+                while (std::getline(stream,line) && !line.empty() && commentChars.find(line[0]) != std::string::npos){
+                    line = chomp(line);
+
+                    std::smatch match;
+                    // We match one space after `nix` so that we preserve indentation.
+                    // No space is necessary for an empty line. An empty line has basically no effect.
+                    if (std::regex_match(line, match, std::regex("^#!\\s*nix(:? |$)(.*)$")))
+                        shebangContent += match[2].str() + "\n";
+                }
+                for (const auto & word : parseShebangContent(shebangContent)) {
+                    cmdline.push_back(word);
+                }
+                cmdline.push_back(script);
+                commandBaseDir = dirOf(script);
+                for (auto pos = savedArgs.begin(); pos != savedArgs.end();pos++)
+                    cmdline.push_back(*pos);
+            }
+        } catch (SysError &) { }
+    }
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
         auto arg = *pos;
@@ -143,6 +359,17 @@ void RootArgs::parseCmdline(const Strings & _cmdline)
      */
     for (auto d : deferredCompletions)
         d.completer(*completions, d.n, d.prefix);
+}
+
+Path Args::getCommandBaseDir() const
+{
+    assert(parent);
+    return parent->getCommandBaseDir();
+}
+
+Path RootArgs::getCommandBaseDir() const
+{
+    return commandBaseDir;
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -255,7 +482,18 @@ bool Args::processArgs(const Strings & args, bool finish)
         }
         if (!anyCompleted)
             exp.handler.fun(ss);
-        expectedArgs.pop_front();
+
+        /* Move the list element to the processedArgs. This is almost the same as
+           `processedArgs.push_back(expectedArgs.front()); expectedArgs.pop_front()`,
+           except that it will only adjust the next and prev pointers of the list
+           elements, meaning the actual contents don't move in memory. This is
+           critical to prevent invalidating internal pointers! */
+        processedArgs.splice(
+            processedArgs.end(),
+            expectedArgs,
+            expectedArgs.begin(),
+            ++expectedArgs.begin());
+
         res = true;
     }
 
@@ -306,36 +544,70 @@ nlohmann::json Args::toJSON()
     return res;
 }
 
-static void hashTypeCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
+static void hashFormatCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
-    for (auto & type : hashTypes)
-        if (hasPrefix(type, prefix))
-            completions.add(type);
+    for (auto & format : hashFormats) {
+        if (hasPrefix(format, prefix)) {
+            completions.add(format);
+        }
+    }
 }
 
-Args::Flag Args::Flag::mkHashTypeFlag(std::string && longName, HashType * ht)
-{
-    return Flag {
-        .longName = std::move(longName),
-        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
-        .labels = {"hash-algo"},
-        .handler = {[ht](std::string s) {
-            *ht = parseHashType(s);
-        }},
-        .completer = hashTypeCompleter,
+Args::Flag Args::Flag::mkHashFormatFlagWithDefault(std::string &&longName, HashFormat * hf) {
+    assert(*hf == nix::HashFormat::SRI);
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash format ('base16', 'nix32', 'base64', 'sri'). Default: 'sri'",
+            .labels = {"hash-format"},
+            .handler = {[hf](std::string s) {
+                *hf = parseHashFormat(s);
+            }},
+            .completer = hashFormatCompleter,
     };
 }
 
-Args::Flag Args::Flag::mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht)
+Args::Flag Args::Flag::mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf) {
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash format ('base16', 'nix32', 'base64', 'sri').",
+            .labels = {"hash-format"},
+            .handler = {[ohf](std::string s) {
+                *ohf = std::optional<HashFormat>{parseHashFormat(s)};
+            }},
+            .completer = hashFormatCompleter,
+    };
+}
+
+static void hashAlgoCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
-    return Flag {
-        .longName = std::move(longName),
-        .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
-        .labels = {"hash-algo"},
-        .handler = {[oht](std::string s) {
-            *oht = std::optional<HashType> { parseHashType(s) };
-        }},
-        .completer = hashTypeCompleter,
+    for (auto & algo : hashAlgorithms)
+        if (hasPrefix(algo, prefix))
+            completions.add(algo);
+}
+
+Args::Flag Args::Flag::mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha)
+{
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
+            .labels = {"hash-algo"},
+            .handler = {[ha](std::string s) {
+                *ha = parseHashAlgo(s);
+            }},
+            .completer = hashAlgoCompleter,
+    };
+}
+
+Args::Flag Args::Flag::mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha)
+{
+    return Flag{
+            .longName = std::move(longName),
+            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
+            .labels = {"hash-algo"},
+            .handler = {[oha](std::string s) {
+                *oha = std::optional<HashAlgorithm>{parseHashAlgo(s)};
+            }},
+            .completer = hashAlgoCompleter,
     };
 }
 
@@ -384,8 +656,9 @@ std::optional<ExperimentalFeature> Command::experimentalFeature ()
     return { Xp::NixCommand };
 }
 
-MultiCommand::MultiCommand(const Commands & commands_)
+MultiCommand::MultiCommand(std::string_view commandName, const Commands & commands_)
     : commands(commands_)
+    , commandName(commandName)
 {
     expectArgs({
         .label = "subcommand",

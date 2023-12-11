@@ -17,6 +17,8 @@ struct SourceAccessor
 {
     const size_t number;
 
+    std::string displayPrefix, displaySuffix;
+
     SourceAccessor();
 
     virtual ~SourceAccessor()
@@ -24,6 +26,13 @@ struct SourceAccessor
 
     /**
      * Return the contents of a file as a string.
+     *
+     * @note Unlike Unix, this method should *not* follow symlinks. Nix
+     * by default wants to manipulate symlinks explicitly, and not
+     * implictly follow them, as they are frequently untrusted user data
+     * and thus may point to arbitrary locations. Acting on the targets
+     * targets of symlinks should only occasionally be done, and only
+     * with care.
      */
     virtual std::string readFile(const CanonPath & path);
 
@@ -32,7 +41,10 @@ struct SourceAccessor
      * called with the size of the file before any data is written to
      * the sink.
      *
-     * Note: subclasses of `SourceAccessor` need to implement at least
+     * @note Like the other `readFile`, this method should *not* follow
+     * symlinks.
+     *
+     * @note subclasses of `SourceAccessor` need to implement at least
      * one of the `readFile()` variants.
      */
     virtual void readFile(
@@ -40,7 +52,7 @@ struct SourceAccessor
         Sink & sink,
         std::function<void(uint64_t)> sizeCallback = [](uint64_t size){});
 
-    virtual bool pathExists(const CanonPath & path) = 0;
+    virtual bool pathExists(const CanonPath & path);
 
     enum Type {
       tRegular, tSymlink, tDirectory,
@@ -57,18 +69,37 @@ struct SourceAccessor
     struct Stat
     {
         Type type = tMisc;
-        //uint64_t fileSize = 0; // regular files only
-        bool isExecutable = false; // regular files only
+
+        /**
+         * For regular files only: the size of the file. Not all
+         * accessors return this since it may be too expensive to
+         * compute.
+         */
+        std::optional<uint64_t> fileSize;
+
+        /**
+         * For regular files only: whether this is an executable.
+         */
+        bool isExecutable = false;
+
+        /**
+         * For regular files only: the position of the contents of this
+         * file in the NAR. Only returned by NAR accessors.
+         */
+        std::optional<uint64_t> narOffset;
     };
 
-    virtual Stat lstat(const CanonPath & path) = 0;
+    Stat lstat(const CanonPath & path);
 
-    std::optional<Stat> maybeLstat(const CanonPath & path);
+    virtual std::optional<Stat> maybeLstat(const CanonPath & path) = 0;
 
     typedef std::optional<Type> DirEntry;
 
     typedef std::map<std::string, DirEntry> DirEntries;
 
+    /**
+     * @note Like `readFile`, this method should *not* follow symlinks.
+     */
     virtual DirEntries readDirectory(const CanonPath & path) = 0;
 
     virtual std::string readLink(const CanonPath & path) = 0;
@@ -79,9 +110,9 @@ struct SourceAccessor
         PathFilter & filter = defaultPathFilter);
 
     Hash hashPath(
-        const CanonPath & path,
-        PathFilter & filter = defaultPathFilter,
-        HashType ht = htSHA256);
+            const CanonPath & path,
+            PathFilter & filter = defaultPathFilter,
+            HashAlgorithm ha = HashAlgorithm::SHA256);
 
     /**
      * Return a corresponding path in the root filesystem, if
@@ -100,6 +131,8 @@ struct SourceAccessor
     {
         return number < x.number;
     }
+
+    void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
 
     virtual std::string showPath(const CanonPath & path);
 };

@@ -1,4 +1,6 @@
 #include "thread-pool.hh"
+#include "signals.hh"
+#include "util.hh"
 
 namespace nix {
 

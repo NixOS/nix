@@ -8,7 +8,6 @@
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"
-#include "util.hh"
 
 #include <iterator>
 #include <memory>
@@ -663,7 +662,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
+        runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
     }
 };
 

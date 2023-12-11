@@ -1,17 +1,27 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
+  # TODO Go back to nixos-23.05-small once
+  # https://github.com/NixOS/nixpkgs/pull/271202 is merged.
+  #
+  # Also, do not grab arbitrary further staging commits. This PR was
+  # carefully made to be based on release-23.05 and just contain
+  # rebuild-causing changes to packages that Nix actually uses.
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/staging-23.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, libgit2 }:
 
     let
       inherit (nixpkgs) lib;
 
       officialRelease = false;
+
+      # Set to true to build the release notes for the next release.
+      buildUnreleasedNotes = false;
 
       version = lib.fileContents ./.version + versionSuffix;
       versionSuffix =
@@ -89,7 +99,7 @@
           ./misc
           ./precompiled-headers.h
           ./src
-          ./unit-test-data
+          ./tests/unit
           ./COPYING
           ./scripts/local.mk
           functionalTestFiles
@@ -162,11 +172,17 @@
 
         testConfigureFlags = [
           "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+        ] ++ lib.optionals (stdenv.hostPlatform != stdenv.buildPlatform) [
+          "--enable-install-unit-tests"
+          "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+          "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
         ];
 
         internalApiDocsConfigureFlags = [
           "--enable-internal-api-docs"
         ];
+
+        changelog-d = pkgs.buildPackages.callPackage ./misc/changelog-d.nix { };
 
         nativeBuildDeps =
           [
@@ -183,14 +199,23 @@
             buildPackages.git
             buildPackages.mercurial # FIXME: remove? only needed for tests
             buildPackages.jq # Also for custom mdBook preprocessor.
+            buildPackages.openssh # only needed for tests (ssh-keygen)
           ]
-          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
+          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)]
+          # Official releases don't have rl-next, so we don't need to compile a changelog
+          ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d
+          ;
 
         buildDeps =
           [ curl
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
+            (pkgs.libgit2.overrideAttrs (attrs: {
+              src = libgit2;
+              version = libgit2.lastModifiedDate;
+              cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
+            }))
             boost
             lowdown-nix
             libsodium
@@ -219,6 +244,9 @@
             }).overrideAttrs(o: {
               patches = (o.patches or []) ++ [
                 ./boehmgc-coroutine-sp-fallback.diff
+
+                # https://github.com/ivmai/bdwgc/pull/586
+                ./boehmgc-traceable_allocator-public.diff
               ];
             })
             )
@@ -401,7 +429,8 @@
             src = nixSrc;
             VERSION_SUFFIX = versionSuffix;
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (currentStdenv.hostPlatform != currentStdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps;
             buildInputs = buildDeps
@@ -510,6 +539,8 @@
 
         # Binary package for various platforms.
         build = forAllSystems (system: self.packages.${system}.nix);
+
+        shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
         buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
@@ -662,6 +693,11 @@
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
+        rl-next =
+          let pkgs = nixpkgsFor.${system}.native;
+          in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
+          LANG=C.UTF-8 ${(commonDeps { inherit pkgs; }).changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
+        '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });
@@ -707,13 +743,16 @@
           stdenv.mkDerivation {
             name = "nix";
 
-            outputs = [ "out" "dev" "doc" ];
+            outputs = [ "out" "dev" "doc" ]
+              ++ lib.optional (stdenv.hostPlatform != stdenv.buildPlatform) "check";
 
             nativeBuildInputs = nativeBuildDeps
               ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
               ++ lib.optional
                 (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform)
                 pkgs.buildPackages.clang-tools
+              # We want changelog-d in the shell even if the current build doesn't need it
+              ++ lib.optional (officialRelease || ! buildUnreleasedNotes) changelog-d
               ;
 
             buildInputs = buildDeps ++ propagatedDeps

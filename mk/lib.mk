@@ -43,27 +43,6 @@ define newline
 endef
 
 
-# Default installation paths.
-prefix ?= /usr/local
-libdir ?= $(prefix)/lib
-bindir ?= $(prefix)/bin
-libexecdir ?= $(prefix)/libexec
-datadir ?= $(prefix)/share
-localstatedir ?= $(prefix)/var
-sysconfdir ?= $(prefix)/etc
-mandir ?= $(prefix)/share/man
-
-
-# Initialise support for build directories.
-builddir ?=
-
-ifdef builddir
-  buildprefix = $(builddir)/
-else
-  buildprefix =
-endif
-
-
 # Pass -fPIC if we're building dynamic libraries.
 BUILD_SHARED_LIBS ?= 1
 
@@ -94,6 +73,8 @@ ifeq ($(BUILD_DEBUG), 1)
 endif
 
 
+include mk/build-dir.mk
+include mk/install-dirs.mk
 include mk/functions.mk
 include mk/tracing.mk
 include mk/clean.mk
@@ -112,7 +93,7 @@ define include-sub-makefile
   include $(1)
 endef
 
-$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile, $(mf))))
+$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile,$(mf))))
 
 
 # Instantiate stuff.
@@ -122,14 +103,15 @@ $(foreach script, $(bin-scripts), $(eval $(call install-program-in,$(script),$(b
 $(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
 $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
+install_test_init=tests/functional/init.sh
 $(foreach test, $(install-tests), \
-  $(eval $(call run-install-test,$(test))) \
+  $(eval $(call run-test,$(test),$(install_test_init))) \
   $(eval installcheck: $(test).test))
 $(foreach test-group, $(install-tests-groups), \
-  $(eval $(call run-install-test-group,$(test-group))) \
+  $(eval $(call run-test-group,$(test-group),$(install_test_init))) \
   $(eval installcheck: $(test-group).test-group) \
   $(foreach test, $($(test-group)-tests), \
-    $(eval $(call run-install-test,$(test))) \
+    $(eval $(call run-test,$(test),$(install_test_init))) \
     $(eval $(test-group).test-group: $(test).test)))
 
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))

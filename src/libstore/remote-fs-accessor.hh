@@ -1,40 +1,43 @@
 #pragma once
 ///@file
 
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "ref.hh"
 #include "store-api.hh"
 
 namespace nix {
 
-class RemoteFSAccessor : public FSAccessor
+class RemoteFSAccessor : public SourceAccessor
 {
     ref<Store> store;
 
-    std::map<std::string, ref<FSAccessor>> nars;
+    std::map<std::string, ref<SourceAccessor>> nars;
+
+    bool requireValidPath;
 
     Path cacheDir;
 
-    std::pair<ref<FSAccessor>, Path> fetch(const Path & path_, bool requireValidPath = true);
+    std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
     friend class BinaryCacheStore;
 
     Path makeCacheFile(std::string_view hashPart, const std::string & ext);
 
-    ref<FSAccessor> addToCache(std::string_view hashPart, std::string && nar);
+    ref<SourceAccessor> addToCache(std::string_view hashPart, std::string && nar);
 
 public:
 
     RemoteFSAccessor(ref<Store> store,
+        bool requireValidPath = true,
         const /* FIXME: use std::optional */ Path & cacheDir = "");
 
-    Stat stat(const Path & path) override;
+    std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
-    StringSet readDirectory(const Path & path) override;
+    DirEntries readDirectory(const CanonPath & path) override;
 
-    std::string readFile(const Path & path, bool requireValidPath = true) override;
+    std::string readFile(const CanonPath & path) override;
 
-    std::string readLink(const Path & path) override;
+    std::string readLink(const CanonPath & path) override;
 };
 
 }

@@ -1,6 +1,8 @@
 #include <algorithm>
 
 #include "args/root.hh"
+#include "current-process.hh"
+#include "namespaces.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
@@ -20,6 +22,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <regex>
 
 #include <nlohmann/json.hpp>
 
@@ -64,7 +67,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
     bool helpRequested = false;
     bool showVersion = false;
 
-    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
+    NixArgs() : MultiCommand("", RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
         categories.clear();
         categories[catHelp] = "Help commands";
@@ -131,10 +134,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         {"ping-store", {"store", "ping"}},
         {"sign-paths", {"store", "sign"}},
         {"show-derivation", {"derivation", "show"}},
+        {"show-config", {"config", "show"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
         {"verify", {"store", "verify"}},
+        {"doctor", {"config", "check"}},
     };
 
     bool aliasUsed = false;
@@ -188,6 +193,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
             j["experimentalFeature"] = storeConfig->experimentalFeature();
         }
         res["stores"] = std::move(stores);
+        res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
 
         return res.dump();
     }
@@ -292,7 +298,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "help-stores.md"
+          #include "generated-doc/help-stores.md"
           ;
     }
 
@@ -367,6 +373,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::Flakes,
             Xp::FetchClosure,
             Xp::DynamicDerivations,
+            Xp::FetchTree,
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
@@ -425,7 +432,9 @@ void mainWrapped(int argc, char * * argv)
     });
 
     try {
-        args.parseCmdline(argvToStrings(argc, argv));
+        auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
+        auto allowShebang = isNixCommand && argc > 1;
+        args.parseCmdline(argvToStrings(argc, argv),allowShebang);
     } catch (UsageError &) {
         if (!args.helpRequested && !args.completions) throw;
     }

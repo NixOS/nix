@@ -13,11 +13,12 @@ namespace nix {
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
 
-class Store;
+struct StoreDirConfig;
 struct Source;
 
 // items being serialised
 struct BuildResult;
+struct UnkeyedValidPathInfo;
 
 
 /**
@@ -72,8 +73,8 @@ struct ServeProto
     // See `worker-protocol.hh` for a longer explanation.
 #if 0
     {
-        static T read(const Store & store, ReadConn conn);
-        static void write(const Store & store, WriteConn conn, const T & t);
+        static T read(const StoreDirConfig & store, ReadConn conn);
+        static void write(const StoreDirConfig & store, WriteConn conn, const T & t);
     };
 #endif
 
@@ -82,10 +83,17 @@ struct ServeProto
      * infer the type instead of having to write it down explicitly.
      */
     template<typename T>
-    static void write(const Store & store, WriteConn conn, const T & t)
+    static void write(const StoreDirConfig & store, WriteConn conn, const T & t)
     {
         ServeProto::Serialise<T>::write(store, conn, t);
     }
+
+    /**
+     * Options for building shared between
+     * `ServeProto::Command::BuildPaths` and
+     * `ServeProto::Command::BuildDerivation`.
+     */
+    struct BuildOptions;
 };
 
 enum struct ServeProto::Command : uint64_t
@@ -99,6 +107,22 @@ enum struct ServeProto::Command : uint64_t
     QueryClosure = 7,
     BuildDerivation = 8,
     AddToStoreNar = 9,
+};
+
+
+struct ServeProto::BuildOptions {
+    /**
+     * Default value in this and every other field is so tests pass when
+     * testing older deserialisers which do not set all the fields.
+     */
+    time_t maxSilentTime = -1;
+    time_t buildTimeout = -1;
+    size_t maxLogSize = -1;
+    size_t nrRepeats = -1;
+    bool enforceDeterminism = -1;
+    bool keepFailed = -1;
+
+    bool operator == (const ServeProto::BuildOptions &) const = default;
 };
 
 /**
@@ -135,12 +159,16 @@ inline std::ostream & operator << (std::ostream & s, ServeProto::Command op)
 #define DECLARE_SERVE_SERIALISER(T) \
     struct ServeProto::Serialise< T > \
     { \
-        static T read(const Store & store, ServeProto::ReadConn conn); \
-        static void write(const Store & store, ServeProto::WriteConn conn, const T & t); \
+        static T read(const StoreDirConfig & store, ServeProto::ReadConn conn); \
+        static void write(const StoreDirConfig & store, ServeProto::WriteConn conn, const T & t); \
     };
 
 template<>
 DECLARE_SERVE_SERIALISER(BuildResult);
+template<>
+DECLARE_SERVE_SERIALISER(UnkeyedValidPathInfo);
+template<>
+DECLARE_SERVE_SERIALISER(ServeProto::BuildOptions);
 
 template<typename T>
 DECLARE_SERVE_SERIALISER(std::vector<T>);

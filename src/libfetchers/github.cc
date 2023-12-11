@@ -27,13 +27,11 @@ std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
 {
-    virtual std::string type() const = 0;
-
     virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
 
     std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
-        if (url.scheme != type()) return {};
+        if (url.scheme != schemeName()) return {};
 
         auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
 
@@ -44,7 +42,7 @@ struct GitArchiveInputScheme : InputScheme
         auto size = path.size();
         if (size == 3) {
             if (std::regex_match(path[2], revRegex))
-                rev = Hash::parseAny(path[2], htSHA1);
+                rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
@@ -70,7 +68,7 @@ struct GitArchiveInputScheme : InputScheme
             if (name == "rev") {
                 if (rev)
                     throw BadURL("URL '%s' contains multiple commit hashes", url.url);
-                rev = Hash::parseAny(value, htSHA1);
+                rev = Hash::parseAny(value, HashAlgorithm::SHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
@@ -91,7 +89,7 @@ struct GitArchiveInputScheme : InputScheme
             throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url.url, *ref, rev->gitRev());
 
         Input input;
-        input.attrs.insert_or_assign("type", type());
+        input.attrs.insert_or_assign("type", std::string { schemeName() });
         input.attrs.insert_or_assign("owner", path[0]);
         input.attrs.insert_or_assign("repo", path[1]);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
@@ -101,14 +99,21 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "owner",
+            "repo",
+            "ref",
+            "rev",
+            "narHash",
+            "lastModified",
+            "host",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != type()) return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified" && name != "host")
-                throw Error("unsupported input attribute '%s'", name);
-
         getStrAttr(attrs, "owner");
         getStrAttr(attrs, "repo");
 
@@ -128,7 +133,7 @@ struct GitArchiveInputScheme : InputScheme
         if (ref) path += "/" + *ref;
         if (rev) path += "/" + rev->to_string(HashFormat::Base16, false);
         return ParsedURL {
-            .scheme = type(),
+            .scheme = std::string { schemeName() },
             .path = path,
         };
     }
@@ -220,15 +225,23 @@ struct GitArchiveInputScheme : InputScheme
         return {result.storePath, input};
     }
 
-    std::optional<ExperimentalFeature> experimentalFeature() override
+    std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev())
+            return rev->gitRev();
+        else
+            return std::nullopt;
     }
 };
 
 struct GitHubInputScheme : GitArchiveInputScheme
 {
-    std::string type() const override { return "github"; }
+    std::string_view schemeName() const override { return "github"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -271,7 +284,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
+        auto rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
@@ -309,7 +322,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
 struct GitLabInputScheme : GitArchiveInputScheme
 {
-    std::string type() const override { return "gitlab"; }
+    std::string_view schemeName() const override { return "gitlab"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -343,7 +356,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
+        auto rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
@@ -377,7 +390,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
 struct SourceHutInputScheme : GitArchiveInputScheme
 {
-    std::string type() const override { return "sourcehut"; }
+    std::string_view schemeName() const override { return "sourcehut"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -435,7 +448,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         if(!id)
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
-        auto rev = Hash::parseAny(*id, htSHA1);
+        auto rev = Hash::parseAny(*id, HashAlgorithm::SHA1);
         debug("HEAD revision for '%s' is %s", fmt("%s/%s", base_url, ref), rev.gitRev());
         return rev;
     }

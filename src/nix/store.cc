@@ -2,9 +2,9 @@
 
 using namespace nix;
 
-struct CmdStore : virtual NixMultiCommand
+struct CmdStore : NixMultiCommand
 {
-    CmdStore() : MultiCommand(RegisterCommand::getCommandsFor({"store"}))
+    CmdStore() : NixMultiCommand("store", RegisterCommand::getCommandsFor({"store"}))
     { }
 
     std::string description() override
@@ -13,13 +13,6 @@ struct CmdStore : virtual NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix store' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdStore = registerCommand<CmdStore>("store");

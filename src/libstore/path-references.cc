@@ -1,6 +1,5 @@
 #include "path-references.hh"
 #include "hash.hh"
-#include "util.hh"
 #include "archive.hh"
 
 #include <map>
@@ -50,7 +49,7 @@ std::pair<StorePathSet, HashResult> scanForReferences(
     const std::string & path,
     const StorePathSet & refs)
 {
-    HashSink hashSink { htSHA256 };
+    HashSink hashSink { HashAlgorithm::SHA256 };
     auto found = scanForReferences(hashSink, path, refs);
     auto hash = hashSink.finish();
     return std::pair<StorePathSet, HashResult>(found, hash);

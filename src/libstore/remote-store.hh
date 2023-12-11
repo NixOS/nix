@@ -22,10 +22,10 @@ struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+    const Setting<int> maxConnections{this, 1, "max-connections",
         "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this,
+    const Setting<unsigned int> maxConnectionAge{this,
         std::numeric_limits<unsigned int>::max(),
         "max-connection-age",
         "Maximum age of a connection before it is closed."};
@@ -74,18 +74,18 @@ public:
      * Add a content-addressable store path. `dump` will be drained.
      */
     ref<const ValidPathInfo> addCAToStore(
-        Source & dump,
-        std::string_view name,
-        ContentAddressMethod caMethod,
-        HashType hashType,
-        const StorePathSet & references,
-        RepairFlag repair);
+            Source & dump,
+            std::string_view name,
+            ContentAddressMethod caMethod,
+            HashAlgorithm hashAlgo,
+            const StorePathSet & references,
+            RepairFlag repair);
 
     /**
      * Add a content-addressable store path. Does not support references. `dump` will be drained.
      */
     StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
+                                 FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -185,7 +185,7 @@ protected:
 
     friend struct ConnectionHandle;
 
-    virtual ref<FSAccessor> getFSAccessor() override;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 

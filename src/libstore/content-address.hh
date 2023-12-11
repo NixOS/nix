@@ -39,12 +39,12 @@ enum struct FileIngestionMethod : uint8_t {
     /**
      * Flat-file hashing. Directly ingest the contents of a single file
      */
-    Flat = false,
+    Flat = 0,
     /**
      * Recursive (or NAR) hashing. Serializes the file-system object in Nix
      * Archive format and ingest that
      */
-    Recursive = true
+    Recursive = 1
 };
 
 /**
@@ -94,7 +94,7 @@ struct ContentAddressMethod
     /**
      * Parse a content addressing method and hash type.
      */
-    static std::pair<ContentAddressMethod, HashType> parse(std::string_view rawCaMethod);
+    static std::pair<ContentAddressMethod, HashAlgorithm> parse(std::string_view rawCaMethod);
 
     /**
      * Render a content addressing method and hash type in a
@@ -102,7 +102,7 @@ struct ContentAddressMethod
      *
      * The rough inverse of `parse()`.
      */
-    std::string render(HashType ht) const;
+    std::string render(HashAlgorithm ha) const;
 };
 
 

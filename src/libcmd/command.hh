@@ -26,9 +26,13 @@ static constexpr Command::Category catNixInstallation = 102;
 
 static constexpr auto installablesCategory = "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
 
-struct NixMultiCommand : virtual MultiCommand, virtual Command
+struct NixMultiCommand : MultiCommand, virtual Command
 {
     nlohmann::json toJSON() override;
+
+    using MultiCommand::MultiCommand;
+
+    virtual void run() override;
 };
 
 // For the overloaded run methods
@@ -325,6 +329,12 @@ struct MixEnvironment : virtual Args {
      */
     void setEnviron();
 };
+
+void completeFlakeInputPath(
+    AddCompletions & completions,
+    ref<EvalState> evalState,
+    const std::vector<FlakeRef> & flakeRefs,
+    std::string_view prefix);
 
 void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::string_view prefix);
 

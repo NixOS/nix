@@ -1,5 +1,4 @@
 #include "user-env.hh"
-#include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
@@ -22,7 +21,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     auto manifestFile = userEnv + "/manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
-        state.evalFile(state.rootPath(CanonPath(manifestFile)), v);
+        state.evalFile(state.rootPath(CanonPath(manifestFile)).resolveSymlinks(), v);
         Bindings & bindings(*state.allocBindings(0));
         getDerivations(state, v, "", bindings, elems, false);
     }

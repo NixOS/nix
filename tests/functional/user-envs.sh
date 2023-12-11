@@ -26,6 +26,7 @@ nix-env -f ./user-envs.nix -qa --json --out-path | jq -e '.[] | select(.name == 
     .outputName == "out",
     (.outputs.out | test("'$NIX_STORE_DIR'.*-0\\.1"))
 ] | all'
+nix-env -f ./user-envs.nix -qa --json --drv-path | jq -e '.[] | select(.name == "bar-0.1") | (.drvPath | test("'$NIX_STORE_DIR'.*-0\\.1\\.drv"))'
 
 # Query descriptions.
 nix-env -f ./user-envs.nix -qa '*' --description | grepQuiet silly

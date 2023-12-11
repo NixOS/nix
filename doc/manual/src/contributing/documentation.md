@@ -73,6 +73,17 @@ It should therefore aim to be correct, consistent, complete, and easy to navigat
 
   Non-trivial examples may need additional explanation, especially if they use concepts from outside the given context.
 
+- Always explain code examples in the text.
+
+  Use comments in code samples very sparingly, for instance to highlight a particular aspect.
+  Readers tend to glance over large amounts of code when scanning for information.
+
+  Especially beginners will likely find reading more complex-looking code strenuous and may therefore avoid it altogether.
+
+  If a code sample appears to require a lot of inline explanation, consider replacing it with a simpler one.
+  If that's not possible, break the example down into multiple parts, explain them separately, and then show the combined result at the end.
+  This should be a last resort, as that would amount to writing a [tutorial](https://diataxis.fr/tutorials/) on the given subject.
+
 - Use British English.
 
   This is a somewhat arbitrary choice to force consistency, and accounts for the fact that a majority of Nix users and developers are from Europe.
@@ -150,6 +161,24 @@ Please observe these guidelines to ease reviews:
   >
   > This is a note.
   ```
+
+  Highlight examples as such:
+
+  ````
+  > **Example**
+  >
+  > ```console
+  > $ nix --version
+  > ```
+  ````
+
+  Highlight syntax definiions as such, using [EBNF](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) notation:
+
+  ````
+  > **Syntax**
+  >
+  > *attribute-set* = `{` [ *attribute-name* `=` *expression* `;` ... ] `}`
+  ````
 
 ### The `@docroot@` variable
 

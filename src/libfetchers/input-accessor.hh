@@ -1,8 +1,10 @@
 #pragma once
+///@file
 
 #include "source-accessor.hh"
 #include "ref.hh"
 #include "types.hh"
+#include "file-system.hh"
 #include "repair-flag.hh"
 #include "content-address.hh"
 
@@ -14,8 +16,10 @@ struct SourcePath;
 class StorePath;
 class Store;
 
-struct InputAccessor : SourceAccessor, std::enable_shared_from_this<InputAccessor>
+struct InputAccessor : virtual SourceAccessor, std::enable_shared_from_this<InputAccessor>
 {
+    std::optional<std::string> fingerprint;
+
     /**
      * Return the maximum last-modified time of the files in this
      * tree, if available.
@@ -32,8 +36,6 @@ struct InputAccessor : SourceAccessor, std::enable_shared_from_this<InputAccesso
         FileIngestionMethod method = FileIngestionMethod::Recursive,
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair);
-
-    SourcePath root();
 };
 
 /**
@@ -46,6 +48,11 @@ struct SourcePath
 {
     ref<InputAccessor> accessor;
     CanonPath path;
+
+    SourcePath(ref<InputAccessor> accessor, CanonPath path = CanonPath::root)
+        : accessor(std::move(accessor))
+        , path(std::move(path))
+    { }
 
     std::string_view baseName() const;
 

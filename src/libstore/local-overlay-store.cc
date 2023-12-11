@@ -1,5 +1,7 @@
 #include "local-overlay-store.hh"
 #include "callback.hh"
+#include "realisation.hh"
+#include "processes.hh"
 #include "url.hh"
 #include <regex>
 
