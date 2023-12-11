@@ -607,6 +607,8 @@ static RegisterPrimOp primop_fetchGit({
         A Boolean parameter that specifies whether `export-ignore` from `.gitattributes` should be applied.
         This approximates part of the `git archive` behavior.
 
+        Enabling this option is not recommended because it is unknown whether the Git developers commit to the reproducibility of `export-ignore` in newer Git versions.
+
       - `shallow` (default: `false`)
 
         A Boolean parameter that specifies whether fetching from a shallow remote repository is allowed.
