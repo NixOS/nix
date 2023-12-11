@@ -285,33 +285,33 @@ Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on 
 
 ## Branches
 
-- `master`
+- [`master`](https://github.com/NixOS/nix/commits/master)
 
   The main development branch. All changes are approved and merged here.
   When developing a change, create a branch based on the latest `master`.
 
   Maintainers try to [keep it in a release-worthy state](#reverting).
 
-- `maintenance-*.*`
+- [`maintenance-*.*`](https://github.com/NixOS/nix/branches/all?query=maintenance)
 
   These branches are the subject of backports only, and are
   also [kept](#reverting) in a release-worthy state.
 
   See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
 
-- `latest-release`
+- [`latest-release`](https://github.com/NixOS/nix/tree/latest-release)
 
   The latest patch release of the latest minor version.
 
   See [`maintainers/release-process.md`](https://github.com/NixOS/nix/blob/master/maintainers/release-process.md)
 
-- `backport-*-to-*`
+- [`backport-*-to-*`](https://github.com/NixOS/nix/branches/all?query=backport)
 
   Generally branches created by the backport action.
 
   See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
 
-- _other_
+- [_other_](https://github.com/NixOS/nix/branches/all)
 
   Branches that do not conform to the above patterns should be feature branches.
 
