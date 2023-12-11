@@ -193,6 +193,14 @@ nix build -o "$TEST_ROOT/result" flake1
 nix build -o "$TEST_ROOT/result" "$flake1Dir"
 nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir"
 
+# Test explicit packages.default.
+nix build -o "$TEST_ROOT/result" "$flake1Dir#default"
+nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir#default"
+
+# Test explicit packages.default with query.
+nix build -o "$TEST_ROOT/result" "$flake1Dir?ref=HEAD#default"
+nix build -o "$TEST_ROOT/result" "git+file://$flake1Dir?ref=HEAD#default"
+
 # Check that store symlinks inside a flake are not interpreted as flakes.
 nix build -o "$flake1Dir/result" "git+file://$flake1Dir"
 nix path-info "$flake1Dir/result"
