@@ -662,13 +662,44 @@ struct GitInputAccessor : InputAccessor
 
 struct GitExportIgnoreInputAccessor : FilteringInputAccessor {
     ref<GitRepoImpl> repo;
+    std::optional<Hash> rev;
 
-    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<InputAccessor> next)
+    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<InputAccessor> next, std::optional<Hash> rev)
         : FilteringInputAccessor(next, [&](const CanonPath & path) {
             return RestrictedPathError(fmt("'%s' does not exist because it was fetched with exportIgnore enabled", path));
         })
         , repo(repo)
+        , rev(rev)
     { }
+
+    bool gitAttrGet(const CanonPath & path, const char * attrName, const char * & valueOut)
+    {
+        std::string pathStr {path.rel()};
+        const char * pathCStr = pathStr.c_str();
+
+        if (rev) {
+            git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
+            opts.attr_commit_id = hashToOID(*rev);
+            // TODO: test that gitattributes from global and system are not used
+            //       (ie more or less: home and etc - both of them!)
+            opts.flags = GIT_ATTR_CHECK_INCLUDE_COMMIT | GIT_ATTR_CHECK_NO_SYSTEM;
+            return git_attr_get_ext(
+                &valueOut,
+                *repo,
+                &opts,
+                pathCStr,
+                attrName
+                );
+        }
+        else {
+            return git_attr_get(
+                &valueOut,
+                *repo,
+                GIT_ATTR_CHECK_INDEX_ONLY | GIT_ATTR_CHECK_NO_SYSTEM,
+                pathCStr,
+                attrName);
+        }
+    }
 
     bool isExportIgnored(const CanonPath & path) {
         const char *exportIgnoreEntry = nullptr;
@@ -677,11 +708,7 @@ struct GitExportIgnoreInputAccessor : FilteringInputAccessor {
         // > It will use index only for creating archives or for a bare repo
         // > (if an index has been specified for the bare repo).
         // -- https://github.com/libgit2/libgit2/blob/HEAD/include/git2/attr.h#L113C62-L115C48
-        if (git_attr_get(&exportIgnoreEntry,
-                *repo,
-                GIT_ATTR_CHECK_INDEX_ONLY,
-                std::string(path.rel()).c_str(),
-                "export-ignore")) {
+        if (gitAttrGet(path, "export-ignore", exportIgnoreEntry)) {
             if (git_error_last()->klass == GIT_ENOTFOUND)
                 return false;
             else
@@ -711,7 +738,7 @@ ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitInputAccessor> rawGitAccessor = getRawAccessor(rev);
     if (exportIgnore) {
-        return make_ref<GitExportIgnoreInputAccessor>(self, rawGitAccessor);
+        return make_ref<GitExportIgnoreInputAccessor>(self, rawGitAccessor, rev);
     }
     else {
         return rawGitAccessor;
@@ -727,7 +754,7 @@ ref<InputAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportI
                 std::set<CanonPath> { wd.files },
                 std::move(makeNotAllowedError));
     if (exportIgnore) {
-        return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor);
+        return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor, std::nullopt);
     }
     else {
         return fileAccessor;

@@ -116,11 +116,6 @@ static void fetchTree(
 
         attrs.emplace("type", type.value());
 
-        if (params.isFetchGit) {
-            // Default value; user attrs are assigned later.
-            attrs.emplace("exportIgnore", Explicit<bool>{true});
-        }
-
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
             state.forceValue(*attr.value, attr.pos);
@@ -144,6 +139,12 @@ static void fetchTree(
                     state.symbols[attr.name], showType(*attr.value)));
         }
 
+        if (params.isFetchGit && !attrs.contains("exportIgnore")) {
+            // Default value; user attrs are assigned later.
+            // FIXME: exportIgnore := !submodules
+            attrs.emplace("exportIgnore", Explicit<bool>{true});
+        }
+
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.debugThrowLastTrace(EvalError({
@@ -161,7 +162,10 @@ static void fetchTree(
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
             attrs.emplace("url", fixGitURL(url));
-            attrs.emplace("exportIgnore", Explicit<bool>{true});
+            if (!attrs.contains("exportIgnore")) {
+                // FIXME: exportIgnore := !submodules
+                attrs.emplace("exportIgnore", Explicit<bool>{true});
+            }
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))

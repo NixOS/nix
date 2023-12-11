@@ -628,6 +628,7 @@ struct GitInputScheme : InputScheme
                 if (submodule.branch != "")
                     attrs.insert_or_assign("ref", submodule.branch);
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
+                attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
@@ -660,9 +661,11 @@ struct GitInputScheme : InputScheme
 
         auto repo = GitRepo::openRepo(CanonPath(repoInfo.url), false, false);
 
+        auto exportIgnore = getExportIgnoreAttr(input);
+
         ref<InputAccessor> accessor =
             repo->getAccessor(repoInfo.workdirInfo,
-                getExportIgnoreAttr(input),
+                exportIgnore,
                 makeNotAllowedError(repoInfo.url));
 
         /* If the repo has submodules, return a mounted input accessor
@@ -676,6 +679,8 @@ struct GitInputScheme : InputScheme
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", submodulePath.abs());
+                attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
@@ -747,7 +752,7 @@ struct GitInputScheme : InputScheme
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "");
+            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
         else
             return std::nullopt;
     }
