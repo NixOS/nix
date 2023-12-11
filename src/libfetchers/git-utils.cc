@@ -52,6 +52,8 @@ bool operator == (const git_oid & oid1, const git_oid & oid2)
 
 namespace nix {
 
+struct GitInputAccessor;
+
 // Some wrapper types that ensure that the git_*_free functions get called.
 template<auto del>
 struct Deleter
@@ -341,6 +343,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         return true;
     }
+
+    /**
+     * A 'GitInputAccessor' with no regard for export-ignore or any other transformations.
+     */
+    ref<GitInputAccessor> getRawAccessor(const Hash & rev);
 
     ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
 
@@ -685,6 +692,12 @@ struct GitInputAccessor : InputAccessor
     }
 };
 
+ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
+{
+    auto self = ref<GitRepoImpl>(shared_from_this());
+    return make_ref<GitInputAccessor>(self, rev);
+}
+
 ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 {
     return make_ref<GitInputAccessor>(ref<GitRepoImpl>(shared_from_this()), rev, exportIgnore);
@@ -706,8 +719,10 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
     std::vector<std::tuple<Submodule, Hash>> result;
 
+    auto rawAccessor = getRawAccessor(rev);
+
     for (auto & submodule : parseSubmodules(CanonPath(pathTemp))) {
-        auto rev = accessor.dynamic_pointer_cast<GitInputAccessor>()->getSubmoduleRev(submodule.path);
+        auto rev = rawAccessor->getSubmoduleRev(submodule.path);
         result.push_back({std::move(submodule), rev});
     }
 
