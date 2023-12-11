@@ -1,7 +1,7 @@
 { lib
 , runCommand
 , nix
-, systemTarballPairs
+, tarballs
 }:
 
 runCommand "installer-script" {
@@ -22,13 +22,14 @@ runCommand "installer-script" {
 
   substitute ${./install.in} $out/install \
     ${lib.concatMapStrings
-      ({ system, tarball }:
-        '' \
+      (tarball: let
+          inherit (tarball.stdenv.hostPlatform) system;
+        in '' \
         --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
         --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
         ''
       )
-      systemTarballPairs
+      tarballs
     } --replace '@nixVersion@' ${nix.version}
 
   echo "file installer $out/install" >> $out/nix-support/hydra-build-products

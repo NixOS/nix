@@ -44,8 +44,17 @@
       systems = linuxSystems ++ darwinSystems;
 
       crossSystems = [
-        "armv6l-linux" "armv7l-linux"
-        "x86_64-freebsd13" "x86_64-netbsd"
+        "armv6l-unknown-linux-gnueabihf"
+        "armv7l-unknown-linux-gnueabihf"
+        "x86_64-unknown-freebsd13"
+        "x86_64-unknown-netbsd"
+      ];
+
+      # Nix doesn't yet build on this platform, so we put it in a
+      # separate list. We just use this for `devShells` and
+      # `nixpkgsFor`, which this depends on.
+      shellCrossSystems = crossSystems ++ [
+        "x86_64-w64-mingw32"
       ];
 
       stdenvs = [
@@ -78,8 +87,8 @@
               inherit system;
             };
             crossSystem = if crossSystem == null then null else {
-              system = crossSystem;
-            } // lib.optionalAttrs (crossSystem == "x86_64-freebsd13") {
+              config = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
               useLLVM = true;
             };
             overlays = [
@@ -91,20 +100,12 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
-          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          cross = lib.genAttrs shellCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
-      installScriptFor = systems:
+      installScriptFor = tarballs:
         nixpkgsFor.x86_64-linux.native.callPackage ./scripts/installer.nix {
-          systemTarballPairs = map
-            (system: {
-              inherit system;
-              tarball =
-                if builtins.elem system crossSystems
-                then self.hydraJobs.binaryTarballCross.x86_64-linux.${system}
-                else self.hydraJobs.binaryTarball.${system};
-            })
-            systems;
+          inherit tarballs;
         };
 
       testNixVersions = pkgs: client: daemon:
@@ -264,19 +265,23 @@
         # tarball for the user's system and calls the second half of the
         # installation script.
         installerScript = installScriptFor [
-          "aarch64-linux"
-          "armv6l-linux"
-          "armv7l-linux"
-          "i686-linux"
-          "x86_64-linux"
-          "aarch64-darwin"
-          "x86_64-darwin"
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."i686-linux"
+          self.hydraJobs.binaryTarball."aarch64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          self.hydraJobs.binaryTarball."aarch64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
         ];
         installerScriptForGHA = installScriptFor [
-          "armv6l-linux"
-          "armv7l-linux"
-          "x86_64-linux"
-          "x86_64-darwin"
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
         ];
 
         # docker image with Nix inside
@@ -416,7 +421,7 @@
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
             (makeShells "static" nixpkgsFor.${system}.static) //
-            (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+            (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }

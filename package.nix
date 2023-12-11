@@ -214,14 +214,15 @@ in {
     brotli
     bzip2
     curl
-    editline
     libarchive
     libgit2
     libsodium
-    lowdown
     openssl
     sqlite
     xz
+  ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+    editline
+    lowdown
   ] ++ lib.optional stdenv.isLinux libseccomp
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
@@ -353,7 +354,7 @@ in {
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
   meta = {
-    platforms = lib.platforms.unix;
+    platforms = lib.platforms.unix ++ lib.platforms.windows;
     mainProgram = "nix";
     broken = !(lib.all (a: a) [
       # We cannot run or install unit tests if we don't build them or
