@@ -1,5 +1,6 @@
 #include "git-utils.hh"
 #include "input-accessor.hh"
+#include "filtering-input-accessor.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -465,16 +466,17 @@ ref<GitRepo> GitRepo::openRepo(const CanonPath & path, bool create, bool bare)
     return make_ref<GitRepoImpl>(path, create, bare);
 }
 
+/**
+ * Raw git tree input accessor.
+ */
 struct GitInputAccessor : InputAccessor
 {
     ref<GitRepoImpl> repo;
     Tree root;
-    bool exportIgnore;
 
-    GitInputAccessor(ref<GitRepoImpl> repo_, const Hash & rev, bool exportIgnore)
+    GitInputAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
         : repo(repo_)
         , root(peelObject<Tree>(*repo, lookupObject(*repo, hashToOID(rev)).get(), GIT_OBJECT_TREE))
-        , exportIgnore(exportIgnore)
     {
     }
 
@@ -503,7 +505,7 @@ struct GitInputAccessor : InputAccessor
             return Stat { .type = tDirectory };
 
         auto entry = lookup(path);
-        if (!entry || isExportIgnored(path))
+        if (!entry)
             return std::nullopt;
 
         auto mode = git_tree_entry_filemode(entry);
@@ -538,12 +540,6 @@ struct GitInputAccessor : InputAccessor
 
                 for (size_t n = 0; n < count; ++n) {
                     auto entry = git_tree_entry_byindex(tree.get(), n);
-                    if (exportIgnore) {
-                        if (isExportIgnored(path + git_tree_entry_name(entry))) {
-                            continue;
-                        }
-                    }
-
                     // FIXME: add to cache
                     res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
                 }
@@ -573,33 +569,6 @@ struct GitInputAccessor : InputAccessor
 
     std::unordered_map<CanonPath, TreeEntry> lookupCache;
 
-    bool isExportIgnored(const CanonPath & path) {
-        if (!exportIgnore)
-            return false;
-
-        const char *exportIgnoreEntry = nullptr;
-
-        // GIT_ATTR_CHECK_INDEX_ONLY:
-        // > It will use index only for creating archives or for a bare repo
-        // > (if an index has been specified for the bare repo).
-        // -- https://github.com/libgit2/libgit2/blob/HEAD/include/git2/attr.h#L113C62-L115C48
-        if (git_attr_get(&exportIgnoreEntry,
-                *repo,
-                GIT_ATTR_CHECK_INDEX_ONLY,
-                std::string(path.rel()).c_str(),
-                "export-ignore")) {
-            if (git_error_last()->klass == GIT_ENOTFOUND)
-                return false;
-            else
-                throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
-        }
-        else {
-            // Official git will silently reject export-ignore lines that have
-            // values. We do the same.
-            return GIT_ATTR_IS_TRUE(exportIgnoreEntry);
-        }
-    }
-
     /* Recursively look up 'path' relative to the root. */
     git_tree_entry * lookup(const CanonPath & path)
     {
@@ -611,10 +580,6 @@ struct GitInputAccessor : InputAccessor
             if (auto err = git_tree_entry_bypath(Setter(entry), root.get(), std::string(path.rel()).c_str())) {
                 if (err != GIT_ENOTFOUND)
                     throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
-            }
-
-            if (entry && isExportIgnored(path)) {
-                entry.reset();
             }
 
             i = lookupCache.emplace(path, std::move(entry)).first;
@@ -692,6 +657,46 @@ struct GitInputAccessor : InputAccessor
     }
 };
 
+struct GitExportIgnoreInputAccessor : FilteringInputAccessor {
+    ref<GitRepoImpl> repo;
+
+    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<InputAccessor> next)
+        : FilteringInputAccessor(next, [&](const CanonPath & path) {
+            return RestrictedPathError(fmt("'%s' does not exist because it was fetched with exportIgnore enabled", path));
+        })
+        , repo(repo)
+    { }
+
+    bool isExportIgnored(const CanonPath & path) {
+        const char *exportIgnoreEntry = nullptr;
+
+        // GIT_ATTR_CHECK_INDEX_ONLY:
+        // > It will use index only for creating archives or for a bare repo
+        // > (if an index has been specified for the bare repo).
+        // -- https://github.com/libgit2/libgit2/blob/HEAD/include/git2/attr.h#L113C62-L115C48
+        if (git_attr_get(&exportIgnoreEntry,
+                *repo,
+                GIT_ATTR_CHECK_INDEX_ONLY,
+                std::string(path.rel()).c_str(),
+                "export-ignore")) {
+            if (git_error_last()->klass == GIT_ENOTFOUND)
+                return false;
+            else
+                throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
+        }
+        else {
+            // Official git will silently reject export-ignore lines that have
+            // values. We do the same.
+            return GIT_ATTR_IS_TRUE(exportIgnoreEntry);
+        }
+    }
+
+    bool isAllowed(const CanonPath & path) override {
+        return !isExportIgnored(path);
+    }
+
+};
+
 ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
@@ -700,7 +705,14 @@ ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
 
 ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 {
-    return make_ref<GitInputAccessor>(ref<GitRepoImpl>(shared_from_this()), rev, exportIgnore);
+    auto self = ref<GitRepoImpl>(shared_from_this());
+    ref<GitInputAccessor> rawGitAccessor = getRawAccessor(rev);
+    if (exportIgnore) {
+        return make_ref<GitExportIgnoreInputAccessor>(self, rawGitAccessor);
+    }
+    else {
+        return rawGitAccessor;
+    }
 }
 
 std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev, bool exportIgnore)
