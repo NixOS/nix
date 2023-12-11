@@ -61,6 +61,7 @@ class Bindings;
 struct Env;
 struct Expr;
 struct ExprLambda;
+struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
 class PosIdx;
@@ -442,16 +443,17 @@ public:
 };
 
 
-extern Value prim_blackHole;
+extern ExprBlackHole eBlackHole;
 
-inline bool Value::isBlackhole() const
+bool Value::isBlackhole() const
 {
-    return internalType == tApp && app.left == &prim_blackHole;
+    return internalType == tThunk && thunk.expr == (Expr*) &eBlackHole;
 }
 
-inline void Value::mkBlackhole()
+void Value::mkBlackhole()
 {
-    mkApp(&prim_blackHole, &prim_blackHole);
+    internalType = tThunk;
+    thunk.expr = (Expr*) &eBlackHole;
 }
 
 

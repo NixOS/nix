@@ -462,6 +462,16 @@ struct ExprPos : Expr
     COMMON_METHODS
 };
 
+/* only used to mark thunks as black holes. */
+struct ExprBlackHole : Expr
+{
+    void show(const SymbolTable & symbols, std::ostream & str) const override {}
+    void eval(EvalState & state, Env & env, Value & v) override;
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+};
+
+extern ExprBlackHole eBlackHole;
+
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at

@@ -9,6 +9,8 @@
 
 namespace nix {
 
+ExprBlackHole eBlackHole;
+
 struct PosAdapter : AbstractPos
 {
     Pos::Origin origin;

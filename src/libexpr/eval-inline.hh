@@ -93,20 +93,12 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             expr->eval(*this, *env, v);
         } catch (...) {
             v.mkThunk(env, expr);
+            tryFixupBlackHolePos(v, pos);
             throw;
         }
     }
-    else if (v.isApp()) {
-        try {
-            callFunction(*v.app.left, *v.app.right, v, noPos);
-        } catch (InfiniteRecursionError & e) {
-            // only one black hole can *throw* in any given eval stack so we need not
-            // check whether the position is set already.
-            if (v.isBlackhole())
-                e.err.errPos = positions[pos];
-            throw;
-        }
-    }
+    else if (v.isApp())
+        callFunction(*v.app.left, *v.app.right, v, pos);
 }
 
 

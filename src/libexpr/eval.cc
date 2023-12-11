@@ -256,8 +256,8 @@ std::string showType(const Value & v)
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", std::string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
-        case tThunk: return "a thunk";
-        case tApp: return v.isBlackhole() ? "a black hole" : "a function application";
+        case tThunk: return v.isBlackhole() ? "a black hole" : "a thunk";
+        case tApp: return "a function application";
     default:
         return std::string(showType(v.type()));
     }
@@ -1624,14 +1624,12 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 auto * fn = vCur.primOp;
 
                 nrPrimOpCalls++;
-                // This will count black holes, but that's ok, because unrecoverable errors are rare.
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
                     fn->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
-                    if (!fn->hideInDiagnostics)
-                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1670,7 +1668,6 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
                 auto fn = primOp->primOp;
                 nrPrimOpCalls++;
-                // This will count black holes, but that's ok, because unrecoverable errors are rare.
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
@@ -1680,8 +1677,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
-                    if (!fn->hideInDiagnostics)
-                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -2032,6 +2028,29 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkPos(v, pos);
+}
+
+
+void ExprBlackHole::eval(EvalState & state, Env & env, Value & v)
+{
+    state.error("infinite recursion encountered")
+        .debugThrow<InfiniteRecursionError>();
+}
+
+// always force this to be separate, otherwise forceValue may inline it and take
+// a massive perf hit
+[[gnu::noinline]]
+void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
+{
+    if (!v.isBlackhole())
+        return;
+    auto e = std::current_exception();
+    try {
+        std::rethrow_exception(e);
+    } catch (InfiniteRecursionError & e) {
+        e.err.errPos = positions[pos];
+    } catch (...) {
+    }
 }
 
 

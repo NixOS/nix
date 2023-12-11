@@ -78,14 +78,6 @@ struct PrimOp
     std::optional<ExperimentalFeature> experimentalFeature;
 
     /**
-     * Whether to hide this primop in diagnostics.
-     *
-     * Used to hide the fact that black holes are primop applications from
-     * stack traces.
-     */
-    bool hideInDiagnostics;
-
-    /**
      * Validity check to be performed by functions that introduce primops,
      * such as RegisterPrimOp() and Value::mkPrimOp().
      */
@@ -472,6 +464,8 @@ public:
      * result.  Otherwise, this is a no-op.
      */
     inline void forceValue(Value & v, const PosIdx pos);
+
+    void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
     /**
      * Force a value, then recursively force list elements and

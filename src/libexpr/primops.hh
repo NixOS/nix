@@ -51,10 +51,4 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
  */
 void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
-/**
- *  Placeholder value for black holes, used to represent black holes as
- *  applications of this value to the evaluated thunks.
- */
-extern Value prim_blackHole;
-
 }
