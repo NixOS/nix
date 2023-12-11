@@ -81,6 +81,7 @@ Env & EvalState::allocEnv(size_t size)
 }
 
 
+[[gnu::always_inline]]
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     if (v.isThunk()) {
