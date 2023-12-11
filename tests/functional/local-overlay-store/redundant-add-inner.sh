@@ -19,17 +19,17 @@ mountOverlayfs
 ### Do a redundant add
 
 # (Already done in `initLowerStore`, but repeated here for clarity.)
-path=$(nix-store --store "$storeA" --add ../dummy)
+pathInLowerStore=$(nix-store --store "$storeA" --add ../dummy)
 
 # upper layer should not have it
-expect 1 stat $(toRealPath "$storeBTop/nix/store" "$path")
+expect 1 stat $(toRealPath "$storeBTop/nix/store" "$pathInLowerStore")
 
 pathFromB=$(nix-store --store "$storeB" --add ../dummy)
 
-[[ $path == $pathFromB ]]
+[[ $pathInLowerStore == $pathFromB ]]
 
 # lower store should have it from before
-stat $(toRealPath "$storeA/nix/store" "$path")
+stat $(toRealPath "$storeA/nix/store" "$pathInLowerStore")
 
 # upper layer should still not have it (no redundant copy)
-expect 1 stat $(toRealPath "$storeBTop" "$path")
+expect 1 stat $(toRealPath "$storeBTop" "$pathInLowerStore")

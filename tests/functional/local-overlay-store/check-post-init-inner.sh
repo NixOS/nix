@@ -19,13 +19,13 @@ mountOverlayfs
 ### Check status
 
 # Checking for path in lower layer
-stat $(toRealPath "$storeA/nix/store" "$path")
+stat $(toRealPath "$storeA/nix/store" "$pathInLowerStore")
 
 # Checking for path in upper layer (should fail)
-expect 1 stat $(toRealPath "$storeBTop" "$path")
+expect 1 stat $(toRealPath "$storeBTop" "$pathInLowerStore")
 
 # Checking for path in overlay store matching lower layer
-diff $(toRealPath "$storeA/nix/store" "$path") $(toRealPath "$storeBRoot/nix/store" "$path")
+diff $(toRealPath "$storeA/nix/store" "$pathInLowerStore") $(toRealPath "$storeBRoot/nix/store" "$pathInLowerStore")
 
 # Checking requisites query agreement
 [[ \
@@ -44,9 +44,9 @@ busyboxStore=$(nix store --store $storeA add-path $busybox)
 
 # Checking derivers query agreement
 [[ \
-  $(nix-store --store $storeA --query --deriver $path) \
+  $(nix-store --store $storeA --query --deriver $pathInLowerStore) \
   == \
-  $(nix-store --store $storeB --query --deriver $path) \
+  $(nix-store --store $storeB --query --deriver $pathInLowerStore) \
   ]]
 
 # Checking outputs query agreement
@@ -57,15 +57,15 @@ busyboxStore=$(nix store --store $storeA add-path $busybox)
   ]]
 
 # Verifying path in lower layer
-nix-store --verify-path --store "$storeA" "$path"
+nix-store --verify-path --store "$storeA" "$pathInLowerStore"
 
 # Verifying path in merged-store
-nix-store --verify-path --store "$storeB" "$path"
+nix-store --verify-path --store "$storeB" "$pathInLowerStore"
 
-hashPart=$(echo $path | sed "s^${NIX_STORE_DIR:-/nix/store}/^^" | sed 's/-.*//')
+hashPart=$(echo $pathInLowerStore | sed "s^${NIX_STORE_DIR:-/nix/store}/^^" | sed 's/-.*//')
 
 # Lower store can find from hash part
-[[ $(nix store --store $storeA path-from-hash-part $hashPart) == $path ]]
+[[ $(nix store --store $storeA path-from-hash-part $hashPart) == $pathInLowerStore ]]
 
 # merged store can find from hash part
-[[ $(nix store --store $storeB path-from-hash-part $hashPart) == $path ]]
+[[ $(nix store --store $storeB path-from-hash-part $hashPart) == $pathInLowerStore ]]
