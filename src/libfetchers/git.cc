@@ -9,7 +9,6 @@
 #include "processes.hh"
 #include "git.hh"
 #include "fs-input-accessor.hh"
-#include "filtering-input-accessor.hh"
 #include "mounted-input-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
@@ -659,10 +658,11 @@ struct GitInputScheme : InputScheme
             for (auto & submodule : repoInfo.workdirInfo.submodules)
                 repoInfo.workdirInfo.files.insert(submodule.path);
 
+        auto repo = GitRepo::openRepo(CanonPath(repoInfo.url), false, false);
+
         ref<InputAccessor> accessor =
-            AllowListInputAccessor::create(
-                makeFSInputAccessor(CanonPath(repoInfo.url)),
-                std::move(repoInfo.workdirInfo.files),
+            repo->getAccessor(repoInfo.workdirInfo,
+                getExportIgnoreAttr(input),
                 makeNotAllowedError(repoInfo.url));
 
         /* If the repo has submodules, return a mounted input accessor

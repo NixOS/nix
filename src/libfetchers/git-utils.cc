@@ -1,4 +1,5 @@
 #include "git-utils.hh"
+#include "fs-input-accessor.hh"
 #include "input-accessor.hh"
 #include "filtering-input-accessor.hh"
 #include "cache.hh"
@@ -351,6 +352,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     ref<GitInputAccessor> getRawAccessor(const Hash & rev);
 
     ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
+
+    ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
     static int sidebandProgressCallback(const char * str, int len, void * payload)
     {
@@ -712,6 +715,22 @@ ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
     }
     else {
         return rawGitAccessor;
+    }
+}
+
+ref<InputAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
+{
+    auto self = ref<GitRepoImpl>(shared_from_this());
+    ref<InputAccessor> fileAccessor =
+        AllowListInputAccessor::create(
+                makeFSInputAccessor(path),
+                std::set<CanonPath> { wd.files },
+                std::move(makeNotAllowedError));
+    if (exportIgnore) {
+        return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor);
+    }
+    else {
+        return fileAccessor;
     }
 }
 

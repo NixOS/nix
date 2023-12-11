@@ -1,5 +1,6 @@
 #pragma once
 
+#include "filtering-input-accessor.hh"
 #include "input-accessor.hh"
 
 namespace nix {
@@ -72,6 +73,8 @@ struct GitRepo
     virtual bool hasObject(const Hash & oid) = 0;
 
     virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+
+    virtual ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual void fetch(
         const std::string & url,
