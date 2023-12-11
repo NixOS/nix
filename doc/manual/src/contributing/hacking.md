@@ -290,7 +290,7 @@ Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on 
   The main development branch. All changes are approved and merged here.
   When developing a change, create a branch based on the latest `master`.
 
-  It is [kept](#reverting) in a release-worthy state.
+  Maintainers try to [keep it in a release-worthy state](#reverting).
 
 - `maintenance-*.*`
 
@@ -318,9 +318,9 @@ Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on 
 ## Reverting
 
 If a change turns out to be merged by mistake, or contain a regression, it may be reverted.
-A revert is not a rejection; just part of an effective development process.
-It makes sure that development keeps running smoothly, with minimal uncertainty, less overhead.
+A revert is not a rejection of the contribution, but merely part of an effective development process.
+It makes sure that development keeps running smoothly, with minimal uncertainty, and less overhead.
 If maintainers have to worry too much about avoiding reverts, they would not be able to merge as much.
 By embracing reverts as a good part of the development process, everyone wins.
 
-However, taking a step back may feel un-fun, so we will try to be extra supportive on the next try.
+However, taking a step back may be frustrating, so maintainers will be extra supportive on the next try.
