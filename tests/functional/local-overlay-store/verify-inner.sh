@@ -34,7 +34,7 @@ nix-store --store "$storeB" --verify --check-contents
 # Make a backup so we can repair later
 backupStore="$storeVolume/backup"
 mkdir "$backupStore"
-tar -cC "$storeBRoot" nix | tar -xC "$backupStore"
+cp -ar "$storeBRoot/nix" "$backupStore"
 
 
 ## Deliberately corrupt store paths
