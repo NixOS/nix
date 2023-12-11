@@ -6,7 +6,7 @@
 namespace nix {
 
 /**
- * A function that should throw an exception of type
+ * A function that returns an exception of type
  * `RestrictedPathError` explaining that access to `path` is
  * forbidden.
  */
