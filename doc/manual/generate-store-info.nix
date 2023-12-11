@@ -19,9 +19,9 @@ let
       result = squash ''
         # ${name}
 
-        ${doc}
-
         ${experimentalFeatureNote}
+
+        ${doc}
 
         ## Settings
 

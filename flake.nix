@@ -1,7 +1,13 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
+  # TODO Go back to nixos-23.05-small once
+  # https://github.com/NixOS/nixpkgs/pull/271202 is merged.
+  #
+  # Also, do not grab arbitrary further staging commits. This PR was
+  # carefully made to be based on release-23.05 and just contain
+  # rebuild-causing changes to packages that Nix actually uses.
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/staging-23.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
@@ -178,6 +184,8 @@
             ];
           });
 
+          changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
+
           nix =
             let
               officialRelease = false;
@@ -197,6 +205,7 @@
               libgit2 = final.libgit2-nix;
               lowdown = final.lowdown-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+              changelog-d = final.changelog-d-nix;
             } // {
               # this is a proper separate downstream package, but put
               # here also for back compat reasons.
@@ -218,6 +227,8 @@
 
         # Binary package for various platforms.
         build = forAllSystems (system: self.packages.${system}.nix);
+
+        shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
         buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
@@ -342,6 +353,11 @@
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
+        rl-next =
+          let pkgs = nixpkgsFor.${system}.native;
+          in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
+          LANG=C.UTF-8 ${pkgs.changelog-d-nix}/bin/changelog-d ${./doc/manual/rl-next} >$out
+        '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });

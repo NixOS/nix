@@ -98,7 +98,7 @@ struct CmdVerify : StorePathsCommand
 
                 if (!noContents) {
 
-                    auto hashSink = HashSink(info->narHash.type);
+                    auto hashSink = HashSink(info->narHash.algo);
 
                     store->narFromPath(info->path, hashSink);
 
@@ -109,8 +109,8 @@ struct CmdVerify : StorePathsCommand
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
                         printError("path '%s' was modified! expected hash '%s', got '%s'",
                             store->printStorePath(info->path),
-                            info->narHash.to_string(HashFormat::Base32, true),
-                            hash.first.to_string(HashFormat::Base32, true));
+                            info->narHash.to_string(HashFormat::Nix32, true),
+                            hash.first.to_string(HashFormat::Nix32, true));
                     }
                 }
 

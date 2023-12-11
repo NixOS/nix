@@ -35,7 +35,7 @@ StorePath::StorePath(std::string_view _baseName)
 }
 
 StorePath::StorePath(const Hash & hash, std::string_view _name)
-    : baseName((hash.to_string(HashFormat::Base32, false) + "-").append(std::string(_name)))
+    : baseName((hash.to_string(HashFormat::Nix32, false) + "-").append(std::string(_name)))
 {
     checkName(baseName, name());
 }
@@ -49,7 +49,7 @@ StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
 
 StorePath StorePath::random(std::string_view name)
 {
-    Hash hash(htSHA1);
+    Hash hash(HashAlgorithm::SHA1);
     randombytes_buf(hash.hash, hash.hashSize);
     return StorePath(hash, name);
 }

@@ -75,9 +75,9 @@ struct DerivationOutput
         /**
          * How the serialization will be hashed
          */
-        HashType hashType;
+        HashAlgorithm hashAlgo;
 
-        GENERATE_CMP(CAFloating, me->method, me->hashType);
+        GENERATE_CMP(CAFloating, me->method, me->hashAlgo);
     };
 
     /**
@@ -102,9 +102,9 @@ struct DerivationOutput
         /**
          * How the serialization will be hashed
          */
-        HashType hashType;
+        HashAlgorithm hashAlgo;
 
-        GENERATE_CMP(Impure, me->method, me->hashType);
+        GENERATE_CMP(Impure, me->method, me->hashAlgo);
     };
 
     typedef std::variant<
@@ -342,7 +342,7 @@ struct Derivation : BasicDerivation
      * 2. Input placeholders are replaced with realized input store
      *    paths.
      */
-    std::optional<BasicDerivation> tryResolve(Store & store) const;
+    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const;
 
     /**
      * Like the above, but instead of querying the Nix database for

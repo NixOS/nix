@@ -405,6 +405,7 @@ struct ExprOpNot : Expr
 {
     Expr * e;
     ExprOpNot(Expr * e) : e(e) { };
+    PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };
 

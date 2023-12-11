@@ -44,18 +44,13 @@ StorePath InputAccessor::fetchToStore(
 
     auto storePath =
         settings.readOnlyMode
-        ? store->computeStorePathFromDump(*source, name, method, htSHA256).first
-        : store->addToStoreFromDump(*source, name, method, htSHA256, repair);
+        ? store->computeStorePathFromDump(*source, name, method, HashAlgorithm::SHA256).first
+        : store->addToStoreFromDump(*source, name, method, HashAlgorithm::SHA256, repair);
 
     if (cacheKey)
         fetchers::getCache()->add(store, *cacheKey, {}, storePath, true);
 
     return storePath;
-}
-
-SourcePath InputAccessor::root()
-{
-    return {ref(shared_from_this()), CanonPath::root};
 }
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path)
@@ -88,7 +83,7 @@ SourcePath SourcePath::parent() const
 
 SourcePath SourcePath::resolveSymlinks() const
 {
-    auto res = accessor->root();
+    auto res = SourcePath(accessor);
 
     int linksAllowed = 1024;
 
