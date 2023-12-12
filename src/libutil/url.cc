@@ -2,7 +2,6 @@
 #include "url-parts.hh"
 #include "util.hh"
 #include "split.hh"
-#include "string.hh"
 
 namespace nix {
 
@@ -179,17 +178,9 @@ std::string fixGitURL(const std::string & url)
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
 bool isValidSchemeName(std::string_view s)
 {
-    if (s.empty()) return false;
-    if (!isASCIIAlpha(s[0])) return false;
-    for (auto c : s.substr(1)) {
-        if (isASCIIAlpha(c)) continue;
-        if (isASCIIDigit(c)) continue;
-        if (c == '+') continue;
-        if (c == '-') continue;
-        if (c == '.') continue;
-        return false;
-    }
-    return true;
+    static std::regex regex(schemeNameRegex, std::regex::ECMAScript);
+
+    return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);
 }
 
 }
