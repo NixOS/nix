@@ -331,8 +331,11 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,
     const Derivation & drv,
-    const StorePath & outputPath)
+    const StorePath & outputPath,
+    Store * evalStore_)
 {
+    auto & evalStore = evalStore_ ? *evalStore_ : store;
+
     std::set<Realisation> inputRealisations;
 
     std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumRealisations;
@@ -340,7 +343,7 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
     accumRealisations = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
         if (!inputNode.value.empty()) {
             auto outputHashes =
-                staticOutputHashes(store, store.readDerivation(inputDrv));
+                staticOutputHashes(evalStore, evalStore.readDerivation(inputDrv));
             for (const auto & outputName : inputNode.value) {
                 auto outputHash = get(outputHashes, outputName);
                 if (!outputHash)
@@ -362,7 +365,7 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
                 SingleDerivedPath next = SingleDerivedPath::Built { d, outputName };
                 accumRealisations(
                     // TODO deep resolutions for dynamic derivations, issue #8947, would go here.
-                    resolveDerivedPath(store, next),
+                    resolveDerivedPath(store, next, evalStore_),
                     childNode);
             }
         }
