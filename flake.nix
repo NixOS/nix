@@ -7,6 +7,10 @@
   # Also, do not grab arbitrary further staging commits. This PR was
   # carefully made to be based on release-23.05 and just contain
   # rebuild-causing changes to packages that Nix actually uses.
+  #
+  # Once this is updated to something containing
+  # https://github.com/NixOS/nixpkgs/pull/271423, don't forget
+  # to remove the `nix.checkAllErrors = false;` line in the tests.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/staging-23.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
