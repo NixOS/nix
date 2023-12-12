@@ -360,6 +360,11 @@ TEST(nix, isValidSchemeName) {
     ASSERT_FALSE(isValidSchemeName(".file"));
     ASSERT_FALSE(isValidSchemeName("-file"));
     ASSERT_FALSE(isValidSchemeName("1file"));
+    // regex ok?
+    ASSERT_FALSE(isValidSchemeName("\nhttp"));
+    ASSERT_FALSE(isValidSchemeName("\nhttp\n"));
+    ASSERT_FALSE(isValidSchemeName("http\n"));
+    ASSERT_FALSE(isValidSchemeName("http "));
 }
 
 }
