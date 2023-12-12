@@ -14,7 +14,7 @@ std::regex revRegex(revRegexS, std::regex::ECMAScript);
 ParsedURL parseURL(const std::string & url)
 {
     static std::regex uriRegex(
-        "((" + schemeRegex + "):"
+        "((" + schemeNameRegex + "):"
         + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex + ")))"
         + "(?:\\?(" + queryRegex + "))?"
         + "(?:#(" + queryRegex + "))?",
