@@ -9,6 +9,9 @@
 
 #include <iostream>
 
+#include "eval.hh"
+#include "print-options.hh"
+
 namespace nix {
 
 /**
@@ -16,6 +19,7 @@ namespace nix {
  *
  * Quotes and fairly minimal escaping are added.
  *
+ * @param o The output stream to print to
  * @param s The logical string
  */
 std::ostream & printLiteralString(std::ostream & o, std::string_view s);
@@ -52,5 +56,7 @@ bool isReservedKeyword(const std::string_view str);
  *        `print*` functions instead.
  */
 std::ostream & printIdentifier(std::ostream & o, std::string_view s);
+
+void printValue(EvalState & state, std::ostream & str, Value & v, PrintOptions options = PrintOptions {});
 
 }

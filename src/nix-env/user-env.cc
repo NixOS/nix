@@ -8,6 +8,8 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "profiles.hh"
+#include "print-ambiguous.hh"
+#include <limits>
 
 
 namespace nix {
@@ -106,7 +108,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        environment. */
     auto manifestFile = ({
         std::ostringstream str;
-        manifest.print(state.symbols, str, true);
+        std::set<const void *> seen;
+        printAmbiguous(manifest, state.symbols, str, &seen, std::numeric_limits<int>::max());
         // TODO with C++20 we can use str.view() instead and avoid copy.
         std::string str2 = str.str();
         StringSource source { str2 };

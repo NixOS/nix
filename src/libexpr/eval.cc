@@ -105,117 +105,23 @@ RootValue allocRootValue(Value * v)
 #endif
 }
 
-void Value::print(const SymbolTable &symbols, std::ostream &str,
-                  std::set<const void *> *seen, int depth) const
-
-{
-    checkInterrupt();
-
-    if (depth <= 0) {
-        str << "«too deep»";
-        return;
-    }
-    switch (internalType) {
-    case tInt:
-        str << integer;
-        break;
-    case tBool:
-        printLiteralBool(str, boolean);
-        break;
-    case tString:
-        printLiteralString(str, string_view());
-        break;
-    case tPath:
-        str << path().to_string(); // !!! escaping?
-        break;
-    case tNull:
-        str << "null";
-        break;
-    case tAttrs: {
-        if (seen && !attrs->empty() && !seen->insert(attrs).second)
-            str << "«repeated»";
-        else {
-            str << "{ ";
-            for (auto & i : attrs->lexicographicOrder(symbols)) {
-                str << symbols[i->name] << " = ";
-                i->value->print(symbols, str, seen, depth - 1);
-                str << "; ";
-            }
-            str << "}";
-        }
-        break;
-    }
-    case tList1:
-    case tList2:
-    case tListN:
-        if (seen && listSize() && !seen->insert(listElems()).second)
-            str << "«repeated»";
-        else {
-            str << "[ ";
-            for (auto v2 : listItems()) {
-                if (v2)
-                    v2->print(symbols, str, seen, depth - 1);
-                else
-                    str << "(nullptr)";
-                str << " ";
-            }
-            str << "]";
-        }
-        break;
-    case tThunk:
-    case tApp:
-        if (!isBlackhole()) {
-            str << "<CODE>";
-        } else {
-            // Although we know for sure that it's going to be an infinite recursion
-            // when this value is accessed _in the current context_, it's likely
-            // that the user will misinterpret a simpler «infinite recursion» output
-            // as a definitive statement about the value, while in fact it may be
-            // a valid value after `builtins.trace` and perhaps some other steps
-            // have completed.
-            str << "«potential infinite recursion»";
-        }
-        break;
-    case tLambda:
-        str << "<LAMBDA>";
-        break;
-    case tPrimOp:
-        str << "<PRIMOP>";
-        break;
-    case tPrimOpApp:
-        str << "<PRIMOP-APP>";
-        break;
-    case tExternal:
-        str << *external;
-        break;
-    case tFloat:
-        str << fpoint;
-        break;
-    default:
-        printError("Nix evaluator internal error: Value::print(): invalid value type %1%", internalType);
-        abort();
-    }
-}
-
-void Value::print(const SymbolTable &symbols, std::ostream &str,
-                  bool showRepeated, int depth) const {
-    std::set<const void *> seen;
-    print(symbols, str, showRepeated ? nullptr : &seen, depth);
-}
-
 // Pretty print types for assertion errors
 std::ostream & operator << (std::ostream & os, const ValueType t) {
     os << showType(t);
     return os;
 }
 
-std::string printValue(const EvalState & state, const Value & v)
+std::string printValue(EvalState & state, Value & v)
 {
     std::ostringstream out;
-    v.print(state.symbols, out);
+    v.print(state, out);
     return out.str();
 }
 
+void Value::print(EvalState & state, std::ostream & str, PrintOptions options)
+{
+    printValue(state, str, *this, options);
+}
 
 const Value * getPrimOp(const Value &v) {
     const Value * primOp = &v;
@@ -707,6 +613,26 @@ void PrimOp::check()
     if (arity > maxPrimOpArity) {
         throw Error("primop arity must not exceed %1%", maxPrimOpArity);
     }
+}
+
+
+std::ostream & operator<<(std::ostream & output, PrimOp & primOp)
+{
+    output << "primop " << primOp.name;
+    return output;
+}
+
+
+PrimOp * Value::primOpAppPrimOp() const
+{
+    Value * left = primOpApp.left;
+    while (left && !left->isPrimOp()) {
+        left = left->primOpApp.left;
+    }
+
+    if (!left)
+        return nullptr;
+    return left->primOp;
 }
 
 

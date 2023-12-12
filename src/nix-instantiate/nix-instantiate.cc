@@ -56,7 +56,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 std::cout << std::endl;
             } else {
                 if (strict) state.forceValueDeep(vRes);
-                vRes.print(state.symbols, std::cout);
+                vRes.print(state, std::cout);
                 std::cout << std::endl;
             }
         } else {
