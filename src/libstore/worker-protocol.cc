@@ -7,6 +7,7 @@
 #include "archive.hh"
 #include "path-info.hh"
 
+#include <chrono>
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -43,6 +44,31 @@ void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const StoreDirCon
         default:
             assert(false);
         };
+    }
+}
+
+
+std::optional<std::chrono::microseconds> WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto tag = readNum<uint8_t>(conn.from);
+    switch (tag) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return std::optional<std::chrono::microseconds>{std::chrono::microseconds(readNum<int64_t>(conn.from))};
+        default:
+            throw Error("Invalid optional tag from remote");
+    }
+}
+
+void WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const std::optional<std::chrono::microseconds> & optDuration)
+{
+    if (!optDuration.has_value()) {
+        conn.to << uint8_t{0};
+    } else {
+        conn.to
+            << uint8_t{1}
+            << optDuration.value().count();
     }
 }
 
@@ -110,6 +136,10 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
             >> res.startTime
             >> res.stopTime;
     }
+    if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
+        res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
+        res.cpuSystem = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
+    }
     if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
         auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
@@ -131,6 +161,10 @@ void WorkerProto::Serialise<BuildResult>::write(const StoreDirConfig & store, Wo
             << res.isNonDeterministic
             << res.startTime
             << res.stopTime;
+    }
+    if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
+        WorkerProto::write(store, conn, res.cpuUser);
+        WorkerProto::write(store, conn, res.cpuSystem);
     }
     if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
         DrvOutputs builtOutputs;
