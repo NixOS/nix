@@ -14,6 +14,7 @@ let
   inherit (nix) version;
 
   env = {
+    #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
     meta.description = "Distribution-independent Nix bootstrap binaries for ${system}";
   };
 
