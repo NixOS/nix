@@ -61,7 +61,7 @@ include mk/lib.mk
 # by the library. Rules are not "lazy" like variables, unfortunately.
 ifeq ($(ENABLE_BUILD), yes)
 $(eval $(call include-sub-makefile, doc/manual/local.mk))
-$(eval $(call include-sub-makefile, doc/internal-api/local.mk))
 endif
+$(eval $(call include-sub-makefile, doc/internal-api/local.mk))
 
 GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src
