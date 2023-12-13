@@ -268,9 +268,7 @@ public:
     Setting<bool> alwaysAllowSubstitutes{
         this, false, "always-allow-substitutes",
         R"(
-          If set to `true`, Nix will ignore the `allowSubstitutes` attribute in
-          derivations and always attempt to use available substituters.
-          For more information on `allowSubstitutes`, see [the manual chapter on advanced attributes](../language/advanced-attributes.md).
+          If set to `true`, Nix will ignore the [`allowSubstitutes`](@docroot@/language/advanced-attributes.md) attribute in derivations and always attempt to use [available substituters](#conf-substituters).
         )"};
 
     Setting<bool> buildersUseSubstitutes{
