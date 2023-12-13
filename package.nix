@@ -320,7 +320,6 @@ in {
       -change ${boost}/lib/libboost_context.dylib \
       $out/lib/libboost_context.dylib \
       $out/lib/libnixutil.dylib
-      install_name_tool
     ''
   ) + lib.optionalString enableInternalAPIDocs ''
     mkdir -p ''${!outputDoc}/nix-support
