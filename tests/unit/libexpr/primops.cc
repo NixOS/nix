@@ -1,6 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "memory-input-accessor.hh"
+
 #include "tests/libexpr.hh"
 
 namespace nix {
@@ -148,10 +150,25 @@ namespace nix {
     }
 
     TEST_F(PrimOpTest, unsafeGetAttrPos) {
-        // The `y` attribute is at position
-        const char* expr = "builtins.unsafeGetAttrPos \"y\" { y = \"x\"; }";
+        state.corepkgsFS->addFile(CanonPath("foo.nix"), "{ y = \"x\"; }");
+
+        auto expr = "builtins.unsafeGetAttrPos \"y\" (import <nix/foo.nix>)";
         auto v = eval(expr);
-        ASSERT_THAT(v, IsNull());
+        ASSERT_THAT(v, IsAttrsOfSize(3));
+
+        auto file = v.attrs->find(createSymbol("file"));
+        ASSERT_NE(file, nullptr);
+        ASSERT_THAT(*file->value, IsString());
+        auto s = baseNameOf(file->value->string_view());
+        ASSERT_EQ(s, "foo.nix");
+
+        auto line = v.attrs->find(createSymbol("line"));
+        ASSERT_NE(line, nullptr);
+        ASSERT_THAT(*line->value, IsIntEq(1));
+
+        auto column = v.attrs->find(createSymbol("column"));
+        ASSERT_NE(column, nullptr);
+        ASSERT_THAT(*column->value, IsIntEq(3));
     }
 
     TEST_F(PrimOpTest, hasAttr) {

@@ -336,11 +336,6 @@ private:
     std::map<std::string, std::optional<std::string>> searchPathResolved;
 
     /**
-     * Cache used by checkSourcePath().
-     */
-    std::unordered_map<Path, SourcePath> resolvedPaths;
-
-    /**
      * Cache used by prim_match().
      */
     std::shared_ptr<RegexCache> regexCache;
@@ -836,6 +831,11 @@ std::string showType(const Value & v);
  * If `path` refers to a directory, then append "/default.nix".
  */
 SourcePath resolveExprPath(SourcePath path);
+
+/**
+ * Whether a URI is allowed, assuming restrictEval is enabled
+ */
+bool isAllowedURI(std::string_view uri, const Strings & allowedPaths);
 
 struct InvalidPathError : EvalError
 {
