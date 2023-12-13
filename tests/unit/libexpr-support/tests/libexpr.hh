@@ -8,6 +8,7 @@
 #include "nixexpr.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "store-api.hh"
 
 #include "tests/libstore.hh"
@@ -18,6 +19,7 @@ namespace nix {
             static void SetUpTestSuite() {
                 LibStoreTest::SetUpTestSuite();
                 initGC();
+                evalSettings.nixPath = {};
             }
 
         protected:
