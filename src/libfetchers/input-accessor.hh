@@ -130,7 +130,7 @@ struct SourcePath
     { return accessor->getPhysicalPath(path); }
 
     std::string to_string() const
-    { return path.abs(); }
+    { return accessor->showPath(path); }
 
     /**
      * Append a `CanonPath` to this path.
