@@ -336,11 +336,6 @@ private:
     std::map<std::string, std::optional<std::string>> searchPathResolved;
 
     /**
-     * Cache used by checkSourcePath().
-     */
-    std::unordered_map<Path, SourcePath> resolvedPaths;
-
-    /**
      * Cache used by prim_match().
      */
     std::shared_ptr<RegexCache> regexCache;
