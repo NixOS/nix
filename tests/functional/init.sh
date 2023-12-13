@@ -31,7 +31,7 @@ EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
 fsync-metadata = false
-extra-experimental-features = flakes
+extra-experimental-features = flakes acls
 !include nix.conf.extra.not-there
 EOF
 

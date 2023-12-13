@@ -26,6 +26,13 @@ constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::VerifiedFetches);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
+        .tag = Xp::ACLs,
+        .name = "acls",
+        .description = R"(
+            Allow protection of store paths with the use of [POSIX ACLs](https://man7.org/linux/man-pages/man5/acl.5.html).
+        )",
+    },
+    {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
         .description = R"(

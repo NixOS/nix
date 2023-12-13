@@ -1,4 +1,6 @@
 #include "derivation-goal.hh"
+#include "config.hh"
+#include "granular-access-store.hh"
 #include "hook-instance.hh"
 #include "worker.hh"
 #include "builtins.hh"
@@ -731,13 +733,24 @@ void DerivationGoal::tryToBuild()
         return;
     }
 
-    /* If any of the outputs already exist but are not valid, delete
-       them. */
+    /* If any of the outputs already exist but are not valid, delete them. If
+       any of the outputs are inacessible, set the build mode to `Check` so that
+       if outputs match, access is granted */
     for (auto & [_, status] : initialOutputs) {
-        if (!status.known || status.known->isValid()) continue;
-        auto storePath = status.known->path;
-        debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
-        deletePath(worker.store.Store::toRealPath(storePath));
+        if (status.known) {
+            if (status.known->status == PathStatus::Corrupt || status.known->status == PathStatus::Absent) {
+                auto storePath = status.known->path;
+                debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
+                deletePath(worker.store.Store::toRealPath(storePath));
+            } else if (status.known->status == PathStatus::Inaccessible) {
+                logger->cout("don't have access to path %s; checking outputs", worker.store.printStorePath(status.known->path));
+                buildMode = bmCheck;
+            } else if (status.known->status == PathStatus::ShouldSync) {
+                logger->cout("permissions should be synced for path %s; repairing",
+                            worker.store.printStorePath(status.known->path));
+                buildMode = bmRepair;
+            }
+        }
     }
 
     /* Don't do a remote build if the derivation has the attribute
@@ -1273,7 +1286,11 @@ Path DerivationGoal::openLogFile()
     Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2),
         settings.compressLog ? ".bz2" : "");
 
-    fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
+    bool logFileExisted = std::filesystem::exists(logFileName);
+
+    auto mode = experimentalFeatureSettings.isEnabled(Xp::ACLs) ? 0660 : 0666;
+
+    fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, mode);
     if (!fdLogFile) throw SysError("creating log file '%1%'", logFileName);
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
@@ -1282,6 +1299,16 @@ Path DerivationGoal::openLogFile()
         logSink = std::shared_ptr<CompressionSink>(makeCompressionSink("bzip2", *logFileSink));
     else
         logSink = logFileSink;
+
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs) && !logFileExisted)
+        if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
+            auto storeObject = StoreObjectDerivationLog {drvPath};
+            auto status =
+                    localStore->futurePermissions.contains(storeObject)
+                    ? localStore->futurePermissions.at(storeObject)
+                    : LocalGranularAccessStore::AccessStatus {settings.protectByDefault.get(), {}};
+            localStore->setCurrentAccessStatus(logFileName, status);
+        }
 
     return logFileName;
 }
@@ -1452,21 +1479,45 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
             wantedOutputsLeft.erase(i.first);
         if (i.second) {
             auto outputPath = *i.second;
+            bool canAccess = true;
+            bool shouldSyncPermissions = false;
+            bool isValid = worker.store.isValidPath(outputPath);
+            if (experimentalFeatureSettings.isEnabled(Xp::ACLs) && isValid)
+                // We only need to look at permissions if the path is valid.
+                // So we can assume that the path exists here.
+                if (auto aclStore = dynamic_cast<LocalStore *>(&worker.store)){
+                  // Todo: to cast to LocalGranularAccessStore instead of LocalStore we need to implement shouldSyncPermissions for the remote store.
+                    canAccess = aclStore->canAccess(outputPath, false);
+                    shouldSyncPermissions = aclStore->shouldSyncPermissions(outputPath);
+                }
             info.known = {
                 .path = outputPath,
-                .status = !worker.store.isValidPath(outputPath)
+                .status = !isValid
                     ? PathStatus::Absent
-                    : !checkHash || worker.pathContentsGood(outputPath)
-                    ? PathStatus::Valid
-                    : PathStatus::Corrupt,
+                    : checkHash && !worker.pathContentsGood(outputPath)
+                    ? PathStatus::Corrupt
+                    : shouldSyncPermissions
+                    ? PathStatus::ShouldSync
+                    : !canAccess
+                    ? PathStatus::Inaccessible
+                    : PathStatus::Valid,
             };
         }
         auto drvOutput = DrvOutput{info.outputHash, i.first};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
+                bool canAccess = true;
+                bool shouldSyncPermissions = false;
+                if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
+                    if (auto aclStore = dynamic_cast<LocalStore *>(&worker.store)){
+                        // Todo: to cast to LocalGranularAccessStore instead of LocalStore we need to implement shouldSyncPermissions for the remote store.
+                        // Todo: do we need to check for the path existence here before calling shouldSyncPermissions ?
+                        canAccess = aclStore->canAccess(real->outPath, false);
+                        shouldSyncPermissions = aclStore->shouldSyncPermissions(real->outPath);
+                    }
                 info.known = {
                     .path = real->outPath,
-                    .status = PathStatus::Valid,
+                    .status = shouldSyncPermissions ? PathStatus::ShouldSync : !canAccess ? PathStatus::Inaccessible : PathStatus::Valid,
                 };
             } else if (info.known && info.known->isValid()) {
                 // We know the output because it's a static output of the

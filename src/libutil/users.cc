@@ -4,18 +4,59 @@
 #include "file-system.hh"
 
 #include <pwd.h>
+#include <grp.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 namespace nix {
 
-std::string getUserName()
+std::string getUserName(uid_t uid)
 {
-    auto pw = getpwuid(geteuid());
+    auto pw = getpwuid(uid);
     std::string name = pw ? pw->pw_name : getEnv("USER").value_or("");
     if (name.empty())
         throw Error("cannot figure out user name");
     return name;
+}
+
+std::string getUserName()
+{
+    return getUserName(getuid());
+}
+
+std::string getGroupName(gid_t gid)
+{
+    auto gr = getgrgid(gid);
+    if (!gr)
+        throw Error("cannot figure out group name");
+    return gr->gr_name;
+}
+
+
+std::vector<gid_t> getUserGroups(uid_t uid) {
+    struct passwd * pw = getpwuid(uid);
+    int ngroups = 0;
+    getgrouplist(pw->pw_name, pw->pw_gid, NULL, &ngroups);
+    gid_t _groups[ngroups];
+// Apple takes ints instead of gids for the second and third arguments
+#if __APPLE__
+    getgrouplist(pw->pw_name, (int) pw->pw_gid, (int *) _groups, &ngroups);
+#else
+    getgrouplist(pw->pw_name, pw->pw_gid, _groups, &ngroups);
+#endif
+    std::vector<gid_t> groups;
+    for (auto group : _groups) groups.push_back(group);
+    return groups;
+}
+
+std::vector<std::string> getUserGroupNames(uid_t uid) {
+    auto groups = getUserGroups(uid);
+    std::vector<std::string> groupsWithNames;
+    for (auto group : groups) {
+        struct group * g = getgrgid(group);
+        groupsWithNames.push_back(g->gr_name);
+    }
+    return groupsWithNames;
 }
 
 Path getHomeOf(uid_t userId)

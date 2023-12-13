@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "globals.hh"
 #include "serialise.hh"
 #include "store-api.hh"
 
@@ -12,7 +13,7 @@ void processConnection(
     ref<Store> store,
     FdSource & from,
     FdSink & to,
-    TrustedFlag trusted,
+    AuthenticatedUser user,
     RecursiveFlag recursive);
 
 }

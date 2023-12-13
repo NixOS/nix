@@ -7,6 +7,7 @@
 #include "store-api.hh"
 #include "indirect-root-store.hh"
 #include "sync.hh"
+#include "granular-access-store.hh"
 
 #include <chrono>
 #include <future>
@@ -67,8 +68,10 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 };
 
 class LocalStore : public virtual LocalStoreConfig
-    , public virtual IndirectRootStore
+    , public virtual LocalFSStore
     , public virtual GcStore
+    , public virtual LocalGranularAccessStore
+    , public virtual IndirectRootStore
 {
 private:
 
@@ -112,6 +115,16 @@ private:
     };
 
     Sync<State> _state;
+
+    /**
+     * Map of paths, which, when added to the store need permissions to be set.
+     */
+    std::map<StoreObject, AccessStatus> futurePermissions;
+
+    /**
+     * Sync path permissions from futurePermissions to a real path in store
+     */
+    void syncPathPermissions(const ValidPathInfo & info);
 
 public:
 
@@ -253,9 +266,9 @@ public:
      * register the hash of the file system contents of the path.  The
      * hash must be a SHA-256 hash.
      */
-    void registerValidPath(const ValidPathInfo & info);
+    void registerValidPath(const ValidPathInfo & info, bool syncPermissions = true);
 
-    void registerValidPaths(const ValidPathInfos & infos);
+    void registerValidPaths(const ValidPathInfos & infos, bool syncPermissions = true);
 
     unsigned int getProtocol() override;
 
@@ -288,8 +301,24 @@ public:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    std::optional<std::string> getVersion() override;
+    void setFutureAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    void setCurrentAccessStatus(const Path & path, const AccessStatus & status);
+    AccessStatus getFutureAccessStatus(const StoreObject & storeObject) override;
+    std::optional<AccessStatus> getFutureAccessStatusOpt(const StoreObject & storeObject);
+    AccessStatus getCurrentAccessStatus(const Path & path);
+    AccessStatus getCurrentAccessStatus(const StoreObject & storeObject) override;
+    bool shouldSyncPermissions(const StoreObject &storeObject);
+    bool pathOfStoreObjectExists(const StoreObject & storeObject);
 
+    void grantBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);
+    void revokeBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);
+    void revokeBuildUserAccess(const StorePath & path);
+    void revokeBuildUserAccess();
+
+    std::set<ACL::Group> getSubjectGroupsUncached(ACL::User user) override;
+
+    std::optional<std::string> getVersion() override;
 private:
 
     /**

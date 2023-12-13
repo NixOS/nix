@@ -1,4 +1,6 @@
+#include "access-status.hh"
 #include "archive.hh"
+#include "config.hh"
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
 #include "eval-inline.hh"
@@ -6,6 +8,8 @@
 #include "eval-settings.hh"
 #include "gc-small-vector.hh"
 #include "globals.hh"
+#include "granular-access-store.hh"
+#include "hash.hh"
 #include "json-to-value.hh"
 #include "names.hh"
 #include "path-references.hh"
@@ -15,6 +19,9 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "granular-access-store.hh"
+#include "acl.hh"
+#include "store-cast.hh"
 #include "fs-input-accessor.hh"
 
 #include <boost/container/small_vector.hpp>
@@ -127,6 +134,46 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bo
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
     }
+}
+
+void readAccessStatus(EvalState & state, Attr & attr, LocalGranularAccessStore::AccessStatus * accessStatus, std::string_view attrName, std::string_view primop)
+{
+    state.forceAttrs(*attr.value, attr.pos, fmt("while evaluating the `%s` attribute passed to %s", attrName, primop));
+    for (auto & subAttr : *attr.value->attrs) {
+        auto sn = state.symbols[subAttr.name];
+        if (sn == "protected")
+            accessStatus->isProtected = state.forceBool(*subAttr.value, subAttr.pos, fmt("while evaluating the `%s.protected` attribute passed to %s", attrName, primop));
+        else if (sn == "users") {
+            state.forceList(*subAttr.value, subAttr.pos, fmt("while evaluating the `%s.users` attribute passed to %s", attrName, primop));
+            for (auto & user : subAttr.value->listItems())
+                accessStatus->entities.insert(ACL::User(std::string(state.forceStringNoCtx(*user, noPos, fmt("while evaluating an element of `%s.users` attribute passed to %s", attrName, primop)))));
+        }
+        else if (sn == "groups") {
+            state.forceList(*subAttr.value, subAttr.pos, fmt("while evaluating the `%s.groups` attribute passed to %s", attrName, primop));
+            for (auto & group : subAttr.value->listItems())
+                accessStatus->entities.insert(ACL::Group(std::string(state.forceStringNoCtx(*group, noPos, fmt("while evaluating an element of `%s.groups` attribute passed to %s", attrName, primop)))));
+        }
+        else
+            state.debugThrowLastTrace(EvalError({
+                .msg = hintfmt("unsupported argument '%1%.%2%' to %3%", attrName, sn, primop),
+                .errPos = state.positions[subAttr.pos]
+            }));
+    }
+}
+
+void ensureAccess(LocalGranularAccessStore::AccessStatus * accessStatus, std::string_view description, LocalGranularAccessStore & store)
+{
+    if (!accessStatus->isProtected || store.trusted) return;
+    uid_t uid = getuid();
+    auto groups = store.getSubjectGroups(uid);
+    for (auto entity : accessStatus->entities) {
+        if (std::visit(overloaded {
+            [&](ACL::User u) { return u.uid == uid; },
+            [&](ACL::Group g) { return groups.contains(g); }
+        }, entity))
+            return;
+    }
+    throw AccessDenied("you (%s) would not have access to %s; ensure that you do by adding yourself or a group you're in to the list", getUserName(uid), description);
 }
 
 /**
@@ -1076,8 +1123,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 }
 
-static void derivationStrictInternal(EvalState & state, const std::string &
-drvName, Bindings * attrs, Value & v)
+static void derivationStrictInternal(EvalState & state, const std::string & drvName, Bindings * attrs, Value & v)
 {
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
@@ -1165,6 +1211,10 @@ drvName, Bindings * attrs, Value & v)
                 if (i->value->type() == nNull) continue;
             }
 
+            if (i->name == state.sPermissions && experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
+                continue;
+            }
+
             if (i->name == state.sContentAddressed && state.forceBool(*i->value, noPos, context_below)) {
                 contentAddressed = true;
                 experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -1217,7 +1267,7 @@ drvName, Bindings * attrs, Value & v)
                     }
 
                 } else {
-                    auto s = state.coerceToString(noPos, *i->value, context, context_below, true).toOwned();
+                    auto s = state.coerceToString(i->pos, *i->value, context, context_below, true).toOwned();
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = std::move(s);
                     else if (i->name == state.sSystem) drv.platform = std::move(s);
@@ -1391,10 +1441,61 @@ drvName, Bindings * attrs, Value & v)
         }
     }
 
+
+    /* Pre-protect the derivation itself */
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
+        auto drvPath = writeDerivation(*state.store, drv, state.repair, true);
+        attr = attrs->find(state.sPermissions);
+        if (attr != attrs->end()) {
+            state.forceAttrs(*attr->value, noPos,
+                            "while evaluating the `__permissions` "
+                            "attribute passed to builtins.derivationStrict");
+            auto derivation = attr->value->attrs->find(state.sDrv);
+            if (derivation != attr->value->attrs->end()) {
+                LocalGranularAccessStore::AccessStatus status;
+                readAccessStatus(state, *derivation, &status, "__permissions.drv", "builtins.derivationStrict");
+                ensureAccess(&status, state.store->printStorePath(drvPath), require<LocalGranularAccessStore>(*state.store));
+                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(drvPath, status);
+            }
+        }
+    }
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(*state.store, drv, state.repair);
+    auto drvPath = writeDerivation(*state.store, drv, state.repair, false);
     auto drvPathS = state.store->printStorePath(drvPath);
 
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
+        attr = attrs->find(state.sPermissions);
+        if (attr != attrs->end()) {
+            state.forceAttrs(*attr->value, noPos,
+                            "while evaluating the `__permissions` "
+                            "attribute passed to builtins.derivationStrict");
+            auto outputs = attr->value->attrs->find(state.sOutputs);
+            if (outputs != attr->value->attrs->end()) {
+                state.forceAttrs(*outputs->value, noPos,
+                                "while evaluating the `__permissions.outputs` "
+                                "attribute passed to builtins.derivationStrict");
+                for (auto & output : *outputs->value->attrs) {
+                    if (!drv.outputs.contains(state.symbols[output.name])) 
+                        state.debugThrowLastTrace(EvalError({
+                            .msg = hintfmt("derivation has no output %s", state.symbols[output.name]),
+                            .errPos = state.positions[output.pos]
+                        }));
+                    LocalGranularAccessStore::AccessStatus status;
+                    readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
+                    ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS), require<LocalGranularAccessStore>(*state.store));
+                    require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
+                }
+            }
+            auto log = attr->value->attrs->find(state.sLog);
+            if (log != attr->value->attrs->end()) {
+                LocalGranularAccessStore::AccessStatus status;
+                readAccessStatus(state, *log, &status, "__permissions.log", "builtins.derivationStrict");
+                ensureAccess(&status, fmt("log of derivation %s", drvPathS), require<LocalGranularAccessStore>(*state.store));
+                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationLog {drvPath}, status);
+            }
+        }
+    }
+    
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
@@ -2192,6 +2293,7 @@ static void addPath(
     Value * filterFun,
     FileIngestionMethod method,
     const std::optional<Hash> expectedHash,
+    std::optional<LocalGranularAccessStore::AccessStatus> accessStatus,
     Value & v,
     const NixStringContext & context)
 {
@@ -2228,13 +2330,34 @@ static void addPath(
                 .references = {},
             });
 
+        // Commented out because computeStorePathForPath needs reading access to the path.
+        // But this should not be needed if the path is already in the store and is fixed output derivation.
+        // For the case where the file is private but a public derivation depends on it.
+
+        // TODO: why is this needed ?
+        // if (accessStatus && !settings.readOnlyMode) {
+        //     StorePath dstPath = state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first;
+        //     ensureAccess(&*accessStatus, state.store->printStorePath(dstPath));
+        //     require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(dstPath, *accessStatus);
+        // }
+
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             auto dstPath = path.fetchToStore(state.store, name, method, filter.get(), state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
-        } else
+        } else if (!expectedHash && accessStatus && !settings.readOnlyMode) {
+            auto source = sinkToSource([&](Sink & sink) {
+                if (method == FileIngestionMethod::Recursive)
+                    dumpPath(path.path.abs(), sink, defaultPathFilter);
+                else
+                    readFile(path.path.abs(), sink);
+            });
+            StorePath dstPath = state.store->computeStorePathFromDump(*source, name, method, HashAlgorithm::SHA256).first;
+            state.allowAndSetStorePathString(dstPath, v);
+        } else {
             state.allowAndSetStorePathString(*expectedStorePath, v);
+        }
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while adding path '%s'", path);
         throw;
@@ -2248,8 +2371,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
     auto path = state.coerceToPath(pos, *args[1], context,
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
-
-    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2314,6 +2436,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
+    std::optional<LocalGranularAccessStore::AccessStatus> accessStatus;
     NixStringContext context;
 
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to 'builtins.path'");
@@ -2330,6 +2453,10 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             method = FileIngestionMethod { state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path") };
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
+        else if (n == "permissions") {
+            if (!accessStatus) accessStatus = AccessStatusFor<std::variant<ACL::User, ACL::Group>> {};
+            readAccessStatus(state, attr, &*accessStatus, "permissions", "builtins.path");
+        }
         else
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("unsupported argument '%1%' to 'addPath'", state.symbols[attr.name]),
@@ -2344,7 +2471,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     if (name.empty())
         name = path->baseName();
 
-    addPath(state, pos, name, *path, filterFun, method, expectedHash, v, context);
+    addPath(state, pos, name, *path, filterFun, method, expectedHash, accessStatus, v, context);
 }
 
 static RegisterPrimOp primop_path({
@@ -2378,6 +2505,12 @@ static RegisterPrimOp primop_path({
           path. Evaluation will fail if the hash is incorrect, and
           providing a hash allows `builtins.path` to be used even when the
           `pure-eval` nix config option is on.
+
+        - permissions\
+          An attrset of `{protected : bool, users : list, groups : list}`
+          If `protected` is true, protects the resulting store path;
+          `users` and `groups` are lists of strings, each representing either a
+          user or a group to whom access should be granted.
     )",
     .fun = prim_path,
 });

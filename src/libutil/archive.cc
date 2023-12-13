@@ -281,10 +281,11 @@ void parseDump(ParseSink & sink, Source & source)
 }
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(const Path & path, Source & source, bool protect)
 {
     RestoreSink sink;
     sink.dstPath = path;
+    sink.protect = protect;
     parseDump(sink, source);
 }
 
@@ -302,12 +303,12 @@ void copyNAR(Source & source, Sink & sink)
 }
 
 
-void copyPath(const Path & from, const Path & to)
+void copyPath(const Path & from, const Path & to, bool protect)
 {
     auto source = sinkToSource([&](Sink & sink) {
         dumpPath(from, sink);
     });
-    restorePath(to, *source);
+    restorePath(to, *source, protect);
 }
 
 

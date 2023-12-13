@@ -415,7 +415,6 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
     return outputs;
 }
 
-
 StorePath resolveDerivedPath(Store & store, const SingleDerivedPath & req, Store * evalStore_)
 {
     auto & evalStore = evalStore_ ? *evalStore_ : store;

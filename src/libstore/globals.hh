@@ -1070,6 +1070,22 @@ public:
         )"
     };
 
+    Setting<bool> protectByDefault{
+      this, false, "protect-by-default",
+      R"(
+        If set to `true`, protects all newly added (either directly or as a result of a derivation build) paths by default, making them unreadable to the world.
+
+        Requires the `acls` experimental feature.
+      )"
+    };
+
+    Setting<bool> cacheUserGroups{
+      this, false, "cache-user-groups",
+      R"(
+        If set to `true`, caches the group lists of users upon first fetch. Useful for situations in which group memberships are stored on a remote server.
+      )"
+    };
+
     Setting<StringMap> impureEnv {this, {}, "impure-env",
         R"(
           A list of items, each in the format of:
@@ -1128,5 +1144,12 @@ void initLibStore();
  * this in a key locations, so as not to litter the code.
  */
 void assertLibStoreInitialized();
+
+enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
+
+struct AuthenticatedUser {
+    TrustedFlag trusted;
+    uid_t uid;
+};
 
 }

@@ -5,6 +5,8 @@
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
+#include "acl.hh"
+#include "access-status.hh"
 
 #include <string>
 #include <optional>
@@ -13,7 +15,6 @@ namespace nix {
 
 
 class Store;
-
 
 struct SubstitutablePathInfo
 {
@@ -70,6 +71,9 @@ struct UnkeyedValidPathInfo
      * and ‘references’. However, we support many types of content addresses.
      */
     std::optional<ContentAddress> ca;
+
+    using AccessStatus = AccessStatusFor<std::variant<ACL::User, ACL::Group>>;
+    std::optional<AccessStatus> accessStatus;
 
     UnkeyedValidPathInfo(const UnkeyedValidPathInfo & other) = default;
 
@@ -134,7 +138,6 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
      * Verify a single signature.
      */
     bool checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const;
-
     Strings shortRefs() const;
 
     ValidPathInfo(const ValidPathInfo & other) = default;

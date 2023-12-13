@@ -38,6 +38,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation {
       boost
     ]
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+    ++ lib.optional stdenv.isLinux acl
     ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
   configureFlags = [

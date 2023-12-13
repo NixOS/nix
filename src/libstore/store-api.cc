@@ -953,7 +953,6 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
     return paths;
 }
 
-
 const Store::Stats & Store::getStats()
 {
     {

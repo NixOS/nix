@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include "serialise.hh"
+#include "acl.hh"
 #include "common-protocol.hh"
 
 namespace nix {
@@ -29,12 +31,18 @@ struct Source;
 
 // items being serialised
 struct DerivedPath;
+struct StoreObjectDerivationOutput;
+struct StoreObjectDerivationLog;
+struct DrvOutput;
+struct Realisation;
 struct BuildResult;
 struct KeyedBuildResult;
 struct ValidPathInfo;
 struct UnkeyedValidPathInfo;
 enum TrustedFlag : bool;
-
+struct AuthenticatedUser;
+namespace acl { struct User; struct Group; };
+template<typename T> struct AccessStatusFor;
 
 /**
  * The "worker protocol", used by unix:// and ssh-ng:// stores.
@@ -162,6 +170,10 @@ enum struct WorkerProto::Op : uint64_t
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    GetCurrentAccessStatus = 48,
+    GetFutureAccessStatus = 49,
+    SetCurrentAccessStatus = 50,
+    SetFutureAccessStatus = 51,
 };
 
 /**
@@ -211,9 +223,21 @@ DECLARE_WORKER_SERIALISER(KeyedBuildResult);
 template<>
 DECLARE_WORKER_SERIALISER(ValidPathInfo);
 template<>
-DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
+DECLARE_WORKER_SERIALISER(StoreObjectDerivationOutput);
+template<>
+DECLARE_WORKER_SERIALISER(StoreObjectDerivationLog);
 template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
+template<>
+DECLARE_WORKER_SERIALISER(AuthenticatedUser);
+template<>
+DECLARE_WORKER_SERIALISER(ACL::User);
+template<>
+DECLARE_WORKER_SERIALISER(ACL::Group);
+template<typename T>
+DECLARE_WORKER_SERIALISER(AccessStatusFor<T>);
+template<>
+DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);
@@ -221,6 +245,15 @@ template<typename T>
 DECLARE_WORKER_SERIALISER(std::set<T>);
 template<typename... Ts>
 DECLARE_WORKER_SERIALISER(std::tuple<Ts...>);
+
+template<typename A, typename B>
+#define X_ std::variant<A, B>
+DECLARE_WORKER_SERIALISER(X_);
+#undef X_
+template<typename A, typename B, typename C>
+#define X_ std::variant<A, B, C>
+DECLARE_WORKER_SERIALISER(X_);
+#undef X_
 
 #define COMMA_ ,
 template<typename K, typename V>

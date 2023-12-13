@@ -14,10 +14,12 @@
 #include "repair-flag.hh"
 #include "store-dir-config.hh"
 
+#include <grp.h>
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
 #include <limits>
 #include <map>
+#include <pwd.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <memory>
@@ -66,6 +68,8 @@ MakeError(SubstituterDisabled, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+MakeError(AccessDenied, Error);
+
 struct Realisation;
 struct RealisedPath;
 struct DrvOutput;
@@ -84,6 +88,7 @@ typedef std::map<std::string, StorePath> OutputPathMap;
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 
+
 /**
  * Magic header of exportPath() output (obsolete).
  */
@@ -91,7 +96,6 @@ const uint32_t exportMagic = 0x4558494e;
 
 
 enum BuildMode { bmNormal, bmRepair, bmCheck };
-enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
 struct KeyedBuildResult;

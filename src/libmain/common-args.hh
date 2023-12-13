@@ -35,6 +35,20 @@ struct MixDryRun : virtual Args
     }
 };
 
+struct MixProtect : virtual Args
+{
+    bool protect = false;
+    
+    MixProtect()
+    {
+        addFlag({
+            .longName = "protect",
+            .description = "Protect the resulting paths in nix store upon addition.",
+            .handler = {&protect, true},
+        });
+    }
+};
+
 struct MixJSON : virtual Args
 {
     bool json = false;

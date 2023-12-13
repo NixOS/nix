@@ -17,6 +17,7 @@ namespace nix {
  */
 enum struct ExperimentalFeature
 {
+    ACLs,
     CaDerivations,
     ImpureDerivations,
     Flakes,

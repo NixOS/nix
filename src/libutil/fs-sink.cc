@@ -67,14 +67,16 @@ static GlobalConfig::Register r1(&restoreSinkSettings);
 void RestoreSink::createDirectory(const Path & path)
 {
     Path p = dstPath + path;
-    if (mkdir(p.c_str(), 0777) == -1)
+    auto mode = (protect && (path == "" || path == "/")) ? 0770 : 0777;
+    if (mkdir(p.c_str(), mode) == -1)
         throw SysError("creating directory '%1%'", p);
 };
 
 void RestoreSink::createRegularFile(const Path & path)
 {
     Path p = dstPath + path;
-    fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+    auto mode = (protect && (path == "" || path == "/")) ? 0660 : 0666;
+    fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, mode);
     if (!fd) throw SysError("creating file '%1%'", p);
 }
 

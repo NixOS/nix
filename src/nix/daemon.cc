@@ -134,21 +134,6 @@ static void setSigChldAction(bool autoReap)
 }
 
 /**
- * @return Is the given user a member of this group?
- *
- * @param user User specified by username.
- *
- * @param group Group the user might be a member of.
- */
-static bool matchUser(std::string_view user, const struct group & gr)
-{
-    for (char * * mem = gr.gr_mem; *mem; mem++)
-        if (user == std::string_view(*mem)) return true;
-    return false;
-}
-
-
-/**
  * Does the given user (specified by user name and primary group name)
  * match the given user/group whitelist?
  *
@@ -156,13 +141,11 @@ static bool matchUser(std::string_view user, const struct group & gr)
  *
  * If the username is in the set: Yes.
  *
- * If the groupname is in the set: Yes.
- *
- * If the user is in another group which is in the set: yes.
+ * If any of the groups the user is in is in the set: Yes.
  *
  * Otherwise: No.
  */
-static bool matchUser(const std::string & user, const std::string & group, const Strings & users)
+static bool matchUser(const std::string & user, const std::vector<std::string> & groups, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;
@@ -171,12 +154,8 @@ static bool matchUser(const std::string & user, const std::string & group, const
         return true;
 
     for (auto & i : users)
-        if (i.substr(0, 1) == "@") {
-            if (group == i.substr(1)) return true;
-            struct group * gr = getgrnam(i.c_str() + 1);
-            if (!gr) continue;
-            if (matchUser(user, *gr)) return true;
-        }
+        if (i.substr(0, 1) == "@")
+            if (find(groups.begin(), groups.end(), i.substr(1)) != groups.end()) return true;
 
     return false;
 }
@@ -251,7 +230,7 @@ static ref<Store> openUncachedStore()
  *
  * If the potential client is not allowed to talk to us, we throw an `Error`.
  */
-static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
+static AuthenticatedUser authPeer(const PeerInfo & peer)
 {
     TrustedFlag trusted = NotTrusted;
 
@@ -261,16 +240,19 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
     struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
     std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
 
+    std::vector<std::string> groups = getUserGroupNames(peer.uid);
+    groups.push_back(group);
+
     const Strings & trustedUsers = authorizationSettings.trustedUsers;
     const Strings & allowedUsers = authorizationSettings.allowedUsers;
 
-    if (matchUser(user, group, trustedUsers))
+    if (matchUser(user, groups, trustedUsers))
         trusted = Trusted;
 
-    if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
+    if ((!trusted && !matchUser(user, groups, allowedUsers)) || group == settings.buildUsersGroup)
         throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
 
-    return { trusted, std::move(user) };
+    return { trusted, peer.uid };
 }
 
 
@@ -326,19 +308,14 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
             closeOnExec(remote.get());
 
             PeerInfo peer { .pidKnown = false };
-            TrustedFlag trusted;
             std::string user;
 
-            if (forceTrustClientOpt)
-                trusted = *forceTrustClientOpt;
-            else {
-                peer = getPeerInfo(remote.get());
-                auto [_trusted, _user] = authPeer(peer);
-                trusted = _trusted;
-                user = _user;
-            };
+            peer = getPeerInfo(remote.get());
+            AuthenticatedUser _user = authPeer(peer);
+            if (forceTrustClientOpt) _user.trusted = Trusted;
+            user = getUserName(_user.uid);
 
-            printInfo((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
+            printInfo((std::string) "accepted connection from pid %1%, user %2%" + (_user.trusted ? " (trusted)" : ""),
                 peer.pidKnown ? std::to_string(peer.pid) : "<unknown>",
                 peer.uidKnown ? user : "<unknown>");
 
@@ -367,7 +344,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 //  Handle the connection.
                 FdSource from(remote.get());
                 FdSink to(remote.get());
-                processConnection(openUncachedStore(), from, to, trusted, NotRecursive);
+                processConnection(openUncachedStore(), from, to, _user, NotRecursive);
 
                 exit(0);
             }, options);
@@ -430,11 +407,11 @@ static void forwardStdioConnection(RemoteStore & store) {
  * @param trustClient Whether to trust the client. Forwarded directly to
  * `processConnection()`.
  */
-static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
+static void processStdioConnection(ref<Store> store, AuthenticatedUser user)
 {
     FdSource from(STDIN_FILENO);
     FdSink to(STDOUT_FILENO);
-    processConnection(store, from, to, trustClient, NotRecursive);
+    processConnection(store, from, to, user, NotRecursive);
 }
 
 /**
@@ -461,11 +438,13 @@ static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt
 
         if (!processOps && (remoteStore = store.dynamic_pointer_cast<RemoteStore>()))
             forwardStdioConnection(*remoteStore);
-        else
+        else {
             // `Trusted` is passed in the auto (no override case) because we
             // cannot see who is on the other side of a plain pipe. Limiting
             // access to those is explicitly not `nix-daemon`'s responsibility.
-            processStdioConnection(store, forceTrustClientOpt.value_or(Trusted));
+            AuthenticatedUser user {forceTrustClientOpt.value_or(Trusted), 0};
+            processStdioConnection(store, user);
+        }
     } else
         daemonLoop(forceTrustClientOpt);
 }

@@ -20,6 +20,8 @@ in
 {
   authorization = runNixOSTestFor "x86_64-linux" ./authorization.nix;
 
+  acls = runNixOSTestFor "x86_64-linux" ./acls.nix;
+
   remoteBuilds = runNixOSTestFor "x86_64-linux" ./remote-builds.nix;
 
   remoteBuildsSshNg = runNixOSTestFor "x86_64-linux" ./remote-builds-ssh-ng.nix;

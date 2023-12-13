@@ -27,6 +27,10 @@ ifeq ($(HAVE_SECCOMP), 1)
 	libstore_LDFLAGS += $(LIBSECCOMP_LIBS)
 endif
 
+ifdef HOST_LINUX
+	libstore_LDFLAGS += -lacl
+endif
+
 libstore_CXXFLAGS += \
  -I src/libutil -I src/libstore -I src/libstore/build \
  -DNIX_PREFIX=\"$(prefix)\" \

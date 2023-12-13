@@ -1,6 +1,11 @@
 #include "local-derivation-goal.hh"
+#include "acl.hh"
+#include "config.hh"
+#include "gc-store.hh"
+#include "granular-access-store.hh"
 #include "indirect-root-store.hh"
 #include "hook-instance.hh"
+#include "local-fs-store.hh"
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
@@ -21,11 +26,13 @@
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
 
+#include <filesystem>
 #include <regex>
 #include <queue>
 
 #include <sys/un.h>
 #include <fcntl.h>
+#include <sys/xattr.h>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/mman.h>
@@ -237,6 +244,22 @@ void LocalDerivationGoal::tryLocalBuild()
         }
     }
 
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
+        if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
+            for (auto path : inputPaths) {
+                if (localStore->getCurrentAccessStatus(path).isProtected) {
+                    if (!localStore->canAccess(path, false))
+                        throw AccessDenied(
+                            "%s (uid %d) does not have access to path %s",
+                            getUserName(localStore->effectiveUser->uid),
+                            localStore->effectiveUser->uid,
+                            localStore->printStorePath(path));
+                    localStore->grantBuildUserAccess(path, ACL::User(getuid()));
+                    localStore->grantBuildUserAccess(path, ACL::User(sandboxUid()));
+                }
+            }
+        }
+
     actLock.reset();
 
     try {
@@ -271,17 +294,19 @@ static void chmod_(const Path & path, mode_t mode)
    directory's parent link ".."). */
 static void movePath(const Path & src, const Path & dst)
 {
+    debug("Moving %s to %s", src, dst);
     auto st = lstat(src);
 
     bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+    mode_t mode = st.st_mode;
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
+        mode &= ~S_IRWXO;
 
-    if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
+    chmod_(src, mode | (changePerm ? S_IWUSR : 0));
 
     renameFile(src, dst);
 
-    if (changePerm)
-        chmod_(dst, st.st_mode);
+    chmod_(dst, mode);
 }
 
 
@@ -304,6 +329,15 @@ void LocalDerivationGoal::closeReadPipes()
 
 void LocalDerivationGoal::cleanupHookFinally()
 {
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
+        if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
+            for (auto path : inputPaths) {
+                localStore->revokeBuildUserAccess(path, ACL::User(getuid()));
+                localStore->revokeBuildUserAccess(path, ACL::User(sandboxUid()));
+            }
+        }
+    }
+
     /* Release the build user at the end of this function. We don't do
        it right away because we don't want another build grabbing this
        uid and then messing around with our output. */
@@ -364,8 +398,10 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (!status.known) continue;
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.toRealPath(status.known->path);
-            if (pathExists(chrootRootDir + p))
+            if (pathExists(chrootRootDir + p)) {
+                deletePath(p);
                 renameFile((chrootRootDir + p), p);
+            }
         }
 
     return diskFull;
@@ -391,23 +427,53 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 }
 
 #if __linux__
-static void doBind(const Path & source, const Path & target, bool optional = false) {
-    debug("bind mounting '%1%' to '%2%'", source, target);
-    struct stat st;
-    if (stat(source.c_str(), &st) == -1) {
-        if (optional && errno == ENOENT)
+static void doBind(const Path & source, const Path & target, Store & store, bool optional = false) {
+    auto doMount = [&](const Path & source, const Path & target) {
+        debug("bind mounting '%1%' to '%2%'", source, target);
+        struct stat st;
+        if (stat(source.c_str(), &st) == -1) {
+            if (optional && errno == ENOENT)
+                return;
+            else
+                throw SysError("getting attributes of path '%1%'", source);
+        }
+
+        if (S_ISDIR(st.st_mode))
+            createDirs(target);
+        else {
+            createDirs(dirOf(target));
+            writeFile(target, "");
+        }
+
+        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+            throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+    };
+
+
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs) && store.isInStore(source)) {
+        auto [storePath, subPath] = store.toStorePath(source);
+
+        // TODO(ACL) Add tests to check that ACL information is never leaked
+        // FIXME probably should use a FUSE fs or something?
+        ssize_t eaSize = llistxattr(source.c_str(), nullptr, 0);
+        if (subPath == "" && eaSize > 0) {
+            // The source store path contains extended attributes
+            // mounting it as-is would preserve them, which is undesireable.
+            if (std::filesystem::is_directory(source)) {
+                createDirs(target); // In case the directory is empty
+                for (auto dirent : std::filesystem::directory_iterator(std::filesystem::directory_entry(source)))
+                    doMount(dirent.path().c_str(), (target + "/" + baseNameOf(dirent.path().c_str())).c_str());
+            }
+            else {
+                std::filesystem::copy(source, target);
+            }
+            using namespace std::filesystem;
+            auto p = status(target).permissions();
+            permissions(target, (p | ((p & perms::owner_read) != perms::none ? perms::others_read : perms::none) | ((p & perms::owner_exec) != perms::none ? perms::others_exec : perms::none)), perm_options::add);
             return;
-        else
-            throw SysError("getting attributes of path '%1%'", source);
+        }
     }
-    if (S_ISDIR(st.st_mode))
-        createDirs(target);
-    else {
-        createDirs(dirOf(target));
-        writeFile(target, "");
-    }
-    if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-        throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+    doMount(source, target);
 };
 #endif
 
@@ -712,6 +778,7 @@ void LocalDerivationGoal::startBuilder()
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootStoreDir);
 
+        // auto & localStore = getLocalStore();
         for (auto & i : inputPaths) {
             auto p = worker.store.printStorePath(i);
             Path r = worker.store.toRealPath(p);
@@ -804,6 +871,7 @@ void LocalDerivationGoal::startBuilder()
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
     printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
+    
     for (auto & i : drv->env)
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
@@ -1500,9 +1568,15 @@ void LocalDerivationGoal::startDaemon()
             auto workerThread = std::thread([store, remote{std::move(remote)}]() {
                 FdSource from(remote.get());
                 FdSink to(remote.get());
+                AuthenticatedUser user;
+                if (store->next->effectiveUser) {
+                    user = {NotTrusted, store->next->effectiveUser->uid};
+                } else {
+                    user = {NotTrusted, 0};
+                }
                 try {
                     daemon::processConnection(store, from, to,
-                        NotTrusted, daemon::Recursive);
+                        user, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
@@ -1585,7 +1659,7 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
                 if (setns(sandboxMountNamespace.get(), 0) == -1)
                     throw SysError("entering sandbox mount namespace");
 
-                doBind(source, target);
+                doBind(source, target, worker.store);
 
                 _exit(0);
             }));
@@ -1608,7 +1682,6 @@ void LocalDerivationGoal::chownToBuilder(const Path & path)
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
         throw SysError("cannot change ownership of '%1%'", path);
 }
-
 
 void setupSeccomp()
 {
@@ -1841,7 +1914,7 @@ void LocalDerivationGoal::runChild()
                     chmod_(dst, 0555);
                 } else
                 #endif
-                    doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
+                    doBind(i.second.source, chrootRootDir + i.first, worker.store, i.second.optional);
             }
 
             /* Bind a new instance of procfs on /proc. */
@@ -1880,8 +1953,8 @@ void LocalDerivationGoal::runChild()
                 } else {
                     if (errno != EINVAL)
                         throw SysError("mounting /dev/pts");
-                    doBind("/dev/pts", chrootRootDir + "/dev/pts");
-                    doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx");
+                    doBind("/dev/pts", chrootRootDir + "/dev/pts", worker.store);
+                    doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx", worker.store);
                 }
             }
 
@@ -2374,6 +2447,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         auto actualPath = toRealPathChroot(worker.store.printStorePath(*scratchPath));
 
         auto finish = [&](StorePath finalStorePath) {
+            auto & localStore = getLocalStore();
+
+            StoreObjectDerivationOutput thisOutput(drvPath, outputName);
+            if (localStore.futurePermissions.contains(thisOutput)) {
+                localStore.setFutureAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput]);
+            }
             /* Store the final path */
             finalOutputs.insert_or_assign(outputName, finalStorePath);
             /* The rewrite rule will be used in downstream outputs that refer to
@@ -2657,11 +2736,18 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         worker.store.printStorePath(drvPath), worker.store.toRealPath(finalDestPath));
             }
 
-            /* Since we verified the build, it's now ultimately trusted. */
+            /* Since we verified the build, it's now ultimately trusted, and we
+               can grant access to whoever requested the build */
             if (!oldInfo.ultimate) {
                 oldInfo.ultimate = true;
                 localStore.signPathInfo(oldInfo);
                 localStore.registerValidPaths({{oldInfo.path, oldInfo}});
+            }
+            if (localStore.effectiveUser && !localStore.canAccess(oldInfo.path, false)){
+                // Is this needed ?
+                // Can give to many permission, if test user tries to build a path that already exists
+                // but on which it does not have permission.
+                // localStore.addAllowedEntitiesCurrent(oldInfo.path, {*localStore.effectiveUser});
             }
 
             continue;
@@ -2688,12 +2774,18 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
            isn't statically known so that we can safely unlock the path before
            the next iteration */
         if (newInfo.ca)
-            localStore.registerValidPaths({{newInfo.path, newInfo}});
+            localStore.registerValidPaths({{newInfo.path, newInfo}}, false);
 
         infos.emplace(outputName, std::move(newInfo));
     }
 
     if (buildMode == bmCheck) {
+        auto & localStore = getLocalStore();
+        StoreObjectDerivationLog log { drvPath };
+        /* Since all outputs are known to be matching, give access to the log */
+        if (localStore.effectiveUser && !localStore.canAccess(log, false))
+            localStore.addAllowedEntitiesFuture(log, {*localStore.effectiveUser});
+
         /* In case of fixed-output derivations, if there are
            mismatches on `--check` an error must be thrown as this is
            also a source for non-determinism. */

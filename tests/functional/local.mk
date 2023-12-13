@@ -124,8 +124,16 @@ nix_tests = \
   path-info.sh \
   toString-path.sh \
   read-only-store.sh \
+  acls.sh \
   nested-sandboxing.sh \
   impure-env.sh
+
+acls_test = \
+  acls.sh \
+  acls/protect_dep.sh \
+  acls/revoke_runtime_dep.sh
+
+# nix_tests += $(acls_test)
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh

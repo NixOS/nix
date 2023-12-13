@@ -1,6 +1,11 @@
 #include "local-store.hh"
+#include "acl.hh"
+#include "config.hh"
+#include "derived-path.hh"
 #include "globals.hh"
 #include "archive.hh"
+#include "granular-access-store.hh"
+#include "hash.hh"
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
@@ -14,10 +19,13 @@
 #include "signals.hh"
 #include "posix-fs-canonicalise.hh"
 
+#include <filesystem>
 #include <iostream>
 #include <algorithm>
 #include <cstring>
 
+#include <pwd.h>
+#include <sys/acl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/select.h>
@@ -29,6 +37,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <grp.h>
+#include <variant>
 
 #if __linux__
 #include <sched.h>
@@ -197,6 +206,10 @@ LocalStore::LocalStore(const Params & params)
     } else {
         makeStoreWritable();
     }
+
+    effectiveUser = getuid();
+    trusted = true;
+
     createDirs(linksDir);
     Path profilesDir = stateDir + "/profiles";
     createDirs(profilesDir);
@@ -252,6 +265,15 @@ LocalStore::LocalStore(const Params & params)
             path = dirOf(path);
         }
     }
+
+    Path aclDir = stateDir + "/acls";
+    createDirs(aclDir);
+    Path aclBuilderPermissions = stateDir + "/acls/builder-permissions";
+    createDirs(aclBuilderPermissions);
+
+    // Clean up build users from ACLs, in case the process was killed during a build
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
+        revokeBuildUserAccess();
 
     /* We can't open a SQLite database if the disk is full.  Since
        this prevents the garbage collector from running when it's most
@@ -643,6 +665,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 .exec();
         }
     });
+    /* FIXME(ACL) set ACLs correctly */
 }
 
 void LocalStore::cacheDrvOutputMapping(
@@ -768,6 +791,10 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     while (useQueryReferences.next())
         info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
 
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs)){
+        info->accessStatus = getCurrentAccessStatus(path);
+    }
+
     return info;
 }
 
@@ -835,6 +862,8 @@ void LocalStore::queryReferrers(State & state, const StorePath & path, StorePath
 {
     auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));
 
+    if (!canAccess(path, false)) throw AccessDenied("Access Denied");
+
     while (useQueryReferrers.next())
         referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
 }
@@ -851,6 +880,7 @@ void LocalStore::queryReferrers(const StorePath & path, StorePathSet & referrers
 
 StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 {
+    if (!canAccess(path, false)) throw AccessDenied("Access Denied");
     return retrySQLite<StorePathSet>([&]() {
         auto state(_state.lock());
 
@@ -933,14 +963,34 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
     return res;
 }
 
-
-void LocalStore::registerValidPath(const ValidPathInfo & info)
+void LocalStore::syncPathPermissions(const ValidPathInfo & info)
 {
-    registerValidPaths({{info.path, info}});
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
+        auto realPath = Store::toRealPath(info.path);
+        if (futurePermissions.contains(info.path)) {
+            setCurrentAccessStatus(realPath, futurePermissions[info.path]);
+            /* FIXME: we should erase the permissions to prevent memory leakage;
+               However, it's not easy to only call this function once, so we end
+               up resetting the permissions to the default ones */
+            // futurePermissions.erase(info.path);
+            if (info.accessStatus)
+                addAllowedEntitiesCurrent(info.path, info.accessStatus->entities);
+        } else if (info.accessStatus) {
+            setCurrentAccessStatus(realPath, *info.accessStatus);
+        } else {
+            // TODO: a mode where all new paths are protected by default
+            setCurrentAccessStatus(realPath, AccessStatus());
+        }
+    }
+}
+
+void LocalStore::registerValidPath(const ValidPathInfo & info, bool syncPermissions)
+{
+    registerValidPaths({{info.path, info}}, syncPermissions);
 }
 
 
-void LocalStore::registerValidPaths(const ValidPathInfos & infos)
+void LocalStore::registerValidPaths(const ValidPathInfos & infos, bool syncPermissions)
 {
     /* SQLite will fsync by default, but the new valid paths may not
        be fsync-ed.  So some may want to fsync them before registering
@@ -948,7 +998,9 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
        registering operation. */
     if (settings.syncBeforeRegistering) sync();
 
-    return retrySQLite<void>([&]() {
+    std::vector<StorePath> sortedPaths;
+
+    retrySQLite<void>([&]() {
         auto state(_state.lock());
 
         SQLiteTxn txn(state->db);
@@ -982,7 +1034,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        topoSort(paths,
+        sortedPaths = topoSort(paths,
             {[&](const StorePath & path) {
                 auto i = infos.find(path);
                 return i == infos.end() ? StorePathSet() : i->second.references;
@@ -996,8 +1048,375 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 
         txn.commit();
     });
+
+    std::reverse(sortedPaths.begin(), sortedPaths.end());
+
+    if (syncPermissions)
+        for (auto path : sortedPaths)
+            syncPathPermissions(infos.at(path));
 }
 
+void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::AccessStatus & status)
+{
+    experimentalFeatureSettings.require(Xp::ACLs);
+
+    // This check is deactivated for now
+    // It makes the public example3 derivation (from acls.nix) fail because it depends on the private derivation example 2.
+    // However it does not look like a runtime dependency.
+    if (false && isInStore(path)) {
+        StorePath storePath(baseNameOf(path));
+
+        // FIXME(acls): cache is broken when called from registerValidPaths
+
+        std::promise<ref<const ValidPathInfo>> promise;
+
+        queryPathInfoUncached(storePath,
+            {[&](std::future<std::shared_ptr<const ValidPathInfo>> result) {
+                try {
+                    promise.set_value(ref(result.get()));
+                } catch (...) {
+                    promise.set_exception(std::current_exception());
+                }
+            }});
+
+        auto info = promise.get_future().get();
+
+        for (auto reference : info->references) {
+            if (reference == storePath) continue;
+            auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
+            if (!otherStatus.isProtected) continue;
+            if (!status.isProtected)
+                throw AccessDenied("can not make %s non-protected because it references a protected path %s", path, printStorePath(reference));
+            std::vector<AccessControlEntity> difference;
+            std::set_difference(status.entities.begin(), status.entities.end(), otherStatus.entities.begin(), otherStatus.entities.end(), difference.begin());
+
+            if (! difference.empty()) {
+                std::string entities;
+                for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
+                throw AccessDenied("can not allow %s access to %s because it references path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(reference));
+            }
+        }
+    }
+
+    debug("setting access status %s on %s", status.json().dump(), path);
+
+    using namespace ACL;
+
+    // NOTE: On Darwin, the standard posix permissions are not part of the ACL API.
+    // As such, we use the standard posix API instead.
+    // TODO(ACLs): We could consider extending the ACL api to include these
+    // FS permissions for Darwin. Essentially ading UserObj, GroupObj, and Other manually.
+    auto perms_bm = std::filesystem::status(path).permissions();
+
+    // These perms will be used later to substitute the permissions
+    Permissions perms;
+
+    // Remove other permissions
+    perms_bm &= ~std::filesystem::perms::others_all;
+
+    // NOTE: We cannot bitshift on the permissions, so we have to copy
+    // the user permissions manually.
+    // NOTE: the bitmask is only used if the path is not going to be protected
+    // NOTE: The Permissions are the permissions that are equivalent to the posix bits
+    if ((perms_bm & std::filesystem::perms::owner_read) != std::filesystem::perms::none) {
+        perms_bm |= std::filesystem::perms::others_read;
+
+        perms.allowRead(true);
+    }
+    if ((perms_bm & std::filesystem::perms::owner_write) != std::filesystem::perms::none) {
+        perms_bm |= std::filesystem::perms::others_write;
+
+        perms.allowWrite(true);
+    }
+    if ((perms_bm & std::filesystem::perms::owner_exec) != std::filesystem::perms::none) {
+        perms_bm |= std::filesystem::perms::others_exec;
+
+        perms.allowExecute(true);
+    }
+
+    if (status.isProtected) {
+        std::filesystem::permissions(
+            path,
+            std::filesystem::perms::others_all,
+            std::filesystem::perm_options::remove
+        );
+    } else {
+        std::filesystem::permissions(
+            path,
+            perms_bm,
+            std::filesystem::perm_options::replace
+        );
+    }
+
+    AccessControlList acl;
+
+    for (auto entity : status.entities) {
+        std::visit(overloaded {
+            [&](User u){ acl[u] = perms; },
+            [&](Group g){ acl[g] = perms; },
+        }, entity);
+    }
+
+    acl.set(path);
+}
+
+void LocalStore::setFutureAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
+{
+    // If adding future permissions to a StoreObjectDerivationOutput,
+    // also add permissions to the paths that will exist in the future.
+    std::visit(overloaded {
+        [&](StorePath p) {},
+        [&](StoreObjectDerivationOutput p) {
+                auto drv = readDerivation(p.drvPath);
+                auto outputHashes = staticOutputHashes(*this, drv);
+                auto drvOutputs = drv.outputsAndOptPaths(*this);
+                if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                    auto path = *drvOutputs.at(p.output).second;
+                    futurePermissions[path] = status;
+                }
+        },
+        [&](StoreObjectDerivationLog l){}
+    }, storePathstoreObject);
+    futurePermissions[storePathstoreObject] = status;
+}
+
+void LocalStore::setCurrentAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
+{
+    std::set<std::string> users;
+    std::set<std::string> groups;
+    for (auto entity : status.entities) {
+        std::visit(overloaded {
+            [&](ACL::User user) {
+                users.insert(getUserName(user.uid));
+            },
+            [&](ACL::Group group) {
+                groups.insert(getGroupName(group.gid));
+            }
+        }, entity);
+    }
+    std::visit(overloaded {
+        [&](StorePath p) {
+            auto path = Store::toRealPath(p);
+            if (pathExists(path)){
+                setCurrentAccessStatus(path, status);
+            }
+            else{
+                throw Error("setCurrentAccessStatus path does not exists (%s)", path);
+            }
+        },
+        [&](StoreObjectDerivationOutput p) {
+            auto drv = readDerivation(p.drvPath);
+            auto outputHashes = staticOutputHashes(*this, drv);
+            auto drvOutputs = drv.outputsAndOptPaths(*this);
+            if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                auto path = Store::toRealPath(*drvOutputs.at(p.output).second);
+                if (pathExists(path)) {
+                    setCurrentAccessStatus(path, status);
+                    return;
+                }
+                throw Error("setCurrentAccessStatus drv path does not exists (%s)", path);
+            }
+        },
+        [&](StoreObjectDerivationLog l) {
+            auto baseName = l.drvPath.to_string();
+
+            auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+
+            if (pathExists(logPath)) {
+                setCurrentAccessStatus(logPath, status);
+            }
+            throw Error("setCurrentAccessStatus log path does not exists (%s)", logPath);
+        }
+    }, storePathstoreObject);
+}
+
+LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const Path & path)
+{
+    AccessStatus status;
+
+    using namespace ACL;
+
+    AccessControlList acl(path);
+
+    auto perms_bm = std::filesystem::status(path).permissions();
+    // Only take others read and exec
+    perms_bm &= perms_bm & (std::filesystem::perms::others_read | std::filesystem::perms::others_exec);
+
+    // If neither is set, the path isProtected
+    status.isProtected = perms_bm == std::filesystem::perms::none;
+    for (auto [tag, perms] : acl) {
+        // Try to handle unmodelled permissions: if the subject can't read, write or execute the path, they don't really have access
+        if (perms.canRead() == Permissions::HasPermission::None && perms.canWrite() == Permissions::HasPermission::None && perms.canExecute() == Permissions::HasPermission::None) continue;
+        if (auto u = std::get_if<User>(&tag)) status.entities.insert(*u);
+        else if (auto g = std::get_if<Group>(&tag)) status.entities.insert(*g);
+    }
+
+    return status;
+}
+
+LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const StoreObject & storeObject)
+{
+    experimentalFeatureSettings.require(Xp::ACLs);
+
+    return std::visit(overloaded {
+        [&](StorePath p){
+            auto path = Store::toRealPath(p);
+            if (pathExists(path))
+                return getCurrentAccessStatus(path);
+            throw Error("getCurrentAccessStatus of inexisting path (%s)", path);
+        },
+        [&](StoreObjectDerivationOutput p) {
+            auto drv = readDerivation(p.drvPath);
+            auto outputHashes = staticOutputHashes(*this, drv);
+            auto drvOutputs = drv.outputsAndOptPaths(*this);
+            if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                auto path = Store::toRealPath(*drvOutputs.at(p.output).second);
+                if (pathExists(path)) {
+                    return getCurrentAccessStatus(path);
+                }
+                throw Error("getCurrentAccessStatus of inexisting drv path (%s)", path);
+            }
+            throw Error("getCurrentAccessStatus of inexisting p.output (%s)", p.output);
+        },
+        [&](StoreObjectDerivationLog l) {
+            auto baseName = l.drvPath.to_string();
+
+            auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+
+            if (pathExists(logPath))
+                return getCurrentAccessStatus(logPath);
+            throw Error("getCurrentAccessStatus of inexisting log path (%s)", logPath);
+        }
+    }, storeObject);
+}
+
+void LocalStore::grantBuildUserAccess(const StorePath & storePath, const LocalStore::AccessControlEntity & buildUser)
+{
+    // The builder-permissions directory remembers permissions to remove at the end of the build.
+    auto status = getCurrentAccessStatus(storePath);
+    if (! status.entities.contains(buildUser)){
+        auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
+        std::visit(overloaded {
+            [&](ACL::User u) { createDirs(basePath + "/users/" + std::to_string(u.uid)); },
+            [&](ACL::Group g) { createDirs(basePath + "/groups/" + std::to_string(g.gid)); },
+        }, buildUser);
+        addAllowedEntitiesCurrent(storePath, {buildUser});
+    }
+}
+
+
+LocalStore::AccessStatus LocalStore::getFutureAccessStatus(const StoreObject & storeObject)
+{
+    return futurePermissions.at(storeObject);
+}
+
+std::optional<LocalStore::AccessStatus> LocalStore::getFutureAccessStatusOpt(const StoreObject & storeObject)
+{
+    if (futurePermissions.contains(storeObject)){
+        return futurePermissions[storeObject];
+    }
+    return std::nullopt;
+
+}
+
+/**
+ * Compare the current and future access status to decide if permission should be synced up
+ *
+ * @precondition: The path of the store object must exist.
+ */
+
+bool LocalStore::shouldSyncPermissions(const StoreObject &storeObject) {
+    AccessStatus current = getCurrentAccessStatus(storeObject);
+    std::optional<AccessStatus> future = getFutureAccessStatusOpt(storeObject);
+    if (future){
+        return (current != future);
+    }
+    return false;
+}
+
+// TODO: make a pathOfStoreObjectFunction to deduplicate
+bool LocalStore::pathOfStoreObjectExists(const StoreObject & storeObject)
+{
+    experimentalFeatureSettings.require(Xp::ACLs);
+
+    return std::visit(overloaded {
+        [&](StorePath p){
+            auto path = Store::toRealPath(p);
+            return pathExists(path);
+        },
+        [&](StoreObjectDerivationOutput p) {
+            auto drv = readDerivation(p.drvPath);
+            auto outputHashes = staticOutputHashes(*this, drv);
+            auto drvOutputs = drv.outputsAndOptPaths(*this);
+            if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                auto path = Store::toRealPath(*drvOutputs.at(p.output).second);
+                return pathExists(path);
+                }
+            return false;
+        }
+        ,
+        [&](StoreObjectDerivationLog l) {
+            auto baseName = l.drvPath.to_string();
+            auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+            return pathExists(logPath);
+        }
+    }, storeObject);
+}
+
+void LocalStore::revokeBuildUserAccess(const StorePath & storePath, const LocalStore::AccessControlEntity & buildUser)
+{
+    auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
+    auto builderPermissionExisted = std::visit(overloaded {
+        [&](ACL::User u) { return std::filesystem::remove((basePath + "/users/" + std::to_string(u.uid)).c_str()); },
+        [&](ACL::Group g) { return std::filesystem::remove((basePath + "/groups/" + std::to_string(g.gid)).c_str()); },
+    }, buildUser);
+    if (builderPermissionExisted) removeAllowedEntitiesCurrent(storePath, {buildUser});
+}
+
+void LocalStore::revokeBuildUserAccess(const StorePath & storePath)
+{
+    auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
+    for (auto entry : std::filesystem::directory_iterator(basePath)) {
+        if (entry.is_directory()) {
+            for (auto entity : std::filesystem::directory_iterator(entry.path())) {
+                if (entity.path().filename() == "users") {
+                    auto entity_ = ACL::User (std::stoi(entity.path().filename()));
+                    revokeBuildUserAccess(storePath, entity_);
+                }
+                else if (entity.path().filename() == "groups") {
+                    auto entity_ = ACL::Group (std::stoi(entity.path().filename()));
+                    revokeBuildUserAccess(storePath, entity_);
+                }
+                else {
+                    std::filesystem::remove(entity.path());
+                }
+            }
+        }
+        std::filesystem::remove(entry.path());
+    }
+}
+
+void LocalStore::revokeBuildUserAccess()
+{
+    for (auto storePath : std::filesystem::directory_iterator(stateDir + "/acls/builder-permissions")) {
+        if (storePath.is_directory()) {
+            revokeBuildUserAccess(StorePath(storePath.path().filename().c_str()));
+        } else {
+            std::filesystem::remove(storePath.path());
+        }
+    }
+}
+
+std::set<ACL::Group> LocalStore::getSubjectGroupsUncached(ACL::User user)
+{
+    struct passwd * pw = getpwuid(user.uid);
+    auto groups_vec = getUserGroups(pw->pw_uid);
+    std::set<ACL::Group> groups;
+    for (auto group : groups_vec) {
+        groups.insert(group);
+    }
+    return groups;
+}
 
 /* Invalidate a path.  The caller is responsible for checking that
    there are no referrers. */
@@ -1051,7 +1470,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
     addTempRoot(info.path);
 
-    if (repair || !isValidPath(info.path)) {
+    if (repair || !isValidPath(info.path) || !canAccess(info.path, false)) {
 
         PathLocks outputLock;
 
@@ -1105,9 +1524,19 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             canonicalisePathMetaData(realPath, {});
 
-            optimisePath(realPath, repair); // FIXME: combine with hashPath()
+            optimisePath(realPath, repair);
 
             registerValidPath(info);
+
+        } else if (effectiveUser && !canAccess(info.path, false)) {
+            auto curInfo = queryPathInfo(info.path);
+            HashSink hashSink(HashAlgorithm::SHA256);
+            source.drainInto(hashSink);
+
+            /* Check that both new and old info matches */
+            // checkInfoValidity(hashSink.finish());
+            // checkInfoValidity({curInfo->narHash, curInfo->narSize});
+            addAllowedEntitiesFuture(info.path, {*effectiveUser});
         }
 
         outputLock.setDeletion(true);
@@ -1129,6 +1558,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
        temporary path. Otherwise, we move it to the destination store
        path. */
     bool inMemory = false;
+
+    bool protect = experimentalFeatureSettings.isEnabled(Xp::ACLs);
 
     std::string dump;
 
@@ -1167,9 +1598,9 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         tempPath = tempDir + "/x";
 
         if (method == FileIngestionMethod::Recursive)
-            restorePath(tempPath, bothSource);
+            restorePath(tempPath, bothSource, protect);
         else
-            writeFile(tempPath, bothSource);
+            writeFile(tempPath, bothSource, protect ? 0660 : 0666);
 
         dump.clear();
     }
@@ -1209,9 +1640,9 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 StringSource dumpSource { dump };
                 /* Restore from the NAR in memory. */
                 if (method == FileIngestionMethod::Recursive)
-                    restorePath(realPath, dumpSource);
+                    restorePath(realPath, dumpSource, protect);
                 else
-                    writeFile(realPath, dumpSource);
+                    writeFile(realPath, dumpSource, protect ? 0660 : 0666);
             } else {
                 /* Move the temporary path we restored above. */
                 moveFile(tempPath, realPath);
@@ -1272,7 +1703,9 @@ StorePath LocalStore::addTextToStore(
 
             autoGC();
 
-            writeFile(realPath, s);
+            mode_t mode = experimentalFeatureSettings.isEnabled(Xp::ACLs) ? 0440 : 0444;
+
+            writeFile(realPath, s, mode);
 
             canonicalisePathMetaData(realPath, {});
 

@@ -232,11 +232,11 @@
             boost
             libsodium
           ]
+          ++ lib.optionals stdenv.isLinux [libseccomp acl]
           ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
             editline
             lowdown-nix
           ]
-          ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [

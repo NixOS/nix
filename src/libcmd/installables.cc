@@ -1,4 +1,5 @@
 #include "globals.hh"
+#include "granular-access-store.hh"
 #include "installables.hh"
 #include "installable-derived-path.hh"
 #include "installable-attr-path.hh"
@@ -21,6 +22,8 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
+#include "store-cast.hh"
+#include "local-store.hh"
 
 #include <regex>
 #include <queue>
@@ -585,10 +588,11 @@ std::vector<BuiltPathWithResult> Installable::build(
     ref<Store> store,
     Realise mode,
     const Installables & installables,
-    BuildMode bMode)
+    BuildMode bMode,
+    bool protect)
 {
     std::vector<BuiltPathWithResult> res;
-    for (auto & [_, builtPathWithResult] : build2(evalStore, store, mode, installables, bMode))
+    for (auto & [_, builtPathWithResult] : build2(evalStore, store, mode, installables, bMode, protect))
         res.push_back(builtPathWithResult);
     return res;
 }
@@ -598,7 +602,8 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
     ref<Store> store,
     Realise mode,
     const Installables & installables,
-    BuildMode bMode)
+    BuildMode bMode,
+    bool protect)
 {
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
@@ -616,6 +621,17 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         for (auto b : i->toDerivedPaths()) {
             pathsToBuild.push_back(b.path);
             backmap[b.path].push_back({.info = b.info, .installable = i});
+            if (protect) {
+                LocalStore::AccessStatus status {true, {ACL::User(getuid())}};
+                std::visit(overloaded {
+                    [&](DerivedPath::Opaque p){
+                        require<LocalGranularAccessStore>(*store).setFutureAccessStatus(p.path, status);
+                    },
+                    [&](DerivedPath::Built b){
+                        require<LocalGranularAccessStore>(*store).setFutureAccessStatus(b, status);
+                    }
+                }, b.path);
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 #include <nlohmann/json.hpp>
 
+#include "config.hh"
 #include "path-info.hh"
 #include "store-api.hh"
 #include "json-utils.hh"
@@ -169,6 +170,15 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
     if (ca)
         jsonObject["ca"] = renderContentAddress(ca);
 
+    if (accessStatus) {
+        jsonObject["protected"] = accessStatus->isProtected;
+        for (auto & entity : accessStatus->entities) {
+            std::visit(overloaded {
+                [&](ACL::User u) { jsonObject["allowedUsers"].push_back(getUserName(u.uid)); },
+                [&](ACL::Group g) { jsonObject["allowedGroups"].push_back(getGroupName(g.gid)); },
+            }, entity);
+        }
+    }
     if (includeImpureInfo) {
         if (deriver)
             jsonObject["deriver"] = store.printStorePath(*deriver);
@@ -233,6 +243,17 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
 
     if (json.contains("signatures"))
         res.sigs = valueAt(json, "signatures");
+
+    if (experimentalFeatureSettings.isEnabled(Xp::ACLs) && json.contains("protected")) {
+        res.accessStatus = AccessStatus();
+        res.accessStatus->isProtected = json.at("protected");
+        if (json.contains("allowedUsers"))
+            for (std::string user : json.at("allowedUsers"))
+                res.accessStatus->entities.insert(ACL::User(user));
+        if (json.contains("allowedGroups"))
+            for (std::string group : json.at("allowedGroups"))
+                res.accessStatus->entities.insert(ACL::Group(group));
+    }
 
     return res;
 }

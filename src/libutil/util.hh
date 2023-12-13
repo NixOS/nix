@@ -23,6 +23,19 @@ void initLibUtil();
  */
 std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
+std::string getUserName();
+std::string getUserName(uid_t uid);
+std::string getGroupName(gid_t gid);
+
+/**
+ * Get the groups to which the user belongs
+ */
+std::vector<gid_t> getUserGroups(uid_t uid);
+
+/**
+ * Get the names of groups to which the user belongs
+ */
+std::vector<std::string> getUserGroupNames(uid_t uid);
 
 MakeError(FormatError, Error);
 

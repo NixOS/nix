@@ -55,6 +55,8 @@ struct RestoreSink : ParseSink
 {
     Path dstPath;
 
+    bool protect;
+
     void createDirectory(const Path & path) override;
 
     void createRegularFile(const Path & path) override;
