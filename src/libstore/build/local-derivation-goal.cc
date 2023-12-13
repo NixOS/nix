@@ -426,6 +426,7 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
     cleanupPostOutputsRegisteredModeCheck();
 }
 
+#if __linux__
 static void doBind(const Path & source, const Path & target, Store & store, bool optional = false) {
     auto doMount = [&](const Path & source, const Path & target) {
         debug("bind mounting '%1%' to '%2%'", source, target);
@@ -474,6 +475,7 @@ static void doBind(const Path & source, const Path & target, Store & store, bool
     }
     doMount(source, target);
 };
+#endif
 
 void LocalDerivationGoal::startBuilder()
 {
