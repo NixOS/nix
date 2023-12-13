@@ -101,11 +101,11 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             }
             else if (name == "AllowedUser") {
                 if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus();
-                accessStatus->entities.insert(ACL::User{getpwnam(value.c_str())->pw_uid});
+                accessStatus->entities.insert(ACL::User(value.c_str()));
             }
             else if (name == "AllowedGroup") {
                 if (!accessStatus) accessStatus = ValidPathInfo::AccessStatus();
-                accessStatus->entities.insert(ACL::Group{getgrnam(value.c_str())->gr_gid});
+                accessStatus->entities.insert(ACL::Group(value.c_str()));
             }
         }
 
