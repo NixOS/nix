@@ -171,14 +171,14 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDi
         auto accessor = fetchers::downloadTarball(
             EvalSettings::resolvePseudoUrl(s)).accessor;
         state.registerAccessor(accessor);
-        return accessor->root();
+        return SourcePath(accessor);
     }
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
         auto [accessor, _] = flakeRef.resolve(state.store).lazyFetch(state.store);
-        return accessor->root();
+        return SourcePath(accessor);
     }
 
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {

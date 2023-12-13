@@ -91,9 +91,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         for (auto & [outputName, outputPath] : outputs) {
             /* Add the output of this derivations to the allowed
                paths. */
-            if (rootFS->hasAccessControl()) {
-                allowPath(store->toRealPath(outputPath));
-            }
+            allowPath(store->toRealPath(outputPath));
+
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                 res.insert_or_assign(
@@ -111,25 +110,19 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     return res;
 }
 
-// FIXME: remove?
-struct RealisePathFlags {
-    // Whether to check that the path is allowed in pure eval mode
-    bool checkForPureEval = true;
-};
-
-static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, const RealisePathFlags flags = {})
+static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bool resolveSymlinks = true)
 {
     NixStringContext context;
 
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        if (!context.empty()) {
+        if (!context.empty() && path.accessor == state.rootFS) {
             auto rewrites = state.realiseContext(context);
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
-            return {path.accessor, CanonPath(realPath)};
-        } else
-            return path;
+            path = {path.accessor, CanonPath(realPath)};
+        }
+        return resolveSymlinks ? path.resolveSymlinks() : path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -169,7 +162,7 @@ static void mkOutputString(
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath);
+    auto path = realisePath(state, pos, vPath, false);
     auto path2 = path.path.abs();
 
 #if 0
@@ -1500,7 +1493,6 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
         }));
 
     NixStringContext context;
-    // FIXME: check rootPath
     auto path = state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'").path;
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
@@ -1541,28 +1533,19 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto & arg = *args[0];
-
-    /* We don’t check the path right now, because we don’t want to
-       throw if the path isn’t allowed, but just return false (and we
-       can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `arg` tries to
-       access an unauthorized path). */
-    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
-
-    /* SourcePath doesn't know about trailing slash. */
-    auto mustBeDir = arg.type() == nString
-        && (arg.string_view().ends_with("/")
-            || arg.string_view().ends_with("/."));
-
     try {
+        auto & arg = *args[0];
+
+        auto path = realisePath(state, pos, arg);
+
+        /* SourcePath doesn't know about trailing slash. */
+        auto mustBeDir = arg.type() == nString
+            && (arg.string_view().ends_with("/")
+                || arg.string_view().ends_with("/."));
+
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);
-    } catch (SysError & e) {
-        /* Don't give away info from errors while canonicalising
-           ‘path’ in restricted mode. */
-        v.mkBool(false);
     } catch (RestrictedPathError & e) {
         v.mkBool(false);
     }
@@ -1797,7 +1780,7 @@ static std::string_view fileTypeToString(InputAccessor::Type type)
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = realisePath(state, pos, *args[0], false);
     /* Retrieve the directory entry type and stringize it. */
     v.mkString(fileTypeToString(path.lstat().type));
 }
@@ -2214,7 +2197,7 @@ static void addPath(
     EvalState & state,
     const PosIdx pos,
     std::string_view name,
-    const SourcePath & path,
+    SourcePath path,
     Value * filterFun,
     FileIngestionMethod method,
     const std::optional<Hash> expectedHash,
@@ -2222,28 +2205,22 @@ static void addPath(
     const NixStringContext & context)
 {
     try {
-        // FIXME
-        #if 0
-        // FIXME: handle CA derivation outputs (where path needs to
-        // be rewritten to the actual output).
-        auto rewrites = state.realiseContext(context);
-        path = state.toRealPath(rewriteStrings(path, rewrites), context);
-        #endif
-
         StorePathSet refs;
 
-        // FIXME
-        #if 0
-        if (state.store->isInStore(path)) {
+        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
+            // FIXME: handle CA derivation outputs (where path needs to
+            // be rewritten to the actual output).
+            auto rewrites = state.realiseContext(context);
+            path = {state.rootFS, CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context))};
+
             try {
-                auto [storePath, subPath] = state.store->toStorePath(path);
+                auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
                 // FIXME: we should scanForReferences on the path before adding it
                 refs = state.store->queryPathInfo(storePath)->references;
-                path = state.store->toRealPath(storePath) + subPath;
+                path = {state.rootFS, CanonPath(state.store->toRealPath(storePath) + subPath)};
             } catch (Error &) { // FIXME: should be InvalidPathError
             }
         }
-        #endif
 
         std::unique_ptr<PathFilter> filter;
         if (filterFun)

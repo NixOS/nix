@@ -32,7 +32,6 @@ struct DerivedPath;
 struct SourcePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
-struct FSInputAccessor;
 struct MemoryInputAccessor;
 
 
@@ -224,7 +223,7 @@ public:
     /**
      * The accessor for the root filesystem.
      */
-    const ref<FSInputAccessor> rootFS;
+    const ref<InputAccessor> rootFS;
 
     /**
      * The in-memory filesystem for <nix/...> paths.

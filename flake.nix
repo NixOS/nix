@@ -36,8 +36,17 @@
       systems = linuxSystems ++ darwinSystems;
 
       crossSystems = [
-        "armv6l-linux" "armv7l-linux"
-        "x86_64-freebsd13" "x86_64-netbsd"
+        "armv6l-unknown-linux-gnueabihf"
+        "armv7l-unknown-linux-gnueabihf"
+        "x86_64-unknown-freebsd13"
+        "x86_64-unknown-netbsd"
+      ];
+
+      # Nix doesn't yet build on this platform, so we put it in a
+      # separate list. We just use this for `devShells` and
+      # `nixpkgsFor`, which this depends on.
+      shellCrossSystems = crossSystems ++ [
+        "x86_64-w64-mingw32"
       ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
@@ -114,8 +123,8 @@
               inherit system;
             };
             crossSystem = if crossSystem == null then null else {
-              system = crossSystem;
-            } // lib.optionalAttrs (crossSystem == "x86_64-freebsd13") {
+              config = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
               useLLVM = true;
             };
             overlays = [
@@ -127,7 +136,7 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
-          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          cross = lib.genAttrs shellCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
       commonDeps =
@@ -182,7 +191,7 @@
           "--enable-internal-api-docs"
         ];
 
-        changelog-d = pkgs.buildPackages.changelog-d;
+        changelog-d = pkgs.buildPackages.callPackage ./misc/changelog-d.nix { };
 
         nativeBuildDeps =
           [
@@ -208,7 +217,7 @@
 
         buildDeps =
           [ curl
-            bzip2 xz brotli editline
+            bzip2 xz brotli
             openssl sqlite
             libarchive
             (pkgs.libgit2.overrideAttrs (attrs: {
@@ -217,10 +226,13 @@
               cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
             }))
             boost
-            lowdown-nix
             libsodium
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp]
+          ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+            editline
+            lowdown-nix
+          ]
+          ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [
@@ -254,7 +266,7 @@
           ];
       };
 
-      installScriptFor = systems:
+      installScriptFor = tarballs:
         with nixpkgsFor.x86_64-linux.native;
         runCommand "installer-script"
           { buildInputs = [ nix ];
@@ -275,14 +287,14 @@
 
             substitute ${./scripts/install.in} $out/install \
               ${pkgs.lib.concatMapStrings
-                (system: let
-                    tarball = if builtins.elem system crossSystems then self.hydraJobs.binaryTarballCross.x86_64-linux.${system} else self.hydraJobs.binaryTarball.${system};
+                (tarball: let
+                    inherit (tarball.stdenv.hostPlatform) system;
                   in '' \
                   --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
                   --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
                   ''
                 )
-                systems
+                tarballs
               } --replace '@nixVersion@' ${version}
 
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
@@ -339,7 +351,7 @@
           installerClosureInfo = buildPackages.closureInfo { rootPaths = [ nix cacert ]; };
         in
 
-        buildPackages.runCommand "nix-binary-tarball-${version}"
+        pkgs.runCommand "nix-binary-tarball-${version}"
           { #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
             meta.description = "Distribution-independent Nix bootstrap binaries for ${pkgs.system}";
           }
@@ -508,7 +520,7 @@
               stdenv = currentStdenv;
             };
 
-            meta.platforms = lib.platforms.unix;
+            meta.platforms = lib.platforms.unix ++ lib.platforms.windows;
             meta.mainProgram = "nix";
           });
 
@@ -539,6 +551,8 @@
 
         # Binary package for various platforms.
         build = forAllSystems (system: self.packages.${system}.nix);
+
+        shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
         buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
@@ -573,8 +587,25 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "armv6l-linux" "armv7l-linux" ];
-        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
+        installerScript = installScriptFor [
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."i686-linux"
+          self.hydraJobs.binaryTarball."aarch64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          self.hydraJobs.binaryTarball."aarch64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+        ];
+        installerScriptForGHA = installScriptFor [
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+        ];
 
         # docker image with Nix inside
         dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
@@ -691,6 +722,11 @@
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
+        rl-next =
+          let pkgs = nixpkgsFor.${system}.native;
+          in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
+          LANG=C.UTF-8 ${(commonDeps { inherit pkgs; }).changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
+        '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });
@@ -779,7 +815,7 @@
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
             (makeShells "static" nixpkgsFor.${system}.static) //
-            (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+            (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }

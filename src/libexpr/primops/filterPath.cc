@@ -10,7 +10,7 @@ struct FilterPathInputAccessor : CachingFilteringInputAccessor
     Value * filterFun;
 
     FilterPathInputAccessor(EvalState & state, PosIdx pos, const SourcePath & src, Value * filterFun)
-        : CachingFilteringInputAccessor(src)
+        : CachingFilteringInputAccessor(src, {})
         , state(state)
         , pos(pos)
         , filterFun(filterFun)
@@ -74,7 +74,7 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value
 
     state.registerAccessor(accessor);
 
-    v.mkPath(accessor->root());
+    v.mkPath(SourcePath(accessor));
 }
 
 static RegisterPrimOp primop_filterPath({

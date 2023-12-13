@@ -650,7 +650,7 @@ LockedFlake lockFlake(
                                     auto resolvedRef = maybeResolve(state, *input.ref, useRegistries);
                                     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
                                     state.registerAccessor(accessor);
-                                    return {accessor->root(), lockedRef};
+                                    return {SourcePath(accessor), lockedRef};
                                 }
                             }();
 
@@ -793,7 +793,7 @@ void callFlake(EvalState & state,
 
         emitTreeAttrs(
             state,
-            sourcePath.accessor->root(),
+            SourcePath(sourcePath.accessor),
             lockedNode ? lockedNode->lockedRef.input : lockedFlake.flake.lockedRef.input,
             vSourceInfo,
             false,

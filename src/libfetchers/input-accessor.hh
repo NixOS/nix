@@ -37,8 +37,6 @@ struct InputAccessor : virtual SourceAccessor, std::enable_shared_from_this<Inpu
         FileIngestionMethod method = FileIngestionMethod::Recursive,
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair);
-
-    SourcePath root();
 };
 
 typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
@@ -57,6 +55,11 @@ struct SourcePath
 {
     ref<InputAccessor> accessor;
     CanonPath path;
+
+    SourcePath(ref<InputAccessor> accessor, CanonPath path = CanonPath::root)
+        : accessor(std::move(accessor))
+        , path(std::move(path))
+    { }
 
     std::string_view baseName() const;
 

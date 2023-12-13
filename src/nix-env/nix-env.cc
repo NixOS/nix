@@ -97,7 +97,7 @@ static bool isNixExpr(const SourcePath & path, struct InputAccessor::Stat & st)
 {
     return
         st.type == InputAccessor::tRegular
-        || (st.type == InputAccessor::tDirectory && (path + "default.nix").pathExists());
+        || (st.type == InputAccessor::tDirectory && (path + "default.nix").resolveSymlinks().pathExists());
 }
 
 
@@ -116,11 +116,11 @@ static void getAllExprs(EvalState & state,
            are implemented using profiles). */
         if (i == "manifest.nix") continue;
 
-        SourcePath path2 = path + i;
+        auto path2 = (path + i).resolveSymlinks();
 
         InputAccessor::Stat st;
         try {
-            st = path2.resolveSymlinks().lstat();
+            st = path2.lstat();
         } catch (Error &) {
             continue; // ignore dangling symlinks in ~/.nix-defexpr
         }

@@ -205,8 +205,19 @@ public:
      * `CanonPath(this.makeRelative(x), this) == path`.
      */
     std::string makeRelative(const CanonPath & path) const;
+
+    friend class std::hash<CanonPath>;
 };
 
 std::ostream & operator << (std::ostream & stream, const CanonPath & path);
 
 }
+
+template<>
+struct std::hash<nix::CanonPath>
+{
+    std::size_t operator ()(const nix::CanonPath & s) const noexcept
+    {
+        return std::hash<std::string>{}(s.path);
+    }
+};

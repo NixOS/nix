@@ -1,6 +1,7 @@
+---
 synopsis: Rename hash format `base32` to `nix32`
-prs: #9452
-description: {
+prs: 9452
+---
 
 Hash format `base32` was renamed to `nix32` since it used a special nix-specific character set for 
 [Base32](https://en.wikipedia.org/wiki/Base32).

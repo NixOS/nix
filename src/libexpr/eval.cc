@@ -14,6 +14,7 @@
 #include "profiles.hh"
 #include "print.hh"
 #include "fs-input-accessor.hh"
+#include "filtering-input-accessor.hh"
 #include "memory-input-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
@@ -344,7 +345,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Value nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue, noPos, "while evaluating an attribute name");
+        state.forceStringNoCtx(nameValue, name.expr->getPos(), "while evaluating an attribute name");
         return state.symbols.create(nameValue.string_view());
     }
 }
@@ -510,17 +511,15 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
-        makeFSInputAccessor(
-            CanonPath::root,
-            evalSettings.restrictEval || evalSettings.pureEval
-            ? std::optional<std::set<CanonPath>>(std::set<CanonPath>())
-            : std::nullopt,
+        evalSettings.restrictEval || evalSettings.pureEval
+        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(CanonPath::root), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
+        : makeFSInputAccessor(CanonPath::root))
     , corepkgsFS(makeMemoryInputAccessor())
     , internalFS(makeMemoryInputAccessor())
     , derivationInternal{corepkgsFS->addFile(
@@ -564,7 +563,7 @@ EvalState::EvalState(
     }
 
     /* Allow access to all paths in the search path. */
-    if (rootFS->hasAccessControl())
+    if (rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
         for (auto & i : searchPath.elements)
             resolveSearchPathPath(i.path, true);
 
@@ -584,12 +583,14 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    rootFS->allowPath(CanonPath(path));
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    rootFS->allowPath(CanonPath(store->toRealPath(storePath)));
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(store->toRealPath(storePath)));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
@@ -618,12 +619,14 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        rootFS->checkAllowed(CanonPath(uri));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        rootFS->checkAllowed(CanonPath(uri.substr(7)));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri.substr(7)));
         return;
     }
 
@@ -1456,7 +1459,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     for (auto & i : attrPath) {
-        state.forceValue(*vAttrs, noPos);
+        state.forceValue(*vAttrs, getPos());
         Bindings::iterator j;
         auto name = getName(i, state, env);
         if (vAttrs->type() != nAttrs ||
@@ -1626,7 +1629,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[name]++;
 
                 try {
-                    vCur.primOp->fun(*this, noPos, args, vCur);
+                    vCur.primOp->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
@@ -1674,7 +1677,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    primOp->primOp->fun(*this, noPos, vArgs, vCur);
+                    primOp->primOp->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
@@ -1782,7 +1785,7 @@ https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbo
         }
     }
 
-    callFunction(fun, allocValue()->mkAttrs(attrs), res, noPos);
+    callFunction(fun, allocValue()->mkAttrs(attrs), res, pos);
 }
 
 
@@ -1818,7 +1821,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e, noPos, "in the argument of the not operator")); // XXX: FIXME: !
+    v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
 }
 
 
@@ -2015,7 +2018,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 if (sSize <= 1 && !hasPrefix(*part, "/") && accessor != state.rootFS.get_ptr() && !part->empty())
                     state.error(
                         "cannot append non-absolute path '%1%' to '%2%' (hint: change it to '/%1%')",
-                        (std::string) *part, accessor->root().to_string())
+                        (std::string) *part, SourcePath(ref(accessor)).to_string())
                         .atPos(i_pos)
                         .withFrame(env, *this)
                         .debugThrow<EvalError>();
@@ -2274,9 +2277,9 @@ BackedStringView EvalState::coerceToString(
             std::string result;
             for (auto [n, v2] : enumerate(v.listItems())) {
                 try {
-                    result += *coerceToString(noPos, *v2, context,
-                        "while evaluating one element of the list",
-                        coerceMore, copyToStore);
+                    result += *coerceToString(pos, *v2, context,
+                            "while evaluating one element of the list",
+                            coerceMore, copyToStore);
                 } catch (Error & e) {
                     e.addTrace(positions[pos], errorCtx);
                     throw;
@@ -2423,8 +2426,8 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
 
 bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx)
 {
-    forceValue(v1, noPos);
-    forceValue(v2, noPos);
+    forceValue(v1, pos);
+    forceValue(v2, pos);
 
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls

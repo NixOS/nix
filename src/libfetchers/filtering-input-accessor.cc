@@ -36,15 +36,48 @@ std::string FilteringInputAccessor::readLink(const CanonPath & path)
     return next->readLink(prefix + path);
 }
 
-void FilteringInputAccessor::checkAccess(const CanonPath & path)
-{
-    if (!isAllowed(path))
-        throw Error("access to path '%s' has been filtered out", showPath(path));
-}
-
 std::string FilteringInputAccessor::showPath(const CanonPath & path)
 {
     return next->showPath(prefix + path);
+}
+
+void FilteringInputAccessor::checkAccess(const CanonPath & path)
+{
+    if (!isAllowed(path))
+        throw makeNotAllowedError
+            ? makeNotAllowedError(path)
+            : RestrictedPathError("access to path '%s' is forbidden", showPath(path));
+}
+
+struct AllowListInputAccessorImpl : AllowListInputAccessor
+{
+    std::set<CanonPath> allowedPaths;
+
+    AllowListInputAccessorImpl(
+        ref<InputAccessor> next,
+        std::set<CanonPath> && allowedPaths,
+        MakeNotAllowedError && makeNotAllowedError)
+        : AllowListInputAccessor(SourcePath(next), std::move(makeNotAllowedError))
+        , allowedPaths(std::move(allowedPaths))
+    { }
+
+    bool isAllowed(const CanonPath & path) override
+    {
+        return path.isAllowed(allowedPaths);
+    }
+
+    void allowPath(CanonPath path) override
+    {
+        allowedPaths.insert(std::move(path));
+    }
+};
+
+ref<AllowListInputAccessor> AllowListInputAccessor::create(
+    ref<InputAccessor> next,
+    std::set<CanonPath> && allowedPaths,
+    MakeNotAllowedError && makeNotAllowedError)
+{
+    return make_ref<AllowListInputAccessorImpl>(next, std::move(allowedPaths), std::move(makeNotAllowedError));
 }
 
 bool CachingFilteringInputAccessor::isAllowed(const CanonPath & path)

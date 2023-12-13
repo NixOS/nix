@@ -138,12 +138,16 @@ struct PathInputScheme : InputScheme
 
             input2.attrs.erase("lastModified");
 
+            #if 0
+            // FIXME: produce a better error message if the path does
+            // not exist in the source directory.
             auto makeNotAllowedError = [absPath](const CanonPath & path) -> RestrictedPathError
             {
                 return RestrictedPathError("path '%s' does not exist'", absPath + path);
             };
+            #endif
 
-            return {makeStorePathAccessor(store, *storePath, std::move(makeNotAllowedError)), std::move(input2)};
+            return {makeStorePathAccessor(store, *storePath), std::move(input2)};
 
         } else {
             return {makeFSInputAccessor(absPath), std::move(input2)};

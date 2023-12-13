@@ -707,16 +707,17 @@ SourcePath resolveExprPath(SourcePath path)
 
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    while (true) {
+    while (!path.path.isRoot()) {
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
             throw Error("too many symbolic links encountered while traversing the path '%s'", path);
-        if (path.lstat().type != InputAccessor::tSymlink) break;
-        path = {path.accessor, CanonPath(path.readLink(), path.path.parent().value_or(CanonPath::root))};
+        auto p = path.parent().resolveSymlinks() + path.baseName();
+        if (p.lstat().type != InputAccessor::tSymlink) break;
+        path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path.lstat().type == InputAccessor::tDirectory)
+    if (path.resolveSymlinks().lstat().type == InputAccessor::tDirectory)
         return path + "default.nix";
 
     return path;
@@ -731,7 +732,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 
 Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto buffer = path.readFile();
+    auto buffer = path.resolveSymlinks().readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
@@ -811,7 +812,7 @@ std::optional<SourcePath> EvalState::resolveSearchPathPath(const SearchPath::Pat
             auto accessor = fetchers::downloadTarball(
                 EvalSettings::resolvePseudoUrl(value)).accessor;
             registerAccessor(accessor);
-            res.emplace(accessor->root());
+            res.emplace(SourcePath(accessor));
         } catch (Error & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -824,7 +825,7 @@ std::optional<SourcePath> EvalState::resolveSearchPathPath(const SearchPath::Pat
         auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", value);
         auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
-        res.emplace(accessor->root());
+        res.emplace(SourcePath(accessor));
     }
 
     else {

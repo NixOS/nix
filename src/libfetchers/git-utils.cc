@@ -726,7 +726,7 @@ struct GitInputAccessor : InputAccessor
         return toHash(*git_tree_entry_id(entry));
     }
 
-    std::map<CanonPath, TreeEntry> lookupCache;
+    std::unordered_map<CanonPath, TreeEntry> lookupCache;
 
     /* Recursively look up 'path' relative to the root. */
     git_tree_entry * lookup(const CanonPath & path)

@@ -227,6 +227,131 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
+    unkeyedValidPathInfo_2_3,
+    "unkeyed-valid-path-info-2.3",
+    2 << 8 | 3,
+    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo> {
+        ({
+            UnkeyedValidPathInfo info { Hash::dummy };
+            info.narSize = 34878;
+            info;
+        }),
+        ({
+            UnkeyedValidPathInfo info { Hash::dummy };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv",
+                },
+            };
+            info.narSize = 34878;
+            info;
+        }),
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    unkeyedValidPathInfo_2_4,
+    "unkeyed-valid-path-info-2.4",
+    2 << 8 | 4,
+    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo> {
+        ({
+            UnkeyedValidPathInfo info {
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv",
+                },
+            };
+            info.narSize = 34878;
+            info;
+        }),
+        ({
+            ValidPathInfo info {
+                *LibStoreTest::store,
+                "foo",
+                FixedOutputInfo {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = hashString(HashAlgorithm::SHA256, "(...)"),
+                    .references = {
+                        .others = {
+                            StorePath {
+                                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                            },
+                        },
+                        .self = true,
+                    },
+                },
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.narSize = 34878;
+            info.sigs = {
+                "fake-sig-1",
+                "fake-sig-2",
+            },
+            static_cast<UnkeyedValidPathInfo>(std::move(info));
+        }),
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    build_options_2_1,
+    "build-options-2.1",
+    2 << 8 | 1,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    build_options_2_2,
+    "build-options-2.2",
+    2 << 8 | 2,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+        .maxLogSize = 7,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    build_options_2_3,
+    "build-options-2.3",
+    2 << 8 | 3,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+        .maxLogSize = 7,
+        .nrRepeats = 8,
+        .enforceDeterminism = true,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    build_options_2_7,
+    "build-options-2.7",
+    2 << 8 | 7,
+    (ServeProto::BuildOptions {
+        .maxSilentTime = 5,
+        .buildTimeout = 6,
+        .maxLogSize = 7,
+        .nrRepeats = 8,
+        .enforceDeterminism = false,
+        .keepFailed = true,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
     vector,
     "vector",
     defaultVersion,
