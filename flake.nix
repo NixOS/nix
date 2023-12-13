@@ -167,7 +167,7 @@
             '';
           };
 
-          lowdown-nix = final.callPackage ./lowdown.nix {
+          lowdown-nix = final.callPackage ./misc/lowdown.nix {
             inherit lowdown-src stdenv;
           };
 
