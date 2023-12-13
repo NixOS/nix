@@ -210,7 +210,7 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, HashAlgorithm::SHA256, filter);
 
                 return {std::move(storePath), input};
             }
@@ -220,7 +220,7 @@ struct MercurialInputScheme : InputScheme
 
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
-            if (hash.has_value() && hash->type != htSHA1)
+            if (hash.has_value() && hash->algo != HashAlgorithm::SHA1)
                 throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(HashFormat::Base16, true));
         };
 
@@ -260,14 +260,14 @@ struct MercurialInputScheme : InputScheme
         });
 
         if (auto res = getCache()->lookup(store, unlockedAttrs)) {
-            auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
+            auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), HashAlgorithm::SHA1);
             if (!input.getRev() || input.getRev() == rev2) {
                 input.attrs.insert_or_assign("rev", rev2.gitRev());
                 return makeResult(res->first, std::move(res->second));
             }
         }
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(HashFormat::Base32, false));
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false));
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
@@ -301,7 +301,7 @@ struct MercurialInputScheme : InputScheme
             runHg({ "log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}" }));
         assert(tokens.size() == 3);
 
-        input.attrs.insert_or_assign("rev", Hash::parseAny(tokens[0], htSHA1).gitRev());
+        input.attrs.insert_or_assign("rev", Hash::parseAny(tokens[0], HashAlgorithm::SHA1).gitRev());
         auto revCount = std::stoull(tokens[1]);
         input.attrs.insert_or_assign("ref", tokens[2]);
 

@@ -77,18 +77,18 @@ public:
      * Add a content-addressable store path. `dump` will be drained.
      */
     ref<const ValidPathInfo> addCAToStore(
-        Source & dump,
-        std::string_view name,
-        ContentAddressMethod caMethod,
-        HashType hashType,
-        const StorePathSet & references,
-        RepairFlag repair);
+            Source & dump,
+            std::string_view name,
+            ContentAddressMethod caMethod,
+            HashAlgorithm hashAlgo,
+            const StorePathSet & references,
+            RepairFlag repair);
 
     /**
      * Add a content-addressable store path. Does not support references. `dump` will be drained.
      */
     StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
+                                 FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;

@@ -62,11 +62,11 @@ struct CmdAddToStore : MixDryRun, MixProtect, StoreCommand
         StringSink sink;
         dumpPath(path, sink);
 
-        auto narHash = hashString(htSHA256, sink.s);
+        auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
 
         Hash hash = narHash;
         if (ingestionMethod == FileIngestionMethod::Flat) {
-            HashSink hsink(htSHA256);
+            HashSink hsink(HashAlgorithm::SHA256);
             readFile(path, hsink);
             hash = hsink.finish().first;
         }

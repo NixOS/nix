@@ -15,7 +15,7 @@ namespace nix {
 
 /* protocol-specific definitions */
 
-std::optional<TrustedFlag> WorkerProto::Serialise<std::optional<TrustedFlag>>::read(const Store & store, WorkerProto::ReadConn conn)
+std::optional<TrustedFlag> WorkerProto::Serialise<std::optional<TrustedFlag>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto temp = readNum<uint8_t>(conn.from);
     switch (temp) {
@@ -30,7 +30,7 @@ std::optional<TrustedFlag> WorkerProto::Serialise<std::optional<TrustedFlag>>::r
     }
 }
 
-void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const Store & store, WorkerProto::WriteConn conn, const std::optional<TrustedFlag> & optTrusted)
+void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const std::optional<TrustedFlag> & optTrusted)
 {
     if (!optTrusted)
         conn.to << uint8_t{0};
@@ -48,42 +48,42 @@ void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const Store & sto
     }
 }
 
-AuthenticatedUser WorkerProto::Serialise<AuthenticatedUser>::read(const Store & store, WorkerProto::ReadConn conn) {
+AuthenticatedUser WorkerProto::Serialise<AuthenticatedUser>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn) {
     AuthenticatedUser user;
     user.trusted = *WorkerProto::Serialise<std::optional<TrustedFlag>>::read(store, conn);
     conn.from >> user.uid;
     return user;
 }
 
-void WorkerProto::Serialise<AuthenticatedUser>::write(const Store & store, WorkerProto::WriteConn conn, const AuthenticatedUser & user)
+void WorkerProto::Serialise<AuthenticatedUser>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const AuthenticatedUser & user)
 {
     WorkerProto::Serialise<std::optional<TrustedFlag>>::write(store, conn, user.trusted);
     conn.to << user.uid;
 }
 
-ACL::User WorkerProto::Serialise<ACL::User>::read(const Store & store, WorkerProto::ReadConn conn) {
+ACL::User WorkerProto::Serialise<ACL::User>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn) {
     uid_t uid;
     conn.from >> uid;
     return uid;
 }
 
-void WorkerProto::Serialise<ACL::User>::write(const Store & store, WorkerProto::WriteConn conn, const ACL::User & user)
+void WorkerProto::Serialise<ACL::User>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const ACL::User & user)
 {
     conn.to << user.uid;
 }
 
-ACL::Group WorkerProto::Serialise<ACL::Group>::read(const Store & store, WorkerProto::ReadConn conn) {
+ACL::Group WorkerProto::Serialise<ACL::Group>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn) {
     gid_t gid;
     conn.from >> gid;
     return gid;
 }
 
-void WorkerProto::Serialise<ACL::Group>::write(const Store & store, WorkerProto::WriteConn conn, const ACL::Group & group)
+void WorkerProto::Serialise<ACL::Group>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const ACL::Group & group)
 {
     conn.to << group.gid;
 }
 
-DerivedPath WorkerProto::Serialise<DerivedPath>::read(const Store & store, WorkerProto::ReadConn conn)
+DerivedPath WorkerProto::Serialise<DerivedPath>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto s = readString(conn.from);
     if (GET_PROTOCOL_MINOR(conn.version) >= 30) {
@@ -93,7 +93,7 @@ DerivedPath WorkerProto::Serialise<DerivedPath>::read(const Store & store, Worke
     }
 }
 
-void WorkerProto::Serialise<DerivedPath>::write(const Store & store, WorkerProto::WriteConn conn, const DerivedPath & req)
+void WorkerProto::Serialise<DerivedPath>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const DerivedPath & req)
 {
     if (GET_PROTOCOL_MINOR(conn.version) >= 30) {
         conn.to << req.to_string_legacy(store);
@@ -116,30 +116,30 @@ void WorkerProto::Serialise<DerivedPath>::write(const Store & store, WorkerProto
     }
 }
 
-StoreObjectDerivationOutput WorkerProto::Serialise<StoreObjectDerivationOutput>::read(const Store & store, WorkerProto::ReadConn conn)
+StoreObjectDerivationOutput WorkerProto::Serialise<StoreObjectDerivationOutput>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto drvPath = WorkerProto::Serialise<StorePath>::read(store, conn);
     auto output = WorkerProto::Serialise<std::string>::read(store, conn);
     return {drvPath, output};
 }
 
-void WorkerProto::Serialise<StoreObjectDerivationOutput>::write(const Store & store, WorkerProto::WriteConn conn, const StoreObjectDerivationOutput & drvOutput)
+void WorkerProto::Serialise<StoreObjectDerivationOutput>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const StoreObjectDerivationOutput & drvOutput)
 {
     WorkerProto::Serialise<StorePath>::write(store, conn, drvOutput.drvPath);
     WorkerProto::Serialise<std::string>::write(store, conn, drvOutput.output);
 }
 
-StoreObjectDerivationLog WorkerProto::Serialise<StoreObjectDerivationLog>::read(const Store & store, WorkerProto::ReadConn conn)
+StoreObjectDerivationLog WorkerProto::Serialise<StoreObjectDerivationLog>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     return { WorkerProto::Serialise<StorePath>::read(store, conn) };
 }
 
-void WorkerProto::Serialise<StoreObjectDerivationLog>::write(const Store & store, WorkerProto::WriteConn conn, const StoreObjectDerivationLog & drvLog)
+void WorkerProto::Serialise<StoreObjectDerivationLog>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const StoreObjectDerivationLog & drvLog)
 {
     WorkerProto::Serialise<StorePath>::write(store, conn, drvLog.drvPath);
 }
 
-KeyedBuildResult WorkerProto::Serialise<KeyedBuildResult>::read(const Store & store, WorkerProto::ReadConn conn)
+KeyedBuildResult WorkerProto::Serialise<KeyedBuildResult>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto path = WorkerProto::Serialise<DerivedPath>::read(store, conn);
     auto br = WorkerProto::Serialise<BuildResult>::read(store, conn);
@@ -149,14 +149,14 @@ KeyedBuildResult WorkerProto::Serialise<KeyedBuildResult>::read(const Store & st
     };
 }
 
-void WorkerProto::Serialise<KeyedBuildResult>::write(const Store & store, WorkerProto::WriteConn conn, const KeyedBuildResult & res)
+void WorkerProto::Serialise<KeyedBuildResult>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const KeyedBuildResult & res)
 {
     WorkerProto::write(store, conn, res.path);
     WorkerProto::write(store, conn, static_cast<const BuildResult &>(res));
 }
 
 
-BuildResult WorkerProto::Serialise<BuildResult>::read(const Store & store, WorkerProto::ReadConn conn)
+BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     BuildResult res;
     res.status = static_cast<BuildResult::Status>(readInt(conn.from));
@@ -178,7 +178,7 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const Store & store, Worke
     return res;
 }
 
-void WorkerProto::Serialise<BuildResult>::write(const Store & store, WorkerProto::WriteConn conn, const BuildResult & res)
+void WorkerProto::Serialise<BuildResult>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const BuildResult & res)
 {
     conn.to
         << res.status
@@ -199,7 +199,7 @@ void WorkerProto::Serialise<BuildResult>::write(const Store & store, WorkerProto
 }
 
 
-ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const Store & store, ReadConn conn)
+ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
 {
     auto path = WorkerProto::Serialise<StorePath>::read(store, conn);
     return ValidPathInfo {
@@ -208,17 +208,17 @@ ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const Store & store, R
     };
 }
 
-void WorkerProto::Serialise<ValidPathInfo>::write(const Store & store, WriteConn conn, const ValidPathInfo & pathInfo)
+void WorkerProto::Serialise<ValidPathInfo>::write(const StoreDirConfig & store, WriteConn conn, const ValidPathInfo & pathInfo)
 {
     WorkerProto::write(store, conn, pathInfo.path);
     WorkerProto::write(store, conn, static_cast<const UnkeyedValidPathInfo &>(pathInfo));
 }
 
 
-UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const Store & store, ReadConn conn)
+UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
 {
     auto deriver = readString(conn.from);
-    auto narHash = Hash::parseAny(readString(conn.from), htSHA256);
+    auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
     UnkeyedValidPathInfo info(narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
@@ -231,7 +231,7 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
     return info;
 }
 
-void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const Store & store, WriteConn conn, const UnkeyedValidPathInfo & pathInfo)
+void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & store, WriteConn conn, const UnkeyedValidPathInfo & pathInfo)
 {
     conn.to
         << (pathInfo.deriver ? store.printStorePath(*pathInfo.deriver) : "")

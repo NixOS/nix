@@ -20,7 +20,7 @@ cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 build-users-group =
 keep-derivations = false
 sandbox = false
-experimental-features = nix-command flakes acls
+experimental-features = nix-command
 gc-reserved-space = 0
 substituters =
 flake-registry = $TEST_ROOT/registry.json
@@ -31,6 +31,7 @@ EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
 fsync-metadata = false
+extra-experimental-features = flakes acls
 !include nix.conf.extra.not-there
 EOF
 

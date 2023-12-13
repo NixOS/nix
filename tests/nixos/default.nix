@@ -10,6 +10,7 @@ let
     hostPkgs = nixpkgsFor.${system}.native;
     defaults = {
       nixpkgs.pkgs = nixpkgsFor.${system}.native;
+      nix.checkAllErrors = false;
     };
     _module.args.nixpkgs = nixpkgs;
   };

@@ -36,8 +36,6 @@ struct InputAccessor : virtual SourceAccessor, std::enable_shared_from_this<Inpu
         FileIngestionMethod method = FileIngestionMethod::Recursive,
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair);
-
-    SourcePath root();
 };
 
 /**
@@ -50,6 +48,11 @@ struct SourcePath
 {
     ref<InputAccessor> accessor;
     CanonPath path;
+
+    SourcePath(ref<InputAccessor> accessor, CanonPath path = CanonPath::root)
+        : accessor(std::move(accessor))
+        , path(std::move(path))
+    { }
 
     std::string_view baseName() const;
 
@@ -127,7 +130,7 @@ struct SourcePath
     { return accessor->getPhysicalPath(path); }
 
     std::string to_string() const
-    { return path.abs(); }
+    { return accessor->showPath(path); }
 
     /**
      * Append a `CanonPath` to this path.

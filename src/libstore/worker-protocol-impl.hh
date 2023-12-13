@@ -17,11 +17,11 @@ namespace nix {
 /* protocol-agnostic templates */
 
 #define WORKER_USE_LENGTH_PREFIX_SERIALISER(TEMPLATE, T) \
-    TEMPLATE T WorkerProto::Serialise< T >::read(const Store & store, WorkerProto::ReadConn conn) \
+    TEMPLATE T WorkerProto::Serialise< T >::read(const StoreDirConfig & store, WorkerProto::ReadConn conn) \
     { \
         return LengthPrefixedProtoHelper<WorkerProto, T >::read(store, conn); \
     } \
-    TEMPLATE void WorkerProto::Serialise< T >::write(const Store & store, WorkerProto::WriteConn conn, const T & t) \
+    TEMPLATE void WorkerProto::Serialise< T >::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const T & t) \
     { \
         LengthPrefixedProtoHelper<WorkerProto, T >::write(store, conn, t); \
     }
@@ -42,12 +42,12 @@ WORKER_USE_LENGTH_PREFIX_SERIALISER(
 template<typename T>
 struct WorkerProto::Serialise
 {
-    static T read(const Store & store, WorkerProto::ReadConn conn)
+    static T read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
     {
         return CommonProto::Serialise<T>::read(store,
             CommonProto::ReadConn { .from = conn.from });
     }
-    static void write(const Store & store, WorkerProto::WriteConn conn, const T & t)
+    static void write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const T & t)
     {
         CommonProto::Serialise<T>::write(store,
             CommonProto::WriteConn { .to = conn.to },
@@ -58,7 +58,7 @@ struct WorkerProto::Serialise
 /* protocol-specific templates */
 
 template<typename T>
-AccessStatusFor<T> WorkerProto::Serialise<AccessStatusFor<T>>::read(const Store & store, WorkerProto::ReadConn conn) {
+AccessStatusFor<T> WorkerProto::Serialise<AccessStatusFor<T>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn) {
     AccessStatusFor<T> status;
     conn.from >> status.isProtected;
     status.entities = WorkerProto::Serialise<std::set<T>>::read(store, conn);
@@ -66,14 +66,14 @@ AccessStatusFor<T> WorkerProto::Serialise<AccessStatusFor<T>>::read(const Store 
 }
 
 template<typename T>
-void WorkerProto::Serialise<AccessStatusFor<T>>::write(const Store & store, WorkerProto::WriteConn conn, const AccessStatusFor<T> & status)
+void WorkerProto::Serialise<AccessStatusFor<T>>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const AccessStatusFor<T> & status)
 {
     conn.to << status.isProtected;
     WorkerProto::Serialise<std::set<T>>::write(store, conn, status.entities);
 }
 
 template<typename A, typename B>
-std::variant<A, B> WorkerProto::Serialise<std::variant<A, B>>::read(const Store & store, WorkerProto::ReadConn conn)
+std::variant<A, B> WorkerProto::Serialise<std::variant<A, B>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     size_t index;
     conn.from >> index;
@@ -90,7 +90,7 @@ std::variant<A, B> WorkerProto::Serialise<std::variant<A, B>>::read(const Store 
 }
 
 template<typename A, typename B>
-void WorkerProto::Serialise<std::variant<A, B>>::write(const Store & store, WorkerProto::WriteConn conn, const std::variant<A, B> & resVariant)
+void WorkerProto::Serialise<std::variant<A, B>>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const std::variant<A, B> & resVariant)
 {
         size_t index = resVariant.index();
         conn.to << index;
@@ -106,7 +106,7 @@ void WorkerProto::Serialise<std::variant<A, B>>::write(const Store & store, Work
         }
 }
 template<typename A, typename B, typename C>
-std::variant<A, B, C> WorkerProto::Serialise<std::variant<A, B, C>>::read(const Store & store, WorkerProto::ReadConn conn)
+std::variant<A, B, C> WorkerProto::Serialise<std::variant<A, B, C>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     size_t index;
     conn.from >> index;
@@ -123,7 +123,7 @@ std::variant<A, B, C> WorkerProto::Serialise<std::variant<A, B, C>>::read(const 
 }
 
 template<typename A, typename B, typename C>
-void WorkerProto::Serialise<std::variant<A, B, C>>::write(const Store & store, WorkerProto::WriteConn conn, const std::variant<A, B, C> & resVariant)
+void WorkerProto::Serialise<std::variant<A, B, C>>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const std::variant<A, B, C> & resVariant)
 {
         size_t index = resVariant.index();
         conn.to << index;

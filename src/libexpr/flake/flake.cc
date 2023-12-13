@@ -904,7 +904,7 @@ Fingerprint LockedFlake::getFingerprint() const
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
-    return hashString(htSHA256,
+    return hashString(HashAlgorithm::SHA256,
         fmt("%s;%s;%d;%d;%s",
             flake.storePath.to_string(),
             flake.lockedRef.subdir,

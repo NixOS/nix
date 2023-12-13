@@ -39,11 +39,11 @@ void SourceAccessor::readFile(
 }
 
 Hash SourceAccessor::hashPath(
-    const CanonPath & path,
-    PathFilter & filter,
-    HashType ht)
+        const CanonPath & path,
+        PathFilter & filter,
+        HashAlgorithm ha)
 {
-    HashSink sink(ht);
+    HashSink sink(ha);
     dumpPath(path, sink, filter);
     return sink.finish().first;
 }

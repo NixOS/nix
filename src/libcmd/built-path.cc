@@ -80,7 +80,7 @@ SingleDerivedPath SingleBuiltPath::discardOutputPath() const
     );
 }
 
-nlohmann::json BuiltPath::Built::toJSON(const Store & store) const
+nlohmann::json BuiltPath::Built::toJSON(const StoreDirConfig & store) const
 {
     nlohmann::json res;
     res["drvPath"] = drvPath->toJSON(store);
@@ -90,7 +90,7 @@ nlohmann::json BuiltPath::Built::toJSON(const Store & store) const
     return res;
 }
 
-nlohmann::json SingleBuiltPath::Built::toJSON(const Store & store) const
+nlohmann::json SingleBuiltPath::Built::toJSON(const StoreDirConfig & store) const
 {
     nlohmann::json res;
     res["drvPath"] = drvPath->toJSON(store);
@@ -100,14 +100,14 @@ nlohmann::json SingleBuiltPath::Built::toJSON(const Store & store) const
     return res;
 }
 
-nlohmann::json SingleBuiltPath::toJSON(const Store & store) const
+nlohmann::json SingleBuiltPath::toJSON(const StoreDirConfig & store) const
 {
     return std::visit([&](const auto & buildable) {
         return buildable.toJSON(store);
     }, raw());
 }
 
-nlohmann::json BuiltPath::toJSON(const Store & store) const
+nlohmann::json BuiltPath::toJSON(const StoreDirConfig & store) const
 {
     return std::visit([&](const auto & buildable) {
         return buildable.toJSON(store);

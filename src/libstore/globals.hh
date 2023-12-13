@@ -201,7 +201,7 @@ public:
           Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
-          The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
+          The following system types are widely used, as Nix is actively supported on these platforms:
 
           - `x86_64-linux`
           - `x86_64-darwin`
@@ -268,21 +268,16 @@ public:
     Setting<bool> alwaysAllowSubstitutes{
         this, false, "always-allow-substitutes",
         R"(
-          If set to `true`, Nix will ignore the `allowSubstitutes` attribute in
-          derivations and always attempt to use available substituters.
-          For more information on `allowSubstitutes`, see [the manual chapter on advanced attributes](../language/advanced-attributes.md).
+          If set to `true`, Nix will ignore the [`allowSubstitutes`](@docroot@/language/advanced-attributes.md) attribute in derivations and always attempt to use [available substituters](#conf-substituters).
         )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
         R"(
-          If set to `true`, Nix will instruct remote build machines to use
-          their own binary substitutes if available. In practical terms, this
-          means that remote hosts will fetch as many build dependencies as
-          possible from their own substitutes (e.g, from `cache.nixos.org`),
-          instead of waiting for this host to upload them all. This can
-          drastically reduce build times if the network connection between
-          this computer and the remote build host is slow.
+          If set to `true`, Nix will instruct [remote build machines](#conf-builders) to use their own [`substituters`](#conf-substituters) if available.
+
+          It means that remote build hosts will fetch as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
+          This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
@@ -761,7 +756,7 @@ public:
         "substituters",
         R"(
           A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store]{@docroot@/glossary.md##gloss-store} from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.

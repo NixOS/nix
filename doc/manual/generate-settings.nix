@@ -20,9 +20,9 @@ let
         else "`${setting}`";
       # separate body to cleanly handle indentation
       body = ''
-          ${description}
-
           ${experimentalFeatureNote}
+
+          ${description}
 
           **Default:** ${showDefault documentDefault defaultValue}
 

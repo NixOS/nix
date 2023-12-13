@@ -103,7 +103,8 @@ let
             ${allStores}
           '';
           index = replaceStrings
-            [ "@store-types@" ] [ storesOverview ]
+            [ "@store-types@" "./local-store.md" "./local-daemon-store.md" ]
+            [ storesOverview "#local-store" "#local-daemon-store" ]
             details.doc;
           storesOverview =
             let

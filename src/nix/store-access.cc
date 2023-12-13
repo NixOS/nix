@@ -4,7 +4,7 @@ using namespace nix;
 
 struct CmdStoreAccess : virtual NixMultiCommand
 {
-    CmdStoreAccess() : MultiCommand(RegisterCommand::getCommandsFor({"store", "access"}))
+    CmdStoreAccess() : NixMultiCommand("store access", RegisterCommand::getCommandsFor({"store", "access"}))
     { }
 
     std::string description() override

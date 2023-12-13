@@ -1,8 +1,6 @@
 #pragma once
 ///@file
 
-#include "nar-info.hh"
-#include "realisation.hh"
 #include "path.hh"
 #include "derived-path.hh"
 #include "hash.hh"
@@ -14,6 +12,7 @@
 #include "config.hh"
 #include "path-info.hh"
 #include "repair-flag.hh"
+#include "store-dir-config.hh"
 
 #include <grp.h>
 #include <nlohmann/json_fwd.hpp>
@@ -66,14 +65,18 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
-MakeError(BadStorePath, Error);
 
 MakeError(InvalidStoreURI, Error);
 
 MakeError(AccessDenied, Error);
 
+struct Realisation;
+struct RealisedPath;
+struct DrvOutput;
+
 struct BasicDerivation;
 struct Derivation;
+
 struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
@@ -100,11 +103,11 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
-struct StoreConfig : public Config
+struct StoreConfig : public StoreDirConfig
 {
     typedef std::map<std::string, std::string> Params;
 
-    using Config::Config;
+    using StoreDirConfig::StoreDirConfig;
 
     StoreConfig() = delete;
 
@@ -133,15 +136,6 @@ struct StoreConfig : public Config
     {
         return std::nullopt;
     }
-
-    const PathSetting storeDir_{this, settings.nixStore,
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
-    const Path storeDir = storeDir_;
 
     const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
         "Size of the in-memory store path metadata cache."};
@@ -230,45 +224,6 @@ public:
 
     virtual std::string getUri() = 0;
 
-    StorePath parseStorePath(std::string_view path) const;
-
-    std::optional<StorePath> maybeParseStorePath(std::string_view path) const;
-
-    std::string printStorePath(const StorePath & path) const;
-
-    /**
-     * Deprecated
-     *
-     * \todo remove
-     */
-    StorePathSet parseStorePathSet(const PathSet & paths) const;
-
-    PathSet printStorePathSet(const StorePathSet & path) const;
-
-    /**
-     * Display a set of paths in human-readable form (i.e., between quotes
-     * and separated by commas).
-     */
-    std::string showPaths(const StorePathSet & paths);
-
-    /**
-     * @return true if ‘path’ is in the Nix store (but not the Nix
-     * store itself).
-     */
-    bool isInStore(PathView path) const;
-
-    /**
-     * @return true if ‘path’ is a store path, i.e. a direct child of the
-     * Nix store.
-     */
-    bool isStorePath(std::string_view path) const;
-
-    /**
-     * Split a path like /nix/store/<hash>-<name>/<bla> into
-     * /nix/store/<hash>-<name> and /<bla>.
-     */
-    std::pair<StorePath, Path> toStorePath(PathView path) const;
-
     /**
      * Follow symlinks until we end up with a path in the Nix store.
      */
@@ -279,55 +234,6 @@ public:
      * result.
      */
     StorePath followLinksToStorePath(std::string_view path) const;
-
-    /**
-     * Constructs a unique store path name.
-     */
-    StorePath makeStorePath(std::string_view type,
-        std::string_view hash, std::string_view name) const;
-    StorePath makeStorePath(std::string_view type,
-        const Hash & hash, std::string_view name) const;
-
-    StorePath makeOutputPath(std::string_view id,
-        const Hash & hash, std::string_view name) const;
-
-    StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
-
-    StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
-
-    StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
-
-    /**
-     * Read-only variant of addToStoreFromDump(). It returns the store
-     * path to which a NAR or flat file would be written.
-     */
-    std::pair<StorePath, Hash> computeStorePathFromDump(
-        Source & dump,
-        std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256,
-        const StorePathSet & references = {}) const;
-
-    /**
-     * Preparatory part of addTextToStore().
-     *
-     * !!! Computation of the path should take the references given to
-     * addTextToStore() into account, otherwise we have a (relatively
-     * minor) security hole: a caller can register a source file with
-     * bogus references.  If there are too many references, the path may
-     * not be garbage collected when it has to be (not really a problem,
-     * the caller could create a root anyway), or it may be garbage
-     * collected when it shouldn't be (more serious).
-     *
-     * Hashing the references would solve this (bogus references would
-     * simply yield a different store path, so other users wouldn't be
-     * affected), but it has some backwards compatibility issues (the
-     * hashing scheme changes), so I'm not doing that for now.
-     */
-    StorePath computeStorePathForText(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references) const;
 
     /**
      * Check whether a path is valid.
@@ -467,7 +373,7 @@ public:
      * Query the mapping outputName=>outputPath for the given derivation.
      * Assume every output has a mapping and throw an exception otherwise.
      */
-    OutputPathMap queryDerivationOutputMap(const StorePath & path);
+    OutputPathMap queryDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr);
 
     /**
      * Query the full store path given the hash part of a valid store
@@ -525,13 +431,13 @@ public:
      * libutil/archive.hh).
      */
     virtual StorePath addToStore(
-        std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter,
-        RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet());
+            std::string_view name,
+            const Path & srcPath,
+            FileIngestionMethod method = FileIngestionMethod::Recursive,
+            HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+            PathFilter & filter = defaultPathFilter,
+            RepairFlag repair = NoRepair,
+            const StorePathSet & references = StorePathSet());
 
     /**
      * Copy the contents of a path to the store and register the
@@ -539,8 +445,8 @@ public:
      * memory.
      */
     ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        std::optional<Hash> expectedCAHash = {});
+                                 FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+                                 std::optional<Hash> expectedCAHash = {});
 
     /**
      * Like addToStore(), but the contents of the path are contained
@@ -552,8 +458,8 @@ public:
      * \todo remove?
      */
     virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet())
+                                         FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256, RepairFlag repair = NoRepair,
+                                         const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }
 
     /**
@@ -892,7 +798,7 @@ void copyStorePath(
  */
 std::map<StorePath, StorePath> copyPaths(
     Store & srcStore, Store & dstStore,
-    const RealisedPath::Set &,
+    const std::set<RealisedPath> &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -909,7 +815,7 @@ std::map<StorePath, StorePath> copyPaths(
  */
 void copyClosure(
     Store & srcStore, Store & dstStore,
-    const RealisedPath::Set & paths,
+    const std::set<RealisedPath> & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -1041,6 +947,7 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,
     const Derivation & drv,
-    const StorePath & outputPath);
+    const StorePath & outputPath,
+    Store * evalStore = nullptr);
 
 }

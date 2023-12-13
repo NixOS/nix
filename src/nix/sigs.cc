@@ -205,7 +205,9 @@ struct CmdKeyConvertSecretToPublic : Command
 struct CmdKey : NixMultiCommand
 {
     CmdKey()
-        : MultiCommand({
+        : NixMultiCommand(
+            "key",
+            {
                 {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
                 {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
             })
@@ -218,13 +220,6 @@ struct CmdKey : NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix key' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdKey = registerCommand<CmdKey>("key");
