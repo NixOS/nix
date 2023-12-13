@@ -92,7 +92,7 @@
 , __forDefaults ? {
     canRunInstalled = doBuild && stdenv.buildPlatform.canExecute stdenv.hostPlatform;
   }
-} @ attrs0:
+}:
 
 let
   version = lib.fileContents ./.version + versionSuffix;
