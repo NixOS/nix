@@ -344,4 +344,27 @@ namespace nix {
         ASSERT_EQ(percentDecode(e), s);
     }
 
+TEST(nix, isValidSchemeName) {
+    ASSERT_TRUE(isValidSchemeName("http"));
+    ASSERT_TRUE(isValidSchemeName("https"));
+    ASSERT_TRUE(isValidSchemeName("file"));
+    ASSERT_TRUE(isValidSchemeName("file+https"));
+    ASSERT_TRUE(isValidSchemeName("fi.le"));
+    ASSERT_TRUE(isValidSchemeName("file-ssh"));
+    ASSERT_TRUE(isValidSchemeName("file+"));
+    ASSERT_TRUE(isValidSchemeName("file."));
+    ASSERT_TRUE(isValidSchemeName("file1"));
+    ASSERT_FALSE(isValidSchemeName("file:"));
+    ASSERT_FALSE(isValidSchemeName("file/"));
+    ASSERT_FALSE(isValidSchemeName("+file"));
+    ASSERT_FALSE(isValidSchemeName(".file"));
+    ASSERT_FALSE(isValidSchemeName("-file"));
+    ASSERT_FALSE(isValidSchemeName("1file"));
+    // regex ok?
+    ASSERT_FALSE(isValidSchemeName("\nhttp"));
+    ASSERT_FALSE(isValidSchemeName("\nhttp\n"));
+    ASSERT_FALSE(isValidSchemeName("http\n"));
+    ASSERT_FALSE(isValidSchemeName("http "));
+}
+
 }

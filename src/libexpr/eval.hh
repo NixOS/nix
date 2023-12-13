@@ -832,6 +832,11 @@ std::string showType(const Value & v);
  */
 SourcePath resolveExprPath(SourcePath path);
 
+/**
+ * Whether a URI is allowed, assuming restrictEval is enabled
+ */
+bool isAllowedURI(std::string_view uri, const Strings & allowedPaths);
+
 struct InvalidPathError : EvalError
 {
     Path path;
