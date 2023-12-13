@@ -68,6 +68,11 @@ struct EvalSettings : Config
           evaluation mode. For example, when set to
           `https://github.com/NixOS`, builtin functions such as `fetchGit` are
           allowed to access `https://github.com/NixOS/patchelf.git`.
+
+          Access is granted when
+          - the URI is equal to the prefix,
+          - or the URI is a subpath of the prefix,
+          - or the prefix is a URI scheme ended by a colon `:` and the URI has the same scheme.
         )"};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",

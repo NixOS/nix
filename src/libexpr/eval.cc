@@ -16,6 +16,7 @@
 #include "fs-input-accessor.hh"
 #include "memory-input-accessor.hh"
 #include "signals.hh"
+#include "url.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -602,6 +603,15 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     mkStorePathString(storePath, v);
 }
 
+inline static bool isJustSchemePrefix(std::string_view prefix)
+{
+    return
+        !prefix.empty()
+        && prefix[prefix.size() - 1] == ':'
+        && isValidSchemeName(prefix.substr(0, prefix.size() - 1));
+}
+
+
 SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 {
     // Don't check non-rootFS accessors, they're in a different namespace.
@@ -650,21 +660,37 @@ SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 }
 
 
+bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
+{
+    /* 'uri' should be equal to a prefix, or in a subdirectory of a
+       prefix. Thus, the prefix https://github.co does not permit
+       access to https://github.com. */
+    for (auto & prefix : allowedUris) {
+        if (uri == prefix
+            // Allow access to subdirectories of the prefix.
+            || (uri.size() > prefix.size()
+                && prefix.size() > 0
+                && hasPrefix(uri, prefix)
+                && (
+                    // Allow access to subdirectories of the prefix.
+                    prefix[prefix.size() - 1] == '/'
+                    || uri[prefix.size()] == '/'
+
+                    // Allow access to whole schemes
+                    || isJustSchemePrefix(prefix)
+                    )
+                ))
+            return true;
+    }
+
+    return false;
+}
+
 void EvalState::checkURI(const std::string & uri)
 {
     if (!evalSettings.restrictEval) return;
 
-    /* 'uri' should be equal to a prefix, or in a subdirectory of a
-       prefix. Thus, the prefix https://github.co does not permit
-       access to https://github.com. Note: this allows 'http://' and
-       'https://' as prefixes for any http/https URI. */
-    for (auto & prefix : evalSettings.allowedUris.get())
-        if (uri == prefix ||
-            (uri.size() > prefix.size()
-            && prefix.size() > 0
-            && hasPrefix(uri, prefix)
-            && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
-            return;
+    if (isAllowedURI(uri, evalSettings.allowedUris.get())) return;
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */

@@ -12,7 +12,7 @@ std::regex revRegex(revRegexS, std::regex::ECMAScript);
 ParsedURL parseURL(const std::string & url)
 {
     static std::regex uriRegex(
-        "((" + schemeRegex + "):"
+        "((" + schemeNameRegex + "):"
         + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex + ")))"
         + "(?:\\?(" + queryRegex + "))?"
         + "(?:#(" + queryRegex + "))?",
@@ -173,6 +173,14 @@ std::string fixGitURL(const std::string & url)
         } else
             return url;
     }
+}
+
+// https://www.rfc-editor.org/rfc/rfc3986#section-3.1
+bool isValidSchemeName(std::string_view s)
+{
+    static std::regex regex(schemeNameRegex, std::regex::ECMAScript);
+
+    return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);
 }
 
 }
