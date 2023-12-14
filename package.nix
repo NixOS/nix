@@ -284,8 +284,9 @@ in {
   ] ++ lib.optionals installUnitTests [
     "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
     "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
-  ] ++ lib.optionals (doBuild && stdenv.isLinux) [
+  ] ++ lib.optionals (doBuild) [
     "--with-boost=${boost}/lib"
+  ] ++ lib.optionals (doBuild && stdenv.isLinux) [
     "--with-sandbox-shell=${busybox-sandbox-shell}/bin/busybox"
   ] ++ lib.optional (doBuild && stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
        "LDFLAGS=-fuse-ld=gold"
