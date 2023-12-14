@@ -507,7 +507,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case WorkerProto::Op::ExportPath: {
         auto path = store->parseStorePath(readString(from));
-        if (!require<LocalGranularAccessStore>(*store).canAccess(path, false)) throw AccessDenied("Access Denied");
+        if (!require<LocalGranularAccessStore>(*store).canAccess(path)) throw AccessDenied("Access Denied");
         readInt(from); // obsolete
         logger->startWork();
         TunnelSink sink(to);

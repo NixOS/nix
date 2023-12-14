@@ -248,7 +248,7 @@ void LocalDerivationGoal::tryLocalBuild()
         if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
             for (auto path : inputPaths) {
                 if (localStore->getAccessStatus(path).isProtected) {
-                    if (!localStore->canAccess(path, true))
+                    if (!localStore->canAccess(path))
                         throw AccessDenied(
                             "%s (uid %d) does not have access to path %s",
                             getUserName(localStore->effectiveUser->uid),
@@ -871,7 +871,7 @@ void LocalDerivationGoal::startBuilder()
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
     printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
-    
+
     for (auto & i : drv->env)
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 

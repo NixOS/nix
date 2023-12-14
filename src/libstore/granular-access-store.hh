@@ -71,16 +71,10 @@ struct GranularAccessStore : public virtual Store
     /**
      * Whether any of the given @entities@ can access the path
      */
-    bool canAccess(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities, bool use_future)
+    bool canAccess(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities)
     {
         if (! experimentalFeatureSettings.isEnabled(Xp::ACLs) || trusted) return true;
-        AccessStatus status;
-        if (use_future) {
-            status = getAccessStatus(storeObject);
-        }
-        else {
-            status = getAccessStatus(storeObject);
-        }
+        AccessStatus status = getAccessStatus(storeObject);
         if (! status.isProtected) return true;
         for (auto ent : status.entities) {
           if (entities.contains(ent)) {
@@ -92,7 +86,7 @@ struct GranularAccessStore : public virtual Store
     /**
      * Whether a subject can access the store path
      */
-    bool canAccess(const StoreObject & storeObject, AccessControlSubject subject, bool use_future)
+    bool canAccess(const StoreObject & storeObject, AccessControlSubject subject)
     {
         std::set<AccessControlEntity> entities;
         auto groups = getSubjectGroups(subject);
@@ -100,23 +94,19 @@ struct GranularAccessStore : public virtual Store
             entities.insert(group);
         }
         entities.insert(subject);
-        return canAccess(storeObject, entities, use_future);
+        return canAccess(storeObject, entities);
     }
 
     /**
      * Whether the effective subject can access the store path
      */
-    bool canAccess(const StoreObject & storeObject, bool use_future) {
+    bool canAccess(const StoreObject & storeObject) {
         if (!experimentalFeatureSettings.isEnabled(Xp::ACLs) || trusted) return true;
         if (effectiveUser){
-            return canAccess(storeObject, *effectiveUser, use_future);
+            return canAccess(storeObject, *effectiveUser);
         }
         else {
-            if (use_future) {
-              return !getAccessStatus(storeObject).isProtected;
-            } else {
-              return !getAccessStatus(storeObject).isProtected;
-            }
+            return !getAccessStatus(storeObject).isProtected;
         }
     }
 

@@ -2340,7 +2340,7 @@ static void addPath(
           if (expectedStorePath) {
             if (pathExists(state.store->toRealPath(*expectedStorePath))) {
               auto curStatus = require<LocalGranularAccessStore>(*state.store).getAccessStatus(*expectedStorePath);
-              if (curStatus != *accessStatus && !require<LocalGranularAccessStore>(*state.store).canAccess(*expectedStorePath, false)) {
+              if (curStatus != *accessStatus && !require<LocalGranularAccessStore>(*state.store).canAccess(*expectedStorePath)) {
                   // It's ok to update the permission of a store path if we have read access to the original file.
                   std::ifstream path_file(path.path.abs());
                   if (!path_file) {

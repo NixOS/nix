@@ -862,7 +862,7 @@ void LocalStore::queryReferrers(State & state, const StorePath & path, StorePath
 {
     auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));
 
-    if (!canAccess(path, false)) throw AccessDenied("Access Denied");
+    if (!canAccess(path)) throw AccessDenied("Access Denied");
 
     while (useQueryReferrers.next())
         referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
@@ -880,7 +880,7 @@ void LocalStore::queryReferrers(const StorePath & path, StorePathSet & referrers
 
 StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 {
-    if (!canAccess(path, false)) throw AccessDenied("Access Denied");
+    if (!canAccess(path)) throw AccessDenied("Access Denied");
     return retrySQLite<StorePathSet>([&]() {
         auto state(_state.lock());
 
@@ -1480,7 +1480,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
     addTempRoot(info.path);
 
-    if (repair || !isValidPath(info.path) || !canAccess(info.path, false)) {
+    if (repair || !isValidPath(info.path) || !canAccess(info.path)) {
 
         PathLocks outputLock;
 
@@ -1538,7 +1538,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             registerValidPath(info);
 
-        } else if (effectiveUser && !canAccess(info.path, false)) {
+        } else if (effectiveUser && !canAccess(info.path)) {
             auto curInfo = queryPathInfo(info.path);
             HashSink hashSink(HashAlgorithm::SHA256);
             source.drainInto(hashSink);
