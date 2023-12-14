@@ -13,11 +13,10 @@
   # to remove the `nix.checkAllErrors = false;` line in the tests.
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/staging-23.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
-  inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, libgit2, ... }:
+  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, ... }:
 
     let
       inherit (nixpkgs) lib;
@@ -140,9 +139,6 @@
         {
           nixStable = prev.nix;
 
-          # Forward from the previous stage as we don’t want it to pick the lowdown override
-          inherit (prev) nixUnstable;
-
           default-busybox-sandbox-shell = final.busybox.override {
             useMusl = true;
             enableStatic = true;
@@ -165,10 +161,6 @@
               CONFIG_ASH_PRINTF y
               CONFIG_ASH_TEST y
             '';
-          };
-
-          lowdown-nix = final.callPackage ./misc/lowdown.nix {
-            inherit lowdown-src stdenv;
           };
 
           libgit2-nix = final.libgit2.overrideAttrs (attrs: {
@@ -208,7 +200,6 @@
               officialRelease = false;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
-              lowdown = final.lowdown-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
               changelog-d = final.changelog-d-nix;
             } // {
