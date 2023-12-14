@@ -247,8 +247,8 @@ void LocalDerivationGoal::tryLocalBuild()
     if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
         if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
             for (auto path : inputPaths) {
-                if (localStore->getCurrentAccessStatus(path).isProtected) {
-                    if (!localStore->canAccess(path, false))
+                if (localStore->getAccessStatus(path).isProtected) {
+                    if (!localStore->canAccess(path, true))
                         throw AccessDenied(
                             "%s (uid %d) does not have access to path %s",
                             getUserName(localStore->effectiveUser->uid),
@@ -2451,7 +2451,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
             StoreObjectDerivationOutput thisOutput(drvPath, outputName);
             if (localStore.futurePermissions.contains(thisOutput)) {
-                localStore.setFutureAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput]);
+                localStore.setAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput]);
             }
             /* Store the final path */
             finalOutputs.insert_or_assign(outputName, finalStorePath);

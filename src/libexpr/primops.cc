@@ -1456,7 +1456,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *derivation, &status, "__permissions.drv", "builtins.derivationStrict");
                 ensureAccess(&status, state.store->printStorePath(drvPath), require<LocalGranularAccessStore>(*state.store));
-                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(drvPath, status);
+                require<LocalGranularAccessStore>(*state.store).setAccessStatus(drvPath, status);
             }
         }
     }
@@ -1484,7 +1484,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                     LocalGranularAccessStore::AccessStatus status;
                     readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
                     ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS), require<LocalGranularAccessStore>(*state.store));
-                    require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
+                    require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
                 }
             }
             auto log = attr->value->attrs->find(state.sLog);
@@ -1492,11 +1492,11 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *log, &status, "__permissions.log", "builtins.derivationStrict");
                 ensureAccess(&status, fmt("log of derivation %s", drvPathS), require<LocalGranularAccessStore>(*state.store));
-                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationLog {drvPath}, status);
+                require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationLog {drvPath}, status);
             }
         }
     }
-    
+
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
@@ -2334,10 +2334,7 @@ static void addPath(
         if (accessStatus && !settings.readOnlyMode) {
           if (expectedStorePath) {
             if (pathExists(state.store->toRealPath(*expectedStorePath))) {
-                // auto curStatus = require<LocalGranularAccessStore>(*state.store).getCurrentAccessStatus(*expectedStorePath);
-                // We want current here, but there should be nothing in future.
-                // TODO: read current back just for this.
-              auto curStatus = require<LocalGranularAccessStore>(*state.store).getFutureAccessStatus(*expectedStorePath);
+              auto curStatus = require<LocalGranularAccessStore>(*state.store).getAccessStatus(*expectedStorePath);
               if (curStatus != *accessStatus && !require<LocalGranularAccessStore>(*state.store).canAccess(*expectedStorePath, false)) {
                   // It's ok to update the permission of a store path if we have read access to the original file.
                   std::ifstream path_file(path.path.abs());

@@ -54,10 +54,8 @@ struct GranularAccessStore : public virtual Store
     typedef AccessStatusFor<AccessControlEntity> AccessStatus;
 
 
-    virtual void setFutureAccessStatus(const StoreObject & storeObject, const AccessStatus & status) = 0;
-    virtual void setCurrentAccessStatus(const StoreObject & path, const AccessStatus & status) = 0;
-    virtual AccessStatus getFutureAccessStatus(const StoreObject & storeObject) = 0;
-    virtual AccessStatus getCurrentAccessStatus(const StoreObject & storeObject) = 0;
+    virtual void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) = 0;
+    virtual AccessStatus getAccessStatus(const StoreObject & storeObject) = 0;
 
     virtual std::set<AccessControlGroup> getSubjectGroupsUncached(AccessControlSubject subject) = 0;
 
@@ -78,10 +76,10 @@ struct GranularAccessStore : public virtual Store
         if (! experimentalFeatureSettings.isEnabled(Xp::ACLs) || trusted) return true;
         AccessStatus status;
         if (use_future) {
-            status = getFutureAccessStatus(storeObject);
+            status = getAccessStatus(storeObject);
         }
         else {
-            status =  getCurrentAccessStatus(storeObject);
+            status = getAccessStatus(storeObject);
         }
         if (! status.isProtected) return true;
         for (auto ent : status.entities) {
@@ -115,34 +113,34 @@ struct GranularAccessStore : public virtual Store
         }
         else {
             if (use_future) {
-              return !getFutureAccessStatus(storeObject).isProtected;
+              return !getAccessStatus(storeObject).isProtected;
             } else {
-              return !getCurrentAccessStatus(storeObject).isProtected;
+              return !getAccessStatus(storeObject).isProtected;
             }
         }
     }
 
     void addAllowedEntitiesFuture(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
-        auto status = getFutureAccessStatus(storeObject);
+        auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.insert(entity);
-        setFutureAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status);
     }
 
     void addAllowedEntitiesCurrent(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
-        auto status = getCurrentAccessStatus(storeObject);
+        auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.insert(entity);
-        setCurrentAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status);
     }
 
     void removeAllowedEntitiesFuture(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
-        auto status = getFutureAccessStatus(storeObject);
+        auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.erase(entity);
-        setFutureAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status);
     }
     void removeAllowedEntitiesCurrent(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
-        auto status = getCurrentAccessStatus(storeObject);
+        auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.erase(entity);
-        setCurrentAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status);
     }
 
 private:

@@ -170,10 +170,8 @@ enum struct WorkerProto::Op : uint64_t
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
-    GetCurrentAccessStatus = 48,
-    GetFutureAccessStatus = 49,
-    SetCurrentAccessStatus = 50,
-    SetFutureAccessStatus = 51,
+    GetAccessStatus = 48,
+    SetAccessStatus = 49,
 };
 
 /**

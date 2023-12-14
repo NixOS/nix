@@ -1160,24 +1160,29 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
     acl.set(path);
 }
 
-void LocalStore::setFutureAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
+void LocalStore::setAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
 {
-    // If adding future permissions to a StoreObjectDerivationOutput,
-    // also add permissions to the paths that will exist in the future.
-    std::visit(overloaded {
-        [&](StorePath p) {},
-        [&](StoreObjectDerivationOutput p) {
-                auto drv = readDerivation(p.drvPath);
-                auto outputHashes = staticOutputHashes(*this, drv);
-                auto drvOutputs = drv.outputsAndOptPaths(*this);
-                if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
-                    auto path = *drvOutputs.at(p.output).second;
-                    futurePermissions[path] = status;
-                }
-        },
-        [&](StoreObjectDerivationLog l){}
-    }, storePathstoreObject);
-    futurePermissions[storePathstoreObject] = status;
+    if (pathOfStoreObjectExists(storePathstoreObject)){
+        setCurrentAccessStatus(storePathstoreObject, status);
+    }
+    else {
+        // If adding future permissions to a StoreObjectDerivationOutput,
+        // also add permissions to the paths that will exist in the future.
+        std::visit(overloaded {
+            [&](StorePath p) {},
+            [&](StoreObjectDerivationOutput p) {
+                    auto drv = readDerivation(p.drvPath);
+                    auto outputHashes = staticOutputHashes(*this, drv);
+                    auto drvOutputs = drv.outputsAndOptPaths(*this);
+                    if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                        auto path = *drvOutputs.at(p.output).second;
+                        futurePermissions[path] = status;
+                    }
+            },
+            [&](StoreObjectDerivationLog l){}
+        }, storePathstoreObject);
+        futurePermissions[storePathstoreObject] = status;
+    }
 }
 
 void LocalStore::setCurrentAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
@@ -1222,10 +1227,10 @@ void LocalStore::setCurrentAccessStatus(const StoreObject & storePathstoreObject
 
             auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
 
-            if (pathExists(logPath)) {
-                setCurrentAccessStatus(logPath, status);
+            if (!pathExists(logPath)){
+                throw Error("setCurrentAccessStatus log path does not exists (%s)", logPath);
             }
-            throw Error("setCurrentAccessStatus log path does not exists (%s)", logPath);
+            setCurrentAccessStatus(logPath, status);
         }
     }, storePathstoreObject);
 }
@@ -1293,7 +1298,7 @@ LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const StoreObject & 
 void LocalStore::grantBuildUserAccess(const StorePath & storePath, const LocalStore::AccessControlEntity & buildUser)
 {
     // The builder-permissions directory remembers permissions to remove at the end of the build.
-    auto status = getCurrentAccessStatus(storePath);
+    auto status = getAccessStatus(storePath);
     if (! status.entities.contains(buildUser)){
         auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
         std::visit(overloaded {
@@ -1305,9 +1310,14 @@ void LocalStore::grantBuildUserAccess(const StorePath & storePath, const LocalSt
 }
 
 
-LocalStore::AccessStatus LocalStore::getFutureAccessStatus(const StoreObject & storeObject)
+LocalStore::AccessStatus LocalStore::getAccessStatus(const StoreObject & storeObject)
 {
-    return futurePermissions.at(storeObject);
+    if (futurePermissions.contains(storeObject)){
+        return futurePermissions[storeObject];
+    }
+    else {
+        return getCurrentAccessStatus(storeObject);
+    }
 }
 
 std::optional<LocalStore::AccessStatus> LocalStore::getFutureAccessStatusOpt(const StoreObject & storeObject)

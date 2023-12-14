@@ -59,7 +59,7 @@ struct CmdStoreAccessRevoke : StorePathsCommand
         } else {
             auto & localStore = require<LocalGranularAccessStore>(*store);
             for (auto & path : storePaths) {
-                auto status = localStore.getCurrentAccessStatus(path);
+                auto status = localStore.getAccessStatus(path);
                 if (!status.isProtected) warn("Path '%s' is not protected; all users can access it regardless of permissions", store->printStorePath(path));
                 if (!localStore.isValidPath(path)) warn("Path %s does not exist yet; permissions will be applied as soon as it is added to the store", localStore.printStorePath(path));
 
@@ -69,7 +69,7 @@ struct CmdStoreAccessRevoke : StorePathsCommand
                     for (auto user : users) status.entities.erase(nix::ACL::User(user));
                     for (auto group : groups) status.entities.erase(nix::ACL::Group(group));
                 }
-                localStore.setCurrentAccessStatus(path, status);
+                localStore.setAccessStatus(path, status);
             }
         }
     }
