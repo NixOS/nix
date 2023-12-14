@@ -6,4 +6,10 @@ struct Store
 {
     nix::ref<nix::Store> ptr;
 };
+
+struct StorePath
+{
+    nix::StorePath path;
+};
+
 #endif
