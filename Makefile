@@ -1,5 +1,7 @@
--include Makefile.config
-clean-files += Makefile.config
+include mk/build-dir.mk
+
+-include $(buildprefix)Makefile.config
+clean-files += $(buildprefix)Makefile.config
 
 ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
@@ -19,17 +21,17 @@ makefiles = \
   misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
-  misc/upstart/local.mk \
-  doc/manual/local.mk \
-  doc/internal-api/local.mk
+  misc/upstart/local.mk
 endif
 
 ifeq ($(ENABLE_BUILD)_$(ENABLE_TESTS), yes_yes)
-UNIT_TEST_ENV = _NIX_TEST_UNIT_DATA=unit-test-data
 makefiles += \
-  src/libutil/tests/local.mk \
-  src/libstore/tests/local.mk \
-  src/libexpr/tests/local.mk
+  tests/unit/libutil/local.mk \
+  tests/unit/libutil-support/local.mk \
+  tests/unit/libstore/local.mk \
+  tests/unit/libstore-support/local.mk \
+  tests/unit/libexpr/local.mk \
+  tests/unit/libexpr-support/local.mk
 endif
 
 ifeq ($(ENABLE_TESTS), yes)
@@ -55,4 +57,11 @@ endif
 
 include mk/lib.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++2a -I src
+# Must be included after `mk/lib.mk` so rules refer to variables defined
+# by the library. Rules are not "lazy" like variables, unfortunately.
+ifeq ($(ENABLE_BUILD), yes)
+$(eval $(call include-sub-makefile, doc/manual/local.mk))
+endif
+$(eval $(call include-sub-makefile, doc/internal-api/local.mk))
+
+GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src

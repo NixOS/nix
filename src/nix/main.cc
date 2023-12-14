@@ -67,7 +67,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
     bool helpRequested = false;
     bool showVersion = false;
 
-    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
+    NixArgs() : MultiCommand("", RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
         categories.clear();
         categories[catHelp] = "Help commands";
@@ -139,6 +139,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
         {"verify", {"store", "verify"}},
+        {"doctor", {"config", "check"}},
     };
 
     bool aliasUsed = false;
@@ -297,7 +298,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "help-stores.md"
+          #include "generated-doc/help-stores.md"
           ;
     }
 
@@ -372,6 +373,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::Flakes,
             Xp::FetchClosure,
             Xp::DynamicDerivations,
+            Xp::FetchTree,
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));

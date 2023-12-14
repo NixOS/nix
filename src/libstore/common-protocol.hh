@@ -5,7 +5,7 @@
 
 namespace nix {
 
-class Store;
+struct StoreDirConfig;
 struct Source;
 
 // items being serialized
@@ -48,7 +48,7 @@ struct CommonProto
      * infer the type instead of having to write it down explicitly.
      */
     template<typename T>
-    static void write(const Store & store, WriteConn conn, const T & t)
+    static void write(const StoreDirConfig & store, WriteConn conn, const T & t)
     {
         CommonProto::Serialise<T>::write(store, conn, t);
     }
@@ -57,8 +57,8 @@ struct CommonProto
 #define DECLARE_COMMON_SERIALISER(T) \
     struct CommonProto::Serialise< T > \
     { \
-        static T read(const Store & store, CommonProto::ReadConn conn); \
-        static void write(const Store & store, CommonProto::WriteConn conn, const T & str); \
+        static T read(const StoreDirConfig & store, CommonProto::ReadConn conn); \
+        static void write(const StoreDirConfig & store, CommonProto::WriteConn conn, const T & str); \
     }
 
 template<>

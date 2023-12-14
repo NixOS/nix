@@ -38,14 +38,14 @@ ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
     return FileIngestionMethod::Flat;
 }
 
-std::string ContentAddressMethod::render(HashType ht) const
+std::string ContentAddressMethod::render(HashAlgorithm ha) const
 {
     return std::visit(overloaded {
         [&](const TextIngestionMethod & th) {
-            return std::string{"text:"} + printHashType(ht);
+            return std::string{"text:"} + printHashAlgo(ha);
         },
         [&](const FileIngestionMethod & fim) {
-            return "fixed:" + makeFileIngestionPrefix(fim) + printHashType(ht);
+            return "fixed:" + makeFileIngestionPrefix(fim) + printHashAlgo(ha);
         }
     }, raw);
 }
@@ -61,13 +61,13 @@ std::string ContentAddress::render() const
                 + makeFileIngestionPrefix(method);
         },
     }, method.raw)
-        + this->hash.to_string(HashFormat::Base32, true);
+        + this->hash.to_string(HashFormat::Nix32, true);
 }
 
 /**
  * Parses content address strings up to the hash.
  */
-static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix(std::string_view & rest)
+static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodPrefix(std::string_view & rest)
 {
     std::string_view wholeInput { rest };
 
@@ -83,27 +83,27 @@ static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix
         auto hashTypeRaw = splitPrefixTo(rest, ':');
         if (!hashTypeRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
-        HashType hashType = parseHashType(*hashTypeRaw);
-        return hashType;
+        HashAlgorithm hashAlgo = parseHashAlgo(*hashTypeRaw);
+        return hashAlgo;
     };
 
     // Switch on prefix
     if (prefix == "text") {
         // No parsing of the ingestion method, "text" only support flat.
-        HashType hashType = parseHashType_();
+        HashAlgorithm hashAlgo = parseHashType_();
         return {
             TextIngestionMethod {},
-            std::move(hashType),
+            std::move(hashAlgo),
         };
     } else if (prefix == "fixed") {
         // Parse method
         auto method = FileIngestionMethod::Flat;
         if (splitPrefix(rest, "r:"))
             method = FileIngestionMethod::Recursive;
-        HashType hashType = parseHashType_();
+        HashAlgorithm hashAlgo = parseHashType_();
         return {
             std::move(method),
-            std::move(hashType),
+            std::move(hashAlgo),
         };
     } else
         throw UsageError("content address prefix '%s' is unrecognized. Recogonized prefixes are 'text' or 'fixed'", prefix);
@@ -113,15 +113,15 @@ ContentAddress ContentAddress::parse(std::string_view rawCa)
 {
     auto rest = rawCa;
 
-    auto [caMethod, hashType] = parseContentAddressMethodPrefix(rest);
+    auto [caMethod, hashAlgo] = parseContentAddressMethodPrefix(rest);
 
     return ContentAddress {
         .method = std::move(caMethod),
-        .hash = Hash::parseNonSRIUnprefixed(rest, hashType),
+        .hash = Hash::parseNonSRIUnprefixed(rest, hashAlgo),
     };
 }
 
-std::pair<ContentAddressMethod, HashType> ContentAddressMethod::parse(std::string_view caMethod)
+std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parse(std::string_view caMethod)
 {
     std::string asPrefix = std::string{caMethod} + ":";
     // parseContentAddressMethodPrefix takes its argument by reference
@@ -144,7 +144,7 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 std::string ContentAddress::printMethodAlgo() const
 {
     return method.renderPrefix()
-        + printHashType(hash.type);
+        + printHashAlgo(hash.algo);
 }
 
 bool StoreReferences::empty() const

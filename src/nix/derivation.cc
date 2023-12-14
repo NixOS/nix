@@ -2,9 +2,9 @@
 
 using namespace nix;
 
-struct CmdDerivation : virtual NixMultiCommand
+struct CmdDerivation : NixMultiCommand
 {
-    CmdDerivation() : MultiCommand(RegisterCommand::getCommandsFor({"derivation"}))
+    CmdDerivation() : NixMultiCommand("derivation", RegisterCommand::getCommandsFor({"derivation"}))
     { }
 
     std::string description() override
@@ -13,13 +13,6 @@ struct CmdDerivation : virtual NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix derivation' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdDerivation = registerCommand<CmdDerivation>("derivation");

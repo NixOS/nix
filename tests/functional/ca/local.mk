@@ -5,6 +5,7 @@ ca-tests := \
   $(d)/concurrent-builds.sh \
   $(d)/derivation-json.sh \
   $(d)/duplicate-realisation-in-closure.sh \
+  $(d)/eval-store.sh \
   $(d)/gc.sh \
   $(d)/import-derivation.sh \
   $(d)/new-build-cmd.sh \

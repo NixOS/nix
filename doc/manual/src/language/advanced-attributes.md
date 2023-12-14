@@ -257,29 +257,18 @@ Derivations can declare some infrequently used optional attributes.
     of the environment (typically, a few hundred kilobyte).
 
   - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
-    If this attribute is set to `true` and [distributed building is
-    enabled](../advanced-topics/distributed-builds.md), then, if
-    possible, the derivation will be built locally instead of forwarded
-    to a remote machine. This is appropriate for trivial builders
-    where the cost of doing a download or remote build would exceed
-    the cost of building locally.
+    If this attribute is set to `true` and [distributed building is enabled](../advanced-topics/distributed-builds.md), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
+    This is useful for derivations that are cheapest to build locally.
 
   - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\
-    If this attribute is set to `false`, then Nix will always build this
-    derivation; it will not try to substitute its outputs. This is
-    useful for very trivial derivations (such as `writeText` in Nixpkgs)
-    that are cheaper to build than to substitute from a binary cache.
+    If this attribute is set to `false`, then Nix will always build this derivation (locally or remotely); it will not try to substitute its outputs.
+    This is useful for derivations that are cheaper to build than to substitute.
 
-    You may disable the effects of this attibute by enabling the
-    `always-allow-substitutes` configuration option in Nix.
+    This attribute can be ignored by setting [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) to `true`.
 
     > **Note**
     >
-    > You need to have a builder configured which satisfies the
-    > derivation’s `system` attribute, since the derivation cannot be
-    > substituted. Thus it is usually a good idea to align `system` with
-    > `builtins.currentSystem` when setting `allowSubstitutes` to
-    > `false`. For most trivial derivations this should be the case.
+    > If set to `false`, the [`builder`](./derivations.md#attr-builder) should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation

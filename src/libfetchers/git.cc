@@ -9,6 +9,7 @@
 #include "processes.hh"
 #include "git.hh"
 #include "fs-input-accessor.hh"
+#include "filtering-input-accessor.hh"
 #include "mounted-input-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
@@ -52,7 +53,7 @@ bool touchCacheFile(const Path & path, time_t touch_time)
 Path getCachePath(std::string_view key)
 {
     return getCacheDir() + "/nix/gitv3/" +
-        hashString(htSHA256, key).to_string(HashFormat::Base32, false);
+        hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false);
 }
 
 // Returns the name of the HEAD branch.
@@ -369,7 +370,7 @@ struct GitInputScheme : InputScheme
     {
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
-            if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
+            if (hash.has_value() && !(hash->algo == HashAlgorithm::SHA1 || hash->algo == HashAlgorithm::SHA256))
                 throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(HashFormat::Base16, true));
         };
 
@@ -559,7 +560,7 @@ struct GitInputScheme : InputScheme
                         repoInfo.url
                         );
             } else
-                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
+                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), HashAlgorithm::SHA1).gitRev());
 
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
@@ -639,7 +640,10 @@ struct GitInputScheme : InputScheme
                 repoInfo.workdirInfo.files.insert(submodule.path);
 
         ref<InputAccessor> accessor =
-            makeFSInputAccessor(CanonPath(repoInfo.url), repoInfo.workdirInfo.files, makeNotAllowedError(repoInfo.url));
+            AllowListInputAccessor::create(
+                makeFSInputAccessor(CanonPath(repoInfo.url)),
+                std::move(repoInfo.workdirInfo.files),
+                makeNotAllowedError(repoInfo.url));
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the

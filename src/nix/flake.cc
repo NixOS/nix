@@ -1399,7 +1399,9 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
-        : MultiCommand({
+        : NixMultiCommand(
+            "flake",
+            {
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
                 {"lock", []() { return make_ref<CmdFlakeLock>(); }},
                 {"metadata", []() { return make_ref<CmdFlakeMetadata>(); }},
@@ -1429,10 +1431,8 @@ struct CmdFlake : NixMultiCommand
 
     void run() override
     {
-        if (!command)
-            throw UsageError("'nix flake' requires a sub-command.");
         experimentalFeatureSettings.require(Xp::Flakes);
-        command->second->run();
+        NixMultiCommand::run();
     }
 };
 

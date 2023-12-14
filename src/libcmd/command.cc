@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "markdown.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "derivations.hh"
@@ -32,6 +33,19 @@ nlohmann::json NixMultiCommand::toJSON()
 {
     // FIXME: use Command::toJSON() as well.
     return MultiCommand::toJSON();
+}
+
+void NixMultiCommand::run()
+{
+    if (!command) {
+        std::set<std::string> subCommandTextLines;
+        for (auto & [name, _] : commands)
+            subCommandTextLines.insert(fmt("- `%s`", name));
+        std::string markdownError = fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
+                commandName, concatStringsSep("\n", subCommandTextLines));
+        throw UsageError(renderMarkdownToTerminal(markdownError));
+    }
+    command->second->run();
 }
 
 StoreCommand::StoreCommand()

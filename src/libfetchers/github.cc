@@ -43,7 +43,7 @@ struct GitArchiveInputScheme : InputScheme
         auto size = path.size();
         if (size == 3) {
             if (std::regex_match(path[2], revRegex))
-                rev = Hash::parseAny(path[2], htSHA1);
+                rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
@@ -69,7 +69,7 @@ struct GitArchiveInputScheme : InputScheme
             if (name == "rev") {
                 if (rev)
                     throw BadURL("URL '%s' contains multiple commit hashes", url.url);
-                rev = Hash::parseAny(value, htSHA1);
+                rev = Hash::parseAny(value, HashAlgorithm::SHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
@@ -323,9 +323,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
+
         return RefInfo {
-            .rev = Hash::parseAny(std::string { json["sha"] }, htSHA1),
-            .treeHash = Hash::parseAny(std::string { json["commit"]["tree"]["sha"] }, htSHA1)
+            .rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1),
+            .treeHash = Hash::parseAny(std::string { json["commit"]["tree"]["sha"] }, HashAlgorithm::SHA1)
         };
     }
 
@@ -396,8 +397,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
+
         return RefInfo {
-            .rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1)
+            .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
         };
     }
 
@@ -489,7 +491,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
         return RefInfo {
-            .rev = Hash::parseAny(*id, htSHA1)
+            .rev = Hash::parseAny(*id, HashAlgorithm::SHA1)
         };
     }
 

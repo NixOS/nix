@@ -106,7 +106,7 @@ void parse(
             std::string hashs = getString(source, 20);
             left -= 20;
 
-            Hash hash(htSHA1);
+            Hash hash(HashAlgorithm::SHA1);
             std::copy(hashs.begin(), hashs.end(), hash.hash);
 
             hook(name, TreeEntry {
@@ -241,12 +241,12 @@ Mode dump(
 
 
 TreeEntry dumpHash(
-    HashType ht,
-    SourceAccessor & accessor, const CanonPath & path, PathFilter & filter)
+        HashAlgorithm ha,
+        SourceAccessor & accessor, const CanonPath & path, PathFilter & filter)
 {
     std::function<DumpHook> hook;
     hook = [&](const CanonPath & path) -> TreeEntry {
-        auto hashSink = HashSink(ht);
+        auto hashSink = HashSink(ha);
         auto mode = dump(accessor, path, hashSink, hook, filter);
         auto hash = hashSink.finish().first;
         return {

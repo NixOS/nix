@@ -1,5 +1,10 @@
 ifeq ($(doc_generate),yes)
 
+# The version of Nix used to generate the doc. Can also be
+# `$(nix_INSTALL_PATH)` or just `nix` (to grap ambient from the `PATH`),
+# if one prefers.
+doc_nix = $(nix_PATH)
+
 MANUAL_SRCS := \
 	$(call rwildcard, $(d)/src, *.md) \
 	$(call rwildcard, $(d)/src, */*.md)
@@ -32,7 +37,7 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix=doc/manual --store dummy:// --impure --raw
+nix-eval = $(dummy-env) $(doc_nix) eval --experimental-features nix-command -I nix=doc/manual --store dummy:// --impure --raw
 
 # re-implement mdBook's include directive to make it usable for terminal output and for proper @docroot@ substitution
 define process-includes
@@ -92,56 +97,63 @@ $(d)/nix-profiles.5: $(d)/src/command-ref/files/profiles.md
 	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
-$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/SUMMARY-rl-next.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/SUMMARY-rl-next.md $(d)/src/store/types $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
 	@cp $< $@
 	@$(call process-includes,$@,$@)
 
-$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage.nix $(d)/generate-settings.nix $(d)/generate-store-info.nix $(bindir)/nix
+$(d)/src/store/types: $(d)/nix.json $(d)/utils.nix $(d)/generate-store-info.nix  $(d)/generate-store-types.nix $(d)/src/store/types/index.md.in $(doc_nix)
+	@# FIXME: build out of tree!
+	@rm -rf $@.tmp
+	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-store-types.nix (builtins.fromJSON (builtins.readFile $<)).stores'
+	@# do not destroy existing contents
+	@mv $@.tmp/* $@/
+
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage.nix $(d)/generate-settings.nix $(d)/generate-store-info.nix $(doc_nix)
 	@rm -rf $@ $@.tmp
 	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix true (builtins.readFile $<)'
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/generate-settings.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(bindir)/nix
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/generate-settings.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(doc_nix)
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-settings.nix { prefix = "conf"; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
 	@mv $@.tmp $@
 
-$(d)/nix.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-cli > $@.tmp
+$(d)/nix.json: $(doc_nix)
+	$(trace-gen) $(dummy-env) $(doc_nix) __dump-cli > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix config show --json --experimental-features nix-command > $@.tmp
+$(d)/conf-file.json: $(doc_nix)
+	$(trace-gen) $(dummy-env) $(doc_nix) config show --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/contributing/experimental-feature-descriptions.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features.nix $(bindir)/nix
+$(d)/src/contributing/experimental-feature-descriptions.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features.nix $(doc_nix)
 	@rm -rf $@ $@.tmp
 	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-xp-features.nix (builtins.fromJSON (builtins.readFile $<))'
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/experimental-features-shortlist.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features-shortlist.nix $(bindir)/nix
+$(d)/src/command-ref/experimental-features-shortlist.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features-shortlist.nix $(doc_nix)
 	@rm -rf $@ $@.tmp
 	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-xp-features-shortlist.nix (builtins.fromJSON (builtins.readFile $<))'
 	@mv $@.tmp $@
 
-$(d)/xp-features.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-xp-features > $@.tmp
+$(d)/xp-features.json: $(doc_nix)
+	$(trace-gen) $(dummy-env) $(doc_nix) __dump-xp-features > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/language/builtins.md: $(d)/language.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
+$(d)/src/language/builtins.md: $(d)/language.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(doc_nix)
 	@cat doc/manual/src/language/builtins-prefix.md > $@.tmp
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<)).builtins' >> $@.tmp;
 	@cat doc/manual/src/language/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/language/builtin-constants.md: $(d)/language.json $(d)/generate-builtin-constants.nix $(d)/src/language/builtin-constants-prefix.md $(bindir)/nix
+$(d)/src/language/builtin-constants.md: $(d)/language.json $(d)/generate-builtin-constants.nix $(d)/src/language/builtin-constants-prefix.md $(doc_nix)
 	@cat doc/manual/src/language/builtin-constants-prefix.md > $@.tmp
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtin-constants.nix (builtins.fromJSON (builtins.readFile $<)).constants' >> $@.tmp;
 	@cat doc/manual/src/language/builtin-constants-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
-$(d)/language.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-language > $@.tmp
+$(d)/language.json: $(doc_nix)
+	$(trace-gen) $(dummy-env) $(doc_nix) __dump-language > $@.tmp
 	@mv $@.tmp $@
 
 # Generate "Upcoming release" notes (or clear it and remove from menu)
@@ -195,7 +207,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 # `@docroot@` is to be preserved for documenting the mechanism
 # FIXME: maybe contributing guides should live right next to the code
 # instead of in the manual
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md $(d)/src/release-notes/rl-next.md
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/store/types $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md $(d)/src/release-notes/rl-next.md
 	$(trace-gen) \
 		tmp="$$(mktemp -d)"; \
 		cp -r doc/manual "$$tmp"; \

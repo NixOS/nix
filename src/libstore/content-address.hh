@@ -94,7 +94,7 @@ struct ContentAddressMethod
     /**
      * Parse a content addressing method and hash type.
      */
-    static std::pair<ContentAddressMethod, HashType> parse(std::string_view rawCaMethod);
+    static std::pair<ContentAddressMethod, HashAlgorithm> parse(std::string_view rawCaMethod);
 
     /**
      * Render a content addressing method and hash type in a
@@ -102,7 +102,7 @@ struct ContentAddressMethod
      *
      * The rough inverse of `parse()`.
      */
-    std::string render(HashType ht) const;
+    std::string render(HashAlgorithm ha) const;
 };
 
 

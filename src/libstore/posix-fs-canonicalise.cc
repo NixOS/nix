@@ -1,4 +1,6 @@
-#include <sys/xattr.h>
+#if HAVE_SYS_XATTR_H
+# include <sys/xattr.h>
+#endif
 
 #include "posix-fs-canonicalise.hh"
 #include "file-system.hh"
@@ -76,7 +78,7 @@ static void canonicalisePathMetaData_(
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
         throw Error("file '%1%' has an unsupported type", path);
 
-#if __linux__
+#ifdef HAVE_SYS_XATTR_H
     /* Remove extended attributes / ACLs. */
     ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
 

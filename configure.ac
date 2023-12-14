@@ -122,7 +122,6 @@ AC_PATH_PROG(flex, flex, false)
 AC_PATH_PROG(bison, bison, false)
 AC_PATH_PROG(dot, dot)
 AC_PATH_PROG(lsof, lsof, lsof)
-NEED_PROG(jq, jq)
 
 
 AC_SUBST(coreutils, [$(dirname $(type -p cat))])
@@ -132,6 +131,30 @@ AC_ARG_WITH(store-dir, AS_HELP_STRING([--with-store-dir=PATH],[path of the Nix s
   storedir=$withval, storedir='/nix/store')
 AC_SUBST(storedir)
 
+
+# Running the functional tests without building Nix is useful for testing
+# different pre-built versions of Nix against each other.
+AC_ARG_ENABLE(build, AS_HELP_STRING([--disable-build],[Do not build nix]),
+  ENABLE_BUILD=$enableval, ENABLE_BUILD=yes)
+AC_SUBST(ENABLE_BUILD)
+
+# Building without tests is useful for bootstrapping with a smaller footprint
+# or running the tests in a separate derivation. Otherwise, we do compile and
+# run them.
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
+  ENABLE_TESTS=$enableval, ENABLE_TESTS=yes)
+AC_SUBST(ENABLE_TESTS)
+
+# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
+AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
+  internal_api_docs=$enableval, internal_api_docs=no)
+AC_SUBST(internal_api_docs)
+
+AS_IF(
+  [test "$ENABLE_BUILD" == "yes" || test "$ENABLE_TEST" == "yes"],
+  [NEED_PROG(jq, jq)])
+
+AS_IF([test "$ENABLE_BUILD" == "yes"],[
 
 # Look for boost, a required dependency.
 # Note that AX_BOOST_BASE only exports *CPP* BOOST_CPPFLAGS, no CXX flags,
@@ -155,18 +178,6 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
-# Running the functional tests without building Nix is useful for testing
-# different pre-built versions of Nix against each other.
-AC_ARG_ENABLE(build, AS_HELP_STRING([--disable-build],[Do not build nix]),
-  ENABLE_BUILD=$enableval, ENABLE_BUILD=yes)
-AC_SUBST(ENABLE_BUILD)
-# Building without tests is useful for bootstrapping with a smaller footprint
-# or running the tests in a separate derivation. Otherwise, we do compile and
-# run them.
-AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
-  ENABLE_TESTS=$enableval, ENABLE_TESTS=yes)
-AC_SUBST(ENABLE_TESTS)
-
 AC_ARG_ENABLE(install-unit-tests, AS_HELP_STRING([--enable-install-unit-tests],[Install the unit tests for running later (default no)]),
   INSTALL_UNIT_TESTS=$enableval, INSTALL_UNIT_TESTS=no)
 AC_SUBST(INSTALL_UNIT_TESTS)
@@ -178,11 +189,6 @@ AC_SUBST(checkbindir)
 AC_ARG_WITH(check-lib-dir, AS_HELP_STRING([--with-check-lib-dir=PATH],[path to install unit tests for running later (defaults to $libdir)]),
   checklibdir=$withval, checklibdir=$libdir)
 AC_SUBST(checklibdir)
-
-# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
-AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
-  internal_api_docs=$enableval, internal_api_docs=no)
-AC_SUBST(internal_api_docs)
 
 # LTO is currently broken with clang for unknown reasons; ld segfaults in the llvm plugin
 AC_ARG_ENABLE(lto, AS_HELP_STRING([--enable-lto],[Enable LTO (only supported with GCC) [default=no]]),
@@ -282,6 +288,8 @@ case "$host_os" in
 esac
 AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
+# Optional dependencies for better normalizing file system data
+AC_CHECK_HEADERS[sys/xattr.h]
 
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)
@@ -308,8 +316,7 @@ if test "$gc" = yes; then
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
 fi
 
-
-if test "$ENABLE_TESTS" = yes; then
+AS_IF([test "$ENABLE_TESTS" == "yes"],[
 
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])
@@ -336,11 +343,10 @@ AC_LINK_IFELSE([
   [AC_MSG_ERROR([librapidcheck is not found.])])
 AC_LANG_POP(C++)
 
-fi
+])
 
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
-
 
 # documentation generation switch
 AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
@@ -385,6 +391,8 @@ AC_SUBST(embedded_sandbox_shell)
 if test "$embedded_sandbox_shell" = yes; then
   AC_DEFINE(HAVE_EMBEDDED_SANDBOX_SHELL, 1, [Include the sandbox shell in the Nix binary.])
 fi
+
+])
 
 
 # Expand all variables in config.status.

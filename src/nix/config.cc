@@ -7,9 +7,9 @@
 
 using namespace nix;
 
-struct CmdConfig : virtual NixMultiCommand
+struct CmdConfig : NixMultiCommand
 {
-    CmdConfig() : MultiCommand(RegisterCommand::getCommandsFor({"config"}))
+    CmdConfig() : NixMultiCommand("config", RegisterCommand::getCommandsFor({"config"}))
     { }
 
     std::string description() override
@@ -18,13 +18,6 @@ struct CmdConfig : virtual NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix config' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 struct CmdConfigShow : Command, MixJSON
