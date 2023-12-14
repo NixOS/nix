@@ -3,25 +3,11 @@
 #include "args.hh"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
+#include "tests/nix_api_util.hh"
 
 #include <gtest/gtest.h>
 
 namespace nixC {
-
-class nix_api_util_context : public ::testing::Test {
-protected:
-    static void SetUpTestSuite() {
-        nix_libutil_init(NULL);
-    }
-    void SetUp() override {
-        ctx = nix_c_context_create();
-    };
-    void TearDown() override {
-        nix_c_context_free(ctx);
-        ctx = nullptr;
-    }
-    nix_c_context* ctx;
-};
 
 TEST_F(nix_api_util_context, nix_context_error) {
     std::string err_msg_ref;
@@ -57,12 +43,38 @@ TEST(nix_api_util, nix_version_get) {
     ASSERT_EQ(std::string(nix_version_get()), PACKAGE_VERSION);
 }
 
-TEST_F(nix_api_util_context, nix_setting_get) {
-    // todo
+struct MySettings : nix::Config
+{
+    nix::Setting<std::string> settingSet{this, "empty", "setting-name", "Description"};
+};
+
+MySettings mySettings;
+static nix::GlobalConfig::Register rs(&mySettings);
+
+TEST_F(nix_api_util_context, nix_setting_get)
+{
+    ASSERT_EQ(ctx->last_err_code, NIX_OK);
+    char value[256];
+    nix_err result = nix_setting_get(ctx, "invalid-key", value, 256);
+    ASSERT_EQ(result, NIX_ERR_KEY);
+
+    result = nix_setting_get(ctx, "setting-name", value, 256);
+    ASSERT_EQ(result, NIX_OK);
+    ASSERT_STREQ("empty", value);
 }
 
-TEST_F(nix_api_util_context, nix_setting_set) {
-    // todo
+TEST_F(nix_api_util_context, nix_setting_set)
+{
+    nix_err result = nix_setting_set(ctx, "invalid-key", "new-value");
+    ASSERT_EQ(result, NIX_ERR_KEY);
+
+    result = nix_setting_set(ctx, "setting-name", "new-value");
+    ASSERT_EQ(result, NIX_OK);
+
+    char value[256];
+    result = nix_setting_get(ctx, "setting-name", value, 256);
+    ASSERT_EQ(result, NIX_OK);
+    ASSERT_STREQ("new-value", value);
 }
 
 TEST_F(nix_api_util_context, nix_err_msg) {

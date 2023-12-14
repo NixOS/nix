@@ -26,6 +26,6 @@ libstore-tests_CXXFLAGS += $(libstore-tests_EXTRA_INCLUDES)
 
 libstore-tests_LIBS = \
     libstore-test-support libutil-test-support \
-    libstore libutil
+    libstore libstorec libutil libutilc
 
 libstore-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)

@@ -8,11 +8,6 @@
 
 #include "globals.hh"
 
-struct StorePath
-{
-    nix::StorePath path;
-};
-
 nix_err nix_libstore_init(nix_c_context * context)
 {
     if (context)
