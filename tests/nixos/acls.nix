@@ -137,6 +137,10 @@ let
     def assert_info(path, expected, when):
       got = info(path)
       assert(got == expected),f"Path info {got} is not as expected {expected} for path {path} {when}"
+
+    def assert_in_last_line(expected, output):
+      last_line = output.splitlines()[-1]
+      assert(expected in last_line),f"last line ({last_line}) does not contain string ({expected})"
   '';
 
  testCli =''
@@ -189,9 +193,10 @@ let
      sudo -u test nix store add-file /tmp/unaccessible
     """)
 
-    machine.fail("""
-      sudo -u test nix-build ${test-unaccessible} --no-out-link --debug
+    test_unaccessible_output = machine.fail("""
+      sudo -u test nix-build ${test-unaccessible} --no-out-link --debug 2>&1
     """)
+    assert_in_last_line("error: opening file '/tmp/unaccessible': Permission denied", test_unaccessible_output)
 
   '';
   testFoo = ''
@@ -239,9 +244,10 @@ let
     assert_info(examplePackagePathDiffPermissions, {"exists": True, "protected": True, "users": ["root", "test"], "groups": []}, "after nix-build as a different user")
 
     # Trying to revoke permissions fails as a non trusted user.
-    machine.fail(f"""
-      sudo -u test nix store access revoke --user test {examplePackagePath}
+    try_revoke_output = machine.fail(f"""
+      sudo -u test nix store access revoke --user test {examplePackagePath} 2>&1
     """)
+    assert_in_last_line("Only trusted users can revoke permissions on path", try_revoke_output)
 
     exampleDependenciesPackagePath = machine.succeed("""
       sudo -u test nix-build ${example-dependencies} --no-out-link --show-trace
@@ -327,7 +333,7 @@ let
   '';
 
   # Test adding a private runtime dependency, which should fail.
-  runtime-depend-on-private = builtins.toFile "depend_on_private.nix" ''
+  runtime-depend-on-private = builtins.toFile "runtime_depend_on_private.nix" ''
     with import <nixpkgs> {};
     let private = import ${private-package}; in
     stdenvNoCC.mkDerivation {
@@ -375,16 +381,20 @@ let
 
     machine.fail(f"""sudo -u test cat {private_output}""")
 
-    machine.fail("""
-      sudo -u test nix-build ${depend-on-private} --no-out-link
+    depend_on_private_output = machine.fail("""
+      sudo -u test nix-build ${depend-on-private} --no-out-link 2>&1
     """)
 
-    machine.fail(f"""sudo -u test cat {private_output}""")
-    machine.fail("""
-      sudo -u test nix-build ${runtime-depend-on-private} --no-out-link
-    """)
+    assert_in_last_line("error: test (uid 1000) does not have access to path", depend_on_private_output)
 
     machine.fail(f"""sudo -u test cat {private_output}""")
+    runtime_depend_on_private_output = machine.fail("""
+      sudo -u test nix-build ${runtime-depend-on-private} --no-out-link 2>&1
+    """)
+    assert_in_last_line("error: test (uid 1000) does not have access to path", runtime_depend_on_private_output)
+
+    machine.fail(f"""sudo -u test cat {private_output}""")
+
     # Root builds the derivation to give access to test
     public_output = machine.succeed("""
       sudo nix-build ${depend-on-private} --no-out-link
@@ -393,10 +403,19 @@ let
     print(machine.succeed(f"""sudo -u test cat {public_output}"""))
     print(machine.succeed(f"""getfacl {public_output}"""))
     print(machine.succeed(f"""getfacl {private_output}"""))
+
+    machine.fail(f"""sudo -u test cat {private_output}""")
+
+    machine.succeed(f"""sudo -u test cat {public_output}""")
+
+    # Test can depend on the values that were made public, even if it these have private build time dependencies.
+    machine.succeed("""
+      sudo -u test nix-build ${depend-on-public} --no-out-link
+    """)
   '';
 
   # Non trusted user gives permission to another one.
-  test-user-private = builtins.toFile "private.nix" ''
+  test-user-private = builtins.toFile "test-user-private.nix" ''
     with import <nixpkgs> {};
     stdenvNoCC.mkDerivation {
       name = "test-user-private";
@@ -408,10 +427,33 @@ let
           users = ["test"];
         };
       };
-      buildCommand = "cat $privateSource > $out";
+      buildCommand = "echo $privateSource > $out && echo Example >> $out";
       allowSubstitutes = false;
       __permissions = {
         outputs.out = { protected = true; users = ["test" "test2"]; };
+        drv = { protected = true; users = ["test" "test2"]; };
+        log.protected = true;
+        log.users = ["test" "test2"];
+      };
+    }
+  '';
+
+  test-user-private-2 = builtins.toFile "test-user-private-2.nix" ''
+    with import <nixpkgs> {};
+    stdenvNoCC.mkDerivation {
+      name = "test-user-private";
+      privateSource = builtins.path {
+        path = /tmp/test_secret;
+        sha256 = "f90af0f74a205cadaad0f17854805cae15652ba2afd7992b73c4823765961533";
+        permissions = {
+          protected = true;
+          users = ["test" "test2"];
+        };
+      };
+      buildCommand = "echo $privateSource > $out && echo Example >> $out";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["test" "test2" "test3"]; };
         drv = { protected = true; users = ["test" "test2"]; };
         log.protected = true;
         log.users = ["test" "test2"];
@@ -424,20 +466,54 @@ let
     # fmt: off
     machine.succeed("""sudo -u test bash -c 'echo secret_string > /tmp/test_secret'""");
     machine.succeed("""sudo -u test chmod 700 /tmp/test_secret""");
-    print(machine.succeed("""getfacl /tmp/test_secret"""));
+
+    # User test2 cannot build the derivation itself
+    test_user_private_out = machine.fail("""
+     sudo -u test2 nix-build ${test-user-private} --no-out-link 2>&1
+    """)
+
+    assert_in_last_line("opening file '/tmp/test_secret': Permission denied", test_user_private_out)
+
+    # User test can do it to grant access to the outputs to test2
     userPrivatePath = machine.succeed("""
      sudo -u test nix-build ${test-user-private} --no-out-link
     """)
+
+    machine.succeed("""
+     sudo -u test2 nix-build ${test-user-private} --no-out-link
+    """)
+
     assert_info(userPrivatePath, {"exists": True, "protected": True, "users": ["test", "test2"], "groups": []}, "after nix-build test-user-private")
+
     machine.succeed(f"""
       sudo -u test2 cat {userPrivatePath}
     """)
+
+    # Non trusted user cannot revoke permissions, even if it was the one who granted them.
     machine.fail(f"""
      sudo -u test nix store access revoke --user test2 {userPrivatePath}
     """)
+
+    # Since test2 was given permissions, it can grant access to test3
     machine.succeed(f"""
      sudo -u test2 nix store access grant --user test3 {userPrivatePath}
     """)
+
+    # test2 cannot add itself to the permissions of /tmp/test_secret
+    add_permissions_output = machine.fail("""
+     sudo -u test2 nix-build ${test-user-private-2} --no-out-link 2>&1
+    """)
+
+    assert_in_last_line("Could not access file (/tmp/test_secret) permissions may be missing", add_permissions_output)
+
+    inputPath1 = machine.succeed(f"""
+     sudo -u test2 head -n 1 {userPrivatePath}
+    """)
+
+    machine.fail(f"""
+     sudo -u test2 cat {inputPath1}
+    """)
+
   '';
 
 in
