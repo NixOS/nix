@@ -238,12 +238,14 @@ struct GitArchiveInputScheme : InputScheme
         cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
         cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});
 
+        #if 0
         if (upstreamTreeHash != tarballInfo.treeHash)
             warn(
                 "Git tree hash mismatch for revision '%s' of '%s': "
                 "expected '%s', got '%s'. "
                 "This can happen if the Git repository uses submodules.",
                 rev->gitRev(), input.to_string(), upstreamTreeHash->gitRev(), tarballInfo.treeHash.gitRev());
+        #endif
 
         return {std::move(input), tarballInfo};
     }
