@@ -395,7 +395,7 @@
           stdenvs)));
 
       devShells = let
-        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; }).overrideAttrs (_: {
+        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; }).overrideAttrs (attrs: {
           installFlags = "sysconfdir=$(out)/etc";
           shellHook = ''
             PATH=$prefix/bin:$PATH
@@ -405,6 +405,9 @@
             # Make bash completion work.
             XDG_DATA_DIRS+=:$out/share
           '';
+          nativeBuildInputs = attrs.nativeBuildInputs or []
+            ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
+            ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
         });
         in
         forAllSystems (system:
