@@ -38,6 +38,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <filesystem>
 
 namespace nix {
 
@@ -2291,6 +2292,15 @@ bool EvalState::callPathFilter(
     return forceBool(res, pos, "while evaluating the return value of the path filter function");
 }
 
+
+void assertReadable(const Path &p){
+  std::ifstream path_file(p);
+  if (!path_file) {
+      throw Error(fmt("Could not access file (%s) permissions may be missing", p));
+  }
+  path_file.close();
+}
+
 static void addPath(
     EvalState & state,
     const PosIdx pos,
@@ -2342,11 +2352,16 @@ static void addPath(
               auto curStatus = require<LocalGranularAccessStore>(*state.store).getAccessStatus(*expectedStorePath);
               if (curStatus != *accessStatus && !require<LocalGranularAccessStore>(*state.store).canAccess(*expectedStorePath)) {
                   // It's ok to update the permission of a store path if we have read access to the original file.
-                  std::ifstream path_file(path.path.abs());
-                  if (!path_file) {
-                      throw Error(fmt("Could not access file (%s) permissions may be missing", path));
+
+                  if(std::filesystem::is_directory(path.path.abs())){
+                    for (const auto& dirEntry : std::filesystem::recursive_directory_iterator(path.path.abs())){
+                        if (std::filesystem::is_directory(dirEntry)) continue;
+                        assertReadable(dirEntry.path());
+                    }
                   }
-                  path_file.close();
+                  else {
+                      assertReadable(path.path.abs());
+                  }
               }
             }
             require<LocalGranularAccessStore>(*state.store).setAccessStatus(*expectedStorePath, *accessStatus);
