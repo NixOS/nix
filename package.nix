@@ -5,7 +5,6 @@
 , autoreconfHook
 , aws-sdk-cpp
 , boehmgc
-, buildPackages
 , nlohmann_json
 , bison
 , boost
@@ -208,9 +207,6 @@ in {
     # changelog
     ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d
     ++ lib.optional enableInternalAPIDocs doxygen
-
-    ++ lib.optional stdenv.cc.isClang buildPackages.bear
-    ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) buildPackages.clang-tools
   ;
 
   buildInputs = lib.optionals doBuild [
