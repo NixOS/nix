@@ -1505,9 +1505,27 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
+namespace {
+/** Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
+};
+};
 
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
+    if (callDepth > evalSettings.maxCallDepth)
+        error("stack overflow; max-call-depth exceeded").atPos(pos).template debugThrow<EvalError>();
+    CallDepth _level(callDepth);
+
     auto trace = evalSettings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
         : nullptr;

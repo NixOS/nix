@@ -25,6 +25,7 @@
 #include <memory>
 #include <map>
 #include <optional>
+#include <compare>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -88,6 +89,8 @@ struct AbstractPos
     std::optional<LinesOfCode> getCodeLines() const;
 
     virtual ~AbstractPos() = default;
+
+    inline auto operator<=>(const AbstractPos& rhs) const = default;
 };
 
 std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
@@ -102,6 +105,11 @@ struct Trace {
     hintformat hint;
     bool frame;
 };
+
+inline bool operator<(const Trace& lhs, const Trace& rhs);
+inline bool operator> (const Trace& lhs, const Trace& rhs);
+inline bool operator<=(const Trace& lhs, const Trace& rhs);
+inline bool operator>=(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;
