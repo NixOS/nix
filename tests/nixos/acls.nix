@@ -516,6 +516,113 @@ let
 
   '';
 
+  # Tests importing a private folder
+  test-import-folder = builtins.toFile "test-import-folder.nix" ''
+    with import <nixpkgs> {};
+    stdenvNoCC.mkDerivation {
+      name = "test-import-folder";
+      outputs = ["out" "out2"];
+      privateSource = builtins.path {
+        path = /tmp/private-src;
+        sha256 = "961102b8a00318065d49b8c941adc13f56da0fbb56e094de4917b6fdf80a41df";
+        permissions = {
+          protected = true;
+          users = ["test" "test3"];
+        };
+      };
+      buildCommand = "touch $out2 && mkdir $out && cat $privateSource/1 $privateSource/2 > $out/output";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["test" "test2"]; };
+        outputs.out2 = { protected = true; users = ["test" "test2"]; };
+        drv = { protected = true; users = ["test" "test2"]; };
+        log.protected = true;
+        log.users = ["test" "test2"];
+      };
+    }
+  '';
+
+  # Tests overriding permissions over a private folder that was previsously imported.
+  test-import-folder-2 = builtins.toFile "test-import-folder-2.nix" ''
+    with import <nixpkgs> {};
+    stdenvNoCC.mkDerivation {
+      name = "test-import-folder";
+      outputs = ["out" "out2"];
+      privateSource = builtins.path {
+        path = /tmp/private-src;
+        sha256 = "961102b8a00318065d49b8c941adc13f56da0fbb56e094de4917b6fdf80a41df";
+        permissions = {
+          protected = true;
+          users = ["test" "test2"];
+        };
+      };
+      buildCommand = "touch $out2 && mkdir $out && cat $privateSource/1 $privateSource/2 > $out/output";
+      allowSubstitutes = false;
+      __permissions = {
+        outputs.out = { protected = true; users = ["test" "test2"]; };
+        outputs.out2 = { protected = true; users = ["test" "test2"]; };
+        drv = { protected = true; users = ["test" "test2"]; };
+        log.protected = true;
+        log.users = ["test" "test2"];
+      };
+    }
+  '';
+
+  # Tests importing a private folder
+  testImportFolder = ''
+    # fmt: off
+    machine.succeed("""sudo -u test mkdir /tmp/private-src""")
+    machine.succeed("""sudo -u test bash -c 'echo secret_string_1 > /tmp/private-src/1'""")
+    machine.succeed("""sudo -u test bash -c 'echo secret_string_2 > /tmp/private-src/2'""")
+    machine.succeed("""sudo -u test chmod 700 /tmp/private-src/2""")
+
+    # test2 does not have access to all the files in /tmp/private-src
+    machine.fail("""
+        sudo -u test2 nix-build ${test-import-folder} --no-out-link 2>&1
+    """)
+
+    # test has read access to all the files in /tmp/private-src
+    testImportFolderPath = machine.succeed("""
+        sudo -u test nix-build ${test-import-folder} --no-out-link
+    """).strip()
+
+    assert_info(f"""{testImportFolderPath}/output""", {"exists": True, "protected": True, "users": ["test", "test2"], "groups": []}, "after nix-build test-import-folder")
+
+    # Check permissions of the copies of the files from /tmp/private-src in the store
+    testImportFolderPathDrv = machine.succeed("""
+        sudo -u test nix-instantiate ${test-import-folder}
+    """).strip()
+    inputFolderPath=machine.succeed(f"nix-store -q --references {testImportFolderPathDrv} | grep private-src").strip()
+    assert_info(f"""{inputFolderPath}""", {"exists": True, "protected": True, "users": ["test", "test3"], "groups": []}, "inputFolderPath")
+    assert_info(f"""{inputFolderPath}/1""", {"exists": True, "protected": True, "users": ["test", "test3"], "groups": []}, "inputFolderPath/1")
+    assert_info(f"""{inputFolderPath}/2""", {"exists": True, "protected": True, "users": ["test", "test3"], "groups": []}, "inputFolderPath/2")
+
+    # test2 tries grant itself permission to the /tmp/private-src input but it cannot read all the original files
+    assert_in_last_line(
+      "Could not access file (/tmp/private-src/2) permissions may be missing",
+      machine.fail("""
+        sudo -u test2 nix-build ${test-import-folder-2} --no-out-link 2>&1
+      """)
+    )
+
+    # test2 can now read all the files in /tmp/private-src
+    machine.succeed("""sudo -u test chmod 777 /tmp/private-src/2""")
+
+    # test-import-folder-2 will remove the permissions of test3 so this fails
+    assert_in_last_line(
+      f"Only trusted users can revoke permissions on path {inputFolderPath}",
+      machine.fail("""
+        sudo -u test2 nix-build ${test-import-folder-2} --no-out-link 2>&1
+      """)
+    )
+
+    # It succeeds after a trusted user manually removes the permissions of test3
+    machine.succeed(f"nix store access revoke {inputFolderPath} --user test3")
+    machine.succeed("""
+        sudo -u test2 nix-build ${test-import-folder-2} --no-out-link
+    """)
+  '';
+
 in
 {
   name = "acls";
@@ -547,6 +654,7 @@ in
       testExamples
       testDependOnPrivate
       testTestUserPrivate
+      testImportFolder
       # [TODO] uncomment once access to the runtime closure is unforced
       # testRuntimeDepNoPermScript
     ];
