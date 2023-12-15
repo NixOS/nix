@@ -71,6 +71,7 @@ nix_tests = \
   build-remote-trustless-should-fail-0.sh \
   build-remote-with-mounted-ssh-ng.sh \
   nar-access.sh \
+  impure-eval.sh \
   pure-eval.sh \
   eval.sh \
   repl.sh \
