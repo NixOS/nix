@@ -5,8 +5,7 @@ error:
              | ^
             2|
 
-       error: function 'anonymous lambda' called without required argument 'y'
-       at /pwd/lang/eval-fail-missing-arg.nix:1:2:
+       error: function 'anonymous lambda' called without required argument 'y' at 1:2:
             1| ({x, y, z}: x + y + z) {x = "foo"; z = "bar";}
              |  ^
             2|

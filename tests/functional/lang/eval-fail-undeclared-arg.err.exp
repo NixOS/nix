@@ -5,8 +5,7 @@ error:
              | ^
             2|
 
-       error: function 'anonymous lambda' called with unexpected argument 'y'
-       at /pwd/lang/eval-fail-undeclared-arg.nix:1:2:
+       error: function 'anonymous lambda' called with unexpected argument 'y' at 1:2:
             1| ({x, z}: x + z) {x = "foo"; y = "bla"; z = "bar";}
              |  ^
             2|

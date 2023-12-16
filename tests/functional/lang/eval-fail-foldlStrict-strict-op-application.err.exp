@@ -6,22 +6,19 @@ error:
              | ^
             3|   (_: f: f null)
 
-       … while calling anonymous lambda
-         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:3:7:
+       … while calling anonymous lambda at 3:7:
             2| builtins.foldl'
             3|   (_: f: f null)
              |       ^
             4|   null
 
-       … from call site
-         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:3:10:
+       … from call site at 3:10:
             2| builtins.foldl'
             3|   (_: f: f null)
              |          ^
             4|   null
 
-       … while calling anonymous lambda
-         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:5:6:
+       … while calling anonymous lambda at 5:6:
             4|   null
             5|   [ (_: throw "Not the final value, but is still forced!") (_: 23) ]
              |      ^

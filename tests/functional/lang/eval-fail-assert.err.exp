@@ -6,22 +6,19 @@ error:
              |   ^
             5| }
 
-       … from call site
-         at /pwd/lang/eval-fail-assert.nix:4:10:
+       … from call site at 4:10:
             3|
             4|   body = x "x";
              |          ^
             5| }
 
-       … while calling 'x'
-         at /pwd/lang/eval-fail-assert.nix:2:7:
+       … while calling 'x' at 2:7:
             1| let {
             2|   x = arg: assert arg == "y"; 123;
              |       ^
             3|
 
-       error: assertion '(arg == "y")' failed
-       at /pwd/lang/eval-fail-assert.nix:2:12:
+       error: assertion '(arg == "y")' failed at 2:12:
             1| let {
             2|   x = arg: assert arg == "y"; 123;
              |            ^

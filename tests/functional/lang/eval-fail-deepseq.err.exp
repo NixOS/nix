@@ -5,14 +5,12 @@ error:
              | ^
             2|
 
-       … while evaluating the attribute 'x'
-         at /pwd/lang/eval-fail-deepseq.nix:1:20:
+       … while evaluating the attribute 'x' at 1:20:
             1| builtins.deepSeq { x = abort "foo"; } 456
              |                    ^
             2|
 
-       … while calling the 'abort' builtin
-         at /pwd/lang/eval-fail-deepseq.nix:1:24:
+       … while calling the 'abort' builtin at 1:24:
             1| builtins.deepSeq { x = abort "foo"; } 456
              |                        ^
             2|

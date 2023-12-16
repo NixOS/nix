@@ -6,8 +6,7 @@ error:
              |     ^
             4|   };
 
-       … while evaluating an attribute name
-         at /pwd/lang/eval-fail-attr-name-type.nix:7:17:
+       … while evaluating an attribute name at 7:17:
             6| in
             7|   attrs.puppy.${key}
              |                 ^

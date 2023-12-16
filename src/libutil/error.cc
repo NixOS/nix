@@ -118,25 +118,47 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
  */
 static bool printUnknownLocations = getEnv("_NIX_EVAL_SHOW_UNKNOWN_LOCATIONS").has_value();
 
-/**
- * Print a position, if it is known.
- *
- * @return true if a position was printed.
- */
-static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<Pos> & pos) {
-    bool hasPos = pos && *pos;
-    if (hasPos) {
-        oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
+class PosOutput {
+    std::ostream & output;
+    std::shared_ptr<Pos> lastPos = std::shared_ptr<Pos>();
 
-        if (auto loc = pos->getCodeLines()) {
-            printCodeLines(oss, "", *pos, *loc);
-            oss << "\n";
+public:
+    PosOutput(std::ostream & o) : output(o) { }
+
+    /**
+     * Print a position, if it is known.
+     *
+     * @return true if a position was printed.
+     */
+    bool maybePrint(std::string_view indent, hintformat hint, const std::shared_ptr<Pos> & pos)
+    {
+        output << hint;
+        bool hasPos = pos && *pos;
+        if (hasPos) {
+            bool showOrigin = !lastPos || pos->origin != lastPos->origin;
+            if (showOrigin)
+                output << "\n" << indent;
+            else
+                output << " ";
+            output << ANSI_BLUE << "at " ANSI_WARNING;
+            pos->print(output, showOrigin);
+            output << ANSI_NORMAL << ":";
+
+            if (auto loc = pos->getCodeLines()) {
+                printCodeLines(output, "", *pos, *loc);
+                output << "\n";
+            }
+            lastPos = *pos;
+        } else {
+            lastPos.reset();
+            output << "\n";
+            if (printUnknownLocations) {
+                output << indent << ANSI_BLUE << "at " ANSI_RED << "UNKNOWN LOCATION" << ANSI_NORMAL << "\n";
+            }
         }
-    } else if (printUnknownLocations) {
-        oss << "\n" << indent << ANSI_BLUE << "at " ANSI_RED << "UNKNOWN LOCATION" << ANSI_NORMAL << "\n";
+        return hasPos;
     }
-    return hasPos;
-}
+};
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
 {
@@ -285,9 +307,10 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     auto ellipsisIndent = "  ";
 
     bool frameOnly = false;
+    PosOutput posOutput(oss);
     if (!einfo.traces.empty()) {
         size_t count = 0;
-        for (const auto & trace : einfo.traces) {
+        for (auto & trace : einfo.traces) {
             if (trace.hint.str().empty()) continue;
             if (frameOnly && !trace.frame) continue;
 
@@ -299,17 +322,15 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             count++;
             frameOnly = trace.frame;
 
-            oss << "\n" << "… " << trace.hint.str() << "\n";
+            oss << "\n" << "… ";
 
-            if (printPosMaybe(oss, ellipsisIndent, trace.pos))
+            if (posOutput.maybePrint(ellipsisIndent, trace.hint, trace.pos))
                 count++;
         }
         oss << "\n" << prefix;
     }
 
-    oss << einfo.msg << "\n";
-
-    printPosMaybe(oss, "", einfo.errPos);
+    posOutput.maybePrint("", einfo.msg, einfo.errPos);
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {

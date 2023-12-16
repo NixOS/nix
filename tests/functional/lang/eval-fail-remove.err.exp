@@ -6,8 +6,7 @@ error:
              |   ^
             5| }
 
-       error: attribute 'x' missing
-       at /pwd/lang/eval-fail-remove.nix:4:10:
+       error: attribute 'x' missing at 4:10:
             3|
             4|   body = (removeAttrs attrs ["x"]).x;
              |          ^

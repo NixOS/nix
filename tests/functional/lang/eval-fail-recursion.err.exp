@@ -5,8 +5,7 @@ error:
              |            ^
             2|
 
-       error: infinite recursion encountered
-       at /pwd/lang/eval-fail-recursion.nix:1:15:
+       error: infinite recursion encountered at 1:15:
             1| let a = {} // a; in a.foo
              |               ^
             2|

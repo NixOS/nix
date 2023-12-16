@@ -5,8 +5,7 @@ error:
              |    ^
             2|
 
-       … while calling the 'throw' builtin
-         at /pwd/lang/eval-fail-not-throws.nix:1:4:
+       … while calling the 'throw' builtin at 1:4:
             1| ! (throw "uh oh!")
              |    ^
             2|

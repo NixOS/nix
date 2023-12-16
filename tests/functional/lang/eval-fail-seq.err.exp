@@ -5,8 +5,7 @@ error:
              | ^
             2|
 
-       … while calling the 'abort' builtin
-         at /pwd/lang/eval-fail-seq.nix:1:15:
+       … while calling the 'abort' builtin at 1:15:
             1| builtins.seq (abort "foo") 2
              |               ^
             2|

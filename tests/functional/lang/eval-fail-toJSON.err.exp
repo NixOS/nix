@@ -5,15 +5,13 @@ error:
              | ^
             2|   a.b = [
 
-       … while evaluating attribute 'a'
-         at /pwd/lang/eval-fail-toJSON.nix:2:3:
+       … while evaluating attribute 'a' at 2:3:
             1| builtins.toJSON {
             2|   a.b = [
              |   ^
             3|     true
 
-       … while evaluating attribute 'b'
-         at /pwd/lang/eval-fail-toJSON.nix:2:3:
+       … while evaluating attribute 'b' at 2:3:
             1| builtins.toJSON {
             2|   a.b = [
              |   ^
@@ -28,15 +26,13 @@ error:
              |       ^
             8|     }
 
-       … while evaluating attribute 'd'
-         at /pwd/lang/eval-fail-toJSON.nix:7:7:
+       … while evaluating attribute 'd' at 7:7:
             6|     {
             7|       c.d = throw "hah no";
              |       ^
             8|     }
 
-       … while calling the 'throw' builtin
-         at /pwd/lang/eval-fail-toJSON.nix:7:13:
+       … while calling the 'throw' builtin at 7:13:
             6|     {
             7|       c.d = throw "hah no";
              |             ^
