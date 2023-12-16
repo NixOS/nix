@@ -71,8 +71,7 @@ You can also build Nix for one of the [supported platforms](#platforms).
 - `OPTIMIZE=1` to enable optimizations.
 - `doc_generate=yes` to enable building the documentation (manual, man pages, etc.).
 
-  The docs can take a while to build, so you may want to disable this for local
-  development.
+  The docs can take a while to build, so you may want to disable this for local development.
 
 ## Building Nix
 
