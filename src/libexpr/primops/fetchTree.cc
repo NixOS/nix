@@ -167,7 +167,10 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked())
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+        if (type == "git")
+            state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchGit' requires a locked input, at %s", state.positions[pos]));
+        else
+            state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
 
     state.checkURI(input.toURLString());
 
