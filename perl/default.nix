@@ -2,7 +2,7 @@
 , stdenv
 , perl, perlPackages
 , autoconf-archive, autoreconfHook, pkg-config
-, nix, curl, bzip2, xz, boost, libsodium, darwin
+, nix, curl, bzip2, xz, boost, libsodium, darwin, acl
 }:
 
 perl.pkgs.toPerlModule (stdenv.mkDerivation {
