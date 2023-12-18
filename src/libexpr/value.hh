@@ -8,6 +8,7 @@
 #include "symbol-table.hh"
 #include "value/context.hh"
 #include "input-accessor.hh"
+#include "source-path.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>

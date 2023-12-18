@@ -1,6 +1,7 @@
 #pragma once
 
 #include "input-accessor.hh"
+#include "source-path.hh"
 
 namespace nix {
 
