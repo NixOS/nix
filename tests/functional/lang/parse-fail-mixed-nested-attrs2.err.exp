@@ -1,7 +1,5 @@
 error: attribute 'y' already defined at «stdin»:3:9
-
        at «stdin»:2:3:
-
             1| {
             2|   x.y.y = 3;
              |   ^

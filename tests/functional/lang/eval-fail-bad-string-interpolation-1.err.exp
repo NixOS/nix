@@ -1,8 +1,6 @@
 error:
        … while evaluating a path segment
-
          at /pwd/lang/eval-fail-bad-string-interpolation-1.nix:1:2:
-
             1| "${x: x}"
              |  ^
             2|
