@@ -6,6 +6,7 @@
 #include "path.hh"
 #include "comparator.hh"
 #include "variant-wrapper.hh"
+#include "file-ingestion-method.hh"
 
 namespace nix {
 
@@ -30,22 +31,6 @@ namespace nix {
  * restriction on self-references.
  */
 struct TextIngestionMethod : std::monostate { };
-
-/**
- * An enumeration of the main ways we can serialize file system
- * objects.
- */
-enum struct FileIngestionMethod : uint8_t {
-    /**
-     * Flat-file hashing. Directly ingest the contents of a single file
-     */
-    Flat = 0,
-    /**
-     * Recursive (or NAR) hashing. Serializes the file-system object in Nix
-     * Archive format and ingest that
-     */
-    Recursive = 1
-};
 
 /**
  * Compute the prefix to the hash algorithm which indicates how the

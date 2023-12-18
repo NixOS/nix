@@ -1,6 +1,8 @@
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "input-accessor.hh"
+#include "source-path.hh"
+#include "fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -374,7 +376,7 @@ void InputScheme::clone(const Input & input, const Path & destDir) const
 std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
 {
     auto [accessor, input2] = getAccessor(store, input);
-    auto storePath = SourcePath(accessor).fetchToStore(store, input2.getName());
+    auto storePath = fetchToStore(store, SourcePath(accessor), input2.getName());
     return {storePath, input2};
 }
 

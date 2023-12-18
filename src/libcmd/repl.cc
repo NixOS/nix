@@ -221,7 +221,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     // prefer direct pos, but if noPos then try the expr.
     auto pos = dt.pos
         ? dt.pos
-        : static_cast<std::shared_ptr<AbstractPos>>(positions[dt.expr.getPos() ? dt.expr.getPos() : noPos]);
+        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
         out << pos;

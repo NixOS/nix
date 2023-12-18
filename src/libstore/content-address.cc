@@ -4,18 +4,6 @@
 
 namespace nix {
 
-std::string makeFileIngestionPrefix(FileIngestionMethod m)
-{
-    switch (m) {
-    case FileIngestionMethod::Flat:
-        return "";
-    case FileIngestionMethod::Recursive:
-        return "r:";
-    default:
-        throw Error("impossible, caught both cases");
-    }
-}
-
 std::string ContentAddressMethod::renderPrefix() const
 {
     return std::visit(overloaded {

@@ -4,6 +4,8 @@
 #include "terminal.hh"
 #include "util.hh"
 #include "config.hh"
+#include "source-path.hh"
+#include "position.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
@@ -136,13 +138,13 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-void to_json(nlohmann::json & json, std::shared_ptr<AbstractPos> pos)
+void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
 {
     if (pos) {
         json["line"] = pos->line;
         json["column"] = pos->column;
         std::ostringstream str;
-        pos->print(str);
+        pos->print(str, true);
         json["file"] = str.str();
     } else {
         json["line"] = nullptr;

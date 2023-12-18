@@ -8,6 +8,7 @@
 #include "symbol-table.hh"
 #include "error.hh"
 #include "chunked-vector.hh"
+#include "position.hh"
 
 namespace nix {
 
@@ -20,27 +21,6 @@ MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
-
-/**
- * Position objects.
- */
-struct Pos
-{
-    uint32_t line;
-    uint32_t column;
-
-    struct none_tag { };
-    struct Stdin { ref<std::string> source; };
-    struct String { ref<std::string> source; };
-
-    typedef std::variant<none_tag, Stdin, String, SourcePath> Origin;
-
-    Origin origin;
-
-    explicit operator bool() const { return line > 0; }
-
-    operator std::shared_ptr<AbstractPos>() const;
-};
 
 class PosIdx {
     friend class PosTable;
@@ -124,8 +104,6 @@ public:
 };
 
 inline PosIdx noPos = {};
-
-std::ostream & operator << (std::ostream & str, const Pos & pos);
 
 
 struct Env;
