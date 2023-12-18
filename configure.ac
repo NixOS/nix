@@ -138,20 +138,38 @@ AC_ARG_ENABLE(build, AS_HELP_STRING([--disable-build],[Do not build nix]),
   ENABLE_BUILD=$enableval, ENABLE_BUILD=yes)
 AC_SUBST(ENABLE_BUILD)
 
-# Building without tests is useful for bootstrapping with a smaller footprint
+# Building without unit tests is useful for bootstrapping with a smaller footprint
 # or running the tests in a separate derivation. Otherwise, we do compile and
 # run them.
-AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
-  ENABLE_TESTS=$enableval, ENABLE_TESTS=yes)
-AC_SUBST(ENABLE_TESTS)
 
-# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
-AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
-  internal_api_docs=$enableval, internal_api_docs=no)
-AC_SUBST(internal_api_docs)
+AC_ARG_ENABLE(unit-tests, AS_HELP_STRING([--disable-unit-tests],[Do not build the tests]),
+  ENABLE_UNIT_TESTS=$enableval, ENABLE_UNIT_TESTS=$ENABLE_BUILD)
+AC_SUBST(ENABLE_UNIT_TESTS)
 
 AS_IF(
-  [test "$ENABLE_BUILD" == "yes" || test "$ENABLE_TEST" == "yes"],
+  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_UNIT_TESTS" == "yes"],
+  [AC_MSG_ERROR([Cannot enable unit tests when building overall is disabled. Please do not pass '--enable-unit-tests' or do not pass '--disable-build'.])])
+
+AC_ARG_ENABLE(functional-tests, AS_HELP_STRING([--disable-functional-tests],[Do not build the tests]),
+  ENABLE_FUNCTIONAL_TESTS=$enableval, ENABLE_FUNCTIONAL_TESTS=yes)
+AC_SUBST(ENABLE_FUNCTIONAL_TESTS)
+
+# documentation generation switch
+AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
+  ENABLE_DOC_GEN=$enableval, ENABLE_DOC_GEN=$ENABLE_BUILD)
+AC_SUBST(ENABLE_DOC_GEN)
+
+AS_IF(
+  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_GENERATED_DOCS" == "yes"],
+  [AC_MSG_ERROR([Cannot enable generated docs when building overall is disabled. Please do not pass '--enable-doc-gen' or do not pass '--disable-build'.])])
+
+# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
+AC_ARG_ENABLE(internal-api-docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
+  ENABLE_INTERNAL_API_DOCS=$enableval, ENABLE_INTERNAL_API_DOCS=no)
+AC_SUBST(ENABLE_INTERNAL_API_DOCS)
+
+AS_IF(
+  [test "$ENABLE_FUNCTIONAL_TESTS" == "yes" || test "$ENABLE_DOC_GEN" == "yes"],
   [NEED_PROG(jq, jq)])
 
 AS_IF([test "$ENABLE_BUILD" == "yes"],[
@@ -317,7 +335,7 @@ if test "$gc" = yes; then
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
 fi
 
-AS_IF([test "$ENABLE_TESTS" == "yes"],[
+AS_IF([test "$ENABLE_UNIT_TESTS" == "yes"],[
 
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])
@@ -348,11 +366,6 @@ AC_LANG_POP(C++)
 
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
-
-# documentation generation switch
-AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
-  doc_generate=$enableval, doc_generate=yes)
-AC_SUBST(doc_generate)
 
 
 # Look for lowdown library.

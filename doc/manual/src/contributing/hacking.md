@@ -67,9 +67,10 @@ You can also build Nix for one of the [supported platforms](#platforms).
 ## Makefile variables
 
 - `ENABLE_BUILD=yes` to enable building the C++ code.
-- `ENABLE_TESTS=yes` to enable building the tests.
+- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
+- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
+- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
 - `OPTIMIZE=1` to enable optimizations.
-- `doc_generate=yes` to enable building the documentation (manual, man pages, etc.).
 
   The docs can take a while to build, so you may want to disable this for local development.
 
