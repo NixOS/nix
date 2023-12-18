@@ -631,7 +631,7 @@ public:
 
           At least one of the following condition must be met
           for Nix to accept copying a store object from another
-          Nix store (such as a substituter):
+          Nix store (such as a [substituter](#conf-substituters)):
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
