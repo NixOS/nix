@@ -84,8 +84,8 @@ in
     client = { lib, nodes, pkgs, ... }: {
       networking.useDHCP = false;
       networking.nameservers = [
-        (lib.head nodes.http_dns.config.networking.interfaces.eth1.ipv6.addresses).address
-        (lib.head nodes.http_dns.config.networking.interfaces.eth1.ipv4.addresses).address
+        (lib.head nodes.http_dns.networking.interfaces.eth1.ipv6.addresses).address
+        (lib.head nodes.http_dns.networking.interfaces.eth1.ipv4.addresses).address
       ];
       networking.interfaces.eth1.ipv6.addresses = [
         { address = "fd21::10"; prefixLength = 64; }

@@ -81,7 +81,7 @@ in
     client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
 
     # Perform a build
-    out = client.succeed("nix-build ${expr nodes.client.config 1} 2> build-output")
+    out = client.succeed("nix-build ${expr nodes.client 1} 2> build-output")
 
     # Verify that the build was done on the builder
     builder.succeed(f"test -e {out.strip()}")

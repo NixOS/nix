@@ -36,7 +36,7 @@ in {
       server =
         { config, pkgs, ... }:
         { services.openssh.enable = true;
-          services.openssh.permitRootLogin = "yes";
+          services.openssh.settings.PermitRootLogin = "yes";
 					users.users.root.password = "foobar";
           virtualisation.writableStore = true;
           virtualisation.additionalPaths = [ pkgB pkgC ];
