@@ -165,7 +165,7 @@ void readAccessStatus(EvalState & state, Attr & attr, LocalGranularAccessStore::
 
 void ensureAccess(LocalGranularAccessStore::AccessStatus * accessStatus, std::string_view description, LocalGranularAccessStore & store)
 {
-    if (!accessStatus->isProtected || store.trusted) return;
+    if (!accessStatus->isProtected) return;
     uid_t uid = getuid();
     auto groups = store.getSubjectGroups(uid);
     for (auto entity : accessStatus->entities) {
