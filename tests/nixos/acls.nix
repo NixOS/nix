@@ -427,7 +427,7 @@ let
           users = ["test"];
         };
       };
-      buildCommand = "echo $privateSource > $out && echo Example >> $out";
+      buildCommand = "cat $privateSource > $out && echo Example >> $out";
       allowSubstitutes = false;
       __permissions = {
         outputs.out = { protected = true; users = ["test" "test2"]; };
@@ -506,13 +506,18 @@ let
 
     assert_in_last_line("Could not access file (/tmp/test_secret) permissions may be missing", add_permissions_output)
 
-    inputPath1 = machine.succeed(f"""
-     sudo -u test2 head -n 1 {userPrivatePath}
-    """)
 
-    machine.fail(f"""
-     sudo -u test2 cat {inputPath1}
-    """)
+    testUserPrivateDrv = machine.succeed("""
+        sudo nix-instantiate ${test-user-private} 
+    """).strip()
+    testUserPrivateInput=machine.succeed(f"nix-store -q --references {testUserPrivateDrv} | grep test_secret").strip()
+
+    assert_in_last_line(
+      "test_secret: Permission denied",
+      machine.fail(f"""
+      sudo -u test2 cat {testUserPrivateInput} 2>&1
+      """)
+    )
 
   '';
 
@@ -655,7 +660,6 @@ in
       testDependOnPrivate
       testTestUserPrivate
       testImportFolder
-      # [TODO] uncomment once access to the runtime closure is unforced
-      # testRuntimeDepNoPermScript
+      testRuntimeDepNoPermScript
     ];
 }
