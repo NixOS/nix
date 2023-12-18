@@ -10,6 +10,8 @@
 
 <!-- Large change: Provide instructions to reviewers how to read the diff. -->
 
-# Priorities
+# Priorities and Process
 
 Add :+1: to [pull requests you find important](https://github.com/NixOS/nix/pulls?q=is%3Aopen+sort%3Areactions-%2B1-desc).
+
+The Nix Team uses [this project board](https://github.com/orgs/NixOS/projects/19) to help track and schedule work. This should provide visibility into the initial discussion, assignments, as well as postponments.
