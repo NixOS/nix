@@ -746,7 +746,7 @@ void DerivationGoal::tryToBuild()
                 logger->cout("don't have access to path %s; checking outputs", worker.store.printStorePath(status.known->path));
                 buildMode = bmCheck;
             } else if (status.known->status == PathStatus::ShouldSync) {
-                logger->cout("permissions should be synced for path %s; repairing",
+                debug("permissions should be synced for path %s; repairing",
                             worker.store.printStorePath(status.known->path));
                 buildMode = bmRepair;
             }
