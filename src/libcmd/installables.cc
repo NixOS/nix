@@ -729,6 +729,20 @@ StorePathSet Installable::toStorePathSet(
     return outPaths;
 }
 
+StorePaths Installable::toStorePaths(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode, OperateOn operateOn,
+    const Installables & installables)
+{
+    StorePaths outPaths;
+    for (auto & path : toBuiltPaths(evalStore, store, mode, operateOn, installables)) {
+        auto thisOutPaths = path.outPaths();
+        outPaths.insert(outPaths.end(), thisOutPaths.begin(), thisOutPaths.end());
+    }
+    return outPaths;
+}
+
 StorePath Installable::toStorePath(
     ref<Store> evalStore,
     ref<Store> store,

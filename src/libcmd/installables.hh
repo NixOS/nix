@@ -172,6 +172,13 @@ struct Installable
         OperateOn operateOn,
         const Installables & installables);
 
+    static std::vector<StorePath> toStorePaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const Installables & installables);
+
     static StorePath toStorePath(
         ref<Store> evalStore,
         ref<Store> store,
