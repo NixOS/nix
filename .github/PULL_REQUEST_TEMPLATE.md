@@ -14,4 +14,4 @@
 
 Add :+1: to [pull requests you find important](https://github.com/NixOS/nix/pulls?q=is%3Aopen+sort%3Areactions-%2B1-desc).
 
-The Nix maintainer team uses [this project board](https://github.com/orgs/NixOS/projects/19) to track and schedule reviews.
+The Nix maintainer team uses a [GitHub project board](https://github.com/orgs/NixOS/projects/19) to [schedule and track reviews](https://github.com/NixOS/nix/tree/master/maintainers#project-board-protocol). 
