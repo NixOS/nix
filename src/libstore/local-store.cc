@@ -1060,40 +1060,48 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
 {
     experimentalFeatureSettings.require(Xp::ACLs);
 
-    // This check is deactivated for now
-    // It makes the public example3 derivation (from acls.nix) fail because it depends on the private derivation example 2.
-    // However it does not look like a runtime dependency.
-    if (false && isInStore(path)) {
+
+    // We check that everyone who has access to the path has access to runtimes dependencies
+    if (isInStore(path)) {
         StorePath storePath(baseNameOf(path));
 
         // FIXME(acls): cache is broken when called from registerValidPaths
 
-        std::promise<ref<const ValidPathInfo>> promise;
+        // We do not check paths referenced by drv files, as these are not really runtimes dependencies
+        // Skipping the check is needed if we want to build a derivation (B) which depends on a public output of another derivation (A),
+        // but we do not have access to the private inputs of A.
+        // In this case we need access to `B.drv` but do not need access to the private input that is referenced transitively.
+        if (!storePath.isDerivation()){
 
-        queryPathInfoUncached(storePath,
-            {[&](std::future<std::shared_ptr<const ValidPathInfo>> result) {
-                try {
-                    promise.set_value(ref(result.get()));
-                } catch (...) {
-                    promise.set_exception(std::current_exception());
+            std::promise<std::shared_ptr<const ValidPathInfo>> promise;
+
+            queryPathInfoUncached(storePath,
+                {[&](std::future<std::shared_ptr<const ValidPathInfo>> result) {
+                    try {
+                        promise.set_value(result.get());
+                    } catch (...) {
+                        promise.set_exception(std::current_exception());
+                    }
+                }});
+
+            auto info = promise.get_future().get();
+
+            if (info){
+                for (auto reference : info->references) {
+                    if (reference == storePath) continue;
+                    auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
+                    if (!otherStatus.isProtected) continue;
+                    if (!status.isProtected)
+                        throw AccessDenied("can not make %s non-protected because it references a protected path %s", path, printStorePath(reference));
+                    std::vector<AccessControlEntity> difference;
+                    std::set_difference(status.entities.begin(), status.entities.end(), otherStatus.entities.begin(), otherStatus.entities.end(),std::inserter(difference, difference.begin()));
+
+                    if (! difference.empty()) {
+                        std::string entities;
+                        for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
+                        throw AccessDenied("can not allow %s access to %s because it references path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(reference));
+                    }
                 }
-            }});
-
-        auto info = promise.get_future().get();
-
-        for (auto reference : info->references) {
-            if (reference == storePath) continue;
-            auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
-            if (!otherStatus.isProtected) continue;
-            if (!status.isProtected)
-                throw AccessDenied("can not make %s non-protected because it references a protected path %s", path, printStorePath(reference));
-            std::vector<AccessControlEntity> difference;
-            std::set_difference(status.entities.begin(), status.entities.end(), otherStatus.entities.begin(), otherStatus.entities.end(), difference.begin());
-
-            if (! difference.empty()) {
-                std::string entities;
-                for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
-                throw AccessDenied("can not allow %s access to %s because it references path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(reference));
             }
         }
     }
