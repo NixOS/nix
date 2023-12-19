@@ -87,6 +87,9 @@
 , test-daemon ? null
 , test-client ? null
 
+# Avoid setting things that would interfere with a functioning devShell
+, forDevShell ? false
+
 # Not a real argument, just the only way to approximate let-binding some
 # stuff for argument defaults.
 , __forDefaults ? {
@@ -263,13 +266,14 @@ in {
   );
 
   configureFlags = [
-    "--sysconfdir=/etc"
     (lib.enableFeature doBuild "build")
     (lib.enableFeature buildUnitTests "unit-tests")
     (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature installUnitTests "install-unit-tests")
+  ] ++ lib.optionals (!forDevShell) [
+    "--sysconfdir=/etc"
   ] ++ lib.optionals installUnitTests [
     "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
     "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
