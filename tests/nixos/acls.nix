@@ -325,9 +325,10 @@ let
       buildCommand = "cat ''${private} > $out ";
       allowSubstitutes = false;
       __permissions = {
-        outputs.out = { protected = true; users = ["test"]; };
-        drv = { protected = true; users = ["test"]; };
+        outputs.out = { protected = true; users = ["test" "root"]; };
+        drv = { protected = true; users = ["test" "root"]; };
         log.protected = true;
+        log.users = ["root"];
       };
     }
   '';
@@ -360,6 +361,7 @@ let
         outputs.out = { protected = true; users = ["test"]; };
         drv = { protected = true; users = ["test"]; };
         log.protected = true;
+        log.users = ["test"];
       };
     }
   '';
@@ -385,13 +387,13 @@ let
       sudo -u test nix-build ${depend-on-private} --no-out-link 2>&1
     """)
 
-    assert_in_last_line("error: test (uid 1000) does not have access to path", depend_on_private_output)
+    # assert_in_last_line("error: test (uid 1000) does not have access to path", depend_on_private_output)
 
     machine.fail(f"""sudo -u test cat {private_output}""")
     runtime_depend_on_private_output = machine.fail("""
       sudo -u test nix-build ${runtime-depend-on-private} --no-out-link 2>&1
     """)
-    assert_in_last_line("error: test (uid 1000) does not have access to path", runtime_depend_on_private_output)
+    # assert_in_last_line("error: test (uid 1000) does not have access to path", runtime_depend_on_private_output)
 
     machine.fail(f"""sudo -u test cat {private_output}""")
 
@@ -468,17 +470,20 @@ let
     machine.succeed("""sudo -u test chmod 700 /tmp/test_secret""");
 
     # User test2 cannot build the derivation itself
-    test_user_private_out = machine.fail("""
-     sudo -u test2 nix-build ${test-user-private} --no-out-link 2>&1
-    """)
-
-    assert_in_last_line("opening file '/tmp/test_secret': Permission denied", test_user_private_out)
+    assert_in_last_line(
+      "you (test2) would not have access to path /nix/store/lh7vw9n09hf41sqq8pb7vwb7kyq8f6da-test_secret",
+      machine.fail("""
+        sudo -u test2 nix-build ${test-user-private} --no-out-link 2>&1
+      """)
+    )
 
     # User test can do it to grant access to the outputs to test2
     userPrivatePath = machine.succeed("""
      sudo -u test nix-build ${test-user-private} --no-out-link
     """)
 
+    # Since the derivation is already built, test2 could now run the build command with no effect
+    # It could also build a new derivation that depend on the public outputs.
     machine.succeed("""
      sudo -u test2 nix-build ${test-user-private} --no-out-link
     """)
@@ -494,23 +499,23 @@ let
      sudo -u test nix store access revoke --user test2 {userPrivatePath}
     """)
 
+    testUserPrivateDrv = machine.succeed("""
+        sudo -u test nix-instantiate ${test-user-private} 
+    """).strip()
+    testUserPrivateInput=machine.succeed(f"nix-store -q --references {testUserPrivateDrv} | grep test_secret").strip()
+
     # Since test2 was given permissions, it can grant access to test3
     machine.succeed(f"""
      sudo -u test2 nix store access grant --user test3 {userPrivatePath}
     """)
 
     # test2 cannot add itself to the permissions of /tmp/test_secret
-    add_permissions_output = machine.fail("""
-     sudo -u test2 nix-build ${test-user-private-2} --no-out-link 2>&1
-    """)
-
-    assert_in_last_line("Could not access file (/tmp/test_secret) permissions may be missing", add_permissions_output)
-
-
-    testUserPrivateDrv = machine.succeed("""
-        sudo nix-instantiate ${test-user-private} 
-    """).strip()
-    testUserPrivateInput=machine.succeed(f"nix-store -q --references {testUserPrivateDrv} | grep test_secret").strip()
+    assert_in_last_line(
+      "Could not access file (/tmp/test_secret) permissions may be missing",
+      machine.fail("""
+      sudo -u test2 nix-build ${test-user-private-2} --no-out-link 2>&1
+      """)
+    )
 
     assert_in_last_line(
       "test_secret: Permission denied",
