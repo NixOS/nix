@@ -223,7 +223,11 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     if (builder != "bash")
         throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
 
-    auto getEnvShPath = evalStore->addTextToStore("get-env.sh", getEnvSh, {});
+    auto getEnvShPath = ({
+        StringSource source { getEnvSh };
+        evalStore->addToStoreFromDump(
+            source, "get-env.sh", TextIngestionMethod {}, HashAlgorithm::SHA256, {});
+    });
 
     drv.args = {store->printStorePath(getEnvShPath)};
 

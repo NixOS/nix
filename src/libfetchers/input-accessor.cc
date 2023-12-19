@@ -5,10 +5,10 @@
 namespace nix {
 
 StorePath InputAccessor::fetchToStore(
-    ref<Store> store,
+    Store & store,
     const CanonPath & path,
     std::string_view name,
-    FileIngestionMethod method,
+    ContentAddressMethod method,
     PathFilter * filter,
     RepairFlag repair)
 {
@@ -20,10 +20,24 @@ StorePath InputAccessor::fetchToStore(
     if (!filter && fingerprint) {
         cacheKey = fetchers::Attrs{
             {"_what", "fetchToStore"},
-            {"store", store->storeDir},
+            {"store", store.storeDir},
             {"name", std::string(name)},
             {"fingerprint", *fingerprint},
-            {"method", (uint8_t) method},
+            {
+                "method",
+                std::visit(overloaded {
+                    [](const TextIngestionMethod &) {
+                        return "text";
+                    },
+                    [](const FileIngestionMethod & fim) {
+                        switch (fim) {
+                        case FileIngestionMethod::Flat: return "flat";
+                        case FileIngestionMethod::Recursive: return "nar";
+                        default: assert(false);
+                        }
+                    },
+                }, method.raw),
+            },
             {"path", path.abs()}
         };
         if (auto res = fetchers::getCache()->lookup(store, *cacheKey)) {
@@ -35,17 +49,14 @@ StorePath InputAccessor::fetchToStore(
 
     Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", showPath(path)));
 
-    auto source = sinkToSource([&](Sink & sink) {
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(path, sink, filter ? *filter : defaultPathFilter);
-        else
-            readFile(path, sink);
-    });
+    auto filter2 = filter ? *filter : defaultPathFilter;
 
     auto storePath =
         settings.readOnlyMode
-        ? store->computeStorePathFromDump(*source, name, method, HashAlgorithm::SHA256).first
-        : store->addToStoreFromDump(*source, name, method, HashAlgorithm::SHA256, repair);
+        ? store.computeStorePath(
+            name, *this, path, method, HashAlgorithm::SHA256, {}, filter2).first
+        : store.addToStore(
+            name, *this, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
 
     if (cacheKey)
         fetchers::getCache()->add(store, *cacheKey, {}, storePath, true);
@@ -60,9 +71,9 @@ std::ostream & operator << (std::ostream & str, const SourcePath & path)
 }
 
 StorePath SourcePath::fetchToStore(
-    ref<Store> store,
+    Store & store,
     std::string_view name,
-    FileIngestionMethod method,
+    ContentAddressMethod method,
     PathFilter * filter,
     RepairFlag repair) const
 {

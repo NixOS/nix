@@ -9,6 +9,7 @@
 #include "attr-path.hh"
 #include "eval-inline.hh"
 #include "legacy.hh"
+#include "posix-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -122,7 +123,11 @@ std::tuple<StorePath, Hash> prefetchFile(
         Activity act(*logger, lvlChatty, actUnknown,
             fmt("adding '%s' to the store", url));
 
-        auto info = store->addToStoreSlow(*name, tmpFile, ingestionMethod, hashAlgo, expectedHash);
+        PosixSourceAccessor accessor;
+        auto info = store->addToStoreSlow(
+            *name,
+            accessor, CanonPath::fromCwd(tmpFile),
+            ingestionMethod, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);
         hash = info.ca->hash;
