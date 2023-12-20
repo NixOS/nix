@@ -32,11 +32,6 @@ makefiles += \
   tests/unit/libstore-support/local.mk \
   tests/unit/libexpr/local.mk \
   tests/unit/libexpr-support/local.mk
-else
-.PHONY: check
-check:
-	@echo "Unit tests are disabled. Configure without '--disable-unit-tests', or avoid calling 'make check'."
-	@exit 1
 endif
 
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
@@ -46,11 +41,6 @@ makefiles += \
   tests/functional/dyn-drv/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
-else
-.PHONY: installcheck
-installcheck:
-	@echo "Functional tests are disabled. Configure without '--disable-functional-tests', or avoid calling 'make installcheck'."
-	@exit 1
 endif
 
 OPTIMIZE = 1
@@ -64,9 +54,25 @@ endif
 
 include mk/lib.mk
 
+# Must be included after `mk/lib.mk` so isn't the default target.
+ifneq ($(ENABLE_UNIT_TESTS), yes)
+.PHONY: check
+check:
+	@echo "Unit tests are disabled. Configure without '--disable-unit-tests', or avoid calling 'make check'."
+	@exit 1
+endif
+
+ifneq ($(ENABLE_FUNCTIONAL_TESTS), yes)
+.PHONY: installcheck
+installcheck:
+	@echo "Functional tests are disabled. Configure without '--disable-functional-tests', or avoid calling 'make installcheck'."
+	@exit 1
+endif
+
 # Must be included after `mk/lib.mk` so rules refer to variables defined
 # by the library. Rules are not "lazy" like variables, unfortunately.
-ifeq ($(ENABLE_DOC_GEN),yes)
+
+ifeq ($(ENABLE_DOC_GEN), yes)
 $(eval $(call include-sub-makefile, doc/manual/local.mk))
 else
 .PHONY: manual-html manpages
@@ -75,7 +81,7 @@ manual-html manpages:
 	@exit 1
 endif
 
-ifeq ($(ENABLE_INTERNAL_API_DOCS),yes)
+ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
 $(eval $(call include-sub-makefile, doc/internal-api/local.mk))
 else
 .PHONY: internal-api-html
