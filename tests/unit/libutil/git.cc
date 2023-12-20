@@ -66,7 +66,8 @@ TEST_F(GitTest, blob_read) {
         StringSource in { encoded };
         StringSink out;
         RegularFileSink out2 { out };
-        parse(out2, "", in, [](auto &, auto) {}, mockXpSettings);
+        ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Blob);
+        parseBlob(out2, "", in, false, mockXpSettings);
 
         auto expected = readFile(goldenMaster("hello-world.bin"));
 
@@ -121,7 +122,8 @@ TEST_F(GitTest, tree_read) {
         StringSource in { encoded };
         NullFileSystemObjectSink out;
         Tree got;
-        parse(out, "", in, [&](auto & name, auto entry) {
+        ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Tree);
+        parseTree(out, "", in, [&](auto & name, auto entry) {
             auto name2 = name;
             if (entry.mode == Mode::Directory)
                 name2 += '/';
@@ -193,15 +195,21 @@ TEST_F(GitTest, both_roundrip) {
 
     MemorySink sinkFiles2 { files2 };
 
-    std::function<void(const Path, const Hash &)> mkSinkHook;
-    mkSinkHook = [&](const Path prefix, const Hash & hash) {
+    std::function<void(const Path, const Hash &, bool)> mkSinkHook;
+    mkSinkHook = [&](auto prefix, auto & hash, auto executable) {
         StringSource in { cas[hash] };
-        parse(sinkFiles2, prefix, in, [&](const Path & name, const auto & entry) {
-            mkSinkHook(prefix + "/" + name, entry.hash);
-        }, mockXpSettings);
+        parse(
+            sinkFiles2, prefix, in, executable,
+            [&](const Path & name, const auto & entry) {
+                mkSinkHook(
+                    prefix + "/" + name,
+                    entry.hash,
+                    entry.mode == Mode::Executable);
+            },
+            mockXpSettings);
     };
 
-    mkSinkHook("", root.hash);
+    mkSinkHook("", root.hash, false);
 
     ASSERT_EQ(files, files2);
 }

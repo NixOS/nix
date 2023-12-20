@@ -13,12 +13,19 @@
 
 namespace nix::git {
 
+enum struct ObjectType {
+    Blob,
+    Tree,
+    //Commit,
+    //Tag,
+};
+
 using RawMode = uint32_t;
 
 enum struct Mode : RawMode {
     Directory = 0040000,
-    Executable = 0100755,
     Regular = 0100644,
+    Executable = 0100755,
     Symlink = 0120000,
 };
 
@@ -59,9 +66,34 @@ using Tree = std::map<std::string, TreeEntry>;
  */
 using SinkHook = void(const Path & name, TreeEntry entry);
 
+/**
+ * Parse the "blob " or "tree " prefix.
+ *
+ * @throws if prefix not recognized
+ */
+ObjectType parseObjectType(
+    Source & source,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+void parseBlob(
+    FileSystemObjectSink & sink, const Path & sinkPath,
+    Source & source,
+    bool executable,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+void parseTree(
+    FileSystemObjectSink & sink, const Path & sinkPath,
+    Source & source,
+    std::function<SinkHook> hook,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+/**
+ * Helper putting the previous three `parse*` functions together.
+ */
 void parse(
     FileSystemObjectSink & sink, const Path & sinkPath,
     Source & source,
+    bool executable,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 

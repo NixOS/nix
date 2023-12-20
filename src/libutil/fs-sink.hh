@@ -9,18 +9,13 @@
 namespace nix {
 
 /**
- * \todo Fix this API, it sucks.
+ * Actions on an open regular file in the process of creating it.
+ *
+ * See `FileSystemObjectSink::createRegularFile`.
  */
-struct FileSystemObjectSink
+struct CreateRegularFileSink : Sink
 {
-    virtual void createDirectory(const Path & path) = 0;
-
-    virtual void createRegularFile(const Path & path) = 0;
-    virtual void receiveContents(std::string_view data) = 0;
     virtual void isExecutable() = 0;
-    virtual void closeRegularFile() = 0;
-
-    virtual void createSymlink(const Path & path, const std::string & target) = 0;
 
     /**
      * An optimization. By default, do nothing.
@@ -28,8 +23,24 @@ struct FileSystemObjectSink
     virtual void preallocateContents(uint64_t size) { };
 };
 
+
+struct FileSystemObjectSink
+{
+    virtual void createDirectory(const Path & path) = 0;
+
+    /**
+     * This function in general is no re-entrant. Only one file can be
+     * written at a time.
+     */
+    virtual void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) = 0;
+
+    virtual void createSymlink(const Path & path, const std::string & target) = 0;
+};
+
 /**
- * Recusively copy file system objects from the source into the sink.
+ * Recursively copy file system objects from the source into the sink.
  */
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & sourcePath,
@@ -41,11 +52,10 @@ void copyRecursive(
 struct NullFileSystemObjectSink : FileSystemObjectSink
 {
     void createDirectory(const Path & path) override { }
-    void receiveContents(std::string_view data) override { }
     void createSymlink(const Path & path, const std::string & target) override { }
-    void createRegularFile(const Path & path) override { }
-    void closeRegularFile() override { }
-    void isExecutable() override { }
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) override;
 };
 
 /**
@@ -57,17 +67,11 @@ struct RestoreSink : FileSystemObjectSink
 
     void createDirectory(const Path & path) override;
 
-    void createRegularFile(const Path & path) override;
-    void receiveContents(std::string_view data) override;
-    void isExecutable() override;
-    void closeRegularFile() override;
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) override;
 
     void createSymlink(const Path & path, const std::string & target) override;
-
-    void preallocateContents(uint64_t size) override;
-
-private:
-    AutoCloseFD fd;
 };
 
 /**
@@ -87,19 +91,14 @@ struct RegularFileSink : FileSystemObjectSink
         regular = false;
     }
 
-    void receiveContents(std::string_view data) override
-    {
-        sink(data);
-    }
-
     void createSymlink(const Path & path, const std::string & target) override
     {
         regular = false;
     }
 
-    void createRegularFile(const Path & path) override { }
-    void closeRegularFile() override { }
-    void isExecutable() override { }
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) override;
 };
 
 }
