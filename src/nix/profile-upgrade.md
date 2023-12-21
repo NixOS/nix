@@ -15,13 +15,6 @@ R""(
   # nix profile upgrade hello
   ```
 
-* Upgrade a specific package by index
-  *(deprecated, will be removed in a future version)*:
-
-  ```console
-  # nix profile upgrade 0
-  ```
-
 # Description
 
 This command upgrades a previously installed package in a Nix profile,

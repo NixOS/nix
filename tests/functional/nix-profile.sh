@@ -49,7 +49,7 @@ cp ./config.nix $flake1Dir/
 nix-env -f ./user-envs.nix -i foo-1.0
 nix profile list | grep -A2 'Name:.*foo' | grep 'Store paths:.*foo-1.0'
 nix profile install $flake1Dir -L
-nix profile list | grep -A4 'Index:.*1' | grep 'Locked flake URL:.*narHash'
+nix profile list | grep -A4 'Name:.*flake1' | grep 'Locked flake URL:.*narHash'
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
 [ -e $TEST_HOME/.nix-profile/share/man ]
 (! [ -e $TEST_HOME/.nix-profile/include ])
@@ -58,9 +58,8 @@ nix profile history | grep "packages.$system.default: ∅ -> 1.0"
 nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
 
 # Test XDG Base Directories support
-
 export NIX_CONFIG="use-xdg-base-directories = true"
-nix profile remove 1
+nix profile remove flake1
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG
@@ -68,7 +67,7 @@ unset NIX_CONFIG
 # Test upgrading a package.
 printf NixOS > $flake1Dir/who
 printf 2.0 > $flake1Dir/version
-nix profile upgrade 1
+nix profile upgrade flake1
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello NixOS" ]]
 nix profile history | grep "packages.$system.default: 1.0, 1.0-man -> 2.0, 2.0-man"
 
@@ -89,7 +88,7 @@ nix profile diff-closures | grep 'Version 3 -> 4'
 # Test installing a non-flake package.
 nix profile install --file ./simple.nix ''
 [[ $(cat $TEST_HOME/.nix-profile/hello) = "Hello World!" ]]
-nix profile remove 1
+nix profile remove simple
 nix profile install $(nix-build --no-out-link ./simple.nix)
 [[ $(cat $TEST_HOME/.nix-profile/hello) = "Hello World!" ]]
 
@@ -107,7 +106,7 @@ nix profile wipe-history
 # Test upgrade to CA package.
 printf true > $flake1Dir/ca.nix
 printf 3.0 > $flake1Dir/version
-nix profile upgrade 0
+nix profile upgrade flake1
 nix profile history | grep "packages.$system.default: 1.0, 1.0-man -> 3.0, 3.0-man"
 
 # Test new install of CA package.

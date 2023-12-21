@@ -8,13 +8,6 @@ R""(
   # nix profile remove hello
   ```
 
-* Remove a package by index
-  *(deprecated, will be removed in a future version)*:
-
-  ```console
-  # nix profile remove 3
-  ```
-
 * Remove all packages:
 
   ```console
