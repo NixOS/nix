@@ -61,6 +61,17 @@ void WorkerProto::Serialise<AuthenticatedUser>::write(const StoreDirConfig & sto
     conn.to << user.uid;
 }
 
+bool WorkerProto::Serialise<bool>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn) {
+    bool b;
+    conn.from >> b;
+    return b;
+}
+
+void WorkerProto::Serialise<bool>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const bool & b)
+{
+    conn.to << b;
+}
+
 ACL::User WorkerProto::Serialise<ACL::User>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn) {
     uid_t uid;
     conn.from >> uid;

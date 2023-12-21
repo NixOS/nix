@@ -229,6 +229,8 @@ DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
 template<>
 DECLARE_WORKER_SERIALISER(AuthenticatedUser);
 template<>
+DECLARE_WORKER_SERIALISER(bool);
+template<>
 DECLARE_WORKER_SERIALISER(ACL::User);
 template<>
 DECLARE_WORKER_SERIALISER(ACL::Group);

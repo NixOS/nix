@@ -163,26 +163,6 @@ void readAccessStatus(EvalState & state, Attr & attr, LocalGranularAccessStore::
     }
 }
 
-void ensureAccess(LocalGranularAccessStore::AccessStatus * accessStatus, std::string_view description, LocalGranularAccessStore & store)
-{
-    if (!accessStatus->isProtected) return;
-    uid_t uid = getuid();
-    auto groups = store.getSubjectGroups(uid);
-    for (auto entity : accessStatus->entities) {
-        if (std::visit(overloaded {
-            [&](ACL::User u) { return u.uid == uid; },
-            [&](ACL::Group g) { return groups.contains(g); }
-        }, entity))
-            return;
-    }
-    // TODO: Reactivate ensureAccess.
-    // It should be possible to depend on the public outputs of a derivation that has private inputs.
-    // For now it is deactivated because in this case, I think the check can fail when is should not.
-    // Cf the depend-on-public test in acls.nix
-    return;
-    throw AccessDenied("you (%s) would not have access to %s; ensure that you do by adding yourself or a group you're in to the list", getUserName(uid), description);
-}
-
 /**
  * Add and attribute to the given attribute map from the output name to
  * the output path, or a placeholder.
@@ -1461,8 +1441,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
             if (derivation != attr->value->attrs->end()) {
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *derivation, &status, "__permissions.drv", "builtins.derivationStrict");
-                ensureAccess(&status, state.store->printStorePath(drvPath), require<LocalGranularAccessStore>(*state.store));
-                require<LocalGranularAccessStore>(*state.store).setAccessStatus(drvPath, status);
+                require<LocalGranularAccessStore>(*state.store).setAccessStatus(drvPath, status, true);
             }
         }
     }
@@ -1489,16 +1468,14 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                         }));
                     LocalGranularAccessStore::AccessStatus status;
                     readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
-                    ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS), require<LocalGranularAccessStore>(*state.store));
-                    require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
+                    require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status, true);
                 }
             }
             auto log = attr->value->attrs->find(state.sLog);
             if (log != attr->value->attrs->end()) {
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *log, &status, "__permissions.log", "builtins.derivationStrict");
-                ensureAccess(&status, fmt("log of derivation %s", drvPathS), require<LocalGranularAccessStore>(*state.store));
-                require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationLog {drvPath}, status);
+                require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationLog {drvPath}, status, true);
             }
         }
     }
@@ -2364,7 +2341,8 @@ static void addPath(
                   }
               }
             }
-            require<LocalGranularAccessStore>(*state.store).setAccessStatus(*expectedStorePath, *accessStatus);
+
+            require<LocalGranularAccessStore>(*state.store).setAccessStatus(*expectedStorePath, *accessStatus, true);
           } else {
             // computeStorePathForPath should fail if we do not have access to the original path
             //StorePath dstPath = state.store->computeStorePathForPath(name, path, method, htSHA256, filter) .first;
@@ -2375,7 +2353,7 @@ static void addPath(
                     readFile(path.path.abs(), sink);
             });
             StorePath dstPath = state.store->computeStorePathFromDump(*source, name, method, HashAlgorithm::SHA256).first;
-            require<LocalGranularAccessStore>(*state.store).setAccessStatus(dstPath, *accessStatus);
+            require<LocalGranularAccessStore>(*state.store).setAccessStatus(dstPath, *accessStatus, true);
           }
         }
 

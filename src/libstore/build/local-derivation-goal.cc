@@ -2451,7 +2451,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
             StoreObjectDerivationOutput thisOutput(drvPath, outputName);
             if (localStore.futurePermissions.contains(thisOutput)) {
-                localStore.setAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput]);
+                localStore.setAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput], false);
             }
             /* Store the final path */
             finalOutputs.insert_or_assign(outputName, finalStorePath);

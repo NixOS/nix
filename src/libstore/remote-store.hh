@@ -170,7 +170,7 @@ public:
 
     ref<Connection> openConnectionWrapper();
 
-    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status, const bool & ensureAccessCheck) override;
     AccessStatus getAccessStatus(const StoreObject & storeObject) override;
 
     std::set<ACL::Group> getSubjectGroupsUncached(ACL::User user) override;

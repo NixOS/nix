@@ -54,7 +54,7 @@ struct GranularAccessStore : public virtual Store
     typedef AccessStatusFor<AccessControlEntity> AccessStatus;
 
 
-    virtual void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) = 0;
+    virtual void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status, const bool & ensureAccessCheck) = 0;
     virtual AccessStatus getAccessStatus(const StoreObject & storeObject) = 0;
 
     virtual std::set<AccessControlGroup> getSubjectGroupsUncached(AccessControlSubject subject) = 0;
@@ -113,24 +113,24 @@ struct GranularAccessStore : public virtual Store
     void addAllowedEntitiesFuture(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
         auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.insert(entity);
-        setAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status, false);
     }
 
     void addAllowedEntitiesCurrent(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
         auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.insert(entity);
-        setAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status, false);
     }
 
     void removeAllowedEntitiesFuture(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
         auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.erase(entity);
-        setAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status, false);
     }
     void removeAllowedEntitiesCurrent(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
         auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.erase(entity);
-        setAccessStatus(storeObject, status);
+        setAccessStatus(storeObject, status, false);
     }
 
 private:

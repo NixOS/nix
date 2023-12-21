@@ -301,7 +301,8 @@ public:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status) override;
+    void ensureAccess(const AccessStatus & accessStatus, const StoreObject & object);
+    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status, const bool & ensureAccessCheck) override;
     void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
     void setCurrentAccessStatus(const Path & path, const AccessStatus & status);
     AccessStatus getAccessStatus(const StoreObject & storeObject) override;

@@ -69,7 +69,7 @@ struct CmdStoreAccessRevoke : StorePathsCommand
                     for (auto user : users) status.entities.erase(nix::ACL::User(user));
                     for (auto group : groups) status.entities.erase(nix::ACL::Group(group));
                 }
-                localStore.setAccessStatus(path, status);
+                localStore.setAccessStatus(path, status, false);
             }
         }
     }

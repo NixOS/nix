@@ -1019,17 +1019,18 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::SetAccessStatus: {
         auto object = WorkerProto::Serialise<StoreObject>::read(*store, rconn);
         auto status = WorkerProto::Serialise<LocalStore::AccessStatus>::read(*store, rconn);
+        bool ensureAccessCheck = WorkerProto::Serialise<bool>::read(*store, rconn);
         logger->startWork();
         auto localStore = dynamic_cast<LocalStore*>(&*store);
         // Could there be a race condition here ? If the path is added by a concurrent build, after we checked its existence.
         if (!localStore->pathOfStoreObjectExists(object)){
-                localStore->setAccessStatus(object, status);
+            localStore->setAccessStatus(object, status, ensureAccessCheck);
         }
         else {
           auto curStatus = require<LocalGranularAccessStore>(*store).getAccessStatus(object);
           if (status != curStatus) {
             if (user.trusted) {
-              localStore->setAccessStatus(object, status);
+                localStore->setAccessStatus(object, status, ensureAccessCheck);
             } else {
               // TODO document rationale behind this logic
               auto [exists, description] = std::visit(
@@ -1088,7 +1089,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     "Only trusted users can revoke permissions on %s",
                     description);
               }
-              localStore->setAccessStatus(object, status);
+              localStore->setAccessStatus(object, status, ensureAccessCheck);
             }
           }
         }

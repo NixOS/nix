@@ -56,7 +56,7 @@ struct CmdStoreAccessGrant : StorePathsCommand
 
                 for (auto user : users) status.entities.insert(nix::ACL::User(user));
                 for (auto group : groups) status.entities.insert(nix::ACL::Group(group));
-                localStore.setAccessStatus(path, status);
+                localStore.setAccessStatus(path, status, false);
             }
         }
     }

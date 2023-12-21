@@ -625,10 +625,10 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
                 LocalStore::AccessStatus status {true, {ACL::User(getuid())}};
                 std::visit(overloaded {
                     [&](DerivedPath::Opaque p){
-                        require<LocalGranularAccessStore>(*store).setAccessStatus(p.path, status);
+                        require<LocalGranularAccessStore>(*store).setAccessStatus(p.path, status, false);
                     },
                     [&](DerivedPath::Built b){
-                        require<LocalGranularAccessStore>(*store).setAccessStatus(b, status);
+                        require<LocalGranularAccessStore>(*store).setAccessStatus(b, status, false);
                     }
                 }, b.path);
             }

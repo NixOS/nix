@@ -1168,8 +1168,50 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
     acl.set(path);
 }
 
-void LocalStore::setAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
+void LocalStore::ensureAccess(const AccessStatus & accessStatus, const StoreObject & object)
 {
+    auto description = std::visit(
+        overloaded{
+            [&](StorePath p) {
+                return fmt("path %s", printStorePath(p));
+            },
+            [&](StoreObjectDerivationOutput b) {
+                auto drv = readDerivation(b.drvPath);
+                auto outputHashes =
+                    staticOutputHashes(*this, drv);
+                auto drvOutputs = drv.outputsAndOptPaths(*this);
+                bool known = drvOutputs.contains(b.output) &&
+                                drvOutputs.at(b.output).second;
+                if (known) {
+                    auto realPath = printStorePath(*drvOutputs.at(b.output).second);
+                    return fmt("path %s", realPath);
+                } else {
+                    return fmt("output %s of derivation %s", b.output, printStorePath(b.drvPath));
+                }
+            },
+            [&](StoreObjectDerivationLog l) {
+                return fmt("build log of derivation %s", printStorePath(l.drvPath));
+            }
+        }, object);
+
+    if (!accessStatus.isProtected) return;
+    uid_t uid = getuid();
+    if (effectiveUser) uid = effectiveUser->uid;
+    auto groups = getSubjectGroups(uid);
+    for (auto entity : accessStatus.entities) {
+        if (std::visit(overloaded {
+            [&](ACL::User u) { return u.uid == uid; },
+            [&](ACL::Group g) { return groups.contains(g); }
+        }, entity))
+            return;
+    }
+    throw AccessDenied("you (%s) would not have access to %s; ensure that you do by adding yourself or a group you're in to the list", getUserName(uid), description);
+}
+
+
+void LocalStore::setAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status, const bool & ensureAccessCheck)
+{
+    if (ensureAccessCheck) ensureAccess(status, storePathstoreObject);
     if (pathOfStoreObjectExists(storePathstoreObject)){
         setCurrentAccessStatus(storePathstoreObject, status);
     }
