@@ -165,7 +165,7 @@ struct Installable
         const Installables & installables,
         BuildMode bMode = bmNormal);
 
-    static std::set<StorePath> toStorePaths(
+    static std::set<StorePath> toStorePathSet(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,

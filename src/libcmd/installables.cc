@@ -715,7 +715,7 @@ BuiltPaths Installable::toBuiltPaths(
     }
 }
 
-StorePathSet Installable::toStorePaths(
+StorePathSet Installable::toStorePathSet(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
@@ -735,7 +735,7 @@ StorePath Installable::toStorePath(
     Realise mode, OperateOn operateOn,
     ref<Installable> installable)
 {
-    auto paths = toStorePaths(evalStore, store, mode, operateOn, {installable});
+    auto paths = toStorePathSet(evalStore, store, mode, operateOn, {installable});
 
     if (paths.size() != 1)
         throw Error("argument '%s' should evaluate to one store path", installable->what());
