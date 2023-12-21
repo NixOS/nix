@@ -633,6 +633,78 @@ let
     """)
   '';
 
+  private-flake = builtins.toFile "private-flake.nix" ''
+    {
+      description = "Test alcs with flake";
+      outputs = { self, nixpkgs }: {
+        packages.x86_64-linux.default =
+          with import nixpkgs { system = "x86_64-linux"; };
+          stdenvNoCC.mkDerivation {
+            name = "private-flake";
+            src = builtins.path {
+              path = self;
+              permissions = {
+                protected = true;
+                users = ["root"];
+              };
+            };
+            buildCommand = "echo Example > $out && cat $src/secret >> $out";
+            __permissions = {
+              outputs.out = { protected = true; users = ["test" "test2" "root"]; };
+              drv = { protected = true; users = ["test" "test2" "root"]; };
+              log.protected = true;
+              log.users = ["test" "test2" "root"];
+            };
+          };
+      };
+    }
+  '';
+
+  public-flake = builtins.toFile "public-flake.nix" ''
+    {
+      description = "Test alcs with flake";
+      inputs.priv.url = "/tmp/private-flake";
+      outputs = { self, nixpkgs, priv }: {
+        packages.x86_64-linux.default =
+          with import nixpkgs { system = "x86_64-linux"; };
+          stdenvNoCC.mkDerivation {
+            name = "public-flake";
+            src = self;
+            buildCommand = "echo Example > $out && cat ''${priv.packages.x86_64-linux.default} >> $out";
+            __permissions = {
+              outputs.out = { protected = true; users = ["test" "test2"]; };
+              drv = { protected = true; users = ["test" "test2"]; };
+              log.protected = true;
+              log.users = ["test" "test2"];
+            };
+          };
+      };
+    }
+  '';
+
+  testFlake = ''
+    # fmt: off
+    machine.succeed("mkdir /tmp/private-flake")
+    machine.succeed("echo secret_string > /tmp/private-flake/secret && chmod 700 /tmp/private-flake/secret")
+    machine.succeed("cp ${private-flake} /tmp/private-flake/flake.nix")
+    assert_in_last_line(
+      "error: opening file '/tmp/private-flake/secret': Permission denied",
+      machine.fail("cd /tmp/private-flake && sudo -u test nix build --print-out-paths 2>&1")
+    )
+    flakeOutput = machine.succeed("cd /tmp/private-flake && nix build --print-out-paths --no-link")
+    assert_info(f"""{flakeOutput}""", {"exists": True, "protected": True, "users": ["root", "test", "test2"], "groups": []}, "inputFolderPath")
+
+    # public-flake depends on the public output of private-flake
+    machine.succeed("mkdir /tmp/public-flake && cp ${public-flake} /tmp/public-flake/flake.nix")
+
+    # We build the lockfile as root because this needs to check that the secret input did not change since the build
+    machine.succeed("cd /tmp/public-flake &&  nix flake lock")
+
+    # After this the test user can rely on the output of the already built private-flake
+    publicFlakeOutput = machine.succeed("cd /tmp/public-flake && sudo -u test nix build --print-out-paths --no-link")
+    assert_info(f"""{publicFlakeOutput}""", {"exists": True, "protected": True, "users": ["test", "test2"], "groups": []}, "inputFolderPath")
+  '';
+
 in
 {
   name = "acls";
@@ -641,7 +713,22 @@ in
     { config, lib, pkgs, ... }:
     { virtualisation.writableStore = true;
       nix.settings.substituters = lib.mkForce [ ];
-      nix.settings.experimental-features = lib.mkForce [ "nix-command" "acls" ];
+      nix.settings.experimental-features = lib.mkForce [ "nix-command" "acls" "flakes"];
+
+      # Do not try to download the registry and setup a local nixpkgs for flake tests
+      nix.settings.flake-registry = builtins.toFile "global-registry.json" ''{"flakes":[],"version":2}'';
+      nix.registry = {
+          nixpkgs = {
+            from = {
+              type = "indirect";
+              id = "nixpkgs";
+            };
+            to = {
+              type = "path";
+              path = "${nixpkgs}";
+            };
+          };
+        };
       nix.nixPath = [ "nixpkgs=${lib.cleanSource pkgs.path}" ];
       nix.checkConfig = false;
       virtualisation.additionalPaths = [ pkgs.stdenvNoCC pkgs.pkgsi686Linux.stdenvNoCC ];
@@ -666,5 +753,6 @@ in
       testTestUserPrivate
       testImportFolder
       testRuntimeDepNoPermScript
+      testFlake
     ];
 }
