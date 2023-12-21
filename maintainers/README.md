@@ -43,7 +43,8 @@ The team meets twice a week:
 - Discussion meeting: [Fridays 13:00-14:00 CET](https://calendar.google.com/calendar/event?eid=MHNtOGVuNWtrZXNpZHR2bW1sM3QyN2ZjaGNfMjAyMjExMjVUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
 
   1. Triage issues and pull requests from the [No Status](#no-status) column (30 min)
-  2. Discuss issues and pull requests from the [To discuss](#to-discuss) column (30 min)
+  2. Discuss issues and pull requests from the [To discuss](#to-discuss) column (30 min).
+     Once a month, this slot is used to check the [Assigned](#assigned) column to make sure that nothing bitrots in it.
 
 - Work meeting: [Mondays 13:00-15:00 CET](https://calendar.google.com/calendar/event?eid=NTM1MG1wNGJnOGpmOTZhYms3bTB1bnY5cWxfMjAyMjExMjFUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
 
