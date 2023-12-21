@@ -1,6 +1,7 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "hash.hh"
+#include "primops.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -13,8 +14,11 @@
 #include "profiles.hh"
 #include "print.hh"
 #include "fs-input-accessor.hh"
+#include "filtering-input-accessor.hh"
 #include "memory-input-accessor.hh"
 #include "signals.hh"
+#include "gc-small-vector.hh"
+#include "url.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -30,6 +34,7 @@
 
 #include <sys/resource.h>
 #include <nlohmann/json.hpp>
+#include <boost/container/small_vector.hpp>
 
 #if HAVE_BOEHMGC
 
@@ -341,7 +346,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Value nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue, noPos, "while evaluating an attribute name");
+        state.forceStringNoCtx(nameValue, name.expr->getPos(), "while evaluating an attribute name");
         return state.symbols.create(nameValue.string_view());
     }
 }
@@ -506,7 +511,16 @@ EvalState::EvalState(
     , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
-    , rootFS(makeFSInputAccessor(CanonPath::root))
+    , rootFS(
+        evalSettings.restrictEval || evalSettings.pureEval
+        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(CanonPath::root), {},
+            [](const CanonPath & path) -> RestrictedPathError {
+                auto modeInformation = evalSettings.pureEval
+                    ? "in pure evaluation mode (use '--impure' to override)"
+                    : "in restricted mode";
+                throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+            }))
+        : makeFSInputAccessor(CanonPath::root))
     , corepkgsFS(makeMemoryInputAccessor())
     , internalFS(makeMemoryInputAccessor())
     , derivationInternal{corepkgsFS->addFile(
@@ -531,6 +545,9 @@ EvalState::EvalState(
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
+    corepkgsFS->setPathDisplay("<nix", ">");
+    internalFS->setPathDisplay("«nix-internal»", "");
+
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     assert(gcInitialised);
@@ -545,28 +562,10 @@ EvalState::EvalState(
             searchPath.elements.emplace_back(SearchPath::Elem::parse(i));
     }
 
-    if (evalSettings.restrictEval || evalSettings.pureEval) {
-        allowedPaths = PathSet();
-
-        for (auto & i : searchPath.elements) {
-            auto r = resolveSearchPathPath(i.path);
-            if (!r) continue;
-
-            auto path = std::move(*r);
-
-            if (store->isInStore(path)) {
-                try {
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
-                    for (auto & path : closure)
-                        allowPath(path);
-                } catch (InvalidPath &) {
-                    allowPath(path);
-                }
-            } else
-                allowPath(path);
-        }
-    }
+    /* Allow access to all paths in the search path. */
+    if (rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        for (auto & i : searchPath.elements)
+            resolveSearchPathPath(i.path, true);
 
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
@@ -584,14 +583,14 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    if (allowedPaths)
-        allowedPaths->insert(path);
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    if (allowedPaths)
-        allowedPaths->insert(store->toRealPath(storePath));
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        rootFS2->allowPath(CanonPath(store->toRealPath(storePath)));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
@@ -601,79 +600,57 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     mkStorePathString(storePath, v);
 }
 
-SourcePath EvalState::checkSourcePath(const SourcePath & path_)
+inline static bool isJustSchemePrefix(std::string_view prefix)
 {
-    // Don't check non-rootFS accessors, they're in a different namespace.
-    if (path_.accessor != ref<InputAccessor>(rootFS)) return path_;
-
-    if (!allowedPaths) return path_;
-
-    auto i = resolvedPaths.find(path_.path.abs());
-    if (i != resolvedPaths.end())
-        return i->second;
-
-    bool found = false;
-
-    /* First canonicalize the path without symlinks, so we make sure an
-     * attacker can't append ../../... to a path that would be in allowedPaths
-     * and thus leak symlink targets.
-     */
-    Path abspath = canonPath(path_.path.abs());
-
-    for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(abspath, i)) {
-            found = true;
-            break;
-        }
-    }
-
-    if (!found) {
-        auto modeInformation = evalSettings.pureEval
-            ? "in pure eval mode (use '--impure' to override)"
-            : "in restricted mode";
-        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", abspath, modeInformation);
-    }
-
-    /* Resolve symlinks. */
-    debug("checking access to '%s'", abspath);
-    SourcePath path = rootPath(CanonPath(canonPath(abspath, true)));
-
-    for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(path.path.abs(), i)) {
-            resolvedPaths.insert_or_assign(path_.path.abs(), path);
-            return path;
-        }
-    }
-
-    throw RestrictedPathError("access to canonical path '%1%' is forbidden in restricted mode", path);
+    return
+        !prefix.empty()
+        && prefix[prefix.size() - 1] == ':'
+        && isValidSchemeName(prefix.substr(0, prefix.size() - 1));
 }
 
+bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
+{
+    /* 'uri' should be equal to a prefix, or in a subdirectory of a
+       prefix. Thus, the prefix https://github.co does not permit
+       access to https://github.com. */
+    for (auto & prefix : allowedUris) {
+        if (uri == prefix
+            // Allow access to subdirectories of the prefix.
+            || (uri.size() > prefix.size()
+                && prefix.size() > 0
+                && hasPrefix(uri, prefix)
+                && (
+                    // Allow access to subdirectories of the prefix.
+                    prefix[prefix.size() - 1] == '/'
+                    || uri[prefix.size()] == '/'
+
+                    // Allow access to whole schemes
+                    || isJustSchemePrefix(prefix)
+                    )
+                ))
+            return true;
+    }
+
+    return false;
+}
 
 void EvalState::checkURI(const std::string & uri)
 {
     if (!evalSettings.restrictEval) return;
 
-    /* 'uri' should be equal to a prefix, or in a subdirectory of a
-       prefix. Thus, the prefix https://github.co does not permit
-       access to https://github.com. Note: this allows 'http://' and
-       'https://' as prefixes for any http/https URI. */
-    for (auto & prefix : evalSettings.allowedUris.get())
-        if (uri == prefix ||
-            (uri.size() > prefix.size()
-            && prefix.size() > 0
-            && hasPrefix(uri, prefix)
-            && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
-            return;
+    if (isAllowedURI(uri, evalSettings.allowedUris.get())) return;
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        checkSourcePath(rootPath(CanonPath(uri)));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        checkSourcePath(rootPath(CanonPath(std::string(uri, 7))));
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+            rootFS2->checkAccess(CanonPath(uri.substr(7)));
         return;
     }
 
@@ -719,6 +696,23 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
         baseEnv.values[baseEnvDispl++] = v;
         baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
     }
+}
+
+
+void PrimOp::check()
+{
+    if (arity > maxPrimOpArity) {
+        throw Error("primop arity must not exceed %1%", maxPrimOpArity);
+    }
+}
+
+
+void Value::mkPrimOp(PrimOp * p)
+{
+    p->check();
+    clearValue();
+    internalType = tPrimOp;
+    primOp = p;
 }
 
 
@@ -1158,10 +1152,8 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial)
+void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    auto path = checkSourcePath(path_);
-
     FileEvalCache::iterator i;
     if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
         v = i->second;
@@ -1182,7 +1174,7 @@ void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial
         e = j->second;
 
     if (!e)
-        e = parseExprFromFile(checkSourcePath(resolvedPath));
+        e = parseExprFromFile(resolvedPath);
 
     fileParseCache[resolvedPath] = e;
 
@@ -1491,7 +1483,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     for (auto & i : attrPath) {
-        state.forceValue(*vAttrs, noPos);
+        state.forceValue(*vAttrs, getPos());
         Bindings::iterator j;
         auto name = getName(i, state, env);
         if (vAttrs->type() != nAttrs ||
@@ -1660,7 +1652,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[name]++;
 
                 try {
-                    vCur.primOp->fun(*this, noPos, args, vCur);
+                    vCur.primOp->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
@@ -1691,7 +1683,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 /* We have all the arguments, so call the primop with
                    the previous and new arguments. */
 
-                Value * vArgs[arity];
+                Value * vArgs[maxPrimOpArity];
                 auto n = argsDone;
                 for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp.left)
                     vArgs[--n] = arg->primOpApp.right;
@@ -1708,7 +1700,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    primOp->primOp->fun(*this, noPos, vArgs, vCur);
+                    primOp->primOp->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;
@@ -1748,11 +1740,17 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     Value vFun;
     fun->eval(state, env, vFun);
 
-    Value * vArgs[args.size()];
+    // Empirical arity of Nixpkgs lambdas by regex e.g. ([a-zA-Z]+:(\s|(/\*.*\/)|(#.*\n))*){5}
+    // 2: over 4000
+    // 3: about 300
+    // 4: about 60
+    // 5: under 10
+    // This excluded attrset lambdas (`{...}:`). Contributions of mixed lambdas appears insignificant at ~150 total.
+    SmallValueVector<4> vArgs(args.size());
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
 
-    state.callFunction(vFun, args.size(), vArgs, v, pos);
+    state.callFunction(vFun, args.size(), vArgs.data(), v, pos);
 }
 
 
@@ -1810,7 +1808,7 @@ https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbo
         }
     }
 
-    callFunction(fun, allocValue()->mkAttrs(attrs), res, noPos);
+    callFunction(fun, allocValue()->mkAttrs(attrs), res, pos);
 }
 
 
@@ -1846,7 +1844,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e, noPos, "in the argument of the not operator")); // XXX: FIXME: !
+    v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
 }
 
 
@@ -1991,8 +1989,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         return result;
     };
 
-    Value values[es->size()];
-    Value * vTmpP = values;
+    // List of returned strings. References to these Values must NOT be persisted.
+    SmallTemporaryValueVector<conservativeStackReservation> values(es->size());
+    Value * vTmpP = values.data();
 
     for (auto & [i_pos, i] : *es) {
         Value & vTmp = *vTmpP++;
@@ -2286,7 +2285,7 @@ BackedStringView EvalState::coerceToString(
             std::string result;
             for (auto [n, v2] : enumerate(v.listItems())) {
                 try {
-                    result += *coerceToString(noPos, *v2, context,
+                    result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
                             coerceMore, copyToStore, canonicalizePath);
                 } catch (Error & e) {
@@ -2318,7 +2317,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            auto dstPath = path.fetchToStore(store, path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
+            auto dstPath = path.fetchToStore(*store, path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
@@ -2433,8 +2432,8 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
 
 bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx)
 {
-    forceValue(v1, noPos);
-    forceValue(v2, noPos);
+    forceValue(v1, pos);
+    forceValue(v2, pos);
 
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls

@@ -90,7 +90,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         fragment = percentDecode(url.substr(fragmentStart+1));
     }
     if (pathEnd != std::string::npos && fragmentStart != std::string::npos) {
-        query = decodeQuery(url.substr(pathEnd+1, fragmentStart));
+        query = decodeQuery(url.substr(pathEnd+1, fragmentStart-pathEnd-1));
     }
 
     if (baseDir) {

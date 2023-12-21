@@ -19,6 +19,8 @@
 #include "namespaces.hh"
 #include "child.hh"
 #include "unix-domain-socket.hh"
+#include "posix-fs-canonicalise.hh"
+#include "posix-source-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -652,8 +654,8 @@ void LocalDerivationGoal::startBuilder()
 #if __linux__
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.  We put it in the Nix store
-           to ensure that we can create hard-links to non-directory
-           inputs in the fake Nix store in the chroot (see below). */
+           so that the build outputs can be moved efficiently from the
+           chroot to their final location. */
         chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
         deletePath(chrootRootDir);
 
@@ -1065,8 +1067,8 @@ void LocalDerivationGoal::initTmpDir() {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
-                auto hash = hashString(htSHA256, i.first);
-                std::string fn = ".attr-" + hash.to_string(HashFormat::Base32, false);
+                auto hash = hashString(HashAlgorithm::SHA256, i.first);
+                std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
@@ -1290,12 +1292,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
 
     StorePath addToStore(
         std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashType hashAlgo,
+        SourceAccessor & accessor,
+        const CanonPath & srcPath,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
         PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references) override
+        RepairFlag repair) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1305,26 +1308,15 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         goal.addDependency(info.path);
     }
 
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair = NoRepair) override
-    {
-        auto path = next->addTextToStore(name, s, references, repair);
-        goal.addDependency(path);
-        return path;
-    }
-
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        FileIngestionMethod method,
-        HashType hashAlgo,
-        RepairFlag repair,
-        const StorePathSet & references) override
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, references, repair);
         goal.addDependency(path);
         return path;
     }
@@ -2452,8 +2444,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 throw BuildError(
                     "output path %1% without valid stats info",
                     actualPath);
-            if (outputHash.method == ContentAddressMethod { FileIngestionMethod::Flat } ||
-                outputHash.method == ContentAddressMethod { TextIngestionMethod {} })
+            if (outputHash.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
             {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
@@ -2465,38 +2456,23 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             rewriteOutput(outputRewrites);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
-            HashModuloSink caSink { outputHash.hashType, oldHashPart };
-            std::visit(overloaded {
-                [&](const TextIngestionMethod &) {
-                    readFile(actualPath, caSink);
-                },
-                [&](const FileIngestionMethod & m2) {
-                    switch (m2) {
-                    case FileIngestionMethod::Recursive:
-                        dumpPath(actualPath, caSink);
-                        break;
-                    case FileIngestionMethod::Flat:
-                        readFile(actualPath, caSink);
-                        break;
-                    }
-                },
-            }, outputHash.method.raw);
-            auto got = caSink.finish().first;
+            auto got = ({
+                HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
+                PosixSourceAccessor accessor;
+                dumpPath(
+                    accessor, CanonPath { actualPath },
+                    caSink,
+                    outputHash.method.getFileIngestionMethod());
+                caSink.finish().first;
+            });
 
-            auto optCA = ContentAddressWithReferences::fromPartsOpt(
-                outputHash.method,
-                std::move(got),
-                rewriteRefs());
-            if (!optCA) {
-                // TODO track distinct failure modes separately (at the time of
-                // writing there is just one but `nullopt` is unclear) so this
-                // message can't get out of sync.
-                throw BuildError("output path '%s' has illegal content address, probably a spurious self-reference with text hashing");
-            }
             ValidPathInfo newInfo0 {
                 worker.store,
                 outputPathName(drv->name, outputName),
-                std::move(*optCA),
+                ContentAddressWithReferences::fromParts(
+                    outputHash.method,
+                    std::move(got),
+                    rewriteRefs()),
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {
@@ -2510,9 +2486,14 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                                std::string(newInfo0.path.hashPart())}});
             }
 
-            HashResult narHashAndSize = hashPath(htSHA256, actualPath);
-            newInfo0.narHash = narHashAndSize.first;
-            newInfo0.narSize = narHashAndSize.second;
+            {
+                PosixSourceAccessor accessor;
+                HashResult narHashAndSize = hashPath(
+                    accessor, CanonPath { actualPath },
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                newInfo0.narHash = narHashAndSize.first;
+                newInfo0.narSize = narHashAndSize.second;
+            }
 
             assert(newInfo0.ca);
             return newInfo0;
@@ -2530,7 +2511,10 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput(outputRewrites);
-                auto narHashAndSize = hashPath(htSHA256, actualPath);
+                PosixSourceAccessor accessor;
+                HashResult narHashAndSize = hashPath(
+                    accessor, CanonPath { actualPath },
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
@@ -2545,7 +2529,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.ca.method,
-                    .hashType = wanted.type,
+                    .hashAlgo = wanted.algo,
                 });
 
                 /* Check wanted hash */
@@ -2582,7 +2566,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             [&](const DerivationOutput::Impure & doi) {
                 return newInfoFromCA(DerivationOutput::CAFloating {
                     .method = doi.method,
-                    .hashType = doi.hashType,
+                    .hashAlgo = doi.hashAlgo,
                 });
             },
 
@@ -2944,7 +2928,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),
-        Hash(htSHA256), outputPathName(drv->name, outputName));
+        Hash(HashAlgorithm::SHA256), outputPathName(drv->name, outputName));
 }
 
 
@@ -2952,7 +2936,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string()),
-        Hash(htSHA256), path.name());
+        Hash(HashAlgorithm::SHA256), path.name());
 }
 
 

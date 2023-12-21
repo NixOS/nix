@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "input-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -105,6 +106,11 @@ Input Input::fromAttrs(Attrs && attrs)
     res->scheme = inputScheme;
     fixupInput(*res);
     return std::move(*res);
+}
+
+std::optional<std::string> Input::getFingerprint(ref<Store> store) const
+{
+    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
 }
 
 ParsedURL Input::toURL() const
@@ -219,6 +225,16 @@ std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
     return {std::move(storePath), input};
 }
 
+std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+{
+    try {
+        return scheme->getAccessor(store, *this);
+    } catch (Error & e) {
+        e.addTrace({}, "while fetching the input '%s'", to_string());
+        throw;
+    }
+}
+
 Input Input::applyOverrides(
     std::optional<std::string> ref,
     std::optional<Hash> rev) const
@@ -273,8 +289,8 @@ std::string Input::getType() const
 std::optional<Hash> Input::getNarHash() const
 {
     if (auto s = maybeGetStrAttr(attrs, "narHash")) {
-        auto hash = s->empty() ? Hash(htSHA256) : Hash::parseSRI(*s);
-        if (hash.type != htSHA256)
+        auto hash = s->empty() ? Hash(HashAlgorithm::SHA256) : Hash::parseSRI(*s);
+        if (hash.algo != HashAlgorithm::SHA256)
             throw UsageError("narHash must use SHA-256");
         return hash;
     }
@@ -298,7 +314,7 @@ std::optional<Hash> Input::getRev() const
         } catch (BadHash &e) {
             // Default to sha1 for backwards compatibility with existing
             // usages (e.g. `builtins.fetchTree` calls or flake inputs).
-            hash = Hash::parseAny(*s, htSHA1);
+            hash = Hash::parseAny(*s, HashAlgorithm::SHA1);
         }
     }
 
@@ -353,6 +369,18 @@ void InputScheme::putFile(
 void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
+{
+    auto [accessor, input2] = getAccessor(store, input);
+    auto storePath = SourcePath(accessor).fetchToStore(*store, input2.getName());
+    return {storePath, input2};
+}
+
+std::pair<ref<InputAccessor>, Input> InputScheme::getAccessor(ref<Store> store, const Input & input) const
+{
+    throw UnimplementedError("InputScheme must implement fetch() or getAccessor()");
 }
 
 std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const

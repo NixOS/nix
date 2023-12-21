@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <climits>
+#include <span>
 
 #include "symbol-table.hh"
 #include "value/context.hh"
@@ -66,7 +67,6 @@ class Symbol;
 class PosIdx;
 struct Pos;
 class StorePath;
-class Store;
 class EvalState;
 class XMLWriter;
 
@@ -158,42 +158,60 @@ public:
     inline bool isPrimOp() const { return internalType == tPrimOp; };
     inline bool isPrimOpApp() const { return internalType == tPrimOpApp; };
 
+    /**
+     * Strings in the evaluator carry a so-called `context` which
+     * is a list of strings representing store paths.  This is to
+     * allow users to write things like
+     *
+     *   "--with-freetype2-library=" + freetype + "/lib"
+     *
+     * where `freetype` is a derivation (or a source to be copied
+     * to the store).  If we just concatenated the strings without
+     * keeping track of the referenced store paths, then if the
+     * string is used as a derivation attribute, the derivation
+     * will not have the correct dependencies in its inputDrvs and
+     * inputSrcs.
+
+     * The semantics of the context is as follows: when a string
+     * with context C is used as a derivation attribute, then the
+     * derivations in C will be added to the inputDrvs of the
+     * derivation, and the other store paths in C will be added to
+     * the inputSrcs of the derivations.
+
+     * For canonicity, the store paths should be in sorted order.
+     */
+    struct StringWithContext {
+        const char * c_str;
+        const char * * context; // must be in sorted order
+    };
+
+    struct Path {
+        InputAccessor * accessor;
+        const char * path;
+    };
+
+    struct ClosureThunk {
+        Env * env;
+        Expr * expr;
+    };
+
+    struct FunctionApplicationThunk {
+        Value * left, * right;
+    };
+
+    struct Lambda {
+        Env * env;
+        ExprLambda * fun;
+    };
+
     union
     {
         NixInt integer;
         bool boolean;
 
-        /**
-         * Strings in the evaluator carry a so-called `context` which
-         * is a list of strings representing store paths.  This is to
-         * allow users to write things like
+        StringWithContext string;
 
-         *   "--with-freetype2-library=" + freetype + "/lib"
-
-         * where `freetype` is a derivation (or a source to be copied
-         * to the store).  If we just concatenated the strings without
-         * keeping track of the referenced store paths, then if the
-         * string is used as a derivation attribute, the derivation
-         * will not have the correct dependencies in its inputDrvs and
-         * inputSrcs.
-
-         * The semantics of the context is as follows: when a string
-         * with context C is used as a derivation attribute, then the
-         * derivations in C will be added to the inputDrvs of the
-         * derivation, and the other store paths in C will be added to
-         * the inputSrcs of the derivations.
-
-         * For canonicity, the store paths should be in sorted order.
-         */
-        struct {
-            const char * c_str;
-            const char * * context; // must be in sorted order
-        } string;
-
-        struct {
-            InputAccessor * accessor;
-            const char * path;
-        } _path;
+        Path _path;
 
         Bindings * attrs;
         struct {
@@ -201,21 +219,11 @@ public:
             Value * * elems;
         } bigList;
         Value * smallList[2];
-        struct {
-            Env * env;
-            Expr * expr;
-        } thunk;
-        struct {
-            Value * left, * right;
-        } app;
-        struct {
-            Env * env;
-            ExprLambda * fun;
-        } lambda;
+        ClosureThunk thunk;
+        FunctionApplicationThunk app;
+        Lambda lambda;
         PrimOp * primOp;
-        struct {
-            Value * left, * right;
-        } primOpApp;
+        FunctionApplicationThunk primOpApp;
         ExternalValueBase * external;
         NixFloat fpoint;
     };
@@ -354,13 +362,7 @@ public:
         // Value will be overridden anyways
     }
 
-    inline void mkPrimOp(PrimOp * p)
-    {
-        clearValue();
-        internalType = tPrimOp;
-        primOp = p;
-    }
-
+    void mkPrimOp(PrimOp * p);
 
     inline void mkPrimOpApp(Value * l, Value * r)
     {
@@ -393,7 +395,13 @@ public:
         return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
 
-    const Value * const * listElems() const
+    std::span<Value * const> listItems() const
+    {
+        assert(isList());
+        return std::span<Value * const>(listElems(), listSize());
+    }
+
+    Value * const * listElems() const
     {
         return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
@@ -412,41 +420,12 @@ public:
      */
     bool isTrivial() const;
 
-    auto listItems()
-    {
-        struct ListIterable
-        {
-            typedef Value * const * iterator;
-            iterator _begin, _end;
-            iterator begin() const { return _begin; }
-            iterator end() const { return _end; }
-        };
-        assert(isList());
-        auto begin = listElems();
-        return ListIterable { begin, begin + listSize() };
-    }
-
-    auto listItems() const
-    {
-        struct ConstListIterable
-        {
-            typedef const Value * const * iterator;
-            iterator _begin, _end;
-            iterator begin() const { return _begin; }
-            iterator end() const { return _end; }
-        };
-        assert(isList());
-        auto begin = listElems();
-        return ConstListIterable { begin, begin + listSize() };
-    }
-
     SourcePath path() const
     {
         assert(internalType == tPath);
-        return SourcePath {
-            .accessor = ref(_path.accessor->shared_from_this()),
-            .path = CanonPath(CanonPath::unchecked_t(), _path.path)
-        };
+        return SourcePath(
+            ref(_path.accessor->shared_from_this()),
+            CanonPath(CanonPath::unchecked_t(), _path.path));
     }
 
     std::string_view string_view() const

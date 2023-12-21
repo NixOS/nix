@@ -116,6 +116,7 @@
   [store path]: ../glossary.md#gloss-store-path
 
   Paths can include [string interpolation] and can themselves be [interpolated in other expressions].
+
   [interpolated in other expressions]: ./string-interpolation.md#interpolated-expressions
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.

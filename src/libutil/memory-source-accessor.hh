@@ -1,4 +1,5 @@
 #include "source-accessor.hh"
+#include "fs-sink.hh"
 #include "variant-wrapper.hh"
 
 namespace nix {
@@ -69,6 +70,30 @@ struct MemorySourceAccessor : virtual SourceAccessor
     File * open(const CanonPath & path, std::optional<File> create);
 
     CanonPath addFile(CanonPath path, std::string && contents);
+};
+
+/**
+ * Write to a `MemorySourceAccessor` at the given path
+ */
+struct MemorySink : ParseSink
+{
+    MemorySourceAccessor & dst;
+
+    MemorySink(MemorySourceAccessor & dst) : dst(dst) { }
+
+    void createDirectory(const Path & path) override;
+
+    void createRegularFile(const Path & path) override;
+    void receiveContents(std::string_view data) override;
+    void isExecutable() override;
+    void closeRegularFile() override;
+
+    void createSymlink(const Path & path, const std::string & target) override;
+
+    void preallocateContents(uint64_t size) override;
+
+private:
+    MemorySourceAccessor::File::Regular * r;
 };
 
 }

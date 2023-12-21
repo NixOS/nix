@@ -7,26 +7,12 @@ namespace nix {
 class StorePath;
 class Store;
 
-struct FSInputAccessor : InputAccessor
-{
-    virtual void checkAllowed(const CanonPath & absPath) = 0;
+ref<InputAccessor> makeFSInputAccessor(
+    const CanonPath & root);
 
-    virtual void allowPath(CanonPath path) = 0;
-
-    virtual bool hasAccessControl() = 0;
-};
-
-typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
-
-ref<FSInputAccessor> makeFSInputAccessor(
-    const CanonPath & root,
-    std::optional<std::set<CanonPath>> && allowedPaths = {},
-    MakeNotAllowedError && makeNotAllowedError = {});
-
-ref<FSInputAccessor> makeStorePathAccessor(
+ref<InputAccessor> makeStorePathAccessor(
     ref<Store> store,
-    const StorePath & storePath,
-    MakeNotAllowedError && makeNotAllowedError = {});
+    const StorePath & storePath);
 
 SourcePath getUnfilteredRootPath(CanonPath path);
 

@@ -196,10 +196,19 @@ void DerivationGoal::loadDerivation()
        things being garbage collected while we're busy. */
     worker.evalStore.addTempRoot(drvPath);
 
-    assert(worker.evalStore.isValidPath(drvPath));
+    /* Get the derivation. It is probably in the eval store, but it might be inthe main store:
 
-    /* Get the derivation. */
-    drv = std::make_unique<Derivation>(worker.evalStore.readDerivation(drvPath));
+         - Resolved derivation are resolved against main store realisations, and so must be stored there.
+
+         - Dynamic derivations are built, and so are found in the main store.
+     */
+    for (auto * drvStore : { &worker.evalStore, &worker.store }) {
+        if (drvStore->isValidPath(drvPath)) {
+            drv = std::make_unique<Derivation>(drvStore->readDerivation(drvPath));
+            break;
+        }
+    }
+    assert(drv);
 
     haveDerivation();
 }
@@ -401,11 +410,15 @@ void DerivationGoal::gaveUpOnSubstitution()
     }
 
     /* Copy the input sources from the eval store to the build
-       store. */
+       store.
+
+       Note that some inputs might not be in the eval store because they
+       are (resolved) derivation outputs in a resolved derivation. */
     if (&worker.evalStore != &worker.store) {
         RealisedPath::Set inputSrcs;
         for (auto & i : drv->inputSrcs)
-            inputSrcs.insert(i);
+            if (worker.evalStore.isValidPath(i))
+                inputSrcs.insert(i);
         copyClosure(worker.evalStore, worker.store, inputSrcs);
     }
 
@@ -453,7 +466,7 @@ void DerivationGoal::repairClosure()
     std::map<StorePath, StorePath> outputsToDrv;
     for (auto & i : inputClosure)
         if (i.isDerivation()) {
-            auto depOutputs = worker.store.queryPartialDerivationOutputMap(i);
+            auto depOutputs = worker.store.queryPartialDerivationOutputMap(i, &worker.evalStore);
             for (auto & j : depOutputs)
                 if (j.second)
                     outputsToDrv.insert_or_assign(*j.second, i);
@@ -558,7 +571,7 @@ void DerivationGoal::inputsRealised()
                  inputDrvOutputs statefully, sometimes it gets out of sync with
                  the real source of truth (store). So we query the store
                  directly if there's a problem. */
-              attempt = fullDrv.tryResolve(worker.store);
+              attempt = fullDrv.tryResolve(worker.store, &worker.evalStore);
             }
             assert(attempt);
             Derivation drvResolved { std::move(*attempt) };
@@ -604,7 +617,13 @@ void DerivationGoal::inputsRealised()
                     return *outPath;
                 }
                 else {
-                    auto outMap = worker.evalStore.queryDerivationOutputMap(depDrvPath);
+                    auto outMap = [&]{
+                        for (auto * drvStore : { &worker.evalStore, &worker.store })
+                            if (drvStore->isValidPath(depDrvPath))
+                                return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                        assert(false);
+                    }();
+
                     auto outMapPath = outMap.find(outputName);
                     if (outMapPath == outMap.end()) {
                         throw Error(
@@ -1085,8 +1104,12 @@ void DerivationGoal::resolvedFinished()
                 auto newRealisation = realisation;
                 newRealisation.id = DrvOutput { initialOutput->outputHash, outputName };
                 newRealisation.signatures.clear();
-                if (!drv->type().isFixed())
-                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath);
+                if (!drv->type().isFixed()) {
+                    auto & drvStore = worker.evalStore.isValidPath(drvPath)
+                        ? worker.evalStore
+                        : worker.store;
+                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
+                }
                 signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
@@ -1317,9 +1340,26 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
                     auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
                     // ensure that logs from a builder using `ssh-ng://` as protocol
                     // are also available to `nix log`.
-                    if (s && !isWrittenToLog && logSink && (*json)["type"] == resBuildLogLine) {
-                        auto f = (*json)["fields"];
-                        (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
+                    if (s && !isWrittenToLog && logSink) {
+                        const auto type = (*json)["type"];
+                        const auto fields = (*json)["fields"];
+                        if (type == resBuildLogLine) {
+                            (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                        } else if (type == resSetPhase && ! fields.is_null()) {
+                            const auto phase = fields[0];
+                            if (! phase.is_null()) {
+                                // nixpkgs' stdenv produces lines in the log to signal
+                                // phase changes.
+                                // We want to get the same lines in case of remote builds.
+                                // The format is:
+                                //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                const auto logLine = nlohmann::json::object({
+                                    {"action", "setPhase"},
+                                    {"phase", phase}
+                                });
+                                (*logSink)("@nix " + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n");
+                            }
+                        }
                     }
                 }
                 currentHookLine.clear();
@@ -1362,7 +1402,10 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDeri
             res.insert_or_assign(name, output.path(worker.store, drv->name, name));
         return res;
     } else {
-        return worker.store.queryPartialDerivationOutputMap(drvPath);
+        for (auto * drvStore : { &worker.evalStore, &worker.store })
+            if (drvStore->isValidPath(drvPath))
+                return worker.store.queryPartialDerivationOutputMap(drvPath, drvStore);
+        assert(false);
     }
 }
 
@@ -1375,7 +1418,10 @@ OutputPathMap DerivationGoal::queryDerivationOutputMap()
             res.insert_or_assign(name, *output.second);
         return res;
     } else {
-        return worker.store.queryDerivationOutputMap(drvPath);
+        for (auto * drvStore : { &worker.evalStore, &worker.store })
+            if (drvStore->isValidPath(drvPath))
+                return worker.store.queryDerivationOutputMap(drvPath, drvStore);
+        assert(false);
     }
 }
 
@@ -1474,6 +1520,7 @@ void DerivationGoal::done(
     SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
+    outputLocks.unlock();
     buildResult.status = status;
     if (ex)
         buildResult.errorMsg = fmt("%s", normaltxt(ex->info().msg));

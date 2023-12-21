@@ -20,6 +20,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 
 [googletest]: https://google.github.io/googletest/
 [rapidcheck]: https://github.com/emil-e/rapidcheck
+[property testing]: https://en.wikipedia.org/wiki/Property_testing
 
 ### Source and header layout
 
@@ -28,34 +29,50 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ```
 > src
 > ├── libexpr
+> │   ├── local.mk
 > │   ├── value/context.hh
 > │   ├── value/context.cc
+> │   …
+> │
+> ├── tests
 > │   │
 > │   …
->     └── tests
-> │       ├── value/context.hh
-> │       ├── value/context.cc
+> │   └── unit
+> │       ├── libutil
+> │       │   ├── local.mk
+> │       │   …
+> │       │   └── data
+> │       │       ├── git/tree.txt
+> │       │       …
 > │       │
-> │       …
-> │
-> ├── unit-test-data
-> │   ├── libstore
-> │   │   ├── worker-protocol/content-address.bin
-> │   │   …
-> │   …
+> │       ├── libexpr-support
+> │       │   ├── local.mk
+> │       │   └── tests
+> │       │       ├── value/context.hh
+> │       │       ├── value/context.cc
+> │       │       …
+> │       │
+> │       ├── libexpr
+> │       …   ├── local.mk
+> │           ├── value/context.cc
+> │           …
 > …
 > ```
 
-The unit tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `src/${library_shortname}/tests` within the directory for the library (`src/${library_shortname}`).
+The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `tests/unit/${library_name_without-nix}`.
+Given a interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `tests/unit/libexpr/tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `tests/unit/libexpr-support/tests/value/context.{hh,cc}`.
 
-The data is in `unit-test-data`, with one subdir per library, with the same name as where the code goes.
-For example, `libnixstore` code is in `src/libstore`, and its test data is in `unit-test-data/libstore`.
-The path to the `unit-test-data` directory is passed to the unit test executable with the environment variable `_NIX_TEST_UNIT_DATA`.
+Data for unit tests is stored in a `data` subdir of the directory for each unit test executable.
+For example, `libnixstore` code is in `src/libstore`, and its test data is in `tests/unit/libstore/data`.
+The path to the `tests/unit/data` directory is passed to the unit test executable with the environment variable `_NIX_TEST_UNIT_DATA`.
+Note that each executable only gets the data for its tests.
 
-> **Note**
-> Due to the way googletest works, downstream unit test executables will actually include and re-run upstream library tests.
-> Therefore it is important that the same value for `_NIX_TEST_UNIT_DATA` be used with the tests for each library.
-> That is why we have the test data nested within a single `unit-test-data` directory.
+The unit test libraries are in `tests/unit/${library_name_without-nix}-lib`.
+All headers are in a `tests` subdirectory so they are included with `#include "tests/"`.
+
+The use of all these separate directories for the unit tests might seem inconvenient, as for example the tests are not "right next to" the part of the code they are testing.
+But organizing the tests this way has one big benefit:
+there is no risk of any build-system wildcards for the library accidentally picking up test code that should not built and installed as part of the library.
 
 ### Running tests
 
@@ -69,7 +86,7 @@ See [functional characterisation testing](#characterisation-testing-functional) 
 Like with the functional characterisation, `_NIX_TEST_ACCEPT=1` is also used.
 For example:
 ```shell-session
-$ _NIX_TEST_ACCEPT=1 make libstore-tests-exe_RUN
+$ _NIX_TEST_ACCEPT=1 make libstore-tests_RUN
 ...
 [  SKIPPED ] WorkerProtoTest.string_read
 [  SKIPPED ] WorkerProtoTest.string_write
@@ -79,6 +96,18 @@ $ _NIX_TEST_ACCEPT=1 make libstore-tests-exe_RUN
 ```
 will regenerate the "golden master" expected result for the `libnixstore` characterisation tests.
 The characterisation tests will mark themselves "skipped" since they regenerated the expected result instead of actually testing anything.
+
+### Unit test support libraries
+
+There are headers and code which are not just used to test the library in question, but also downstream libraries.
+For example, we do [property testing] with the [rapidcheck] library.
+This requires writing `Arbitrary` "instances", which are used to describe how to generate values of a given type for the sake of running property tests.
+Because types contain other types, `Arbitrary` "instances" for some type are not just useful for testing that type, but also any other type that contains it.
+Downstream types frequently contain upstream types, so it is very important that we share arbitrary instances so that downstream libraries' property tests can also use them.
+
+It is important that these testing libraries don't contain any actual tests themselves.
+On some platforms they would be run as part of every test executable that uses them, which is redundant.
+On other platforms they wouldn't be run at all.
 
 ## Functional tests
 
@@ -133,17 +162,17 @@ ran test tests/functional/${testName}.sh... [PASS]
 or without `make`:
 
 ```shell-session
-$ ./mk/run-test.sh tests/functional/${testName}.sh
+$ ./mk/run-test.sh tests/functional/${testName}.sh tests/functional/init.sh
 ran test tests/functional/${testName}.sh... [PASS]
 ```
 
 To see the complete output, one can also run:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/functional/${testName}.sh
-+ foo
+$ ./mk/debug-test.sh tests/functional/${testName}.sh tests/functional/init.sh
++(${testName}.sh:1) foo
 output from foo
-+ bar
++(${testName}.sh:2) bar
 output from bar
 ...
 ```
@@ -175,7 +204,7 @@ edit it like so:
 Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/functional/${testName}.sh
+$ ./mk/debug-test.sh tests/functional/${testName}.sh tests/functional/init.sh
 ...
 + gdb blash blub
 GNU gdb (GDB) 12.1

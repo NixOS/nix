@@ -400,31 +400,18 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashType_] = ContentAddressMethod::parse(camStr);
-                auto hashType = hashType_; // work around clang bug
+                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parse(camStr);
+                auto hashAlgo = hashAlgo_; // work around clang bug
                 FramedSource source(from);
-                // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
-                return std::visit(overloaded {
-                    [&](const TextIngestionMethod &) {
-                        if (hashType != htSHA256)
-                            throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
-                                name, printHashType(hashType));
-                        // We could stream this by changing Store
-                        std::string contents = source.drain();
-                        auto path = store->addTextToStore(name, contents, refs, repair);
-                        return store->queryPathInfo(path);
-                    },
-                    [&](const FileIngestionMethod & fim) {
-                        auto path = store->addToStoreFromDump(source, name, fim, hashType, repair, refs);
-                        return store->queryPathInfo(path);
-                    },
-                }, contentAddressMethod.raw);
+                // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
+                auto path = store->addToStoreFromDump(source, name, contentAddressMethod, hashAlgo, refs, repair);
+                return store->queryPathInfo(path);
             }();
             logger->stopWork();
 
             WorkerProto::Serialise<ValidPathInfo>::write(*store, wconn, *pathInfo);
         } else {
-            HashType hashAlgo;
+            HashAlgorithm hashAlgo;
             std::string baseName;
             FileIngestionMethod method;
             {
@@ -440,7 +427,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     hashAlgoRaw = "sha256";
                     method = FileIngestionMethod::Recursive;
                 }
-                hashAlgo = parseHashType(hashAlgoRaw);
+                hashAlgo = parseHashAlgo(hashAlgoRaw);
             }
 
             auto dumpSource = sinkToSource([&](Sink & saved) {
@@ -496,7 +483,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         std::string s = readString(from);
         auto refs = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         logger->startWork();
-        auto path = store->addTextToStore(suffix, s, refs, NoRepair);
+        auto path = ({
+            StringSource source { s };
+            store->addToStoreFromDump(source, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, NoRepair);
+        });
         logger->stopWork();
         to << store->printStorePath(path);
         break;
@@ -574,6 +564,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::BuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;
+        /*
+         * Note: unlike wopEnsurePath, this operation reads a
+         * derivation-to-be-realized from the client with
+         * readDerivation(Source,Store) rather than reading it from
+         * the local store with Store::readDerivation().  Since the
+         * derivation-to-be-realized is not registered in the store
+         * it cannot be trusted that its outPath was calculated
+         * correctly.
+         */
         readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
@@ -654,6 +653,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         store->addTempRoot(path);
         logger->stopWork();
         to << 1;
+        break;
+    }
+
+    case WorkerProto::Op::AddPermRoot: {
+        if (!trusted)
+            throw Error(
+                "you are not privileged to create perm roots\n\n"
+                "hint: you can just do this client-side without special privileges, and probably want to do that instead.");
+        auto storePath = WorkerProto::Serialise<StorePath>::read(*store, rconn);
+        Path gcRoot = absPath(readString(from));
+        logger->startWork();
+        auto & localFSStore = require<LocalFSStore>(*store);
+        localFSStore.addPermRoot(storePath, gcRoot);
+        logger->stopWork();
+        to << gcRoot;
         break;
     }
 
@@ -868,7 +882,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         bool repair, dontCheckSigs;
         auto path = store->parseStorePath(readString(from));
         auto deriver = readString(from);
-        auto narHash = Hash::parseAny(readString(from), htSHA256);
+        auto narHash = Hash::parseAny(readString(from), HashAlgorithm::SHA256);
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);

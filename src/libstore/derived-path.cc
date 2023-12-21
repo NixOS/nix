@@ -1,4 +1,5 @@
 #include "derived-path.hh"
+#include "derivations.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>
@@ -32,7 +33,7 @@ CMP(SingleDerivedPath, DerivedPathBuilt, outputs)
 #undef CMP
 #undef CMP_ONE
 
-nlohmann::json DerivedPath::Opaque::toJSON(const Store & store) const
+nlohmann::json DerivedPath::Opaque::toJSON(const StoreDirConfig & store) const
 {
     return store.printStorePath(path);
 }
@@ -86,50 +87,50 @@ nlohmann::json DerivedPath::toJSON(Store & store) const
     }, raw());
 }
 
-std::string DerivedPath::Opaque::to_string(const Store & store) const
+std::string DerivedPath::Opaque::to_string(const StoreDirConfig & store) const
 {
     return store.printStorePath(path);
 }
 
-std::string SingleDerivedPath::Built::to_string(const Store & store) const
+std::string SingleDerivedPath::Built::to_string(const StoreDirConfig & store) const
 {
     return drvPath->to_string(store) + "^" + output;
 }
 
-std::string SingleDerivedPath::Built::to_string_legacy(const Store & store) const
+std::string SingleDerivedPath::Built::to_string_legacy(const StoreDirConfig & store) const
 {
     return drvPath->to_string(store) + "!" + output;
 }
 
-std::string DerivedPath::Built::to_string(const Store & store) const
+std::string DerivedPath::Built::to_string(const StoreDirConfig & store) const
 {
     return drvPath->to_string(store)
         + '^'
         + outputs.to_string();
 }
 
-std::string DerivedPath::Built::to_string_legacy(const Store & store) const
+std::string DerivedPath::Built::to_string_legacy(const StoreDirConfig & store) const
 {
     return drvPath->to_string_legacy(store)
         + "!"
         + outputs.to_string();
 }
 
-std::string SingleDerivedPath::to_string(const Store & store) const
+std::string SingleDerivedPath::to_string(const StoreDirConfig & store) const
 {
     return std::visit(
         [&](const auto & req) { return req.to_string(store); },
         raw());
 }
 
-std::string DerivedPath::to_string(const Store & store) const
+std::string DerivedPath::to_string(const StoreDirConfig & store) const
 {
     return std::visit(
         [&](const auto & req) { return req.to_string(store); },
         raw());
 }
 
-std::string SingleDerivedPath::to_string_legacy(const Store & store) const
+std::string SingleDerivedPath::to_string_legacy(const StoreDirConfig & store) const
 {
     return std::visit(overloaded {
         [&](const SingleDerivedPath::Built & req) { return req.to_string_legacy(store); },
@@ -137,7 +138,7 @@ std::string SingleDerivedPath::to_string_legacy(const Store & store) const
     }, this->raw());
 }
 
-std::string DerivedPath::to_string_legacy(const Store & store) const
+std::string DerivedPath::to_string_legacy(const StoreDirConfig & store) const
 {
     return std::visit(overloaded {
         [&](const DerivedPath::Built & req) { return req.to_string_legacy(store); },
@@ -146,7 +147,7 @@ std::string DerivedPath::to_string_legacy(const Store & store) const
 }
 
 
-DerivedPath::Opaque DerivedPath::Opaque::parse(const Store & store, std::string_view s)
+DerivedPath::Opaque DerivedPath::Opaque::parse(const StoreDirConfig & store, std::string_view s)
 {
     return {store.parseStorePath(s)};
 }
@@ -166,7 +167,7 @@ void drvRequireExperiment(
 }
 
 SingleDerivedPath::Built SingleDerivedPath::Built::parse(
-    const Store & store, ref<SingleDerivedPath> drv,
+    const StoreDirConfig & store, ref<SingleDerivedPath> drv,
     OutputNameView output,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -178,7 +179,7 @@ SingleDerivedPath::Built SingleDerivedPath::Built::parse(
 }
 
 DerivedPath::Built DerivedPath::Built::parse(
-    const Store & store, ref<SingleDerivedPath> drv,
+    const StoreDirConfig & store, ref<SingleDerivedPath> drv,
     OutputNameView outputsS,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -190,7 +191,7 @@ DerivedPath::Built DerivedPath::Built::parse(
 }
 
 static SingleDerivedPath parseWithSingle(
-    const Store & store, std::string_view s, std::string_view separator,
+    const StoreDirConfig & store, std::string_view s, std::string_view separator,
     const ExperimentalFeatureSettings & xpSettings)
 {
     size_t n = s.rfind(separator);
@@ -207,7 +208,7 @@ static SingleDerivedPath parseWithSingle(
 }
 
 SingleDerivedPath SingleDerivedPath::parse(
-    const Store & store,
+    const StoreDirConfig & store,
     std::string_view s,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -215,7 +216,7 @@ SingleDerivedPath SingleDerivedPath::parse(
 }
 
 SingleDerivedPath SingleDerivedPath::parseLegacy(
-    const Store & store,
+    const StoreDirConfig & store,
     std::string_view s,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -223,7 +224,7 @@ SingleDerivedPath SingleDerivedPath::parseLegacy(
 }
 
 static DerivedPath parseWith(
-    const Store & store, std::string_view s, std::string_view separator,
+    const StoreDirConfig & store, std::string_view s, std::string_view separator,
     const ExperimentalFeatureSettings & xpSettings)
 {
     size_t n = s.rfind(separator);
@@ -240,7 +241,7 @@ static DerivedPath parseWith(
 }
 
 DerivedPath DerivedPath::parse(
-    const Store & store,
+    const StoreDirConfig & store,
     std::string_view s,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -248,7 +249,7 @@ DerivedPath DerivedPath::parse(
 }
 
 DerivedPath DerivedPath::parseLegacy(
-    const Store & store,
+    const StoreDirConfig & store,
     std::string_view s,
     const ExperimentalFeatureSettings & xpSettings)
 {

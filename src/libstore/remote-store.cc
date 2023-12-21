@@ -20,7 +20,7 @@
 
 namespace nix {
 
-/* TODO: Separate these store impls into different files, give them better names */
+/* TODO: Separate these store types into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
     : RemoteStoreConfig(params)
     , Store(params)
@@ -225,7 +225,7 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
         conn->to << WorkerProto::Op::QueryValidPaths;
         WorkerProto::write(*this, *conn, paths);
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
-            conn->to << (settings.buildersUseSubstitutes ? 1 : 0);
+            conn->to << maybeSubstitute;
         }
         conn.processStderr();
         return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
@@ -417,12 +417,12 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
-    Source & dump,
-    std::string_view name,
-    ContentAddressMethod caMethod,
-    HashType hashType,
-    const StorePathSet & references,
-    RepairFlag repair)
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod caMethod,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair)
 {
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
@@ -432,7 +432,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << WorkerProto::Op::AddToStore
             << name
-            << caMethod.render(hashType);
+            << caMethod.render(hashAlgo);
         WorkerProto::write(*this, *conn, references);
         conn->to << repair;
 
@@ -453,9 +453,9 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 
         std::visit(overloaded {
             [&](const TextIngestionMethod & thm) -> void {
-                if (hashType != htSHA256)
+                if (hashAlgo != HashAlgorithm::SHA256)
                     throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
-                        name, printHashType(hashType));
+                        name, printHashAlgo(hashAlgo));
                 std::string s = dump.drain();
                 conn->to << WorkerProto::Op::AddTextToStore << name << s;
                 WorkerProto::write(*this, *conn, references);
@@ -465,9 +465,9 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                 conn->to
                     << WorkerProto::Op::AddToStore
                     << name
-                    << ((hashType == htSHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+                    << ((hashAlgo == HashAlgorithm::SHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
                     << (fim == FileIngestionMethod::Recursive ? 1 : 0)
-                    << printHashType(hashType);
+                    << printHashAlgo(hashAlgo);
 
                 try {
                     conn->to.written = 0;
@@ -502,10 +502,15 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, std::string_view name,
-      FileIngestionMethod method, HashType hashType, RepairFlag repair, const StorePathSet & references)
+StorePath RemoteStore::addToStoreFromDump(
+    Source & dump,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
-    return addCAToStore(dump, name, method, hashType, references, repair)->path;
+    return addCAToStore(dump, name, method, hashAlgo, references, repair)->path;
 }
 
 
@@ -602,16 +607,6 @@ void RemoteStore::addMultipleToStore(
         Store::addMultipleToStore(source, repair, checkSigs);
 }
 
-
-StorePath RemoteStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    StringSource source(s);
-    return addCAToStore(source, name, TextIngestionMethod {}, htSHA256, references, repair)->path;
-}
 
 void RemoteStore::registerDrvOutput(const Realisation & info)
 {

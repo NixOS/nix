@@ -97,7 +97,7 @@ static bool isNixExpr(const SourcePath & path, struct InputAccessor::Stat & st)
 {
     return
         st.type == InputAccessor::tRegular
-        || (st.type == InputAccessor::tDirectory && (path + "default.nix").pathExists());
+        || (st.type == InputAccessor::tDirectory && (path + "default.nix").resolveSymlinks().pathExists());
 }
 
 
@@ -116,11 +116,11 @@ static void getAllExprs(EvalState & state,
            are implemented using profiles). */
         if (i == "manifest.nix") continue;
 
-        SourcePath path2 = path + i;
+        auto path2 = (path + i).resolveSymlinks();
 
         InputAccessor::Stat st;
         try {
-            st = path2.resolveSymlinks().lstat();
+            st = path2.lstat();
         } catch (Error &) {
             continue; // ignore dangling symlinks in ~/.nix-defexpr
         }
@@ -172,7 +172,7 @@ static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v
        directory). */
     else if (st.type == InputAccessor::tDirectory) {
         auto attrs = state.buildBindings(maxAttrs);
-        attrs.alloc("_combineChannels").mkList(0);
+        state.mkList(attrs.alloc("_combineChannels"), 0);
         StringSet seen;
         getAllExprs(state, path, seen, attrs);
         v.mkAttrs(attrs);
@@ -922,7 +922,7 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
+static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printDrvPath, bool printMeta)
 {
     using nlohmann::json;
     json topObj = json::object();
@@ -951,6 +951,11 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                     else
                         outputObj[j.first] = nullptr;
                 }
+            }
+
+            if (printDrvPath) {
+                auto drvPath = i.queryDrvPath();
+                if (drvPath) pkgObj["drvPath"] = globals.state->store->printStorePath(*drvPath);
             }
 
             if (printMeta) {
@@ -1079,7 +1084,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
-        queryJSON(globals, elems, printOutPath, printMeta);
+        queryJSON(globals, elems, printOutPath, printDrvPath, printMeta);
         cout << '\n';
         return;
     }

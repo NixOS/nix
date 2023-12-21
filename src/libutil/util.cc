@@ -5,6 +5,8 @@
 #include <cctype>
 #include <iostream>
 #include <grp.h>
+#include <regex>
+
 
 namespace nix {
 

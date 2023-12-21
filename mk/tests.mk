@@ -2,19 +2,22 @@
 
 test-deps =
 
-define run-install-test
+define run-bash
 
-  .PHONY: $1.test
-  $1.test: $1 $(test-deps)
-	@env BASH=$(bash) $(bash) mk/run-test.sh $1 < /dev/null
-
-  .PHONY: $1.test-debug
-  $1.test-debug: $1 $(test-deps)
-	@env BASH=$(bash) $(bash) mk/debug-test.sh $1 < /dev/null
+  .PHONY: $1
+  $1: $2
+	@env BASH=$(bash) $(bash) $3 < /dev/null
 
 endef
 
-define run-install-test-group
+define run-test
+
+  $(eval $(call run-bash,$1.test,$1 $(test-deps),mk/run-test.sh $1 $2))
+  $(eval $(call run-bash,$1.test-debug,$1 $(test-deps),mk/debug-test.sh $1 $2))
+
+endef
+
+define run-test-group
 
   .PHONY: $1.test-group
 
