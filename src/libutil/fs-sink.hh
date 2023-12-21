@@ -26,6 +26,8 @@ struct CreateRegularFileSink : Sink
 
 struct FileSystemObjectSink
 {
+    virtual ~FileSystemObjectSink() = default;
+
     virtual void createDirectory(const Path & path) = 0;
 
     /**
