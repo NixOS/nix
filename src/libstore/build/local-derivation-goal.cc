@@ -2747,7 +2747,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 // Is this needed ?
                 // Can give to many permission, if test user tries to build a path that already exists
                 // but on which it does not have permission.
-                // localStore.addAllowedEntitiesCurrent(oldInfo.path, {*localStore.effectiveUser});
+                // localStore.addAllowedEntities(oldInfo.path, {*localStore.effectiveUser});
             }
 
             continue;
@@ -2784,7 +2784,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         StoreObjectDerivationLog log { drvPath };
         /* Since all outputs are known to be matching, give access to the log */
         if (localStore.effectiveUser && !localStore.canAccess(log, false))
-            localStore.addAllowedEntitiesFuture(log, {*localStore.effectiveUser});
+            localStore.addAllowedEntities(log, {*localStore.effectiveUser});
 
         /* In case of fixed-output derivations, if there are
            mismatches on `--check` an error must be thrown as this is

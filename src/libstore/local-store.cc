@@ -974,7 +974,7 @@ void LocalStore::syncPathPermissions(const ValidPathInfo & info)
                up resetting the permissions to the default ones */
             // futurePermissions.erase(info.path);
             if (info.accessStatus)
-                addAllowedEntitiesCurrent(info.path, info.accessStatus->entities);
+                addAllowedEntities(info.path, info.accessStatus->entities);
         } else if (info.accessStatus) {
             setCurrentAccessStatus(realPath, *info.accessStatus);
         } else {
@@ -1355,7 +1355,7 @@ void LocalStore::grantBuildUserAccess(const StorePath & storePath, const LocalSt
             [&](ACL::User u) { createDirs(basePath + "/users/" + std::to_string(u.uid)); },
             [&](ACL::Group g) { createDirs(basePath + "/groups/" + std::to_string(g.gid)); },
         }, buildUser);
-        addAllowedEntitiesCurrent(storePath, {buildUser});
+        addAllowedEntities(storePath, {buildUser});
     }
 }
 
@@ -1430,7 +1430,7 @@ void LocalStore::revokeBuildUserAccess(const StorePath & storePath, const LocalS
         [&](ACL::User u) { return std::filesystem::remove((basePath + "/users/" + std::to_string(u.uid)).c_str()); },
         [&](ACL::Group g) { return std::filesystem::remove((basePath + "/groups/" + std::to_string(g.gid)).c_str()); },
     }, buildUser);
-    if (builderPermissionExisted) removeAllowedEntitiesCurrent(storePath, {buildUser});
+    if (builderPermissionExisted) removeAllowedEntities(storePath, {buildUser});
 }
 
 void LocalStore::revokeBuildUserAccess(const StorePath & storePath)
@@ -1596,7 +1596,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             /* Check that both new and old info matches */
             // checkInfoValidity(hashSink.finish());
             // checkInfoValidity({curInfo->narHash, curInfo->narSize});
-            addAllowedEntitiesFuture(info.path, {*effectiveUser});
+            addAllowedEntities(info.path, {*effectiveUser});
         }
 
         outputLock.setDeletion(true);

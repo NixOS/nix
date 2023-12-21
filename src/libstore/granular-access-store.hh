@@ -110,24 +110,13 @@ struct GranularAccessStore : public virtual Store
         }
     }
 
-    void addAllowedEntitiesFuture(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
+    void addAllowedEntities(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
         auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.insert(entity);
         setAccessStatus(storeObject, status, false);
     }
 
-    void addAllowedEntitiesCurrent(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
-        auto status = getAccessStatus(storeObject);
-        for (auto entity : entities) status.entities.insert(entity);
-        setAccessStatus(storeObject, status, false);
-    }
-
-    void removeAllowedEntitiesFuture(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
-        auto status = getAccessStatus(storeObject);
-        for (auto entity : entities) status.entities.erase(entity);
-        setAccessStatus(storeObject, status, false);
-    }
-    void removeAllowedEntitiesCurrent(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
+    void removeAllowedEntities(const StoreObject & storeObject, const std::set<AccessControlEntity> & entities) {
         auto status = getAccessStatus(storeObject);
         for (auto entity : entities) status.entities.erase(entity);
         setAccessStatus(storeObject, status, false);
