@@ -119,7 +119,7 @@ struct ProfileManifest
 
         if (pathExists(manifestPath)) {
             auto json = nlohmann::json::parse(readFile(manifestPath));
-            /* Keep track of alreay found names to allow preventing duplicates */
+            /* Keep track of already found names to allow preventing duplicates. */
             std::set<std::string> foundNames;
 
             auto version = json.value("version", 0);
