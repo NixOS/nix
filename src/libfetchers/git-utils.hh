@@ -73,12 +73,6 @@ struct GitRepo
         const std::string & url,
         const std::string & base) = 0;
 
-    struct TarballInfo
-    {
-        Hash treeHash;
-        time_t lastModified;
-    };
-
     virtual bool hasObject(const Hash & oid) = 0;
 
     virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
@@ -99,10 +93,6 @@ struct GitRepo
     virtual void verifyCommit(
         const Hash & rev,
         const std::vector<fetchers::PublicKey> & publicKeys) = 0;
-
-    virtual TarballInfo importTarball(Source & source) = 0;
 };
-
-ref<GitRepo> getTarballCache();
 
 }

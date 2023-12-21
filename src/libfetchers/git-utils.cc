@@ -315,8 +315,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return std::nullopt;
     }
 
-    TarballInfo importTarball(Source & source) override;
-
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
     std::string resolveSubmoduleUrl(
@@ -946,89 +944,5 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
     return result;
 }
-
-ref<GitRepo> getTarballCache()
-{
-    static auto repoDir = std::filesystem::path(getCacheDir()) / "nix" / "tarball-cache";
-
-    return make_ref<GitRepoImpl>(repoDir, true, true);
-}
-
-}
-
-#include "tarfile.hh"
-#include <archive_entry.h>
-
-namespace nix {
-
-GitRepo::TarballInfo GitRepoImpl::importTarball(Source & source)
-{
-    TarArchive archive { source };
-
-    auto parseSink = getFileSystemObjectSink();
-
-    time_t lastModified = 0;
-
-    for (;;) {
-        // FIXME: merge with extract_archive
-        struct archive_entry * entry;
-        int r = archive_read_next_header(archive.archive, &entry);
-        if (r == ARCHIVE_EOF) break;
-        auto path = archive_entry_pathname(entry);
-        if (!path)
-            throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
-        if (r == ARCHIVE_WARN)
-            warn(archive_error_string(archive.archive));
-        else
-            archive.check(r);
-
-        lastModified = std::max(lastModified, archive_entry_mtime(entry));
-
-        switch (archive_entry_filetype(entry)) {
-
-        case AE_IFDIR:
-            parseSink->createDirectory(path);
-            break;
-
-        case AE_IFREG: {
-            parseSink->createRegularFile(path, [&](auto & crf) {
-                if (archive_entry_mode(entry) & S_IXUSR)
-                    crf.isExecutable();
-
-                while (true) {
-                    std::vector<unsigned char> buf(128 * 1024);
-                    auto n = archive_read_data(archive.archive, buf.data(), buf.size());
-                    if (n < 0)
-                        throw Error("cannot read file '%s' from tarball", path);
-                    if (n == 0) break;
-                    crf(std::string_view {
-                        (const char *) buf.data(),
-                        (size_t) n,
-                    });
-                }
-            });
-
-            break;
-        }
-
-        case AE_IFLNK: {
-            auto target = archive_entry_symlink(entry);
-
-            parseSink->createSymlink(path, target);
-
-            break;
-        }
-
-        default:
-            throw Error("file '%s' in tarball has unsupported file type", path);
-        }
-    }
-
-    return TarballInfo {
-        .treeHash = parseSink->sync(),
-        .lastModified = lastModified
-    };
-}
-
 
 }
