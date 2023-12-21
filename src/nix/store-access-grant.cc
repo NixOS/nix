@@ -39,7 +39,7 @@ struct CmdStoreAccessGrant : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-repair.md"
+          #include "store-access-grant.md"
           ;
     }
 

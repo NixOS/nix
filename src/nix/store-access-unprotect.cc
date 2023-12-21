@@ -16,7 +16,7 @@ struct CmdStoreAccessUnprotect : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-repair.md"
+          #include "store-access-unprotect.md"
           ;
     }
 

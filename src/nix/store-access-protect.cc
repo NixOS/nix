@@ -16,7 +16,7 @@ struct CmdStoreAccessProtect : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-repair.md"
+          #include "store-access-protect.md"
           ;
     }
 
