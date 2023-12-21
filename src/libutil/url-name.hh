@@ -15,6 +15,6 @@ namespace nix {
  * flake output, for example because it is empty or "default".
  * Otherwise returns the extracted name.
  */
-std::optional<std::string> getNameFromURL(ParsedURL url);
+std::optional<std::string> getNameFromURL(const ParsedURL & url);
 
 }
