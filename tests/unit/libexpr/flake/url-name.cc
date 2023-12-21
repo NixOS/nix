@@ -1,4 +1,4 @@
-#include "url-name.hh"
+#include "flake/url-name.hh"
 #include <gtest/gtest.h>
 
 namespace nix {
