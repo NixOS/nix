@@ -1,5 +1,5 @@
 ---
-synopsis: nix profile: Allow referring to elements by human-readable name
+synopsis: "`nix profile` now allows referring to elements by human-readable name"
 prs: 8678
 ---
 
