@@ -59,7 +59,7 @@ nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
 
 # Test XDG Base Directories support
 export NIX_CONFIG="use-xdg-base-directories = true"
-nix profile remove flake1
+nix profile remove flake1 2>&1 | grep 'removed 1 packages'
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG
@@ -80,7 +80,7 @@ nix profile rollback
 
 # Test uninstall.
 [ -e $TEST_HOME/.nix-profile/bin/foo ]
-nix profile remove foo
+nix profile remove foo 2>&1 | grep 'removed 1 packages'
 (! [ -e $TEST_HOME/.nix-profile/bin/foo ])
 nix profile history | grep 'foo: 1.0 -> ∅'
 nix profile diff-closures | grep 'Version 3 -> 4'
@@ -88,7 +88,7 @@ nix profile diff-closures | grep 'Version 3 -> 4'
 # Test installing a non-flake package.
 nix profile install --file ./simple.nix ''
 [[ $(cat $TEST_HOME/.nix-profile/hello) = "Hello World!" ]]
-nix profile remove simple
+nix profile remove simple 2>&1 | grep 'removed 1 packages'
 nix profile install $(nix-build --no-out-link ./simple.nix)
 [[ $(cat $TEST_HOME/.nix-profile/hello) = "Hello World!" ]]
 
@@ -96,8 +96,9 @@ nix profile install $(nix-build --no-out-link ./simple.nix)
 mkdir $TEST_ROOT/simple-too
 cp ./simple.nix ./config.nix simple.builder.sh $TEST_ROOT/simple-too
 nix profile install --file $TEST_ROOT/simple-too/simple.nix ''
-nix profile list | grep -A4 'Name:.*simple' | grep 'Name:.*simple1'
-nix profile remove simple1
+nix profile list | grep -A4 'Name:.*simple' | grep 'Name:.*simple-1'
+nix profile remove simple 2>&1 | grep 'removed 1 packages'
+nix profile remove simple-1 2>&1 | grep 'removed 1 packages'
 
 # Test wipe-history.
 nix profile wipe-history
@@ -110,7 +111,7 @@ nix profile upgrade flake1
 nix profile history | grep "packages.$system.default: 1.0, 1.0-man -> 3.0, 3.0-man"
 
 # Test new install of CA package.
-nix profile remove flake1
+nix profile remove flake1 2>&1 | grep 'removed 1 packages'
 printf 4.0 > $flake1Dir/version
 printf Utrecht > $flake1Dir/who
 nix profile install $flake1Dir
@@ -131,14 +132,14 @@ nix profile upgrade flake1
 [ -e $TEST_HOME/.nix-profile/share/man ]
 [ -e $TEST_HOME/.nix-profile/include ]
 
-nix profile remove flake1
+nix profile remove flake1 2>&1 | grep 'removed 1 packages'
 nix profile install "$flake1Dir^man"
 (! [ -e $TEST_HOME/.nix-profile/bin/hello ])
 [ -e $TEST_HOME/.nix-profile/share/man ]
 (! [ -e $TEST_HOME/.nix-profile/include ])
 
 # test priority
-nix profile remove flake1
+nix profile remove flake1 2>&1 | grep 'removed 1 packages'
 
 # Make another flake.
 flake2Dir=$TEST_ROOT/flake2
