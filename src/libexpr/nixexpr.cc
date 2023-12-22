@@ -333,6 +333,8 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
+    fromWith = nullptr;
+
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
     const StaticEnv * curEnv;
@@ -344,7 +346,6 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
         } else {
             auto i = curEnv->find(name);
             if (i != curEnv->vars.end()) {
-                fromWith = false;
                 this->level = level;
                 displ = i->second;
                 return;
@@ -360,7 +361,8 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
             .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
             .errPos = es.positions[pos]
         });
-    fromWith = true;
+    for (auto * e = env.get(); e && !fromWith; e = e->up)
+        fromWith = e->isWith;
     this->level = withLevel;
 }
 
@@ -393,7 +395,7 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
         es.exprEnvs.insert(std::make_pair(this, env));
 
     if (recursive) {
-        auto newEnv = std::make_shared<StaticEnv>(false, env.get(), recursive ? attrs.size() : 0);
+        auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), recursive ? attrs.size() : 0);
 
         Displacement displ = 0;
         for (auto & i : attrs)
@@ -435,7 +437,7 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
         es.exprEnvs.insert(std::make_pair(this, env));
 
     auto newEnv = std::make_shared<StaticEnv>(
-        false, env.get(),
+        nullptr, env.get(),
         (hasFormals() ? formals->formals.size() : 0) +
         (!arg ? 0 : 1));
 
@@ -471,7 +473,7 @@ void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
-    auto newEnv = std::make_shared<StaticEnv>(false, env.get(), attrs->attrs.size());
+    auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs->attrs.size());
 
     Displacement displ = 0;
     for (auto & i : attrs->attrs)
@@ -490,6 +492,10 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
+    parentWith = nullptr;
+    for (auto * e = env.get(); e && !parentWith; e = e->up)
+        parentWith = e->isWith;
+
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
        `with' if this one doesn't contain the desired attribute. */
@@ -506,7 +512,7 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
         es.exprEnvs.insert(std::make_pair(this, env));
 
     attrs->bindVars(es, env);
-    auto newEnv = std::make_shared<StaticEnv>(true, env.get());
+    auto newEnv = std::make_shared<StaticEnv>(this, env.get());
     body->bindVars(es, newEnv);
 }
 

@@ -116,11 +116,6 @@ struct Constant
 struct Env
 {
     Env * up;
-    /**
-     * Number of of levels up to next `with` environment
-     */
-    unsigned short prevWith:14;
-    enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
 

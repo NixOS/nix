@@ -138,6 +138,7 @@ std::ostream & operator << (std::ostream & str, const Pos & pos);
 struct Env;
 struct Value;
 class EvalState;
+struct ExprWith;
 struct StaticEnv;
 
 
@@ -226,8 +227,11 @@ struct ExprVar : Expr
     Symbol name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
-       or function argument) or from a "with". */
-    bool fromWith;
+       or function argument) or from a "with".
+
+       `nullptr`: Not from a `with`.
+       Valid pointer: the nearest, innermost `with` expression to query first. */
+    ExprWith * fromWith;
 
     /* In the former case, the value is obtained by going `level`
        levels up from the current environment and getting the
@@ -385,6 +389,7 @@ struct ExprWith : Expr
     PosIdx pos;
     Expr * attrs, * body;
     size_t prevWith;
+    ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -478,14 +483,14 @@ extern ExprBlackHole eBlackHole;
    runtime. */
 struct StaticEnv
 {
-    bool isWith;
+    ExprWith * isWith;
     const StaticEnv * up;
 
     // Note: these must be in sorted order.
     typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
-    StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+    StaticEnv(ExprWith * isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
         vars.reserve(expectedSize);
     };
 

@@ -543,7 +543,7 @@ EvalState::EvalState(
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #endif
     , baseEnv(allocEnv(128))
-    , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
+    , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
@@ -781,7 +781,7 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    if (env.type == Env::HasWithAttrs) {
+    if (!env.values[0]->isThunk()) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         Bindings::iterator j = env.values[0]->attrs->begin();
@@ -835,7 +835,7 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     if (env.up && se.up) {
         mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
-        if (env.type == Env::HasWithAttrs) {
+        if (!env.values[0]->isThunk()) {
             // add 'with' bindings.
             Bindings::iterator j = env.values[0]->attrs->begin();
             while (j != env.values[0]->attrs->end()) {
@@ -973,22 +973,23 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 
     if (!var.fromWith) return env->values[var.displ];
 
+    // This early exit defeats the `maybeThunk` optimization for variables from `with`,
+    // The added complexity of handling this appears to be similarly in cost, or
+    // the cases where applicable were insignificant in the first place.
+    if (noEval) return nullptr;
+
+    auto * fromWith = var.fromWith;
     while (1) {
-        if (env->type == Env::HasWithExpr) {
-            if (noEval) return 0;
-            Value * v = allocValue();
-            evalAttrs(*env->up, (Expr *) env->values[0], *v, noPos, "<borked>");
-            env->values[0] = v;
-            env->type = Env::HasWithAttrs;
-        }
+        forceAttrs(*env->values[0], fromWith->pos, "while evaluating the first subexpression of a with expression");
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
             if (countCalls) attrSelects[j->pos]++;
             return j->value;
         }
-        if (!env->prevWith)
+        if (!fromWith->parentWith)
             error("undefined variable '%1%'", symbols[var.name]).atPos(var.pos).withFrame(*env, var).debugThrow<UndefinedVarError>();
-        for (size_t l = env->prevWith; l; --l, env = env->up) ;
+        for (size_t l = fromWith->prevWith; l; --l, env = env->up) ;
+        fromWith = fromWith->parentWith;
     }
 }
 
@@ -1816,9 +1817,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
     Env & env2(state.allocEnv(1));
     env2.up = &env;
-    env2.prevWith = prevWith;
-    env2.type = Env::HasWithExpr;
-    env2.values[0] = (Value *) attrs;
+    env2.values[0] = attrs->maybeThunk(state, env);
 
     body->eval(state, env2, v);
 }

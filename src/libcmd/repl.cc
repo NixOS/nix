@@ -112,7 +112,7 @@ NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalS
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
-    , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
+    , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
 }
