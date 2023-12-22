@@ -351,18 +351,20 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             if (printPosMaybe(oss, ellipsisIndent, trace.pos))
                 count++;
         }
-        oss << "\n" << prefix;
     }
 
-    oss << einfo.msg << "\n";
 
     printPosMaybe(oss, "", einfo.errPos);
 
+    oss << "\n" << prefix << einfo.msg << "\n";
+
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {
+        oss << "\n";
         oss << "Did you mean " <<
             suggestions.trim() <<
             "?" << std::endl;
+        oss << "\n";
     }
 
     out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
