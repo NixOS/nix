@@ -26,7 +26,8 @@ const static std::string pathRegex = "(?:" + segmentRegex + "(?:/" + segmentRege
 
 /// A Git ref (i.e. branch or tag name).
 /// \todo check that this is correct.
-const static std::string refRegexS = "[a-zA-Z0-9@][a-zA-Z0-9_.\\/@-]*";
+/// This regex incomplete. See https://git-scm.com/docs/git-check-ref-format
+const static std::string refRegexS = "[a-zA-Z0-9@][a-zA-Z0-9_.\\/@+-]*";
 extern std::regex refRegex;
 
 /// Instead of defining what a good Git Ref is, we define what a bad Git Ref is
