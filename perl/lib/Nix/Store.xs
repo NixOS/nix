@@ -13,6 +13,7 @@
 #include "globals.hh"
 #include "store-api.hh"
 #include "crypto.hh"
+#include "posix-source-accessor.hh"
 
 #include <sodium.h>
 #include <nlohmann/json.hpp>
@@ -205,7 +206,10 @@ void importPaths(int fd, int dontCheckSigs)
 SV * hashPath(char * algo, int base32, char * path)
     PPCODE:
         try {
-            Hash h = hashPath(parseHashAlgo(algo), path).first;
+            PosixSourceAccessor accessor;
+            Hash h = hashPath(
+                accessor, CanonPath::fromCwd(path),
+                FileIngestionMethod::Recursive, parseHashAlgo(algo)).first;
             auto s = h.to_string(base32 ? HashFormat::Nix32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -281,7 +285,11 @@ SV * addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            auto path = store()->addToStore(std::string(baseNameOf(srcPath)), srcPath, method, parseHashAlgo(algo));
+            PosixSourceAccessor accessor;
+            auto path = store()->addToStore(
+                std::string(baseNameOf(srcPath)),
+                accessor, CanonPath::fromCwd(srcPath),
+                method, parseHashAlgo(algo));
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());

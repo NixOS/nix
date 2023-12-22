@@ -403,22 +403,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parse(camStr);
                 auto hashAlgo = hashAlgo_; // work around clang bug
                 FramedSource source(from);
-                // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
-                return std::visit(overloaded {
-                    [&](const TextIngestionMethod &) {
-                        if (hashAlgo != HashAlgorithm::SHA256)
-                            throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
-                                name, printHashAlgo(hashAlgo));
-                        // We could stream this by changing Store
-                        std::string contents = source.drain();
-                        auto path = store->addTextToStore(name, contents, refs, repair);
-                        return store->queryPathInfo(path);
-                    },
-                    [&](const FileIngestionMethod & fim) {
-                        auto path = store->addToStoreFromDump(source, name, fim, hashAlgo, repair, refs);
-                        return store->queryPathInfo(path);
-                    },
-                }, contentAddressMethod.raw);
+                // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
+                auto path = store->addToStoreFromDump(source, name, contentAddressMethod, hashAlgo, refs, repair);
+                return store->queryPathInfo(path);
             }();
             logger->stopWork();
 
@@ -496,7 +483,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         std::string s = readString(from);
         auto refs = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         logger->startWork();
-        auto path = store->addTextToStore(suffix, s, refs, NoRepair);
+        auto path = ({
+            StringSource source { s };
+            store->addToStoreFromDump(source, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, NoRepair);
+        });
         logger->stopWork();
         to << store->printStorePath(path);
         break;

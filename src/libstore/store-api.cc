@@ -205,25 +205,19 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
 }
 
 
-StorePath StoreDirConfig::makeTextPath(std::string_view name, const TextInfo & info) const
-{
-    assert(info.hash.algo == HashAlgorithm::SHA256);
-    return makeStorePath(
-        makeType(*this, "text", StoreReferences {
-            .others = info.references,
-            .self = false,
-        }),
-        info.hash,
-        name);
-}
-
-
 StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
 {
     // New template
     return std::visit(overloaded {
         [&](const TextInfo & ti) {
-            return makeTextPath(name, ti);
+            assert(ti.hash.algo == HashAlgorithm::SHA256);
+            return makeStorePath(
+                makeType(*this, "text", StoreReferences {
+                    .others = ti.references,
+                    .self = false,
+                }),
+                ti.hash,
+                name);
         },
         [&](const FixedOutputInfo & foi) {
             return makeFixedOutputPath(name, foi);
@@ -232,54 +226,45 @@ StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const
 }
 
 
-std::pair<StorePath, Hash> StoreDirConfig::computeStorePathFromDump(
-        Source & dump,
-        std::string_view name,
-        FileIngestionMethod method,
-        HashAlgorithm hashAlgo,
-        const StorePathSet & references) const
-{
-    HashSink sink(hashAlgo);
-    dump.drainInto(sink);
-    auto h = sink.finish().first;
-    FixedOutputInfo caInfo {
-        .method = method,
-        .hash = h,
-        .references = {},
-    };
-    return std::make_pair(makeFixedOutputPath(name, caInfo), h);
-}
-
-
-StorePath StoreDirConfig::computeStorePathForText(
+std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     std::string_view name,
-    std::string_view s,
-    const StorePathSet & references) const
+    SourceAccessor & accessor,
+    const CanonPath & path,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    PathFilter & filter) const
 {
-    return makeTextPath(name, TextInfo {
-        .hash = hashString(HashAlgorithm::SHA256, s),
-        .references = references,
-    });
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
+    return {
+        makeFixedOutputPathFromCA(
+            name,
+            ContentAddressWithReferences::fromParts(
+                method,
+                h,
+                {
+                    .others = references,
+                    .self = false,
+                })),
+        h,
+    };
 }
 
 
 StorePath Store::addToStore(
-        std::string_view name,
-        const Path & _srcPath,
-        FileIngestionMethod method,
-        HashAlgorithm hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references)
+    std::string_view name,
+    SourceAccessor & accessor,
+    const CanonPath & path,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    PathFilter & filter,
+    RepairFlag repair)
 {
-    Path srcPath(absPath(_srcPath));
     auto source = sinkToSource([&](Sink & sink) {
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(srcPath, sink, filter);
-        else
-            readFile(srcPath, sink);
+        dumpPath(accessor, path, sink, method.getFileIngestionMethod(), filter);
     });
-    return addToStoreFromDump(*source, name, method, hashAlgo, repair, references);
+    return addToStoreFromDump(*source, name, method, hashAlgo, references, repair);
 }
 
 void Store::addMultipleToStore(
@@ -404,9 +389,13 @@ digraph graphname {
     fileSink -> caHashSink
 }
 */
-ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
-                                    FileIngestionMethod method, HashAlgorithm hashAlgo,
-                                    std::optional<Hash> expectedCAHash)
+ValidPathInfo Store::addToStoreSlow(
+    std::string_view name,
+    SourceAccessor & accessor,
+    const CanonPath & srcPath,
+    ContentAddressMethod method, HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    std::optional<Hash> expectedCAHash)
 {
     HashSink narHashSink { HashAlgorithm::SHA256 };
     HashSink caHashSink { hashAlgo };
@@ -425,7 +414,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
        srcPath. The fact that we use scratchpadSink as a temporary buffer here
        is an implementation detail. */
     auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
-        dumpPath(srcPath, scratchpadSink);
+        accessor.dumpPath(srcPath, scratchpadSink);
     });
 
     /* tapped provides the same data as fileSource, but we also write all the
@@ -433,9 +422,11 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     TeeSource tapped { *fileSource, narSink };
 
     NullParseSink blank;
-    auto & parseSink = method == FileIngestionMethod::Flat
+    auto & parseSink = method.getFileIngestionMethod() == FileIngestionMethod::Flat
         ? (ParseSink &) fileSink
-        : (ParseSink &) blank;
+        : method.getFileIngestionMethod() == FileIngestionMethod::Recursive
+        ? (ParseSink &) blank
+        : (abort(), (ParseSink &)*(ParseSink *)nullptr); // handled both cases
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */
@@ -452,21 +443,24 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
 
+
     ValidPathInfo info {
         *this,
         name,
-        FixedOutputInfo {
-            .method = method,
-            .hash = hash,
-            .references = {},
-        },
+        ContentAddressWithReferences::fromParts(
+            method,
+            hash,
+            {
+                .others = references,
+                .self = false,
+            }),
         narHash,
     };
     info.narSize = narSize;
 
     if (!isValidPath(info.path)) {
         auto source = sinkToSource([&](Sink & scratchpadSink) {
-            dumpPath(srcPath, scratchpadSink);
+            accessor.dumpPath(srcPath, scratchpadSink);
         });
         addToStore(info, *source);
     }

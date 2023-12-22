@@ -143,8 +143,14 @@ StorePath writeDerivation(Store & store,
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
     return readOnly || settings.readOnlyMode
-        ? store.computeStorePathForText(suffix, contents, references)
-        : store.addTextToStore(suffix, contents, references, repair);
+        ? store.makeFixedOutputPathFromCA(suffix, TextInfo {
+            .hash = hashString(HashAlgorithm::SHA256, contents),
+            .references = std::move(references),
+        })
+        : ({
+            StringSource s { contents };
+            store.addToStoreFromDump(s, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair);
+        });
 }
 
 

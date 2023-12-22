@@ -427,22 +427,28 @@ public:
      * libutil/archive.hh).
      */
     virtual StorePath addToStore(
-            std::string_view name,
-            const Path & srcPath,
-            FileIngestionMethod method = FileIngestionMethod::Recursive,
-            HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
-            PathFilter & filter = defaultPathFilter,
-            RepairFlag repair = NoRepair,
-            const StorePathSet & references = StorePathSet());
+        std::string_view name,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        PathFilter & filter = defaultPathFilter,
+        RepairFlag repair = NoRepair);
 
     /**
      * Copy the contents of a path to the store and register the
      * validity the resulting path, using a constant amount of
      * memory.
      */
-    ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
-                                 FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
-                                 std::optional<Hash> expectedCAHash = {});
+    ValidPathInfo addToStoreSlow(
+        std::string_view name,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        std::optional<Hash> expectedCAHash = {});
 
     /**
      * Like addToStore(), but the contents of the path are contained
@@ -453,20 +459,14 @@ public:
      *
      * \todo remove?
      */
-    virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
-                                         FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256, RepairFlag repair = NoRepair,
-                                         const StorePathSet & references = StorePathSet())
-    { unsupported("addToStoreFromDump"); }
-
-    /**
-     * Like addToStore, but the contents written to the output path is a
-     * regular file containing the given string.
-     */
-    virtual StorePath addTextToStore(
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
         std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair = NoRepair) = 0;
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair)
+    { unsupported("addToStoreFromDump"); }
 
     /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path

@@ -395,7 +395,7 @@
           stdenvs)));
 
       devShells = let
-        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; }).overrideAttrs (attrs: {
+        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs: {
           installFlags = "sysconfdir=$(out)/etc";
           shellHook = ''
             PATH=$prefix/bin:$PATH

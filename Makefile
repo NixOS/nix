@@ -24,7 +24,7 @@ makefiles = \
   misc/upstart/local.mk
 endif
 
-ifeq ($(ENABLE_BUILD)_$(ENABLE_TESTS), yes_yes)
+ifeq ($(ENABLE_UNIT_TESTS), yes)
 makefiles += \
   tests/unit/libutil/local.mk \
   tests/unit/libutil-support/local.mk \
@@ -34,16 +34,13 @@ makefiles += \
   tests/unit/libexpr-support/local.mk
 endif
 
-ifeq ($(ENABLE_TESTS), yes)
+ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
 makefiles += \
   tests/functional/local.mk \
   tests/functional/ca/local.mk \
   tests/functional/dyn-drv/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
-else
-makefiles += \
-  mk/disable-tests.mk
 endif
 
 OPTIMIZE = 1
@@ -57,11 +54,40 @@ endif
 
 include mk/lib.mk
 
+# Must be included after `mk/lib.mk` so isn't the default target.
+ifneq ($(ENABLE_UNIT_TESTS), yes)
+.PHONY: check
+check:
+	@echo "Unit tests are disabled. Configure without '--disable-unit-tests', or avoid calling 'make check'."
+	@exit 1
+endif
+
+ifneq ($(ENABLE_FUNCTIONAL_TESTS), yes)
+.PHONY: installcheck
+installcheck:
+	@echo "Functional tests are disabled. Configure without '--disable-functional-tests', or avoid calling 'make installcheck'."
+	@exit 1
+endif
+
 # Must be included after `mk/lib.mk` so rules refer to variables defined
 # by the library. Rules are not "lazy" like variables, unfortunately.
-ifeq ($(ENABLE_BUILD), yes)
+
+ifeq ($(ENABLE_DOC_GEN), yes)
 $(eval $(call include-sub-makefile, doc/manual/local.mk))
+else
+.PHONY: manual-html manpages
+manual-html manpages:
+	@echo "Generated docs are disabled. Configure without '--disable-doc-gen', or avoid calling 'make manpages' and 'make manual-html'."
+	@exit 1
 endif
+
+ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
 $(eval $(call include-sub-makefile, doc/internal-api/local.mk))
+else
+.PHONY: internal-api-html
+internal-api-html:
+	@echo "Internal API docs are disabled. Configure with '--enable-internal-api-docs', or avoid calling 'make internal-api-html'."
+	@exit 1
+endif
 
 GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src

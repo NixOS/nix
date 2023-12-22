@@ -8,6 +8,7 @@
 #include "tarfile.hh"
 #include "types.hh"
 #include "split.hh"
+#include "posix-source-accessor.hh"
 
 namespace nix::fetchers {
 
@@ -26,7 +27,7 @@ DownloadFileResult downloadFile(
         {"name", name},
     });
 
-    auto cached = getCache()->lookupExpired(store, inAttrs);
+    auto cached = getCache()->lookupExpired(*store, inAttrs);
 
     auto useCached = [&]() -> DownloadFileResult
     {
@@ -91,7 +92,7 @@ DownloadFileResult downloadFile(
     }
 
     getCache()->add(
-        store,
+        *store,
         inAttrs,
         infoAttrs,
         *storePath,
@@ -99,7 +100,7 @@ DownloadFileResult downloadFile(
 
     if (url != res.effectiveUri)
         getCache()->add(
-            store,
+            *store,
             {
                 {"type", "file"},
                 {"url", res.effectiveUri},
@@ -130,7 +131,7 @@ DownloadTarballResult downloadTarball(
         {"name", name},
     });
 
-    auto cached = getCache()->lookupExpired(store, inAttrs);
+    auto cached = getCache()->lookupExpired(*store, inAttrs);
 
     if (cached && !cached->expired)
         return {
@@ -156,7 +157,8 @@ DownloadTarballResult downloadTarball(
             throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
         auto topDir = tmpDir + "/" + members.begin()->name;
         lastModified = lstat(topDir).st_mtime;
-        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, HashAlgorithm::SHA256, defaultPathFilter, NoRepair);
+        PosixSourceAccessor accessor;
+        unpackedStorePath = store->addToStore(name, accessor, CanonPath { topDir }, FileIngestionMethod::Recursive, HashAlgorithm::SHA256, {}, defaultPathFilter, NoRepair);
     }
 
     Attrs infoAttrs({
@@ -168,7 +170,7 @@ DownloadTarballResult downloadTarball(
         infoAttrs.emplace("immutableUrl", *res.immutableUrl);
 
     getCache()->add(
-        store,
+        *store,
         inAttrs,
         infoAttrs,
         *unpackedStorePath,

@@ -87,6 +87,9 @@
 , test-daemon ? null
 , test-client ? null
 
+# Avoid setting things that would interfere with a functioning devShell
+, forDevShell ? false
+
 # Not a real argument, just the only way to approximate let-binding some
 # stuff for argument defaults.
 , __forDefaults ? {
@@ -102,30 +105,6 @@ let
   # work with overriding.
   attrs = {
     inherit doBuild doCheck doInstallCheck;
-  };
-
-  filesets = {
-    baseFiles = fileset.fileFilter (f: f.name != ".gitignore") ./.;
-
-    configureFiles = fileset.unions [
-      ./.version
-      ./configure.ac
-      ./m4
-      # TODO: do we really need README.md? It doesn't seem used in the build.
-      ./README.md
-    ];
-
-    topLevelBuildFiles = fileset.unions [
-      ./local.mk
-      ./Makefile
-      ./Makefile.config.in
-      ./mk
-    ];
-
-    functionalTestFiles = fileset.unions [
-      ./tests/functional
-      (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-    ];
   };
 
   mkDerivation =
@@ -151,32 +130,44 @@ mkDerivation (finalAttrs: let
   # to be run later, requiresthe unit tests to be built.
   buildUnitTests = doCheck || installUnitTests;
 
-  anySortOfTesting = buildUnitTests || doInstallCheck;
-
 in {
   inherit pname version;
 
   src =
     let
-
+      baseFiles = fileset.fileFilter (f: f.name != ".gitignore") ./.;
     in
       fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect filesets.baseFiles (fileset.unions ([
-          filesets.configureFiles
-          filesets.topLevelBuildFiles
-          ./doc/internal-api
+        fileset = fileset.intersect baseFiles (fileset.unions ([
+          # For configure
+          ./.version
+          ./configure.ac
+          ./m4
+          # TODO: do we really need README.md? It doesn't seem used in the build.
+          ./README.md
+          # For make, regardless of what we are building
+          ./local.mk
+          ./Makefile
+          ./Makefile.config.in
+          ./mk
+          (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
         ] ++ lib.optionals doBuild [
           ./boehmgc-coroutine-sp-fallback.diff
           ./doc
           ./misc
           ./precompiled-headers.h
           ./src
-          ./tests/unit
           ./COPYING
           ./scripts/local.mk
-        ] ++ lib.optionals anySortOfTesting [
-          filesets.functionalTestFiles
+        ] ++ lib.optionals buildUnitTests [
+          ./doc/manual
+        ] ++ lib.optionals enableInternalAPIDocs [
+          ./doc/internal-api
+        ] ++ lib.optionals buildUnitTests [
+          ./tests/unit
+        ] ++ lib.optionals doInstallCheck [
+          ./tests/functional
         ]));
       };
 
@@ -275,12 +266,14 @@ in {
   );
 
   configureFlags = [
-    "--sysconfdir=/etc"
     (lib.enableFeature doBuild "build")
-    (lib.enableFeature anySortOfTesting "tests")
+    (lib.enableFeature buildUnitTests "unit-tests")
+    (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature installUnitTests "install-unit-tests")
+  ] ++ lib.optionals (!forDevShell) [
+    "--sysconfdir=/etc"
   ] ++ lib.optionals installUnitTests [
     "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
     "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
@@ -310,10 +303,7 @@ in {
   '';
 
   postInstall = lib.optionalString doBuild (
-    ''
-      mkdir -p $doc/nix-support
-      echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-    '' + lib.optionalString stdenv.hostPlatform.isStatic ''
+    lib.optionalString stdenv.hostPlatform.isStatic ''
       mkdir -p $out/nix-support
       echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
     '' + lib.optionalString stdenv.isDarwin ''
@@ -322,7 +312,10 @@ in {
       $out/lib/libboost_context.dylib \
       $out/lib/libnixutil.dylib
     ''
-  ) + lib.optionalString enableInternalAPIDocs ''
+  ) + lib.optionalString enableManual ''
+    mkdir -p ''${!outputDoc}/nix-support
+    echo "doc manual ''${!outputDoc}/share/doc/nix/manual" >> ''${!outputDoc}/nix-support/hydra-build-products
+  '' + lib.optionalString enableInternalAPIDocs ''
     mkdir -p ''${!outputDoc}/nix-support
     echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';

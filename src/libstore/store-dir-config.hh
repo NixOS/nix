@@ -86,41 +86,20 @@ struct StoreDirConfig : public Config
 
     StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
 
-    StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
-
     StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
 
     /**
-     * Read-only variant of addToStoreFromDump(). It returns the store
-     * path to which a NAR or flat file would be written.
+     * Read-only variant of addToStore(). It returns the store
+     * path for the given file sytem object.
      */
-    std::pair<StorePath, Hash> computeStorePathFromDump(
-        Source & dump,
+    std::pair<StorePath, Hash> computeStorePath(
         std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
-        const StorePathSet & references = {}) const;
-
-    /**
-     * Preparatory part of addTextToStore().
-     *
-     * !!! Computation of the path should take the references given to
-     * addTextToStore() into account, otherwise we have a (relatively
-     * minor) security hole: a caller can register a source file with
-     * bogus references.  If there are too many references, the path may
-     * not be garbage collected when it has to be (not really a problem,
-     * the caller could create a root anyway), or it may be garbage
-     * collected when it shouldn't be (more serious).
-     *
-     * Hashing the references would solve this (bogus references would
-     * simply yield a different store path, so other users wouldn't be
-     * affected), but it has some backwards compatibility issues (the
-     * hashing scheme changes), so I'm not doing that for now.
-     */
-    StorePath computeStorePathForText(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references) const;
+        const StorePathSet & references = {},
+        PathFilter & filter = defaultPathFilter) const;
 };
 
 }

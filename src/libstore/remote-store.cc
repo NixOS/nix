@@ -502,8 +502,13 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, std::string_view name,
-                                          FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references)
+StorePath RemoteStore::addToStoreFromDump(
+    Source & dump,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     return addCAToStore(dump, name, method, hashAlgo, references, repair)->path;
 }
@@ -602,16 +607,6 @@ void RemoteStore::addMultipleToStore(
         Store::addMultipleToStore(source, repair, checkSigs);
 }
 
-
-StorePath RemoteStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    StringSource source(s);
-    return addCAToStore(source, name, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair)->path;
-}
 
 void RemoteStore::registerDrvOutput(const Realisation & info)
 {
