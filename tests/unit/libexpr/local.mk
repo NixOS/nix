@@ -16,7 +16,8 @@ endif
 
 libexpr-tests_SOURCES := \
     $(wildcard $(d)/*.cc) \
-    $(wildcard $(d)/value/*.cc)
+    $(wildcard $(d)/value/*.cc) \
+    $(wildcard $(d)/flake/*.cc)
 
 libexpr-tests_EXTRA_INCLUDES = \
     -I tests/unit/libexpr-support \
