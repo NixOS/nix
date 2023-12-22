@@ -584,7 +584,7 @@ struct CompareValues
                 case nFloat:
                     return v1->fpoint < v2->fpoint;
                 case nString:
-                    return v1->string_view().compare(v2->string_view()) < 0;
+                    return strcmp(v1->c_str(), v2->c_str()) < 0;
                 case nPath:
                     // Note: we don't take the accessor into account
                     // since it's not obvious how to compare them in a
@@ -2405,7 +2405,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
         (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return v1->string_view().compare(v2->string_view()) < 0; });
+              [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({

@@ -84,13 +84,6 @@ Env & EvalState::allocEnv(size_t size)
 [[gnu::always_inline]]
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
-    forceValue(v, [&]() { return pos; });
-}
-
-
-template<typename Callable>
-void EvalState::forceValue(Value & v, Callable getPos)
-{
     if (v.isThunk()) {
         Env * env = v.thunk.env;
         Expr * expr = v.thunk.expr;
@@ -100,15 +93,12 @@ void EvalState::forceValue(Value & v, Callable getPos)
             expr->eval(*this, *env, v);
         } catch (...) {
             v.mkThunk(env, expr);
+            tryFixupBlackHolePos(v, pos);
             throw;
         }
     }
-    else if (v.isApp()) {
-        PosIdx pos = getPos();
+    else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, pos);
-    }
-    else if (v.isBlackhole())
-        error("infinite recursion encountered").atPos(getPos()).template debugThrow<EvalError>();
 }
 
 

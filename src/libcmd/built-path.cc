@@ -12,9 +12,9 @@ namespace nix {
     bool MY_TYPE ::operator COMPARATOR (const MY_TYPE & other) const \
     { \
         const MY_TYPE* me = this; \
-        auto fields1 = std::make_tuple<const CHILD_TYPE &, const FIELD_TYPE &>(*me->drvPath, me->FIELD); \
+        auto fields1 = std::tie(*me->drvPath, me->FIELD); \
         me = &other; \
-        auto fields2 = std::make_tuple<const CHILD_TYPE &, const FIELD_TYPE &>(*me->drvPath, me->FIELD); \
+        auto fields2 = std::tie(*me->drvPath, me->FIELD); \
         return fields1 COMPARATOR fields2; \
     }
 #define CMP(CHILD_TYPE, MY_TYPE, FIELD) \

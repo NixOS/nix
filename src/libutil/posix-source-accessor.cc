@@ -25,7 +25,7 @@ void PosixSourceAccessor::readFile(
 
     off_t left = st.st_size;
 
-    std::vector<unsigned char> buf(64 * 1024);
+    std::array<unsigned char, 64 * 1024> buf;
     while (left) {
         checkInterrupt();
         ssize_t rd = read(fd.get(), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
