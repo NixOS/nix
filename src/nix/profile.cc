@@ -155,8 +155,6 @@ struct ProfileManifest
                 std::string name =
                     elems.is_object()
                     ? elem.key()
-                    : e.contains("name")
-                    ? (std::string) e["name"]
                     : element.source
                     ? getNameFromURL(parseURL(element.source->to_string())).value_or(element.identifier())
                     : element.identifier();
