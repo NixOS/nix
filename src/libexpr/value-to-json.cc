@@ -1,7 +1,7 @@
 #include "value-to-json.hh"
 #include "eval-inline.hh"
-#include "util.hh"
 #include "store-api.hh"
+#include "signals.hh"
 
 #include <cstdlib>
 #include <iomanip>

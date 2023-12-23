@@ -4,7 +4,6 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
-#include "fs-accessor.hh"
 #include "eval-inline.hh"
 
 using namespace nix;

@@ -5,12 +5,14 @@ let
   map2' = f: fsts: snds: map2 f { inherit fsts snds; };
   getOutputHashes = hashes: {
     hashesBase16 = map2' (hashAlgo: hash: builtins.convertHash { inherit hash hashAlgo; toHashFormat = "base16";}) hashAlgos hashes;
+    hashesNix32 = map2' (hashAlgo: hash: builtins.convertHash { inherit hash hashAlgo; toHashFormat = "nix32";}) hashAlgos hashes;
     hashesBase32 = map2' (hashAlgo: hash: builtins.convertHash { inherit hash hashAlgo; toHashFormat = "base32";}) hashAlgos hashes;
     hashesBase64 = map2' (hashAlgo: hash: builtins.convertHash { inherit hash hashAlgo; toHashFormat = "base64";}) hashAlgos hashes;
     hashesSRI    = map2' (hashAlgo: hash: builtins.convertHash { inherit hash hashAlgo; toHashFormat = "sri"   ;}) hashAlgos hashes;
   };
   getOutputHashesColon = hashes: {
     hashesBase16 = map2' (hashAlgo: hashBody: builtins.convertHash { hash = hashAlgo + ":" + hashBody; toHashFormat = "base16";}) hashAlgos hashes;
+    hashesNix32 = map2' (hashAlgo: hashBody: builtins.convertHash { hash = hashAlgo + ":" + hashBody; toHashFormat = "nix32";}) hashAlgos hashes;
     hashesBase32 = map2' (hashAlgo: hashBody: builtins.convertHash { hash = hashAlgo + ":" + hashBody; toHashFormat = "base32";}) hashAlgos hashes;
     hashesBase64 = map2' (hashAlgo: hashBody: builtins.convertHash { hash = hashAlgo + ":" + hashBody; toHashFormat = "base64";}) hashAlgos hashes;
     hashesSRI    = map2' (hashAlgo: hashBody: builtins.convertHash { hash = hashAlgo + ":" + hashBody; toHashFormat = "sri"   ;}) hashAlgos hashes;

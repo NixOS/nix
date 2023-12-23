@@ -59,7 +59,7 @@ $(d)/build.cc:
 
 clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
-$(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
+$(eval $(call install-file-in, $(buildprefix)$(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 
 $(foreach i, $(wildcard src/libstore/builtins/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/builtins, 0644)))

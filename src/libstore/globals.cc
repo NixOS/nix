@@ -1,7 +1,8 @@
 #include "globals.hh"
-#include "util.hh"
+#include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
+#include "users.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
 
@@ -17,9 +18,13 @@
 #include <sodium/core.h>
 
 #ifdef __GLIBC__
-#include <gnu/lib-names.h>
-#include <nss.h>
-#include <dlfcn.h>
+# include <gnu/lib-names.h>
+# include <nss.h>
+# include <dlfcn.h>
+#endif
+
+#if __APPLE__
+# include "processes.hh"
 #endif
 
 #include "config-impl.hh"
@@ -111,7 +116,14 @@ Settings::Settings()
 
 void loadConfFile()
 {
-    globalConfig.applyConfigFile(settings.nixConfDir + "/nix.conf");
+    auto applyConfigFile = [&](const Path & path) {
+        try {
+            std::string contents = readFile(path);
+            globalConfig.applyConfig(contents, path);
+        } catch (SysError &) { }
+    };
+
+    applyConfigFile(settings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
@@ -119,7 +131,7 @@ void loadConfFile()
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        globalConfig.applyConfigFile(*file);
+        applyConfigFile(*file);
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");

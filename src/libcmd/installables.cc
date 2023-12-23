@@ -4,6 +4,7 @@
 #include "installable-attr-path.hh"
 #include "installable-flake.hh"
 #include "outputs-spec.hh"
+#include "users.hh"
 #include "util.hh"
 #include "command.hh"
 #include "attr-path.hh"
@@ -28,7 +29,7 @@
 
 namespace nix {
 
-static void completeFlakeInputPath(
+void completeFlakeInputPath(
     AddCompletions & completions,
     ref<EvalState> evalState,
     const std::vector<FlakeRef> & flakeRefs,
@@ -48,9 +49,18 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "recreate-lock-file",
-        .description = "Recreate the flake's lock file from scratch.",
+        .description = R"(
+    Recreate the flake's lock file from scratch.
+
+    > **DEPRECATED**
+    >
+    > Use [`nix flake update`](@docroot@/command-ref/new-cli/nix3-flake-update.md) instead.
+        )",
         .category = category,
-        .handler = {&lockFlags.recreateLockFile, true}
+        .handler = {[&]() {
+            lockFlags.recreateLockFile = true;
+            warn("'--recreate-lock-file' is deprecated and will be removed in a future version; use 'nix flake update' instead.");
+        }}
     });
 
     addFlag({
@@ -69,8 +79,13 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "no-registries",
-        .description =
-          "Don't allow lookups in the flake registries. This option is deprecated; use `--no-use-registries`.",
+        .description = R"(
+    Don't allow lookups in the flake registries.
+
+    > **DEPRECATED**
+    >
+    > Use [`--no-use-registries`](#opt-no-use-registries) instead.
+        )",
         .category = category,
         .handler = {[&]() {
             lockFlags.useRegistries = false;
@@ -87,10 +102,17 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "update-input",
-        .description = "Update a specific flake input (ignoring its previous entry in the lock file).",
+        .description = R"(
+    Update a specific flake input (ignoring its previous entry in the lock file).
+
+    > **DEPRECATED**
+    >
+    > Use [`nix flake update`](@docroot@/command-ref/new-cli/nix3-flake-update.md) instead.
+        )",
         .category = category,
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
+            warn("'--update-input' is a deprecated alias for 'flake update' and will be removed in a future version.");
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
@@ -107,7 +129,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath("."), true));
+                parseFlakeRef(flakeRef, absPath(getCommandBaseDir()), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
@@ -149,7 +171,7 @@ MixFlakeOptions::MixFlakeOptions()
             auto evalState = getEvalState();
             auto flake = flake::lockFlake(
                 *evalState,
-                parseFlakeRef(flakeRef, absPath(".")),
+                parseFlakeRef(flakeRef, absPath(getCommandBaseDir())),
                 { .writeLockFile = false });
             for (auto & [inputName, input] : flake.lockFile.root->inputs) {
                 auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
@@ -238,9 +260,10 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
 
             evalSettings.pureEval = false;
             auto state = getEvalState();
-            Expr *e = state->parseExprFromFile(
-                resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
-                );
+            auto e =
+                state->parseExprFromFile(
+                    resolveExprPath(
+                        lookupFileArg(*state, *file)));
 
             Value root;
             state->eval(e, root);
@@ -313,6 +336,8 @@ void completeFlakeRefWithFragment(
                 prefixRoot = ".";
             }
             auto flakeRefS = std::string(prefix.substr(0, hash));
+
+            // TODO: ideally this would use the command base directory instead of assuming ".".
             auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath("."));
 
             auto evalCache = openEvalCache(*evalState,
@@ -461,10 +486,12 @@ Installables SourceExprCommand::parseInstallables(
             auto e = state->parseStdin();
             state->eval(e, *vFile);
         }
-        else if (file)
-            state->evalFile(lookupFileArg(*state, *file), *vFile);
+        else if (file) {
+            state->evalFile(lookupFileArg(*state, *file, CanonPath::fromCwd(getCommandBaseDir())), *vFile);
+        }
         else {
-            auto e = state->parseExprFromString(*expr, state->rootPath(CanonPath::fromCwd()));
+            CanonPath dir(CanonPath::fromCwd(getCommandBaseDir()));
+            auto e = state->parseExprFromString(*expr, state->rootPath(dir));
             state->eval(e, *vFile);
         }
 
@@ -499,7 +526,7 @@ Installables SourceExprCommand::parseInstallables(
             }
 
             try {
-                auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath("."));
+                auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath(getCommandBaseDir()));
                 result.push_back(make_ref<InstallableFlake>(
                         this,
                         getEvalState(),
@@ -683,7 +710,7 @@ BuiltPaths Installable::toBuiltPaths(
 
         BuiltPaths res;
         for (auto & drvPath : Installable::toDerivations(store, installables, true))
-            res.push_back(BuiltPath::Opaque{drvPath});
+            res.emplace_back(BuiltPath::Opaque{drvPath});
         return res;
     }
 }
@@ -773,7 +800,7 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     for (auto i : rawInstallables)
         res.push_back(parseFlakeRefWithFragment(
             expandTilde(i),
-            absPath(".")).first);
+            absPath(getCommandBaseDir())).first);
     return res;
 }
 
@@ -795,7 +822,7 @@ std::vector<FlakeRef> InstallableCommand::getFlakeRefsForCompletion()
     return {
         parseFlakeRefWithFragment(
             expandTilde(_installable),
-            absPath(".")).first
+            absPath(getCommandBaseDir())).first
     };
 }
 

@@ -1,4 +1,5 @@
 #include "crypto.hh"
+#include "file-system.hh"
 #include "util.hh"
 #include "globals.hh"
 

@@ -10,6 +10,7 @@ let
     hostPkgs = nixpkgsFor.${system}.native;
     defaults = {
       nixpkgs.pkgs = nixpkgsFor.${system}.native;
+      nix.checkAllErrors = false;
     };
     _module.args.nixpkgs = nixpkgs;
   };
@@ -20,6 +21,8 @@ in
   authorization = runNixOSTestFor "x86_64-linux" ./authorization.nix;
 
   remoteBuilds = runNixOSTestFor "x86_64-linux" ./remote-builds.nix;
+
+  remoteBuildsSshNg = runNixOSTestFor "x86_64-linux" ./remote-builds-ssh-ng.nix;
 
   nix-copy-closure = runNixOSTestFor "x86_64-linux" ./nix-copy-closure.nix;
 

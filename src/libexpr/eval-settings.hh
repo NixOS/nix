@@ -1,4 +1,6 @@
 #pragma once
+///@file
+
 #include "config.hh"
 
 namespace nix {
@@ -24,6 +26,26 @@ struct EvalSettings : Config
           In particular, outside of [pure evaluation mode](#conf-pure-eval), this determines the value of
           [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath).
         )"};
+
+    Setting<std::string> currentSystem{
+        this, "", "eval-system",
+        R"(
+          This option defines
+          [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+          in the Nix language if it is set as a non-empty string.
+          Otherwise, if it is defined as the empty string (the default), the value of the
+          [`system` ](#conf-system)
+          configuration setting is used instead.
+
+          Unlike `system`, this setting does not change what kind of derivations can be built locally.
+          This is useful for evaluating Nix code on one system to produce derivations to be built on another type of system.
+        )"};
+
+    /**
+     * Implements the `eval-system` vs `system` defaulting logic
+     * described for `eval-system`.
+     */
+    const std::string & getCurrentSystem();
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
@@ -66,6 +88,11 @@ struct EvalSettings : Config
           evaluation mode. For example, when set to
           `https://github.com/NixOS`, builtin functions such as `fetchGit` are
           allowed to access `https://github.com/NixOS/patchelf.git`.
+
+          Access is granted when
+          - the URI is equal to the prefix,
+          - or the URI is a subpath of the prefix,
+          - or the prefix is a URI scheme ended by a colon `:` and the URI has the same scheme.
         )"};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",

@@ -2,6 +2,7 @@
 #include "url-parts.hh"
 #include "util.hh"
 #include "split.hh"
+#include "canon-path.hh"
 
 namespace nix {
 
@@ -12,10 +13,10 @@ std::regex revRegex(revRegexS, std::regex::ECMAScript);
 ParsedURL parseURL(const std::string & url)
 {
     static std::regex uriRegex(
-        "((" + schemeRegex + "):"
+        "((" + schemeNameRegex + "):"
         + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex + ")))"
         + "(?:\\?(" + queryRegex + "))?"
-        + "(?:#(" + queryRegex + "))?",
+        + "(?:#(" + fragmentRegex + "))?",
         std::regex::ECMAScript);
 
     std::smatch match;
@@ -141,6 +142,13 @@ bool ParsedURL::operator ==(const ParsedURL & other) const
         && fragment == other.fragment;
 }
 
+ParsedURL ParsedURL::canonicalise()
+{
+    ParsedURL res(*this);
+    res.path = CanonPath(res.path).abs();
+    return res;
+}
+
 /**
  * Parse a URL scheme of the form '(applicationScheme\+)?transportScheme'
  * into a tuple '(applicationScheme, transportScheme)'
@@ -173,6 +181,14 @@ std::string fixGitURL(const std::string & url)
         } else
             return url;
     }
+}
+
+// https://www.rfc-editor.org/rfc/rfc3986#section-3.1
+bool isValidSchemeName(std::string_view s)
+{
+    static std::regex regex(schemeNameRegex, std::regex::ECMAScript);
+
+    return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);
 }
 
 }

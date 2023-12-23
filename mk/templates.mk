@@ -10,10 +10,10 @@ endef
 
 ifneq ($(MAKECMDGOALS), clean)
 
-%.h: %.h.in
-	$(trace-gen) rm -f $@ && ./config.status --quiet --header=$@
+$(buildprefix)%.h: %.h.in
+	$(trace-gen) rm -f $@ && cd $(buildprefixrel) && ./config.status --quiet --header=$(@:$(buildprefix)%=%)
 
-%: %.in
-	$(trace-gen) rm -f $@ && ./config.status --quiet --file=$@
+$(buildprefix)%: %.in
+	$(trace-gen) rm -f $@ && cd $(buildprefixrel) && ./config.status --quiet --file=$(@:$(buildprefix)%=%)
 
 endif

@@ -2,7 +2,7 @@
 #include "binary-cache-store.hh"
 #include "compression.hh"
 #include "derivations.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "globals.hh"
 #include "nar-info.hh"
 #include "sync.hh"
@@ -11,6 +11,8 @@
 #include "nar-accessor.hh"
 #include "thread-pool.hh"
 #include "callback.hh"
+#include "signals.hh"
+#include "archive.hh"
 
 #include <chrono>
 #include <future>
@@ -142,9 +144,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     /* Read the NAR simultaneously into a CompressionSink+FileSink (to
        write the compressed NAR to disk), into a HashSink (to get the
        NAR hash), and into a NarAccessor (to get the NAR listing). */
-    HashSink fileHashSink { htSHA256 };
-    std::shared_ptr<FSAccessor> narAccessor;
-    HashSink narHashSink { htSHA256 };
+    HashSink fileHashSink { HashAlgorithm::SHA256 };
+    std::shared_ptr<SourceAccessor> narAccessor;
+    HashSink narHashSink { HashAlgorithm::SHA256 };
     {
     FdSink fileSink(fdTemp.get());
     TeeSink teeSinkCompressed { fileSink, fileHashSink };
@@ -164,8 +166,8 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
-    narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Base32, false) + ".nar"
-        + (compression == "xz" ? ".xz" :
+    narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Nix32, false) + ".nar"
+                   + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "zstd" ? ".zst" :
            compression == "lzip" ? ".lzip" :
@@ -195,7 +197,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     if (writeNARListing) {
         nlohmann::json j = {
             {"version", 1},
-            {"root", listNar(ref<FSAccessor>(narAccessor), "", true)},
+            {"root", listNar(ref<SourceAccessor>(narAccessor), CanonPath::root, true)},
         };
 
         upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");
@@ -206,9 +208,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
        specify the NAR file and member containing the debug info. */
     if (writeDebugInfo) {
 
-        std::string buildIdDir = "/lib/debug/.build-id";
+        CanonPath buildIdDir("lib/debug/.build-id");
 
-        if (narAccessor->stat(buildIdDir).type == FSAccessor::tDirectory) {
+        if (auto st = narAccessor->maybeLstat(buildIdDir); st && st->type == SourceAccessor::tDirectory) {
 
             ThreadPool threadPool(25);
 
@@ -231,17 +233,17 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
             std::regex regex1("^[0-9a-f]{2}$");
             std::regex regex2("^[0-9a-f]{38}\\.debug$");
 
-            for (auto & s1 : narAccessor->readDirectory(buildIdDir)) {
-                auto dir = buildIdDir + "/" + s1;
+            for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
+                auto dir = buildIdDir + s1;
 
-                if (narAccessor->stat(dir).type != FSAccessor::tDirectory
+                if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory
                     || !std::regex_match(s1, regex1))
                     continue;
 
-                for (auto & s2 : narAccessor->readDirectory(dir)) {
-                    auto debugPath = dir + "/" + s2;
+                for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
+                    auto debugPath = dir + s2;
 
-                    if (narAccessor->stat(debugPath).type != FSAccessor::tRegular
+                    if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular
                         || !std::regex_match(s2, regex2))
                         continue;
 
@@ -250,7 +252,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                     std::string key = "debuginfo/" + buildId;
                     std::string target = "../" + narInfo->url;
 
-                    threadPool.enqueue(std::bind(doFile, std::string(debugPath, 1), key, target));
+                    threadPool.enqueue(std::bind(doFile, std::string(debugPath.rel()), key, target));
                 }
             }
 
@@ -299,24 +301,60 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     }});
 }
 
-StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
+StorePath BinaryCacheStore::addToStoreFromDump(
+    Source & dump,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
-    if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256)
-        unsupported("addToStoreFromDump");
-    return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
+    std::optional<Hash> caHash;
+    std::string nar;
+
+    if (auto * dump2p = dynamic_cast<StringSource *>(&dump)) {
+        auto & dump2 = *dump2p;
+        // Hack, this gives us a "replayable" source so we can compute
+        // multiple hashes more easily.
+        caHash = hashString(HashAlgorithm::SHA256, dump2.s);
+        switch (method.getFileIngestionMethod()) {
+        case FileIngestionMethod::Recursive:
+            // The dump is already NAR in this case, just use it.
+            nar = dump2.s;
+            break;
+        case FileIngestionMethod::Flat:
+            // The dump is Flat, so we need to convert it to NAR with a
+            // single file.
+            StringSink s;
+            dumpString(dump2.s, s);
+            nar = std::move(s.s);
+            break;
+        }
+    } else {
+        // Otherwise, we have to do th same hashing as NAR so our single
+        // hash will suffice for both purposes.
+        if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
+            unsupported("addToStoreFromDump");
+    }
+    StringSource narDump { nar };
+
+    // Use `narDump` if we wrote to `nar`.
+    Source & narDump2 = nar.size() > 0
+        ? static_cast<Source &>(narDump)
+        : dump;
+
+    return addToStoreCommon(narDump2, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
             name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = nar.first,
-                .references = {
+            ContentAddressWithReferences::fromParts(
+                method,
+                caHash ? *caHash : nar.first,
+                {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
-                },
-            },
+                }),
             nar.first,
         };
         info.narSize = nar.second;
@@ -399,71 +437,35 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 
 StorePath BinaryCacheStore::addToStore(
     std::string_view name,
-    const Path & srcPath,
-    FileIngestionMethod method,
-    HashType hashAlgo,
+    SourceAccessor & accessor,
+    const CanonPath & path,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
     PathFilter & filter,
-    RepairFlag repair,
-    const StorePathSet & references)
+    RepairFlag repair)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    HashSink sink { hashAlgo };
-    if (method == FileIngestionMethod::Recursive) {
-        dumpPath(srcPath, sink, filter);
-    } else {
-        readFile(srcPath, sink);
-    }
-    auto h = sink.finish().first;
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
 
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(srcPath, sink, filter);
+        accessor.dumpPath(path, sink, filter);
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
             name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = h,
-                .references = {
+            ContentAddressWithReferences::fromParts(
+                method,
+                h,
+                {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
-                },
-            },
-            nar.first,
-        };
-        info.narSize = nar.second;
-        return info;
-    })->path;
-}
-
-StorePath BinaryCacheStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    auto textHash = hashString(htSHA256, s);
-    auto path = makeTextPath(name, TextInfo { { textHash }, references });
-
-    if (!repair && isValidPath(path))
-        return path;
-
-    StringSink sink;
-    dumpString(s, sink);
-    StringSource source(sink.s);
-    return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
-        ValidPathInfo info {
-            *this,
-            std::string { name },
-            TextInfo {
-                .hash = textHash,
-                .references = references,
-            },
+                }),
             nar.first,
         };
         info.narSize = nar.second;
@@ -503,9 +505,9 @@ void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
     upsertFile(filePath, info.toJSON().dump(), "application/json");
 }
 
-ref<FSAccessor> BinaryCacheStore::getFSAccessor()
+ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), localNarCache);
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, localNarCache);
 }
 
 void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)

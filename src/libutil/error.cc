@@ -1,4 +1,7 @@
 #include "error.hh"
+#include "environment-variables.hh"
+#include "signals.hh"
+#include "terminal.hh"
 
 #include <iostream>
 #include <optional>
@@ -6,8 +9,6 @@
 #include <sstream>
 
 namespace nix {
-
-const std::string nativeSystem = SYSTEM;
 
 void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame)
 {
@@ -158,11 +159,11 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
 /**
  * A development aid for finding missing positions, to improve error messages. Example use:
  *
- *     NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS=1 _NIX_TEST_ACCEPT=1 make tests/lang.sh.test
+ *     _NIX_EVAL_SHOW_UNKNOWN_LOCATIONS=1 _NIX_TEST_ACCEPT=1 make tests/lang.sh.test
  *     git diff -U20 tests
  *
  */
-static bool printUnknownLocations = getEnv("_NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS").has_value();
+static bool printUnknownLocations = getEnv("_NIX_EVAL_SHOW_UNKNOWN_LOCATIONS").has_value();
 
 /**
  * Print a position, if it is known.
@@ -172,10 +173,9 @@ static bool printUnknownLocations = getEnv("_NIX_DEVELOPER_SHOW_UNKNOWN_LOCATION
 static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<AbstractPos> & pos) {
     bool hasPos = pos && *pos;
     if (hasPos) {
-        oss << "\n" << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
+        oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
 
         if (auto loc = pos->getCodeLines()) {
-            oss << "\n";
             printCodeLines(oss, "", *pos, *loc);
             oss << "\n";
         }

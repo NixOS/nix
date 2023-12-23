@@ -83,12 +83,6 @@ public:
     void applyConfig(const std::string & contents, const std::string & path = "<unknown>");
 
     /**
-     * Applies a nix configuration file
-     * - path: the location of the config file to apply
-     */
-    void applyConfigFile(const Path & path);
-
-    /**
      * Resets the `overridden` flag of all Settings
      */
     virtual void resetOverridden() = 0;
@@ -150,7 +144,7 @@ public:
         AbstractSetting * setting;
     };
 
-    typedef std::map<std::string, SettingData> Settings;
+    using Settings = std::map<std::string, SettingData>;
 
 private:
 
@@ -213,7 +207,7 @@ protected:
 
     nlohmann::json toJSON();
 
-    virtual std::map<std::string, nlohmann::json> toJSONObject();
+    virtual std::map<std::string, nlohmann::json> toJSONObject() const;
 
     virtual void convertToArg(Args & args, const std::string & category);
 
@@ -247,7 +241,7 @@ protected:
      *
      * @param append Whether to append or overwrite.
      */
-    virtual void appendOrSet(T && newValue, bool append);
+    virtual void appendOrSet(T newValue, bool append);
 
 public:
 
@@ -306,7 +300,7 @@ public:
 
     void convertToArg(Args & args, const std::string & category) override;
 
-    std::map<std::string, nlohmann::json> toJSONObject() override;
+    std::map<std::string, nlohmann::json> toJSONObject() const override;
 };
 
 template<typename T>
@@ -316,7 +310,7 @@ std::ostream & operator <<(std::ostream & str, const BaseSetting<T> & opt)
 }
 
 template<typename T>
-bool operator ==(const T & v1, const BaseSetting<T> & v2) { return v1 == (const T &) v2; }
+bool operator ==(const T & v1, const BaseSetting<T> & v2) { return v1 == static_cast<const T &>(v2); }
 
 template<typename T>
 class Setting : public BaseSetting<T>
@@ -329,7 +323,7 @@ public:
         const std::set<std::string> & aliases = {},
         const bool documentDefault = true,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases, experimentalFeature)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
     {
         options->addSetting(this);
     }

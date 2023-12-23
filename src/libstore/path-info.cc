@@ -1,5 +1,8 @@
+#include <nlohmann/json.hpp>
+
 #include "path-info.hh"
 #include "store-api.hh"
+#include "json-utils.hh"
 
 namespace nix {
 
@@ -28,9 +31,9 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
         throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
-        "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(HashFormat::Base32, true) + ";"
-        + std::to_string(narSize) + ";"
+            "1;" + store.printStorePath(path) + ";"
+            + narHash.to_string(HashFormat::Nix32, true) + ";"
+            + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
 
@@ -142,6 +145,96 @@ ValidPathInfo::ValidPathInfo(
             };
         },
     }, std::move(ca).raw);
+}
+
+
+nlohmann::json UnkeyedValidPathInfo::toJSON(
+    const Store & store,
+    bool includeImpureInfo,
+    HashFormat hashFormat) const
+{
+    using nlohmann::json;
+
+    auto jsonObject = json::object();
+
+    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    jsonObject["narSize"] = narSize;
+
+    {
+        auto& jsonRefs = (jsonObject["references"] = json::array());
+        for (auto & ref : references)
+            jsonRefs.emplace_back(store.printStorePath(ref));
+    }
+
+    if (ca)
+        jsonObject["ca"] = renderContentAddress(ca);
+
+    if (includeImpureInfo) {
+        if (deriver)
+            jsonObject["deriver"] = store.printStorePath(*deriver);
+
+        if (registrationTime)
+            jsonObject["registrationTime"] = registrationTime;
+
+        if (ultimate)
+            jsonObject["ultimate"] = ultimate;
+
+        if (!sigs.empty()) {
+            for (auto & sig : sigs)
+                jsonObject["signatures"].push_back(sig);
+        }
+    }
+
+    return jsonObject;
+}
+
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
+    const Store & store,
+    const nlohmann::json & json)
+{
+    using nlohmann::detail::value_t;
+
+    UnkeyedValidPathInfo res {
+        Hash(Hash::dummy),
+    };
+
+    ensureType(json, value_t::object);
+    res.narHash = Hash::parseAny(
+        static_cast<const std::string &>(
+            ensureType(valueAt(json, "narHash"), value_t::string)),
+        std::nullopt);
+    res.narSize = ensureType(valueAt(json, "narSize"), value_t::number_integer);
+
+    try {
+        auto & references = ensureType(valueAt(json, "references"), value_t::array);
+        for (auto & input : references)
+            res.references.insert(store.parseStorePath(static_cast<const std::string &>
+(input)));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'references'");
+        throw;
+    }
+
+    if (json.contains("ca"))
+        res.ca = ContentAddress::parse(
+            static_cast<const std::string &>(
+                ensureType(valueAt(json, "ca"), value_t::string)));
+
+    if (json.contains("deriver"))
+        res.deriver = store.parseStorePath(
+            static_cast<const std::string &>(
+                ensureType(valueAt(json, "deriver"), value_t::string)));
+
+    if (json.contains("registrationTime"))
+        res.registrationTime = ensureType(valueAt(json, "registrationTime"), value_t::number_integer);
+
+    if (json.contains("ultimate"))
+        res.ultimate = ensureType(valueAt(json, "ultimate"), value_t::boolean);
+
+    if (json.contains("signatures"))
+        res.sigs = valueAt(json, "signatures");
+
+    return res;
 }
 
 }

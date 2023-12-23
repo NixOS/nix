@@ -2,7 +2,6 @@
 #include "common-eval-args.hh"
 #include "shared.hh"
 #include "filetransfer.hh"
-#include "util.hh"
 #include "eval.hh"
 #include "fetchers.hh"
 #include "registry.hh"
@@ -142,7 +141,7 @@ MixEvalArgs::MixEvalArgs()
         .longName = "eval-store",
         .description =
           R"(
-            The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+            The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
             to use for evaluation, i.e. to store derivations (`.drv` files) and inputs referenced by them.
           )",
         .category = category,
@@ -165,7 +164,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s)
+SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto storePath = fetchers::downloadTarball(
@@ -186,7 +185,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else
-        return state.rootPath(CanonPath::fromCwd(s));
+        return state.rootPath(CanonPath(s, baseDir));
 }
 
 }

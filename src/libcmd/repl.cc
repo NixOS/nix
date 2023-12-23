@@ -22,6 +22,7 @@ extern "C" {
 #include "repl.hh"
 
 #include "ansicolor.hh"
+#include "signals.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-cache.hh"
@@ -36,11 +37,12 @@ extern "C" {
 #include "globals.hh"
 #include "flake/flake.hh"
 #include "flake/lockfile.hh"
+#include "users.hh"
+#include "terminal.hh"
 #include "editor-for.hh"
 #include "finally.hh"
 #include "markdown.hh"
 #include "local-fs-store.hh"
-#include "progress-bar.hh"
 #include "print.hh"
 
 #if HAVE_BOEHMGC
@@ -259,13 +261,11 @@ void NixRepl::mainLoop()
     rl_set_list_possib_func(listPossibleCallback);
 #endif
 
-    /* Stop the progress bar because it interferes with the display of
-       the repl. */
-    stopProgressBar();
-
     std::string input;
 
     while (true) {
+        // Hide the progress bar while waiting for user input, so that it won't interfere.
+        logger->pause();
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
         if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
@@ -275,6 +275,7 @@ void NixRepl::mainLoop()
             logger->cout("");
             break;
         }
+        logger->resume();
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
@@ -893,7 +894,7 @@ void NixRepl::evalString(std::string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    state->forceValue(v, v.determinePos(noPos));
 }
 
 
@@ -912,7 +913,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    state->forceValue(v, v.determinePos(noPos));
 
     switch (v.type()) {
 

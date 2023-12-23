@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "derived-path.hh"
 #include "realisation.hh"
 
@@ -11,9 +14,9 @@ struct SingleBuiltPathBuilt {
 
     SingleDerivedPathBuilt discardOutputPath() const;
 
-    std::string to_string(const Store & store) const;
-    static SingleBuiltPathBuilt parse(const Store & store, std::string_view, std::string_view);
-    nlohmann::json toJSON(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
+    static SingleBuiltPathBuilt parse(const StoreDirConfig & store, std::string_view, std::string_view);
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 
     DECLARE_CMP(SingleBuiltPathBuilt);
 };
@@ -38,8 +41,8 @@ struct SingleBuiltPath : _SingleBuiltPathRaw {
 
     SingleDerivedPath discardOutputPath() const;
 
-    static SingleBuiltPath parse(const Store & store, std::string_view);
-    nlohmann::json toJSON(const Store & store) const;
+    static SingleBuiltPath parse(const StoreDirConfig & store, std::string_view);
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 };
 
 static inline ref<SingleBuiltPath> staticDrv(StorePath drvPath)
@@ -56,9 +59,9 @@ struct BuiltPathBuilt {
     ref<SingleBuiltPath> drvPath;
     std::map<std::string, StorePath> outputs;
 
-    std::string to_string(const Store & store) const;
-    static BuiltPathBuilt parse(const Store & store, std::string_view, std::string_view);
-    nlohmann::json toJSON(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
+    static BuiltPathBuilt parse(const StoreDirConfig & store, std::string_view, std::string_view);
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 
     DECLARE_CMP(BuiltPathBuilt);
 };
@@ -86,7 +89,7 @@ struct BuiltPath : _BuiltPathRaw {
     StorePathSet outPaths() const;
     RealisedPath::Set toRealisedPaths(Store & store) const;
 
-    nlohmann::json toJSON(const Store & store) const;
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 };
 
 typedef std::vector<BuiltPath> BuiltPaths;

@@ -1,10 +1,11 @@
 #include "globals.hh"
+#include "current-process.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
-#include "util.hh"
 #include "loggers.hh"
 #include "progress-bar.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <cctype>

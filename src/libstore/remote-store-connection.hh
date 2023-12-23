@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "pool.hh"

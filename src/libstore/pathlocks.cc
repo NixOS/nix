@@ -1,6 +1,7 @@
 #include "pathlocks.hh"
 #include "util.hh"
 #include "sync.hh"
+#include "signals.hh"
 
 #include <cerrno>
 #include <cstdlib>
