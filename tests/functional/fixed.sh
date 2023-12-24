@@ -26,6 +26,9 @@ nix-build fixed.nix -A good2 --no-out-link
 echo 'testing reallyBad...'
 nix-instantiate fixed.nix -A reallyBad && fail "should fail"
 
+echo 'testing fixed with references...'
+expectStderr 1 nix-build fixed.nix -A badReferences | grepQuiet "not allowed to refer to other store paths"
+
 # While we're at it, check attribute selection a bit more.
 echo 'testing attribute selection...'
 test $(nix-instantiate fixed.nix -A good.1 | wc -l) = 1
