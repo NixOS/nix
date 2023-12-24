@@ -154,18 +154,39 @@ StorePath writeDerivation(Store & store,
 }
 
 
-/* Read string `s' from stream `str'. */
-static void expect(std::istream & str, std::string_view s)
-{
-    for (auto & c : s) {
-        if (str.get() != c)
-            throw FormatError("expected string '%1%'", s);
+namespace {
+/**
+ * This mimics std::istream to some extent. We use this much smaller implementation
+ * instead of plain istreams because the sentry object overhead is too high.
+ */
+struct StringViewStream {
+    std::string_view remaining;
+
+    int peek() const {
+        return remaining.empty() ? EOF : remaining[0];
     }
+
+    int get() {
+        if (remaining.empty()) return EOF;
+        char c = remaining[0];
+        remaining.remove_prefix(1);
+        return c;
+    }
+};
+}
+
+
+/* Read string `s' from stream `str'. */
+static void expect(StringViewStream & str, std::string_view s)
+{
+    if (!str.remaining.starts_with(s))
+        throw FormatError("expected string '%1%'", s);
+    str.remaining.remove_prefix(s.size());
 }
 
 
 /* Read a C-style string from stream `str'. */
-static std::string parseString(std::istream & str)
+static std::string parseString(StringViewStream & str)
 {
     std::string res;
     expect(str, "\"");
@@ -187,7 +208,7 @@ static void validatePath(std::string_view s) {
         throw FormatError("bad path '%1%' in derivation", s);
 }
 
-static Path parsePath(std::istream & str)
+static Path parsePath(StringViewStream & str)
 {
     auto s = parseString(str);
     validatePath(s);
@@ -195,7 +216,7 @@ static Path parsePath(std::istream & str)
 }
 
 
-static bool endOfList(std::istream & str)
+static bool endOfList(StringViewStream & str)
 {
     if (str.peek() == ',') {
         str.get();
@@ -209,7 +230,7 @@ static bool endOfList(std::istream & str)
 }
 
 
-static StringSet parseStrings(std::istream & str, bool arePaths)
+static StringSet parseStrings(StringViewStream & str, bool arePaths)
 {
     StringSet res;
     expect(str, "[");
@@ -267,7 +288,7 @@ static DerivationOutput parseDerivationOutput(
 }
 
 static DerivationOutput parseDerivationOutput(
-    const StoreDirConfig & store, std::istringstream & str,
+    const StoreDirConfig & store, StringViewStream & str,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings)
 {
     expect(str, ","); const auto pathS = parseString(str);
@@ -297,7 +318,7 @@ enum struct DerivationATermVersion {
 
 static DerivedPathMap<StringSet>::ChildNode parseDerivedPathMapNode(
     const StoreDirConfig & store,
-    std::istringstream & str,
+    StringViewStream & str,
     DerivationATermVersion version)
 {
     DerivedPathMap<StringSet>::ChildNode node;
@@ -349,7 +370,7 @@ Derivation parseDerivation(
     Derivation drv;
     drv.name = name;
 
-    std::istringstream str(std::move(s));
+    StringViewStream str{s};
     expect(str, "D");
     DerivationATermVersion version;
     switch (str.peek()) {
