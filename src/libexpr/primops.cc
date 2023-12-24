@@ -82,16 +82,15 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
-    store->buildPaths(buildReqs);
+    buildStore->buildPaths(buildReqs, bmNormal, store);
+
+    StorePathSet outputsToCopyAndAllow;
 
     for (auto & drv : drvs) {
-        auto outputs = resolveDerivedPath(*store, drv);
+        auto outputs = resolveDerivedPath(*buildStore, drv, &*store);
         for (auto & [outputName, outputPath] : outputs) {
-            /* Add the output of this derivations to the allowed
-               paths. */
-            if (allowedPaths) {
-                allowPath(outputPath);
-            }
+            outputsToCopyAndAllow.insert(outputPath);
+
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                 res.insert_or_assign(
@@ -100,9 +99,18 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                             .drvPath = drv.drvPath,
                             .output = outputName,
                         }).render(),
-                    store->printStorePath(outputPath)
+                    buildStore->printStorePath(outputPath)
                 );
             }
+        }
+    }
+
+    if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
+    if (allowedPaths) {
+        for (auto & outputPath : outputsToCopyAndAllow) {
+            /* Add the output of this derivations to the allowed
+               paths. */
+            allowPath(store->toRealPath(outputPath));
         }
     }
 
