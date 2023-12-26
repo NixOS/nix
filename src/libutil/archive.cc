@@ -140,7 +140,7 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
     sink.preallocateContents(size);
 
     uint64_t left = size;
-    std::vector<char> buf(65536);
+    std::array<char, 65536> buf;
 
     while (left) {
         checkInterrupt();

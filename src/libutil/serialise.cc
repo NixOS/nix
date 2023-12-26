@@ -82,7 +82,7 @@ void Source::operator () (std::string_view data)
 void Source::drainInto(Sink & sink)
 {
     std::string s;
-    std::vector<char> buf(8192);
+    std::array<char, 8192> buf;
     while (true) {
         size_t n;
         try {
