@@ -2,6 +2,7 @@
 #include "downstream-placeholder.hh"
 #include "store-api.hh"
 #include "globals.hh"
+#include "types.hh"
 #include "util.hh"
 #include "split.hh"
 #include "common-protocol.hh"
@@ -186,20 +187,38 @@ static void expect(StringViewStream & str, std::string_view s)
 
 
 /* Read a C-style string from stream `str'. */
-static std::string parseString(StringViewStream & str)
+static BackedStringView parseString(StringViewStream & str)
 {
-    std::string res;
     expect(str, "\"");
-    int c;
-    while ((c = str.get()) != '"')
-        if (c == '\\') {
-            c = str.get();
-            if (c == 'n') res += '\n';
-            else if (c == 'r') res += '\r';
-            else if (c == 't') res += '\t';
-            else res += c;
+    auto c = str.remaining.begin(), end = str.remaining.end();
+    bool escaped = false;
+    for (; c != end && *c != '"'; c++) {
+        if (*c == '\\') {
+            c++;
+            if (c == end)
+                throw FormatError("unterminated string in derivation");
+            escaped = true;
         }
-        else res += c;
+    }
+
+    const auto contentLen = c - str.remaining.begin();
+    const auto content = str.remaining.substr(0, contentLen);
+    str.remaining.remove_prefix(contentLen + 1);
+
+    if (!escaped)
+        return content;
+
+    std::string res;
+    res.reserve(content.size());
+    for (c = content.begin(), end = content.end(); c != end; c++)
+        if (*c == '\\') {
+            c++;
+            if (*c == 'n') res += '\n';
+            else if (*c == 'r') res += '\r';
+            else if (*c == 't') res += '\t';
+            else res += *c;
+        }
+        else res += *c;
     return res;
 }
 
@@ -210,7 +229,7 @@ static void validatePath(std::string_view s) {
 
 static Path parsePath(StringViewStream & str)
 {
-    auto s = parseString(str);
+    auto s = parseString(str).toOwned();
     validatePath(s);
     return s;
 }
@@ -235,7 +254,7 @@ static StringSet parseStrings(StringViewStream & str, bool arePaths)
     StringSet res;
     expect(str, "[");
     while (!endOfList(str))
-        res.insert(arePaths ? parsePath(str) : parseString(str));
+        res.insert(arePaths ? parsePath(str) : parseString(str).toOwned());
     return res;
 }
 
@@ -296,7 +315,7 @@ static DerivationOutput parseDerivationOutput(
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    return parseDerivationOutput(store, pathS, hashAlgo, hash, xpSettings);
+    return parseDerivationOutput(store, *pathS, *hashAlgo, *hash, xpSettings);
 }
 
 /**
@@ -344,7 +363,7 @@ static DerivedPathMap<StringSet>::ChildNode parseDerivedPathMapNode(
             expect(str, ",[");
             while (!endOfList(str)) {
                 expect(str, "(");
-                auto outputName = parseString(str);
+                auto outputName = parseString(str).toOwned();
                 expect(str, ",");
                 node.childMap.insert_or_assign(outputName, parseDerivedPathMapNode(store, str, version));
                 expect(str, ")");
@@ -381,12 +400,12 @@ Derivation parseDerivation(
     case 'r': {
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
-        if (versionS == "xp-dyn-drv") {
+        if (*versionS == "xp-dyn-drv") {
             // Only verison we have so far
             version = DerivationATermVersion::DynamicDerivations;
             xpSettings.require(Xp::DynamicDerivations);
         } else {
-            throw FormatError("Unknown derivation ATerm format version '%s'", versionS);
+            throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
         }
         expect(str, ",");
         break;
@@ -398,7 +417,7 @@ Derivation parseDerivation(
     /* Parse the list of outputs. */
     expect(str, "[");
     while (!endOfList(str)) {
-        expect(str, "("); std::string id = parseString(str);
+        expect(str, "("); std::string id = parseString(str).toOwned();
         auto output = parseDerivationOutput(store, str, xpSettings);
         drv.outputs.emplace(std::move(id), std::move(output));
     }
@@ -414,19 +433,19 @@ Derivation parseDerivation(
     }
 
     expect(str, ","); drv.inputSrcs = store.parseStorePathSet(parseStrings(str, true));
-    expect(str, ","); drv.platform = parseString(str);
-    expect(str, ","); drv.builder = parseString(str);
+    expect(str, ","); drv.platform = parseString(str).toOwned();
+    expect(str, ","); drv.builder = parseString(str).toOwned();
 
     /* Parse the builder arguments. */
     expect(str, ",[");
     while (!endOfList(str))
-        drv.args.push_back(parseString(str));
+        drv.args.push_back(parseString(str).toOwned());
 
     /* Parse the environment variables. */
     expect(str, ",[");
     while (!endOfList(str)) {
-        expect(str, "("); auto name = parseString(str);
-        expect(str, ","); auto value = parseString(str);
+        expect(str, "("); auto name = parseString(str).toOwned();
+        expect(str, ","); auto value = parseString(str).toOwned();
         expect(str, ")");
         drv.env[name] = value;
     }
