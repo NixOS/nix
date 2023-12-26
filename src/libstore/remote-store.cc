@@ -186,7 +186,7 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
                 if (m.find("parsing derivation") != std::string::npos &&
                     m.find("expected string") != std::string::npos &&
                     m.find("Derive([") != std::string::npos)
-                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw dervation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
+                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw derivation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
             }
             throw;
         }
