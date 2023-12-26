@@ -174,6 +174,17 @@ struct StringViewStream {
         return c;
     }
 };
+
+constexpr struct Escapes {
+    char map[256];
+    constexpr Escapes() {
+        for (int i = 0; i < 256; i++) map[i] = (char) (unsigned char) i;
+        map[(int) (unsigned char) 'n'] = '\n';
+        map[(int) (unsigned char) 'r'] = '\r';
+        map[(int) (unsigned char) 't'] = '\t';
+    }
+    char operator[](char c) const { return map[(unsigned char) c]; }
+} escapes;
 }
 
 
@@ -213,10 +224,7 @@ static BackedStringView parseString(StringViewStream & str)
     for (c = content.begin(), end = content.end(); c != end; c++)
         if (*c == '\\') {
             c++;
-            if (*c == 'n') res += '\n';
-            else if (*c == 'r') res += '\r';
-            else if (*c == 't') res += '\t';
-            else res += *c;
+            res += escapes[*c];
         }
         else res += *c;
     return res;
