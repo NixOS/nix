@@ -144,7 +144,7 @@ public:
      */
     bool verboseBuild = true;
 
-    Setting<size_t> logLines{this, 10, "log-lines",
+    Setting<size_t> logLines{this, 25, "log-lines",
         "The number of lines of the tail of "
         "the log to show if a build fails."};
 
