@@ -235,10 +235,10 @@ static void validatePath(std::string_view s) {
         throw FormatError("bad path '%1%' in derivation", s);
 }
 
-static Path parsePath(StringViewStream & str)
+static BackedStringView parsePath(StringViewStream & str)
 {
-    auto s = parseString(str).toOwned();
-    validatePath(s);
+    auto s = parseString(str);
+    validatePath(*s);
     return s;
 }
 
@@ -262,7 +262,7 @@ static StringSet parseStrings(StringViewStream & str, bool arePaths)
     StringSet res;
     expect(str, "[");
     while (!endOfList(str))
-        res.insert(arePaths ? parsePath(str) : parseString(str).toOwned());
+        res.insert((arePaths ? parsePath(str) : parseString(str)).toOwned());
     return res;
 }
 
@@ -434,9 +434,9 @@ Derivation parseDerivation(
     expect(str, ",[");
     while (!endOfList(str)) {
         expect(str, "(");
-        Path drvPath = parsePath(str);
+        auto drvPath = parsePath(str);
         expect(str, ",");
-        drv.inputDrvs.map.insert_or_assign(store.parseStorePath(drvPath), parseDerivedPathMapNode(store, str, version));
+        drv.inputDrvs.map.insert_or_assign(store.parseStorePath(*drvPath), parseDerivedPathMapNode(store, str, version));
         expect(str, ")");
     }
 
@@ -455,7 +455,7 @@ Derivation parseDerivation(
         expect(str, "("); auto name = parseString(str).toOwned();
         expect(str, ","); auto value = parseString(str).toOwned();
         expect(str, ")");
-        drv.env[name] = value;
+        drv.env.insert_or_assign(std::move(name), std::move(value));
     }
 
     expect(str, ")");
