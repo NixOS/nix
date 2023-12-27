@@ -381,9 +381,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         };
 
         git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
-        // FIXME: for some reason, shallow fetching over ssh barfs
-        // with "could not read from remote repository".
-        opts.depth = shallow && parseURL(url).scheme != "ssh" ? 1 : GIT_FETCH_DEPTH_FULL;
+        opts.depth = GIT_FETCH_DEPTH_FULL;
         opts.callbacks.payload = &act;
         opts.callbacks.sideband_progress = sidebandProgressCallback;
         opts.callbacks.transfer_progress = transferProgressCallback;

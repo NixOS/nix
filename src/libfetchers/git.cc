@@ -527,8 +527,6 @@ struct GitInputScheme : InputScheme
                     auto fetchRef =
                         getAllRefsAttr(input)
                         ? "refs/*"
-                        : input.getRev()
-                        ? input.getRev()->gitRev()
                         : ref.compare(0, 5, "refs/") == 0
                         ? ref
                         : ref == "HEAD"
