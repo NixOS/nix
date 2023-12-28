@@ -453,20 +453,6 @@ ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s)
     return *this;
 }
 
-ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr)
-{
-    // NOTE: This is abusing side-effects.
-    // TODO: check compatibility with nested debugger calls.
-    state.debugTraces.push_front(DebugTrace {
-        .pos = nullptr,
-        .expr = expr,
-        .env = env,
-        .hint = hintformat("Fake frame for debugging purposes"),
-        .isError = true
-    });
-    return *this;
-}
-
 
 EvalState::EvalState(
     const SearchPath & _searchPath,
@@ -794,17 +780,21 @@ void printWithBindings(const SymbolTable & st, const Env & env)
     }
 }
 
-void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl)
+int printEnvBindings_helper(const SymbolTable & st, const StaticEnv & se, const Env & env)
 {
-    std::cout << "Env level " << lvl << std::endl;
-
     if (se.up && env.up) {
+        // first print parent bindings
+        int lvl = printEnvBindings_helper(st, *se.up, *env.up);
+        // then bindings for this level.
+        ++lvl;
+        std::cout << "Env level " << lvl << std::endl;
         std::cout << "static: ";
         printStaticEnvBindings(st, se);
         printWithBindings(st, env);
         std::cout << std::endl;
-        printEnvBindings(st, *se.up, *env.up, ++lvl);
+        return lvl;
     } else {
+        std::cout << "Env level " << 0 << std::endl;
         std::cout << ANSI_MAGENTA;
         // for the top level, don't print the double underscore ones;
         // they are in builtins.
@@ -815,7 +805,7 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
         std::cout << std::endl;
         printWithBindings(st, env);  // probably nothing there for the top level.
         std::cout << std::endl;
-
+        return 0;
     }
 }
 
@@ -824,7 +814,7 @@ void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env)
     // just print the names for now
     auto se = es.getStaticEnv(expr);
     if (se)
-        printEnvBindings(es.symbols, *se, env, 0);
+        printEnvBindings_helper(es.symbols, *se, env);
 }
 
 void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, ValMap & vm)
@@ -859,10 +849,6 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
 
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
-    // double check we've got the debugRepl function pointer.
-    if (!debugRepl)
-        return;
-
     auto dts =
         error && expr.getPos()
         ? std::make_unique<DebugTraceStacker>(
@@ -872,7 +858,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
-                .isError = true
+                .verbosity = std::make_optional(error->info().level),
             })
         : nullptr;
 
@@ -917,7 +903,7 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
             .expr = expr,
             .env = env,
             .hint = hintfmt(s, s2),
-            .isError = false
+            .verbosity = std::nullopt
         });
 }
 
@@ -987,7 +973,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            error("undefined variable '%1%'", symbols[var.name]).atPos(var.pos).withFrame(*env, var).debugThrow<UndefinedVarError>();
+            error("undefined variable '%1%'", symbols[var.name]).atPos(var.pos).debugThrow<UndefinedVarError>();
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
@@ -1223,7 +1209,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
         Value v;
         e->eval(*this, env, v);
         if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+            error("value is %1% while a Boolean was expected", showType(v)).debugThrow<TypeError>();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -1237,7 +1223,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
-            error("value is %1% while a set was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+            error("value is %1% while a set was expected", showType(v)).debugThrow<TypeError>();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -1346,7 +1332,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         auto nameSym = state.symbols.create(nameVal.string_view());
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            state.error("dynamic attribute '%1%' already defined at %2%", state.symbols[nameSym], state.positions[j->pos]).atPos(i.pos).withFrame(env, *this).debugThrow<EvalError>();
+            state.error("dynamic attribute '%1%' already defined at %2%", state.symbols[nameSym], state.positions[j->pos]).atPos(i.pos).debugThrow<EvalError>();
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1450,7 +1436,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                         allAttrNames.insert(state.symbols[attr.name]);
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
                     state.error("attribute '%1%' missing", state.symbols[name])
-                        .atPos(pos).withSuggestions(suggestions).withFrame(env, *this).debugThrow<EvalError>();
+                        .atPos(pos).withSuggestions(suggestions).debugThrow<EvalError>();
                 }
             }
             vAttrs = j->value;
@@ -1568,7 +1554,6 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                              symbols[i.name])
                                     .atPos(lambda.pos)
                                     .withTrace(pos, "from call site")
-                                    .withFrame(*fun.lambda.env, lambda)
                                     .debugThrow<TypeError>();
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
@@ -1595,7 +1580,6 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                 .atPos(lambda.pos)
                                 .withTrace(pos, "from call site")
                                 .withSuggestions(suggestions)
-                                .withFrame(*fun.lambda.env, lambda)
                                 .debugThrow<TypeError>();
                         }
                     abort(); // can't happen
@@ -1803,7 +1787,7 @@ Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
 https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbols[i.name])
-                    .atPos(i.pos).withFrame(*fun.lambda.env, *fun.lambda.fun).debugThrow<MissingArgumentError>();
+                    .atPos(i.pos).debugThrow<MissingArgumentError>();
             }
         }
     }
@@ -1836,7 +1820,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
-        state.error("assertion '%1%' failed", out.str()).atPos(pos).withFrame(env, *this).debugThrow<AssertionError>();
+        state.error("assertion '%1%' failed", out.str()).atPos(pos).debugThrow<AssertionError>();
     }
     body->eval(state, env, v);
 }
@@ -2014,14 +1998,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                state.error("cannot add %1% to an integer", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow<EvalError>();
+                state.error("cannot add %1% to an integer", showType(vTmp)).atPos(i_pos).debugThrow<EvalError>();
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                state.error("cannot add %1% to a float", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow<EvalError>();
+                state.error("cannot add %1% to a float", showType(vTmp)).atPos(i_pos).debugThrow<EvalError>();
         } else {
             if (s.empty()) s.reserve(es->size());
             /* skip canonization of first path, which would only be not
@@ -2043,7 +2027,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         v.mkFloat(nf);
     else if (firstType == nPath) {
         if (!context.empty())
-            state.error("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow<EvalError>();
+            state.error("a string that refers to a store path cannot be appended to a path").atPos(pos).debugThrow<EvalError>();
         v.mkPath(state.rootPath(CanonPath(canonPath(str()))));
     } else
         v.mkStringMove(c_str(), context);

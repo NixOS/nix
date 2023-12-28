@@ -151,10 +151,8 @@ struct DebugTrace {
     const Expr & expr;
     const Env & env;
     hintformat hint;
-    bool isError;
+    std::optional<Verbosity> verbosity;
 };
-
-void debugError(Error * e, Env & env, Expr & expr);
 
 class ErrorBuilder
 {
@@ -183,9 +181,6 @@ class ErrorBuilder
 
         [[nodiscard, gnu::noinline]]
         ErrorBuilder & withSuggestions(Suggestions & s);
-
-        [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withFrame(const Env & e, const Expr & ex);
 
         template<class ErrorType>
         [[gnu::noinline, gnu::noreturn]]
@@ -274,6 +269,7 @@ public:
     [[gnu::noinline, gnu::noreturn]]
     void debugThrowLastTrace(E && error)
     {
+        // 'nullptr' args mean use env,expr from last debugTrace
         debugThrow(error, nullptr, nullptr);
     }
 
@@ -281,13 +277,13 @@ public:
     [[gnu::noinline, gnu::noreturn]]
     void debugThrow(E && error, const Env * env, const Expr * expr)
     {
-        if (debugRepl && ((env && expr) || !debugTraces.empty())) {
-            if (!env || !expr) {
+        if (debugRepl) {
+            if (env && expr)
+                runDebugRepl(&error, *env, *expr);
+            else if (!debugTraces.empty()) {
                 const DebugTrace & last = debugTraces.front();
-                env = &last.env;
-                expr = &last.expr;
+                runDebugRepl(&error, last.env, last.expr);
             }
-            runDebugRepl(&error, *env, *expr);
         }
 
         throw std::move(error);

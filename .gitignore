@@ -95,6 +95,7 @@ perl/Makefile.config
 /tests/functional/dyn-drv/config.nix
 /tests/functional/repl-result-out
 /tests/functional/test-libstoreconsumer/test-libstoreconsumer
+/tests/functional/debugger/*.out
 
 # /tests/functional/lang/
 /tests/functional/lang/*.out

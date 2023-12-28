@@ -114,6 +114,9 @@ struct ErrorInfo {
     static std::optional<std::string> programName;
 };
 
+
+std::string showVerbosity(Verbosity v);
+
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
 
 /**

@@ -1,0 +1,4 @@
+[34;1m0[0m: while evaluating the file
+[34;1m1[0m: while calling [35;1m'foo'[0m
+[34;1m2[0m: while calling [35;1m'wat'[0m
+[34;1m3[0m: [32;1minfo: [0mbreakpoint reached
