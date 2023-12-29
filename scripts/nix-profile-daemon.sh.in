@@ -1,4 +1,5 @@
 # Only execute this file once per shell.
+# This file is tested by tests/installer/default.nix.
 if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
 __ETC_PROFILE_NIX_SOURCED=1
 

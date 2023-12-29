@@ -1,3 +1,4 @@
+# This file is tested by tests/installer/default.nix.
 if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Set up the per-user profile.
