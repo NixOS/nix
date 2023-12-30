@@ -229,7 +229,7 @@ rev_tag2=$(git -C $repo rev-parse refs/tags/tag2)
 [[ $rev_tag2_nix = $rev_tag2 ]]
 unset _NIX_FORCE_HTTP
 
-# Ensure .gitattributes is respected
+# Ensure export-ignore in .gitattributes is respected
 touch $repo/not-exported-file
 echo "/not-exported-file export-ignore" >> $repo/.gitattributes
 git -C $repo add not-exported-file .gitattributes
@@ -237,6 +237,16 @@ git -C $repo commit -m 'Bla6'
 rev5=$(git -C $repo rev-parse HEAD)
 path12=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev5\"; }).outPath")
 [[ ! -e $path12/not-exported-file ]]
+
+# Ensure export-subst in .gitattributes is respected
+echo '$Format:%H$' > $repo/exported-file
+echo '/exported-file export-subst' >> $repo/.gitattributes
+git -C $repo add exported-file .gitattributes
+git -C $repo commit -m 'Bla7'
+rev6=$(git -C $repo rev-parse HEAD)
+path13=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev6\"; }).outPath")
+[[ $(cat $path13/exported-file) = $rev6 ]]
+[[ $(cat $path13/exported-file) != '$Format:%H$' ]]
 
 # should fail if there is no repo
 rm -rf $repo/.git
