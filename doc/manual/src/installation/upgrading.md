@@ -1,5 +1,28 @@
 # Upgrading Nix
 
+First find the name of the current channel:
+
+```console
+$ nix-channel --list
+```
+
+Will return:
+
+```console
+$ nixpkgs https://nixos.org/channels/nixpkgs-23.05
+```
+Remove old channel:
+
+```console
+$ nix-channel --remove nixpkgs
+```
+
+Add new channel:
+
+```console
+$ nix-channel --add https://nixos.org/channels/nixpkgs-23.11 nixpkgs
+```
+
 Multi-user Nix users on macOS can upgrade Nix by running: `sudo -i sh -c
 'nix-channel --update &&
 nix-env --install --attr nixpkgs.nix &&
