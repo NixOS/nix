@@ -53,6 +53,11 @@ class RemoteSigner : public Signer
         virtual std::string signDetached(std::string_view s) const;
 
     private:
+        /* Ask the remote server about the current public key
+         * and store it.
+         */
+        void fetchAndRememberPublicKey();
+
         std::string serverPath;
         std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> _curl_handle;
 };

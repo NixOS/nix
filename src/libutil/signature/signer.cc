@@ -71,6 +71,29 @@ static size_t _writeResponse(void* ptr, size_t size, size_t nmemb, void* userdat
     return real_size;
 }
 
+void RemoteSigner::fetchAndRememberPublicKey() {
+    if (!_curl_handle) {
+        throw Error("CURL is not initialized!");
+    }
+
+    // Since cURL 7.50, a valid URL must always be passed, we use a dummy hostname here.
+    curl_easy_setopt(_curl_handle.get(), CURLOPT_URL, "http://localhost/publickey");
+    curl_easy_setopt(_curl_handle.get(), CURLOPT_WRITEFUNCTION, &_writeResponse);
+    curl_easy_setopt(_curl_handle.get(), CURLOPT_WRITEDATA, &this->pubkey);
+
+    CURLcode res = curl_easy_perform(_curl_handle.get());
+    if (res != CURLE_OK) {
+        // log the error?
+        throw Error("failed to fetch the remote public key (curl error)");
+    }
+
+    long http_code = 0;
+    curl_easy_getinfo(_curl_handle.get(), CURLINFO_RESPONSE_CODE, &http_code);
+    if (http_code != 200) {
+        throw Error("failed to fetch the remote public key (non-200 error code from server)");
+    }
+}
+
 std::string RemoteSigner::signDetached(std::string_view fingerprint) const {
     std::string detached_signature;
 
