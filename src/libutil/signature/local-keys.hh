@@ -63,6 +63,4 @@ typedef std::map<std::string, PublicKey> PublicKeys;
  */
 bool verifyDetached(const std::string & data, const std::string & sig, const PublicKeys & publicKeys);
 
-PublicKeys getDefaultPublicKeys();
-
 }

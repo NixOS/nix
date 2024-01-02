@@ -14,6 +14,8 @@
 
 namespace nix {
 
+struct Hash;
+
 void initLibUtil();
 
 /**

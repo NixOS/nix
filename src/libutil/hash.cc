@@ -14,6 +14,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <sodium.h>
+
 namespace nix {
 
 static size_t regularHashSize(HashAlgorithm type) {
@@ -259,6 +261,13 @@ Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
 
     else
         throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(this->algo));
+}
+
+Hash Hash::random(HashAlgorithm algo)
+{
+    Hash hash(algo);
+    randombytes_buf(hash.hash, hash.hashSize);
+    return hash;
 }
 
 Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha)

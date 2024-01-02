@@ -2,8 +2,6 @@
 
 #include "file-system.hh"
 #include "util.hh"
-#include "globals.hh"
-
 #include <sodium.h>
 
 namespace nix {
@@ -74,7 +72,7 @@ PublicKey::PublicKey(std::string_view s)
         throw Error("public key is not valid");
 }
 
-bool verifyDetached(const std::string & data, const std::string & sig, const PublicKeys& publicKeys)
+bool verifyDetached(const std::string & data, const std::string & sig, const PublicKeys & publicKeys)
 {
     auto ss = split(sig);
 
@@ -88,30 +86,6 @@ bool verifyDetached(const std::string & data, const std::string & sig, const Pub
     return crypto_sign_verify_detached((unsigned char *) sig2.data(),
         (unsigned char *) data.data(), data.size(),
         (unsigned char *) key->second.key.data()) == 0;
-}
-
-PublicKeys getDefaultPublicKeys()
-{
-    PublicKeys publicKeys;
-
-    // FIXME: filter duplicates
-
-    for (auto s : settings.trustedPublicKeys.get()) {
-        PublicKey key(s);
-        publicKeys.emplace(key.name, key);
-    }
-
-    for (auto secretKeyFile : settings.secretKeyFiles.get()) {
-        try {
-            SecretKey secretKey(readFile(secretKeyFile));
-            publicKeys.emplace(secretKey.name, secretKey.toPublicKey());
-        } catch (SysError & e) {
-            /* Ignore unreadable key files. That's normal in a
-               multi-user installation. */
-        }
-    }
-
-    return publicKeys;
 }
 
 }

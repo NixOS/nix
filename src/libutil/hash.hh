@@ -5,7 +5,6 @@
 #include "serialise.hh"
 #include "file-system.hh"
 
-
 namespace nix {
 
 
@@ -143,6 +142,11 @@ public:
     }
 
     static Hash dummy;
+
+    /**
+     * @return a random hash with hash algorithm `algo`
+     */
+    static Hash random(HashAlgorithm algo);
 };
 
 /**

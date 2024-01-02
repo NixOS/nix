@@ -70,15 +70,14 @@ namespace nix {
         return real_size;
     }
 
-    std::string RemoteSigner::signDetached(std::string_view s) const {
+    std::string RemoteSigner::signDetached(std::string_view fingerprint) const {
         std::string detached_signature;
-        std::string hash_to_sign = std::string(s);
 
         // Since cURL 7.50, a valid URL must always be passed, we use a dummy hostname here.
         curl_easy_setopt(_curl_handle.get(), CURLOPT_URL, "http://localhost/sign");
         curl_easy_setopt(_curl_handle.get(), CURLOPT_WRITEFUNCTION, &_writeResponse);
         curl_easy_setopt(_curl_handle.get(), CURLOPT_WRITEDATA, &detached_signature);
-        curl_easy_setopt(_curl_handle.get(), CURLOPT_POSTFIELDS, hash_to_sign.c_str());
+        curl_easy_setopt(_curl_handle.get(), CURLOPT_POSTFIELDS, fingerprint.data());
 
         CURLcode res = curl_easy_perform(_curl_handle.get());
         if (res != CURLE_OK) {

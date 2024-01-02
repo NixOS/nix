@@ -14,6 +14,7 @@
 #include "signals.hh"
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
+#include "keys.hh"
 
 #include <iostream>
 #include <algorithm>

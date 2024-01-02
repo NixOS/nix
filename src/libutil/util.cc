@@ -1,5 +1,9 @@
 #include "util.hh"
 #include "fmt.hh"
+#include "sync.hh"
+#include "finally.hh"
+#include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -7,6 +11,7 @@
 #include <grp.h>
 #include <regex>
 
+#include <sodium.h>
 
 namespace nix {
 
@@ -30,6 +35,9 @@ void initLibUtil() {
     }
     // This is not actually the main point of this check, but let's make sure anyway:
     assert(caught);
+
+    if (sodium_init() == -1)
+        throw Error("could not initialise libsodium");
 }
 
 //////////////////////////////////////////////////////////////////////
