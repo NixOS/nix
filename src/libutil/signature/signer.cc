@@ -6,6 +6,7 @@
 #include <sodium.h>
 
 namespace nix {
+
 // Splits a signature, that is `$publicKey:$signatureDigest` into a pair (publicKey, signatureDigest)
 static std::pair<std::string_view, std::string_view> split(std::string_view s)
 {
@@ -18,7 +19,7 @@ static std::pair<std::string_view, std::string_view> split(std::string_view s)
 Signer::Signer() : pubkey(this->getPublicKey()) { }
 Signer::Signer(PublicKey && pubkey) : pubkey(pubkey) { }
 
-bool Signer::verifyDetached(const std::string & data, const std::string & sig) {
+bool Signer::verifyDetached(std::string_view data, std::string_view sig) {
     auto ss = split(sig);
 
     if (std::string(ss.first) != pubkey.key) return false;
@@ -93,4 +94,5 @@ std::string RemoteSigner::signDetached(std::string_view fingerprint) const {
 
     return detached_signature;
 }
+
 }

@@ -19,7 +19,7 @@ class Signer
 {
     public:
         virtual std::string signDetached(std::string_view s) const = 0;
-        virtual bool verifyDetached(const std::string & data, const std::string & sig);
+        virtual bool verifyDetached(std::string_view data, std::string_view sig);
         virtual const PublicKey& getPublicKey() const;
 
     protected:
