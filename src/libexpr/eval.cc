@@ -554,6 +554,8 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
+    vEmptyList.mkList(0);
+
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
         for (auto & i : _searchPath.elements)
@@ -1381,6 +1383,15 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
     state.mkList(v, elems.size());
     for (auto [n, v2] : enumerate(v.listItems()))
         const_cast<Value * &>(v2) = elems[n]->maybeThunk(state, env);
+}
+
+
+Value * ExprList::maybeThunk(EvalState & state, Env & env)
+{
+    if (elems.empty()) {
+        return &state.vEmptyList;
+    }
+    return Expr::maybeThunk(state, env);
 }
 
 

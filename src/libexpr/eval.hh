@@ -305,6 +305,9 @@ public:
         return *errorBuilder;
     }
 
+    /* Empty list constant. */
+    Value vEmptyList;
+
 private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
