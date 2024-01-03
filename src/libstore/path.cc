@@ -1,7 +1,5 @@
 #include "store-dir-config.hh"
 
-#include <sodium.h>
-
 namespace nix {
 
 static void checkName(std::string_view path, std::string_view name)
@@ -49,9 +47,7 @@ StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
 
 StorePath StorePath::random(std::string_view name)
 {
-    Hash hash(HashAlgorithm::SHA1);
-    randombytes_buf(hash.hash, hash.hashSize);
-    return StorePath(hash, name);
+    return StorePath(Hash::random(HashAlgorithm::SHA1), name);
 }
 
 StorePath StoreDirConfig::parseStorePath(std::string_view path) const
