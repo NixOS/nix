@@ -214,6 +214,11 @@ public:
     Bindings emptyBindings;
 
     /**
+     * Empty list constant.
+     */
+    Value vEmptyList;
+
+    /**
      * The accessor for the root filesystem.
      */
     const ref<InputAccessor> rootFS;

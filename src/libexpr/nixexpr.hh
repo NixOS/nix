@@ -303,6 +303,7 @@ struct ExprList : Expr
     std::vector<Expr *> elems;
     ExprList() { };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env) override;
 
     PosIdx getPos() const override
     {
