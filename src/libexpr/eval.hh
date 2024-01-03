@@ -219,6 +219,11 @@ public:
     Bindings emptyBindings;
 
     /**
+     * Empty list constant.
+     */
+    Value vEmptyList;
+
+    /**
      * The accessor for the root filesystem.
      */
     const ref<InputAccessor> rootFS;
@@ -304,9 +309,6 @@ public:
         errorBuilder = ErrorBuilder::create(*this, args...);
         return *errorBuilder;
     }
-
-    /* Empty list constant. */
-    Value vEmptyList;
 
 private:
 
