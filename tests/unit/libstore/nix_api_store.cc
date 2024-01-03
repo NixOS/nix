@@ -2,31 +2,14 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
-#include "tests/nix_api_util.hh"
+
+#include "tests/nix_api_store.hh"
 
 #define STORE_DIR "/nix/store/"
 #define HASH_PART "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q"
 const char * validPath = STORE_DIR HASH_PART "-x";
 
 namespace nixC {
-
-class nix_api_store_test : public nix_api_util_context
-{
-public:
-    void SetUp() override
-    {
-        nix_api_util_context::SetUp();
-        nix_libstore_init(ctx);
-        store = nix_store_open(ctx, "dummy://", NULL);
-    };
-    void TearDown() override
-    {
-        nix_store_unref(store);
-        nix_api_util_context::TearDown();
-    }
-
-    Store * store;
-};
 
 TEST_F(nix_api_util_context, nix_libstore_init)
 {
@@ -39,7 +22,7 @@ TEST_F(nix_api_store_test, nix_store_get_uri)
     char value[256];
     auto ret = nix_store_get_uri(ctx, store, value, 256);
     ASSERT_EQ(NIX_OK, ret);
-    ASSERT_STREQ("dummy", value);
+    ASSERT_STREQ("local", value);
 }
 
 TEST_F(nix_api_store_test, InvalidPathFails)
@@ -65,6 +48,14 @@ TEST_F(nix_api_store_test, SetsLastErrCodeToNixOk)
 TEST_F(nix_api_store_test, DoesNotCrashWhenContextIsNull)
 {
     ASSERT_NO_THROW(nix_store_parse_path(nullptr, store, validPath));
+}
+
+TEST_F(nix_api_store_test, get_version)
+{
+    char value[256];
+    auto ret = nix_store_get_version(ctx, store, value, 256);
+    ASSERT_EQ(NIX_OK, ret);
+    ASSERT_STREQ(PACKAGE_VERSION, value);
 }
 
 }

@@ -24,14 +24,17 @@ libexpr-tests_EXTRA_INCLUDES = \
     -I tests/unit/libstore-support \
     -I tests/unit/libutil-support \
     -I src/libexpr \
+    -I src/libexpr/c \
     -I src/libfetchers \
     -I src/libstore \
-    -I src/libutil
+    -I src/libstore/c \
+    -I src/libutil \
+    -I src/libutil/c
 
 libexpr-tests_CXXFLAGS += $(libexpr-tests_EXTRA_INCLUDES)
 
 libexpr-tests_LIBS = \
     libexpr-test-support libstore-test-support libutils-test-support \
-    libexpr libfetchers libstore libutil
+    libexpr libexprc libfetchers libstore libstorec libutil libutilc
 
 libexpr-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS) -lgmock
