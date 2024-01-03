@@ -16,6 +16,8 @@
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"
+#include "signals.hh"
+
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -1071,6 +1073,7 @@ void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sin
     std::thread stderrThread([&]()
     {
         try {
+            ReceiveInterrupts receiveInterrupts;
             processStderr(nullptr, nullptr, false);
         } catch (...) {
             ex = std::current_exception();
