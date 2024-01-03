@@ -14,15 +14,7 @@
 
 namespace nix {
 
-struct Hash;
-
 void initLibUtil();
-
-/**
- * This Nix version.
- */
-extern const std::string nixVersion;
-
 
 /**
  * Convert a list of strings to a null-terminated vector of `char

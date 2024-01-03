@@ -1,9 +1,5 @@
 #include "util.hh"
 #include "fmt.hh"
-#include "sync.hh"
-#include "finally.hh"
-#include "serialise.hh"
-#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -14,8 +10,6 @@
 #include <sodium.h>
 
 namespace nix {
-
-const std::string nixVersion = PACKAGE_VERSION;
 
 void initLibUtil() {
     // Check that exception handling works. Exception handling has been observed

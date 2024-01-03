@@ -29,13 +29,10 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
 {
     if (remoteSigningPath != "")
         signer = std::make_unique<RemoteSigner>(
-                remoteSigningPath
-            );
+            remoteSigningPath);
     else if (secretKeyFile != "")
         signer = std::make_unique<LocalSigner>(
-                SecretKey(readFile(secretKeyFile))
-            );
-
+            SecretKey { readFile(secretKeyFile) });
 
     StringSink sink;
     sink << narVersionMagic1;

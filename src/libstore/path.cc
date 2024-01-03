@@ -1,7 +1,5 @@
 #include "store-dir-config.hh"
 
-#include "util.hh"
-
 namespace nix {
 
 static void checkName(std::string_view path, std::string_view name)

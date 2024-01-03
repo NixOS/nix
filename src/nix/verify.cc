@@ -5,7 +5,7 @@
 #include "thread-pool.hh"
 #include "references.hh"
 #include "signals.hh"
-#include "libstore/keys.hh"
+#include "keys.hh"
 
 #include <atomic>
 

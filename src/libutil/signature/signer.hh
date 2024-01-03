@@ -5,60 +5,79 @@
 
 #include <curl/curl.h>
 #include <map>
+#include <optional>
 
 namespace nix {
 
-
-// An abstract signer
-// Derive from this class to implement a custom signature scheme
-// for the store.
-//
-// It is only necessary to implement signature of bytes
-// and verification of data according to that signer.
-class Signer
+/**
+ * An abstract signer
+ *
+ * Derive from this class to implement a custom signature scheme.
+ *
+ * It is only necessary to implement signature of bytes and provide a
+ * public key.
+ */
+struct Signer
 {
-    public:
-        virtual std::string signDetached(std::string_view s) const = 0;
-        virtual bool verifyDetached(std::string_view data, std::string_view sig);
-        virtual const PublicKey& getPublicKey() const;
+    virtual ~Signer() = default;
 
-    protected:
-        Signer(PublicKey && pubkey);
-        Signer();
-        PublicKey pubkey;
+    /**
+     * Sign the given data, creating a (detached) signature.
+     *
+     * @param data data to be signed.
+     *
+     * @return the [detached
+     * signature](https://en.wikipedia.org/wiki/Detached_signature),
+     * i.e. just the signature itself without a copy of the signed data.
+     */
+    virtual std::string signDetached(std::string_view data) const = 0;
+
+    /**
+     * View the public key associated with this `Signer`.
+     */
+    virtual const PublicKey & getPublicKey() = 0;
 };
 
-typedef std::map<std::string, Signer*> Signers;
+using Signers = std::map<std::string, Signer*>;
 
-// Local signer
-// The private key is held in this machine's RAM
-class LocalSigner : public Signer
+/**
+ * Local signer
+ *
+ * The private key is held in this machine's RAM
+ */
+struct LocalSigner : Signer
 {
-    public:
-        LocalSigner(SecretKey &&privkey);
+    LocalSigner(SecretKey && privateKey);
 
-        virtual std::string signDetached(std::string_view s) const;
+    std::string signDetached(std::string_view s) const override;
 
-    private:
-        SecretKey privkey;
+    const PublicKey & getPublicKey() override;
+
+private:
+
+    SecretKey privateKey;
+    PublicKey publicKey;
 };
 
-// Remote signer
-// The remote signer adheres to the Nix Remote Signing API
-class RemoteSigner : public Signer
+/**
+ * Remote signer
+ *
+ * The remote signer adheres to the Nix Remote Signing API
+ */
+struct RemoteSigner : Signer
 {
-    public:
-        RemoteSigner(const std::string & remoteServerPath);
+    RemoteSigner(const std::string & remoteServerPath);
 
-        virtual std::string signDetached(std::string_view s) const;
+    std::string signDetached(std::string_view s) const override;
 
-    private:
-        /* Ask the remote server about the current public key
-         * and store it.
-         */
-        void fetchAndRememberPublicKey();
+    const PublicKey & getPublicKey() override;
 
-        std::string serverPath;
-        std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> _curl_handle;
+private:
+
+    std::optional<PublicKey> optPublicKey;
+
+    std::string serverPath;
+    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> _curl_handle;
 };
+
 }
