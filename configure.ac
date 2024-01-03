@@ -308,7 +308,12 @@ AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
 # Optional dependencies for better normalizing file system data
 AC_CHECK_HEADERS([sys/xattr.h])
-AC_CHECK_FUNCS([llistxattr lremovexattr])
+AS_IF([test "$ac_cv_header_sys_xattr_h" = "yes"],[
+  AC_CHECK_FUNCS([llistxattr lremovexattr])
+  AS_IF([test "$ac_cv_func_llistxattr" = "yes" && test "$ac_cv_func_lremovexattr" = "yes"],[
+    AC_DEFINE([HAVE_ACL_SUPPORT], [1], [Define if we can manipulate file system Access Control Lists])
+  ])
+])
 
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)

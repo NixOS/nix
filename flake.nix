@@ -234,11 +234,11 @@
         buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
 
         buildNoTests = forAllSystems (system:
-          self.packages.${system}.nix.overrideAttrs (a: {
-            doCheck =
-              assert ! a?dontCheck;
-              false;
-          })
+          self.packages.${system}.nix.override {
+            doCheck = false;
+            doInstallCheck = false;
+            installUnitTests = false;
+          }
         );
 
         # Perl bindings for various platforms.
