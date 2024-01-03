@@ -214,6 +214,9 @@ in {
   ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
     editline
     lowdown
+  ] ++ lib.optionals buildUnitTests [
+    gtest
+    rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
@@ -231,11 +234,6 @@ in {
 
   dontBuild = !attrs.doBuild;
   doCheck = attrs.doCheck;
-
-  checkInputs = [
-    gtest
-    rapidcheck
-  ];
 
   nativeCheckInputs = [
     git
