@@ -32,6 +32,6 @@ libexpr-tests_CXXFLAGS += $(libexpr-tests_EXTRA_INCLUDES)
 
 libexpr-tests_LIBS = \
     libexpr-test-support libstore-test-support libutils-test-support \
-    libexpr libfetchers libstore libutil
+    libexpr libexprc libfetchers libstore libstorec libutil libutilc
 
 libexpr-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS) -lgmock
