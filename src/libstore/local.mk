@@ -8,7 +8,7 @@ libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 
 libstore_LIBS = libutil
 
-libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
+libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) -pthread
 ifdef HOST_LINUX
  libstore_LDFLAGS += -ldl
 endif

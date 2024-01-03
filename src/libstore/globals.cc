@@ -15,8 +15,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <sodium/core.h>
-
 #ifdef __GLIBC__
 # include <gnu/lib-names.h>
 # include <nss.h>
@@ -408,9 +406,6 @@ void assertLibStoreInitialized() {
 void initLibStore() {
 
     initLibUtil();
-
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
 
     loadConfFile();
 

@@ -12,7 +12,6 @@
 #include "realisation.hh"
 #include "globals.hh"
 #include "store-api.hh"
-#include "crypto.hh"
 #include "posix-source-accessor.hh"
 
 #include <sodium.h>

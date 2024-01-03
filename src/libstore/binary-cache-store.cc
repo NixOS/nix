@@ -28,7 +28,8 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
     , Store(params)
 {
     if (secretKeyFile != "")
-        secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
+        signer = std::make_unique<LocalSigner>(
+            SecretKey { readFile(secretKeyFile) });
 
     StringSink sink;
     sink << narVersionMagic1;
@@ -274,7 +275,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     stats.narWriteCompressionTimeMs += duration;
 
     /* Atomically write the NAR info file.*/
-    if (secretKey) narInfo->sign(*this, *secretKey);
+    if (signer) narInfo->sign(*this, *signer);
 
     writeNarInfo(narInfo);
 
