@@ -1094,28 +1094,29 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
     FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
-        v = i->second;
+    if (auto v2 = get(*fileEvalCache.lock(), path)) {
+        v = *v2;
         return;
     }
 
     auto resolvedPath = resolveExprPath(path);
-    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
-        v = i->second;
+    if (auto v2 = get(*fileEvalCache.lock(), resolvedPath)) {
+        v = *v2;
         return;
     }
 
     printTalkative("evaluating file '%1%'", resolvedPath);
     Expr * e = nullptr;
 
-    auto j = fileParseCache.find(resolvedPath);
-    if (j != fileParseCache.end())
-        e = j->second;
+    if (auto e2 = get(*fileParseCache.lock(), resolvedPath))
+        e = *e2;
 
     if (!e)
         e = parseExprFromFile(resolvedPath);
 
-    fileParseCache[resolvedPath] = e;
+    // It's possible that another thread parsed the same file. In that
+    // case we discard the Expr we just created.
+    e = fileParseCache.lock()->emplace(resolvedPath, e).first->second;
 
     try {
         auto dts = debugRepl
@@ -1138,15 +1139,23 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         throw;
     }
 
-    fileEvalCache[resolvedPath] = v;
-    if (path != resolvedPath) fileEvalCache[path] = v;
+    {
+        auto cache(fileEvalCache.lock());
+        // Handle the cache where another thread has evaluated this file.
+        if (auto v2 = get(*cache, path))
+            v = *v2;
+        if (auto v2 = get(*cache, resolvedPath))
+            v = *v2;
+        cache->emplace(resolvedPath, v);
+        if (path != resolvedPath) cache->emplace(path, v);
+    }
 }
 
 
 void EvalState::resetFileCache()
 {
-    fileEvalCache.clear();
-    fileParseCache.clear();
+    fileEvalCache.lock()->clear();
+    fileParseCache.lock()->clear();
 }
 
 

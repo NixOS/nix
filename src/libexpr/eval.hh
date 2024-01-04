@@ -294,7 +294,7 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    std::map<SourcePath, StorePath> srcToStore;
+    std::map<SourcePath, StorePath> srcToStore; // FIXME: Sync
 
     /**
      * A cache from path names to parse trees.
@@ -304,7 +304,7 @@ private:
 #else
     typedef std::map<SourcePath, Expr *> FileParseCache;
 #endif
-    FileParseCache fileParseCache;
+    Sync<FileParseCache> fileParseCache;
 
     /**
      * A cache from path names to values.
@@ -314,7 +314,7 @@ private:
 #else
     typedef std::map<SourcePath, Value> FileEvalCache;
 #endif
-    FileEvalCache fileEvalCache;
+    Sync<FileEvalCache> fileEvalCache;
 
     LookupPath lookupPath;
 
