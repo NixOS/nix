@@ -1,25 +1,37 @@
 # Upgrading Nix
 
-First find the name of the current channel:
+> **Note**
+>
+> These upgrade instructions apply for regular Linux distributions where Nix was installed following the [installation instructions in this manual](./index.md).
+
+First, find the name of the current [channel](@docroot@/command-ref/nix-channel) through which Nix is distributed:
 
 ```console
 $ nix-channel --list
 ```
 
-Will return:
+By default this should return an entry for Nixpkgs:
 
 ```console
-$ nixpkgs https://nixos.org/channels/nixpkgs-23.05
+nixpkgs https://nixos.org/channels/nixpkgs-23.05
 ```
-Remove old channel:
+
+Check which Nix version will be installed:
+
+```console
+$ nix-shell -p nix -I nixpkgs=channel:nixpkgs-23.11 --run "nix --version"
+nix (Nix) 2.18.1
+```
+
+> **Warning**
+>
+> Writing to the [local store](@docroot@/store/types/local-store.md) with a newer version of Nix, for example by building derivations with `nix-build` or `nix-store --realise`, may change the database schema!
+> Reverting to an older version of Nix may therefore require purging the store database before it can be used.
+
+Update the channel entry:
 
 ```console
 $ nix-channel --remove nixpkgs
-```
-
-Add new channel:
-
-```console
 $ nix-channel --add https://nixos.org/channels/nixpkgs-23.11 nixpkgs
 ```
 
