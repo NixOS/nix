@@ -1,3 +1,4 @@
+#include "libfetchers/attrs.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
@@ -139,9 +140,7 @@ static void fetchTree(
                     state.symbols[attr.name], showType(*attr.value)));
         }
 
-        if (params.isFetchGit && !attrs.contains("exportIgnore")) {
-            // Default value; user attrs are assigned later.
-            // FIXME: exportIgnore := !submodules
+        if (params.isFetchGit && !attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
             attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
@@ -162,8 +161,7 @@ static void fetchTree(
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
             attrs.emplace("url", fixGitURL(url));
-            if (!attrs.contains("exportIgnore")) {
-                // FIXME: exportIgnore := !submodules
+            if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
                 attrs.emplace("exportIgnore", Explicit<bool>{true});
             }
             input = fetchers::Input::fromAttrs(std::move(attrs));

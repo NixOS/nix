@@ -1,3 +1,4 @@
+#include "error.hh"
 #include "fetchers.hh"
 #include "users.hh"
 #include "cache.hh"
@@ -738,6 +739,16 @@ struct GitInputScheme : InputScheme
         Input input(_input);
 
         auto repoInfo = getRepoInfo(input);
+
+        if (getExportIgnoreAttr(input)
+            && getSubmodulesAttr(input)) {
+            /* In this situation, we don't have a git CLI behavior that we can copy.
+               `git archive` does not support submodules, so it is unclear whether
+               rules from the parent should affect the submodule or not.
+               When git may eventually implement this, we need Nix to match its
+               behavior. */
+            throw UnimplementedError("exportIgnore and submodules are not supported together yet");
+        }
 
         auto [accessor, final] =
             input.getRef() || input.getRev() || !repoInfo.isLocal
