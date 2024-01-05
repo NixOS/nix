@@ -7,7 +7,7 @@
 , boehmgc
 , nlohmann_json
 , bison
-, boost
+, boost-nix
 , brotli
 , bzip2
 , changelog-d
@@ -201,7 +201,7 @@ in {
   ;
 
   buildInputs = lib.optionals doBuild [
-    boost
+    boost-nix
     brotli
     bzip2
     curl
@@ -241,14 +241,14 @@ in {
     openssh
   ];
 
-  disallowedReferences = [ boost ];
+  disallowedReferences = [ boost-nix ];
 
   preConfigure = lib.optionalString (doBuild && ! stdenv.hostPlatform.isStatic) (
     ''
       # Copy libboost_context so we don't get all of Boost in our closure.
       # https://github.com/NixOS/nixpkgs/issues/45462
       mkdir -p $out/lib
-      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
+      cp -pd ${boost-nix}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
       rm -f $out/lib/*.a
     '' + lib.optionalString stdenv.hostPlatform.isLinux ''
       chmod u+w $out/lib/*.so.*
@@ -257,9 +257,9 @@ in {
       for LIB in $out/lib/*.dylib; do
         chmod u+w $LIB
         install_name_tool -id $LIB $LIB
-        install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
+        install_name_tool -delete_rpath ${boost-nix}/lib/ $LIB || true
       done
-      install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
+      install_name_tool -change ${boost-nix}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
     ''
   );
 
@@ -276,7 +276,7 @@ in {
     "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
     "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
   ] ++ lib.optionals (doBuild) [
-    "--with-boost=${boost}/lib"
+    "--with-boost=${boost-nix}/lib"
   ] ++ lib.optionals (doBuild && stdenv.isLinux) [
     "--with-sandbox-shell=${busybox-sandbox-shell}/bin/busybox"
   ] ++ lib.optional (doBuild && stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
@@ -306,7 +306,7 @@ in {
       echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
     '' + lib.optionalString stdenv.isDarwin ''
       install_name_tool \
-      -change ${boost}/lib/libboost_context.dylib \
+      -change ${boost-nix}/lib/libboost_context.dylib \
       $out/lib/libboost_context.dylib \
       $out/lib/libnixutil.dylib
     ''

@@ -170,6 +170,8 @@
             ];
           });
 
+          boost-nix = final.boost.override { enableIcu = false; };
+
           changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
 
           nix =
