@@ -314,15 +314,26 @@ struct GitInputScheme : InputScheme
 
         writeFile((CanonPath(repoInfo.url) + path).abs(), contents);
 
-        runProgram("git", true,
-            { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
+        auto result = runProgram(RunOptions {
+            .program = "git",
+            .args = {"-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "check-ignore", "--quiet", std::string(path.rel())},
+        });
+        auto exitCode = WEXITSTATUS(result.first);
 
-        // Pause the logger to allow for user input (such as a gpg passphrase) in `git commit`
-        logger->pause();
-        Finally restoreLogger([]() { logger->resume(); });
-        if (commitMsg)
+        if (exitCode != 0) {
+            // The path is not `.gitignore`d, we can add the file.
             runProgram("git", true,
-                { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
+                { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
+
+
+            if (commitMsg) {
+                // Pause the logger to allow for user input (such as a gpg passphrase) in `git commit`
+                logger->pause();
+                Finally restoreLogger([]() { logger->resume(); });
+                runProgram("git", true,
+                    { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
+            }
+        }
     }
 
     struct RepoInfo
