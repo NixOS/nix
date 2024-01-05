@@ -1,6 +1,7 @@
 # Getting started
 
-These C bindings are **experimental** at the moment, which means they can still change any time or get removed again, but the plan is to provide a stable external C API to the Nix language and the Nix store.
+> **Warning**
+> These bindings are **experimental**, which means they can change at any time or be removed outright; nevertheless the plan is to provide a stable external C API to the Nix language and the Nix store.
 
 The language library allows evaluating Nix expressions and interacting with Nix language values.
 The Nix store API is still rudimentary, and only allows initialising and connecting to a store for the Nix language evaluator to interact with.
@@ -49,7 +50,7 @@ int main() {
 ```
  
 **Usage:**
-```
+```ShellSession
 $ gcc main.c $(pkg-config nix-expr-c --libs --cflags) -o main
 $ ./main
 Nix version: 2.17
@@ -84,7 +85,7 @@ void nix_plugin_entry() {
 ```
 
 **Usage:**
-```
+```ShellSession
 $ gcc plugin.c $(pkg-config nix-expr-c --libs --cflags) -shared -o plugin.so
 $ nix --plugin-files ./plugin.so repl
 nix-repl> builtins.increment 1
