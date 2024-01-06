@@ -10,7 +10,6 @@ For more in-depth information you are kindly referred to subsequent chapters.
    ```
 
    The install script will use `sudo`, so make sure you have sufficient rights.
-   On Linux, `--daemon` can be omitted for a single-user install.
 
    For other installation methods, see the detailed [installation instructions](installation/index.md).
 
