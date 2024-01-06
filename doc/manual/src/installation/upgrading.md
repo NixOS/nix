@@ -4,7 +4,7 @@
 >
 > These upgrade instructions apply for regular Linux distributions where Nix was installed following the [installation instructions in this manual](./index.md).
 
-First, find the name of the current [channel](@docroot@/command-ref/nix-channel) through which Nix is distributed:
+First, find the name of the current [channel](@docroot@/command-ref/nix-channel.md) through which Nix is distributed:
 
 ```console
 $ nix-channel --list
