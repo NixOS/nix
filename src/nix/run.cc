@@ -132,6 +132,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         }
 
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
+        setenv("IN_NIX3_SHELL", "1", 1);
 
         Strings args;
         for (auto & arg : command) args.push_back(arg);
