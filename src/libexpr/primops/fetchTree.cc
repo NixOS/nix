@@ -333,7 +333,8 @@ static RegisterPrimOp primop_fetchTree({
 
         - `shallow` (Bool, optional)
 
-          Make a shallow clone when fetching the Git tree.
+          Allow fetching from a shallow remote repository.
+          This still performs a full clone of what is available on the remote.
 
           Default: `false`
 
@@ -362,6 +363,8 @@ static RegisterPrimOp primop_fetchTree({
           Number of revisions in the history of the Git repository before the fetched commit.
 
           If set, pass through the value to the output attribute set.
+          The provided value will be checked against the one obtained from the repository, and an error is thrown if there is a mismatch.
+
           Otherwise, generated from the fetched Git tree.
 
       The following input types are still subject to change:
