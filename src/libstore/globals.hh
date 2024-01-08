@@ -991,7 +991,7 @@ public:
         this, std::numeric_limits<uint64_t>::max(), "gc-threshold",
         R"(
           The amount of free disk space in `/nix/store` below which
-          Nix will start a garbage collection when `auto-gc` is
+          Nix will start a garbage collection when [`auto-gc`](#conf-auto-gc) is
           enabled or when you manually run `nix store gc`. The default
           value is infinity, meaning Nix will start collecting garbage
           regardless of the amount of free space.
@@ -1009,7 +1009,7 @@ public:
         {"max-free"}};
 
     Setting<uint64_t> autoGCCheckInterval{this, 5, "auto-gc-check-interval",
-        "Number of seconds between checking free disk space, if `auto-gc` is enabled.",
+        "Number of seconds between checking free disk space, if [`auto-gc`](#conf-auto-gc) is enabled.",
         {"min-free-check-interval"}};
 
     PluginFilesSetting pluginFiles{
