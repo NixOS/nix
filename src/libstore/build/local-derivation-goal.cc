@@ -398,6 +398,16 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
     if (stat(source.c_str(), &st) == -1) {
         if (optional && errno == ENOENT)
             return;
+        // EACCES can happen when a input path is a symlink to outside the store
+        else if (errno == EACCES) {
+            // either link or copy
+            if (link(source.c_str(), target.c_str()) == -1) {
+                if (errno != EMLINK && errno != EPERM && errno != EXDEV)
+                    throw SysError("linking '%s' to '%s'", source, target);
+                copyPath(source, target);
+                return;
+            }
+        }
         else
             throw SysError("getting attributes of path '%1%'", source);
     }
