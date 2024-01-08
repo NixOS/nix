@@ -113,9 +113,10 @@ ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
 FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
 PATH_CHAR   [a-zA-Z0-9\.\_\-\+]
-PATH        {PATH_CHAR}*(\/{PATH_CHAR}+)+\/?
-PATH_SEG    {PATH_CHAR}*\/
-HPATH       \~(\/{PATH_CHAR}+)+\/?
+PATH        {PATH_CHAR}*(\/{PATH_CHAR}+)(\/{PATH_CHAR}*)*
+PATH_SEG    {PATH_CHAR}*\/+
+PATH_START  {PATH_CHAR}*\/
+HPATH       \~(\/{PATH_CHAR}+)(\/{PATH_CHAR}*)*
 HPATH_START \~\/
 SPATH       \<{PATH_CHAR}+(\/{PATH_CHAR}+)*\>
 URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~\*\']+
@@ -224,7 +225,7 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 
-{PATH_SEG}\$\{ |
+{PATH_START}\$\{ |
 {HPATH_START}\$\{ {
   PUSH_STATE(PATH_START);
   yyless(0);

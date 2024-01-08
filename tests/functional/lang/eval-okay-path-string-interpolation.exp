@@ -1,1 +1,1 @@
-{ absolute = /foo; expr = /pwd/lang/foo/bar; home = /fake-home/foo; notfirst = /pwd/lang/bar/foo; simple = /pwd/lang/foo; slashes = /foo/bar; surrounded = /pwd/lang/a-foo-b; }
+{ absolute = /foo; expr = /pwd/lang/foo/bar; home = /fake-home/foo; more-slashes = [ /pwd/lang/a/foo/foo /pwd/lang/a/foo/foo ]; notfirst = /pwd/lang/bar/foo; simple = /pwd/lang/foo; slashes = /foo/bar; surrounded = /pwd/lang/a-foo-b; }

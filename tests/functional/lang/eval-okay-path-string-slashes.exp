@@ -1,0 +1,1 @@
+{ absolute-slashes = /a/b/c; home-slashes = /fake-home/a//b///c; relative-slashes = /pwd/lang/a/b/c; }

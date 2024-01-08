@@ -9,4 +9,5 @@ in
   home = ~/${foo};
   notfirst = ./bar/${foo};
   slashes = /${foo}/${"bar"};
+  more-slashes = [ ./a//${foo}///${foo} ./a///${foo}///${foo} ];
 }
