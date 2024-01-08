@@ -160,7 +160,7 @@ AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation
 AC_SUBST(ENABLE_DOC_GEN)
 
 AS_IF(
-  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_GENERATED_DOCS" == "yes"],
+  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_DOC_GEN" == "yes"],
   [AC_MSG_ERROR([Cannot enable generated docs when building overall is disabled. Please do not pass '--enable-doc-gen' or do not pass '--disable-build'.])])
 
 # Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
