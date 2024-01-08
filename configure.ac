@@ -374,7 +374,21 @@ PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
 
 
 # Look for lowdown library.
-PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"])
+AC_ARG_ENABLE([markdown], AS_HELP_STRING([--enable-markdown], [Enable Markdown rendering in the Nix binary (requires lowdown) [default=auto]]),
+  enable_markdown=$enableval, enable_markdown=auto)
+AS_CASE(["$enable_markdown"],
+  [yes | auto], [
+    PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [
+      CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"
+      have_lowdown=1
+      AC_DEFINE(HAVE_LOWDOWN, 1, [Whether lowdown is available and should be used for Markdown rendering.])
+    ], [
+      AS_IF([test "x$enable_markdown" == "xyes"], [AC_MSG_ERROR([--enable-markdown was specified, but lowdown was not found.])])
+    ])
+  ],
+  [no], [have_lowdown=],
+  [AC_MSG_ERROR([--enable-markdown must be one of: yes, no, auto])])
+AC_SUBST(HAVE_LOWDOWN, [$have_lowdown])
 
 
 # Look for libgit2.
