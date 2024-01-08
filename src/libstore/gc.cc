@@ -141,7 +141,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                 /* The garbage collector may have exited or not
                    created the socket yet, so we need to restart. */
                 if (e.errNo == ECONNREFUSED || e.errNo == ENOENT) {
-                    debug("GC socket connection refused");
+                    debug("GC socket connection refused: %s", e.msg())
                     fdRootsSocket->close();
                     goto restart;
                 }
