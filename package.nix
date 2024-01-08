@@ -68,6 +68,9 @@
 # Whether to build the regular manual
 , enableManual ? __forDefaults.canRunInstalled
 
+# Whether to enable Markdown rendering in the Nix binary.
+, enableMarkdown ? !stdenv.hostPlatform.isWindows
+
 # Whether to compile `rl-next.md`, the release notes for the next
 # not-yet-released version of Nix in the manul, from the individual
 # change log entries in the directory.
@@ -213,6 +216,7 @@ in {
     xz
   ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
     editline
+  ] ++ lib.optionals enableMarkdown [
     lowdown
   ] ++ lib.optionals buildUnitTests [
     gtest
@@ -269,6 +273,7 @@ in {
     (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
+    (lib.enableFeature enableMarkdown "markdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
   ] ++ lib.optionals (!forDevShell) [
     "--sysconfdir=/etc"
