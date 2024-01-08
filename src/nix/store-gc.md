@@ -13,7 +13,7 @@ R""(
   space.
 
   ```console
-  # nix store gc --gc-threshold 1G --gc-limit 5G
+  # nix store gc --gc-threshold 10G --gc-limit 30G
   ```
 
 # Description
