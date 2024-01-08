@@ -9,7 +9,7 @@ R""(
   ```
 
 * Perform garbage collection if there is less than 1 GiB of free space
-  in `/nix/store`, and stop once there is at least 5 GiB of free
+  for `/nix/store`, and stop once there is at least 5 GiB of free
   space.
 
   ```console
