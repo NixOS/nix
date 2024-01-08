@@ -25,7 +25,7 @@
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
 | Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
-| [Logical implication]                  | *bool* `->` *bool*                         | none          | 14         |
+| [Logical implication]                  | *bool* `->` *bool*                         | right         | 14         |
 
 [string]: ./values.md#type-string
 [path]: ./values.md#type-path
@@ -35,30 +35,37 @@
 
 ## Attribute selection
 
+> **Syntax**
+>
+> *attrset* `.` *attrpath* \[ `or` *expr* \]
+
 Select the attribute denoted by attribute path *attrpath* from [attribute set] *attrset*.
-If the attribute doesn’t exist, return *value* if provided, otherwise abort evaluation.
+If the attribute doesn’t exist, return the *expr* after `or` if provided, otherwise abort evaluation.
 
-<!-- FIXME: the following should to into its own language syntax section, but that needs more work to fit in well -->
+An attribute path is a dot-separated list of [attribute names](./values.md#attribute-set).
 
-An attribute path is a dot-separated list of attribute names.
-An attribute name can be an identifier or a string.
-
+> **Syntax**
+>
 > *attrpath* = *name* [ `.` *name* ]...
-> *name* = *identifier* | *string*
-> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
 
 [Attribute selection]: #attribute-selection
 
 ## Has attribute
 
+> **Syntax**
+>
 > *attrset* `?` *attrpath*
 
 Test whether [attribute set] *attrset* contains the attribute denoted by *attrpath*.
 The result is a [Boolean] value.
 
+See also: [`builtins.hasAttr`](@docroot@/language/builtins.md#builtins-hasAttr)
+
 [Boolean]: ./values.md#type-boolean
 
 [Has attribute]: #has-attribute
+
+After evaluating *attrset* and *attrpath*, the computational complexity is O(log(*n*)) for *n* attributes in the *attrset*
 
 ## Arithmetic
 
@@ -73,6 +80,8 @@ The `+` operator is overloaded to also work on strings and paths.
 
 ## String concatenation
 
+> **Syntax**
+>
 > *string* `+` *string*
 
 Concatenate two [string]s and merge their string contexts.
@@ -81,6 +90,8 @@ Concatenate two [string]s and merge their string contexts.
 
 ## Path concatenation
 
+> **Syntax**
+>
 > *path* `+` *path*
 
 Concatenate two [path]s.
@@ -90,6 +101,8 @@ The result is a path.
 
 ## Path and string concatenation
 
+> **Syntax**
+>
 > *path* + *string*
 
 Concatenate *[path]* with *[string]*.
@@ -103,6 +116,8 @@ The result is a path.
 
 ## String and path concatenation
 
+> **Syntax**
+>
 > *string* + *path*
 
 Concatenate *[string]* with *[path]*.
@@ -120,6 +135,8 @@ The result is a string.
 
 ## Update
 
+> **Syntax**
+>
 > *attrset1* // *attrset2*
 
 Update [attribute set] *attrset1* with names and values from *attrset2*.

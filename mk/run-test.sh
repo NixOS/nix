@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -u
+set -eu -o pipefail
 
 red=""
 green=""
@@ -8,6 +8,7 @@ yellow=""
 normal=""
 
 test=$1
+init=${2-}
 
 dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$dir/common-test.sh"
@@ -21,24 +22,13 @@ if [ -t 1 ]; then
 fi
 
 run_test () {
-    (init_test 2>/dev/null > /dev/null)
-    log="$(run_test_proper 2>&1)"
-    status=$?
+    if [ -n "$init" ]; then
+        (init_test 2>/dev/null > /dev/null)
+    fi
+    log="$(run_test_proper 2>&1)" && status=0 || status=$?
 }
 
 run_test
-
-# Hack: Retry the test if it fails with “unexpected EOF reading a line” as these
-# appear randomly without anyone knowing why.
-# See https://github.com/NixOS/nix/issues/3605 for more info
-if [[ $status -ne 0 && $status -ne 99 && \
-    "$(uname)" == "Darwin" && \
-    "$log" =~ "unexpected EOF reading a line" \
-]]; then
-    echo "$post_run_msg [${yellow}FAIL$normal] (possibly flaky, so will be retried)"
-    echo "$log" | sed 's/^/    /'
-    run_test
-fi
 
 if [ $status -eq 0 ]; then
   echo "$post_run_msg [${green}PASS$normal]"

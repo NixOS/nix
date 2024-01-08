@@ -8,7 +8,7 @@ libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 
 libstore_LIBS = libutil
 
-libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
+libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) -pthread
 ifdef HOST_LINUX
  libstore_LDFLAGS += -ldl
 endif
@@ -57,15 +57,9 @@ $(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(d)/build.cc:
 
-%.gen.hh: %
-	@echo 'R"foo(' >> $@.tmp
-	$(trace-gen) cat $< >> $@.tmp
-	@echo ')foo"' >> $@.tmp
-	@mv $@.tmp $@
-
 clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
-$(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
+$(eval $(call install-file-in, $(buildprefix)$(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 
 $(foreach i, $(wildcard src/libstore/builtins/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/builtins, 0644)))

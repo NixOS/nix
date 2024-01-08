@@ -3,6 +3,10 @@
 set -eu
 set -o pipefail
 
+# System specific settings
+export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
+export NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
+
 readonly SERVICE_SRC=/lib/systemd/system/nix-daemon.service
 readonly SERVICE_DEST=/etc/systemd/system/nix-daemon.service
 
@@ -92,7 +96,7 @@ poly_configure_nix_daemon_service() {
         task "Setting up the nix-daemon systemd service"
 
         _sudo "to create the nix-daemon tmpfiles config" \
-              ln -sfn /nix/var/nix/profiles/default/$TMPFILES_SRC $TMPFILES_DEST
+              ln -sfn "/nix/var/nix/profiles/default$TMPFILES_SRC" "$TMPFILES_DEST"
 
         _sudo "to run systemd-tmpfiles once to pick that path up" \
              systemd-tmpfiles --create --prefix=/nix/var/nix

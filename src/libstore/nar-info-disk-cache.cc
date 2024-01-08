@@ -1,4 +1,5 @@
 #include "nar-info-disk-cache.hh"
+#include "users.hh"
 #include "sync.hh"
 #include "sqlite.hh"
 #include "globals.hh"
@@ -273,7 +274,7 @@ public:
                 narInfo->deriver = StorePath(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
-            narInfo->ca = parseContentAddressOpt(queryNAR.getStr(11));
+            narInfo->ca = ContentAddress::parseOpt(queryNAR.getStr(11));
 
             return {oValid, narInfo};
         });
@@ -332,9 +333,9 @@ public:
                     (std::string(info->path.name()))
                     (narInfo ? narInfo->url : "", narInfo != 0)
                     (narInfo ? narInfo->compression : "", narInfo != 0)
-                    (narInfo && narInfo->fileHash ? narInfo->fileHash->to_string(Base32, true) : "", narInfo && narInfo->fileHash)
+                    (narInfo && narInfo->fileHash ? narInfo->fileHash->to_string(HashFormat::Nix32, true) : "", narInfo && narInfo->fileHash)
                     (narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)
-                    (info->narHash.to_string(Base32, true))
+                    (info->narHash.to_string(HashFormat::Nix32, true))
                     (info->narSize)
                     (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)

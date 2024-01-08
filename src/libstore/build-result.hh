@@ -1,7 +1,9 @@
 #pragma once
+///@file
 
 #include "realisation.hh"
 #include "derived-path.hh"
+#include "comparator.hh"
 
 #include <string>
 #include <chrono>
@@ -11,9 +13,12 @@ namespace nix {
 
 struct BuildResult
 {
-    /* Note: don't remove status codes, and only add new status codes
-       at the end of the list, to prevent client/server
-       incompatibilities in the nix-store --serve protocol. */
+    /**
+     * @note This is directly used in the nix-store --serve protocol.
+     * That means we need to worry about compatability across versions.
+     * Therefore, don't remove status codes, and only add new status
+     * codes at the end of the list.
+     */
     enum Status {
         Built = 0,
         Substituted,
@@ -21,8 +26,10 @@ struct BuildResult
         PermanentFailure,
         InputRejected,
         OutputRejected,
-        TransientFailure, // possibly transient
-        CachedFailure, // no longer used
+        /// possibly transient
+        TransientFailure,
+        /// no longer used
+        CachedFailure,
         TimedOut,
         MiscFailure,
         DependencyFailed,
@@ -32,7 +39,12 @@ struct BuildResult
         NoSubstituters,
     } status = MiscFailure;
 
-    // FIXME: include entire ErrorInfo object.
+    /**
+     * Information about the error if the build failed.
+     *
+     * @todo This should be an entire ErrorInfo object, not just a
+     * string, for richer information.
+     */
     std::string errorMsg;
 
     std::string toString() const {
@@ -52,34 +64,44 @@ struct BuildResult
                 case LogLimitExceeded: return "LogLimitExceeded";
                 case NotDeterministic: return "NotDeterministic";
                 case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
+                case NoSubstituters: return "NoSubstituters";
                 default: return "Unknown";
             };
         }();
         return strStatus + ((errorMsg == "") ? "" : " : " + errorMsg);
     }
 
-    /* How many times this build was performed. */
+    /**
+     * How many times this build was performed.
+     */
     unsigned int timesBuilt = 0;
 
-    /* If timesBuilt > 1, whether some builds did not produce the same
-       result. (Note that 'isNonDeterministic = false' does not mean
-       the build is deterministic, just that we don't have evidence of
-       non-determinism.) */
+    /**
+     * If timesBuilt > 1, whether some builds did not produce the same
+     * result. (Note that 'isNonDeterministic = false' does not mean
+     * the build is deterministic, just that we don't have evidence of
+     * non-determinism.)
+     */
     bool isNonDeterministic = false;
 
-    /* The derivation we built or the store path we substituted. */
-    DerivedPath path;
+    /**
+     * For derivations, a mapping from the names of the wanted outputs
+     * to actual paths.
+     */
+    SingleDrvOutputs builtOutputs;
 
-    /* For derivations, a mapping from the names of the wanted outputs
-       to actual paths. */
-    DrvOutputs builtOutputs;
-
-    /* The start/stop times of the build (or one of the rounds, if it
-       was repeated). */
+    /**
+     * The start/stop times of the build (or one of the rounds, if it
+     * was repeated).
+     */
     time_t startTime = 0, stopTime = 0;
 
-    /* User and system CPU time the build took. */
+    /**
+     * User and system CPU time the build took.
+     */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
+
+    DECLARE_CMP(BuildResult);
 
     bool success()
     {
@@ -90,6 +112,17 @@ struct BuildResult
     {
         throw Error("%s", errorMsg);
     }
+};
+
+/**
+ * A `BuildResult` together with its "primary key".
+ */
+struct KeyedBuildResult : BuildResult
+{
+    /**
+     * The derivation we built or the store path we substituted.
+     */
+    DerivedPath path;
 };
 
 }

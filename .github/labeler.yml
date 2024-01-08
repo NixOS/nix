@@ -1,0 +1,30 @@
+"documentation":
+  - changed-files:
+    - any-glob-to-any-file: "doc/manual/*"
+    - any-glob-to-any-file: "src/nix/**/*.md"
+
+"store":
+  - changed-files:
+    - any-glob-to-any-file: "src/libstore/store-api.*"
+    - any-glob-to-any-file: "src/libstore/*-store.*"
+
+"fetching":
+  - changed-files:
+    - any-glob-to-any-file: "src/libfetchers/**/*"
+
+"repl":
+  - changed-files:
+    - any-glob-to-any-file: "src/libcmd/repl.*"
+    - any-glob-to-any-file: "src/nix/repl.*"
+
+"new-cli":
+  - changed-files:
+    - any-glob-to-any-file: "src/nix/**/*"
+
+"with-tests":
+  - changed-files:
+    # Unit tests
+    - any-glob-to-any-file: "src/*/tests/**/*"
+    # Functional and integration tests
+    - any-glob-to-any-file: "tests/functional/**/*"
+    

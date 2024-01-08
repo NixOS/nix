@@ -1,6 +1,7 @@
 #include "realisation.hh"
 #include "store-api.hh"
 #include "closure.hh"
+#include "signature/local-keys.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -113,9 +114,9 @@ std::string Realisation::fingerprint() const
     return serialized.dump();
 }
 
-void Realisation::sign(const SecretKey & secretKey)
+void Realisation::sign(const Signer &signer)
 {
-    signatures.insert(secretKey.signDetached(fingerprint()));
+    signatures.insert(signer.signDetached(fingerprint()));
 }
 
 bool Realisation::checkSignature(const PublicKeys & publicKeys, const std::string & sig) const
@@ -134,6 +135,19 @@ size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
         if (checkSignature(publicKeys, sig))
             good++;
     return good;
+}
+
+
+SingleDrvOutputs filterDrvOutputs(const OutputsSpec& wanted, SingleDrvOutputs&& outputs)
+{
+    SingleDrvOutputs ret = std::move(outputs);
+    for (auto it = ret.begin(); it != ret.end(); ) {
+        if (!wanted.contains(it->first))
+            it = ret.erase(it);
+        else
+            ++it;
+    }
+    return ret;
 }
 
 StorePath RealisedPath::path() const {

@@ -4,8 +4,9 @@
 #include "filetransfer.hh"
 #include "store-api.hh"
 #include "legacy.hh"
-#include "fetchers.hh"
-#include "util.hh"
+#include "eval-settings.hh" // for defexpr
+#include "users.hh"
+#include "tarball.hh"
 
 #include <fcntl.h>
 #include <regex>
@@ -165,10 +166,11 @@ static int main_nix_channel(int argc, char ** argv)
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
         channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
-        nixDefExpr = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : home + "/.nix-defexpr";
+        nixDefExpr = getNixDefExpr();
 
         // Figure out the name of the channels profile.
-        profile = profilesDir() + "/channels";
+        profile = profilesDir() +  "/channels";
+        createDirs(dirOf(profile));
 
         enum {
             cNone,
@@ -176,6 +178,7 @@ static int main_nix_channel(int argc, char ** argv)
             cRemove,
             cList,
             cUpdate,
+            cListGenerations,
             cRollback
         } cmd = cNone;
         std::vector<std::string> args;
@@ -192,6 +195,8 @@ static int main_nix_channel(int argc, char ** argv)
                 cmd = cList;
             } else if (*arg == "--update") {
                 cmd = cUpdate;
+            } else if (*arg == "--list-generations") {
+                cmd = cListGenerations;
             } else if (*arg == "--rollback") {
                 cmd = cRollback;
             } else {
@@ -235,6 +240,11 @@ static int main_nix_channel(int argc, char ** argv)
                 break;
             case cUpdate:
                 update(StringSet(args.begin(), args.end()));
+                break;
+            case cListGenerations:
+                if (!args.empty())
+                    throw UsageError("'--list-generations' expects no arguments");
+                std::cout << runProgram(settings.nixBinDir + "/nix-env", false, {"--profile", profile, "--list-generations"}) << std::flush;
                 break;
             case cRollback:
                 if (args.size() > 1)

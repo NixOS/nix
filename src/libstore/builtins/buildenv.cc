@@ -1,4 +1,5 @@
 #include "buildenv.hh"
+#include "derivations.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -92,13 +93,11 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw Error(
-                                "files '%1%' and '%2%' have the same priority %3%; "
-                                "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
-                                "or type 'nix profile install --help' if using 'nix profile' to find out how "
-                                "to change the priority of one of the conflicting packages"
-                                " (0 being the highest priority)",
-                                srcFile, readLink(dstFile), priority);
+                        throw BuildEnvFileConflictError(
+                            readLink(dstFile),
+                            srcFile,
+                            priority
+                        );
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
@@ -176,15 +175,19 @@ void builtinBuildenv(const BasicDerivation & drv)
     /* Convert the stuff we get from the environment back into a
      * coherent data type. */
     Packages pkgs;
-    auto derivations = tokenizeString<Strings>(getAttr("derivations"));
-    while (!derivations.empty()) {
-        /* !!! We're trusting the caller to structure derivations env var correctly */
-        auto active = derivations.front(); derivations.pop_front();
-        auto priority = stoi(derivations.front()); derivations.pop_front();
-        auto outputs = stoi(derivations.front()); derivations.pop_front();
-        for (auto n = 0; n < outputs; n++) {
-            auto path = derivations.front(); derivations.pop_front();
-            pkgs.emplace_back(path, active != "false", priority);
+    {
+        auto derivations = tokenizeString<Strings>(getAttr("derivations"));
+
+        auto itemIt = derivations.begin();
+        while (itemIt != derivations.end()) {
+            /* !!! We're trusting the caller to structure derivations env var correctly */
+            const bool active = "false" != *itemIt++;
+            const int priority = stoi(*itemIt++);
+            const size_t outputs = stoul(*itemIt++);
+
+            for (size_t n {0}; n < outputs; n++) {
+                pkgs.emplace_back(std::move(*itemIt++), active, priority);
+            }
         }
     }
 

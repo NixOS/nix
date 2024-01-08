@@ -9,12 +9,13 @@
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-impl.hh"
 #include "shared.hh"
-#include "util.hh"
-#include "worker-protocol.hh"
 #include "graphml.hh"
 #include "legacy.hh"
+#include "posix-source-accessor.hh"
 #include "path-with-outputs.hh"
+#include "posix-fs-canonicalise.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -72,11 +73,13 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
+        /* FIXME: Encode this empty special case explicitly in the type. */
         if (path.outputs.empty())
             for (auto & i : drv.outputs) path.outputs.insert(i.first);
 
         PathSet outputs;
         for (auto & j : path.outputs) {
+            /* Match outputs of a store path with outputs of the derivation that produces it. */
             DerivationOutputs::iterator i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
@@ -141,6 +144,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
         toDerivedPaths(paths),
         willBuild, willSubstitute, unknown, downloadSize, narSize);
 
+    /* Filter out unknown paths from `paths`. */
     if (ignoreUnknown) {
         std::vector<StorePathWithOutputs> paths2;
         for (auto & i : paths)
@@ -172,8 +176,12 @@ static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    PosixSourceAccessor accessor;
     for (auto & i : opArgs)
-        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), i)));
+        cout << fmt("%s\n", store->printStorePath(store->addToStore(
+            std::string(baseNameOf(i)),
+            accessor,
+            CanonPath::fromCwd(i))));
 }
 
 
@@ -190,32 +198,42 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     if (opArgs.empty())
         throw UsageError("first argument must be hash algorithm");
 
-    HashType hashAlgo = parseHashType(opArgs.front());
+    HashAlgorithm hashAlgo = parseHashAlgo(opArgs.front());
     opArgs.pop_front();
 
+    PosixSourceAccessor accessor;
     for (auto & i : opArgs)
-        std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(baseNameOf(i), i, method, hashAlgo).path));
+        std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(
+            baseNameOf(i),
+            accessor,
+            CanonPath::fromCwd(i),
+            method,
+            hashAlgo).path));
 }
 
 
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
-    auto recursive = FileIngestionMethod::Flat;
+    auto method = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
-        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::Recursive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3)
         throw UsageError("'--print-fixed-path' requires three arguments");
 
     Strings::iterator i = opArgs.begin();
-    HashType hashAlgo = parseHashType(*i++);
+    HashAlgorithm hashAlgo = parseHashAlgo(*i++);
     std::string hash = *i++;
     std::string name = *i++;
 
-    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash::parseAny(hash, hashAlgo), name)));
+    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputInfo {
+        .method = method,
+        .hash = Hash::parseAny(hash, hashAlgo),
+        .references = {},
+    })));
 }
 
 
@@ -274,23 +292,24 @@ static void printTree(const StorePath & path,
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum QueryType
-        { qDefault, qOutputs, qRequisites, qReferences, qReferrers
-        , qReferrersClosure, qDeriver, qBinding, qHash, qSize
+        { qOutputs, qRequisites, qReferences, qReferrers
+        , qReferrersClosure, qDeriver, qValidDerivers, qBinding, qHash, qSize
         , qTree, qGraph, qGraphML, qResolve, qRoots };
-    QueryType query = qDefault;
+    std::optional<QueryType> query;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
     std::string bindingName;
 
     for (auto & i : opFlags) {
-        QueryType prev = query;
+        std::optional<QueryType> prev = query;
         if (i == "--outputs") query = qOutputs;
         else if (i == "--requisites" || i == "-R") query = qRequisites;
         else if (i == "--references") query = qReferences;
         else if (i == "--referrers" || i == "--referers") query = qReferrers;
         else if (i == "--referrers-closure" || i == "--referers-closure") query = qReferrersClosure;
         else if (i == "--deriver" || i == "-d") query = qDeriver;
+        else if (i == "--valid-derivers") query = qValidDerivers;
         else if (i == "--binding" || i == "-b") {
             if (opArgs.size() == 0)
                 throw UsageError("expected binding name");
@@ -309,15 +328,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--force-realise" || i == "--force-realize" || i == "-f") forceRealise = true;
         else if (i == "--include-outputs") includeOutputs = true;
         else throw UsageError("unknown flag '%1%'", i);
-        if (prev != qDefault && prev != query)
+        if (prev && prev != query)
             throw UsageError("query type '%1%' conflicts with earlier flag", i);
     }
 
-    if (query == qDefault) query = qOutputs;
+    if (!query) query = qOutputs;
 
     RunPager pager;
 
-    switch (query) {
+    switch (*query) {
 
         case qOutputs: {
             for (auto & i : opArgs) {
@@ -364,6 +383,21 @@ static void opQuery(Strings opFlags, Strings opArgs)
             }
             break;
 
+        case qValidDerivers: {
+            StorePathSet result;
+            for (auto & i : opArgs) {
+                auto derivers = store->queryValidDerivers(store->followLinksToStorePath(i));
+                for (const auto &i: derivers) {
+                    result.insert(i);
+                }
+            }
+            auto sorted = store->topoSortPaths(result);
+            for (StorePaths::reverse_iterator i = sorted.rbegin();
+                 i != sorted.rend(); ++i)
+                cout << fmt("%s\n", store->printStorePath(*i));
+            break;
+        }
+
         case qBinding:
             for (auto & i : opArgs) {
                 auto path = useDeriver(store->followLinksToStorePath(i));
@@ -382,8 +416,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise)) {
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
-                        assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
+                        assert(info->narHash.algo == HashAlgorithm::SHA256);
+                        cout << fmt("%s\n", info->narHash.to_string(HashFormat::Nix32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -457,7 +491,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
     for (auto & i : drv.env)
-        cout << format("export %1%; %1%=%2%\n") % i.first % shellEscape(i.second);
+        logger->cout("export %1%; %1%=%2%\n", i.first, shellEscape(i.second));
 
     /* Also output the arguments.  This doesn't preserve whitespace in
        arguments. */
@@ -518,7 +552,10 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             if (canonicalise)
                 canonicalisePathMetaData(store->printStorePath(info->path), {});
             if (!hashGiven) {
-                HashResult hash = hashPath(htSHA256, store->printStorePath(info->path));
+                HashResult hash = hashPath(
+                    *store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) },
+
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }
@@ -740,14 +777,14 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
-        HashSink sink(info->narHash.type);
+        HashSink sink(info->narHash.algo);
         store->narFromPath(path, sink);
         auto current = sink.finish();
         if (current.first != info->narHash) {
             printError("path '%s' was modified! expected hash '%s', got '%s'",
                 store->printStorePath(path),
-                info->narHash.to_string(Base32, true),
-                current.first.to_string(Base32, true));
+                info->narHash.to_string(HashFormat::Nix32, true),
+                current.first.to_string(HashFormat::Nix32, true));
             status = 1;
         }
     }
@@ -795,7 +832,16 @@ static void opServe(Strings opFlags, Strings opArgs)
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
     out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
     out.flush();
-    unsigned int clientVersion = readInt(in);
+    ServeProto::Version clientVersion = readInt(in);
+
+    ServeProto::ReadConn rconn {
+        .from = in,
+        .version = clientVersion,
+    };
+    ServeProto::WriteConn wconn {
+        .to = out,
+        .version = clientVersion,
+    };
 
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
@@ -803,44 +849,50 @@ static void opServe(Strings opFlags, Strings opArgs)
         verbosity = lvlError;
         settings.keepLog = false;
         settings.useSubstitutes = false;
-        settings.maxSilentTime = readInt(in);
-        settings.buildTimeout = readInt(in);
+
+        auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
+
+        // Only certain feilds get initialized based on the protocol
+        // version. This is why not all the code below is unconditional.
+        // See how the serialization logic in
+        // `ServeProto::Serialise<ServeProto::BuildOptions>` matches
+        // these conditions.
+        settings.maxSilentTime = options.maxSilentTime;
+        settings.buildTimeout = options.buildTimeout;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
-            settings.maxLogSize = readNum<unsigned long>(in);
+            settings.maxLogSize = options.maxLogSize;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
-            auto nrRepeats = readInt(in);
-            if (nrRepeats != 0) {
+            if (options.nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
             }
-            // Ignore 'enforceDeterminism'. It used to be true by
-            // default, but also only never had any effect when
-            // `nrRepeats == 0`.  We have already asserted that
-            // `nrRepeats` in fact is 0, so we can safely ignore this
-            // without doing something other than what the client
-            // asked for.
-            readInt(in);
-
+            // Ignore 'options.enforceDeterminism'.
+            //
+            // It used to be true by default, but also only never had
+            // any effect when `nrRepeats == 0`.  We have already
+            // checked that `nrRepeats` in fact is 0, so we can safely
+            // ignore this without doing something other than what the
+            // client asked for.
             settings.runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
-            settings.keepFailed = (bool) readInt(in);
+            settings.keepFailed = options.keepFailed;
         }
     };
 
     while (true) {
-        ServeCommand cmd;
+        ServeProto::Command cmd;
         try {
-            cmd = (ServeCommand) readInt(in);
+            cmd = (ServeProto::Command) readInt(in);
         } catch (EndOfFile & e) {
             break;
         }
 
         switch (cmd) {
 
-            case cmdQueryValidPaths: {
+            case ServeProto::Command::QueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -849,26 +901,18 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->substitutePaths(paths);
                 }
 
-                worker_proto::write(*store, out, store->queryValidPaths(paths));
+                ServeProto::write(*store, wconn, store->queryValidPaths(paths));
                 break;
             }
 
-            case cmdQueryPathInfos: {
-                auto paths = worker_proto::read(*store, in, Phantom<StorePathSet> {});
+            case ServeProto::Command::QueryPathInfos: {
+                auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
-                        out << store->printStorePath(info->path)
-                            << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        worker_proto::write(*store, out, info->references);
-                        // !!! Maybe we want compression?
-                        out << info->narSize // downloadSize
-                            << info->narSize;
-                        if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << info->narHash.to_string(Base32, true)
-                                << renderContentAddress(info->ca)
-                                << info->sigs;
+                        out << store->printStorePath(info->path);
+                        ServeProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
                     } catch (InvalidPath &) {
                     }
                 }
@@ -876,24 +920,24 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdDumpStorePath:
+            case ServeProto::Command::DumpStorePath:
                 store->narFromPath(store->parseStorePath(readString(in)), out);
                 break;
 
-            case cmdImportPaths: {
+            case ServeProto::Command::ImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
                 store->importPaths(in, NoCheckSigs); // FIXME: should we skip sig checking?
                 out << 1; // indicate success
                 break;
             }
 
-            case cmdExportPaths: {
+            case ServeProto::Command::ExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(worker_proto::read(*store, in, Phantom<StorePathSet> {}), out);
+                store->exportPaths(ServeProto::Serialise<StorePathSet>::read(*store, rconn), out);
                 break;
             }
 
-            case cmdBuildPaths: {
+            case ServeProto::Command::BuildPaths: {
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
@@ -914,7 +958,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdBuildDerivation: { /* Used by hydra-queue-runner. */
+            case ServeProto::Command::BuildDerivation: { /* Used by hydra-queue-runner. */
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
@@ -927,41 +971,34 @@ static void opServe(Strings opFlags, Strings opArgs)
                 MonitorFdHup monitor(in.fd);
                 auto status = store->buildDerivation(drvPath, drv);
 
-                out << status.status << status.errorMsg;
-
-                if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
-                    out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-                if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
-                    worker_proto::write(*store, out, status.builtOutputs);
-                }
-
+                ServeProto::write(*store, wconn, status);
                 break;
             }
 
-            case cmdQueryClosure: {
+            case ServeProto::Command::QueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(worker_proto::read(*store, in, Phantom<StorePathSet> {}),
+                store->computeFSClosure(ServeProto::Serialise<StorePathSet>::read(*store, rconn),
                     closure, false, includeOutputs);
-                worker_proto::write(*store, out, closure);
+                ServeProto::write(*store, wconn, closure);
                 break;
             }
 
-            case cmdAddToStoreNar: {
+            case ServeProto::Command::AddToStoreNar: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
 
                 auto path = readString(in);
                 auto deriver = readString(in);
                 ValidPathInfo info {
                     store->parseStorePath(path),
-                    Hash::parseAny(readString(in), htSHA256),
+                    Hash::parseAny(readString(in), HashAlgorithm::SHA256),
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
-                info.ca = parseContentAddressOpt(readString(in));
+                info.ca = ContentAddress::parseOpt(readString(in));
 
                 if (info.narSize == 0)
                     throw Error("narInfo is too old and missing the narSize field");
@@ -1020,64 +1057,109 @@ static int main_nix_store(int argc, char * * argv)
     {
         Strings opFlags, opArgs;
         Operation op = 0;
+        bool readFromStdIn = false;
+        std::string opName;
+        bool showHelp = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
 
             if (*arg == "--help")
-                showManPage("nix-store");
+                showHelp = true;
             else if (*arg == "--version")
                 op = opVersion;
-            else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r")
+            else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r") {
                 op = opRealise;
-            else if (*arg == "--add" || *arg == "-A")
+                opName = "-realise";
+            }
+            else if (*arg == "--add" || *arg == "-A"){
                 op = opAdd;
-            else if (*arg == "--add-fixed")
+                opName = "-add";
+            }
+            else if (*arg == "--add-fixed") {
                 op = opAddFixed;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--print-fixed-path")
                 op = opPrintFixedPath;
-            else if (*arg == "--delete")
+            else if (*arg == "--delete") {
                 op = opDelete;
-            else if (*arg == "--query" || *arg == "-q")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--query" || *arg == "-q") {
                 op = opQuery;
-            else if (*arg == "--print-env")
+                opName = "-query";
+            }
+            else if (*arg == "--print-env") {
                 op = opPrintEnv;
-            else if (*arg == "--read-log" || *arg == "-l")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--read-log" || *arg == "-l") {
                 op = opReadLog;
-            else if (*arg == "--dump-db")
+                opName = "-read-log";
+            }
+            else if (*arg == "--dump-db") {
                 op = opDumpDB;
-            else if (*arg == "--load-db")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--load-db") {
                 op = opLoadDB;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--register-validity")
                 op = opRegisterValidity;
             else if (*arg == "--check-validity")
                 op = opCheckValidity;
-            else if (*arg == "--gc")
+            else if (*arg == "--gc") {
                 op = opGC;
-            else if (*arg == "--dump")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--dump") {
                 op = opDump;
-            else if (*arg == "--restore")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--restore") {
                 op = opRestore;
-            else if (*arg == "--export")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--export") {
                 op = opExport;
-            else if (*arg == "--import")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--import") {
                 op = opImport;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--init")
                 op = opInit;
-            else if (*arg == "--verify")
+            else if (*arg == "--verify") {
                 op = opVerify;
-            else if (*arg == "--verify-path")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--verify-path") {
                 op = opVerifyPath;
-            else if (*arg == "--repair-path")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--repair-path") {
                 op = opRepairPath;
-            else if (*arg == "--optimise" || *arg == "--optimize")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--optimise" || *arg == "--optimize") {
                 op = opOptimise;
-            else if (*arg == "--serve")
+                opName = "-optimise";
+            }
+            else if (*arg == "--serve") {
                 op = opServe;
-            else if (*arg == "--generate-binary-cache-key")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--generate-binary-cache-key") {
                 op = opGenerateBinaryCacheKey;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
+            else if (*arg == "--stdin" && !isatty(STDIN_FILENO))
+                readFromStdIn = true;
             else if (*arg == "--indirect")
                 ;
             else if (*arg == "--no-output")
@@ -1090,12 +1172,20 @@ static int main_nix_store(int argc, char * * argv)
             else
                 opArgs.push_back(*arg);
 
+            if (readFromStdIn && op != opImport && op != opRestore && op != opServe) {
+                 std::string word;
+                 while (std::cin >> word) {
+                       opArgs.emplace_back(std::move(word));
+                 };
+            }
+
             if (oldOp && oldOp != op)
                 throw UsageError("only one operation may be specified");
 
             return true;
         });
 
+        if (showHelp) showManPage("nix-store" + opName);
         if (!op) throw UsageError("no operation specified");
 
         if (op != opDump && op != opRestore) /* !!! hack */

@@ -7,11 +7,11 @@ It should help users understand why Nix behaves as it does, and it should help d
 
 Nix consists of [hierarchical layers].
 
-[hierarchical layers]: https://en.m.wikipedia.org/wiki/Multitier_architecture#Layers
+[hierarchical layers]: https://en.wikipedia.org/wiki/Multitier_architecture#Layers
 
 The following [concept map] shows its main components (rectangles), the objects they operate on (rounded rectangles), and their interactions (connecting phrases):
 
-[concept map]: https://en.m.wikipedia.org/wiki/Concept_map
+[concept map]: https://en.wikipedia.org/wiki/Concept_map
 
 ```
 
@@ -52,17 +52,18 @@ The following [concept map] shows its main components (rectangles), the objects 
                                             '---------------'
 ```
 
-At the top is the [command line interface](../command-ref/command-ref.md) that drives the underlying layers.
+At the top is the [command line interface](../command-ref/index.md) that drives the underlying layers.
 
 The [Nix language](../language/index.md) evaluator transforms Nix expressions into self-contained *build plans*, which are used to derive *build results* from referenced *build inputs*.
 
 The command line interface and Nix expressions are what users deal with most.
 
 > **Note**
+>
 > The Nix language itself does not have a notion of *packages* or *configurations*.
 > As far as we are concerned here, the inputs and results of a build plan are just data.
 
-Underlying the command line interface and the Nix language evaluator is the [Nix store](../glossary.md#gloss-store), a mechanism to keep track of build plans, data, and references between them.
+Underlying the command line interface and the Nix language evaluator is the [Nix store](../store/index.md), a mechanism to keep track of build plans, data, and references between them.
 It can also execute build plans to produce new data, which are made available to the operating system as files.
 
 A build plan itself is a series of *build tasks*, together with their build inputs.
@@ -76,7 +77,7 @@ The result of a build task can be input to another build task.
 The following [data flow diagram] shows a build plan for illustration.
 Build inputs used as instructions to a build task are marked accordingly:
 
-[data flow diagram]: https://en.m.wikipedia.org/wiki/Data-flow_diagram
+[data flow diagram]: https://en.wikipedia.org/wiki/Data-flow_diagram
 
 ```
 +--------------------------------------------------------------------+

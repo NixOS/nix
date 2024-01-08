@@ -1,10 +1,12 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "hash.hh"
 #include "fetchers.hh"
 #include "outputs-spec.hh"
 
+#include <regex>
 #include <variant>
 
 namespace nix {
@@ -13,7 +15,8 @@ class Store;
 
 typedef std::string FlakeId;
 
-/* A flake reference specifies how to fetch a flake or raw source
+/**
+ * A flake reference specifies how to fetch a flake or raw source
  * (e.g. from a Git repository).  It is created from a URL-like syntax
  * (e.g. 'github:NixOS/patchelf'), an attrset representation (e.g. '{
  * type="github"; owner = "NixOS"; repo = "patchelf"; }'), or a local
@@ -32,14 +35,17 @@ typedef std::string FlakeId;
  * be lazy), but the fetcher can be invoked at any time via the
  * FlakeRef to ensure the store is populated with this input.
  */
-
 struct FlakeRef
 {
-    /* Fetcher-specific representation of the input, sufficient to
-       perform the fetch operation. */
+    /**
+     * Fetcher-specific representation of the input, sufficient to
+     * perform the fetch operation.
+     */
     fetchers::Input input;
 
-    /* sub-path within the fetched input that represents this input */
+    /**
+     * sub-path within the fetched input that represents this input
+     */
     Path subdir;
 
     bool operator==(const FlakeRef & other) const;
@@ -57,7 +63,7 @@ struct FlakeRef
 
     static FlakeRef fromAttrs(const fetchers::Attrs & attrs);
 
-    std::pair<fetchers::Tree, FlakeRef> fetchTree(ref<Store> store) const;
+    std::pair<StorePath, FlakeRef> fetchTree(ref<Store> store) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
@@ -86,5 +92,7 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
     bool allowMissing = false,
     bool isFlake = true);
 
+const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
+extern std::regex flakeIdRegex;
 
 }

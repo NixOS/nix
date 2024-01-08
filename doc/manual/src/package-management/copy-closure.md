@@ -15,7 +15,7 @@ With `nix-store
 path (that is, the path and all its dependencies) to a file, and then
 unpack that file into another Nix store. For example,
 
-    $ nix-store --export $(nix-store -qR $(type -p firefox)) > firefox.closure
+    $ nix-store --export $(nix-store --query --requisites $(type -p firefox)) > firefox.closure
 
 writes the closure of Firefox to a file. You can then copy this file to
 another machine and install the closure:
@@ -27,7 +27,7 @@ store are ignored. It is also possible to pipe the export into another
 command, e.g. to copy and install a closure directly to/on another
 machine:
 
-    $ nix-store --export $(nix-store -qR $(type -p firefox)) | bzip2 | \
+    $ nix-store --export $(nix-store --query --requisites $(type -p firefox)) | bzip2 | \
         ssh alice@itchy.example.org "bunzip2 | nix-store --import"
 
 However, `nix-copy-closure` is generally more efficient because it only

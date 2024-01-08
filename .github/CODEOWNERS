@@ -5,11 +5,13 @@
 # For documentation on this mechanism, see https://help.github.com/articles/about-codeowners/
 
 # Default reviewers if nothing else matches
-* @edolstra @thufschmitt
+* @edolstra
 
 # This file
 .github/CODEOWNERS @edolstra
 
-# Public documentation
-/doc @fricklerhandwerk
-*.md @fricklerhandwerk
+# Documentation of built-in functions
+src/libexpr/primops.cc @roberth
+
+# Libstore layer
+/src/libstore @thufschmitt

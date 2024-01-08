@@ -1,6 +1,8 @@
-#include "util.hh"
 #include "local-store.hh"
 #include "globals.hh"
+#include "signals.hh"
+#include "posix-fs-canonicalise.hh"
+#include "posix-source-accessor.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -55,7 +57,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     }
     if (errno) throw SysError("reading directory '%1%'", linksDir);
 
-    printMsg(lvlTalkative, format("loaded %1% hash inodes") % inodeHash.size());
+    printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
     return inodeHash;
 }
@@ -73,7 +75,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
         checkInterrupt();
 
         if (inodeHash.count(dirent->d_ino)) {
-            debug(format("'%1%' is already linked") % dirent->d_name);
+            debug("'%1%' is already linked", dirent->d_name);
             continue;
         }
 
@@ -102,7 +104,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
     {
-        debug(format("'%1%' is not allowed to be linked in macOS") % path);
+        debug("'%1%' is not allowed to be linked in macOS", path);
         return;
     }
 #endif
@@ -145,17 +147,27 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = hashPath(htSHA256, path).first;
-    debug(format("'%1%' has hash '%2%'") % path % hash.to_string(Base32, true));
+    Hash hash = ({
+        PosixSourceAccessor accessor;
+        hashPath(
+            accessor, CanonPath { path },
+            FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first;
+    });
+    debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
-    Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
+    Path linkPath = linksDir + "/" + hash.to_string(HashFormat::Nix32, false);
 
     /* Maybe delete the link, if it has been corrupted. */
     if (pathExists(linkPath)) {
         auto stLink = lstat(linkPath);
         if (st.st_size != stLink.st_size
-            || (repair && hash != hashPath(htSHA256, linkPath).first))
+            || (repair && hash != ({
+                PosixSourceAccessor accessor;
+                hashPath(
+                    accessor, CanonPath { linkPath },
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first;
+           })))
         {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link '%s'", linkPath);
@@ -196,11 +208,11 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     auto stLink = lstat(linkPath);
 
     if (st.st_ino == stLink.st_ino) {
-        debug(format("'%1%' is already linked to '%2%'") % path % linkPath);
+        debug("'%1%' is already linked to '%2%'", path, linkPath);
         return;
     }
 
-    printMsg(lvlTalkative, format("linking '%1%' to '%2%'") % path % linkPath);
+    printMsg(lvlTalkative, "linking '%1%' to '%2%'", path, linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
@@ -213,8 +225,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % realStoreDir % getpid() % random()).str();
+    Path tempLink = fmt("%1%/.tmp-link-%2%-%3%", realStoreDir, getpid(), random());
 
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
@@ -222,7 +233,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
             if (st.st_size)
-                printInfo(format("'%1%' has maximum number of links") % linkPath);
+                printInfo("'%1%' has maximum number of links", linkPath);
             return;
         }
         throw SysError("cannot link '%1%' to '%2%'", tempLink, linkPath);

@@ -1,4 +1,7 @@
 #include "logging.hh"
+#include "file-descriptor.hh"
+#include "environment-variables.hh"
+#include "terminal.hh"
 #include "util.hh"
 #include "config.hh"
 
@@ -32,7 +35,8 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    std::cout << s << "\n";
+    writeFull(STDOUT_FILENO, s);
+    writeFull(STDOUT_FILENO, "\n");
 }
 
 class SimpleLogger : public Logger
@@ -53,7 +57,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
 
@@ -64,14 +68,15 @@ public:
             switch (lvl) {
             case lvlError: c = '3'; break;
             case lvlWarn: c = '4'; break;
-            case lvlInfo: c = '5'; break;
+            case lvlNotice: case lvlInfo: c = '5'; break;
             case lvlTalkative: case lvlChatty: c = '6'; break;
-            default: c = '7';
+            case lvlDebug: case lvlVomit: c = '7'; break;
+            default: c = '7'; break; // should not happen, and missing enum case is reported by -Werror=switch-enum
             }
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(s, !tty) + "\n");
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -84,7 +89,7 @@ public:
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
-    override
+        override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
@@ -173,12 +178,12 @@ struct JSONLogger : Logger {
         prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         nlohmann::json json;
         json["action"] = "msg";
         json["level"] = lvl;
-        json["msg"] = fs.s;
+        json["msg"] = s;
         write(json);
     }
 
@@ -218,8 +223,8 @@ struct JSONLogger : Logger {
         json["level"] = lvl;
         json["type"] = type;
         json["text"] = s;
+        json["parent"] = parent;
         addFields(json, fields);
-        // FIXME: handle parent
         write(json);
     }
 

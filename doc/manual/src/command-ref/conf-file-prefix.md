@@ -4,49 +4,67 @@
 
 # Description
 
-By default Nix reads settings from the following places:
+Nix supports a variety of configuration settings, which are read from configuration files or taken as command line flags.
 
-  - The system-wide configuration file `sysconfdir/nix/nix.conf` (i.e.
-    `/etc/nix/nix.conf` on most systems), or `$NIX_CONF_DIR/nix.conf` if
-    `NIX_CONF_DIR` is set. Values loaded in this file are not forwarded
-    to the Nix daemon. The client assumes that the daemon has already
-    loaded them.
+## Configuration file
 
-  - If `NIX_USER_CONF_FILES` is set, then each path separated by `:`
-    will be loaded in reverse order.
+By default Nix reads settings from the following places, in that order:
 
-    Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS`
-    and `XDG_CONFIG_HOME`. If unset, `XDG_CONFIG_DIRS` defaults to
-    `/etc/xdg`, and `XDG_CONFIG_HOME` defaults to `$HOME/.config`
-    as per [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
+1. The system-wide configuration file `sysconfdir/nix/nix.conf` (i.e. `/etc/nix/nix.conf` on most systems), or `$NIX_CONF_DIR/nix.conf` if [`NIX_CONF_DIR`](./env-common.md#env-NIX_CONF_DIR) is set.
 
-  - If `NIX_CONFIG` is set, its contents is treated as the contents of
-    a configuration file.
+   Values loaded in this file are not forwarded to the Nix daemon.
+   The client assumes that the daemon has already loaded them.
 
-The configuration files consist of `name = value` pairs, one per
-line. Other files can be included with a line like `include path`,
-where *path* is interpreted relative to the current conf file and a
-missing file is an error unless `!include` is used instead. Comments
-start with a `#` character. Here is an example configuration file:
+1. If [`NIX_USER_CONF_FILES`](./env-common.md#env-NIX_USER_CONF_FILES) is set, then each path separated by `:` will be loaded in reverse order.
 
-    keep-outputs = true       # Nice for developers
-    keep-derivations = true   # Idem
+   Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS` and [`XDG_CONFIG_HOME`](./env-common.md#env-XDG_CONFIG_HOME).
+   If unset, `XDG_CONFIG_DIRS` defaults to `/etc/xdg`, and `XDG_CONFIG_HOME` defaults to `$HOME/.config` as per [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
 
-You can override settings on the command line using the `--option`
-flag, e.g. `--option keep-outputs false`. Every configuration setting
-also has a corresponding command line flag, e.g. `--max-jobs 16`; for
-Boolean settings, there are two flags to enable or disable the setting
-(e.g. `--keep-failed` and `--no-keep-failed`).
+1. If [`NIX_CONFIG`](./env-common.md#env-NIX_CONFIG) is set, its contents are treated as the contents of a configuration file.
 
-A configuration setting usually overrides any previous value. However,
-you can prefix the name of the setting by `extra-` to *append* to the
-previous value. For instance,
+### File format
 
-    substituters = a b
-    extra-substituters = c d
+Configuration files consist of `name = value` pairs, one per line.
+Comments start with a `#` character.
 
-defines the `substituters` setting to be `a b c d`. This is also
-available as a command line flag (e.g. `--extra-substituters`).
+Example:
 
-The following settings are currently available:
+```
+keep-outputs = true       # Nice for developers
+keep-derivations = true   # Idem
+```
+
+Other files can be included with a line like `include <path>`, where `<path>` is interpreted relative to the current configuration file.
+A missing file is an error unless `!include` is used instead.
+
+A configuration setting usually overrides any previous value.
+However, for settings that take a list of items, you can prefix the name of the setting by `extra-` to *append* to the previous value.
+
+For instance,
+
+```
+substituters = a b
+extra-substituters = c d
+```
+
+defines the `substituters` setting to be `a b c d`.
+
+Unknown option names are not an error, and are simply ignored with a warning.
+
+## Command line flags
+
+Configuration options can be set on the command line, overriding the values set in the [configuration file](#configuration-file):
+
+- Every configuration setting has corresponding command line flag (e.g. `--max-jobs 16`).
+  Boolean settings do not need an argument, and can be explicitly disabled with the `no-` prefix (e.g. `--keep-failed` and `--no-keep-failed`).
+
+  Unknown option names are invalid flags (unless there is already a flag with that name), and are rejected with an error.
+
+- The flag `--option <name> <value>` is interpreted exactly like a `<name> = <value>` in a setting file.
+
+  Unknown option names are ignored with a warning.
+
+The `extra-` prefix is supported for settings that take a list of items (e.g. `--extra-trusted users alice` or `--option extra-trusted-users alice`).
+
+# Available settings
 

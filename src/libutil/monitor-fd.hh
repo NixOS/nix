@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <thread>
 #include <atomic>
@@ -8,6 +9,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <signal.h>
+
+#include "signals.hh"
 
 namespace nix {
 

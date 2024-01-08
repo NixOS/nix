@@ -2,6 +2,7 @@
 #include "substitution-goal.hh"
 #include "nar-info.hh"
 #include "finally.hh"
+#include "signals.hh"
 
 namespace nix {
 
@@ -95,7 +96,9 @@ void PathSubstitutionGoal::tryNext()
     subs.pop_front();
 
     if (ca) {
-        subPath = sub->makeFixedOutputPathFromCA(storePath.name(), *ca);
+        subPath = sub->makeFixedOutputPathFromCA(
+            std::string { storePath.name() },
+            ContentAddressWithReferences::withoutRefs(*ca));
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {
@@ -198,11 +201,10 @@ void PathSubstitutionGoal::tryToRun()
 {
     trace("trying to run");
 
-    /* Make sure that we are allowed to start a build.  Note that even
-       if maxBuildJobs == 0 (no local builds allowed), we still allow
-       a substituter to run.  This is because substitutions cannot be
-       distributed to another machine via the build hook. */
-    if (worker.getNrLocalBuilds() >= std::max(1U, (unsigned int) settings.maxBuildJobs)) {
+    /* Make sure that we are allowed to start a substitution.  Note that even
+       if maxSubstitutionJobs == 0, we still allow a substituter to run. This
+       prevents infinite waiting. */
+    if (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         return;
     }
@@ -216,6 +218,8 @@ void PathSubstitutionGoal::tryToRun()
 
     thr = std::thread([this]() {
         try {
+            ReceiveInterrupts receiveInterrupts;
+
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide.close(); });
 

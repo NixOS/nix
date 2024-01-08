@@ -10,19 +10,8 @@
 
 <!-- Large change: Provide instructions to reviewers how to read the diff. -->
 
-# Checklist for maintainers
+# Priorities and Process
 
-<!-- Contributors: please leave this as is -->
+Add :+1: to [pull requests you find important](https://github.com/NixOS/nix/pulls?q=is%3Aopen+sort%3Areactions-%2B1-desc).
 
-Maintainers: tick if completed or explain if not relevant
-
- - [ ] agreed on idea
- - [ ] agreed on implementation strategy
- - [ ] tests, as appropriate
-   - functional tests - `tests/**.sh`
-   - unit tests - `src/*/tests`
-   - integration tests - `tests/nixos/*`
- - [ ] documentation in the manual
- - [ ] code and comments are self-explanatory
- - [ ] commit message explains why the change was made
- - [ ] new feature or incompatible change: updated release notes
+The Nix maintainer team uses a [GitHub project board](https://github.com/orgs/NixOS/projects/19) to [schedule and track reviews](https://github.com/NixOS/nix/tree/master/maintainers#project-board-protocol). 

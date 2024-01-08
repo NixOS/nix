@@ -1,12 +1,13 @@
+#include "current-process.hh"
 #include "run.hh"
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
 #include "finally.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
 #include "build/personality.hh"
@@ -24,6 +25,7 @@ std::string chrootHelperName = "__run_in_chroot";
 namespace nix {
 
 void runProgramInStore(ref<Store> store,
+    UseSearchPath useSearchPath,
     const std::string & program,
     const Strings & args,
     std::optional<std::string_view> system)
@@ -57,7 +59,10 @@ void runProgramInStore(ref<Store> store,
     if (system)
         setPersonality(*system);
 
-    execvp(program.c_str(), stringsToCharPtrs(args).data());
+    if (useSearchPath == UseSearchPath::Use)
+        execvp(program.c_str(), stringsToCharPtrs(args).data());
+    else
+        execv(program.c_str(), stringsToCharPtrs(args).data());
 
     throw SysError("unable to execute '%s'", program);
 }
@@ -97,7 +102,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
           ;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, Installables && installables) override
     {
         auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
 
@@ -119,9 +124,9 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             if (true)
                 unixPath.push_front(store->printStorePath(path) + "/bin");
 
-            auto propPath = store->printStorePath(path) + "/nix-support/propagated-user-env-packages";
-            if (accessor->stat(propPath).type == FSAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(readFile(propPath)))
+            auto propPath = CanonPath(store->printStorePath(path)) + "nix-support" + "propagated-user-env-packages";
+            if (auto st = accessor->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
+                for (auto & p : tokenizeString<Paths>(accessor->readFile(propPath)))
                     todo.push(store->parseStorePath(p));
             }
         }
@@ -131,13 +136,13 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         Strings args;
         for (auto & arg : command) args.push_back(arg);
 
-        runProgramInStore(store, *command.begin(), args);
+        runProgramInStore(store, UseSearchPath::Use, *command.begin(), args);
     }
 };
 
 static auto rCmdShell = registerCommand<CmdShell>("shell");
 
-struct CmdRun : InstallableCommand
+struct CmdRun : InstallableValueCommand
 {
     using InstallableCommand::run;
 
@@ -183,7 +188,7 @@ struct CmdRun : InstallableCommand
         return res;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto state = getEvalState();
 
@@ -193,7 +198,7 @@ struct CmdRun : InstallableCommand
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
 
-        runProgramInStore(store, app.program, allArgs);
+        runProgramInStore(store, UseSearchPath::DontUse, app.program, allArgs);
     }
 };
 

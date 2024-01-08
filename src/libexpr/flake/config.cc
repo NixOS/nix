@@ -1,6 +1,7 @@
-#include "flake.hh"
+#include "users.hh"
 #include "globals.hh"
 #include "fetch-settings.hh"
+#include "flake.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -31,7 +32,7 @@ static void writeTrustedList(const TrustedList & trustedList)
 
 void ConfigFile::apply()
 {
-    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-prefix", "bash-prompt-suffix", "flake-registry"};
+    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-prefix", "bash-prompt-suffix", "flake-registry", "commit-lockfile-summary"};
 
     for (auto & [name, value] : settings) {
 

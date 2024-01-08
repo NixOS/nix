@@ -1,8 +1,14 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
-#include "local-fs-store.hh"
 #include "finally.hh"
+#include "unix-domain-socket.hh"
+#include "signals.hh"
+
+#if !defined(__linux__)
+// For shelling out to lsof
+# include "processes.hh"
+#endif
 
 #include <functional>
 #include <queue>
@@ -33,8 +39,7 @@ static void makeSymlink(const Path & link, const Path & target)
     createDirs(dirOf(link));
 
     /* Create the new symlink. */
-    Path tempLink = (format("%1%.tmp-%2%-%3%")
-        % link % getpid() % random()).str();
+    Path tempLink = fmt("%1%.tmp-%2%-%3%", link, getpid(), random());
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
@@ -44,13 +49,13 @@ static void makeSymlink(const Path & link, const Path & target)
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    std::string hash = hashString(htSHA1, path).to_string(Base32, false);
+    std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
 
 
-Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
+Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
     Path gcRoot(canonPath(_gcRoot));
 
@@ -110,6 +115,11 @@ void LocalStore::createTempRootsFile()
 
 void LocalStore::addTempRoot(const StorePath & path)
 {
+    if (readOnly) {
+      debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
+      return;
+    }
+
     createTempRootsFile();
 
     /* Open/create the global GC lock file. */
@@ -196,7 +206,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 
         pid_t pid = std::stoi(i.name);
 
-        debug(format("reading temporary root file '%1%'") % path);
+        debug("reading temporary root file '%1%'", path);
         AutoCloseFD fd(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666));
         if (!fd) {
             /* It's okay if the file has disappeared. */
@@ -262,7 +272,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
                     if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
-                        printInfo(format("removing stale link from '%1%' to '%2%'") % path % target);
+                        printInfo("removing stale link from '%1%' to '%2%'", path, target);
                         unlink(path.c_str());
                     }
                 } else {
@@ -319,9 +329,7 @@ typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots
 
 static void readProcLink(const std::string & file, UncheckedRoots & roots)
 {
-    /* 64 is the starting buffer size gnu readlink uses... */
-    auto bufsiz = ssize_t{64};
-try_again:
+    constexpr auto bufsiz = PATH_MAX;
     char buf[bufsiz];
     auto res = readlink(file.c_str(), buf, bufsiz);
     if (res == -1) {
@@ -330,10 +338,7 @@ try_again:
         throw SysError("reading symlink");
     }
     if (res == bufsiz) {
-        if (SSIZE_MAX / 2 < bufsiz)
-            throw Error("stupidly long symlink");
-        bufsiz *= 2;
-        goto try_again;
+        throw Error("overly long symlink starting with '%1%'", std::string_view(buf, bufsiz));
     }
     if (res > 0 && buf[0] == '/')
         roots[std::string(static_cast<char *>(buf), res)]
@@ -371,29 +376,29 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
-                readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
-
-                auto fdStr = fmt("/proc/%s/fd", ent->d_name);
-                auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
-                if (!fdDir) {
-                    if (errno == ENOENT || errno == EACCES)
-                        continue;
-                    throw SysError("opening %1%", fdStr);
-                }
-                struct dirent * fd_ent;
-                while (errno = 0, fd_ent = readdir(fdDir.get())) {
-                    if (fd_ent->d_name[0] != '.')
-                        readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
-                }
-                if (errno) {
-                    if (errno == ESRCH)
-                        continue;
-                    throw SysError("iterating /proc/%1%/fd", ent->d_name);
-                }
-                fdDir.reset();
-
                 try {
+                    readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
+                    readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
+
+                    auto fdStr = fmt("/proc/%s/fd", ent->d_name);
+                    auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
+                    if (!fdDir) {
+                        if (errno == ENOENT || errno == EACCES)
+                            continue;
+                        throw SysError("opening %1%", fdStr);
+                    }
+                    struct dirent * fd_ent;
+                    while (errno = 0, fd_ent = readdir(fdDir.get())) {
+                        if (fd_ent->d_name[0] != '.')
+                            readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
+                    }
+                    if (errno) {
+                        if (errno == ESRCH)
+                            continue;
+                        throw SysError("iterating /proc/%1%/fd", ent->d_name);
+                    }
+                    fdDir.reset();
+
                     auto mapFile = fmt("/proc/%s/maps", ent->d_name);
                     auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile), "\n");
                     for (const auto & line : mapLines) {
@@ -563,7 +568,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     /* On macOS, accepted sockets inherit the
                        non-blocking flag from the server socket, so
                        explicitly make it blocking. */
-                    if (fcntl(fdServer.get(), F_SETFL, fcntl(fdServer.get(), F_GETFL) & ~O_NONBLOCK) == -1)
+                    if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
                         abort();
 
                     while (true) {
@@ -772,7 +777,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    /* Synchronisation point for testing, see tests/gc-concurrent.sh. */
+    /* Synchronisation point for testing, see tests/functional/gc-concurrent.sh. */
     if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
         readFile(*p);
 
@@ -862,7 +867,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 continue;
             }
 
-            printMsg(lvlTalkative, format("deleting unused link '%1%'") % path);
+            printMsg(lvlTalkative, "deleting unused link '%1%'", path);
 
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);

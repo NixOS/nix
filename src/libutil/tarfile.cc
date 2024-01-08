@@ -3,6 +3,7 @@
 
 #include "serialise.hh"
 #include "tarfile.hh"
+#include "file-system.hh"
 
 namespace nix {
 
@@ -17,7 +18,7 @@ static ssize_t callback_read(struct archive * archive, void * _self, const void 
     *buffer = self->buffer.data();
 
     try {
-        return self->source->read((char *) self->buffer.data(), 4096);
+        return self->source->read((char *) self->buffer.data(), self->buffer.size());
     } catch (EndOfFile &) {
         return 0;
     } catch (std::exception & err) {
@@ -39,7 +40,7 @@ void TarArchive::check(int err, const std::string & reason)
         throw Error(reason, archive_error_string(this->archive));
 }
 
-TarArchive::TarArchive(Source & source, bool raw) : buffer(4096)
+TarArchive::TarArchive(Source & source, bool raw) : buffer(65536)
 {
     this->archive = archive_read_new();
     this->source = &source;
@@ -52,6 +53,7 @@ TarArchive::TarArchive(Source & source, bool raw) : buffer(4096)
         archive_read_support_format_raw(archive);
         archive_read_support_format_empty(archive);
     }
+    archive_read_set_option(archive, NULL, "mac-ext", NULL);
     check(archive_read_open(archive, (void *)this, callback_open, callback_read, callback_close), "Failed to open archive (%s)");
 }
 
@@ -62,6 +64,7 @@ TarArchive::TarArchive(const Path & path)
 
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
+    archive_read_set_option(archive, NULL, "mac-ext", NULL);
     check(archive_read_open_filename(archive, path.c_str(), 16384), "failed to open archive: %s");
 }
 

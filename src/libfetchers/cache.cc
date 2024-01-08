@@ -1,4 +1,5 @@
 #include "cache.hh"
+#include "users.hh"
 #include "sqlite.hh"
 #include "sync.hh"
 #include "store-api.hh"
@@ -18,6 +19,9 @@ create table if not exists Cache (
     primary key (input)
 );
 )sql";
+
+// FIXME: we should periodically purge/nuke this cache to prevent it
+// from growing too big.
 
 struct CacheImpl : Cache
 {
@@ -47,8 +51,62 @@ struct CacheImpl : Cache
             "select info, path, immutable, timestamp from Cache where input = ?");
     }
 
+    void upsert(
+        const Attrs & inAttrs,
+        const Attrs & infoAttrs) override
+    {
+        _state.lock()->add.use()
+            (attrsToJSON(inAttrs).dump())
+            (attrsToJSON(infoAttrs).dump())
+            ("") // no path
+            (false)
+            (time(0)).exec();
+    }
+
+    std::optional<Attrs> lookup(const Attrs & inAttrs) override
+    {
+        if (auto res = lookupExpired(inAttrs))
+            return std::move(res->infoAttrs);
+        return {};
+    }
+
+    std::optional<Attrs> lookupWithTTL(const Attrs & inAttrs) override
+    {
+        if (auto res = lookupExpired(inAttrs)) {
+            if (!res->expired)
+                return std::move(res->infoAttrs);
+            debug("ignoring expired cache entry '%s'",
+                attrsToJSON(inAttrs).dump());
+        }
+        return {};
+    }
+
+    std::optional<Result2> lookupExpired(const Attrs & inAttrs) override
+    {
+        auto state(_state.lock());
+
+        auto inAttrsJSON = attrsToJSON(inAttrs).dump();
+
+        auto stmt(state->lookup.use()(inAttrsJSON));
+        if (!stmt.next()) {
+            debug("did not find cache entry for '%s'", inAttrsJSON);
+            return {};
+        }
+
+        auto infoJSON = stmt.getStr(0);
+        auto locked = stmt.getInt(2) != 0;
+        auto timestamp = stmt.getInt(3);
+
+        debug("using cache entry '%s' -> '%s'", inAttrsJSON, infoJSON);
+
+        return Result2 {
+            .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
+            .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
+        };
+    }
+
     void add(
-        ref<Store> store,
+        Store & store,
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
         const StorePath & storePath,
@@ -57,13 +115,13 @@ struct CacheImpl : Cache
         _state.lock()->add.use()
             (attrsToJSON(inAttrs).dump())
             (attrsToJSON(infoAttrs).dump())
-            (store->printStorePath(storePath))
+            (store.printStorePath(storePath))
             (locked)
             (time(0)).exec();
     }
 
     std::optional<std::pair<Attrs, StorePath>> lookup(
-        ref<Store> store,
+        Store & store,
         const Attrs & inAttrs) override
     {
         if (auto res = lookupExpired(store, inAttrs)) {
@@ -76,7 +134,7 @@ struct CacheImpl : Cache
     }
 
     std::optional<Result> lookupExpired(
-        ref<Store> store,
+        Store & store,
         const Attrs & inAttrs) override
     {
         auto state(_state.lock());
@@ -90,19 +148,19 @@ struct CacheImpl : Cache
         }
 
         auto infoJSON = stmt.getStr(0);
-        auto storePath = store->parseStorePath(stmt.getStr(1));
+        auto storePath = store.parseStorePath(stmt.getStr(1));
         auto locked = stmt.getInt(2) != 0;
         auto timestamp = stmt.getInt(3);
 
-        store->addTempRoot(storePath);
-        if (!store->isValidPath(storePath)) {
+        store.addTempRoot(storePath);
+        if (!store.isValidPath(storePath)) {
             // FIXME: we could try to substitute 'storePath'.
             debug("ignoring disappeared cache entry '%s'", inAttrsJSON);
             return {};
         }
 
         debug("using cache entry '%s' -> '%s', '%s'",
-            inAttrsJSON, infoJSON, store->printStorePath(storePath));
+            inAttrsJSON, infoJSON, store.printStorePath(storePath));
 
         return Result {
             .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),

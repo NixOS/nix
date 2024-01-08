@@ -1,7 +1,9 @@
 #pragma once
+///@file
 
-#include "util.hh"
 #include "sync.hh"
+#include "processes.hh"
+#include "file-system.hh"
 
 namespace nix {
 
@@ -27,6 +29,7 @@ private:
     Sync<State> state_;
 
     void addCommonSSHOpts(Strings & args);
+    bool isMasterRunning();
 
 public:
 

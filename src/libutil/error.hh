@@ -1,4 +1,19 @@
 #pragma once
+/**
+ * @file
+ *
+ * @brief This file defines two main structs/classes used in nix error handling.
+ *
+ * ErrorInfo provides a standard payload of error information, with conversion to string
+ * happening in the logger rather than at the call site.
+ *
+ * BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
+ * an ErrorInfo.
+ *
+ * ErrorInfo structs are sent to the logger as part of an exception, or directly with the
+ * logError or logWarning macros.
+ * See libutil/tests/logging.cc for usage examples.
+ */
 
 #include "suggestions.hh"
 #include "ref.hh"
@@ -10,6 +25,7 @@
 #include <memory>
 #include <map>
 #include <optional>
+#include <compare>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -26,22 +42,6 @@
 
 namespace nix {
 
-/*
-
-   This file defines two main structs/classes used in nix error handling.
-
-   ErrorInfo provides a standard payload of error information, with conversion to string
-   happening in the logger rather than at the call site.
-
-   BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
-   an ErrorInfo.
-
-   ErrorInfo structs are sent to the logger as part of an exception, or directly with the
-   logError or logWarning macros.
-
-   See libutil/tests/logging.cc for usage examples.
-
- */
 
 typedef enum {
     lvlError = 0,
@@ -54,20 +54,33 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-// the lines of code surrounding an error.
+/**
+ * The lines of code surrounding an error.
+ */
 struct LinesOfCode {
     std::optional<std::string> prevLineOfCode;
     std::optional<std::string> errLineOfCode;
     std::optional<std::string> nextLineOfCode;
 };
 
-/* An abstract type that represents a location in a source file. */
+/**
+ * An abstract type that represents a location in a source file.
+ */
 struct AbstractPos
 {
     uint32_t line = 0;
     uint32_t column = 0;
 
-    /* Return the contents of the source file. */
+    /**
+     * An AbstractPos may be a "null object", representing an unknown position.
+     *
+     * Return true if this position is known.
+     */
+    inline operator bool() const { return line != 0; };
+
+    /**
+     * Return the contents of the source file.
+     */
     virtual std::optional<std::string> getSource() const
     { return std::nullopt; };
 
@@ -76,6 +89,8 @@ struct AbstractPos
     std::optional<LinesOfCode> getCodeLines() const;
 
     virtual ~AbstractPos() = default;
+
+    inline auto operator<=>(const AbstractPos& rhs) const = default;
 };
 
 std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
@@ -91,6 +106,11 @@ struct Trace {
     bool frame;
 };
 
+inline bool operator<(const Trace& lhs, const Trace& rhs);
+inline bool operator> (const Trace& lhs, const Trace& rhs);
+inline bool operator<=(const Trace& lhs, const Trace& rhs);
+inline bool operator>=(const Trace& lhs, const Trace& rhs);
+
 struct ErrorInfo {
     Verbosity level;
     hintformat msg;
@@ -104,8 +124,10 @@ struct ErrorInfo {
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
 
-/* BaseError should generally not be caught, as it has Interrupted as
-   a subclass. Catch Error instead. */
+/**
+ * BaseError should generally not be caught, as it has Interrupted as
+ * a subclass. Catch Error instead.
+ */
 class BaseError : public std::exception
 {
 protected:
@@ -206,5 +228,9 @@ public:
     {
     }
 };
+
+/** Throw an exception for the purpose of checking that exception handling works; see 'initLibUtil()'.
+ */
+void throwExceptionSelfCheck();
 
 }

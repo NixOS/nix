@@ -1,6 +1,8 @@
 #include "sqlite.hh"
 #include "globals.hh"
 #include "util.hh"
+#include "url.hh"
+#include "signals.hh"
 
 #include <sqlite3.h>
 
@@ -50,15 +52,17 @@ static void traceSQL(void * x, const char * sql)
     notice("SQL<[%1%]>", sql);
 };
 
-SQLite::SQLite(const Path & path, bool create)
+SQLite::SQLite(const Path & path, SQLiteOpenMode mode)
 {
     // useSQLiteWAL also indicates what virtual file system we need.  Using
     // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
     // for Linux (WSL) where useSQLiteWAL should be false by default.
     const char *vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
-    int flags = SQLITE_OPEN_READWRITE;
-    if (create) flags |= SQLITE_OPEN_CREATE;
-    int ret = sqlite3_open_v2(path.c_str(), &db, flags, vfs);
+    bool immutable = mode == SQLiteOpenMode::Immutable;
+    int flags = immutable ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
+    if (mode == SQLiteOpenMode::Normal) flags |= SQLITE_OPEN_CREATE;
+    auto uri = "file:" + percentEncode(path) + "?immutable=" + (immutable ? "1" : "0");
+    int ret = sqlite3_open_v2(uri.c_str(), &db, SQLITE_OPEN_URI | flags, vfs);
     if (ret != SQLITE_OK) {
         const char * err = sqlite3_errstr(ret);
         throw Error("cannot open SQLite database '%s': %s", path, err);
@@ -239,14 +243,11 @@ SQLiteTxn::~SQLiteTxn()
     }
 }
 
-void handleSQLiteBusy(const SQLiteBusy & e)
+void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
 {
-    static std::atomic<time_t> lastWarned{0};
-
     time_t now = time(0);
-
-    if (now > lastWarned + 10) {
-        lastWarned = now;
+    if (now > nextWarning) {
+        nextWarning = now + 10;
         logWarning({
             .msg = hintfmt(e.what())
         });

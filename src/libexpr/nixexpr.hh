@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <map>
 #include <vector>
@@ -19,9 +20,17 @@ MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
-MakeError(RestrictedPathError, Error);
 
-/* Position objects. */
+class InfiniteRecursionError : public EvalError
+{
+    friend class EvalState;
+public:
+    using EvalError::EvalError;
+};
+
+/**
+ * Position objects.
+ */
 struct Pos
 {
     uint32_t line;
@@ -31,7 +40,7 @@ struct Pos
     struct Stdin { ref<std::string> source; };
     struct String { ref<std::string> source; };
 
-    typedef std::variant<none_tag, Stdin, String, Path> Origin;
+    typedef std::variant<none_tag, Stdin, String, SourcePath> Origin;
 
     Origin origin;
 
@@ -129,10 +138,13 @@ std::ostream & operator << (std::ostream & str, const Pos & pos);
 struct Env;
 struct Value;
 class EvalState;
+struct ExprWith;
 struct StaticEnv;
 
 
-/* An attribute path is a sequence of attribute names. */
+/**
+ * An attribute path is a sequence of attribute names.
+ */
 struct AttrName
 {
     Symbol symbol;
@@ -150,6 +162,10 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 struct Expr
 {
+    static unsigned long nrExprs;
+    Expr() {
+        nrExprs++;
+    }
     virtual ~Expr() { };
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
     virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
@@ -166,18 +182,16 @@ struct Expr
 
 struct ExprInt : Expr
 {
-    NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
+    ExprInt(NixInt n) { v.mkInt(n); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
 struct ExprFloat : Expr
 {
-    NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
+    ExprFloat(NixFloat nf) { v.mkFloat(nf); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
@@ -186,16 +200,20 @@ struct ExprString : Expr
 {
     std::string s;
     Value v;
-    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
+    ExprString(std::string &&s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
 struct ExprPath : Expr
 {
+    ref<InputAccessor> accessor;
     std::string s;
     Value v;
-    ExprPath(std::string s) : s(std::move(s)) { v.mkPath(this->s.c_str()); };
+    ExprPath(ref<InputAccessor> accessor, std::string s) : accessor(accessor), s(std::move(s))
+    {
+        v.mkPath(&*accessor, this->s.c_str());
+    }
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
@@ -209,14 +227,17 @@ struct ExprVar : Expr
     Symbol name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
-       or function argument) or from a "with". */
-    bool fromWith;
+       or function argument) or from a "with".
 
-    /* In the former case, the value is obtained by going `level'
+       `nullptr`: Not from a `with`.
+       Valid pointer: the nearest, innermost `with` expression to query first. */
+    ExprWith * fromWith;
+
+    /* In the former case, the value is obtained by going `level`
        levels up from the current environment and getting the
-       `displ'th value in that environment.  In the latter case, the
-       value is obtained by getting the attribute named `name' from
-       the set stored in the environment that is `level' levels up
+       `displ`th value in that environment.  In the latter case, the
+       value is obtained by getting the attribute named `name` from
+       the set stored in the environment that is `level` levels up
        from the current one.*/
     Level level;
     Displacement displ;
@@ -233,7 +254,7 @@ struct ExprSelect : Expr
     PosIdx pos;
     Expr * e, * def;
     AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
+    ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -243,7 +264,7 @@ struct ExprOpHasAttr : Expr
 {
     Expr * e;
     AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
+    ExprOpHasAttr(Expr * e, AttrPath attrPath) : e(e), attrPath(std::move(attrPath)) { };
     PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };
@@ -282,6 +303,7 @@ struct ExprList : Expr
     std::vector<Expr *> elems;
     ExprList() { };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env) override;
 
     PosIdx getPos() const override
     {
@@ -368,6 +390,7 @@ struct ExprWith : Expr
     PosIdx pos;
     Expr * attrs, * body;
     size_t prevWith;
+    ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -395,6 +418,7 @@ struct ExprOpNot : Expr
 {
     Expr * e;
     ExprOpNot(Expr * e) : e(e) { };
+    PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };
 
@@ -444,20 +468,30 @@ struct ExprPos : Expr
     COMMON_METHODS
 };
 
+/* only used to mark thunks as black holes. */
+struct ExprBlackHole : Expr
+{
+    void show(const SymbolTable & symbols, std::ostream & str) const override {}
+    void eval(EvalState & state, Env & env, Value & v) override;
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+};
+
+extern ExprBlackHole eBlackHole;
+
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at
    runtime. */
 struct StaticEnv
 {
-    bool isWith;
+    ExprWith * isWith;
     const StaticEnv * up;
 
     // Note: these must be in sorted order.
     typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
-    StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+    StaticEnv(ExprWith * isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
         vars.reserve(expectedSize);
     };
 

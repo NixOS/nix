@@ -2,21 +2,21 @@
 #include "url-parts.hh"
 #include "util.hh"
 #include "split.hh"
+#include "canon-path.hh"
 
 namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex badGitRefRegex(badGitRefRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
-std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
 
 ParsedURL parseURL(const std::string & url)
 {
     static std::regex uriRegex(
-        "((" + schemeRegex + "):"
+        "((" + schemeNameRegex + "):"
         + "(?:(?://(" + authorityRegex + ")(" + absPathRegex + "))|(/?" + pathRegex + ")))"
         + "(?:\\?(" + queryRegex + "))?"
-        + "(?:#(" + queryRegex + "))?",
+        + "(?:#(" + fragmentRegex + "))?",
         std::regex::ECMAScript);
 
     std::smatch match;
@@ -44,7 +44,7 @@ ParsedURL parseURL(const std::string & url)
             .base = base,
             .scheme = scheme,
             .authority = authority,
-            .path = path,
+            .path = percentDecode(path),
             .query = decodeQuery(query),
             .fragment = percentDecode(std::string(fragment))
         };
@@ -88,17 +88,22 @@ std::map<std::string, std::string> decodeQuery(const std::string & query)
     return result;
 }
 
-std::string percentEncode(std::string_view s)
+const static std::string allowedInQuery = ":@/?";
+const static std::string allowedInPath = ":@/";
+
+std::string percentEncode(std::string_view s, std::string_view keep)
 {
     std::string res;
     for (auto & c : s)
+        // unreserved + keep
         if ((c >= 'a' && c <= 'z')
             || (c >= 'A' && c <= 'Z')
             || (c >= '0' && c <= '9')
-            || strchr("-._~!$&'()*+,;=:@", c))
+            || strchr("-._~", c)
+            || keep.find(c) != std::string::npos)
             res += c;
         else
-            res += fmt("%%%02x", (unsigned int) c);
+            res += fmt("%%%02X", c & 0xFF);
     return res;
 }
 
@@ -109,9 +114,9 @@ std::string encodeQuery(const std::map<std::string, std::string> & ss)
     for (auto & [name, value] : ss) {
         if (!first) res += '&';
         first = false;
-        res += percentEncode(name);
+        res += percentEncode(name, allowedInQuery);
         res += '=';
-        res += percentEncode(value);
+        res += percentEncode(value, allowedInQuery);
     }
     return res;
 }
@@ -122,7 +127,7 @@ std::string ParsedURL::to_string() const
         scheme
         + ":"
         + (authority ? "//" + *authority : "")
-        + path
+        + percentEncode(path, allowedInPath)
         + (query.empty() ? "" : "?" + encodeQuery(query))
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
 }
@@ -135,6 +140,13 @@ bool ParsedURL::operator ==(const ParsedURL & other) const
         && path == other.path
         && query == other.query
         && fragment == other.fragment;
+}
+
+ParsedURL ParsedURL::canonicalise()
+{
+    ParsedURL res(*this);
+    res.path = CanonPath(res.path).abs();
+    return res;
 }
 
 /**
@@ -152,6 +164,31 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
         .application = application,
         .transport = transport,
     };
+}
+
+std::string fixGitURL(const std::string & url)
+{
+    std::regex scpRegex("([^/]*)@(.*):(.*)");
+    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
+        return std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+    else {
+        if (url.find("://") == std::string::npos) {
+            return (ParsedURL {
+                .scheme = "file",
+                .authority = "",
+                .path = url
+            }).to_string();
+        } else
+            return url;
+    }
+}
+
+// https://www.rfc-editor.org/rfc/rfc3986#section-3.1
+bool isValidSchemeName(std::string_view s)
+{
+    static std::regex regex(schemeNameRegex, std::regex::ECMAScript);
+
+    return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);
 }
 
 }

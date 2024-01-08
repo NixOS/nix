@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "ref.hh"
 #include "nar-info.hh"
@@ -42,8 +43,10 @@ public:
         const std::string & uri, const DrvOutput & id) = 0;
 };
 
-/* Return a singleton cache object that can be used concurrently by
-   multiple threads. */
+/**
+ * Return a singleton cache object that can be used concurrently by
+ * multiple threads.
+ */
 ref<NarInfoDiskCache> getNarInfoDiskCache();
 
 ref<NarInfoDiskCache> getTestNarInfoDiskCache(Path dbPath);

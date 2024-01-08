@@ -1,7 +1,7 @@
 #include "value-to-xml.hh"
 #include "xml-writer.hh"
 #include "eval-inline.hh"
-#include "util.hh"
+#include "signals.hh"
 
 #include <cstdlib>
 
@@ -18,21 +18,21 @@ static XMLAttrs singletonAttrs(const std::string & name, const std::string & val
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    Value & v, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
     const PosIdx pos);
 
 
 static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
 {
-    if (auto path = std::get_if<Path>(&pos.origin))
-        xmlAttrs["path"] = *path;
-    xmlAttrs["line"] = (format("%1%") % pos.line).str();
-    xmlAttrs["column"] = (format("%1%") % pos.column).str();
+    if (auto path = std::get_if<SourcePath>(&pos.origin))
+        xmlAttrs["path"] = path->path.abs();
+    xmlAttrs["line"] = fmt("%1%", pos.line);
+    xmlAttrs["column"] = fmt("%1%", pos.column);
 }
 
 
 static void showAttrs(EvalState & state, bool strict, bool location,
-    Bindings & attrs, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+    Bindings & attrs, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen)
 {
     StringSet names;
 
@@ -54,7 +54,7 @@ static void showAttrs(EvalState & state, bool strict, bool location,
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    Value & v, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
     const PosIdx pos)
 {
     checkInterrupt();
@@ -64,7 +64,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
     switch (v.type()) {
 
         case nInt:
-            doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % v.integer).str()));
+            doc.writeEmptyElement("int", singletonAttrs("value", fmt("%1%", v.integer)));
             break;
 
         case nBool:
@@ -74,11 +74,11 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
         case nString:
             /* !!! show the context? */
             copyContext(v, context);
-            doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
+            doc.writeEmptyElement("string", singletonAttrs("value", v.c_str()));
             break;
 
         case nPath:
-            doc.writeEmptyElement("path", singletonAttrs("value", v.path));
+            doc.writeEmptyElement("path", singletonAttrs("value", v.path().to_string()));
             break;
 
         case nNull:
@@ -96,14 +96,14 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value, a->pos);
                     if (a->value->type() == nString)
-                        xmlAttrs["drvPath"] = drvPath = a->value->string.s;
+                        xmlAttrs["drvPath"] = drvPath = a->value->c_str();
                 }
 
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value, a->pos);
                     if (a->value->type() == nString)
-                        xmlAttrs["outPath"] = a->value->string.s;
+                        xmlAttrs["outPath"] = a->value->c_str();
                 }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);
@@ -156,7 +156,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
 
         case nFloat:
-            doc.writeEmptyElement("float", singletonAttrs("value", (format("%1%") % v.fpoint).str()));
+            doc.writeEmptyElement("float", singletonAttrs("value", fmt("%1%", v.fpoint)));
             break;
 
         case nThunk:
@@ -166,7 +166,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
 
 void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
-    bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    bool location, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
     const PosIdx pos) const
 {
     doc.writeEmptyElement("unevaluated");
@@ -174,7 +174,7 @@ void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
 
 
 void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, std::ostream & out, PathSet & context, const PosIdx pos)
+    Value & v, std::ostream & out, NixStringContext & context, const PosIdx pos)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");

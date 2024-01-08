@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <cstdint>
 #include <cstdlib>
@@ -7,20 +8,24 @@
 
 namespace nix {
 
-/* Provides an indexable container like vector<> with memory overhead
-   guarantees like list<> by allocating storage in chunks of ChunkSize
-   elements instead of using a contiguous memory allocation like vector<>
-   does. Not using a single vector that is resized reduces memory overhead
-   on large data sets by on average (growth factor)/2, mostly
-   eliminates copies within the vector during resizing, and provides stable
-   references to its elements. */
+/**
+ * Provides an indexable container like vector<> with memory overhead
+ * guarantees like list<> by allocating storage in chunks of ChunkSize
+ * elements instead of using a contiguous memory allocation like vector<>
+ * does. Not using a single vector that is resized reduces memory overhead
+ * on large data sets by on average (growth factor)/2, mostly
+ * eliminates copies within the vector during resizing, and provides stable
+ * references to its elements.
+ */
 template<typename T, size_t ChunkSize>
 class ChunkedVector {
 private:
     uint32_t size_ = 0;
     std::vector<std::vector<T>> chunks;
 
-    /* keep this out of the ::add hot path */
+    /**
+     * Keep this out of the ::add hot path
+     */
     [[gnu::noinline]]
     auto & addChunk()
     {

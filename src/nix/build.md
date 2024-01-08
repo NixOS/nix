@@ -44,7 +44,7 @@ R""(
   `release.nix`:
 
   ```console
-  # nix build -f release.nix build.x86_64-linux
+  # nix build --file release.nix build.x86_64-linux
   ```
 
 * Build a NixOS system configuration from a flake, and make a profile
@@ -82,7 +82,7 @@ R""(
 
 # Description
 
-`nix build` builds the specified *installables*. Installables that
+`nix build` builds the specified *installables*. [Installables](./nix.md#installables) that
 resolve to derivations are built (or substituted if possible). Store
 path installables are substituted.
 

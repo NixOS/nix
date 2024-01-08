@@ -1,13 +1,14 @@
+#include "eval-settings.hh"
 #include "common-eval-args.hh"
 #include "shared.hh"
 #include "filetransfer.hh"
-#include "util.hh"
 #include "eval.hh"
 #include "fetchers.hh"
 #include "registry.hh"
 #include "flake/flakeref.hh"
 #include "store-api.hh"
 #include "command.hh"
+#include "tarball.hh"
 
 namespace nix {
 
@@ -105,7 +106,9 @@ MixEvalArgs::MixEvalArgs()
   )",
         .category = category,
         .labels = {"path"},
-        .handler = {[&](std::string s) { searchPath.push_back(s); }}
+        .handler = {[&](std::string s) {
+            searchPath.elements.emplace_back(SearchPath::Elem::parse(s));
+        }}
     });
 
     addFlag({
@@ -129,14 +132,18 @@ MixEvalArgs::MixEvalArgs()
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
         }},
-        .completer = {[&](size_t, std::string_view prefix) {
-            completeFlakeRef(openStore(), prefix);
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeRef(completions, openStore(), prefix);
         }}
     });
 
     addFlag({
         .longName = "eval-store",
-        .description = "The Nix store to use for evaluations.",
+        .description =
+          R"(
+            The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
+            to use for evaluation, i.e. to store derivations (`.drv` files) and inputs referenced by them.
+          )",
         .category = category,
         .labels = {"store-url"},
         .handler = {&evalStoreUrl},
@@ -149,7 +156,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     for (auto & i : autoArgs) {
         auto v = state.allocValue();
         if (i.second[0] == 'E')
-            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), absPath(".")));
+            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), state.rootPath(CanonPath::fromCwd())));
         else
             v->mkString(((std::string_view) i.second).substr(1));
         res.insert(state.symbols.create(i.first), v);
@@ -157,19 +164,19 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-Path lookupFileArg(EvalState & state, std::string_view s)
+SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto storePath = fetchers::downloadTarball(
-            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).first.storePath;
-        return state.store->toRealPath(storePath);
+            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).storePath;
+        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }
 
     else if (hasPrefix(s, "flake:")) {
-        settings.requireExperimentalFeature(Xp::Flakes);
+        experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
-        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first.storePath;
-        return state.store->toRealPath(storePath);
+        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
+        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }
 
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
@@ -178,7 +185,7 @@ Path lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else
-        return absPath(std::string(s));
+        return state.rootPath(CanonPath(s, baseDir));
 }
 
 }

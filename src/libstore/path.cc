@@ -1,6 +1,4 @@
-#include "store-api.hh"
-
-#include <sodium.h>
+#include "store-dir-config.hh"
 
 namespace nix {
 
@@ -9,8 +7,10 @@ static void checkName(std::string_view path, std::string_view name)
     if (name.empty())
         throw BadStorePath("store path '%s' has an empty name", path);
     if (name.size() > StorePath::MaxPathLen)
-        throw BadStorePath("store path '%s' has a name longer than '%d characters",
-            StorePath::MaxPathLen, path);
+        throw BadStorePath("store path '%s' has a name longer than %d characters",
+            path, StorePath::MaxPathLen);
+    if (name[0] == '.')
+        throw BadStorePath("store path '%s' starts with illegal character '.'", path);
     // See nameRegexStr for the definition
     for (auto c : name)
         if (!((c >= '0' && c <= '9')
@@ -33,7 +33,7 @@ StorePath::StorePath(std::string_view _baseName)
 }
 
 StorePath::StorePath(const Hash & hash, std::string_view _name)
-    : baseName((hash.to_string(Base32, false) + "-").append(std::string(_name)))
+    : baseName((hash.to_string(HashFormat::Nix32, false) + "-").append(std::string(_name)))
 {
     checkName(baseName, name());
 }
@@ -47,12 +47,10 @@ StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
 
 StorePath StorePath::random(std::string_view name)
 {
-    Hash hash(htSHA1);
-    randombytes_buf(hash.hash, hash.hashSize);
-    return StorePath(hash, name);
+    return StorePath(Hash::random(HashAlgorithm::SHA1), name);
 }
 
-StorePath Store::parseStorePath(std::string_view path) const
+StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 {
     auto p = canonPath(std::string(path));
     if (dirOf(p) != storeDir)
@@ -60,7 +58,7 @@ StorePath Store::parseStorePath(std::string_view path) const
     return StorePath(baseNameOf(p));
 }
 
-std::optional<StorePath> Store::maybeParseStorePath(std::string_view path) const
+std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
 {
     try {
         return parseStorePath(path);
@@ -69,24 +67,24 @@ std::optional<StorePath> Store::maybeParseStorePath(std::string_view path) const
     }
 }
 
-bool Store::isStorePath(std::string_view path) const
+bool StoreDirConfig::isStorePath(std::string_view path) const
 {
     return (bool) maybeParseStorePath(path);
 }
 
-StorePathSet Store::parseStorePathSet(const PathSet & paths) const
+StorePathSet StoreDirConfig::parseStorePathSet(const PathSet & paths) const
 {
     StorePathSet res;
     for (auto & i : paths) res.insert(parseStorePath(i));
     return res;
 }
 
-std::string Store::printStorePath(const StorePath & path) const
+std::string StoreDirConfig::printStorePath(const StorePath & path) const
 {
     return (storeDir + "/").append(path.to_string());
 }
 
-PathSet Store::printStorePathSet(const StorePathSet & paths) const
+PathSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
 {
     PathSet res;
     for (auto & i : paths) res.insert(printStorePath(i));

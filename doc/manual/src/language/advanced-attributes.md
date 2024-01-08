@@ -112,6 +112,13 @@ Derivations can declare some infrequently used optional attributes.
     > environmental variables come from the environment of the
     > `nix-build`.
 
+    If the [`configurable-impure-env` experimental
+    feature](@docroot@/contributing/experimental-features.md#xp-feature-configurable-impure-env)
+    is enabled, these environment variables can also be controlled
+    through the
+    [`impure-env`](@docroot@/command-ref/conf-file.md#conf-impure-env)
+    configuration setting.
+
   - [`outputHash`]{#adv-attr-outputHash}; [`outputHashAlgo`]{#adv-attr-outputHashAlgo}; [`outputHashMode`]{#adv-attr-outputHashMode}\
     These attributes declare that the derivation is a so-called
     *fixed-output derivation*, which means that a cryptographic hash of
@@ -198,8 +205,7 @@ Derivations can declare some infrequently used optional attributes.
 
       - `"recursive"`\
         The hash is computed over the NAR archive dump of the output
-        (i.e., the result of [`nix-store
-        --dump`](../command-ref/nix-store.md#operation---dump)). In
+        (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
         this case, the output can be anything, including a directory
         tree.
 
@@ -209,12 +215,28 @@ Derivations can declare some infrequently used optional attributes.
     about converting to and from base-32 notation.)
 
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
-    If this **experimental** attribute is set to true, then the derivation
+    > **Warning**
+    > This attribute is part of an [experimental feature](@docroot@/contributing/experimental-features.md).
+    >
+    > To use this attribute, you must enable the
+    > [`ca-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) experimental feature.
+    > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
+    >
+    > ```
+    > extra-experimental-features = ca-derivations
+    > ```
+
+    If this attribute is set to `true`, then the derivation
     outputs will be stored in a content-addressed location rather than the
     traditional input-addressed one.
-    This only has an effect if the `ca-derivations` experimental feature is enabled.
 
-    Setting this attribute also requires setting `outputHashMode` and `outputHashAlgo` like for *fixed-output derivations* (see above).
+    Setting this attribute also requires setting
+    [`outputHashMode`](#adv-attr-outputHashMode)
+    and
+    [`outputHashAlgo`](#adv-attr-outputHashAlgo)
+    like for *fixed-output derivations* (see above).
+
+    It also implicitly requires that the machine to build the derivation must have the `ca-derivations` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features).
 
   - [`passAsFile`]{#adv-attr-passAsFile}\
     A list of names of attributes that should be passed via files rather
@@ -235,41 +257,36 @@ Derivations can declare some infrequently used optional attributes.
     of the environment (typically, a few hundred kilobyte).
 
   - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
-    If this attribute is set to `true` and [distributed building is
-    enabled](../advanced-topics/distributed-builds.md), then, if
-    possible, the derivation will be built locally instead of forwarded
-    to a remote machine. This is appropriate for trivial builders
-    where the cost of doing a download or remote build would exceed
-    the cost of building locally.
+    If this attribute is set to `true` and [distributed building is enabled](../advanced-topics/distributed-builds.md), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
+    This is useful for derivations that are cheapest to build locally.
 
   - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\
-    If this attribute is set to `false`, then Nix will always build this
-    derivation; it will not try to substitute its outputs. This is
-    useful for very trivial derivations (such as `writeText` in Nixpkgs)
-    that are cheaper to build than to substitute from a binary cache.
+    If this attribute is set to `false`, then Nix will always build this derivation (locally or remotely); it will not try to substitute its outputs.
+    This is useful for derivations that are cheaper to build than to substitute.
+
+    This attribute can be ignored by setting [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) to `true`.
 
     > **Note**
     >
-    > You need to have a builder configured which satisfies the
-    > derivation’s `system` attribute, since the derivation cannot be
-    > substituted. Thus it is usually a good idea to align `system` with
-    > `builtins.currentSystem` when setting `allowSubstitutes` to
-    > `false`. For most trivial derivations this should be the case.
+    > If set to `false`, the [`builder`](./derivations.md#attr-builder) should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation
-    attributes are serialised in JSON format and made available to the
-    builder via the file `.attrs.json` in the builder’s temporary
-    directory. This obviates the need for [`passAsFile`](#adv-attr-passAsFile) since JSON files
-    have no size restrictions, unlike process environments.
+    attributes are serialised into a file in JSON format. The environment variable
+    `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build
+    and a [`nix-shell`](../command-ref/nix-shell.md). This obviates the need for
+    [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions,
+    unlike process environments.
 
     It also makes it possible to tweak derivation settings in a structured way; see
     [`outputChecks`](#adv-attr-outputChecks) for example.
 
     As a convenience to Bash builders,
-    Nix writes a script named `.attrs.sh` to the builder’s directory
-    that initialises shell variables corresponding to all attributes
-    that are representable in Bash. This includes non-nested
+    Nix writes a script that initialises shell variables
+    corresponding to all attributes that are representable in Bash. The
+    environment variable `NIX_ATTRS_SH_FILE` points to the exact
+    location of the script, both in a build and a
+    [`nix-shell`](../command-ref/nix-shell.md). This includes non-nested
     (associative) arrays. For example, the attribute `hardening.format = true`
     ends up as the Bash associative array element `${hardening[format]}`.
 
@@ -307,14 +324,6 @@ Derivations can declare some infrequently used optional attributes.
     ```
 
   - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
-    > **Warning**
-    > This is an experimental feature.
-    >
-    > To enable it, add the following to [nix.conf](../command-ref/conf-file.md):
-    >
-    > ```
-    > extra-experimental-features = discard-references
-    > ```
 
     When using [structured attributes](#adv-attr-structuredAttrs), the
     attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
@@ -330,3 +339,15 @@ Derivations can declare some infrequently used optional attributes.
     This is useful, for example, when generating self-contained filesystem images with
     their own embedded Nix store: hashes found inside such an image refer
     to the embedded store and not to the host's Nix store.
+
+- [`requiredSystemFeatures`]{#adv-attr-requiredSystemFeatures}\
+
+  If a derivation has the `requiredSystemFeatures` attribute, then Nix will only build it on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
+
+  For example, setting
+
+  ```nix
+  requiredSystemFeatures = [ "kvm" ];
+  ```
+
+  ensures that the derivation can only be built on a machine with the `kvm` feature.

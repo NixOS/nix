@@ -3,10 +3,13 @@
 #include "eval.hh"
 #include "symbol-table.hh"
 #include "util.hh"
+#include "print.hh"
 
 #include <cstdlib>
 
 namespace nix {
+
+ExprBlackHole eBlackHole;
 
 struct PosAdapter : AbstractPos
 {
@@ -31,9 +34,9 @@ struct PosAdapter : AbstractPos
                 // Get rid of the null terminators added by the parser.
                 return std::string(s.source->c_str());
             },
-            [](const Path & path) -> std::optional<std::string> {
+            [](const SourcePath & path) -> std::optional<std::string> {
                 try {
-                    return readFile(path);
+                    return path.readFile();
                 } catch (Error &) {
                     return std::nullopt;
                 }
@@ -47,7 +50,7 @@ struct PosAdapter : AbstractPos
             [&](const Pos::none_tag &) { out << "«none»"; },
             [&](const Pos::Stdin &) { out << "«stdin»"; },
             [&](const Pos::String & s) { out << "«string»"; },
-            [&](const Path & path) { out << path; }
+            [&](const SourcePath & path) { out << path; }
         }, origin);
     }
 };
@@ -60,45 +63,12 @@ Pos::operator std::shared_ptr<AbstractPos>() const
     return pos;
 }
 
-/* Displaying abstract syntax trees. */
-
-static void showString(std::ostream & str, std::string_view s)
-{
-    str << '"';
-    for (auto c : s)
-        if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
-        else if (c == '\n') str << "\\n";
-        else if (c == '\r') str << "\\r";
-        else if (c == '\t') str << "\\t";
-        else str << c;
-    str << '"';
-}
-
+// FIXME: remove, because *symbols* are abstract and do not have a single
+//        textual representation; see printIdentifier()
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 {
     std::string_view s = symbol;
-
-    if (s.empty())
-        str << "\"\"";
-    else if (s == "if") // FIXME: handle other keywords
-        str << '"' << s << '"';
-    else {
-        char c = s[0];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            showString(str, s);
-            return str;
-        }
-        for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') ||
-                  (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9') ||
-                  c == '_' || c == '\'' || c == '-')) {
-                showString(str, s);
-                return str;
-            }
-        str << s;
-    }
-    return str;
+    return printIdentifier(str, s);
 }
 
 void Expr::show(const SymbolTable & symbols, std::ostream & str) const
@@ -108,17 +78,17 @@ void Expr::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprInt::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << n;
+    str << v.integer;
 }
 
 void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << nf;
+    str << v.fpoint;
 }
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    showString(str, s);
+    printLiteralString(str, s);
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
@@ -363,6 +333,8 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
+    fromWith = nullptr;
+
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
     const StaticEnv * curEnv;
@@ -374,7 +346,6 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
         } else {
             auto i = curEnv->find(name);
             if (i != curEnv->vars.end()) {
-                fromWith = false;
                 this->level = level;
                 displ = i->second;
                 return;
@@ -390,7 +361,8 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
             .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
             .errPos = es.positions[pos]
         });
-    fromWith = true;
+    for (auto * e = env.get(); e && !fromWith; e = e->up)
+        fromWith = e->isWith;
     this->level = withLevel;
 }
 
@@ -423,7 +395,7 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
         es.exprEnvs.insert(std::make_pair(this, env));
 
     if (recursive) {
-        auto newEnv = std::make_shared<StaticEnv>(false, env.get(), recursive ? attrs.size() : 0);
+        auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), recursive ? attrs.size() : 0);
 
         Displacement displ = 0;
         for (auto & i : attrs)
@@ -465,7 +437,7 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
         es.exprEnvs.insert(std::make_pair(this, env));
 
     auto newEnv = std::make_shared<StaticEnv>(
-        false, env.get(),
+        nullptr, env.get(),
         (hasFormals() ? formals->formals.size() : 0) +
         (!arg ? 0 : 1));
 
@@ -501,7 +473,7 @@ void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
-    auto newEnv = std::make_shared<StaticEnv>(false, env.get(), attrs->attrs.size());
+    auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs->attrs.size());
 
     Displacement displ = 0;
     for (auto & i : attrs->attrs)
@@ -520,6 +492,10 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
+    parentWith = nullptr;
+    for (auto * e = env.get(); e && !parentWith; e = e->up)
+        parentWith = e->isWith;
+
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
        `with' if this one doesn't contain the desired attribute. */
@@ -536,7 +512,7 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
         es.exprEnvs.insert(std::make_pair(this, env));
 
     attrs->bindVars(es, env);
-    auto newEnv = std::make_shared<StaticEnv>(true, env.get());
+    auto newEnv = std::make_shared<StaticEnv>(this, env.get());
     body->bindVars(es, newEnv);
 }
 

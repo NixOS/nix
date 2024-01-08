@@ -1,18 +1,35 @@
 #include "globals.hh"
-#include "util.hh"
+#include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
+#include "users.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
 
 #include <algorithm>
 #include <map>
+#include <mutex>
 #include <thread>
 #include <dlfcn.h>
 #include <sys/utsname.h>
 
 #include <nlohmann/json.hpp>
 
+#ifdef __GLIBC__
+# include <gnu/lib-names.h>
+# include <nss.h>
+# include <dlfcn.h>
+#endif
+
+#if __APPLE__
+# include "processes.hh"
+#endif
+
+#include "config-impl.hh"
+
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 
 namespace nix {
 
@@ -30,28 +47,22 @@ static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
-    , nixStore(canonPath(getEnv("NIX_STORE_DIR").value_or(getEnv("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixDataDir(canonPath(getEnv("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
-    , nixLogDir(canonPath(getEnv("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
-    , nixStateDir(canonPath(getEnv("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnv("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
+    , nixStore(canonPath(getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
+    , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
+    , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
+    , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
+    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
+    , nixBinDir(canonPath(getEnvNonEmpty("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
-    , nixDaemonSocketFile(canonPath(getEnv("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
+    , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
-    lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
-    caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (caFile == "") {
-        for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-            if (pathExists(fn)) {
-                caFile = fn;
-                break;
-            }
-    }
+    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
+    if (sslOverride != "")
+        caFile = sslOverride;
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -72,12 +83,45 @@ Settings::Settings()
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
 
-    buildHook = getSelfExe().value_or("nix") + " __build-remote";
+    /* Set the build hook location
+
+       For builds we perform a self-invocation, so Nix has to be self-aware.
+       That is, it has to know where it is installed. We don't think it's sentient.
+
+       Normally, nix is installed according to `nixBinDir`, which is set at compile time,
+       but can be overridden. This makes for a great default that works even if this
+       code is linked as a library into some other program whose main is not aware
+       that it might need to be a build remote hook.
+
+       However, it may not have been installed at all. For example, if it's a static build,
+       there's a good chance that it has been moved out of its installation directory.
+       That makes `nixBinDir` useless. Instead, we'll query the OS for the path to the
+       current executable, using `getSelfExe()`.
+
+       As a last resort, we resort to `PATH`. Hopefully we find a `nix` there that's compatible.
+       If you're porting Nix to a new platform, that might be good enough for a while, but
+       you'll want to improve `getSelfExe()` to work on your platform.
+     */
+    std::string nixExePath = nixBinDir + "/nix";
+    if (!pathExists(nixExePath)) {
+        nixExePath = getSelfExe().value_or("nix");
+    }
+    buildHook = {
+        nixExePath,
+        "__build-remote",
+    };
 }
 
 void loadConfFile()
 {
-    globalConfig.applyConfigFile(settings.nixConfDir + "/nix.conf");
+    auto applyConfigFile = [&](const Path & path) {
+        try {
+            std::string contents = readFile(path);
+            globalConfig.applyConfig(contents, path);
+        } catch (SysError &) { }
+    };
+
+    applyConfigFile(settings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
@@ -85,7 +129,7 @@ void loadConfFile()
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        globalConfig.applyConfigFile(*file);
+        applyConfigFile(*file);
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
@@ -123,6 +167,29 @@ unsigned int Settings::getDefaultCores()
       return concurrency;
 }
 
+#if __APPLE__
+static bool hasVirt() {
+
+    int hasVMM;
+    int hvSupport;
+    size_t size;
+
+    size = sizeof(hasVMM);
+    if (sysctlbyname("kern.hv_vmm_present", &hasVMM, &size, NULL, 0) == 0) {
+        if (hasVMM)
+            return false;
+    }
+
+    // whether the kernel and hardware supports virt
+    size = sizeof(hvSupport);
+    if (sysctlbyname("kern.hv_support", &hvSupport, &size, NULL, 0) == 0) {
+        return hvSupport == 1;
+    } else {
+        return false;
+    }
+}
+#endif
+
 StringSet Settings::getDefaultSystemFeatures()
 {
     /* For backwards compatibility, accept some "features" that are
@@ -137,6 +204,11 @@ StringSet Settings::getDefaultSystemFeatures()
     #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
+    #endif
+
+    #if __APPLE__
+    if (hasVirt())
+        features.insert("apple-virt");
     #endif
 
     return features;
@@ -166,18 +238,6 @@ StringSet Settings::getDefaultExtraPlatforms()
     return extraPlatforms;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
-{
-    auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
-}
-
-void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
-{
-    if (!isExperimentalFeatureEnabled(feature))
-        throw MissingExperimentalFeature(feature);
-}
-
 bool Settings::isWSL1()
 {
     struct utsname utsbuf;
@@ -185,6 +245,13 @@ bool Settings::isWSL1()
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
     return hasSuffix(utsbuf.release, "-Microsoft");
+}
+
+Path Settings::getDefaultSSLCertFile()
+{
+    for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        if (pathAccessible(fn)) return fn;
+    return "";
 }
 
 const std::string nixVersion = PACKAGE_VERSION;
@@ -195,18 +262,18 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smDisabled, false},
 });
 
-template<> void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
+template<> SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const
 {
-    if (str == "true") value = smEnabled;
-    else if (str == "relaxed") value = smRelaxed;
-    else if (str == "false") value = smDisabled;
+    if (str == "true") return smEnabled;
+    else if (str == "relaxed") return smRelaxed;
+    else if (str == "false") return smDisabled;
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> bool BaseSetting<SandboxMode>::isAppendable()
+template<> struct BaseSetting<SandboxMode>::trait
 {
-    return false;
-}
+    static constexpr bool appendable = false;
+};
 
 template<> std::string BaseSetting<SandboxMode>::to_string() const
 {
@@ -238,23 +305,23 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     });
 }
 
-void MaxBuildJobsSetting::set(const std::string & str, bool append)
+unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
-    if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
+    if (str == "auto") return std::max(1U, std::thread::hardware_concurrency());
     else {
         if (auto n = string2Int<decltype(value)>(str))
-            value = *n;
+            return *n;
         else
             throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
     }
 }
 
 
-void PluginFilesSetting::set(const std::string & str, bool append)
+Paths PluginFilesSetting::parse(const std::string & str) const
 {
     if (pluginsLoaded)
         throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    BaseSetting<Paths>::set(str, append);
+    return BaseSetting<Paths>::parse(str);
 }
 
 
@@ -291,6 +358,42 @@ void initPlugins()
     settings.pluginFiles.pluginsLoaded = true;
 }
 
+static void preloadNSS()
+{
+    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
+       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
+       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
+       load its lookup libraries in the parent before any child gets a chance to. */
+    static std::once_flag dns_resolve_flag;
+
+    std::call_once(dns_resolve_flag, []() {
+#ifdef __GLIBC__
+        /* On linux, glibc will run every lookup through the nss layer.
+         * That means every lookup goes, by default, through nscd, which acts as a local
+         * cache.
+         * Because we run builds in a sandbox, we also remove access to nscd otherwise
+         * lookups would leak into the sandbox.
+         *
+         * But now we have a new problem, we need to make sure the nss_dns backend that
+         * does the dns lookups when nscd is not available is loaded or available.
+         *
+         * We can't make it available without leaking nix's environment, so instead we'll
+         * load the backend, and configure nss so it does not try to run dns lookups
+         * through nscd.
+         *
+         * This is technically only used for builtins:fetch* functions so we only care
+         * about dns.
+         *
+         * All other platforms are unaffected.
+         */
+        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
+            warn("unable to load nss_dns backend");
+        // FIXME: get hosts entry from nsswitch.conf.
+        __nss_configure_lookup("hosts", "files dns");
+#endif
+    });
+}
+
 static bool initLibStoreDone = false;
 
 void assertLibStoreInitialized() {
@@ -301,6 +404,21 @@ void assertLibStoreInitialized() {
 }
 
 void initLibStore() {
+
+    initLibUtil();
+
+    loadConfFile();
+
+    preloadNSS();
+
+    /* On macOS, don't use the per-session TMPDIR (as set e.g. by
+       sshd). This breaks build users because they don't have access
+       to the TMPDIR, in particular in ‘nix-store --serve’. */
+#if __APPLE__
+    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
+        unsetenv("TMPDIR");
+#endif
+
     initLibStoreDone = true;
 }
 

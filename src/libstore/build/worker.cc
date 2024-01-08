@@ -4,6 +4,7 @@
 #include "drv-output-substitution-goal.hh"
 #include "local-derivation-goal.hh"
 #include "hook-instance.hh"
+#include "signals.hh"
 
 #include <poll.h>
 
@@ -18,6 +19,7 @@ Worker::Worker(Store & store, Store & evalStore)
 {
     /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;
+    nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
     permanentFailure = false;
     timedOut = false;
@@ -92,6 +94,7 @@ std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const Sto
     return goal;
 }
 
+
 std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput& id, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     std::weak_ptr<DrvOutputSubstitutionGoal> & goal_weak = drvOutputSubstitutionGoals[id];
@@ -103,6 +106,23 @@ std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal
     }
     return goal;
 }
+
+
+GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
+{
+    return std::visit(overloaded {
+        [&](const DerivedPath::Built & bfd) -> GoalPtr {
+            if (auto bop = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath))
+                return makeDerivationGoal(bop->path, bfd.outputs, buildMode);
+            else
+                throw UnimplementedError("Building dynamic derivations in one shot is not yet implemented.");
+        },
+        [&](const DerivedPath::Opaque & bo) -> GoalPtr {
+            return makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair);
+        },
+    }, req.raw());
+}
+
 
 template<typename K, typename G>
 static void removeGoal(std::shared_ptr<G> goal, std::map<K, std::weak_ptr<G>> & goalMap)
@@ -161,6 +181,12 @@ unsigned Worker::getNrLocalBuilds()
 }
 
 
+unsigned Worker::getNrSubstitutions()
+{
+    return nrSubstitutions;
+}
+
+
 void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     bool inBuildSlot, bool respectTimeouts)
 {
@@ -172,7 +198,18 @@ void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
-    if (inBuildSlot) nrLocalBuilds++;
+    if (inBuildSlot) {
+        switch (goal->jobCategory()) {
+        case JobCategory::Substitution:
+            nrSubstitutions++;
+            break;
+        case JobCategory::Build:
+            nrLocalBuilds++;
+            break;
+        default:
+            abort();
+        }
+    }
 }
 
 
@@ -183,8 +220,18 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
     if (i == children.end()) return;
 
     if (i->inBuildSlot) {
-        assert(nrLocalBuilds > 0);
-        nrLocalBuilds--;
+        switch (goal->jobCategory()) {
+        case JobCategory::Substitution:
+            assert(nrSubstitutions > 0);
+            nrSubstitutions--;
+            break;
+        case JobCategory::Build:
+            assert(nrLocalBuilds > 0);
+            nrLocalBuilds--;
+            break;
+        default:
+            abort();
+        }
     }
 
     children.erase(i);
@@ -205,7 +252,9 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     debug("wait for build slot");
-    if (getNrLocalBuilds() < settings.maxBuildJobs)
+    bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
+    if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs) ||
+        (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
         wakeUp(goal); /* we can do it right away */
     else
         addToWeakGoals(wantingToBuild, goal);
@@ -233,7 +282,10 @@ void Worker::run(const Goals & _topGoals)
     for (auto & i : _topGoals) {
         topGoals.insert(i);
         if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
-            topPaths.push_back(DerivedPath::Built{goal->drvPath, goal->wantedOutputs});
+            topPaths.push_back(DerivedPath::Built {
+                .drvPath = makeConstantStorePathRef(goal->drvPath),
+                .outputs = goal->wantedOutputs,
+            });
         } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Opaque{goal->storePath});
         }
@@ -435,16 +487,9 @@ void Worker::waitForInput()
 }
 
 
-unsigned int Worker::exitStatus()
+unsigned int Worker::failingExitStatus()
 {
-    /*
-     * 1100100
-     *    ^^^^
-     *    |||`- timeout
-     *    ||`-- output hash mismatch
-     *    |`--- build failure
-     *    `---- not deterministic
-     */
+    // See API docs in header for explanation
     unsigned int mask = 0;
     bool buildFailure = permanentFailure || timedOut || hashMismatch;
     if (buildFailure)
@@ -473,8 +518,10 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash.type, store.printStorePath(path));
-        Hash nullHash(htSHA256);
+        HashResult current = hashPath(
+            *store.getFSAccessor(), CanonPath { store.printStorePath(path) },
+            FileIngestionMethod::Recursive, info->narHash.algo);
+        Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }
     pathContentsGoodCache.insert_or_assign(path, res);
@@ -490,10 +537,13 @@ void Worker::markContentsGood(const StorePath & path)
 }
 
 
-GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal) {
+GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal)
+{
     return subGoal;
 }
-GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal) {
+
+GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
+{
     return subGoal;
 }
 

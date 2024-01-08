@@ -3,12 +3,12 @@ if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
 __ETC_PROFILE_NIX_SOURCED=1
 
 NIX_LINK=$HOME/.nix-profile
-if [ -n "$XDG_STATE_HOME" ]; then
+if [ -n "${XDG_STATE_HOME-}" ]; then
     NIX_LINK_NEW="$XDG_STATE_HOME/nix/profile"
 else
     NIX_LINK_NEW=$HOME/.local/state/nix/profile
 fi
-if ! [ -e "$NIX_LINK" ]; then
+if [ -e "$NIX_LINK_NEW" ]; then
     NIX_LINK="$NIX_LINK_NEW"
 else
     if [ -t 2 ] && [ -e "$NIX_LINK_NEW" ]; then
@@ -29,6 +29,14 @@ else
 fi
 
 export NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_LINK"
+
+# Populate bash completions, .desktop files, etc
+if [ -z "${XDG_DATA_DIRS-}" ]; then
+    # According to XDG spec the default is /usr/local/share:/usr/share, don't set something that prevents that default
+    export XDG_DATA_DIRS="/usr/local/share:/usr/share:$NIX_LINK/share:/nix/var/nix/profiles/default/share"
+else
+    export XDG_DATA_DIRS="$XDG_DATA_DIRS:$NIX_LINK/share:/nix/var/nix/profiles/default/share"
+fi
 
 # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
 if [ -n "${NIX_SSL_CERT_FILE:-}" ]; then

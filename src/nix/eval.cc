@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -11,13 +11,13 @@
 
 using namespace nix;
 
-struct CmdEval : MixJSON, InstallableCommand
+struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval() : InstallableCommand(true /* supportReadOnlyMode */)
+    CmdEval() : InstallableValueCommand()
     {
         addFlag({
             .longName = "raw",
@@ -54,7 +54,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         if (raw && json)
             throw UsageError("--raw and --json are mutually exclusive");
@@ -62,11 +62,11 @@ struct CmdEval : MixJSON, InstallableCommand
         auto state = getEvalState();
 
         auto [v, pos] = installable->toValue(*state);
-        PathSet context;
+        NixStringContext context;
 
         if (apply) {
             auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, absPath(".")), *vApply);
+            state->eval(state->parseExprFromString(*apply, state->rootPath(CanonPath::fromCwd())), *vApply);
             auto vRes = state->allocValue();
             state->callFunction(*vApply, *v, *vRes, noPos);
             v = vRes;
@@ -85,7 +85,7 @@ struct CmdEval : MixJSON, InstallableCommand
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
-                    writeFile(path, v.string.s);
+                    writeFile(path, v.string_view());
                 else if (v.type() == nAttrs) {
                     if (mkdir(path.c_str(), 0777) == -1)
                         throw SysError("creating directory '%s'", path);
@@ -112,11 +112,11 @@ struct CmdEval : MixJSON, InstallableCommand
 
         else if (raw) {
             stopProgressBar();
-            std::cout << *state->coerceToString(noPos, *v, context, "while generating the eval command output");
+            writeFull(STDOUT_FILENO, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {
-            std::cout << printValueAsJSON(*state, true, *v, pos, context, false).dump() << std::endl;
+            logger->cout("%s", printValueAsJSON(*state, true, *v, pos, context, false));
         }
 
         else {

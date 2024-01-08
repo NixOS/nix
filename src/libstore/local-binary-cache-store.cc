@@ -11,6 +11,13 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
     const std::string name() override { return "Local Binary Cache Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "local-binary-cache-store.md"
+          ;
+    }
 };
 
 class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore
@@ -88,6 +95,10 @@ protected:
         return paths;
     }
 
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return Trusted;
+    }
 };
 
 void LocalBinaryCacheStore::init()

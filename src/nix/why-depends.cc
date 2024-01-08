@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "store-api.hh"
 #include "progress-bar.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "shared.hh"
 
 #include <queue>
@@ -38,17 +38,13 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         expectArgs({
             .label = "package",
             .handler = {&_package},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeInstallable(prefix);
-            }}
+            .completer = getCompleteInstallable(),
         });
 
         expectArgs({
             .label = "dependency",
             .handler = {&_dependency},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeInstallable(prefix);
-            }}
+            .completer = getCompleteInstallable(),
         });
 
         addFlag({
@@ -179,7 +175,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         struct BailOut { };
 
         printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
-            auto pathS = store->printStorePath(node.path);
+            CanonPath pathS(store->printStorePath(node.path));
 
             assert(node.dist != inf);
             if (precise) {
@@ -187,7 +183,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     firstPad,
                     node.visited ? "\e[38;5;244m" : "",
                     firstPad != "" ? "→ " : "",
-                    pathS);
+                    pathS.abs());
             }
 
             if (node.path == dependencyPath && !all
@@ -214,24 +210,25 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                contain the reference. */
             std::map<std::string, Strings> hits;
 
-            std::function<void(const Path &)> visitPath;
+            std::function<void(const CanonPath &)> visitPath;
 
-            visitPath = [&](const Path & p) {
-                auto st = accessor->stat(p);
+            visitPath = [&](const CanonPath & p) {
+                auto st = accessor->maybeLstat(p);
+                assert(st);
 
-                auto p2 = p == pathS ? "/" : std::string(p, pathS.size() + 1);
+                auto p2 = p == pathS ? "/" : p.abs().substr(pathS.abs().size() + 1);
 
                 auto getColour = [&](const std::string & hash) {
                     return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
                 };
 
-                if (st.type == FSAccessor::Type::tDirectory) {
+                if (st->type == SourceAccessor::Type::tDirectory) {
                     auto names = accessor->readDirectory(p);
-                    for (auto & name : names)
-                        visitPath(p + "/" + name);
+                    for (auto & [name, type] : names)
+                        visitPath(p + name);
                 }
 
-                else if (st.type == FSAccessor::Type::tRegular) {
+                else if (st->type == SourceAccessor::Type::tRegular) {
                     auto contents = accessor->readFile(p);
 
                     for (auto & hash : hashes) {
@@ -239,7 +236,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                         if (pos != std::string::npos) {
                             size_t margin = 32;
                             auto pos2 = pos >= margin ? pos - margin : 0;
-                            hits[hash].emplace_back(fmt("%s: …%s…\n",
+                            hits[hash].emplace_back(fmt("%s: …%s…",
                                     p2,
                                     hilite(filterPrintable(
                                             std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
@@ -249,13 +246,13 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     }
                 }
 
-                else if (st.type == FSAccessor::Type::tSymlink) {
+                else if (st->type == SourceAccessor::Type::tSymlink) {
                     auto target = accessor->readLink(p);
 
                     for (auto & hash : hashes) {
                         auto pos = target.find(hash);
                         if (pos != std::string::npos)
-                            hits[hash].emplace_back(fmt("%s -> %s\n", p2,
+                            hits[hash].emplace_back(fmt("%s -> %s", p2,
                                     hilite(target, pos, StorePath::HashLen, getColour(hash))));
                     }
                 }
@@ -272,9 +269,9 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
                 for (auto & hit : hits[hash]) {
                     bool first = hit == *hits[hash].begin();
-                    std::cout << tailPad
-                              << (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine))
-                              << hit;
+                    logger->cout("%s%s%s", tailPad,
+                              (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine)),
+                              hit);
                     if (!all) break;
                 }
 

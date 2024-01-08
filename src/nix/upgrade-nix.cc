@@ -1,8 +1,10 @@
+#include "processes.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"
 #include "filetransfer.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "attr-path.hh"
 #include "names.hh"
 #include "progress-bar.hh"
@@ -12,7 +14,6 @@ using namespace nix;
 struct CmdUpgradeNix : MixDryRun, StoreCommand
 {
     Path profileDir;
-    std::string storePathsUrl = "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix";
 
     CmdUpgradeNix()
     {
@@ -28,13 +29,21 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             .longName = "nix-store-paths-url",
             .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
-            .handler = {&storePathsUrl}
+            .handler = {&(std::string&) settings.upgradeNixStorePathUrl}
         });
+    }
+
+    /**
+     * This command is stable before the others
+     */
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return std::nullopt;
     }
 
     std::string description() override
     {
-        return "upgrade Nix to the stable version declared in Nixpkgs";
+        return "upgrade Nix to the latest stable version";
     }
 
     std::string doc() override
@@ -135,12 +144,12 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = FileTransferRequest(storePathsUrl);
+        auto req = FileTransferRequest((std::string&) settings.upgradeNixStorePathUrl);
         auto res = getFileTransfer()->download(req);
 
-        auto state = std::make_unique<EvalState>(Strings(), store);
+        auto state = std::make_unique<EvalState>(SearchPath{}, store);
         auto v = state->allocValue();
-        state->eval(state->parseExprFromString(res.data, "/no-such-path"), *v);
+        state->eval(state->parseExprFromString(res.data, state->rootPath(CanonPath("/no-such-path"))), *v);
         Bindings & bindings(*state->allocBindings(0));
         auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
 

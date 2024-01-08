@@ -3,11 +3,13 @@
 set -eu
 set -o pipefail
 
+# System specific settings
+export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-301}"
+export NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
+
 readonly NIX_DAEMON_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
 # create by default; set 0 to DIY, use a symlink, etc.
 readonly NIX_VOLUME_CREATE=${NIX_VOLUME_CREATE:-1} # now default
-NIX_FIRST_BUILD_UID="301"
-NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
 # caution: may update times on / if not run as normal non-root user
 read_only_root() {
@@ -100,7 +102,7 @@ poly_extra_try_me_commands() {
 poly_configure_nix_daemon_service() {
     task "Setting up the nix-daemon LaunchDaemon"
     _sudo "to set up the nix-daemon as a LaunchDaemon" \
-          /bin/cp -f "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
+          /usr/bin/install -m -rw-r--r-- "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
 
     _sudo "to load the LaunchDaemon plist for nix-daemon" \
           launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist

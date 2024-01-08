@@ -1,5 +1,4 @@
 #include "user-env.hh"
-#include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
@@ -19,10 +18,10 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     DrvInfos elems;
     if (pathExists(userEnv + "/manifest.json"))
         throw Error("profile '%s' is incompatible with 'nix-env'; please use 'nix profile' instead", userEnv);
-    Path manifestFile = userEnv + "/manifest.nix";
+    auto manifestFile = userEnv + "/manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
-        state.evalFile(manifestFile, v);
+        state.evalFile(state.rootPath(CanonPath(manifestFile)).resolveSymlinks(), v);
         Bindings & bindings(*state.allocBindings(0));
         getDerivations(state, v, "", bindings, elems, false);
     }
@@ -41,7 +40,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         if (auto drvPath = i.queryDrvPath())
             drvsToBuild.push_back({*drvPath});
 
-    debug(format("building user environment dependencies"));
+    debug("building user environment dependencies");
     state.store->buildPaths(
         toDerivedPaths(drvsToBuild),
         state.repair ? bmRepair : bmNormal);
@@ -105,23 +104,26 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
        environment. */
-    std::ostringstream str;
-    manifest.print(state.symbols, str, true);
-    auto manifestFile = state.store->addTextToStore("env-manifest.nix",
-        str.str(), references);
+    auto manifestFile = ({
+        std::ostringstream str;
+        manifest.print(state.symbols, str, true);
+        // TODO with C++20 we can use str.view() instead and avoid copy.
+        std::string str2 = str.str();
+        StringSource source { str2 };
+        state.store->addToStoreFromDump(
+            source, "env-manifest.nix", TextIngestionMethod {}, HashAlgorithm::SHA256, references);
+    });
 
     /* Get the environment builder expression. */
     Value envBuilder;
     state.eval(state.parseExprFromString(
         #include "buildenv.nix.gen.hh"
-            , "/"), envBuilder);
+            , state.rootPath(CanonPath::root)), envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
     auto attrs = state.buildBindings(3);
-    attrs.alloc("manifest").mkString(
-        state.store->printStorePath(manifestFile),
-        {state.store->printStorePath(manifestFile)});
+    state.mkStorePathString(manifestFile, attrs.alloc("manifest"));
     attrs.insert(state.symbols.create("derivations"), &manifest);
     Value args;
     args.mkAttrs(attrs);
@@ -131,8 +133,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
-    PathSet context;
+    state.forceValue(topLevel, topLevel.determinePos(noPos));
+    NixStringContext context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
     auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context, "");
     Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
@@ -159,8 +161,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             return false;
         }
 
-        debug(format("switching to new user environment"));
-        Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
+        debug("switching to new user environment");
+        Path generation = createGeneration(*store2, profile, topLevelOut);
         switchLink(profile, generation);
     }
 
