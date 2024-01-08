@@ -194,7 +194,10 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
     if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
-        assert(info.references.size() == 0);
+        if (!info.references.empty()) {
+            throw Error("fixed output derivation '%s' is not allowed to refer to other store paths.\nYou may need to use the 'unsafeDiscardReferences' derivation attribute, see the manual for more details.",
+                name);
+        }
         return makeStorePath("output:out",
             hashString(HashAlgorithm::SHA256,
                 "fixed:out:"
