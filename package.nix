@@ -167,6 +167,10 @@ in {
           ./doc/manual
         ] ++ lib.optionals enableInternalAPIDocs [
           ./doc/internal-api
+          # Source might not be compiled, but still must be available
+          # for Doxygen to gather comments.
+          ./src
+          ./tests/unit
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
         ] ++ lib.optionals doInstallCheck [
