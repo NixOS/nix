@@ -184,6 +184,9 @@ in {
           ./doc/manual
         ] ++ lib.optionals enableInternalAPIDocs [
           ./doc/internal-api
+        ] ++ lib.optionals enableExternalAPIDocs [
+          ./doc/external-api
+        ] ++ lib.optionals (enableInternalAPIDocs || enableExternalAPIDocs) [
           # Source might not be compiled, but still must be available
           # for Doxygen to gather comments.
           ./src

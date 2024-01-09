@@ -129,3 +129,12 @@ internal-api-html:
 	@echo "Internal API docs are disabled. Configure with '--enable-internal-api-docs', or avoid calling 'make internal-api-html'."
 	@exit 1
 endif
+
+ifeq ($(ENABLE_EXTERNAL_API_DOCS), yes)
+$(eval $(call include-sub-makefile, doc/external-api/local.mk))
+else
+.PHONY: external-api-html
+external-api-html:
+	@echo "External API docs are disabled. Configure with '--enable-external-api-docs', or avoid calling 'make external-api-html'."
+	@exit 1
+endif

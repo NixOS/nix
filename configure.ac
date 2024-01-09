@@ -177,6 +177,10 @@ AC_ARG_ENABLE(internal-api-docs, AS_HELP_STRING([--enable-internal-api-docs],[Bu
   ENABLE_INTERNAL_API_DOCS=$enableval, ENABLE_INTERNAL_API_DOCS=no)
 AC_SUBST(ENABLE_INTERNAL_API_DOCS)
 
+AC_ARG_ENABLE(external-api-docs, AS_HELP_STRING([--enable-external-api-docs],[Build API docs for Nix's external unstable C interfaces]),
+  ENABLE_EXTERNAL_API_DOCS=$enableval, ENABLE_EXTERNAL_API_DOCS=no)
+AC_SUBST(ENABLE_EXTERNAL_API_DOCS)
+
 AS_IF(
   [test "$ENABLE_FUNCTIONAL_TESTS" == "yes" || test "$ENABLE_DOC_GEN" == "yes"],
   [NEED_PROG(jq, jq)])
