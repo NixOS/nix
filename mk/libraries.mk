@@ -10,6 +10,12 @@ else
   endif
 endif
 
+ifdef HOST_UNIX
+  THREAD_LDFLAGS = -pthread
+else
+  THREAD_LDFLAGS =
+endif
+
 # Build a library with symbolic name $(1).  The library is defined by
 # various variables prefixed by ‘$(1)_’:
 #
