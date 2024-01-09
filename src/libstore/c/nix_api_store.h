@@ -109,7 +109,7 @@ bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath *
 /**
  * @brief Realise a Nix store path
  *
- * Blocking, calls callback once for each realisedoutput
+ * Blocking, calls callback once for each realised output
  *
  * @param[out] context Optional, stores error information
  * @param[in] store Nix Store reference
