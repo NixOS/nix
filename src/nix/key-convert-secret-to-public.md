@@ -14,6 +14,6 @@ R""(
 
 This command reads a Ed25519 secret key from standard input, and
 writes the corresponding public key to standard output. For more
-details, see [nix key generate-secret](./nix3-key-generate-secret.md).
+details, see [nix key generate-secret](key-generate-secret.md).
 
 )""
