@@ -1,1 +1,1 @@
-[ null «primop toString» «partially applied primop deepSeq» «lambda @ /pwd/lang/eval-okay-print.nix:1:61» [ [ «repeated» ] ] ]
+[ null <PRIMOP> <PRIMOP-APP> <LAMBDA> [ [ «repeated» ] ] ]
