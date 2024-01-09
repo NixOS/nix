@@ -187,7 +187,7 @@ namespace nix::fetchers {
                     this->parsers
                 );
 
-                schema = std::make_shared<Schema>(Schema{attrSchema});
+                schema = std::make_shared<Schema>(attrSchema);
                 this->attrSchema = std::get_if<Schema::Attrs>(&schema->choice);
                 assert(this->attrSchema);
             }

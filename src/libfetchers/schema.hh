@@ -42,6 +42,9 @@ struct Schema {
 
     std::variant<Primitive, Attrs> choice;
     bool operator==(const Schema & other) const;
+
+    Schema(Primitive && p) : choice(p) {};
+    Schema(Attrs && p) : choice(p) {};
 };
 
 }
