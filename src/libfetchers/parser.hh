@@ -2,10 +2,12 @@
 
 #include "attrs.hh"
 #include "error.hh"
+#include "libexpr/nixexpr.hh"
 #include "schema.hh"
 #include "map.hh"
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace nix::fetchers {
 
@@ -26,6 +28,11 @@ namespace nix::fetchers {
 
         virtual std::shared_ptr<Schema> getSchema() const = 0;
         virtual Out parse (const In & in) const = 0;
+        virtual In unparse (const Out & out) const = 0;
+        virtual std::string show(const Out_ & out) const {
+            // FIXME
+            return "<error>";
+        };
     };
     
     namespace parsers {
@@ -35,6 +42,8 @@ namespace nix::fetchers {
         public:
             std::shared_ptr<Schema> getSchema() const override;
             std::string parse(const Attr & in) const override;
+            Attr unparse(const std::string & out) const override;
+            // std::string show(const std::string & out) const override;
         };
 
         /** Accepts an int `Attr`. Rejects the other types. */
@@ -42,6 +51,8 @@ namespace nix::fetchers {
         public:
             std::shared_ptr<Schema> getSchema() const override;
             uint64_t parse(const Attr & in) const override;
+            Attr unparse(const uint64_t & out) const override;
+            // std::string show(const uint64_t & out) const override;
         };
 
         /** Accepts a bool `Attr`. Rejects the other types. */
@@ -49,7 +60,39 @@ namespace nix::fetchers {
         public:
             std::shared_ptr<Schema> getSchema() const override;
             bool parse(const Attr & in) const override;
+            Attr unparse(const bool & out) const override;
+            // std::string show(const bool & out) const override;
         };
+
+        // TODO
+        // template <typename Out>
+        // class Enum : public Parser<Attr, Out> {
+        //     std::map<Attr, Out> values;
+        //     std::map<Out, Attr> reverseValues;
+            
+        // public:
+        //     Enum(std::map<Attr, Out> values) : values(values) {}
+
+        //     std::shared_ptr<Schema> getSchema() const override {
+        //         // FIXME
+        //         throw Error("not implemented");
+        //     }
+
+        //     Out parse(const Attr & in) const override {
+        //         auto it = values.find(in);
+        //         if (it != values.end()) {
+        //             return it->second;
+        //         } else {
+        //             throw Error("expected one of: %s", mapJoin(values, ", ", [](auto & pair) {
+        //                 return pair.first.toString();
+        //             }));
+        //         }
+        //     }
+
+        //     std::string show(const Out & out) const override {
+        //         throw UnimplementedError("Enum.show");
+        //     }
+        // };
 
         template <typename Out>
         class Attr : public Parser<std::optional<nix::fetchers::Attr>, Out>{
@@ -58,6 +101,8 @@ namespace nix::fetchers {
             Attr(std::string name) : name(name) {}
 
             virtual Out parse(const std::optional<nix::fetchers::Attr> & in) const override = 0;
+
+            // virtual std::optional<nix::fetchers::Attr> unparse(const Out & out) const override = 0;
 
             virtual bool isRequired() const = 0;
 
@@ -69,10 +114,17 @@ namespace nix::fetchers {
 
             virtual std::shared_ptr<Schema> getAttrValueSchema() const = 0;
 
+            virtual std::optional<std::string> showDefaultValue() const {
+                return std::nullopt;
+            }
+
+            // std::string show(const Out & out) const override;
+
             Schema::Attrs::Attr getAttrSchema() {
                 Schema::Attrs::Attr attrSchema;
                 attrSchema.type = getAttrValueSchema();
                 attrSchema.required = isRequired();
+                attrSchema.defaultValue = showDefaultValue();
                 return attrSchema;
             }
         };
@@ -88,13 +140,14 @@ namespace nix::fetchers {
             }
         }
 
-        template <typename Parser>
+        template <typename From, typename Parser>
         class OptionalAttr : public Attr<std::optional<typename Parser::Out>> {
             Parser parser;
+            std::function<std::optional<typename Parser::Out>(const From &)> restore;
 
         public:
-            OptionalAttr(std::string name, Parser parser)
-                : Attr<std::optional<typename Parser::Out>>(name), parser(parser) {}
+            OptionalAttr(std::string name, Parser parser, std::function<std::optional<typename Parser::Out>(const From &)> restore)
+                : Attr<std::optional<typename Parser::Out>>(name), parser(parser), restore(restore) {}
 
             bool isRequired() const override { return false; }
 
@@ -107,18 +160,32 @@ namespace nix::fetchers {
                 }
             }
 
+            std::optional<nix::fetchers::Attr> unparse(const std::optional<typename Parser::Out> & out) const override {
+                // "map"
+                if (out) {
+                    return parser.unparse(*out);
+                } else {
+                    return std::nullopt;
+                }
+            }
+
+            std::optional<nix::fetchers::Attr> unparseAttr(const From & out) const {
+                return unparse(restore(out));
+            }
+
             std::shared_ptr<Schema> getAttrValueSchema() const override {
                 return parser.getSchema();
             }
         };
 
-        template <typename Parser>
+        template <typename From, typename Parser>
         class RequiredAttr : public Attr<typename Parser::Out> {
             Parser parser;
+            std::function<typename Parser::Out(const From &)> restore;
 
         public:
-            RequiredAttr(std::string name, Parser parser)
-                : Attr<typename Parser::Out>(name), parser(parser) {}
+            RequiredAttr(std::string name, Parser parser, std::function<typename Parser::Out(const From &)> restore)
+                : Attr<typename Parser::Out>(name), parser(parser), restore(restore) {}
 
             bool isRequired() const override { return true; }
 
@@ -130,11 +197,58 @@ namespace nix::fetchers {
                 }
             }
 
+            std::optional<nix::fetchers::Attr> unparse(const typename Parser::Out & out) const override {
+                return parser.unparse(out);
+            }
+
+            std::optional<nix::fetchers::Attr> unparseAttr(const From & out) const {
+                return unparse(restore(out));
+            }
+
             std::shared_ptr<Schema> getAttrValueSchema() const override {
                 return parser.getSchema();
             }
         };
 
+        template <typename From, typename Parser>
+        class DefaultAttr : public Attr<typename Parser::Out> {
+            Parser parser;
+            typename Parser::Out defaultValue;
+            std::function<typename Parser::Out(const From &)> restore;
+
+        public:
+            DefaultAttr(std::string name, Parser parser, typename Parser::Out defaultValue, std::function<typename Parser::Out(const From &)> restore)
+                : Attr<typename Parser::Out>(name), parser(parser), defaultValue(defaultValue), restore(restore) {}
+
+            bool isRequired() const override { return false; }
+
+            typename Parser::Out parse(const std::optional<nix::fetchers::Attr> & in) const override {
+                if (in) {
+                    return parser.parse(*in);
+                } else {
+                    return defaultValue;
+                }
+            }
+
+            std::optional<nix::fetchers::Attr> unparse(const typename Parser::Out & out) const override {
+                // We might do this, but then the output is less useful.
+                // if (out == defaultValue)
+                //     return std::nullopt;
+                return parser.unparse(out);
+            }
+
+            std::optional<nix::fetchers::Attr> unparseAttr(const From & out) const {
+                return unparse(restore(out));
+            }
+
+            std::optional<std::string> showDefaultValue() const override {
+                return parser.show(defaultValue);
+            }
+
+            std::shared_ptr<Schema> getAttrValueSchema() const override {
+                return parser.getSchema();
+            }
+        };
 
         /**
             Perform a side effect for each item in a tuple. `f` must be callable for each item.
@@ -181,13 +295,13 @@ namespace nix::fetchers {
                 Schema::Attrs attrSchema;
 
                 traverse_(
-                    [this, &attrSchema](auto * parser) {
+                    [&attrSchema](auto * parser) {
                         attrSchema.attrs[parser->name] = parser->getAttrSchema();
                     },
                     this->parsers
                 );
 
-                schema = std::make_shared<Schema>(attrSchema);
+                schema = std::make_shared<Schema>(Schema(attrSchema));
                 this->attrSchema = std::get_if<Schema::Attrs>(&schema->choice);
                 assert(this->attrSchema);
             }
@@ -204,6 +318,22 @@ namespace nix::fetchers {
                     },
                     parsers
                 );
+            }
+
+            nix::fetchers::Attrs unparse(const std::invoke_result_t<Callable, typename AttrParsers::Out ...> & out) const override {
+                nix::fetchers::Attrs ret;
+                // for each of the parsers, unparse the output and add it to the attrs in ret
+                traverse_(
+                    [&ret, &out](auto * parser) {
+                        auto attr = parser->unparseAttr(out);
+                        if (attr) {
+                            ret[parser->name] = *attr;
+                        }
+                    },
+                    parsers
+                );
+                
+                return ret;
             }
 
             std::shared_ptr<Schema> getSchema() const override {

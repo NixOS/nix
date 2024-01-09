@@ -17,6 +17,10 @@ namespace nix::fetchers {
             throw Error("expected a string, but value is of type " + attrType(in));
     }
 
+    nix::fetchers::Attr parsers::String::unparse (const std::string & in) const {
+        return in;
+    }
+
     // parsers::Int
 
     std::shared_ptr<Schema> parsers::Int::getSchema() const {
@@ -31,6 +35,10 @@ namespace nix::fetchers {
             throw Error("expected an int, but value is of type " + attrType(in));
     }
 
+    nix::fetchers::Attr parsers::Int::unparse (const uint64_t & in) const {
+        return in;
+    }
+
     // parsers::Bool
 
     std::shared_ptr<Schema> parsers::Bool::getSchema() const {
@@ -43,5 +51,9 @@ namespace nix::fetchers {
             return r->t;
         else
             throw Error("expected a bool, but value is of type " + attrType(in));
+    }
+
+    nix::fetchers::Attr parsers::Bool::unparse (const bool & in) const {
+        return Explicit<bool>{in};
     }
 }

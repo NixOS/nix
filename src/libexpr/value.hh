@@ -7,7 +7,7 @@
 
 #include "symbol-table.hh"
 #include "value/context.hh"
-#include "input-accessor.hh"
+#include "libfetchers/input-accessor.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>

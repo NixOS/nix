@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <variant>
 #include <array>
 
@@ -20,6 +21,7 @@ struct Schema {
         struct Attr {
             bool required;
             std::shared_ptr<Schema> type;
+            std::optional<std::string> defaultValue;
             bool operator==(const Attr & other) const;
         };
         std::map<std::string, Attr> attrs;
@@ -43,8 +45,8 @@ struct Schema {
     std::variant<Primitive, Attrs> choice;
     bool operator==(const Schema & other) const;
 
-    Schema(Primitive && p) : choice(p) {};
-    Schema(Attrs && p) : choice(p) {};
+    Schema(Primitive p) : choice(p) {};
+    Schema(Attrs p) : choice(p) {};
 };
 
 }

@@ -9,6 +9,7 @@
 #include "types.hh"
 #include "split.hh"
 #include "posix-source-accessor.hh"
+#include "parser.hh"
 
 namespace nix::fetchers {
 
@@ -183,6 +184,48 @@ DownloadTarballResult downloadTarball(
     };
 }
 
+struct TarballAttrs {
+    std::string url;
+    std::optional<std::string> narHash;
+    std::optional<std::string> name;
+    std::optional<std::string> rev;
+    std::optional<int> revCount;
+    std::optional<int> lastModified;
+};
+
+static const auto tarballAttrParser = []{
+    using namespace nix::fetchers::parsers;
+    return parsers::Attrs(
+        [](
+            std::string typ,
+            std::string url,
+            std::optional<std::string> narHash,
+            // Had to make this optional to make the tests pass. fetchTree does not allow name?
+            std::optional<std::string> name,
+            std::optional<std::string> rev,
+            std::optional<int> revCount,
+            std::optional<int> lastModified
+        ) {
+            return TarballAttrs {
+                .url = url,
+                .narHash = narHash,
+                .name = name,
+                .rev = rev,
+                .revCount = revCount,
+                .lastModified = lastModified,
+            };
+        },
+        new DefaultAttr<TarballAttrs,String>("type", String {} /* TODO check either missing or "tarball" */, "type", [](auto x) { return "tarball"; }),
+        new RequiredAttr<TarballAttrs,String>("url", String {}, [](auto x) { return x.url; }),
+        new OptionalAttr<TarballAttrs,String>("narHash", String {}, [](auto x) { return x.narHash; }),
+        // new DefaultAttr<TarballAttrs,String>("name", String {}, "source", [](const TarballAttrs & x) { return x.name; }),
+        new OptionalAttr<TarballAttrs,String>("name", String {}, [](auto x) { return x.name; }),
+        new OptionalAttr<TarballAttrs,String>("rev", String {}, [](auto x) { return x.rev; }),
+        new OptionalAttr<TarballAttrs,Int>("revCount", Int {}, [](auto x) { return x.revCount; }),
+        new OptionalAttr<TarballAttrs,Int>("lastModified", Int {}, [](auto x) { return x.lastModified; })
+    );
+}();
+
 // An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
@@ -298,9 +341,11 @@ struct TarballInputScheme : CurlInputScheme
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
-        Input input(_input);
-        auto url = getStrAttr(input.attrs, "url");
-        auto result = downloadTarball(store, url, input.getName(), false);
+        std::cerr << "parsing input attrs" << std::endl;
+        std::cerr << _input.to_string() << std::endl;
+        TarballAttrs input = tarballAttrParser.parse(_input.attrs);
+        // Input input(_input);
+        auto result = downloadTarball(store, input.url, input.name ? *input.name : "source", false);
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);
@@ -308,13 +353,20 @@ struct TarballInputScheme : CurlInputScheme
             // here, e.g. git flakes.
             if (immutableInput.getType() != "tarball")
                 throw Error("tarball 'Link' headers that redirect to non-tarball URLs are not supported");
-            input = immutableInput;
+            
+            return {result.storePath, immutableInput};
         }
 
-        if (result.lastModified && !input.attrs.contains("lastModified"))
-            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
+        if (result.lastModified && !input.lastModified)
+            input.lastModified = uint64_t(result.lastModified);
 
-        return {result.storePath, std::move(input)};
+        Input input2;
+        input2.scheme = std::make_shared<TarballInputScheme>();
+        input2.attrs = tarballAttrParser.unparse(input);
+        std::cerr << "unparsed" << std::endl;
+        std::cerr << input2.to_string() << std::endl;
+
+        return {result.storePath, std::move(input2)};
     }
 };
 
