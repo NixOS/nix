@@ -13,6 +13,7 @@
 , changelog-d
 , curl
 , editline
+, readline
 , fileset
 , flex
 , git
@@ -70,6 +71,14 @@
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
+
+# Which interactive line editor library to use for Nix's repl.
+#
+# Currently supported choices are:
+#
+# - editline (default)
+# - readline
+, readlineFlavor ? if stdenv.hostPlatform.isWindows then "readline" else "editline"
 
 # Whether to compile `rl-next.md`, the release notes for the next
 # not-yet-released version of Nix in the manul, from the individual
@@ -219,7 +228,7 @@ in {
     sqlite
     xz
   ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-    editline
+    ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [
     lowdown
   ] ++ lib.optionals buildUnitTests [
@@ -279,6 +288,7 @@ in {
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature enableMarkdown "markdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
+    (lib.withFeatureAs true "readline-flavor" readlineFlavor)
   ] ++ lib.optionals (!forDevShell) [
     "--sysconfdir=/etc"
   ] ++ lib.optionals installUnitTests [

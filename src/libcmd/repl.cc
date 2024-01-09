@@ -5,7 +5,7 @@
 
 #include <setjmp.h>
 
-#ifdef READLINE
+#ifdef USE_READLINE
 #include <readline/history.h>
 #include <readline/readline.h>
 #else
@@ -249,14 +249,14 @@ void NixRepl::mainLoop()
     } catch (SysError & e) {
         logWarning(e.info());
     }
-#ifndef READLINE
+#ifndef USE_READLINE
     el_hist_size = 1000;
 #endif
     read_history(historyFile.c_str());
     auto oldRepl = curRepl;
     curRepl = this;
     Finally restoreRepl([&] { curRepl = oldRepl; });
-#ifndef READLINE
+#ifndef USE_READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #endif

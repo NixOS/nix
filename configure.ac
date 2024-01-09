@@ -251,17 +251,25 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 # Look for libcurl, a required dependency.
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
 
-# Look for editline, a required dependency.
+# Look for editline or readline, a required dependency.
 # The the libeditline.pc file was added only in libeditline >= 1.15.2,
 # see https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
-# but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
-# editline.h when the pkg-config approach fails.
-PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"], [
-  AC_CHECK_HEADERS([editline.h], [true],
-    [AC_MSG_ERROR([Nix requires libeditline; it was found neither via pkg-config nor its normal header.])])
-  AC_SEARCH_LIBS([readline read_history], [editline], [],
-    [AC_MSG_ERROR([Nix requires libeditline; it was not found via pkg-config, but via its header, but required functions do not work. Maybe it is too old? >= 1.14 is required.])])
-])
+# Older versions are no longer supported.
+AC_ARG_WITH(
+  [readline-flavor],
+  AS_HELP_STRING([--with-readline-flavor],[Which library to use for nice line editting with the Nix language REPL" [default=editline]]),
+  [readline_flavor=$withval],
+  [readline_flavor=editline])
+AS_CASE(["$readline_flavor"],
+  [editline], [
+    readline_flavor_pc=libeditline
+  ],
+  [readline], [
+    readline_flavor_pc=readline
+    AC_DEFINE([USE_READLINE], [1], [Use readline instead of editline])
+  ],
+  [AC_MSG_ERROR([bad value "$readline_flavor" for --with-readline-flavor, must be one of: editline, readline])])
+PKG_CHECK_MODULES([EDITLINE], [$readline_flavor_pc], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"])
 
 # Look for libsodium.
 PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
@@ -387,8 +395,7 @@ AS_CASE(["$enable_markdown"],
     ])
   ],
   [no], [have_lowdown=],
-  [AC_MSG_ERROR([--enable-markdown must be one of: yes, no, auto])])
-AC_SUBST(HAVE_LOWDOWN, [$have_lowdown])
+  [AC_MSG_ERROR([bad value "$enable_markdown" for --enable-markdown, must be one of: yes, no, auto])])
 
 
 # Look for libgit2.
