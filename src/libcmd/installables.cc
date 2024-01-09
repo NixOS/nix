@@ -715,7 +715,7 @@ BuiltPaths Installable::toBuiltPaths(
     }
 }
 
-StorePathSet Installable::toStorePaths(
+StorePathSet Installable::toStorePathSet(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
@@ -729,13 +729,27 @@ StorePathSet Installable::toStorePaths(
     return outPaths;
 }
 
+StorePaths Installable::toStorePaths(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode, OperateOn operateOn,
+    const Installables & installables)
+{
+    StorePaths outPaths;
+    for (auto & path : toBuiltPaths(evalStore, store, mode, operateOn, installables)) {
+        auto thisOutPaths = path.outPaths();
+        outPaths.insert(outPaths.end(), thisOutPaths.begin(), thisOutPaths.end());
+    }
+    return outPaths;
+}
+
 StorePath Installable::toStorePath(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
     ref<Installable> installable)
 {
-    auto paths = toStorePaths(evalStore, store, mode, operateOn, {installable});
+    auto paths = toStorePathSet(evalStore, store, mode, operateOn, {installable});
 
     if (paths.size() != 1)
         throw Error("argument '%s' should evaluate to one store path", installable->what());

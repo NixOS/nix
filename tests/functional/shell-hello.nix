@@ -23,4 +23,20 @@ with import ./config.nix;
         chmod +x $dev/bin/hello2
       '';
   };
+
+  salve-mundi = mkDerivation {
+    name = "salve-mundi";
+    outputs = [ "out" ];
+    meta.outputsToInstall = [ "out" ];
+    buildCommand =
+      ''
+        mkdir -p $out/bin
+
+        cat > $out/bin/hello <<EOF
+        #! ${shell}
+        echo "Salve Mundi from $out/bin/hello"
+        EOF
+        chmod +x $out/bin/hello
+      '';
+  };
 }
