@@ -12,6 +12,9 @@
 
 namespace nix::fetchers {
 
+/**
+ * A primitive value that can be used in a fetcher attribute.
+ */
 typedef std::variant<std::string, uint64_t, Explicit<bool>> Attr;
 
 /**
@@ -20,6 +23,13 @@ typedef std::variant<std::string, uint64_t, Explicit<bool>> Attr;
  * and also not containing any `null`s.
  */
 typedef std::map<std::string, Attr> Attrs;
+
+/**
+ * A lowercase string designating the type of an `Attr`.
+ *
+ * Matches `builtins.typeOf` in Nix.
+ */
+std::string attrType(const Attr & attr);
 
 Attrs jsonToAttrs(const nlohmann::json & json);
 
