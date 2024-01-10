@@ -43,7 +43,7 @@ static void nix_c_primop_wrapper(
     PrimOpFun f, void * userdata, nix::EvalState & state, const nix::PosIdx pos, nix::Value ** args, nix::Value & v)
 {
     nix_c_context ctx;
-    f(userdata, &ctx, (State *) &state, (Value **) args, (Value *) &v);
+    f(userdata, &ctx, (EvalState *) &state, (Value **) args, (Value *) &v);
     /* TODO: In the future, this should throw different errors depending on the error code */
     if (ctx.last_err_code != NIX_OK)
         state.debugThrowLastTrace(nix::Error(
@@ -92,7 +92,7 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp)
     NIXC_CATCH_ERRS
 }
 
-Value * nix_alloc_value(nix_c_context * context, State * state)
+Value * nix_alloc_value(nix_c_context * context, EvalState * state)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -255,7 +255,7 @@ ExternalValue * nix_get_external(nix_c_context * context, Value * value)
     NIXC_CATCH_ERRS_NULL;
 }
 
-Value * nix_get_list_byidx(nix_c_context * context, const Value * value, State * state, unsigned int ix)
+Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int ix)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -270,7 +270,7 @@ Value * nix_get_list_byidx(nix_c_context * context, const Value * value, State *
     NIXC_CATCH_ERRS_NULL
 }
 
-Value * nix_get_attr_byname(nix_c_context * context, const Value * value, State * state, const char * name)
+Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -290,7 +290,7 @@ Value * nix_get_attr_byname(nix_c_context * context, const Value * value, State 
     NIXC_CATCH_ERRS_NULL
 }
 
-bool nix_has_attr_byname(nix_c_context * context, const Value * value, State * state, const char * name)
+bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -307,7 +307,7 @@ bool nix_has_attr_byname(nix_c_context * context, const Value * value, State * s
 }
 
 Value *
-nix_get_attr_byidx(nix_c_context * context, const Value * value, State * state, unsigned int i, const char ** name)
+nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i, const char ** name)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -322,7 +322,7 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, State * state, 
     NIXC_CATCH_ERRS_NULL
 }
 
-const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * value, State * state, unsigned int i)
+const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -413,7 +413,7 @@ nix_err nix_set_external(nix_c_context * context, Value * value, ExternalValue *
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_make_list(nix_c_context * context, State * s, Value * value, unsigned int size)
+nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, unsigned int size)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -471,7 +471,7 @@ nix_err nix_make_attrs(nix_c_context * context, Value * value, BindingsBuilder *
     NIXC_CATCH_ERRS
 }
 
-BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, State * state, size_t capacity)
+BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState * state, size_t capacity)
 {
     if (context)
         context->last_err_code = NIX_OK;

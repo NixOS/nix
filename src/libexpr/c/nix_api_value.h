@@ -35,7 +35,7 @@ typedef enum {
 
 // forward declarations
 typedef void Value;
-typedef struct State State;
+typedef struct EvalState EvalState;
 // type defs
 /** @brief Stores an under-construction set of bindings
  * @ingroup value_manip
@@ -75,7 +75,7 @@ typedef struct ExternalValue ExternalValue;
  * @param[out] ret return value
  * @see nix_alloc_primop, nix_set_primop
  */
-typedef void (*PrimOpFun)(void * user_data, nix_c_context * context, State * state, Value ** args, Value * ret);
+typedef void (*PrimOpFun)(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret);
 
 /** @brief Allocate a PrimOp
  *
@@ -127,7 +127,7 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp);
  * @return value, or null in case of errors
  *
  */
-Value * nix_alloc_value(nix_c_context * context, State * state);
+Value * nix_alloc_value(nix_c_context * context, EvalState * state);
 /** @addtogroup value_manip Manipulating values
  * @brief Functions to inspect and change Nix language values, represented by Value.
  * @{
@@ -209,7 +209,7 @@ ExternalValue * nix_get_external(nix_c_context * context, Value *);
  * @param[in] ix list element to get
  * @return value, NULL in case of errors
  */
-Value * nix_get_list_byidx(nix_c_context * context, const Value * value, State * state, unsigned int ix);
+Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int ix);
 /** @brief Get an attr by name
  *
  * Owned by the GC. Use nix_gc_decref when you're done with the pointer
@@ -219,7 +219,7 @@ Value * nix_get_list_byidx(nix_c_context * context, const Value * value, State *
  * @param[in] name attribute name
  * @return value, NULL in case of errors
  */
-Value * nix_get_attr_byname(nix_c_context * context, const Value * value, State * state, const char * name);
+Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name);
 
 /** @brief Check if an attribute name exists on a value
  * @param[out] context Optional, stores error information
@@ -228,7 +228,7 @@ Value * nix_get_attr_byname(nix_c_context * context, const Value * value, State 
  * @param[in] name attribute name
  * @return value, error info via context
  */
-bool nix_has_attr_byname(nix_c_context * context, const Value * value, State * state, const char * name);
+bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name);
 
 /** @brief Get an attribute by index in the sorted bindings
  *
@@ -243,20 +243,20 @@ bool nix_has_attr_byname(nix_c_context * context, const Value * value, State * s
  * @return value, NULL in case of errors
  */
 Value *
-nix_get_attr_byidx(nix_c_context * context, const Value * value, State * state, unsigned int i, const char ** name);
+nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i, const char ** name);
 
 /** @brief Get an attribute name by index in the sorted bindings
  *
  * Useful when you want the name but want to avoid evaluation.
  *
- * Owned by the nix State
+ * Owned by the nix EvalState
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @param[in] state nix evaluator state
  * @param[in] i attribute index
  * @return name, NULL in case of errors
  */
-const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * value, State * state, unsigned int i);
+const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i);
 /**@}*/
 /** @name Setters
  */
@@ -315,7 +315,7 @@ nix_err nix_set_external(nix_c_context * context, Value * value, ExternalValue *
  * @param[in] size size of list
  * @return error code, NIX_OK on success.
  */
-nix_err nix_make_list(nix_c_context * context, State * s, Value * value, unsigned int size);
+nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, unsigned int size);
 /** @brief Manipulate a list by index
  *
  * Don't do this mid-computation.
@@ -359,7 +359,7 @@ nix_err nix_copy_value(nix_c_context * context, Value * value, Value * source);
 * @return owned reference to a bindings builder. Make sure to unref when you're
 done.
 */
-BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, State * state, size_t capacity);
+BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState * state, size_t capacity);
 /** @brief Insert bindings into a builder
  * @param[out] context Optional, stores error information
  * @param[in] builder BindingsBuilder to insert into

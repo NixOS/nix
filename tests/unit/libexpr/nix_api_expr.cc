@@ -25,7 +25,7 @@ public:
         nix_state_free(state);
     }
 
-    State * state;
+    EvalState * state;
     Value * value;
 };
 

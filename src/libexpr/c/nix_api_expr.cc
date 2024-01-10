@@ -41,8 +41,8 @@ nix_err nix_libexpr_init(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
-nix_err
-nix_expr_eval_from_string(nix_c_context * context, State * state, const char * expr, const char * path, Value * value)
+nix_err nix_expr_eval_from_string(
+    nix_c_context * context, EvalState * state, const char * expr, const char * path, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -54,7 +54,7 @@ nix_expr_eval_from_string(nix_c_context * context, State * state, const char * e
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_call(nix_c_context * context, State * state, Value * fn, Value * arg, Value * value)
+nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, Value * arg, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -65,7 +65,7 @@ nix_err nix_value_call(nix_c_context * context, State * state, Value * fn, Value
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_force(nix_c_context * context, State * state, Value * value)
+nix_err nix_value_force(nix_c_context * context, EvalState * state, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -75,7 +75,7 @@ nix_err nix_value_force(nix_c_context * context, State * state, Value * value)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_force_deep(nix_c_context * context, State * state, Value * value)
+nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -85,7 +85,7 @@ nix_err nix_value_force_deep(nix_c_context * context, State * state, Value * val
     NIXC_CATCH_ERRS
 }
 
-State * nix_state_create(nix_c_context * context, const char ** searchPath_c, Store * store)
+EvalState * nix_state_create(nix_c_context * context, const char ** searchPath_c, Store * store)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -95,12 +95,12 @@ State * nix_state_create(nix_c_context * context, const char ** searchPath_c, St
             for (size_t i = 0; searchPath_c[i] != nullptr; i++)
                 searchPath.push_back(searchPath_c[i]);
 
-        return new State{nix::EvalState(nix::SearchPath::parse(searchPath), store->ptr)};
+        return new EvalState{nix::EvalState(nix::SearchPath::parse(searchPath), store->ptr)};
     }
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_state_free(State * state)
+void nix_state_free(EvalState * state)
 {
     delete state;
 }

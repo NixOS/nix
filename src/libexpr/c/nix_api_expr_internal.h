@@ -4,7 +4,7 @@
 #include "eval.hh"
 #include "attr-set.hh"
 
-struct State
+struct EvalState
 {
     nix::EvalState state;
 };

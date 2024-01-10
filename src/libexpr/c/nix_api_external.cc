@@ -148,7 +148,7 @@ public:
         }
         nix_string_context ctx{context};
         nix_string_return res{""};
-        desc.printValueAsJSON(v, (State *) &state, strict, &ctx, copyToStore, &res);
+        desc.printValueAsJSON(v, (EvalState *) &state, strict, &ctx, copyToStore, &res);
         if (res.str.empty()) {
             return nix::ExternalValueBase::printValueAsJSON(state, strict, context, copyToStore);
         }
@@ -172,7 +172,8 @@ public:
         }
         nix_string_context ctx{context};
         desc.printValueAsXML(
-            v, (State *) &state, strict, location, &doc, &ctx, &drvsSeen, *reinterpret_cast<const uint32_t *>(&pos));
+            v, (EvalState *) &state, strict, location, &doc, &ctx, &drvsSeen,
+            *reinterpret_cast<const uint32_t *>(&pos));
     }
 
     virtual ~NixCExternalValue() override{};
