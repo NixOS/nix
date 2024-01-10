@@ -9,7 +9,7 @@
  *    nix_libexpr_init(NULL);
  *
  *    Store* store = nix_store_open(NULL, "dummy", NULL);
- *    State* state = nix_state_create(NULL, NULL, store); // empty nix path
+ *    EvalState* state = nix_state_create(NULL, NULL, store); // empty nix path
  *    Value *value = nix_alloc_value(NULL, state);
  *
  *    nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
@@ -42,10 +42,10 @@ extern "C" {
  *
  * Multiple states can be created for multi-threaded
  * operation.
- * @struct State
+ * @struct EvalState
  * @see nix_state_create
  */
-typedef struct State State; // nix::EvalState
+typedef struct EvalState EvalState; // nix::EvalState
 /**
  * @brief Represents a value in the Nix language.
  *
@@ -60,7 +60,7 @@ typedef void Value; // nix::Value
  * @brief Initialize the Nix language evaluator.
  *
  * This function must be called at least once,
- * at some point before constructing a State for the first time.
+ * at some point before constructing a EvalState for the first time.
  * This function can be called multiple times, and is idempotent.
  *
  * @param[out] context Optional, stores error information
@@ -77,12 +77,12 @@ nix_err nix_libexpr_init(nix_c_context * context);
  * @param[in] path The file path to associate with the expression.
  * This is required for expressions that contain relative paths (such as `./.`) that are resolved relative to the given
  * directory.
- * @param[out] value The result of the evaluation. You should allocate this
+ * @param[out] value The result of the evaluation. You must allocate this
  * yourself.
  * @return NIX_OK if the evaluation was successful, an error code otherwise.
  */
-nix_err
-nix_expr_eval_from_string(nix_c_context * context, State * state, const char * expr, const char * path, Value * value);
+nix_err nix_expr_eval_from_string(
+    nix_c_context * context, EvalState * state, const char * expr, const char * path, Value * value);
 
 /**
  * @brief Calls a Nix function with an argument.
@@ -94,7 +94,7 @@ nix_expr_eval_from_string(nix_c_context * context, State * state, const char * e
  * @param[out] value The result of the function call.
  * @return NIX_OK if the function call was successful, an error code otherwise.
  */
-nix_err nix_value_call(nix_c_context * context, State * state, Value * fn, Value * arg, Value * value);
+nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, Value * arg, Value * value);
 
 /**
  * @brief Forces the evaluation of a Nix value.
@@ -116,7 +116,7 @@ nix_err nix_value_call(nix_c_context * context, State * state, Value * fn, Value
  * @return NIX_OK if the force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force(nix_c_context * context, State * state, Value * value);
+nix_err nix_value_force(nix_c_context * context, EvalState * state, Value * value);
 
 /**
  * @brief Forces the deep evaluation of a Nix value.
@@ -132,7 +132,7 @@ nix_err nix_value_force(nix_c_context * context, State * state, Value * value);
  * @return NIX_OK if the deep force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force_deep(nix_c_context * context, State * state, Value * value);
+nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, Value * value);
 
 /**
  * @brief Create a new Nix language evaluator state.
@@ -142,7 +142,7 @@ nix_err nix_value_force_deep(nix_c_context * context, State * state, Value * val
  * @param[in] store The Nix store to use.
  * @return A new Nix state or NULL on failure.
  */
-State * nix_state_create(nix_c_context * context, const char ** searchPath, Store * store);
+EvalState * nix_state_create(nix_c_context * context, const char ** searchPath, Store * store);
 
 /**
  * @brief Frees a Nix state.
@@ -151,7 +151,7 @@ State * nix_state_create(nix_c_context * context, const char ** searchPath, Stor
  *
  * @param[in] state The state to free.
  */
-void nix_state_free(State * state);
+void nix_state_free(EvalState * state);
 
 /** @addtogroup GC
  * @brief Reference counting and garbage collector operations

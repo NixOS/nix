@@ -136,7 +136,7 @@ typedef struct NixCExternalValueDesc
      * or setting it to the empty string, will make the conversion throw an error.
      */
     void (*printValueAsJSON)(
-        void * self, State *, int strict, nix_string_context * c, bool copyToStore, nix_string_return * res);
+        void * self, EvalState *, int strict, nix_string_context * c, bool copyToStore, nix_string_return * res);
     /**
      * @brief Convert the external value to XML
      *
@@ -154,7 +154,14 @@ typedef struct NixCExternalValueDesc
      * @param[in] pos The position of the call.
      */
     void (*printValueAsXML)(
-        void * self, State *, int strict, int location, void * doc, nix_string_context * c, void * drvsSeen, int pos);
+        void * self,
+        EvalState *,
+        int strict,
+        int location,
+        void * doc,
+        nix_string_context * c,
+        void * drvsSeen,
+        int pos);
 } NixCExternalValueDesc;
 
 /**
