@@ -69,6 +69,14 @@
 # Whether to build the regular manual
 , enableManual ? __forDefaults.canRunInstalled
 
+# Whether to use garbage collection for the Nix language evaluator.
+#
+# If it is disabled, we just leak memory, but this is not as bad as it
+# sounds so long as evaluation just takes places within short-lived
+# processes. (When the process exits, the memory is reclaimed; it is
+# only leaked *within* the process.)
+, enableGC ? true
+
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
 
@@ -245,9 +253,8 @@ in {
   ;
 
   propagatedBuildInputs = [
-    boehmgc
     nlohmann_json
-  ];
+  ] ++ lib.optional enableGC boehmgc;
 
   dontBuild = !attrs.doBuild;
   doCheck = attrs.doCheck;
@@ -286,6 +293,7 @@ in {
     (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
+    (lib.enableFeature enableGC "gc")
     (lib.enableFeature enableMarkdown "markdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
     (lib.withFeatureAs true "readline-flavor" readlineFlavor)

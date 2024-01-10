@@ -220,7 +220,9 @@
         buildCross = forAllCrossSystems (crossSystem:
           lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
-        buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
+        buildNoGc = forAllSystems (system:
+          self.packages.${system}.nix.override { enableGC = false; }
+        );
 
         buildNoTests = forAllSystems (system:
           self.packages.${system}.nix.override {
