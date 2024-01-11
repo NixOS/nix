@@ -28,3 +28,11 @@ nix-build dependencies.nix --eval-store "$eval_store" -o "$TEST_ROOT/result"
 [[ -e $TEST_ROOT/result/foobar ]]
 (! ls $NIX_STORE_DIR/*.drv)
 ls $eval_store/nix/store/*.drv
+
+clearStore
+rm -rf "$eval_store"
+
+# Confirm that import-from-derivation builds on the build store
+[[ $(nix eval --eval-store "$eval_store?require-sigs=false" --impure --raw --file ./ifd.nix) = hi ]]
+ls $NIX_STORE_DIR/*dependencies-top/foobar
+(! ls $eval_store/nix/store/*dependencies-top/foobar)
