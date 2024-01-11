@@ -100,7 +100,7 @@
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
 # later.
-, installUnitTests ? __forDefaults.canRunInstalled
+, installUnitTests ? doBuild && !__forDefaults.canExecuteHost
 
 # For running the functional tests against a pre-built Nix. Probably
 # want to use in conjunction with `doBuild = false;`.
@@ -113,7 +113,8 @@
 # Not a real argument, just the only way to approximate let-binding some
 # stuff for argument defaults.
 , __forDefaults ? {
-    canRunInstalled = doBuild && stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    canExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    canRunInstalled = doBuild && __forDefaults.canExecuteHost;
   }
 }:
 
