@@ -17,5 +17,5 @@ $(foreach i, $(wildcard $(d)/signature/*.hh), \
 
 
 ifeq ($(HAVE_LIBCPUID), 1)
-	libutil_LDFLAGS += -lcpuid
+  libutil_LDFLAGS += -lcpuid
 endif

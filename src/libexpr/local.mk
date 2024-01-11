@@ -18,7 +18,7 @@ libexpr_LIBS = libutil libstore libfetchers
 
 libexpr_LDFLAGS += -lboost_context -pthread
 ifdef HOST_LINUX
- libexpr_LDFLAGS += -ldl
+  libexpr_LDFLAGS += -ldl
 endif
 
 # The dependency on libgc must be propagated (i.e. meaning that
