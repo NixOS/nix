@@ -1,4 +1,18 @@
-{ lib, nixpkgs, system, ... }: {
+{ lib, nixpkgs, system, pkgs, ... }: let
+  clientPrivateKey = pkgs.writeText "id_ed25519" ''
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+    QyNTUxOQAAACBbeWvHh/AWGWI6EIc1xlSihyXtacNQ9KeztlW/VUy8wQAAAJAwVQ5VMFUO
+    VQAAAAtzc2gtZWQyNTUxOQAAACBbeWvHh/AWGWI6EIc1xlSihyXtacNQ9KeztlW/VUy8wQ
+    AAAEB7lbfkkdkJoE+4TKHPdPQWBKLSx+J54Eg8DaTr+3KoSlt5a8eH8BYZYjoQhzXGVKKH
+    Je1pw1D0p7O2Vb9VTLzBAAAACGJmb0BtaW5pAQIDBAU=
+    -----END OPENSSH PRIVATE KEY-----
+  '';
+
+  clientPublicKey =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFt5a8eH8BYZYjoQhzXGVKKHJe1pw1D0p7O2Vb9VTLzB";
+
+in {
   imports = [
     ../testsupport/setup.nix
   ];
@@ -8,8 +22,11 @@
       services.gitea.settings.service.DISABLE_REGISTRATION = true;
       services.gitea.settings.log.LEVEL = "Info";
       services.gitea.settings.database.LOG_SQL = false;
+      services.openssh.enable = true;
       networking.firewall.allowedTCPPorts = [ 3000 ];
-      environment.systemPackages = [ pkgs.gitea ];
+      environment.systemPackages = [ pkgs.git pkgs.gitea ];
+
+      users.users.root.openssh.authorizedKeys.keys = [clientPublicKey];
 
       # TODO: remove this after updating to nixos-23.11
       nixpkgs.pkgs = lib.mkForce (import nixpkgs {
@@ -58,6 +75,26 @@
       git config --global user.name "Test User"
       git config --global gc.autodetach 0
       git config --global gc.auto 0
+    """)
+
+    # add client's private key to ~/.ssh
+    client.succeed("""
+      mkdir -p ~/.ssh
+      chmod 700 ~/.ssh
+      cat ${clientPrivateKey} >~/.ssh/id_ed25519
+      chmod 600 ~/.ssh/id_ed25519
+    """)
+
+    client.succeed("""
+      echo "Host gitea" >>~/.ssh/config
+      echo "  StrictHostKeyChecking no" >>~/.ssh/config
+      echo "  UserKnownHostsFile /dev/null" >>~/.ssh/config
+      echo "  User root" >>~/.ssh/config
+    """)
+
+    # ensure ssh from client to gitea works
+    client.succeed("""
+      ssh root@gitea true
     """)
   '';
 }
