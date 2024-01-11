@@ -8,6 +8,7 @@
 #include "symbol-table.hh"
 #include "error.hh"
 #include "chunked-vector.hh"
+#include "position.hh"
 
 namespace nix {
 
@@ -26,27 +27,6 @@ class InfiniteRecursionError : public EvalError
     friend class EvalState;
 public:
     using EvalError::EvalError;
-};
-
-/**
- * Position objects.
- */
-struct Pos
-{
-    uint32_t line;
-    uint32_t column;
-
-    struct none_tag { };
-    struct Stdin { ref<std::string> source; };
-    struct String { ref<std::string> source; };
-
-    typedef std::variant<none_tag, Stdin, String, SourcePath> Origin;
-
-    Origin origin;
-
-    explicit operator bool() const { return line > 0; }
-
-    operator std::shared_ptr<AbstractPos>() const;
 };
 
 class PosIdx {
@@ -81,7 +61,7 @@ public:
         mutable uint32_t idx = std::numeric_limits<uint32_t>::max();
 
         // Used for searching in PosTable::[].
-        explicit Origin(uint32_t idx): idx(idx), origin{Pos::none_tag()} {}
+        explicit Origin(uint32_t idx): idx(idx), origin{std::monostate()} {}
 
     public:
         const Pos::Origin origin;
@@ -131,8 +111,6 @@ public:
 };
 
 inline PosIdx noPos = {};
-
-std::ostream & operator << (std::ostream & str, const Pos & pos);
 
 
 struct Env;

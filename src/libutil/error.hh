@@ -63,45 +63,15 @@ struct LinesOfCode {
     std::optional<std::string> nextLineOfCode;
 };
 
-/**
- * An abstract type that represents a location in a source file.
- */
-struct AbstractPos
-{
-    uint32_t line = 0;
-    uint32_t column = 0;
-
-    /**
-     * An AbstractPos may be a "null object", representing an unknown position.
-     *
-     * Return true if this position is known.
-     */
-    inline operator bool() const { return line != 0; };
-
-    /**
-     * Return the contents of the source file.
-     */
-    virtual std::optional<std::string> getSource() const
-    { return std::nullopt; };
-
-    virtual void print(std::ostream & out) const = 0;
-
-    std::optional<LinesOfCode> getCodeLines() const;
-
-    virtual ~AbstractPos() = default;
-
-    inline auto operator<=>(const AbstractPos& rhs) const = default;
-};
-
-std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
+struct Pos;
 
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const AbstractPos & errPos,
+    const Pos & errPos,
     const LinesOfCode & loc);
 
 struct Trace {
-    std::shared_ptr<AbstractPos> pos;
+    std::shared_ptr<Pos> pos;
     hintformat hint;
     bool frame;
 };
@@ -114,7 +84,7 @@ inline bool operator>=(const Trace& lhs, const Trace& rhs);
 struct ErrorInfo {
     Verbosity level;
     hintformat msg;
-    std::shared_ptr<AbstractPos> errPos;
+    std::shared_ptr<Pos> errPos;
     std::list<Trace> traces;
 
     Suggestions suggestions;
@@ -185,12 +155,12 @@ public:
     }
 
     template<typename... Args>
-    void addTrace(std::shared_ptr<AbstractPos> && e, std::string_view fs, const Args & ... args)
+    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
     {
         addTrace(std::move(e), hintfmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame = false);
+    void addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
 
