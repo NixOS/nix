@@ -236,7 +236,6 @@ in {
     openssl
     sqlite
     xz
-  ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
     ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [
     lowdown
