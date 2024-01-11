@@ -1,4 +1,6 @@
 #include "thread-pool.hh"
+#include "signals.hh"
+#include "util.hh"
 
 namespace nix {
 
@@ -77,6 +79,8 @@ void ThreadPool::process()
 
 void ThreadPool::doWork(bool mainThread)
 {
+    ReceiveInterrupts receiveInterrupts;
+
     if (!mainThread)
         interruptCheck = [&]() { return (bool) quit; };
 

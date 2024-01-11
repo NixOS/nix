@@ -1,4 +1,6 @@
 #pragma once
+///@file
+
 #include "config.hh"
 
 namespace nix {
@@ -29,10 +31,12 @@ struct EvalSettings : Config
         this, false, "restrict-eval",
         R"(
           If set to `true`, the Nix evaluator will not allow access to any
-          files outside of the Nix search path (as set via the `NIX_PATH`
-          environment variable or the `-I` option), or to URIs outside of
-          [`allowed-uris`](../command-ref/conf-file.md#conf-allowed-uris).
-          The default is `false`.
+          files outside of
+          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath),
+          or to URIs outside of
+          [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
+
+          Also the default value for [`nix-path`](#conf-nix-path) is ignored, such that only explicitly set search path entries are taken into account.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
@@ -40,18 +44,22 @@ struct EvalSettings : Config
           Pure evaluation mode ensures that the result of Nix expressions is fully determined by explicitly declared inputs, and not influenced by external state:
 
           - Restrict file system and network access to files specified by cryptographic hash
-          - Disable [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) and [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
+          - Disable impure constants:
+            - [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+            - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
+            - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
         )"
         };
 
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",
         R"(
-          By default, Nix allows you to `import` from a derivation, allowing
-          building at evaluation time. With this option set to false, Nix will
-          throw an error when evaluating an expression that uses this feature,
-          allowing users to ensure their evaluation will not require any
-          builds to take place.
+          By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
+
+          With this option set to `false`, Nix will throw an error when evaluating an expression that uses this feature,
+          even when the required store object is readily available.
+          This ensures that evaluation will not require any builds to take place,
+          regardless of the state of the store.
         )"};
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
@@ -60,6 +68,11 @@ struct EvalSettings : Config
           evaluation mode. For example, when set to
           `https://github.com/NixOS`, builtin functions such as `fetchGit` are
           allowed to access `https://github.com/NixOS/patchelf.git`.
+
+          Access is granted when
+          - the URI is equal to the prefix,
+          - or the URI is a subpath of the prefix,
+          - or the prefix is a URI scheme ended by a colon `:` and the URI has the same scheme.
         )"};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",

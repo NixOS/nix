@@ -1,11 +1,12 @@
 #include "fetchers.hh"
+#include "users.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
-#include "util.hh"
+#include "processes.hh"
 #include "git.hh"
 
 #include "fetch-settings.hh"
@@ -46,7 +47,7 @@ bool touchCacheFile(const Path & path, time_t touch_time)
 Path getCachePath(std::string_view key)
 {
     return getCacheDir() + "/nix/gitv3/" +
-        hashString(htSHA256, key).to_string(Base32, false);
+        hashString(htSHA256, key).to_string(HashFormat::Base32, false);
 }
 
 // Returns the name of the HEAD branch.
@@ -142,6 +143,69 @@ struct WorkdirInfo
     bool clean = false;
     bool hasHead = false;
 };
+
+std::vector<PublicKey> getPublicKeys(const Attrs & attrs) {
+    std::vector<PublicKey> publicKeys;
+    if (attrs.contains("publicKeys")) {
+        nlohmann::json publicKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
+        ensureType(publicKeysJson, nlohmann::json::value_t::array);
+        publicKeys = publicKeysJson.get<std::vector<PublicKey>>();
+    }
+    else {
+        publicKeys = {};
+    }
+    if (attrs.contains("publicKey"))
+        publicKeys.push_back(PublicKey{maybeGetStrAttr(attrs, "keytype").value_or("ssh-ed25519"),getStrAttr(attrs, "publicKey")});
+    return publicKeys;
+}
+
+void doCommitVerification(const Path repoDir, const Path gitDir, const std::string rev, const std::vector<PublicKey>& publicKeys) {
+    // Create ad-hoc allowedSignersFile and populate it with publicKeys
+    auto allowedSignersFile = createTempFile().second;
+    std::string allowedSigners;
+    for (const PublicKey& k : publicKeys) {
+        if (k.type != "ssh-dsa"
+            && k.type != "ssh-ecdsa"
+            && k.type != "ssh-ecdsa-sk"
+            && k.type != "ssh-ed25519"
+            && k.type != "ssh-ed25519-sk"
+            && k.type != "ssh-rsa")
+            warn("Unknown keytype: %s\n"
+                 "Please use one of\n"
+                 "- ssh-dsa\n"
+                 "  ssh-ecdsa\n"
+                 "  ssh-ecdsa-sk\n"
+                 "  ssh-ed25519\n"
+                 "  ssh-ed25519-sk\n"
+                 "  ssh-rsa", k.type);
+        allowedSigners += "* " + k.type + " " + k.key + "\n";
+    }
+    writeFile(allowedSignersFile, allowedSigners);
+
+    // Run verification command
+    auto [status, output] = runProgram(RunOptions {
+            .program = "git",
+            .args = {"-c", "gpg.ssh.allowedSignersFile=" + allowedSignersFile, "-C", repoDir,
+                     "--git-dir", gitDir, "verify-commit", rev},
+            .mergeStderrToStdout = true,
+    });
+
+    /* Evaluate result through status code and checking if public key fingerprints appear on stderr
+     * This is neccessary because the git command might also succeed due to the commit being signed by gpg keys
+     * that are present in the users key agent. */
+    std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
+    for (const PublicKey& k : publicKeys){
+        // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
+        auto fingerprint = trim(hashString(htSHA256, base64Decode(k.key)).to_string(nix::HashFormat::Base64, false), "=");
+        auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+" );
+        re += "(" + escaped_fingerprint + ")";
+    }
+    re += "]";
+    if (status == 0 && std::regex_search(output, std::regex(re)))
+        printTalkative("Signature verification on commit %s succeeded", rev);
+    else
+        throw Error("Commit signature verification on commit %s failed: \n%s", rev, output);
+}
 
 // Returns whether a git workdir is clean and has commits.
 WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
@@ -272,9 +336,9 @@ struct GitInputScheme : InputScheme
         attrs.emplace("type", "git");
 
         for (auto & [name, value] : url.query) {
-            if (name == "rev" || name == "ref")
+            if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "allRefs")
+            else if (name == "shallow" || name == "submodules" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -285,18 +349,47 @@ struct GitInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
+
+    std::string_view schemeName() const override
+    {
+        return "git";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "url",
+            "ref",
+            "rev",
+            "shallow",
+            "submodules",
+            "lastModified",
+            "revCount",
+            "narHash",
+            "allRefs",
+            "name",
+            "dirtyRev",
+            "dirtyShortRev",
+            "verifyCommit",
+            "keytype",
+            "publicKey",
+            "publicKeys",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "git") return {};
+        for (auto & [name, _] : attrs)
+            if (name == "verifyCommit"
+                || name == "keytype"
+                || name == "publicKey"
+                || name == "publicKeys")
+                experimentalFeatureSettings.require(Xp::VerifiedFetches);
 
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
-                throw Error("unsupported Git input attribute '%s'", name);
-
-        parseURL(getStrAttr(attrs, "url"));
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
         maybeGetBoolAttr(attrs, "allRefs");
+        maybeGetBoolAttr(attrs, "verifyCommit");
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
             if (std::regex_search(*ref, badGitRefRegex))
@@ -305,6 +398,9 @@ struct GitInputScheme : InputScheme
 
         Input input;
         input.attrs = attrs;
+        auto url = fixGitURL(getStrAttr(attrs, "url"));
+        parseURL(url);
+        input.attrs["url"] = url;
         return input;
     }
 
@@ -316,16 +412,16 @@ struct GitInputScheme : InputScheme
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
             url.query.insert_or_assign("shallow", "1");
+        if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
+            url.query.insert_or_assign("verifyCommit", "1");
+        auto publicKeys = getPublicKeys(input.attrs);
+        if (publicKeys.size() == 1) {
+            url.query.insert_or_assign("keytype", publicKeys.at(0).type);
+            url.query.insert_or_assign("publicKey", publicKeys.at(0).key);
+        }
+        else if (publicKeys.size() > 1)
+            url.query.insert_or_assign("publicKeys", publicKeys_to_string(publicKeys));
         return url;
-    }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        bool maybeDirty = !input.getRef();
-        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-        return
-            maybeGetIntAttr(input.attrs, "lastModified")
-            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
     }
 
     Input applyOverrides(
@@ -361,7 +457,7 @@ struct GitInputScheme : InputScheme
         runProgram("git", true, args, {}, true);
     }
 
-    std::optional<Path> getSourcePath(const Input & input) override
+    std::optional<Path> getSourcePath(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
@@ -369,18 +465,26 @@ struct GitInputScheme : InputScheme
         return {};
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const override
     {
-        auto sourcePath = getSourcePath(input);
-        assert(sourcePath);
+        auto root = getSourcePath(input);
+        if (!root)
+            throw Error("cannot commit '%s' to Git repository '%s' because it's not a working tree", path, input.to_string());
+
+        writeFile((CanonPath(*root) + path).abs(), contents);
+
         auto gitDir = ".git";
 
         runProgram("git", true,
-            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(file) });
+            { "-C", *root, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg });
+                { "-C", *root, "--git-dir", gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -406,6 +510,8 @@ struct GitInputScheme : InputScheme
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
         bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
         bool allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
+        std::vector<PublicKey> publicKeys = getPublicKeys(input.attrs);
+        bool verifyCommit = maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(!publicKeys.empty());
 
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
@@ -415,7 +521,7 @@ struct GitInputScheme : InputScheme
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
-                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(HashFormat::Base16, true));
         };
 
         auto getLockedAttrs = [&]()
@@ -426,6 +532,8 @@ struct GitInputScheme : InputScheme
                 {"type", cacheType},
                 {"name", name},
                 {"rev", input.getRev()->gitRev()},
+                {"verifyCommit", verifyCommit},
+                {"publicKeys", publicKeys_to_string(publicKeys)},
             });
         };
 
@@ -448,12 +556,15 @@ struct GitInputScheme : InputScheme
         auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
 
-        /* If this is a local directory and no ref or revision is given,
+        /* If this is a local directory, no ref or revision is given and no signature verification is needed,
            allow fetching directly from a dirty workdir. */
         if (!input.getRef() && !input.getRev() && isLocal) {
             auto workdirInfo = getWorkdirInfo(input, actualUrl);
             if (!workdirInfo.clean) {
-                return fetchFromWorkdir(store, input, actualUrl, workdirInfo);
+                if (verifyCommit)
+                    throw Error("Can't fetch from a dirty workdir with commit signature verification enabled.");
+                else
+                    return fetchFromWorkdir(store, input, actualUrl, workdirInfo);
             }
         }
 
@@ -461,6 +572,8 @@ struct GitInputScheme : InputScheme
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
+            {"verifyCommit", verifyCommit},
+            {"publicKeys", publicKeys_to_string(publicKeys)},
         });
 
         Path repoDir;
@@ -617,6 +730,9 @@ struct GitInputScheme : InputScheme
                 actualUrl
             );
         }
+
+        if (verifyCommit)
+            doCommitVerification(repoDir, gitDir, input.getRev()->gitRev(), publicKeys);
 
         if (submodules) {
             Path tmpGitDir = createTempDir();

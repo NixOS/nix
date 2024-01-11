@@ -1,4 +1,6 @@
 #include "fetchers.hh"
+#include "processes.hh"
+#include "users.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
@@ -69,14 +71,25 @@ struct MercurialInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
+    std::string_view schemeName() const override
+    {
+        return "hg";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "url",
+            "ref",
+            "rev",
+            "revCount",
+            "narHash",
+            "name",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "hg") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash" && name != "name")
-                throw Error("unsupported Mercurial input attribute '%s'", name);
-
         parseURL(getStrAttr(attrs, "url"));
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
@@ -98,13 +111,6 @@ struct MercurialInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        // FIXME: ugly, need to distinguish between dirty and clean
-        // default trees.
-        return input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount");
-    }
-
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
@@ -116,7 +122,7 @@ struct MercurialInputScheme : InputScheme
         return res;
     }
 
-    std::optional<Path> getSourcePath(const Input & input) override
+    std::optional<Path> getSourcePath(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
@@ -124,18 +130,27 @@ struct MercurialInputScheme : InputScheme
         return {};
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const override
     {
-        auto sourcePath = getSourcePath(input);
-        assert(sourcePath);
+        auto [isLocal, repoPath] = getActualUrl(input);
+        if (!isLocal)
+            throw Error("cannot commit '%s' to Mercurial repository '%s' because it's not a working tree", path, input.to_string());
+
+        auto absPath = CanonPath(repoPath) + path;
+
+        writeFile(absPath.abs(), contents);
 
         // FIXME: shut up if file is already tracked.
         runHg(
-            { "add", *sourcePath + "/" + std::string(file) });
+            { "add", absPath.abs() });
 
         if (commitMsg)
             runHg(
-                { "commit", *sourcePath + "/" + std::string(file), "-m", *commitMsg });
+                { "commit", absPath.abs(), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -206,7 +221,7 @@ struct MercurialInputScheme : InputScheme
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && hash->type != htSHA1)
-                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
+                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(HashFormat::Base16, true));
         };
 
 
@@ -252,7 +267,7 @@ struct MercurialInputScheme : InputScheme
             }
         }
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(HashFormat::Base32, false));
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */

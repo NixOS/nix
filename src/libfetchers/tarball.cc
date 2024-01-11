@@ -1,3 +1,4 @@
+#include "tarball.hh"
 #include "fetchers.hh"
 #include "cache.hh"
 #include "filetransfer.hh"
@@ -133,7 +134,7 @@ DownloadTarballResult downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            .tree = Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
+            .storePath = std::move(cached->storePath),
             .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
@@ -174,7 +175,7 @@ DownloadTarballResult downloadTarball(
         locked);
 
     return {
-        .tree = Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        .storePath = std::move(*unpackedStorePath),
         .lastModified = lastModified,
         .immutableUrl = res.immutableUrl,
     };
@@ -183,7 +184,6 @@ DownloadTarballResult downloadTarball(
 // An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
-    virtual const std::string inputType() const = 0;
     const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
 
     const bool hasTarballExtension(std::string_view path) const
@@ -221,22 +221,27 @@ struct CurlInputScheme : InputScheme
         url.query.erase("rev");
         url.query.erase("revCount");
 
-        input.attrs.insert_or_assign("type", inputType());
+        input.attrs.insert_or_assign("type", std::string { schemeName() });
         input.attrs.insert_or_assign("url", url.to_string());
         return input;
     }
 
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "type",
+            "url",
+            "narHash",
+            "name",
+            "unpack",
+            "rev",
+            "revCount",
+            "lastModified",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        auto type = maybeGetStrAttr(attrs, "type");
-        if (type != inputType()) return {};
-
-        // FIXME: some of these only apply to TarballInputScheme.
-        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount", "lastModified"};
-        for (auto & [name, value] : attrs)
-            if (!allowedNames.count(name))
-                throw Error("unsupported %s input attribute '%s'", *type, name);
-
         Input input;
         input.attrs = attrs;
 
@@ -250,27 +255,21 @@ struct CurlInputScheme : InputScheme
         // NAR hashes are preferred over file hashes since tar/zip
         // files don't have a canonical representation.
         if (auto narHash = input.getNarHash())
-            url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
+            url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
         return url;
     }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
 };
 
 struct FileInputScheme : CurlInputScheme
 {
-    const std::string inputType() const override { return "file"; }
+    std::string_view schemeName() const override { return "file"; }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                ? parsedUrlScheme.application.value() == inputType()
+                ? parsedUrlScheme.application.value() == schemeName()
                 : (!requireTree && !hasTarballExtension(url.path)));
     }
 
@@ -283,7 +282,7 @@ struct FileInputScheme : CurlInputScheme
 
 struct TarballInputScheme : CurlInputScheme
 {
-    const std::string inputType() const override { return "tarball"; }
+    std::string_view schemeName() const override { return "tarball"; }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
@@ -291,7 +290,7 @@ struct TarballInputScheme : CurlInputScheme
 
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                ? parsedUrlScheme.application.value() == inputType()
+                ? parsedUrlScheme.application.value() == schemeName()
                 : (requireTree || hasTarballExtension(url.path)));
     }
 
@@ -313,7 +312,7 @@ struct TarballInputScheme : CurlInputScheme
         if (result.lastModified && !input.attrs.contains("lastModified"))
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
-        return {result.tree.storePath, std::move(input)};
+        return {result.storePath, std::move(input)};
     }
 };
 

@@ -2,7 +2,7 @@
 #include "binary-cache-store.hh"
 #include "compression.hh"
 #include "derivations.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "globals.hh"
 #include "nar-info.hh"
 #include "sync.hh"
@@ -11,6 +11,7 @@
 #include "nar-accessor.hh"
 #include "thread-pool.hh"
 #include "callback.hh"
+#include "signals.hh"
 
 #include <chrono>
 #include <future>
@@ -143,7 +144,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
        write the compressed NAR to disk), into a HashSink (to get the
        NAR hash), and into a NarAccessor (to get the NAR listing). */
     HashSink fileHashSink { htSHA256 };
-    std::shared_ptr<FSAccessor> narAccessor;
+    std::shared_ptr<SourceAccessor> narAccessor;
     HashSink narHashSink { htSHA256 };
     {
     FdSink fileSink(fdTemp.get());
@@ -164,7 +165,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
-    narInfo->url = "nar/" + narInfo->fileHash->to_string(Base32, false) + ".nar"
+    narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Base32, false) + ".nar"
         + (compression == "xz" ? ".xz" :
            compression == "bzip2" ? ".bz2" :
            compression == "zstd" ? ".zst" :
@@ -195,7 +196,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     if (writeNARListing) {
         nlohmann::json j = {
             {"version", 1},
-            {"root", listNar(ref<FSAccessor>(narAccessor), "", true)},
+            {"root", listNar(ref<SourceAccessor>(narAccessor), CanonPath::root, true)},
         };
 
         upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");
@@ -206,9 +207,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
        specify the NAR file and member containing the debug info. */
     if (writeDebugInfo) {
 
-        std::string buildIdDir = "/lib/debug/.build-id";
+        CanonPath buildIdDir("lib/debug/.build-id");
 
-        if (narAccessor->stat(buildIdDir).type == FSAccessor::tDirectory) {
+        if (auto st = narAccessor->maybeLstat(buildIdDir); st && st->type == SourceAccessor::tDirectory) {
 
             ThreadPool threadPool(25);
 
@@ -231,17 +232,17 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
             std::regex regex1("^[0-9a-f]{2}$");
             std::regex regex2("^[0-9a-f]{38}\\.debug$");
 
-            for (auto & s1 : narAccessor->readDirectory(buildIdDir)) {
-                auto dir = buildIdDir + "/" + s1;
+            for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
+                auto dir = buildIdDir + s1;
 
-                if (narAccessor->stat(dir).type != FSAccessor::tDirectory
+                if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory
                     || !std::regex_match(s1, regex1))
                     continue;
 
-                for (auto & s2 : narAccessor->readDirectory(dir)) {
-                    auto debugPath = dir + "/" + s2;
+                for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
+                    auto debugPath = dir + s2;
 
-                    if (narAccessor->stat(debugPath).type != FSAccessor::tRegular
+                    if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular
                         || !std::regex_match(s2, regex2))
                         continue;
 
@@ -250,7 +251,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                     std::string key = "debuginfo/" + buildId;
                     std::string target = "../" + narInfo->url;
 
-                    threadPool.enqueue(std::bind(doFile, std::string(debugPath, 1), key, target));
+                    threadPool.enqueue(std::bind(doFile, std::string(debugPath.rel()), key, target));
                 }
             }
 
@@ -503,9 +504,9 @@ void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
     upsertFile(filePath, info.toJSON().dump(), "application/json");
 }
 
-ref<FSAccessor> BinaryCacheStore::getFSAccessor()
+ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), localNarCache);
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, localNarCache);
 }
 
 void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)

@@ -2,6 +2,7 @@
 
 #include "cgroup.hh"
 #include "util.hh"
+#include "file-system.hh"
 #include "finally.hh"
 
 #include <chrono>

@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "derived-path.hh"

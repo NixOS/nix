@@ -42,8 +42,8 @@ $ nix develop .#native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[nix-shell]$ autoreconfPhase
+[nix-shell]$ configurePhase
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
 
@@ -86,7 +86,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
+[nix-shell]$ autoreconfPhase
 [nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
@@ -210,7 +210,7 @@ See [supported compilation environments](#compilation-environments) and instruct
 To use the LSP with your editor, you first need to [set up `clangd`](https://clangd.llvm.org/installation#project-setup) by running:
 
 ```console
-make clean && bear -- make -j$NIX_BUILD_CORES install
+make clean && bear -- make -j$NIX_BUILD_CORES default check install
 ```
 
 Configure your editor to use the `clangd` from the shell, either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
@@ -220,68 +220,3 @@ Configure your editor to use the `clangd` from the shell, either by running it i
 > For some editors (e.g. Visual Studio Code), you may need to install a [special extension](https://open-vsx.org/extension/llvm-vs-code-extensions/vscode-clangd) for the editor to interact with `clangd`.
 > Some other editors (e.g. Emacs, Vim) need a plugin to support LSP servers in general (e.g. [lsp-mode](https://github.com/emacs-lsp/lsp-mode) for Emacs and [vim-lsp](https://github.com/prabirshrestha/vim-lsp) for vim).
 > Editor-specific setup is typically opinionated, so we will not cover it here in more detail.
-
-### Checking links in the manual
-
-The build checks for broken internal links.
-This happens late in the process, so `nix build` is not suitable for iterating.
-To build the manual incrementally, run:
-
-```console
-make html -j $NIX_BUILD_CORES
-```
-
-In order to reflect changes to the [Makefile], clear all generated files before re-building:
-
-[Makefile]: https://github.com/NixOS/nix/blob/master/doc/manual/local.mk
-
-```console
-rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make html -j $NIX_BUILD_CORES
-```
-
-[`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
-
-[`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
-[URI fragments]: https://en.wikipedia.org/wiki/URI_fragment
-
-#### `@docroot@` variable
-
-`@docroot@` provides a base path for links that occur in reusable snippets or other documentation that doesn't have a base path of its own.
-
-If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
-
-If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
-See existing `@docroot@` logic in the [Makefile].
-Regular markdown files used for the manual have a base path of their own and they can use relative paths instead of `@docroot@`.
-
-## API documentation
-
-Doxygen API documentation is [available
-online](https://hydra.nixos.org/job/nix/master/internal-api-docs/latest/download-by-type/doc/internal-api-docs). You
-can also build and view it yourself:
-
-```console
-# nix build .#hydraJobs.internal-api-docs
-# xdg-open ./result/share/doc/nix/internal-api/html/index.html
-```
-
-or inside a `nix develop` shell by running:
-
-```
-# make internal-api-html
-# xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
-```
-
-## Coverage analysis
-
-A coverage analysis report is [available
-online](https://hydra.nixos.org/job/nix/master/coverage/latest/download-by-type/report/coverage). You
-can build it yourself:
-
-```
-# nix build .#hydraJobs.coverage
-# xdg-open ./result/coverage/index.html
-```
-
-Metrics about the change in line/function coverage over time are also
-[available](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts).

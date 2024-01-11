@@ -4,9 +4,8 @@
 #include "globals.hh"
 #include "util.hh"
 #include "split.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
-#include "fs-accessor.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
 
@@ -152,11 +151,10 @@ StorePath writeDerivation(Store & store,
 /* Read string `s' from stream `str'. */
 static void expect(std::istream & str, std::string_view s)
 {
-    char s2[s.size()];
-    str.read(s2, s.size());
-    std::string_view s2View { s2, s.size() };
-    if (s2View != s)
-        throw FormatError("expected string '%s', got '%s'", s, s2View);
+    for (auto & c : s) {
+        if (str.get() != c)
+            throw FormatError("expected string '%1%'", s);
+    }
 }
 
 
@@ -353,7 +351,7 @@ Derivation parseDerivation(
         expect(str, "erive(");
         version = DerivationATermVersion::Traditional;
         break;
-    case 'r':
+    case 'r': {
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
         if (versionS == "xp-dyn-drv") {
@@ -365,6 +363,9 @@ Derivation parseDerivation(
         }
         expect(str, ",");
         break;
+    }
+    default:
+        throw Error("derivation does not start with 'Derive' or 'DrvWithVersion'");
     }
 
     /* Parse the list of outputs. */
@@ -542,7 +543,7 @@ std::string Derivation::unparse(const Store & store, bool maskOutputs,
             [&](const DerivationOutput::CAFixed & dof) {
                 s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(dof.path(store, name, i.first)));
                 s += ','; printUnquotedString(s, dof.ca.printMethodAlgo());
-                s += ','; printUnquotedString(s, dof.ca.hash.to_string(Base16, false));
+                s += ','; printUnquotedString(s, dof.ca.hash.to_string(HashFormat::Base16, false));
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 s += ','; printUnquotedString(s, "");
@@ -775,7 +776,7 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
             auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw);
             auto hash = hashString(htSHA256, "fixed:out:"
                 + dof.ca.printMethodAlgo() + ":"
-                + dof.ca.hash.to_string(Base16, false) + ":"
+                + dof.ca.hash.to_string(HashFormat::Base16, false) + ":"
                 + store.printStorePath(dof.path(store, drv.name, i.first)));
             outputHashes.insert_or_assign(i.first, std::move(hash));
         }
@@ -820,7 +821,7 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
             const auto h = get(res.hashes, outputName);
             if (!h)
                 throw Error("no hash for output '%s' of derivation '%s'", outputName, drv.name);
-            inputs2[h->to_string(Base16, false)].value.insert(outputName);
+            inputs2[h->to_string(HashFormat::Base16, false)].value.insert(outputName);
         }
     }
 
@@ -895,8 +896,8 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
-    drv.inputSrcs = WorkerProto::Serialise<StorePathSet>::read(store,
-        WorkerProto::ReadConn { .from = in });
+    drv.inputSrcs = CommonProto::Serialise<StorePathSet>::read(store,
+        CommonProto::ReadConn { .from = in });
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
@@ -925,7 +926,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             [&](const DerivationOutput::CAFixed & dof) {
                 out << store.printStorePath(dof.path(store, drv.name, i.first))
                     << dof.ca.printMethodAlgo()
-                    << dof.ca.hash.to_string(Base16, false);
+                    << dof.ca.hash.to_string(HashFormat::Base16, false);
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 out << ""
@@ -944,8 +945,8 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
         }, i.second.raw);
     }
-    WorkerProto::write(store,
-        WorkerProto::WriteConn { .to = out },
+    CommonProto::write(store,
+        CommonProto::WriteConn { .to = out },
         drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();
@@ -957,7 +958,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 std::string hashPlaceholder(const OutputNameView outputName)
 {
     // FIXME: memoize?
-    return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(Base32, false);
+    return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(HashFormat::Base32, false);
 }
 
 
@@ -1001,13 +1002,13 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 
 }
 
-std::optional<BasicDerivation> Derivation::tryResolve(Store & store) const
+std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
 {
     std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
 
     std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accum;
     accum = [&](auto & inputDrv, auto & node) {
-        for (auto & [outputName, outputPath] : store.queryPartialDerivationOutputMap(inputDrv)) {
+        for (auto & [outputName, outputPath] : store.queryPartialDerivationOutputMap(inputDrv, evalStore)) {
             if (outputPath) {
                 inputDrvOutputs.insert_or_assign({inputDrv, outputName}, *outputPath);
                 if (auto p = get(node.childMap, outputName))
@@ -1162,7 +1163,7 @@ nlohmann::json DerivationOutput::toJSON(
         [&](const DerivationOutput::CAFixed & dof) {
             res["path"] = store.printStorePath(dof.path(store, drvName, outputName));
             res["hashAlgo"] = dof.ca.printMethodAlgo();
-            res["hash"] = dof.ca.hash.to_string(Base16, false);
+            res["hash"] = dof.ca.hash.to_string(HashFormat::Base16, false);
             // FIXME print refs?
         },
         [&](const DerivationOutput::CAFloating & dof) {

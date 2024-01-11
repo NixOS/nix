@@ -20,4 +20,4 @@
   # Unit tests
   - src/*/tests/**/*
   # Functional and integration tests
-  - tests/**/*
+  - tests/functional/**/*

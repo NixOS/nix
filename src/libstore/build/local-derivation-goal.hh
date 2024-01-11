@@ -3,6 +3,7 @@
 
 #include "derivation-goal.hh"
 #include "local-store.hh"
+#include "processes.hh"
 
 namespace nix {
 
@@ -86,8 +87,8 @@ struct LocalDerivationGoal : public DerivationGoal
             : source(source), optional(optional)
         { }
     };
-    typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
-    DirsInChroot dirsInChroot;
+    typedef map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+    PathsInChroot pathsInChroot;
 
     typedef map<std::string, std::string> Environment;
     Environment env;
@@ -119,14 +120,6 @@ struct LocalDerivationGoal : public DerivationGoal
      *   self-references.
      */
     OutputPathMap scratchOutputs;
-
-    /**
-     * Path registration info from the previous round, if we're
-     * building multiple times. Since this contains the hash, it
-     * allows us to compare whether two rounds produced the same
-     * result.
-     */
-    std::map<Path, ValidPathInfo> prevInfos;
 
     uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
     gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }

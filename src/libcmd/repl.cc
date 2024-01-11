@@ -22,6 +22,7 @@ extern "C" {
 #include "repl.hh"
 
 #include "ansicolor.hh"
+#include "signals.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-cache.hh"
@@ -36,6 +37,8 @@ extern "C" {
 #include "globals.hh"
 #include "flake/flake.hh"
 #include "flake/lockfile.hh"
+#include "users.hh"
+#include "terminal.hh"
 #include "editor-for.hh"
 #include "finally.hh"
 #include "markdown.hh"
@@ -922,7 +925,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     case nString:
         str << ANSI_WARNING;
-        printLiteralString(str, v.string.s);
+        printLiteralString(str, v.string_view());
         str << ANSI_NORMAL;
         break;
 

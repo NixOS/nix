@@ -9,12 +9,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "current-process.hh"
 #include "parsed-derivations.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "derivations.hh"
-#include "util.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
 #include "eval.hh"
@@ -34,13 +34,14 @@ extern char * * environ __attribute__((weak));
  */
 static std::vector<std::string> shellwords(const std::string & s)
 {
-    std::regex whitespace("^(\\s+).*");
+    std::regex whitespace("^\\s+");
     auto begin = s.cbegin();
     std::vector<std::string> res;
     std::string cur;
     enum state {
         sBegin,
-        sQuote
+        sSingleQuote,
+        sDoubleQuote
     };
     state st = sBegin;
     auto it = begin;
@@ -50,26 +51,39 @@ static std::vector<std::string> shellwords(const std::string & s)
             if (regex_search(it, s.cend(), match, whitespace)) {
                 cur.append(begin, it);
                 res.push_back(cur);
-                cur.clear();
-                it = match[1].second;
+                it = match[0].second;
+                if (it == s.cend()) return res;
                 begin = it;
+                cur.clear();
             }
         }
         switch (*it) {
+            case '\'':
+                if (st != sDoubleQuote) {
+                    cur.append(begin, it);
+                    begin = it + 1;
+                    st = st == sBegin ? sSingleQuote : sBegin;
+                }
+                break;
             case '"':
-                cur.append(begin, it);
-                begin = it + 1;
-                st = st == sBegin ? sQuote : sBegin;
+                if (st != sSingleQuote) {
+                    cur.append(begin, it);
+                    begin = it + 1;
+                    st = st == sBegin ? sDoubleQuote : sBegin;
+                }
                 break;
             case '\\':
-                /* perl shellwords mostly just treats the next char as part of the string with no special processing */
-                cur.append(begin, it);
-                begin = ++it;
+                if (st != sSingleQuote) {
+                    /* perl shellwords mostly just treats the next char as part of the string with no special processing */
+                    cur.append(begin, it);
+                    begin = ++it;
+                }
                 break;
         }
     }
+    if (st != sBegin) throw Error("unterminated quote in shebang line");
     cur.append(begin, it);
-    if (!cur.empty()) res.push_back(cur);
+    res.push_back(cur);
     return res;
 }
 
@@ -128,7 +142,7 @@ static void main_nix_build(int argc, char * * argv)
                 for (auto line : lines) {
                     line = chomp(line);
                     std::smatch match;
-                    if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell (.*)$")))
+                    if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
                         for (const auto & word : shellwords(match[1].str()))
                             args.push_back(word);
                 }
@@ -344,7 +358,7 @@ static void main_nix_build(int argc, char * * argv)
         }
     }
 
-    state->printStats();
+    state->maybePrintStats();
 
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         /* Note: we do this even when !printMissing to efficiently
@@ -435,7 +449,7 @@ static void main_nix_build(int argc, char * * argv)
             }
         }
         for (const auto & src : drv.inputSrcs) {
-            pathsToBuild.push_back(DerivedPath::Opaque{src});
+            pathsToBuild.emplace_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
         }
 

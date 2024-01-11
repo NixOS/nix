@@ -45,9 +45,9 @@ struct TunnelLogger : public Logger
 
     Sync<State> state_;
 
-    unsigned int clientVersion;
+    WorkerProto::Version clientVersion;
 
-    TunnelLogger(FdSink & to, unsigned int clientVersion)
+    TunnelLogger(FdSink & to, WorkerProto::Version clientVersion)
         : to(to), clientVersion(clientVersion) { }
 
     void enqueueMsg(const std::string & s)
@@ -261,24 +261,18 @@ struct ClientSettings
     }
 };
 
-static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, WorkerProto::ReadConn conn)
-{
-    std::vector<DerivedPath> reqs;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
-        reqs = WorkerProto::Serialise<std::vector<DerivedPath>>::read(store, conn);
-    } else {
-        for (auto & s : readStrings<Strings>(conn.from))
-            reqs.push_back(parsePathWithOutputs(store, s).toDerivedPath());
-    }
-    return reqs;
-}
-
 static void performOp(TunnelLogger * logger, ref<Store> store,
-    TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
+    TrustedFlag trusted, RecursiveFlag recursive, WorkerProto::Version clientVersion,
     Source & from, BufferedSink & to, WorkerProto::Op op)
 {
-    WorkerProto::ReadConn rconn { .from = from };
-    WorkerProto::WriteConn wconn { .to = to };
+    WorkerProto::ReadConn rconn {
+        .from = from,
+        .version = clientVersion,
+    };
+    WorkerProto::WriteConn wconn {
+        .to = to,
+        .version = clientVersion,
+    };
 
     switch (op) {
 
@@ -334,7 +328,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         logger->stopWork();
-        to << hash.to_string(Base16, false);
+        to << hash.to_string(HashFormat::Base16, false);
         break;
     }
 
@@ -428,7 +422,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             }();
             logger->stopWork();
 
-            pathInfo->write(to, *store, GET_PROTOCOL_MINOR(clientVersion));
+            WorkerProto::Serialise<ValidPathInfo>::write(*store, wconn, *pathInfo);
         } else {
             HashType hashAlgo;
             std::string baseName;
@@ -460,13 +454,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                        eagerly consume the entire stream it's given, past the
                        length of the Nar. */
                     TeeSource savedNARSource(from, saved);
-                    ParseSink sink; /* null sink; just parse the NAR */
+                    NullParseSink sink; /* just parse the NAR */
                     parseDump(sink, savedNARSource);
                 } else {
                     /* Incrementally parse the NAR file, stripping the
                        metadata, and streaming the sole file we expect into
                        `saved`. */
-                    RetrieveRegularNARSink savedRegular { saved };
+                    RegularFileSink savedRegular { saved };
                     parseDump(savedRegular, from);
                     if (!savedRegular.regular) throw Error("regular file expected");
                 }
@@ -532,7 +526,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::BuildPaths: {
-        auto drvs = readDerivedPaths(*store, clientVersion, rconn);
+        auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
@@ -557,7 +551,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::BuildPathsWithResults: {
-        auto drvs = readDerivedPaths(*store, clientVersion, rconn);
+        auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         mode = (BuildMode) readInt(from);
 
@@ -641,16 +635,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
-        to << res.status << res.errorMsg;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
-            to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
-        }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
-            DrvOutputs builtOutputs;
-            for (auto & [output, realisation] : res.builtOutputs)
-                builtOutputs.insert_or_assign(realisation.id, realisation);
-            WorkerProto::write(*store, wconn, builtOutputs);
-        }
+        WorkerProto::write(*store, wconn, res);
         break;
     }
 
@@ -834,7 +819,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            info->write(to, *store, GET_PROTOCOL_MINOR(clientVersion), false);
+            WorkerProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
@@ -914,7 +899,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 source = std::make_unique<TunnelSource>(from, to);
             else {
                 TeeSource tee { from, saved };
-                ParseSink ether;
+                NullParseSink ether;
                 parseDump(ether, tee);
                 source = std::make_unique<StringSource>(saved.s);
             }
@@ -932,7 +917,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::QueryMissing: {
-        auto targets = readDerivedPaths(*store, clientVersion, rconn);
+        auto targets = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
         uint64_t downloadSize, narSize;
@@ -1017,7 +1002,7 @@ void processConnection(
     if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
     to << WORKER_MAGIC_2 << PROTOCOL_VERSION;
     to.flush();
-    unsigned int clientVersion = readInt(from);
+    WorkerProto::Version clientVersion = readInt(from);
 
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
@@ -1052,7 +1037,10 @@ void processConnection(
         auto temp = trusted
             ? store->isTrustedClient()
             : std::optional { NotTrusted };
-        WorkerProto::WriteConn wconn { .to = to };
+        WorkerProto::WriteConn wconn {
+            .to = to,
+            .version = clientVersion,
+        };
         WorkerProto::write(*store, wconn, temp);
     }
 
