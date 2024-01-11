@@ -16,9 +16,9 @@ libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/lib
 
 libexpr_LIBS = libutil libstore libfetchers
 
-libexpr_LDFLAGS += -lboost_context -pthread
+libexpr_LDFLAGS += -lboost_context $(THREAD_LDFLAGS)
 ifdef HOST_LINUX
- libexpr_LDFLAGS += -ldl
+  libexpr_LDFLAGS += -ldl
 endif
 
 # The dependency on libgc must be propagated (i.e. meaning that
