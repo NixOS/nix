@@ -1,8 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  #inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
-  inputs.nixpkgs.url = "github:edolstra/nixpkgs/fix-aws-sdk-cpp";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
@@ -12,7 +11,7 @@
     let
       inherit (nixpkgs) lib;
 
-      officialRelease = false;
+      officialRelease = true;
 
       version = lib.fileContents ./.version + versionSuffix;
       versionSuffix =
@@ -25,7 +24,7 @@
       linuxSystems = linux32BitSystems ++ linux64BitSystems;
       darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
       systems = linuxSystems ++ darwinSystems;
-      
+
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
@@ -59,35 +58,28 @@
 
       nixSrc = fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect baseFiles (
-          fileset.difference
-            (fileset.unions [
-              ./.version
-              ./boehmgc-coroutine-sp-fallback.diff
-              ./bootstrap.sh
-              ./configure.ac
-              ./doc
-              ./local.mk
-              ./m4
-              ./Makefile
-              ./Makefile.config.in
-              ./misc
-              ./mk
-              ./precompiled-headers.h
-              ./src
-              ./tests
-              ./COPYING
-              ./scripts/local.mk
-              (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-              # TODO: do we really need README.md? It doesn't seem used in the build.
-              ./README.md
-            ])
-            (fileset.unions [
-              # Removed file sets
-              ./tests/nixos
-              ./tests/installer
-            ])
-        );
+        fileset = fileset.intersect baseFiles (fileset.unions [
+          ./.version
+          ./boehmgc-coroutine-sp-fallback.diff
+          ./bootstrap.sh
+          ./configure.ac
+          ./doc
+          ./local.mk
+          ./m4
+          ./Makefile
+          ./Makefile.config.in
+          ./misc
+          ./mk
+          ./precompiled-headers.h
+          ./src
+          ./tests/functional
+          ./tests/unit
+          ./COPYING
+          ./scripts/local.mk
+          (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+          # TODO: do we really need README.md? It doesn't seem used in the build.
+          ./README.md
+        ]);
       };
 
       # Memoize nixpkgs for different platforms for efficiency.

@@ -23,14 +23,17 @@ makefiles = \
 
 ifeq ($(tests), yes)
 makefiles += \
-  src/libutil/tests/local.mk \
-  src/libstore/tests/local.mk \
-  src/libexpr/tests/local.mk \
-  tests/local.mk \
-  tests/ca/local.mk \
-  tests/dyn-drv/local.mk \
-  tests/test-libstoreconsumer/local.mk \
-  tests/plugins/local.mk
+  tests/unit/libutil/local.mk \
+  tests/unit/libutil-support/local.mk \
+  tests/unit/libstore/local.mk \
+  tests/unit/libstore-support/local.mk \
+  tests/unit/libexpr/local.mk \
+  tests/unit/libexpr-support/local.mk \
+  tests/functional/local.mk \
+  tests/functional/ca/local.mk \
+  tests/functional/dyn-drv/local.mk \
+  tests/functional/test-libstoreconsumer/local.mk \
+  tests/functional/plugins/local.mk
 else
 makefiles += \
   mk/disable-tests.mk
