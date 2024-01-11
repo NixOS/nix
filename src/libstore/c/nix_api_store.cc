@@ -33,19 +33,19 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        if (!uri) {
-            return new Store{nix::openStore()};
-        } else {
-            std::string uri_str = uri;
-            if (!params)
-                return new Store{nix::openStore(uri_str)};
+        std::string uri_str = uri ? uri : "";
 
-            nix::Store::Params params_map;
-            for (size_t i = 0; params[i] != nullptr; i++) {
-                params_map[params[i][0]] = params[i][1];
-            }
-            return new Store{nix::openStore(uri_str, params_map)};
+        if (uri_str.empty())
+            return new Store{nix::openStore()};
+
+        if (!params)
+            return new Store{nix::openStore(uri_str)};
+
+        nix::Store::Params params_map;
+        for (size_t i = 0; params[i] != nullptr; i++) {
+            params_map[params[i][0]] = params[i][1];
         }
+        return new Store{nix::openStore(uri_str, params_map)};
     }
     NIXC_CATCH_ERRS_NULL
 }

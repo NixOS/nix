@@ -58,4 +58,28 @@ TEST_F(nix_api_store_test, get_version)
     ASSERT_STREQ(PACKAGE_VERSION, value);
 }
 
+TEST_F(nix_api_util_context, nix_store_open_dummy)
+{
+    nix_libstore_init(ctx);
+    Store * store = nix_store_open(ctx, "dummy://", nullptr);
+    ASSERT_EQ(NIX_OK, ctx->last_err_code);
+    ASSERT_STREQ("dummy", store->ptr->getUri().c_str());
+    nix_store_unref(store);
+}
+
+TEST_F(nix_api_util_context, nix_store_open_invalid)
+{
+    nix_libstore_init(ctx);
+    Store * store = nix_store_open(ctx, "invalid://", nullptr);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, ctx->last_err_code);
+    ASSERT_EQ(nullptr, store);
+    nix_store_unref(store);
+}
+
+TEST_F(nix_api_store_test, nix_store_is_valid_path_not_in_store)
+{
+    StorePath * path = nix_store_parse_path(ctx, store, validPath);
+    ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, path));
+}
+
 }
