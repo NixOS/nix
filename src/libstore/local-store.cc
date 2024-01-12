@@ -276,7 +276,7 @@ LocalStore::LocalStore(const Params & params)
                 [[gnu::unused]] auto res2 = ftruncate(fd.get(), settings.reservedSize);
             }
         }
-    } catch (SysError & e) { /* don't care about errors */
+    } catch (SystemError & e) { /* don't care about errors */
     }
 
     /* Acquire the big fat lock in shared mode to make sure that no

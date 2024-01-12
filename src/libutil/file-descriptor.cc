@@ -231,7 +231,7 @@ void closeMostFDs(const std::set<int> & exceptions)
             }
         }
         return;
-    } catch (SysError &) {
+    } catch (SystemError &) {
     }
 #endif
 

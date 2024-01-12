@@ -118,7 +118,7 @@ void loadConfFile()
         try {
             std::string contents = readFile(path);
             globalConfig.applyConfig(contents, path);
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     };
 
     applyConfigFile(settings.nixConfDir + "/nix.conf");
