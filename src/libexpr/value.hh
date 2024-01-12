@@ -9,6 +9,7 @@
 #include "value/context.hh"
 #include "input-accessor.hh"
 #include "source-path.hh"
+#include "print-options.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -70,7 +71,7 @@ struct Pos;
 class StorePath;
 class EvalState;
 class XMLWriter;
-
+class Printer;
 
 typedef int64_t NixInt;
 typedef double NixFloat;
@@ -82,6 +83,7 @@ typedef double NixFloat;
 class ExternalValueBase
 {
     friend std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
+    friend class Printer;
     protected:
     /**
      * Print out the value
@@ -139,11 +141,9 @@ private:
 
     friend std::string showType(const Value & v);
 
-    void print(const SymbolTable &symbols, std::ostream &str, std::set<const void *> *seen, int depth) const;
-
 public:
 
-    void print(const SymbolTable &symbols, std::ostream &str, bool showRepeated = false, int depth = INT_MAX) const;
+    void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
@@ -364,9 +364,14 @@ public:
     inline void mkPrimOpApp(Value * l, Value * r)
     {
         internalType = tPrimOpApp;
-        app.left = l;
-        app.right = r;
+        primOpApp.left = l;
+        primOpApp.right = r;
     }
+
+    /**
+     * For a `tPrimOpApp` value, get the original `PrimOp` value.
+     */
+    PrimOp * primOpAppPrimOp() const;
 
     inline void mkExternal(ExternalValueBase * e)
     {

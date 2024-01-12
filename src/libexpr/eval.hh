@@ -84,6 +84,8 @@ struct PrimOp
     void check();
 };
 
+std::ostream & operator<<(std::ostream & output, PrimOp & primOp);
+
 /**
  * Info about a constant
  */
@@ -127,7 +129,7 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
 void copyContext(const Value & v, NixStringContext & context);
 
 
-std::string printValue(const EvalState & state, const Value & v);
+std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
