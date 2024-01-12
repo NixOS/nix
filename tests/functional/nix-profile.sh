@@ -193,3 +193,12 @@ nix profile install $flake2Dir --priority 0
 clearProfiles
 nix profile install $(nix build $flake1Dir --no-link --print-out-paths)
 expect 1 nix profile install --impure --expr "(builtins.getFlake ''$flake2Dir'').packages.$system.default"
+
+# Test upgrading from profile version 2.
+clearProfiles
+mkdir -p $TEST_ROOT/import-profile
+outPath=$(nix build --no-link --print-out-paths $flake1Dir/flake.nix^out)
+printf '{ "version": 2, "elements": [ { "active": true, "attrPath": "legacyPackages.x86_64-linux.hello", "originalUrl": "flake:nixpkgs", "outputs": null, "priority": 5, "storePaths": [ "%s" ], "url": "github:NixOS/nixpkgs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } ] }' "$outPath" > $TEST_ROOT/import-profile/manifest.json
+nix build --profile $TEST_HOME/.nix-profile $(nix store add-path $TEST_ROOT/import-profile)
+nix profile list | grep -A4 'Name:.*hello' | grep "Store paths:.*$outPath"
+nix profile remove hello 2>&1 | grep 'removed 1 packages, kept 0 packages'
