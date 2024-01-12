@@ -40,10 +40,6 @@ void emitTreeAttrs(
         attrs.alloc("submodules").mkBool(
             fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
-    if (input.getType() == "git")
-        attrs.alloc("exportIgnore").mkBool(
-            fetchers::maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false));
-
     if (!forceDirty) {
 
         if (auto rev = input.getRev()) {
