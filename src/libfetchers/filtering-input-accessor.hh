@@ -71,4 +71,18 @@ struct AllowListInputAccessor : public FilteringInputAccessor
     using FilteringInputAccessor::FilteringInputAccessor;
 };
 
+/**
+ * A wrapping `InputAccessor` mix-in where `isAllowed()` caches the result of virtual `isAllowedUncached()`.
+ */
+struct CachingFilteringInputAccessor : FilteringInputAccessor
+{
+    std::map<CanonPath, bool> cache;
+
+    using FilteringInputAccessor::FilteringInputAccessor;
+
+    bool isAllowed(const CanonPath & path) override;
+
+    virtual bool isAllowedUncached(const CanonPath & path) = 0;
+};
+
 }
