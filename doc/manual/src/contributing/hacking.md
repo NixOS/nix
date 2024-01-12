@@ -51,10 +51,13 @@ To install it in `$(pwd)/outputs` and test it:
 
 ```console
 [nix-shell]$ make install
-[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
+[nix-shell]$ make installcheck check -j $NIX_BUILD_CORES
 [nix-shell]$ nix --version
 nix (Nix) 2.12
 ```
+
+For more information on running and filtering tests, see
+[`testing.md`](./testing.md).
 
 To build a release version of Nix for the current operating system and CPU architecture:
 
