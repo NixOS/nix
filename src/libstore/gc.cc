@@ -511,7 +511,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Synchronisation point to test ENOENT handling in
        addTempRoot(), see tests/gc-non-blocking.sh. */
-    if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC_1"))
         readFile(*p);
 
     /* Start the server for receiving new roots. */
@@ -636,6 +636,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
         roots.insert(root.first);
     }
+
+    /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
+        readFile(*p);
 
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
@@ -782,10 +786,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             }
         }
     };
-
-    /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
-    if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
-        readFile(*p);
 
     /* Either delete all garbage paths, or just the specified
        paths (for gcDeleteSpecific). */
