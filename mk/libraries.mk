@@ -3,7 +3,7 @@ libs-list :=
 ifdef HOST_DARWIN
   SO_EXT = dylib
 else
-  ifdef HOST_CYGWIN
+  ifdef HOST_WINDOWS
     SO_EXT = dll
   else
     SO_EXT = so
@@ -65,7 +65,7 @@ define build-library
   $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
 
-  ifdef HOST_CYGWIN
+  ifdef HOST_WINDOWS
     $(1)_INSTALL_DIR ?= $$(bindir)
   else
     $(1)_INSTALL_DIR ?= $$(libdir)
@@ -85,7 +85,7 @@ define build-library
       endif
     else
       ifndef HOST_DARWIN
-        ifndef HOST_CYGWIN
+        ifndef HOST_WINDOWS
           $(1)_LDFLAGS += -Wl,-z,defs
         endif
       endif
