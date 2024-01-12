@@ -674,8 +674,7 @@ struct GitExportIgnoreInputAccessor : CachingFilteringInputAccessor {
 
     bool gitAttrGet(const CanonPath & path, const char * attrName, const char * & valueOut)
     {
-        std::string pathStr {path.rel()};
-        const char * pathCStr = pathStr.c_str();
+        const char * pathCStr = path.rel_c_str();
 
         if (rev) {
             git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
