@@ -31,16 +31,16 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
         throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
-        "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(HashFormat::Base32, true) + ";"
-        + std::to_string(narSize) + ";"
+            "1;" + store.printStorePath(path) + ";"
+            + narHash.to_string(HashFormat::Nix32, true) + ";"
+            + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
 
 
-void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
+void ValidPathInfo::sign(const Store & store, const Signer & signer)
 {
-    sigs.insert(secretKey.signDetached(fingerprint(store)));
+    sigs.insert(signer.signDetached(fingerprint(store)));
 }
 
 std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const

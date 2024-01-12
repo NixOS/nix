@@ -146,7 +146,7 @@ static nlohmann::json pathInfoToJSON(
         auto info = store.queryPathInfo(storePath);
 
         auto & jsonPath = jsonList.emplace_back(
-            info->toJSON(store, false, HashFormat::Base32));
+            info->toJSON(store, false, HashFormat::Nix32));
 
         // Add the path to the object whose metadata we are including.
         jsonPath["path"] = store.printStorePath(storePath);

@@ -46,7 +46,7 @@ struct HashModuloSink : AbstractHashSink
     HashSink hashSink;
     RewritingSink rewritingSink;
 
-    HashModuloSink(HashType ht, const std::string & modulus);
+    HashModuloSink(HashAlgorithm ha, const std::string & modulus);
 
     void operator () (std::string_view data) override;
 

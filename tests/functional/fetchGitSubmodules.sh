@@ -118,11 +118,3 @@ cloneRepo=$TEST_ROOT/a/b/gitSubmodulesClone # NB /a/b to make the relative path 
 git clone $rootRepo $cloneRepo
 pathIndirect=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$cloneRepo; rev = \"$rev2\"; submodules = true; }).outPath")
 [[ $pathIndirect = $pathWithRelative ]]
-
-# Test that if the clone has the submodule already, we're not fetching
-# it again.
-git -C $cloneRepo submodule update --init
-rm $TEST_HOME/.cache/nix/fetcher-cache*
-rm -rf $subRepo
-pathSubmoduleGone=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$cloneRepo; rev = \"$rev2\"; submodules = true; }).outPath")
-[[ $pathSubmoduleGone = $pathWithRelative ]]

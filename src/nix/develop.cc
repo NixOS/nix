@@ -223,7 +223,11 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     if (builder != "bash")
         throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
 
-    auto getEnvShPath = evalStore->addTextToStore("get-env.sh", getEnvSh, {});
+    auto getEnvShPath = ({
+        StringSource source { getEnvSh };
+        evalStore->addToStoreFromDump(
+            source, "get-env.sh", TextIngestionMethod {}, HashAlgorithm::SHA256, {});
+    });
 
     drv.args = {store->printStorePath(getEnvShPath)};
 
@@ -371,7 +375,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto builtPaths = Installable::toStorePaths(
+            auto builtPaths = Installable::toStorePathSet(
                 getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
@@ -626,7 +630,7 @@ struct CmdDevelop : Common, MixEnvironment
 
             bool found = false;
 
-            for (auto & path : Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
+            for (auto & path : Installable::toStorePathSet(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
                 auto s = store->printStorePath(path) + "/bin/bash";
                 if (pathExists(s)) {
                     shell = s;
@@ -665,7 +669,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
+        runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
     }
 };
 

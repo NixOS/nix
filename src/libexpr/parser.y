@@ -28,6 +28,31 @@
 
 namespace nix {
 
+#define YYLTYPE ::nix::ParserLocation
+    struct ParserLocation
+    {
+        int first_line, first_column;
+        int last_line, last_column;
+
+        // backup to recover from yyless(0)
+        int stashed_first_line, stashed_first_column;
+        int stashed_last_line, stashed_last_column;
+
+        void stash() {
+          stashed_first_line = first_line;
+          stashed_first_column = first_column;
+          stashed_last_line = last_line;
+          stashed_last_column = last_column;
+        }
+
+        void unstash() {
+          first_line = stashed_first_line;
+          first_column = stashed_first_column;
+          last_line = stashed_last_line;
+          last_column = stashed_last_column;
+        }
+    };
+
     struct ParseData
     {
         EvalState & state;
@@ -686,17 +711,26 @@ Expr * EvalState::parse(
 }
 
 
-SourcePath resolveExprPath(const SourcePath & path)
+SourcePath resolveExprPath(SourcePath path)
 {
+    unsigned int followCount = 0, maxFollow = 1024;
+
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    auto path2 = path.resolveSymlinks();
+    while (!path.path.isRoot()) {
+        // Basic cycle/depth limit to avoid infinite loops.
+        if (++followCount >= maxFollow)
+            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+        auto p = path.parent().resolveSymlinks() + path.baseName();
+        if (p.lstat().type != InputAccessor::tSymlink) break;
+        path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
+    }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path2.lstat().type == InputAccessor::tDirectory)
-        return path2 + "default.nix";
+    if (path.resolveSymlinks().lstat().type == InputAccessor::tDirectory)
+        return path + "default.nix";
 
-    return path2;
+    return path;
 }
 
 
@@ -708,7 +742,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 
 Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto buffer = path.readFile();
+    auto buffer = path.resolveSymlinks().readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
@@ -775,7 +809,7 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0)
+std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = searchPathResolved.find(value);
@@ -792,7 +826,6 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
             });
-            res = std::nullopt;
         }
     }
 
@@ -806,6 +839,20 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
 
     else {
         auto path = absPath(value);
+
+        /* Allow access to paths in the search path. */
+        if (initAccessControl) {
+            allowPath(path);
+            if (store->isInStore(path)) {
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    for (auto & p : closure)
+                        allowPath(p);
+                } catch (InvalidPath &) { }
+            }
+        }
+
         if (pathExists(path))
             res = { path };
         else {
@@ -821,7 +868,7 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
     else
         debug("failed to resolve search path element '%s'", value);
 
-    searchPathResolved[value] = res;
+    searchPathResolved.emplace(value, res);
     return res;
 }
 

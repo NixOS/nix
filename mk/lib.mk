@@ -12,24 +12,7 @@ man-pages :=
 install-tests :=
 install-tests-groups :=
 
-ifdef HOST_OS
-  HOST_KERNEL = $(firstword $(subst -, ,$(HOST_OS)))
-  ifeq ($(HOST_KERNEL), cygwin)
-    HOST_CYGWIN = 1
-  endif
-  ifeq ($(patsubst darwin%,,$(HOST_KERNEL)),)
-    HOST_DARWIN = 1
-  endif
-  ifeq ($(patsubst freebsd%,,$(HOST_KERNEL)),)
-    HOST_FREEBSD = 1
-  endif
-  ifeq ($(HOST_KERNEL), linux)
-    HOST_LINUX = 1
-  endif
-  ifeq ($(patsubst solaris%,,$(HOST_KERNEL)),)
-    HOST_SOLARIS = 1
-  endif
-endif
+include mk/platform.mk
 
 # Hack to define a literal space.
 space :=
@@ -41,27 +24,6 @@ define newline
 
 
 endef
-
-
-# Default installation paths.
-prefix ?= /usr/local
-libdir ?= $(prefix)/lib
-bindir ?= $(prefix)/bin
-libexecdir ?= $(prefix)/libexec
-datadir ?= $(prefix)/share
-localstatedir ?= $(prefix)/var
-sysconfdir ?= $(prefix)/etc
-mandir ?= $(prefix)/share/man
-
-
-# Initialise support for build directories.
-builddir ?=
-
-ifdef builddir
-  buildprefix = $(builddir)/
-else
-  buildprefix =
-endif
 
 
 # Pass -fPIC if we're building dynamic libraries.
@@ -94,6 +56,8 @@ ifeq ($(BUILD_DEBUG), 1)
 endif
 
 
+include mk/build-dir.mk
+include mk/install-dirs.mk
 include mk/functions.mk
 include mk/tracing.mk
 include mk/clean.mk
@@ -112,7 +76,7 @@ define include-sub-makefile
   include $(1)
 endef
 
-$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile, $(mf))))
+$(foreach mf, $(makefiles), $(eval $(call include-sub-makefile,$(mf))))
 
 
 # Instantiate stuff.

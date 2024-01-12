@@ -61,4 +61,12 @@ struct CmdDumpPath2 : Command
     }
 };
 
-static auto rDumpPath2 = registerCommand2<CmdDumpPath2>({"nar", "dump-path"});
+struct CmdNarDumpPath : CmdDumpPath2 {
+    void run() override {
+        warn("'nix nar dump-path' is a deprecated alias for 'nix nar pack'");
+        CmdDumpPath2::run();
+    }
+};
+
+static auto rCmdNarPack = registerCommand2<CmdDumpPath2>({"nar", "pack"});
+static auto rCmdNarDumpPath = registerCommand2<CmdNarDumpPath>({"nar", "dump-path"});

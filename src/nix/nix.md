@@ -235,10 +235,14 @@ operate are determined as follows:
 
 # Nix stores
 
-Most `nix` subcommands operate on a *Nix store*. These are documented
-in [`nix help-stores`](./nix3-help-stores.md).
+Most `nix` subcommands operate on a *Nix store*.
+The various store types are documented in the
+[Store Types](@docroot@/store/types/index.md)
+section of the manual.
 
-# Shebang interpreter 
+The same information is also available from the [`nix help-stores`](./nix3-help-stores.md) command.
+
+# Shebang interpreter
 
 The `nix` command can be used as a `#!` interpreter.
 Arguments to Nix can be passed on subsequent lines in the script.

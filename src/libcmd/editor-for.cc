@@ -1,5 +1,6 @@
 #include "editor-for.hh"
 #include "environment-variables.hh"
+#include "source-path.hh"
 
 namespace nix {
 

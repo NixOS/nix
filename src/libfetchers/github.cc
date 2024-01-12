@@ -42,7 +42,7 @@ struct GitArchiveInputScheme : InputScheme
         auto size = path.size();
         if (size == 3) {
             if (std::regex_match(path[2], revRegex))
-                rev = Hash::parseAny(path[2], htSHA1);
+                rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
@@ -68,7 +68,7 @@ struct GitArchiveInputScheme : InputScheme
             if (name == "rev") {
                 if (rev)
                     throw BadURL("URL '%s' contains multiple commit hashes", url.url);
-                rev = Hash::parseAny(value, htSHA1);
+                rev = Hash::parseAny(value, HashAlgorithm::SHA1);
             }
             else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
@@ -201,7 +201,7 @@ struct GitArchiveInputScheme : InputScheme
             {"rev", rev->gitRev()},
         });
 
-        if (auto res = getCache()->lookup(store, lockedAttrs)) {
+        if (auto res = getCache()->lookup(*store, lockedAttrs)) {
             input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
             return {std::move(res->second), input};
         }
@@ -213,7 +213,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         getCache()->add(
-            store,
+            *store,
             lockedAttrs,
             {
                 {"rev", rev->gitRev()},
@@ -228,6 +228,14 @@ struct GitArchiveInputScheme : InputScheme
     std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev())
+            return rev->gitRev();
+        else
+            return std::nullopt;
     }
 };
 
@@ -276,7 +284,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
+        auto rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
@@ -348,7 +356,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
+        auto rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
@@ -440,7 +448,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         if(!id)
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
-        auto rev = Hash::parseAny(*id, htSHA1);
+        auto rev = Hash::parseAny(*id, HashAlgorithm::SHA1);
         debug("HEAD revision for '%s' is %s", fmt("%s/%s", base_url, ref), rev.gitRev());
         return rev;
     }

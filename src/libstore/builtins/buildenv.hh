@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "derivations.hh"
 #include "store-api.hh"
 
 namespace nix {

@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "posix-source-accessor.hh"
 
 using namespace nix;
 
@@ -20,7 +21,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    FileIngestionMethod ingestionMethod = FileIngestionMethod::Recursive;
+    ContentAddressMethod caMethod = FileIngestionMethod::Recursive;
 
     CmdAddToStore()
     {
@@ -48,7 +49,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             )",
             .labels = {"hash-mode"},
             .handler = {[this](std::string s) {
-                this->ingestionMethod = parseIngestionMethod(s);
+                this->caMethod = parseIngestionMethod(s);
             }},
         });
     }
@@ -57,36 +58,17 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        StringSink sink;
-        dumpPath(path, sink);
+        PosixSourceAccessor accessor;
 
-        auto narHash = hashString(htSHA256, sink.s);
+        auto path2 = CanonPath::fromCwd(path);
 
-        Hash hash = narHash;
-        if (ingestionMethod == FileIngestionMethod::Flat) {
-            HashSink hsink(htSHA256);
-            readFile(path, hsink);
-            hash = hsink.finish().first;
-        }
+        auto storePath = dryRun
+            ? store->computeStorePath(
+                *namePart, accessor, path2, caMethod, HashAlgorithm::SHA256, {}).first
+            : store->addToStoreSlow(
+                *namePart, accessor, path2, caMethod, HashAlgorithm::SHA256, {}).path;
 
-        ValidPathInfo info {
-            *store,
-            std::move(*namePart),
-            FixedOutputInfo {
-                .method = std::move(ingestionMethod),
-                .hash = std::move(hash),
-                .references = {},
-            },
-            narHash,
-        };
-        info.narSize = sink.s.size();
-
-        if (!dryRun) {
-            auto source = StringSource(sink.s);
-            store->addToStore(info, source);
-        }
-
-        logger->cout("%s", store->printStorePath(info.path));
+        logger->cout("%s", store->printStorePath(storePath));
     }
 };
 
@@ -110,7 +92,7 @@ struct CmdAddFile : CmdAddToStore
 {
     CmdAddFile()
     {
-        ingestionMethod = FileIngestionMethod::Flat;
+        caMethod = FileIngestionMethod::Flat;
     }
 
     std::string description() override

@@ -212,8 +212,16 @@ static Flake getFlake(
     auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, allowLookup, flakeCache);
 
+    // We need to guard against symlink attacks, but before we start doing
+    // filesystem operations we should make sure there's a flake.nix in the
+    // first place.
+    auto unsafeFlakeDir = state.store->toRealPath(storePath) + "/" + lockedRef.subdir;
+    auto unsafeFlakeFile = unsafeFlakeDir + "/flake.nix";
+    if (!pathExists(unsafeFlakeFile))
+        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
+
     // Guard against symlink attacks.
-    auto flakeDir = canonPath(state.store->toRealPath(storePath) + "/" + lockedRef.subdir, true);
+    auto flakeDir = canonPath(unsafeFlakeDir, true);
     auto flakeFile = canonPath(flakeDir + "/flake.nix", true);
     if (!isInDir(flakeFile, state.store->toRealPath(storePath)))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
@@ -225,9 +233,6 @@ static Flake getFlake(
         .lockedRef = lockedRef,
         .storePath = storePath,
     };
-
-    if (!pathExists(flakeFile))
-        throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
 
     Value vInfo;
     state.evalFile(state.rootPath(CanonPath(flakeFile)), vInfo, true); // FIXME: symlink attack
@@ -358,10 +363,13 @@ LockedFlake lockFlake(
         debug("old lock file: %s", oldLockFile);
 
         std::map<InputPath, FlakeInput> overrides;
+        std::set<InputPath> explicitCliOverrides;
         std::set<InputPath> overridesUsed, updatesUsed;
 
-        for (auto & i : lockFlags.inputOverrides)
+        for (auto & i : lockFlags.inputOverrides) {
             overrides.insert_or_assign(i.first, FlakeInput { .ref = i.second });
+            explicitCliOverrides.insert(i.first);
+        }
 
         LockFile newLockFile;
 
@@ -432,6 +440,7 @@ LockedFlake lockFlake(
                        ancestors? */
                     auto i = overrides.find(inputPath);
                     bool hasOverride = i != overrides.end();
+                    bool hasCliOverride = explicitCliOverrides.contains(inputPath);
                     if (hasOverride) {
                         overridesUsed.insert(inputPath);
                         // Respect the “flakeness” of the input even if we
@@ -467,7 +476,7 @@ LockedFlake lockFlake(
 
                     if (oldLock
                         && oldLock->originalRef == *input.ref
-                        && !hasOverride)
+                        && !hasCliOverride)
                     {
                         debug("keeping existing input '%s'", inputPathS);
 
@@ -547,7 +556,7 @@ LockedFlake lockFlake(
                             nuked the next time we update the lock
                             file. That is, overrides are sticky unless you
                             use --no-write-lock-file. */
-                        auto ref = input2.ref ? *input2.ref : *input.ref;
+                        auto ref = (input2.ref && explicitCliOverrides.contains(inputPath)) ? *input2.ref : *input.ref;
 
                         if (input.isFlake) {
                             Path localPath = parentPath;
@@ -895,7 +904,7 @@ Fingerprint LockedFlake::getFingerprint() const
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
-    return hashString(htSHA256,
+    return hashString(HashAlgorithm::SHA256,
         fmt("%s;%s;%d;%d;%s",
             flake.storePath.to_string(),
             flake.lockedRef.subdir,

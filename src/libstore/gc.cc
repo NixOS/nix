@@ -50,7 +50,7 @@ static void makeSymlink(const Path & link, const Path & target)
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    std::string hash = hashString(htSHA1, path).to_string(HashFormat::Base32, false);
+    std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
@@ -330,9 +330,7 @@ typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots
 
 static void readProcLink(const std::string & file, UncheckedRoots & roots)
 {
-    /* 64 is the starting buffer size gnu readlink uses... */
-    auto bufsiz = ssize_t{64};
-try_again:
+    constexpr auto bufsiz = PATH_MAX;
     char buf[bufsiz];
     auto res = readlink(file.c_str(), buf, bufsiz);
     if (res == -1) {
@@ -341,10 +339,7 @@ try_again:
         throw SysError("reading symlink");
     }
     if (res == bufsiz) {
-        if (SSIZE_MAX / 2 < bufsiz)
-            throw Error("stupidly long symlink");
-        bufsiz *= 2;
-        goto try_again;
+        throw Error("overly long symlink starting with '%1%'", std::string_view(buf, bufsiz));
     }
     if (res > 0 && buf[0] == '/')
         roots[std::string(static_cast<char *>(buf), res)]

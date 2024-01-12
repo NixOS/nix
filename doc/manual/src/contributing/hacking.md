@@ -10,7 +10,7 @@ $ cd nix
 
 The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment. If you don't have it installed, follow the [installation instructions].
 
-[installation instructions]: ../installation/installation.md
+[installation instructions]: ../installation/index.md
 
 ## Building Nix with flakes
 
@@ -31,7 +31,7 @@ This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` im
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop .#native-clang11StdenvPackages
+$ nix develop .#native-clangStdenvPackages
 ```
 
 > **Note**
@@ -64,6 +64,27 @@ $ nix build
 
 You can also build Nix for one of the [supported platforms](#platforms).
 
+## Makefile variables
+
+You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run
+`make install`.
+
+You may want to set `MAKEFLAGS="-e -j $NIX_BUILD_CORES"` to allow environment
+variables to override `Makefile` variables.
+
+- `ENABLE_BUILD=yes` to enable building the C++ code.
+- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
+
+  The docs can take a while to build, so you may want to disable this for local development.
+- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
+- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
+- `OPTIMIZE=1` to enable optimizations.
+- `libraries=libutil programs=` to only build a specific library (this will
+  fail in the linking phase if you don't have the other libraries built, but is
+  useful for checking types).
+- `libraries= programs=nix` to only build a specific program (this will not, in
+  general, work, because the programs need the libraries).
+
 ## Building Nix
 
 To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
@@ -75,7 +96,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 ```
 
 > **Note**
@@ -145,6 +166,31 @@ $ nix build .#packages.aarch64-linux.default
 
 Cross-compiled builds are available for ARMv6 (`armv6l-linux`) and ARMv7 (`armv7l-linux`).
 Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootstrap Nix on unsupported platforms.
+
+### Building for multiple platforms at once
+
+It is useful to perform multiple cross and native builds on the same source tree,
+for example to ensure that better support for one platform doesn't break the build for another.
+In order to facilitate this, Nix has some support for being built out of tree – that is, placing build artefacts in a different directory than the source code:
+
+1. Create a directory for the build, e.g.
+
+   ```bash
+   mkdir build
+   ```
+
+2. Run the configure script from that directory, e.g.
+
+   ```bash
+   cd build
+   ../configure <configure flags>
+   ```
+
+3. Run make from the source directory, but with the build directory specified, e.g.
+
+   ```bash
+   make builddir=build <make flags>
+   ```
 
 ## System type
 
@@ -220,3 +266,82 @@ Configure your editor to use the `clangd` from the shell, either by running it i
 > For some editors (e.g. Visual Studio Code), you may need to install a [special extension](https://open-vsx.org/extension/llvm-vs-code-extensions/vscode-clangd) for the editor to interact with `clangd`.
 > Some other editors (e.g. Emacs, Vim) need a plugin to support LSP servers in general (e.g. [lsp-mode](https://github.com/emacs-lsp/lsp-mode) for Emacs and [vim-lsp](https://github.com/prabirshrestha/vim-lsp) for vim).
 > Editor-specific setup is typically opinionated, so we will not cover it here in more detail.
+
+## Add a release note
+
+`doc/manual/rl-next` contains release notes entries for all unreleased changes.
+
+User-visible changes should come with a release note.
+
+### Add an entry
+
+Here's what a complete entry looks like. The file name is not incorporated in the document.
+
+```
+---
+synopsis: Basically a title
+issues: 1234
+prs: 1238
+---
+
+Here's one or more paragraphs that describe the change.
+
+- It's markdown
+- Add references to the manual using @docroot@
+```
+
+Significant changes should add the following header, which moves them to the top.
+
+```
+significance: significant
+```
+
+<!-- Keep an eye on https://codeberg.org/fgaz/changelog-d/issues/1 -->
+See also the [format documentation](https://github.com/haskell/cabal/blob/master/CONTRIBUTING.md#changelog).
+
+### Build process
+
+Releases have a precomputed `rl-MAJOR.MINOR.md`, and no `rl-next.md`.
+Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on the fly.
+
+## Branches
+
+- [`master`](https://github.com/NixOS/nix/commits/master)
+
+  The main development branch. All changes are approved and merged here.
+  When developing a change, create a branch based on the latest `master`.
+
+  Maintainers try to [keep it in a release-worthy state](#reverting).
+
+- [`maintenance-*.*`](https://github.com/NixOS/nix/branches/all?query=maintenance)
+
+  These branches are the subject of backports only, and are
+  also [kept](#reverting) in a release-worthy state.
+
+  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
+
+- [`latest-release`](https://github.com/NixOS/nix/tree/latest-release)
+
+  The latest patch release of the latest minor version.
+
+  See [`maintainers/release-process.md`](https://github.com/NixOS/nix/blob/master/maintainers/release-process.md)
+
+- [`backport-*-to-*`](https://github.com/NixOS/nix/branches/all?query=backport)
+
+  Generally branches created by the backport action.
+
+  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
+
+- [_other_](https://github.com/NixOS/nix/branches/all)
+
+  Branches that do not conform to the above patterns should be feature branches.
+
+## Reverting
+
+If a change turns out to be merged by mistake, or contain a regression, it may be reverted.
+A revert is not a rejection of the contribution, but merely part of an effective development process.
+It makes sure that development keeps running smoothly, with minimal uncertainty, and less overhead.
+If maintainers have to worry too much about avoiding reverts, they would not be able to merge as much.
+By embracing reverts as a good part of the development process, everyone wins.
+
+However, taking a step back may be frustrating, so maintainers will be extra supportive on the next try.

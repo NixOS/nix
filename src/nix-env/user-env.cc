@@ -21,7 +21,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     auto manifestFile = userEnv + "/manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
-        state.evalFile(state.rootPath(CanonPath(manifestFile)), v);
+        state.evalFile(state.rootPath(CanonPath(manifestFile)).resolveSymlinks(), v);
         Bindings & bindings(*state.allocBindings(0));
         getDerivations(state, v, "", bindings, elems, false);
     }
@@ -104,10 +104,15 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
        environment. */
-    std::ostringstream str;
-    manifest.print(state.symbols, str, true);
-    auto manifestFile = state.store->addTextToStore("env-manifest.nix",
-        str.str(), references);
+    auto manifestFile = ({
+        std::ostringstream str;
+        manifest.print(state.symbols, str, true);
+        // TODO with C++20 we can use str.view() instead and avoid copy.
+        std::string str2 = str.str();
+        StringSource source { str2 };
+        state.store->addToStoreFromDump(
+            source, "env-manifest.nix", TextIngestionMethod {}, HashAlgorithm::SHA256, references);
+    });
 
     /* Get the environment builder expression. */
     Value envBuilder;
@@ -128,7 +133,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
+    state.forceValue(topLevel, topLevel.determinePos(noPos));
     NixStringContext context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
     auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context, "");

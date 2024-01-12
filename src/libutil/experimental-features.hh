@@ -34,6 +34,7 @@ enum struct ExperimentalFeature
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
     ConfigurableImpureEnv,
+    MountedSSHStore,
     VerifiedFetches,
 };
 

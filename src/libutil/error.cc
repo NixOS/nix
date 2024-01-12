@@ -2,6 +2,7 @@
 #include "environment-variables.hh"
 #include "signals.hh"
 #include "terminal.hh"
+#include "position.hh"
 
 #include <iostream>
 #include <optional>
@@ -10,7 +11,7 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame)
 {
     err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
 }
@@ -41,58 +42,36 @@ std::ostream & operator <<(std::ostream & os, const hintformat & hf)
     return os << hf.str();
 }
 
-std::ostream & operator <<(std::ostream & str, const AbstractPos & pos)
+/**
+ * An arbitrarily defined value comparison for the purpose of using traces in the key of a sorted container.
+ */
+inline bool operator<(const Trace& lhs, const Trace& rhs)
 {
-    pos.print(str);
-    str << ":" << pos.line;
-    if (pos.column > 0)
-        str << ":" << pos.column;
-    return str;
-}
-
-std::optional<LinesOfCode> AbstractPos::getCodeLines() const
-{
-    if (line == 0)
-        return std::nullopt;
-
-    if (auto source = getSource()) {
-
-        std::istringstream iss(*source);
-        // count the newlines.
-        int count = 0;
-        std::string curLine;
-        int pl = line - 1;
-
-        LinesOfCode loc;
-
-        do {
-            std::getline(iss, curLine);
-            ++count;
-            if (count < pl)
-                ;
-            else if (count == pl) {
-                loc.prevLineOfCode = curLine;
-            } else if (count == pl + 1) {
-                loc.errLineOfCode = curLine;
-            } else if (count == pl + 2) {
-                loc.nextLineOfCode = curLine;
-                break;
-            }
-
-            if (!iss.good())
-                break;
-        } while (true);
-
-        return loc;
+    // `std::shared_ptr` does not have value semantics for its comparison
+    // functions, so we need to check for nulls and compare the dereferenced
+    // values here.
+    if (lhs.pos != rhs.pos) {
+        if (!lhs.pos)
+            return true;
+        if (!rhs.pos)
+            return false;
+        if (*lhs.pos != *rhs.pos)
+            return *lhs.pos < *rhs.pos;
     }
-
-    return std::nullopt;
+    // This formats a freshly formatted hint string and then throws it away, which
+    // shouldn't be much of a problem because it only runs when pos is equal, and this function is
+    // used for trace printing, which is infrequent.
+    return std::forward_as_tuple(lhs.hint.str(), lhs.frame)
+        < std::forward_as_tuple(rhs.hint.str(), rhs.frame);
 }
+inline bool operator> (const Trace& lhs, const Trace& rhs) { return rhs < lhs; }
+inline bool operator<=(const Trace& lhs, const Trace& rhs) { return !(lhs > rhs); }
+inline bool operator>=(const Trace& lhs, const Trace& rhs) { return !(lhs < rhs); }
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const AbstractPos & errPos,
+    const Pos & errPos,
     const LinesOfCode & loc)
 {
     // previous line of code.
@@ -159,24 +138,23 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
 /**
  * A development aid for finding missing positions, to improve error messages. Example use:
  *
- *     NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS=1 _NIX_TEST_ACCEPT=1 make tests/lang.sh.test
+ *     _NIX_EVAL_SHOW_UNKNOWN_LOCATIONS=1 _NIX_TEST_ACCEPT=1 make tests/lang.sh.test
  *     git diff -U20 tests
  *
  */
-static bool printUnknownLocations = getEnv("_NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS").has_value();
+static bool printUnknownLocations = getEnv("_NIX_EVAL_SHOW_UNKNOWN_LOCATIONS").has_value();
 
 /**
  * Print a position, if it is known.
  *
  * @return true if a position was printed.
  */
-static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<AbstractPos> & pos) {
+static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<Pos> & pos) {
     bool hasPos = pos && *pos;
     if (hasPos) {
-        oss << "\n" << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
+        oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
 
         if (auto loc = pos->getCodeLines()) {
-            oss << "\n";
             printCodeLines(oss, "", *pos, *loc);
             oss << "\n";
         }
@@ -184,6 +162,69 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
         oss << "\n" << indent << ANSI_BLUE << "at " ANSI_RED << "UNKNOWN LOCATION" << ANSI_NORMAL << "\n";
     }
     return hasPos;
+}
+
+void printTrace(
+    std::ostream & output,
+    const std::string_view & indent,
+    size_t & count,
+    const Trace & trace)
+{
+    output << "\n" << "… " << trace.hint.str() << "\n";
+
+    if (printPosMaybe(output, indent, trace.pos))
+        count++;
+}
+
+void printSkippedTracesMaybe(
+    std::ostream & output,
+    const std::string_view & indent,
+    size_t & count,
+    std::vector<Trace> & skippedTraces,
+    std::set<Trace> tracesSeen)
+{
+    if (skippedTraces.size() > 0) {
+        // If we only skipped a few frames, print them out normally;
+        // messages like "1 duplicate frames omitted" aren't helpful.
+        if (skippedTraces.size() <= 5) {
+            for (auto & trace : skippedTraces) {
+                printTrace(output, indent, count, trace);
+            }
+        } else {
+            output << "\n" << ANSI_WARNING "(" << skippedTraces.size() << " duplicate frames omitted)" ANSI_NORMAL << "\n";
+            // Clear the set of "seen" traces after printing a chunk of
+            // `duplicate frames omitted`.
+            //
+            // Consider a mutually recursive stack trace with:
+            // - 10 entries of A
+            // - 10 entries of B
+            // - 10 entries of A
+            //
+            // If we don't clear `tracesSeen` here, we would print output like this:
+            // - 1 entry of A
+            // - (9 duplicate frames omitted)
+            // - 1 entry of B
+            // - (19 duplicate frames omitted)
+            //
+            // This would obscure the control flow, which went from A,
+            // to B, and back to A again.
+            //
+            // In contrast, if we do clear `tracesSeen`, the output looks like this:
+            // - 1 entry of A
+            // - (9 duplicate frames omitted)
+            // - 1 entry of B
+            // - (9 duplicate frames omitted)
+            // - 1 entry of A
+            // - (9 duplicate frames omitted)
+            //
+            // See: `tests/functional/lang/eval-fail-mutual-recursion.nix`
+            tracesSeen.clear();
+        }
+    }
+    // We've either printed each trace in `skippedTraces` normally, or
+    // printed a chunk of `duplicate frames omitted`. Either way, we've
+    // processed these traces and can clear them.
+    skippedTraces.clear();
 }
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
@@ -334,7 +375,13 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     bool frameOnly = false;
     if (!einfo.traces.empty()) {
+        // Stack traces seen since we last printed a chunk of `duplicate frames
+        // omitted`.
+        std::set<Trace> tracesSeen;
+        // A consecutive sequence of stack traces that are all in `tracesSeen`.
+        std::vector<Trace> skippedTraces;
         size_t count = 0;
+
         for (const auto & trace : einfo.traces) {
             if (trace.hint.str().empty()) continue;
             if (frameOnly && !trace.frame) continue;
@@ -344,14 +391,21 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
                 break;
             }
 
+            if (tracesSeen.count(trace)) {
+                skippedTraces.push_back(trace);
+                continue;
+            }
+            tracesSeen.insert(trace);
+
+            printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+
             count++;
             frameOnly = trace.frame;
 
-            oss << "\n" << "… " << trace.hint.str() << "\n";
-
-            if (printPosMaybe(oss, ellipsisIndent, trace.pos))
-                count++;
+            printTrace(oss, ellipsisIndent, count, trace);
         }
+
+        printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
         oss << "\n" << prefix;
     }
 
@@ -370,4 +424,5 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     return out;
 }
+
 }

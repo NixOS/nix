@@ -10,7 +10,7 @@
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 
-namespace nix { class Store; class StorePath; }
+namespace nix { class Store; class StorePath; struct InputAccessor; }
 
 namespace nix::fetchers {
 
@@ -83,6 +83,8 @@ public:
      */
     std::pair<StorePath, Input> fetch(ref<Store> store) const;
 
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store) const;
+
     Input applyOverrides(
         std::optional<std::string> ref,
         std::optional<Hash> rev) const;
@@ -111,6 +113,12 @@ public:
     std::optional<Hash> getRev() const;
     std::optional<uint64_t> getRevCount() const;
     std::optional<time_t> getLastModified() const;
+
+    /**
+     * For locked inputs, return a string that uniquely specifies the
+     * content of the input (typically a commit hash or content hash).
+     */
+    std::optional<std::string> getFingerprint(ref<Store> store) const;
 };
 
 
@@ -167,7 +175,9 @@ struct InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
-    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
+    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input);
+
+    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const;
 
     /**
      * Is this `InputScheme` part of an experimental feature?
@@ -176,6 +186,9 @@ struct InputScheme
 
     virtual bool isDirect(const Input & input) const
     { return true; }
+
+    virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
+    { return std::nullopt; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

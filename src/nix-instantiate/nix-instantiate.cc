@@ -40,7 +40,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 
     for (auto & i : attrPaths) {
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
-        state.forceValue(v, [&]() { return v.determinePos(noPos); });
+        state.forceValue(v, v.determinePos(noPos));
 
         NixStringContext context;
         if (evalOnly) {
@@ -183,7 +183,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         for (auto & i : files) {
             Expr * e = fromArgs
                 ? state->parseExprFromString(i, state->rootPath(CanonPath::fromCwd()))
-                : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
+                : state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, i)));
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }

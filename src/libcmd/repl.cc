@@ -5,7 +5,7 @@
 
 #include <setjmp.h>
 
-#ifdef READLINE
+#ifdef USE_READLINE
 #include <readline/history.h>
 #include <readline/readline.h>
 #else
@@ -43,7 +43,6 @@ extern "C" {
 #include "finally.hh"
 #include "markdown.hh"
 #include "local-fs-store.hh"
-#include "progress-bar.hh"
 #include "print.hh"
 
 #if HAVE_BOEHMGC
@@ -113,7 +112,7 @@ NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalS
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
-    , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
+    , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
 }
@@ -222,7 +221,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     // prefer direct pos, but if noPos then try the expr.
     auto pos = dt.pos
         ? dt.pos
-        : static_cast<std::shared_ptr<AbstractPos>>(positions[dt.expr.getPos() ? dt.expr.getPos() : noPos]);
+        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
         out << pos;
@@ -250,25 +249,23 @@ void NixRepl::mainLoop()
     } catch (SysError & e) {
         logWarning(e.info());
     }
-#ifndef READLINE
+#ifndef USE_READLINE
     el_hist_size = 1000;
 #endif
     read_history(historyFile.c_str());
     auto oldRepl = curRepl;
     curRepl = this;
     Finally restoreRepl([&] { curRepl = oldRepl; });
-#ifndef READLINE
+#ifndef USE_READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #endif
 
-    /* Stop the progress bar because it interferes with the display of
-       the repl. */
-    stopProgressBar();
-
     std::string input;
 
     while (true) {
+        // Hide the progress bar while waiting for user input, so that it won't interfere.
+        logger->pause();
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
         if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
@@ -278,6 +275,7 @@ void NixRepl::mainLoop()
             logger->cout("");
             break;
         }
+        logger->resume();
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
@@ -890,7 +888,7 @@ void NixRepl::evalString(std::string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    state->forceValue(v, v.determinePos(noPos));
 }
 
 
@@ -909,7 +907,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     str.flush();
     checkInterrupt();
 
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    state->forceValue(v, v.determinePos(noPos));
 
     switch (v.type()) {
 
