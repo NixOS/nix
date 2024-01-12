@@ -31,7 +31,7 @@ This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` im
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop .#native-clang11StdenvPackages
+$ nix develop .#native-clangStdenvPackages
 ```
 
 > **Note**
@@ -96,7 +96,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 ```
 
 > **Note**

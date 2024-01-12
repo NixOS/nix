@@ -1,17 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  # TODO Go back to nixos-23.05-small once
-  # https://github.com/NixOS/nixpkgs/pull/271202 is merged.
-  #
-  # Also, do not grab arbitrary further staging commits. This PR was
-  # carefully made to be based on release-23.05 and just contain
-  # rebuild-causing changes to packages that Nix actually uses.
-  #
-  # Once this is updated to something containing
-  # https://github.com/NixOS/nixpkgs/pull/271423, don't forget
-  # to remove the `nix.checkAllErrors = false;` line in the tests.
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/staging-23.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
@@ -62,7 +52,6 @@
 
       stdenvs = [
         "ccacheStdenv"
-        "clang11Stdenv"
         "clangStdenv"
         "gccStdenv"
         "libcxxStdenv"
@@ -231,14 +220,25 @@
         buildCross = forAllCrossSystems (crossSystem:
           lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
-        buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
+        buildNoGc = forAllSystems (system:
+          self.packages.${system}.nix.override { enableGC = false; }
+        );
 
         buildNoTests = forAllSystems (system:
-          self.packages.${system}.nix.overrideAttrs (a: {
-            doCheck =
-              assert ! a?dontCheck;
-              false;
-          })
+          self.packages.${system}.nix.override {
+            doCheck = false;
+            doInstallCheck = false;
+            installUnitTests = false;
+          }
+        );
+
+        # Toggles some settings for better coverage. Windows needs these
+        # library combinations, and Debian build Nix with GNU readline too.
+        buildReadlineNoMarkdown = forAllSystems (system:
+          self.packages.${system}.nix.override {
+            enableMarkdown = false;
+            readlineFlavor = "readline";
+          }
         );
 
         # Perl bindings for various platforms.

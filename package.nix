@@ -13,6 +13,7 @@
 , changelog-d
 , curl
 , editline
+, readline
 , fileset
 , flex
 , git
@@ -68,6 +69,25 @@
 # Whether to build the regular manual
 , enableManual ? __forDefaults.canRunInstalled
 
+# Whether to use garbage collection for the Nix language evaluator.
+#
+# If it is disabled, we just leak memory, but this is not as bad as it
+# sounds so long as evaluation just takes places within short-lived
+# processes. (When the process exits, the memory is reclaimed; it is
+# only leaked *within* the process.)
+, enableGC ? true
+
+# Whether to enable Markdown rendering in the Nix binary.
+, enableMarkdown ? !stdenv.hostPlatform.isWindows
+
+# Which interactive line editor library to use for Nix's repl.
+#
+# Currently supported choices are:
+#
+# - editline (default)
+# - readline
+, readlineFlavor ? if stdenv.hostPlatform.isWindows then "readline" else "editline"
+
 # Whether to compile `rl-next.md`, the release notes for the next
 # not-yet-released version of Nix in the manul, from the individual
 # change log entries in the directory.
@@ -80,7 +100,7 @@
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
 # later.
-, installUnitTests ? __forDefaults.canRunInstalled
+, installUnitTests ? doBuild && !__forDefaults.canExecuteHost
 
 # For running the functional tests against a pre-built Nix. Probably
 # want to use in conjunction with `doBuild = false;`.
@@ -93,7 +113,8 @@
 # Not a real argument, just the only way to approximate let-binding some
 # stuff for argument defaults.
 , __forDefaults ? {
-    canRunInstalled = doBuild && stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    canExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    canRunInstalled = doBuild && __forDefaults.canExecuteHost;
   }
 }:
 
@@ -164,6 +185,10 @@ in {
           ./doc/manual
         ] ++ lib.optionals enableInternalAPIDocs [
           ./doc/internal-api
+          # Source might not be compiled, but still must be available
+          # for Doxygen to gather comments.
+          ./src
+          ./tests/unit
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
         ] ++ lib.optionals doInstallCheck [
@@ -212,8 +237,12 @@ in {
     sqlite
     xz
   ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-    editline
+    ({ inherit readline editline; }.${readlineFlavor})
+  ] ++ lib.optionals enableMarkdown [
     lowdown
+  ] ++ lib.optionals buildUnitTests [
+    gtest
+    rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
@@ -225,17 +254,11 @@ in {
   ;
 
   propagatedBuildInputs = [
-    boehmgc
     nlohmann_json
-  ];
+  ] ++ lib.optional enableGC boehmgc;
 
   dontBuild = !attrs.doBuild;
   doCheck = attrs.doCheck;
-
-  checkInputs = [
-    gtest
-    rapidcheck
-  ];
 
   nativeCheckInputs = [
     git
@@ -250,7 +273,7 @@ in {
       # Copy libboost_context so we don't get all of Boost in our closure.
       # https://github.com/NixOS/nixpkgs/issues/45462
       mkdir -p $out/lib
-      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
+      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
       rm -f $out/lib/*.a
     '' + lib.optionalString stdenv.hostPlatform.isLinux ''
       chmod u+w $out/lib/*.so.*
@@ -271,7 +294,10 @@ in {
     (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
+    (lib.enableFeature enableGC "gc")
+    (lib.enableFeature enableMarkdown "markdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
+    (lib.withFeatureAs true "readline-flavor" readlineFlavor)
   ] ++ lib.optionals (!forDevShell) [
     "--sysconfdir=/etc"
   ] ++ lib.optionals installUnitTests [

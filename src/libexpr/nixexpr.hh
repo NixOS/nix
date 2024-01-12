@@ -8,6 +8,7 @@
 #include "symbol-table.hh"
 #include "error.hh"
 #include "chunked-vector.hh"
+#include "position.hh"
 
 namespace nix {
 
@@ -21,25 +22,11 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 
-/**
- * Position objects.
- */
-struct Pos
+class InfiniteRecursionError : public EvalError
 {
-    uint32_t line;
-    uint32_t column;
-
-    struct none_tag { };
-    struct Stdin { ref<std::string> source; };
-    struct String { ref<std::string> source; };
-
-    typedef std::variant<none_tag, Stdin, String, SourcePath> Origin;
-
-    Origin origin;
-
-    explicit operator bool() const { return line > 0; }
-
-    operator std::shared_ptr<AbstractPos>() const;
+    friend class EvalState;
+public:
+    using EvalError::EvalError;
 };
 
 class PosIdx {
@@ -74,7 +61,7 @@ public:
         mutable uint32_t idx = std::numeric_limits<uint32_t>::max();
 
         // Used for searching in PosTable::[].
-        explicit Origin(uint32_t idx): idx(idx), origin{Pos::none_tag()} {}
+        explicit Origin(uint32_t idx): idx(idx), origin{std::monostate()} {}
 
     public:
         const Pos::Origin origin;
@@ -125,12 +112,11 @@ public:
 
 inline PosIdx noPos = {};
 
-std::ostream & operator << (std::ostream & str, const Pos & pos);
-
 
 struct Env;
 struct Value;
 class EvalState;
+struct ExprWith;
 struct StaticEnv;
 
 
@@ -219,8 +205,11 @@ struct ExprVar : Expr
     Symbol name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
-       or function argument) or from a "with". */
-    bool fromWith;
+       or function argument) or from a "with".
+
+       `nullptr`: Not from a `with`.
+       Valid pointer: the nearest, innermost `with` expression to query first. */
+    ExprWith * fromWith;
 
     /* In the former case, the value is obtained by going `level`
        levels up from the current environment and getting the
@@ -292,6 +281,7 @@ struct ExprList : Expr
     std::vector<Expr *> elems;
     ExprList() { };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env) override;
 
     PosIdx getPos() const override
     {
@@ -378,6 +368,7 @@ struct ExprWith : Expr
     PosIdx pos;
     Expr * attrs, * body;
     size_t prevWith;
+    ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -455,20 +446,30 @@ struct ExprPos : Expr
     COMMON_METHODS
 };
 
+/* only used to mark thunks as black holes. */
+struct ExprBlackHole : Expr
+{
+    void show(const SymbolTable & symbols, std::ostream & str) const override {}
+    void eval(EvalState & state, Env & env, Value & v) override;
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+};
+
+extern ExprBlackHole eBlackHole;
+
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at
    runtime. */
 struct StaticEnv
 {
-    bool isWith;
+    ExprWith * isWith;
     const StaticEnv * up;
 
     // Note: these must be in sorted order.
     typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
-    StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+    StaticEnv(ExprWith * isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
         vars.reserve(expectedSize);
     };
 

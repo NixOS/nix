@@ -11,7 +11,7 @@
 #include "profiles.hh"
 #include "names.hh"
 #include "url.hh"
-#include "url-name.hh"
+#include "flake/url-name.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>

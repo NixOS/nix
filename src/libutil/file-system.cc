@@ -307,7 +307,7 @@ void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    std::vector<char> buf(64 * 1024);
+    std::array<char, 64 * 1024> buf;
 
     try {
         while (true) {

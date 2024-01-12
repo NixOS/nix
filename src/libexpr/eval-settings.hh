@@ -124,6 +124,9 @@ struct EvalSettings : Config
 
     Setting<bool> traceVerbose{this, false, "trace-verbose",
         "Whether `builtins.traceVerbose` should trace its first argument when evaluated."};
+
+    Setting<unsigned int> maxCallDepth{this, 10000, "max-call-depth",
+        "The maximum function call depth to allow before erroring."};
 };
 
 extern EvalSettings evalSettings;

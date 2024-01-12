@@ -84,6 +84,8 @@ struct PrimOp
     void check();
 };
 
+std::ostream & operator<<(std::ostream & output, PrimOp & primOp);
+
 /**
  * Info about a constant
  */
@@ -116,11 +118,6 @@ struct Constant
 struct Env
 {
     Env * up;
-    /**
-     * Number of of levels up to next `with` environment
-     */
-    unsigned short prevWith:14;
-    enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
 
@@ -132,7 +129,7 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
 void copyContext(const Value & v, NixStringContext & context);
 
 
-std::string printValue(const EvalState & state, const Value & v);
+std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
@@ -147,7 +144,7 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::shared_ptr<AbstractPos> pos;
+    std::shared_ptr<Pos> pos;
     const Expr & expr;
     const Env & env;
     hintformat hint;
@@ -217,6 +214,11 @@ public:
     RepairFlag repair;
 
     Bindings emptyBindings;
+
+    /**
+     * Empty list constant.
+     */
+    Value vEmptyList;
 
     /**
      * The accessor for the root filesystem.
@@ -460,8 +462,7 @@ public:
      */
     inline void forceValue(Value & v, const PosIdx pos);
 
-    template <typename Callable>
-    inline void forceValue(Value & v, Callable getPos);
+    void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
     /**
      * Force a value, then recursively force list elements and
@@ -622,6 +623,11 @@ private:
         Pos::Origin origin,
         const SourcePath & basePath,
         std::shared_ptr<StaticEnv> & staticEnv);
+
+    /**
+     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run out of system stack.
+     */
+    size_t callDepth = 0;
 
 public:
 

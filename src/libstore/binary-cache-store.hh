@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "crypto.hh"
+#include "signature/local-keys.hh"
 #include "store-api.hh"
 #include "log-store.hh"
 
@@ -57,8 +57,7 @@ class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
 {
 
 private:
-
-    std::unique_ptr<SecretKey> secretKey;
+    std::unique_ptr<Signer> signer;
 
 protected:
 

@@ -8,6 +8,8 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "profiles.hh"
+#include "print-ambiguous.hh"
+#include <limits>
 
 
 namespace nix {
@@ -106,7 +108,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        environment. */
     auto manifestFile = ({
         std::ostringstream str;
-        manifest.print(state.symbols, str, true);
+        printAmbiguous(manifest, state.symbols, str, nullptr, std::numeric_limits<int>::max());
         // TODO with C++20 we can use str.view() instead and avoid copy.
         std::string str2 = str.str();
         StringSource source { str2 };
@@ -133,7 +135,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
+    state.forceValue(topLevel, topLevel.determinePos(noPos));
     NixStringContext context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
     auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context, "");

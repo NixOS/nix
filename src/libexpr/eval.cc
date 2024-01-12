@@ -19,6 +19,7 @@
 #include "signals.hh"
 #include "gc-small-vector.hh"
 #include "url.hh"
+#include "fetch-to-store.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -104,116 +105,23 @@ RootValue allocRootValue(Value * v)
 #endif
 }
 
-void Value::print(const SymbolTable &symbols, std::ostream &str,
-                  std::set<const void *> *seen, int depth) const
-
-{
-    checkInterrupt();
-
-    if (depth <= 0) {
-        str << "«too deep»";
-        return;
-    }
-    switch (internalType) {
-    case tInt:
-        str << integer;
-        break;
-    case tBool:
-        printLiteralBool(str, boolean);
-        break;
-    case tString:
-        printLiteralString(str, string_view());
-        break;
-    case tPath:
-        str << path().to_string(); // !!! escaping?
-        break;
-    case tNull:
-        str << "null";
-        break;
-    case tAttrs: {
-        if (seen && !attrs->empty() && !seen->insert(attrs).second)
-            str << "«repeated»";
-        else {
-            str << "{ ";
-            for (auto & i : attrs->lexicographicOrder(symbols)) {
-                str << symbols[i->name] << " = ";
-                i->value->print(symbols, str, seen, depth - 1);
-                str << "; ";
-            }
-            str << "}";
-        }
-        break;
-    }
-    case tList1:
-    case tList2:
-    case tListN:
-        if (seen && listSize() && !seen->insert(listElems()).second)
-            str << "«repeated»";
-        else {
-            str << "[ ";
-            for (auto v2 : listItems()) {
-                if (v2)
-                    v2->print(symbols, str, seen, depth - 1);
-                else
-                    str << "(nullptr)";
-                str << " ";
-            }
-            str << "]";
-        }
-        break;
-    case tThunk:
-    case tApp:
-        str << "<CODE>";
-        break;
-    case tLambda:
-        str << "<LAMBDA>";
-        break;
-    case tPrimOp:
-        str << "<PRIMOP>";
-        break;
-    case tPrimOpApp:
-        str << "<PRIMOP-APP>";
-        break;
-    case tExternal:
-        str << *external;
-        break;
-    case tFloat:
-        str << fpoint;
-        break;
-    case tBlackhole:
-        // Although we know for sure that it's going to be an infinite recursion
-        // when this value is accessed _in the current context_, it's likely
-        // that the user will misinterpret a simpler «infinite recursion» output
-        // as a definitive statement about the value, while in fact it may be
-        // a valid value after `builtins.trace` and perhaps some other steps
-        // have completed.
-        str << "«potential infinite recursion»";
-        break;
-    default:
-        printError("Nix evaluator internal error: Value::print(): invalid value type %1%", internalType);
-        abort();
-    }
-}
-
-void Value::print(const SymbolTable &symbols, std::ostream &str,
-                  bool showRepeated, int depth) const {
-    std::set<const void *> seen;
-    print(symbols, str, showRepeated ? nullptr : &seen, depth);
-}
-
 // Pretty print types for assertion errors
 std::ostream & operator << (std::ostream & os, const ValueType t) {
     os << showType(t);
     return os;
 }
 
-std::string printValue(const EvalState & state, const Value & v)
+std::string printValue(EvalState & state, Value & v)
 {
     std::ostringstream out;
-    v.print(state.symbols, out);
+    v.print(state, out);
     return out.str();
 }
 
+void Value::print(EvalState & state, std::ostream & str, PrintOptions options)
+{
+    printValue(state, str, *this, options);
+}
 
 const Value * getPrimOp(const Value &v) {
     const Value * primOp = &v;
@@ -256,9 +164,8 @@ std::string showType(const Value & v)
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", std::string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
-        case tThunk: return "a thunk";
+        case tThunk: return v.isBlackhole() ? "a black hole" : "a thunk";
         case tApp: return "a function application";
-        case tBlackhole: return "a black hole";
     default:
         return std::string(showType(v.type()));
     }
@@ -543,7 +450,7 @@ EvalState::EvalState(
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #endif
     , baseEnv(allocEnv(128))
-    , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
+    , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
@@ -553,6 +460,8 @@ EvalState::EvalState(
     assert(gcInitialised);
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+
+    vEmptyList.mkList(0);
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -707,6 +616,26 @@ void PrimOp::check()
 }
 
 
+std::ostream & operator<<(std::ostream & output, PrimOp & primOp)
+{
+    output << "primop " << primOp.name;
+    return output;
+}
+
+
+PrimOp * Value::primOpAppPrimOp() const
+{
+    Value * left = primOpApp.left;
+    while (left && !left->isPrimOp()) {
+        left = left->primOpApp.left;
+    }
+
+    if (!left)
+        return nullptr;
+    return left->primOp;
+}
+
+
 void Value::mkPrimOp(PrimOp * p)
 {
     p->check();
@@ -781,7 +710,7 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    if (env.type == Env::HasWithAttrs) {
+    if (!env.values[0]->isThunk()) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         Bindings::iterator j = env.values[0]->attrs->begin();
@@ -835,7 +764,7 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     if (env.up && se.up) {
         mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
-        if (env.type == Env::HasWithAttrs) {
+        if (!env.values[0]->isThunk()) {
             // add 'with' bindings.
             Bindings::iterator j = env.values[0]->attrs->begin();
             while (j != env.values[0]->attrs->end()) {
@@ -868,7 +797,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         ? std::make_unique<DebugTraceStacker>(
             *this,
             DebugTrace {
-                .pos = error->info().errPos ? error->info().errPos : static_cast<std::shared_ptr<AbstractPos>>(positions[expr.getPos()]),
+                .pos = error->info().errPos ? error->info().errPos : positions[expr.getPos()],
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
@@ -907,7 +836,7 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
-    std::shared_ptr<AbstractPos> && pos,
+    std::shared_ptr<Pos> && pos,
     const char * s,
     const std::string & s2)
 {
@@ -973,22 +902,23 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 
     if (!var.fromWith) return env->values[var.displ];
 
+    // This early exit defeats the `maybeThunk` optimization for variables from `with`,
+    // The added complexity of handling this appears to be similarly in cost, or
+    // the cases where applicable were insignificant in the first place.
+    if (noEval) return nullptr;
+
+    auto * fromWith = var.fromWith;
     while (1) {
-        if (env->type == Env::HasWithExpr) {
-            if (noEval) return 0;
-            Value * v = allocValue();
-            evalAttrs(*env->up, (Expr *) env->values[0], *v, noPos, "<borked>");
-            env->values[0] = v;
-            env->type = Env::HasWithAttrs;
-        }
+        forceAttrs(*env->values[0], fromWith->pos, "while evaluating the first subexpression of a with expression");
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
             if (countCalls) attrSelects[j->pos]++;
             return j->value;
         }
-        if (!env->prevWith)
+        if (!fromWith->parentWith)
             error("undefined variable '%1%'", symbols[var.name]).atPos(var.pos).withFrame(*env, var).debugThrow<UndefinedVarError>();
-        for (size_t l = env->prevWith; l; --l, env = env->up) ;
+        for (size_t l = fromWith->prevWith; l; --l, env = env->up) ;
+        fromWith = fromWith->parentWith;
     }
 }
 
@@ -1184,7 +1114,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? static_cast<std::shared_ptr<AbstractPos>>(positions[e->getPos()]) : nullptr,
+                e->getPos() ? std::make_shared<Pos>(positions[e->getPos()]) : nullptr,
                 "while evaluating the file '%1%':", resolvedPath.to_string())
             : nullptr;
 
@@ -1384,6 +1314,15 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+Value * ExprList::maybeThunk(EvalState & state, Env & env)
+{
+    if (elems.empty()) {
+        return &state.vEmptyList;
+    }
+    return Expr::maybeThunk(state, env);
+}
+
+
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
     Value * v2 = state.lookupVar(&env, *this, false);
@@ -1505,9 +1444,27 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
+namespace {
+/** Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
+};
+};
 
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
+    if (callDepth > evalSettings.maxCallDepth)
+        error("stack overflow; max-call-depth exceeded").atPos(pos).template debugThrow<EvalError>();
+    CallDepth _level(callDepth);
+
     auto trace = evalSettings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
         : nullptr;
@@ -1646,15 +1603,15 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 return;
             } else {
                 /* We have all the arguments, so call the primop. */
-                auto name = vCur.primOp->name;
+                auto * fn = vCur.primOp;
 
                 nrPrimOpCalls++;
-                if (countCalls) primOpCalls[name]++;
+                if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    vCur.primOp->fun(*this, vCur.determinePos(noPos), args, vCur);
+                    fn->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1691,18 +1648,18 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 for (size_t i = 0; i < argsLeft; ++i)
                     vArgs[argsDone + i] = args[i];
 
-                auto name = primOp->primOp->name;
+                auto fn = primOp->primOp;
                 nrPrimOpCalls++;
-                if (countCalls) primOpCalls[name]++;
+                if (countCalls) primOpCalls[fn->name]++;
 
                 try {
                     // TODO:
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    primOp->primOp->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1816,9 +1773,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
     Env & env2(state.allocEnv(1));
     env2.up = &env;
-    env2.prevWith = prevWith;
-    env2.type = Env::HasWithExpr;
-    env2.values[0] = (Value *) attrs;
+    env2.values[0] = attrs->maybeThunk(state, env);
 
     body->eval(state, env2, v);
 }
@@ -2056,6 +2011,29 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+void ExprBlackHole::eval(EvalState & state, Env & env, Value & v)
+{
+    state.error("infinite recursion encountered")
+        .debugThrow<InfiniteRecursionError>();
+}
+
+// always force this to be separate, otherwise forceValue may inline it and take
+// a massive perf hit
+[[gnu::noinline]]
+void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
+{
+    if (!v.isBlackhole())
+        return;
+    auto e = std::current_exception();
+    try {
+        std::rethrow_exception(e);
+    } catch (InfiniteRecursionError & e) {
+        e.err.errPos = positions[pos];
+    } catch (...) {
+    }
+}
+
+
 void EvalState::forceValueDeep(Value & v)
 {
     std::set<const Value *> seen;
@@ -2065,7 +2043,7 @@ void EvalState::forceValueDeep(Value & v)
     recurse = [&](Value & v) {
         if (!seen.insert(&v).second) return;
 
-        forceValue(v, [&]() { return v.determinePos(noPos); });
+        forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
@@ -2317,7 +2295,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            auto dstPath = path.fetchToStore(*store, path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
+            auto dstPath = fetchToStore(*store, path, path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
@@ -2457,7 +2435,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return v1.boolean == v2.boolean;
 
         case nString:
-            return v1.string_view().compare(v2.string_view()) == 0;
+            return strcmp(v1.c_str(), v2.c_str()) == 0;
 
         case nPath:
             return
