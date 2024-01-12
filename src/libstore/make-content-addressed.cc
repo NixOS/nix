@@ -43,7 +43,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
 
         sink.s = rewriteStrings(sink.s, rewrites);
 
-        HashModuloSink hashModuloSink(htSHA256, oldHashPart);
+        HashModuloSink hashModuloSink(HashAlgorithm::SHA256, oldHashPart);
         hashModuloSink(sink.s);
 
         auto narModuloHash = hashModuloSink.finish().first;
@@ -52,10 +52,8 @@ std::map<StorePath, StorePath> makeContentAddressed(
             dstStore,
             path.name(),
             FixedOutputInfo {
-                .hash = {
-                    .method = FileIngestionMethod::Recursive,
-                    .hash = narModuloHash,
-                },
+                .method = FileIngestionMethod::Recursive,
+                .hash = narModuloHash,
                 .references = std::move(refs),
             },
             Hash::dummy,
@@ -68,7 +66,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
         rsink2(sink.s);
         rsink2.flush();
 
-        info.narHash = hashString(htSHA256, sink2.s);
+        info.narHash = hashString(HashAlgorithm::SHA256, sink2.s);
         info.narSize = sink.s.size();
 
         StringSource source(sink2.s);
@@ -78,6 +76,17 @@ std::map<StorePath, StorePath> makeContentAddressed(
     }
 
     return remappings;
+}
+
+StorePath makeContentAddressed(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePath & fromPath)
+{
+    auto remappings = makeContentAddressed(srcStore, dstStore, StorePathSet { fromPath });
+    auto i = remappings.find(fromPath);
+    assert(i != remappings.end());
+    return i->second;
 }
 
 }

@@ -2,14 +2,26 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "posix-source-accessor.hh"
 
 using namespace nix;
+
+static FileIngestionMethod parseIngestionMethod(std::string_view input)
+{
+    if (input == "flat") {
+        return FileIngestionMethod::Flat;
+    } else if (input == "nar") {
+        return FileIngestionMethod::Recursive;
+    } else {
+        throw UsageError("Unknown hash mode '%s', expect `flat` or `nar`");
+    }
+}
 
 struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    FileIngestionMethod ingestionMethod;
+    ContentAddressMethod caMethod = FileIngestionMethod::Recursive;
 
     CmdAddToStore()
     {
@@ -23,44 +35,56 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .labels = {"name"},
             .handler = {&namePart},
         });
+
+        addFlag({
+            .longName  = "mode",
+            .shortName = 'n',
+            .description = R"(
+    How to compute the hash of the input.
+    One of:
+
+    - `nar` (the default): Serialises the input as an archive (following the [_Nix Archive Format_](https://edolstra.github.io/pubs/phd-thesis.pdf#page=101)) and passes that to the hash function.
+
+    - `flat`: Assumes that the input is a single file and directly passes it to the hash function;
+            )",
+            .labels = {"hash-mode"},
+            .handler = {[this](std::string s) {
+                this->caMethod = parseIngestionMethod(s);
+            }},
+        });
     }
 
     void run(ref<Store> store) override
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        StringSink sink;
-        dumpPath(path, sink);
+        PosixSourceAccessor accessor;
 
-        auto narHash = hashString(htSHA256, sink.s);
+        auto path2 = CanonPath::fromCwd(path);
 
-        Hash hash = narHash;
-        if (ingestionMethod == FileIngestionMethod::Flat) {
-            HashSink hsink(htSHA256);
-            readFile(path, hsink);
-            hash = hsink.finish().first;
-        }
+        auto storePath = dryRun
+            ? store->computeStorePath(
+                *namePart, accessor, path2, caMethod, HashAlgorithm::SHA256, {}).first
+            : store->addToStoreSlow(
+                *namePart, accessor, path2, caMethod, HashAlgorithm::SHA256, {}).path;
 
-        ValidPathInfo info {
-            *store,
-            std::move(*namePart),
-            FixedOutputInfo {
-                .hash = {
-                    .method = std::move(ingestionMethod),
-                    .hash = std::move(hash),
-                },
-                .references = {},
-            },
-            narHash,
-        };
-        info.narSize = sink.s.size();
+        logger->cout("%s", store->printStorePath(storePath));
+    }
+};
 
-        if (!dryRun) {
-            auto source = StringSource(sink.s);
-            store->addToStore(info, source);
-        }
+struct CmdAdd : CmdAddToStore
+{
 
-        logger->cout("%s", store->printStorePath(info.path));
+    std::string description() override
+    {
+        return "Add a file or directory to the Nix store";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "add.md"
+          ;
     }
 };
 
@@ -68,41 +92,23 @@ struct CmdAddFile : CmdAddToStore
 {
     CmdAddFile()
     {
-        ingestionMethod = FileIngestionMethod::Flat;
+        caMethod = FileIngestionMethod::Flat;
     }
 
     std::string description() override
     {
-        return "add a regular file to the Nix store";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "add-file.md"
-          ;
+        return "Deprecated. Use [`nix store add --mode flat`](@docroot@/command-ref/new-cli/nix3-store-add.md) instead.";
     }
 };
 
 struct CmdAddPath : CmdAddToStore
 {
-    CmdAddPath()
-    {
-        ingestionMethod = FileIngestionMethod::Recursive;
-    }
-
     std::string description() override
     {
-        return "add a path to the Nix store";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "add-path.md"
-          ;
+        return "Deprecated alias to [`nix store add`](@docroot@/command-ref/new-cli/nix3-store-add.md).";
     }
 };
 
 static auto rCmdAddFile = registerCommand2<CmdAddFile>({"store", "add-file"});
 static auto rCmdAddPath = registerCommand2<CmdAddPath>({"store", "add-path"});
+static auto rCmdAdd = registerCommand2<CmdAdd>({"store", "add"});

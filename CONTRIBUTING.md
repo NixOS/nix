@@ -24,29 +24,50 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 
 ## Making changes to Nix
 
-1. Check for [pull requests](https://github.com/NixOS/nix/pulls) that might already cover the contribution you are about to make.
-   There are many open pull requests that might already do what you intent to work on.
+1. Search for related issues that cover what you're going to work on.
+   It could help to mention there that you will work on the issue.
+
+   Issues labeled [good first issue](https://github.com/NixOS/nix/labels/good%20first%20issue) should be relatively easy to fix and are likely to get merged quickly.
+   Pull requests addressing issues labeled [idea approved](https://github.com/NixOS/nix/labels/idea%20approved) or [RFC](https://github.com/NixOS/nix/labels/RFC) are especially welcomed by maintainers and will receive prioritised review.
+
+   If you are proficient with C++, addressing one of the [popular issues](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc) will be highly appreciated by maintainers and Nix users all over the world.
+   For far-reaching changes, please investigate possible blockers and design implications, and coordinate with maintainers before investing too much time in writing code that may not end up getting merged.
+
+   If there is no relevant issue yet and you're not sure whether your change is likely to be accepted, [open an issue](https://github.com/NixOS/nix/issues/new/choose) yourself.
+
+2. Check for [pull requests](https://github.com/NixOS/nix/pulls) that might already cover the contribution you are about to make.
+   There are many open pull requests that might already do what you intend to work on.
    You can use [labels](https://github.com/NixOS/nix/labels) to filter for relevant topics.
-
-2. Search for related issues that cover what you're going to work on. It could help to mention there that you will work on the issue.
-
-   Issues labeled ["good first issue"](https://github.com/NixOS/nix/labels/good-first-issue) should be relatively easy to fix and are likely to get merged quickly.
-   Pull requests addressing issues labeled ["idea approved"](https://github.com/NixOS/nix/labels/idea%20approved) are especially welcomed by maintainers and will receive prioritised review.
 
 3. Check the [Nix reference manual](https://nixos.org/manual/nix/unstable/contributing/hacking.html) for information on building Nix and running its tests.
 
    For contributions to the command line interface, please check the [CLI guidelines](https://nixos.org/manual/nix/unstable/contributing/cli-guideline.html).
 
-4. Make your changes!
+4. Make your change!
 
 5. [Create a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request) for your changes.
-   * [Mark the pull request as draft](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request) if you're not done with the changes.
+   * Clearly explain the problem that you're solving.
+
+     Link related issues to inform interested parties and future contributors about your change.
+     If your pull request closes one or multiple issues, mention that in the description using `Closes: #<number>`, as it will then happen automatically when your change is merged.
    * Make sure to have [a clean history of commits on your branch by using rebase](https://www.digitalocean.com/community/tutorials/how-to-rebase-and-update-a-pull-request).
-   * Link related issues in your pull request to inform interested parties and future contributors about your change.
-     If your pull request closes one or multiple issues, note that in the description using `Closes: #<number>`, as it will then happen automatically when your change is merged.
+   * [Mark the pull request as draft](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request) if you're not done with the changes.
 
 6. Do not expect your pull request to be reviewed immediately.
    Nix maintainers follow a [structured process for reviews and design decisions](https://github.com/NixOS/nix/tree/master/maintainers#project-board-protocol), which may or may not prioritise your work.
+
+   Following this checklist will make the process smoother for everyone:
+
+   - [ ] Fixes an [idea approved](https://github.com/NixOS/nix/labels/idea%20approved) issue
+   - [ ] Tests, as appropriate:
+     - Functional tests – [`tests/functional/**.sh`](./tests/functional)
+     - Unit tests – [`src/*/tests`](./src/)
+     - Integration tests – [`tests/nixos/*`](./tests/nixos)
+   - [ ] User documentation in the [manual](..doc/manual/src)
+   - [ ] API documentation in header files
+   - [ ] Code and comments are self-explanatory
+   - [ ] Commit message explains **why** the change was made
+   - [ ] New feature or incompatible change: updated [release notes](./doc/manual/src/release-notes/rl-next.md)
 
 7. If you need additional feedback or help to getting pull request into shape, ask other contributors using [@mentions](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#mentioning-people-and-teams).
 

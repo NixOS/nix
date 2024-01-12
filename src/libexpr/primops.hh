@@ -8,19 +8,25 @@
 
 namespace nix {
 
+/**
+ * For functions where we do not expect deep recursion, we can use a sizable
+ * part of the stack a free allocation space.
+ *
+ * Note: this is expected to be multiplied by sizeof(Value), or about 24 bytes.
+ */
+constexpr size_t nonRecursiveStackReservation = 128;
+
+/**
+ * Functions that maybe applied to self-similar inputs, such as concatMap on a
+ * tree, should reserve a smaller part of the stack for allocation.
+ *
+ * Note: this is expected to be multiplied by sizeof(Value), or about 24 bytes.
+ */
+constexpr size_t conservativeStackReservation = 16;
+
 struct RegisterPrimOp
 {
-    struct Info
-    {
-        std::string name;
-        std::vector<std::string> args;
-        size_t arity = 0;
-        const char * doc;
-        PrimOpFun fun;
-        std::optional<ExperimentalFeature> experimentalFeature;
-    };
-
-    typedef std::vector<Info> PrimOps;
+    typedef std::vector<PrimOp> PrimOps;
     static PrimOps * primOps;
 
     /**
@@ -28,7 +34,7 @@ struct RegisterPrimOp
      * will get called during EvalState initialization, so there
      * may be primops not yet added and builtins is not yet sorted.
      */
-    RegisterPrimOp(Info && info);
+    RegisterPrimOp(PrimOp && primOp);
 };
 
 /* These primops are disabled without enableNativeCode, but plugins

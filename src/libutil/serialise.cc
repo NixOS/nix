@@ -1,5 +1,5 @@
 #include "serialise.hh"
-#include "util.hh"
+#include "signals.hh"
 
 #include <cstring>
 #include <cerrno>
@@ -74,11 +74,15 @@ void Source::operator () (char * data, size_t len)
     }
 }
 
+void Source::operator () (std::string_view data)
+{
+    (*this)((char *)data.data(), data.size());
+}
 
 void Source::drainInto(Sink & sink)
 {
     std::string s;
-    std::vector<char> buf(8192);
+    std::array<char, 8192> buf;
     while (true) {
         size_t n;
         try {
@@ -444,7 +448,7 @@ Error readError(Source & source)
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,
-        .msg = hintformat(fmt("%s", msg)),
+        .msg = hintfmt(msg),
     };
     auto havePos = readNum<size_t>(source);
     assert(havePos == 0);
@@ -453,7 +457,7 @@ Error readError(Source & source)
         havePos = readNum<size_t>(source);
         assert(havePos == 0);
         info.traces.push_back(Trace {
-            .hint = hintformat(fmt("%s", readString(source)))
+            .hint = hintfmt(readString(source))
         });
     }
     return Error(std::move(info));

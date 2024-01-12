@@ -19,6 +19,11 @@ struct ParsedURL
     std::string to_string() const;
 
     bool operator ==(const ParsedURL & other) const;
+
+    /**
+     * Remove `.` and `..` path elements.
+     */
+    ParsedURL canonicalise();
 };
 
 MakeError(BadURL, Error);
@@ -44,5 +49,19 @@ struct ParsedUrlScheme {
 };
 
 ParsedUrlScheme parseUrlScheme(std::string_view scheme);
+
+/* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
+   them by removing the `:` and assuming a scheme of `ssh://`. Also
+   changes absolute paths into file:// URLs. */
+std::string fixGitURL(const std::string & url);
+
+/**
+ * Whether a string is valid as RFC 3986 scheme name.
+ * Colon `:` is part of the URI; not the scheme name, and therefore rejected.
+ * See https://www.rfc-editor.org/rfc/rfc3986#section-3.1
+ *
+ * Does not check whether the scheme is understood, as that's context-dependent.
+ */
+bool isValidSchemeName(std::string_view scheme);
 
 }

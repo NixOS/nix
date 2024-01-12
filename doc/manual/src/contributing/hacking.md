@@ -10,16 +10,17 @@ $ cd nix
 
 The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment. If you don't have it installed, follow the [installation instructions].
 
-[installation instructions]: ../installation/installation.md
+[installation instructions]: ../installation/index.md
 
-## Nix with flakes
+## Building Nix with flakes
 
-This section assumes you are using Nix with [flakes] enabled. See the [next section](#classic-nix) for equivalent instructions which don't require flakes.
+This section assumes you are using Nix with the [`flakes`] and [`nix-command`] experimental features enabled.
+See the [Building Nix](#building-nix) section for equivalent instructions using stable Nix interfaces.
 
-[flakes]: ../command-ref/new-cli/nix3-flake.md#description
+[`flakes`]: @docroot@/contributing/experimental-features.md#xp-feature-flakes
+[`nix-command`]: @docroot@/contributing/experimental-features.md#xp-nix-command
 
-To build all dependencies and start a shell in which all environment
-variables are set up so that those dependencies can be found:
+To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
 
 ```console
 $ nix develop
@@ -30,7 +31,7 @@ This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` im
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop .#native-clang11StdenvPackages
+$ nix develop .#native-clangStdenvPackages
 ```
 
 > **Note**
@@ -41,8 +42,8 @@ $ nix develop .#native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[nix-shell]$ autoreconfPhase
+[nix-shell]$ configurePhase
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
 
@@ -55,20 +56,38 @@ To install it in `$(pwd)/outputs` and test it:
 nix (Nix) 2.12
 ```
 
-To build a release version of Nix:
+To build a release version of Nix for the current operating system and CPU architecture:
 
 ```console
 $ nix build
 ```
 
-You can also build Nix for one of the [supported target platforms](#target-platforms).
+You can also build Nix for one of the [supported platforms](#platforms).
 
-## Classic Nix
+## Makefile variables
 
-This section is for Nix without [flakes].
+You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run
+`make install`.
 
-To build all dependencies and start a shell in which all environment
-variables are set up so that those dependencies can be found:
+You may want to set `MAKEFLAGS="-e -j $NIX_BUILD_CORES"` to allow environment
+variables to override `Makefile` variables.
+
+- `ENABLE_BUILD=yes` to enable building the C++ code.
+- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
+
+  The docs can take a while to build, so you may want to disable this for local development.
+- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
+- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
+- `OPTIMIZE=1` to enable optimizations.
+- `libraries=libutil programs=` to only build a specific library (this will
+  fail in the linking phase if you don't have the other libraries built, but is
+  useful for checking types).
+- `libraries= programs=nix` to only build a specific program (this will not, in
+  general, work, because the programs need the libraries).
+
+## Building Nix
+
+To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
 
 ```console
 $ nix-shell
@@ -77,7 +96,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 ```
 
 > **Note**
@@ -88,7 +107,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
+[nix-shell]$ autoreconfPhase
 [nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
@@ -102,51 +121,107 @@ To install it in `$(pwd)/outputs` and test it:
 nix (Nix) 2.12
 ```
 
-To build Nix for the current operating system and CPU architecture use
+To build a release version of Nix for the current operating system and CPU architecture:
 
 ```console
 $ nix-build
 ```
 
-You can also build Nix for one of the [supported target platforms](#target-platforms).
+You can also build Nix for one of the [supported platforms](#platforms).
 
 ## Platforms
 
-As specified in [`flake.nix`], Nix can be built for various platforms:
-
-- `aarch64-linux`
-- `i686-linux`
-- `x86_64-darwin`
-- `x86_64-linux`
+Nix can be built for various platforms, as specified in [`flake.nix`]:
 
 [`flake.nix`]: https://github.com/nixos/nix/blob/master/flake.nix
 
+- `x86_64-linux`
+- `x86_64-darwin`
+- `i686-linux`
+- `aarch64-linux`
+- `aarch64-darwin`
+- `armv6l-linux`
+- `armv7l-linux`
+
 In order to build Nix for a different platform than the one you're currently
-on, you need to have some way for your system Nix to build code for that
-platform. Common solutions include [remote builders] and [binfmt emulation]
+on, you need a way for your current Nix installation to build code for that
+platform. Common solutions include [remote builders] and [binary format emulation]
 (only supported on NixOS).
 
 [remote builders]: ../advanced-topics/distributed-builds.md
-[binfmt emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
+[binary format emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
-These solutions let Nix perform builds as if you're on the native platform, so
-executing the build is as simple as
-
-```console
-$ nix build .#packages.aarch64-linux.default
-```
-
-for flake-enabled Nix, or
+Given such a setup, executing the build only requires selecting the respective attribute.
+For example, to compile for `aarch64-linux`:
 
 ```console
 $ nix-build --attr packages.aarch64-linux.default
 ```
 
-for classic Nix.
+or for Nix with the [`flakes`] and [`nix-command`] experimental features enabled:
 
-You can use any of the other supported platforms in place of `aarch64-linux`.
+```console
+$ nix build .#packages.aarch64-linux.default
+```
 
-Cross-compiled builds are available for ARMv6 and ARMv7, and Nix on unsupported platforms can be bootstrapped by adding more `crossSystems` in `flake.nix`.
+Cross-compiled builds are available for ARMv6 (`armv6l-linux`) and ARMv7 (`armv7l-linux`).
+Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootstrap Nix on unsupported platforms.
+
+### Building for multiple platforms at once
+
+It is useful to perform multiple cross and native builds on the same source tree,
+for example to ensure that better support for one platform doesn't break the build for another.
+In order to facilitate this, Nix has some support for being built out of tree – that is, placing build artefacts in a different directory than the source code:
+
+1. Create a directory for the build, e.g.
+
+   ```bash
+   mkdir build
+   ```
+
+2. Run the configure script from that directory, e.g.
+
+   ```bash
+   cd build
+   ../configure <configure flags>
+   ```
+
+3. Run make from the source directory, but with the build directory specified, e.g.
+
+   ```bash
+   make builddir=build <make flags>
+   ```
+
+## System type
+
+Nix uses a string with he following format to identify the *system type* or *platform* it runs on:
+
+```
+<cpu>-<os>[-<abi>]
+```
+
+It is set when Nix is compiled for the given system, and based on the output of [`config.guess`](https://github.com/nixos/nix/blob/master/config/config.guess) ([upstream](https://git.savannah.gnu.org/cgit/config.git/tree/config.guess)):
+
+```
+<cpu>-<vendor>-<os>[<version>][-<abi>]
+```
+
+When Nix is built such that `./configure` is passed any of the `--host`, `--build`, `--target` options, the value is based on the output of [`config.sub`](https://github.com/nixos/nix/blob/master/config/config.sub) ([upstream](https://git.savannah.gnu.org/cgit/config.git/tree/config.sub)):
+
+```
+<cpu>-<vendor>[-<kernel>]-<os>
+```
+
+For historic reasons and backward-compatibility, some CPU and OS identifiers are translated from the GNU Autotools naming convention in [`configure.ac`](https://github.com/nixos/nix/blob/master/configure.ac) as follows:
+
+| `config.guess`             | Nix                 |
+|----------------------------|---------------------|
+| `amd64`                    | `x86_64`            |
+| `i*86`                     | `i686`              |
+| `arm6`                     | `arm6l`             |
+| `arm7`                     | `arm7l`             |
+| `linux-gnu*`               | `linux`             |
+| `linux-musl*`              | `linux`             |
 
 ## Compilation environments
 
@@ -181,7 +256,7 @@ See [supported compilation environments](#compilation-environments) and instruct
 To use the LSP with your editor, you first need to [set up `clangd`](https://clangd.llvm.org/installation#project-setup) by running:
 
 ```console
-make clean && bear -- make -j$NIX_BUILD_CORES install
+make clean && bear -- make -j$NIX_BUILD_CORES default check install
 ```
 
 Configure your editor to use the `clangd` from the shell, either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
@@ -192,232 +267,81 @@ Configure your editor to use the `clangd` from the shell, either by running it i
 > Some other editors (e.g. Emacs, Vim) need a plugin to support LSP servers in general (e.g. [lsp-mode](https://github.com/emacs-lsp/lsp-mode) for Emacs and [vim-lsp](https://github.com/prabirshrestha/vim-lsp) for vim).
 > Editor-specific setup is typically opinionated, so we will not cover it here in more detail.
 
-## Running tests
+## Add a release note
 
-### Unit-tests
+`doc/manual/rl-next` contains release notes entries for all unreleased changes.
 
-The unit-tests for each Nix library (`libexpr`, `libstore`, etc..) are defined
-under `src/{library_name}/tests` using the
-[googletest](https://google.github.io/googletest/) and
-[rapidcheck](https://github.com/emil-e/rapidcheck) frameworks.
+User-visible changes should come with a release note.
 
-You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`. Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option.
+### Add an entry
 
-### Functional tests
-
-The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
-Each test is a bash script.
-
-The whole test suite can be run with:
-
-```shell-session
-$ make install && make installcheck
-ran test tests/foo.sh... [PASS]
-ran test tests/bar.sh... [PASS]
-...
-```
-
-Individual tests can be run with `make`:
-
-```shell-session
-$ make tests/${testName}.sh.test
-ran test tests/${testName}.sh... [PASS]
-```
-
-or without `make`:
-
-```shell-session
-$ ./mk/run-test.sh tests/${testName}.sh
-ran test tests/${testName}.sh... [PASS]
-```
-
-To see the complete output, one can also run:
-
-```shell-session
-$ ./mk/debug-test.sh tests/${testName}.sh
-+ foo
-output from foo
-+ bar
-output from bar
-...
-```
-
-The test script will then be traced with `set -x` and the output displayed as it happens, regardless of whether the test succeeds or fails.
-
-#### Debugging failing functional tests
-
-When a functional test fails, it usually does so somewhere in the middle of the script.
-
-To figure out what's wrong, it is convenient to run the test regularly up to the failing `nix` command, and then run that command with a debugger like GDB.
-
-For example, if the script looks like:
-
-```bash
-foo
-nix blah blub
-bar
-```
-edit it like so:
-
-```diff
- foo
--nix blah blub
-+gdb --args nix blah blub
- bar
-```
-
-Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
-
-```shell-session
-$ ./mk/debug-test.sh tests/${testName}.sh
-...
-+ gdb blash blub
-GNU gdb (GDB) 12.1
-...
-(gdb)
-```
-
-One can debug the Nix invocation in all the usual ways.
-For example, enter `run` to start the Nix invocation.
-
-### Integration tests
-
-The integration tests are defined in the Nix flake under the `hydraJobs.tests` attribute.
-These tests include everything that needs to interact with external services or run Nix in a non-trivial distributed setup.
-Because these tests are expensive and require more than what the standard github-actions setup provides, they only run on the master branch (on <https://hydra.nixos.org/jobset/nix/master>).
-
-You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-build -A hydraJobs.tests.{testName}`
-
-### Installer tests
-
-After a one-time setup, the Nix repository's GitHub Actions continuous integration (CI) workflow can test the installer each time you push to a branch.
-
-Creating a Cachix cache for your installer tests and adding its authorization token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
-
-- The `installer` job generates installers for the platforms below and uploads them to your Cachix cache:
-  - `x86_64-linux`
-  - `armv6l-linux`
-  - `armv7l-linux`
-  - `x86_64-darwin`
-
-- The `installer_test` job (which runs on `ubuntu-latest` and `macos-latest`) will try to install Nix with the cached installer and run a trivial Nix command.
-
-#### One-time setup
-
-1. Have a GitHub account with a fork of the [Nix repository](https://github.com/NixOS/nix).
-2. At cachix.org:
-    - Create or log in to an account.
-    - Create a Cachix cache using the format `<github-username>-nix-install-tests`.
-    - Navigate to the new cache > Settings > Auth Tokens.
-    - Generate a new Cachix auth token and copy the generated value.
-3. At github.com:
-    - Navigate to your Nix fork > Settings > Secrets > Actions > New repository secret.
-    - Name the secret `CACHIX_AUTH_TOKEN`.
-    - Paste the copied value of the Cachix cache auth token.
-
-#### Using the CI-generated installer for manual testing
-
-After the CI run completes, you can check the output to extract the installer URL:
-1. Click into the detailed view of the CI run.
-2. Click into any `installer_test` run (the URL you're here to extract will be the same in all of them).
-3. Click into the `Run cachix/install-nix-action@v...` step and click the detail triangle next to the first log line (it will also be `Run cachix/install-nix-action@v...`)
-4. Copy the value of `install_url`
-5. To generate an install command, plug this `install_url` and your GitHub username into this template:
-
-    ```console
-    curl -L <install_url> | sh -s -- --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
-    ```
-
-<!-- #### Manually generating test installers
-
-There's obviously a manual way to do this, and it's still the only way for
-platforms that lack GA runners.
-
-I did do this back in Fall 2020 (before the GA approach encouraged here). I'll
-sketch what I recall in case it encourages someone to fill in detail, but: I
-didn't know what I was doing at the time and had to fumble/ask around a lot--
-so I don't want to uphold any of it as "right". It may have been dumb or
-the _hard_ way from the getgo. Fundamentals may have changed since.
-
-Here's the build command I used to do this on and for x86_64-darwin:
-nix build --out-link /tmp/foo ".#checks.x86_64-darwin.binaryTarball"
-
-I used the stable out-link to make it easier to script the next steps:
-link=$(readlink /tmp/foo)
-cp $link/*-darwin.tar.xz ~/somewheres
-
-I've lost the last steps and am just going from memory:
-
-From here, I think I had to extract and modify the `install` script to point
-it at this tarball (which I scped to my own site, but it might make more sense
-to just share them locally). I extracted this script once and then just
-search/replaced in it for each new build.
-
-The installer now supports a `--tarball-url-prefix` flag which _may_ have
-solved this need?
--->
-
-### Checking links in the manual
-
-The build checks for broken internal links.
-This happens late in the process, so `nix build` is not suitable for iterating.
-To build the manual incrementally, run:
-
-```console
-make html -j $NIX_BUILD_CORES
-```
-
-In order to reflect changes to the [Makefile], clear all generated files before re-building:
-
-[Makefile]: https://github.com/NixOS/nix/blob/master/doc/manual/local.mk
-
-```console
-rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make html -j $NIX_BUILD_CORES
-```
-
-[`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
-
-[`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
-[URI fragments]: https://en.wikipedia.org/wiki/URI_fragment
-
-#### `@docroot@` variable
-
-`@docroot@` provides a base path for links that occur in reusable snippets or other documentation that doesn't have a base path of its own.
-
-If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
-
-If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
-See existing `@docroot@` logic in the [Makefile].
-Regular markdown files used for the manual have a base path of their own and they can use relative paths instead of `@docroot@`.
-
-## API documentation
-
-Doxygen API documentation is [available
-online](https://hydra.nixos.org/job/nix/master/internal-api-docs/latest/download-by-type/doc/internal-api-docs). You
-can also build and view it yourself:
-
-```console
-# nix build .#hydraJobs.internal-api-docs
-# xdg-open ./result/share/doc/nix/internal-api/html/index.html
-```
-
-or inside a `nix develop` shell by running:
+Here's what a complete entry looks like. The file name is not incorporated in the document.
 
 ```
-# make internal-api-html
-# xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+---
+synopsis: Basically a title
+issues: 1234
+prs: 1238
+---
+
+Here's one or more paragraphs that describe the change.
+
+- It's markdown
+- Add references to the manual using @docroot@
 ```
 
-## Coverage analysis
-
-A coverage analysis report is [available
-online](https://hydra.nixos.org/job/nix/master/coverage/latest/download-by-type/report/coverage). You
-can build it yourself:
+Significant changes should add the following header, which moves them to the top.
 
 ```
-# nix build .#hydraJobs.coverage
-# xdg-open ./result/coverage/index.html
+significance: significant
 ```
 
-Metrics about the change in line/function coverage over time are also
-[available](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts).
+<!-- Keep an eye on https://codeberg.org/fgaz/changelog-d/issues/1 -->
+See also the [format documentation](https://github.com/haskell/cabal/blob/master/CONTRIBUTING.md#changelog).
+
+### Build process
+
+Releases have a precomputed `rl-MAJOR.MINOR.md`, and no `rl-next.md`.
+Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on the fly.
+
+## Branches
+
+- [`master`](https://github.com/NixOS/nix/commits/master)
+
+  The main development branch. All changes are approved and merged here.
+  When developing a change, create a branch based on the latest `master`.
+
+  Maintainers try to [keep it in a release-worthy state](#reverting).
+
+- [`maintenance-*.*`](https://github.com/NixOS/nix/branches/all?query=maintenance)
+
+  These branches are the subject of backports only, and are
+  also [kept](#reverting) in a release-worthy state.
+
+  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
+
+- [`latest-release`](https://github.com/NixOS/nix/tree/latest-release)
+
+  The latest patch release of the latest minor version.
+
+  See [`maintainers/release-process.md`](https://github.com/NixOS/nix/blob/master/maintainers/release-process.md)
+
+- [`backport-*-to-*`](https://github.com/NixOS/nix/branches/all?query=backport)
+
+  Generally branches created by the backport action.
+
+  See [`maintainers/backporting.md`](https://github.com/NixOS/nix/blob/master/maintainers/backporting.md)
+
+- [_other_](https://github.com/NixOS/nix/branches/all)
+
+  Branches that do not conform to the above patterns should be feature branches.
+
+## Reverting
+
+If a change turns out to be merged by mistake, or contain a regression, it may be reverted.
+A revert is not a rejection of the contribution, but merely part of an effective development process.
+It makes sure that development keeps running smoothly, with minimal uncertainty, and less overhead.
+If maintainers have to worry too much about avoiding reverts, they would not be able to merge as much.
+By embracing reverts as a good part of the development process, everyone wins.
+
+However, taking a step back may be frustrating, so maintainers will be extra supportive on the next try.

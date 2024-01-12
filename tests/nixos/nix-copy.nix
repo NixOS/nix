@@ -1,4 +1,6 @@
 # Test that ‘nix copy’ works over ssh.
+# Run interactively with:
+# rm key key.pub; nix run .#hydraJobs.tests.nix-copy.driverInteractive
 
 { lib, config, nixpkgs, hostPkgs, ... }:
 
@@ -34,7 +36,7 @@ in {
       server =
         { config, pkgs, ... }:
         { services.openssh.enable = true;
-          services.openssh.permitRootLogin = "yes";
+          services.openssh.settings.PermitRootLogin = "yes";
 					users.users.root.password = "foobar";
           virtualisation.writableStore = true;
           virtualisation.additionalPaths = [ pkgB pkgC ];
@@ -55,7 +57,9 @@ in {
     server.wait_for_unit("sshd")
     client.wait_for_unit("network.target")
     client.wait_for_unit("getty@tty1.service")
-    client.wait_for_text("]#")
+    # Either the prompt: ]#
+    # or an OCR misreading of it: 1#
+    client.wait_for_text("[]1]#")
 
     # Copy the closure of package A from the client to the server using password authentication,
     # and check that all prompts are visible
@@ -79,6 +83,15 @@ in {
     server.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
     server.succeed("systemctl restart sshd")
     client.succeed(f"ssh -o StrictHostKeyChecking=no {server.name} 'echo hello world'")
+    client.succeed(f"ssh -O check {server.name}")
+    client.succeed(f"ssh -O exit {server.name}")
+    client.fail(f"ssh -O check {server.name}")
+
+    # Check that an explicit master will work
+    client.succeed(f"ssh -MNfS /tmp/master {server.name}")
+    client.succeed(f"ssh -S /tmp/master -O check {server.name}")
+    client.succeed("NIX_SSHOPTS='-oControlPath=/tmp/master' nix copy --to ssh://server ${pkgA} >&2")
+    client.succeed(f"ssh -S /tmp/master -O exit {server.name}")
 
     # Copy the closure of package B from the server to the client, using ssh-ng.
     client.fail("nix-store --check-validity ${pkgB}")

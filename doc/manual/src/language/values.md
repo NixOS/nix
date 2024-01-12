@@ -107,28 +107,24 @@
   e.g. `~/foo` would be equivalent to `/home/edolstra/foo` for a user
   whose home directory is `/home/edolstra`.
 
-  Paths can also be specified between angle brackets, e.g.
-  `<nixpkgs>`. This means that the directories listed in the
-  environment variable `NIX_PATH` will be searched for the given file
-  or directory name.
-
-  When an [interpolated string][string interpolation] evaluates to a path, the path is first copied into the Nix store and the resulting string is the [store path] of the newly created [store object].
-
-  [store path]: ../glossary.md#gloss-store-path
-  [store object]: ../glossary.md#gloss-store-object
-
   For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` in the current directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
 
   Note that the Nix language assumes that all input files will remain _unchanged_ while  evaluating a Nix expression.
   For example, assume you used a file path in an interpolated string during a `nix repl` session.
-  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new store path, since Nix might not re-read the file contents.
+  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents.
 
-  Paths themselves, except those in angle brackets (`< >`), support [string interpolation].
+  [store path]: ../glossary.md#gloss-store-path
+
+  Paths can include [string interpolation] and can themselves be [interpolated in other expressions].
+
+  [interpolated in other expressions]: ./string-interpolation.md#interpolated-expressions
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
 
   `a.${foo}/b.${bar}` is a syntactically valid division operation.
   `./a.${foo}/b.${bar}` is a path.
+
+  [Lookup paths](./constructs/lookup-path.md) such as `<nixpkgs>` resolve to path values.
 
 - <a id="type-boolean" href="#type-boolean">Boolean</a>
 
@@ -167,13 +163,17 @@ An attribute set is a collection of name-value-pairs (called *attributes*) enclo
 An attribute name can be an identifier or a [string](#string).
 An identifier must start with a letter (`a-z`, `A-Z`) or underscore (`_`), and can otherwise contain letters (`a-z`, `A-Z`), numbers (`0-9`), underscores (`_`), apostrophes (`'`), or dashes (`-`).
 
+> **Syntax**
+>
 > *name* = *identifier* | *string* \
 > *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
 
 Names and values are separated by an equal sign (`=`).
 Each value is an arbitrary expression terminated by a semicolon (`;`).
 
-> *attrset* = `{` [ *name* `=` *expr* `;` `]`... `}`
+> **Syntax**
+>
+> *attrset* = `{` [ *name* `=` *expr* `;` ]... `}`
 
 Attributes can appear in any order.
 An attribute name may only occur once.

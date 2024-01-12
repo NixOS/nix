@@ -2,7 +2,9 @@
 ///@file
 
 #include "args.hh"
+#include "canon-path.hh"
 #include "common-args.hh"
+#include "search-path.hh"
 
 namespace nix {
 
@@ -19,7 +21,7 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 
     Bindings * getAutoArgs(EvalState & state);
 
-    Strings searchPath;
+    SearchPath searchPath;
 
     std::optional<std::string> evalStoreUrl;
 
@@ -27,6 +29,6 @@ private:
     std::map<std::string, std::string> autoArgs;
 };
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s);
+SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir = CanonPath::fromCwd());
 
 }

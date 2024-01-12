@@ -51,8 +51,9 @@ derivation).
 
 # Options
 
-All options not listed here are passed to `nix-store --realise`,
-except for `--arg` and `--attr` / `-A` which are passed to `nix-instantiate`.
+All options not listed here are passed to
+[`nix-store --realise`](nix-store/realise.md),
+except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](nix-instantiate.md).
 
   - <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
 
@@ -68,6 +69,8 @@ except for `--arg` and `--attr` / `-A` which are passed to `nix-instantiate`.
 
     Change the name of the symlink to the output path created from
     `result` to *outlink*.
+
+{{#include ./status-build-failure.md}}
 
 {{#include ./opt-common.md}}
 

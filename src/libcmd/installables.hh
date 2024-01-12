@@ -1,10 +1,10 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "derived-path.hh"
+#include "built-path.hh"
 #include "store-api.hh"
 #include "build-result.hh"
 
@@ -165,7 +165,14 @@ struct Installable
         const Installables & installables,
         BuildMode bMode = bmNormal);
 
-    static std::set<StorePath> toStorePaths(
+    static std::set<StorePath> toStorePathSet(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const Installables & installables);
+
+    static std::vector<StorePath> toStorePaths(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,

@@ -3,10 +3,11 @@
 
 #include <nlohmann/json.hpp>
 #include "config.hh"
+#include "json-utils.hh"
 
 namespace nix {
 template<typename T>
-std::map<std::string, nlohmann::json> BaseSetting<T>::toJSONObject()
+std::map<std::string, nlohmann::json> BaseSetting<T>::toJSONObject() const
 {
     auto obj = AbstractSetting::toJSONObject();
     obj.emplace("value", value);

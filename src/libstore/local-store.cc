@@ -4,17 +4,24 @@
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
+#include "realisation.hh"
 #include "nar-info.hh"
 #include "references.hh"
 #include "callback.hh"
 #include "topo-sort.hh"
 #include "finally.hh"
 #include "compression.hh"
+#include "signals.hh"
+#include "posix-fs-canonicalise.hh"
+#include "posix-source-accessor.hh"
+#include "keys.hh"
 
 #include <iostream>
 #include <algorithm>
 #include <cstring>
 
+#include <memory>
+#include <new>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/select.h>
@@ -32,7 +39,6 @@
 #include <sys/statvfs.h>
 #include <sys/mount.h>
 #include <sys/ioctl.h>
-#include <sys/xattr.h>
 #endif
 
 #ifdef __CYGWIN__
@@ -190,7 +196,11 @@ LocalStore::LocalStore(const Params & params)
 
     /* Create missing state directories if they don't already exist. */
     createDirs(realStoreDir);
-    makeStoreWritable();
+    if (readOnly) {
+        experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
+    } else {
+        makeStoreWritable();
+    }
     createDirs(linksDir);
     Path profilesDir = stateDir + "/profiles";
     createDirs(profilesDir);
@@ -204,8 +214,10 @@ LocalStore::LocalStore(const Params & params)
 
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
         createDirs(perUserDir);
-        if (chmod(perUserDir.c_str(), 0755) == -1)
-            throw SysError("could not set permissions on '%s' to 755", perUserDir);
+        if (!readOnly) {
+            if (chmod(perUserDir.c_str(), 0755) == -1)
+                throw SysError("could not set permissions on '%s' to 755", perUserDir);
+        }
     }
 
     /* Optionally, create directories and set permissions for a
@@ -269,10 +281,12 @@ LocalStore::LocalStore(const Params & params)
 
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
-    Path globalLockPath = dbDir + "/big-lock";
-    globalLock = openLockFile(globalLockPath.c_str(), true);
+    if (!readOnly) {
+        Path globalLockPath = dbDir + "/big-lock";
+        globalLock = openLockFile(globalLockPath.c_str(), true);
+    }
 
-    if (!lockFile(globalLock.get(), ltRead, false)) {
+    if (!readOnly && !lockFile(globalLock.get(), ltRead, false)) {
         printInfo("waiting for the big Nix store lock...");
         lockFile(globalLock.get(), ltRead, true);
     }
@@ -280,6 +294,14 @@ LocalStore::LocalStore(const Params & params)
     /* Check the current database schema and if necessary do an
        upgrade.  */
     int curSchema = getSchema();
+    if (readOnly && curSchema < nixSchemaVersion) {
+        debug("current schema version: %d", curSchema);
+        debug("supported schema version: %d", nixSchemaVersion);
+        throw Error(curSchema == 0 ?
+            "database does not exist, and cannot be created in read-only mode" :
+            "database schema needs migrating, but this cannot be done in read-only mode");
+    }
+
     if (curSchema > nixSchemaVersion)
         throw Error("current Nix store schema is version %1%, but I only support %2%",
              curSchema, nixSchemaVersion);
@@ -344,7 +366,11 @@ LocalStore::LocalStore(const Params & params)
     else openDB(*state, false);
 
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-        migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+        if (!readOnly) {
+            migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+        } else {
+            throw Error("need to migrate to content-addressed schema, but this cannot be done in read-only mode");
+        }
     }
 
     /* Prepare SQL statements. */
@@ -475,13 +501,20 @@ int LocalStore::getSchema()
 
 void LocalStore::openDB(State & state, bool create)
 {
-    if (access(dbDir.c_str(), R_OK | W_OK))
+    if (create && readOnly) {
+        throw Error("cannot create database while in read-only mode");
+    }
+
+    if (access(dbDir.c_str(), R_OK | (readOnly ? 0 : W_OK)))
         throw SysError("Nix database directory '%1%' is not writable", dbDir);
 
     /* Open the Nix database. */
     std::string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
-    state.db = SQLite(dbPath, create);
+    auto openMode = readOnly ? SQLiteOpenMode::Immutable
+                  : create ? SQLiteOpenMode::Normal
+                  : SQLiteOpenMode::NoCreate;
+    state.db = SQLite(dbPath, openMode);
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls
@@ -550,164 +583,6 @@ void LocalStore::makeStoreWritable()
             throw SysError("remounting %1% writable", realStoreDir);
     }
 #endif
-}
-
-
-const time_t mtimeStore = 1; /* 1 second into the epoch */
-
-
-static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
-{
-    if (!S_ISLNK(st.st_mode)) {
-
-        /* Mask out all type related bits. */
-        mode_t mode = st.st_mode & ~S_IFMT;
-
-        if (mode != 0444 && mode != 0555) {
-            mode = (st.st_mode & S_IFMT)
-                 | 0444
-                 | (st.st_mode & S_IXUSR ? 0111 : 0);
-            if (chmod(path.c_str(), mode) == -1)
-                throw SysError("changing mode of '%1%' to %2$o", path, mode);
-        }
-
-    }
-
-    if (st.st_mtime != mtimeStore) {
-        struct timeval times[2];
-        times[0].tv_sec = st.st_atime;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = mtimeStore;
-        times[1].tv_usec = 0;
-#if HAVE_LUTIMES
-        if (lutimes(path.c_str(), times) == -1)
-            if (errno != ENOSYS ||
-                (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1))
-#else
-        if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
-#endif
-            throw SysError("changing modification time of '%1%'", path);
-    }
-}
-
-
-void canonicaliseTimestampAndPermissions(const Path & path)
-{
-    canonicaliseTimestampAndPermissions(path, lstat(path));
-}
-
-
-static void canonicalisePathMetaData_(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-    InodesSeen & inodesSeen)
-{
-    checkInterrupt();
-
-#if __APPLE__
-    /* Remove flags, in particular UF_IMMUTABLE which would prevent
-       the file from being garbage-collected. FIXME: Use
-       setattrlist() to remove other attributes as well. */
-    if (lchflags(path.c_str(), 0)) {
-        if (errno != ENOTSUP)
-            throw SysError("clearing flags of path '%1%'", path);
-    }
-#endif
-
-    auto st = lstat(path);
-
-    /* Really make sure that the path is of a supported type. */
-    if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
-        throw Error("file '%1%' has an unsupported type", path);
-
-#if __linux__
-    /* Remove extended attributes / ACLs. */
-    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
-
-    if (eaSize < 0) {
-        if (errno != ENOTSUP && errno != ENODATA)
-            throw SysError("querying extended attributes of '%s'", path);
-    } else if (eaSize > 0) {
-        std::vector<char> eaBuf(eaSize);
-
-        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
-            throw SysError("querying extended attributes of '%s'", path);
-
-        for (auto & eaName: tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            if (settings.ignoredAcls.get().count(eaName)) continue;
-            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
-                throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
-        }
-     }
-#endif
-
-    /* Fail if the file is not owned by the build user.  This prevents
-       us from messing up the ownership/permissions of files
-       hard-linked into the output (e.g. "ln /etc/shadow $out/foo").
-       However, ignore files that we chown'ed ourselves previously to
-       ensure that we don't fail on hard links within the same build
-       (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
-    if (uidRange && (st.st_uid < uidRange->first || st.st_uid > uidRange->second)) {
-        if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
-            throw BuildError("invalid ownership on file '%1%'", path);
-        mode_t mode = st.st_mode & ~S_IFMT;
-        assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
-        return;
-    }
-
-    inodesSeen.insert(Inode(st.st_dev, st.st_ino));
-
-    canonicaliseTimestampAndPermissions(path, st);
-
-    /* Change ownership to the current uid.  If it's a symlink, use
-       lchown if available, otherwise don't bother.  Wrong ownership
-       of a symlink doesn't matter, since the owning user can't change
-       the symlink and can't delete it because the directory is not
-       writable.  The only exception is top-level paths in the Nix
-       store (since that directory is group-writable for the Nix build
-       users group); we check for this case below. */
-    if (st.st_uid != geteuid()) {
-#if HAVE_LCHOWN
-        if (lchown(path.c_str(), geteuid(), getegid()) == -1)
-#else
-        if (!S_ISLNK(st.st_mode) &&
-            chown(path.c_str(), geteuid(), getegid()) == -1)
-#endif
-            throw SysError("changing owner of '%1%' to %2%",
-                path, geteuid());
-    }
-
-    if (S_ISDIR(st.st_mode)) {
-        DirEntries entries = readDirectory(path);
-        for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, uidRange, inodesSeen);
-    }
-}
-
-
-void canonicalisePathMetaData(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-    InodesSeen & inodesSeen)
-{
-    canonicalisePathMetaData_(path, uidRange, inodesSeen);
-
-    /* On platforms that don't have lchown(), the top-level path can't
-       be a symlink, since we can't change its ownership. */
-    auto st = lstat(path);
-
-    if (st.st_uid != geteuid()) {
-        assert(S_ISLNK(st.st_mode));
-        throw Error("wrong ownership of top-level store path '%1%'", path);
-    }
-}
-
-
-void canonicalisePathMetaData(const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange)
-{
-    InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, uidRange, inodesSeen);
 }
 
 
@@ -799,7 +674,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     state.stmts->RegisterValidPath.use()
         (printStorePath(info.path))
-        (info.narHash.to_string(Base16, true))
+        (info.narHash.to_string(HashFormat::Base16, true))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
         (info.narSize, info.narSize != 0)
@@ -906,7 +781,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmts->UpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
-        (info.narHash.to_string(Base16, true))
+        (info.narHash.to_string(HashFormat::Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
@@ -995,10 +870,9 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 
 
 std::map<std::string, std::optional<StorePath>>
-LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
+LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
 {
-    auto path = path_;
-    auto outputs = retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
+    return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
         std::map<std::string, std::optional<StorePath>> outputs;
         uint64_t drvId;
@@ -1010,21 +884,6 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
 
         return outputs;
     });
-
-    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
-        return outputs;
-
-    auto drv = readInvalidDerivation(path);
-    auto drvHashes = staticOutputHashes(*this, drv);
-    for (auto& [outputName, hash] : drvHashes) {
-        auto realisation = queryRealisation(DrvOutput{hash, outputName});
-        if (realisation)
-            outputs.insert_or_assign(outputName, realisation->outPath);
-        else
-            outputs.insert({outputName, std::nullopt});
-    }
-
-    return outputs;
 }
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
@@ -1100,7 +959,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         StorePathSet paths;
 
         for (auto & [_, i] : infos) {
-            assert(i.narHash.type == htSHA256);
+            assert(i.narHash.algo == HashAlgorithm::SHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
             else
@@ -1185,6 +1044,15 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
+    /* In case we are not interested in reading the NAR: discard it. */
+    bool narRead = false;
+    Finally cleanup = [&]() {
+        if (!narRead) {
+            NullParseSink sink;
+            parseDump(sink, source);
+        }
+    };
+
     addTempRoot(info.path);
 
     if (repair || !isValidPath(info.path)) {
@@ -1205,44 +1073,46 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             /* While restoring the path from the NAR, compute the hash
                of the NAR. */
-            HashSink hashSink(htSHA256);
+            HashSink hashSink(HashAlgorithm::SHA256);
 
             TeeSource wrapperSource { source, hashSink };
 
+            narRead = true;
             restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink.finish();
 
             if (hashResult.first != info.narHash)
                 throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                    printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
+                            printStorePath(info.path), info.narHash.to_string(HashFormat::Nix32, true), hashResult.first.to_string(HashFormat::Nix32, true));
 
             if (hashResult.second != info.narSize)
                 throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
-                if (auto foHash = std::get_if<FixedOutputHash>(&info.ca->raw)) {
-                    auto actualFoHash = hashCAPath(
-                        foHash->method,
-                        foHash->hash.type,
-                        info.path
-                    );
-                    if (foHash->hash != actualFoHash.hash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            foHash->hash.to_string(Base32, true),
-                            actualFoHash.hash.to_string(Base32, true));
-                    }
-                }
-                if (auto textHash = std::get_if<TextHash>(&info.ca->raw)) {
-                    auto actualTextHash = hashString(htSHA256, readFile(realPath));
-                    if (textHash->hash != actualTextHash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            textHash->hash.to_string(Base32, true),
-                            actualTextHash.to_string(Base32, true));
-                    }
+                auto & specified = *info.ca;
+                auto actualHash = ({
+                    HashModuloSink caSink {
+                        specified.hash.algo,
+                        std::string { info.path.hashPart() },
+                    };
+                    PosixSourceAccessor accessor;
+                    dumpPath(
+                        *getFSAccessor(false),
+                        CanonPath { printStorePath(info.path) },
+                        caSink,
+                        specified.method.getFileIngestionMethod());
+                    ContentAddress {
+                        .method = specified.method,
+                        .hash = caSink.finish().first,
+                    };
+                });
+                if (specified.hash != actualHash.hash) {
+                    throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                        printStorePath(info.path),
+                        specified.hash.to_string(HashFormat::Nix32, true),
+                        actualHash.hash.to_string(HashFormat::Nix32, true));
                 }
             }
 
@@ -1260,8 +1130,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
+StorePath LocalStore::addToStoreFromDump(
+    Source & source0,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
@@ -1275,7 +1150,11 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
        path. */
     bool inMemory = false;
 
-    std::string dump;
+    struct Free {
+        void operator()(void* v) { free(v); }
+    };
+    std::unique_ptr<char, Free> dumpBuffer(nullptr);
+    std::string_view dump;
 
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
@@ -1284,13 +1163,18 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
-        dump.resize(oldSize + want);
+        if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
+            dumpBuffer.release();
+            dumpBuffer.reset((char*) tmp);
+        } else {
+            throw std::bad_alloc();
+        }
         auto got = 0;
         Finally cleanup([&]() {
-            dump.resize(oldSize + got);
+            dump = {dumpBuffer.get(), dump.size() + got};
         });
         try {
-            got = source.read(dump.data() + oldSize, want);
+            got = source.read(dumpBuffer.get() + oldSize, want);
         } catch (EndOfFile &) {
             inMemory = true;
             break;
@@ -1311,27 +1195,22 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
-        if (method == FileIngestionMethod::Recursive)
-            restorePath(tempPath, bothSource);
-        else
-            writeFile(tempPath, bothSource);
+        restorePath(tempPath, bothSource, method.getFileIngestionMethod());
 
-        dump.clear();
+        dumpBuffer.reset();
+        dump = {};
     }
 
     auto [hash, size] = hashSink->finish();
 
-    ContentAddressWithReferences desc = FixedOutputInfo {
-        .hash = {
-            .method = method,
-            .hash = hash,
-        },
-        .references = {
+    auto desc = ContentAddressWithReferences::fromParts(
+        method,
+        hash,
+        {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
             .self = false,
-        },
-    };
+        });
 
     auto dstPath = makeFixedOutputPathFromCA(name, desc);
 
@@ -1354,11 +1233,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
             if (inMemory) {
                 StringSource dumpSource { dump };
-                /* Restore from the NAR in memory. */
-                if (method == FileIngestionMethod::Recursive)
-                    restorePath(realPath, dumpSource);
-                else
-                    writeFile(realPath, dumpSource);
+                /* Restore from the buffer in memory. */
+                restorePath(realPath, dumpSource, method.getFileIngestionMethod());
             } else {
                 /* Move the temporary path we restored above. */
                 moveFile(tempPath, realPath);
@@ -1367,8 +1243,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
             auto narHash = std::pair { hash, size };
-            if (method != FileIngestionMethod::Recursive || hashAlgo != htSHA256) {
-                HashSink narSink { htSHA256 };
+            if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+                HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
             }
@@ -1384,55 +1260,6 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 narHash.first
             };
             info.narSize = narHash.second;
-            registerValidPath(info);
-        }
-
-        outputLock.setDeletion(true);
-    }
-
-    return dstPath;
-}
-
-
-StorePath LocalStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references, RepairFlag repair)
-{
-    auto hash = hashString(htSHA256, s);
-    auto dstPath = makeTextPath(name, TextInfo {
-        { .hash = hash },
-        references,
-    });
-
-    addTempRoot(dstPath);
-
-    if (repair || !isValidPath(dstPath)) {
-
-        auto realPath = Store::toRealPath(dstPath);
-
-        PathLocks outputLock({realPath});
-
-        if (repair || !isValidPath(dstPath)) {
-
-            deletePath(realPath);
-
-            autoGC();
-
-            writeFile(realPath, s);
-
-            canonicalisePathMetaData(realPath, {});
-
-            StringSink sink;
-            dumpString(s, sink);
-            auto narHash = hashString(htSHA256, sink.s);
-
-            optimisePath(realPath, repair);
-
-            ValidPathInfo info { dstPath, narHash };
-            info.narSize = sink.s.size();
-            info.references = references;
-            info.ca = TextHash { .hash = hash };
             registerValidPath(info);
         }
 
@@ -1497,17 +1324,33 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StringSet store;
-    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
-
-    /* Check whether all valid paths actually exist. */
-    printInfo("checking path existence...");
-
     StorePathSet validPaths;
-    PathSet done;
 
-    for (auto & i : queryAllValidPaths())
-        verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+    {
+        StorePathSet storePathsInStoreDir;
+        /* Why aren't we using `queryAllValidPaths`? Because that would
+           tell us about all the paths than the database knows about. Here we
+           want to know about all the store paths in the store directory,
+           regardless of what the database thinks.
+
+           We will end up cross-referencing these two sources of truth (the
+           database and the filesystem) in the loop below, in order to catch
+           invalid states.
+         */
+        for (auto & i : readDirectory(realStoreDir)) {
+            try {
+                storePathsInStoreDir.insert({i.name});
+            } catch (BadStorePath &) { }
+        }
+
+        /* Check whether all valid paths actually exist. */
+        printInfo("checking path existence...");
+
+        StorePathSet done;
+
+        for (auto & i : queryAllValidPaths())
+            verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
+    }
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1517,7 +1360,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             printMsg(lvlTalkative, "checking contents of '%s'", link.name);
             Path linkPath = linksDir + "/" + link.name;
-            std::string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
+            PosixSourceAccessor accessor;
+            std::string hash = hashPath(
+                accessor, CanonPath { linkPath },
+                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);
@@ -1534,7 +1380,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking store hashes...");
 
-        Hash nullHash(htSHA256);
+        Hash nullHash(HashAlgorithm::SHA256);
 
         for (auto & i : validPaths) {
             try {
@@ -1543,14 +1389,14 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
 
-                auto hashSink = HashSink(info->narHash.type);
+                auto hashSink = HashSink(info->narHash.algo);
 
                 dumpPath(Store::toRealPath(i), hashSink);
                 auto current = hashSink.finish();
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     printError("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true));
+                               printStorePath(i), info->narHash.to_string(HashFormat::Nix32, true), current.first.to_string(HashFormat::Nix32, true));
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
@@ -1593,31 +1439,26 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
-    PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
+void LocalStore::verifyPath(const StorePath & path, const StorePathSet & storePathsInStoreDir,
+    StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
-    if (!done.insert(pathS).second) return;
+    if (!done.insert(path).second) return;
 
-    if (!isStorePath(pathS)) {
-        printError("path '%s' is not in the Nix store", pathS);
-        return;
-    }
-
-    auto path = parseStorePath(pathS);
-
-    if (!store.count(std::string(path.to_string()))) {
+    if (!storePathsInStoreDir.count(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+                verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }
+
+        auto pathS = printStorePath(path);
 
         if (canInvalidate) {
             printInfo("path '%s' disappeared, removing from database...", pathS);
@@ -1738,7 +1579,8 @@ void LocalStore::signRealisation(Realisation & realisation)
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
-        realisation.sign(secretKey);
+        LocalSigner signer(std::move(secretKey));
+        realisation.sign(signer);
     }
 }
 
@@ -1750,7 +1592,8 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
-        info.sign(*this, secretKey);
+        LocalSigner signer(std::move(secretKey));
+        info.sign(*this, signer);
     }
 }
 
@@ -1827,36 +1670,6 @@ void LocalStore::queryRealisationUncached(const DrvOutput & id,
     } catch (...) {
         callback.rethrow();
     }
-}
-
-FixedOutputHash LocalStore::hashCAPath(
-    const FileIngestionMethod & method, const HashType & hashType,
-    const StorePath & path)
-{
-    return hashCAPath(method, hashType, Store::toRealPath(path), path.hashPart());
-}
-
-FixedOutputHash LocalStore::hashCAPath(
-    const FileIngestionMethod & method,
-    const HashType & hashType,
-    const Path & path,
-    const std::string_view pathHash
-)
-{
-    HashModuloSink caSink ( hashType, std::string(pathHash) );
-    switch (method) {
-    case FileIngestionMethod::Recursive:
-        dumpPath(path, caSink);
-        break;
-    case FileIngestionMethod::Flat:
-        readFile(path, caSink);
-        break;
-    }
-    auto hash = caSink.finish().first;
-    return FixedOutputHash{
-        .method = method,
-        .hash = hash,
-    };
 }
 
 void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)

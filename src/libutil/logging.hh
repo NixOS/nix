@@ -23,6 +23,7 @@ typedef enum {
     actQueryPathInfo = 109,
     actPostBuildHook = 110,
     actBuildWaiting = 111,
+    actFetchTree = 112,
 } ActivityType;
 
 typedef enum {
@@ -34,6 +35,7 @@ typedef enum {
     resProgress = 105,
     resSetExpected = 106,
     resPostBuildLogLine = 107,
+    resFetchStatus = 108,
 } ResultType;
 
 typedef uint64_t ActivityId;

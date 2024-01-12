@@ -175,8 +175,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
             .label = "locked",
             .optional = true,
             .handler = {&locked},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(getStore(), prefix);
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(completions, getStore(), prefix);
             }}
         });
     }
@@ -196,10 +196,12 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     }
 };
 
-struct CmdRegistry : virtual NixMultiCommand
+struct CmdRegistry : NixMultiCommand
 {
     CmdRegistry()
-        : MultiCommand({
+        : NixMultiCommand(
+            "registry",
+            {
                 {"list", []() { return make_ref<CmdRegistryList>(); }},
                 {"add", []() { return make_ref<CmdRegistryAdd>(); }},
                 {"remove", []() { return make_ref<CmdRegistryRemove>(); }},
@@ -221,14 +223,6 @@ struct CmdRegistry : virtual NixMultiCommand
     }
 
     Category category() override { return catSecondary; }
-
-    void run() override
-    {
-        experimentalFeatureSettings.require(Xp::Flakes);
-        if (!command)
-            throw UsageError("'nix registry' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");

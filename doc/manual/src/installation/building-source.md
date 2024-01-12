@@ -3,7 +3,7 @@
 After cloning Nix's Git repository, issue the following commands:
 
 ```console
-$ ./bootstrap.sh
+$ autoreconf -vfi
 $ ./configure options...
 $ make
 $ make install

@@ -1,6 +1,5 @@
 #include "references.hh"
 #include "hash.hh"
-#include "util.hh"
 #include "archive.hh"
 
 #include <map>
@@ -24,8 +23,8 @@ static void search(
     static bool isBase32[256];
     std::call_once(initialised, [](){
         for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
-        for (unsigned int i = 0; i < base32Chars.size(); ++i)
-            isBase32[(unsigned char) base32Chars[i]] = true;
+        for (unsigned int i = 0; i < nix32Chars.size(); ++i)
+            isBase32[(unsigned char) nix32Chars[i]] = true;
     });
 
     for (size_t i = 0; i + refLength <= s.size(); ) {
@@ -111,8 +110,8 @@ void RewritingSink::flush()
     prev.clear();
 }
 
-HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
-    : hashSink(ht)
+HashModuloSink::HashModuloSink(HashAlgorithm ha, const std::string & modulus)
+    : hashSink(ha)
     , rewritingSink(modulus, std::string(modulus.size(), 0), hashSink)
 {
 }

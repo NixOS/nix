@@ -4,7 +4,9 @@
 #include <variant>
 #include "hash.hh"
 #include "path.hh"
+#include "file-content-address.hh"
 #include "comparator.hh"
+#include "variant-wrapper.hh"
 
 namespace nix {
 
@@ -31,29 +33,13 @@ namespace nix {
 struct TextIngestionMethod : std::monostate { };
 
 /**
- * An enumeration of the main ways we can serialize file system
- * objects.
- */
-enum struct FileIngestionMethod : uint8_t {
-    /**
-     * Flat-file hashing. Directly ingest the contents of a single file
-     */
-    Flat = false,
-    /**
-     * Recursive (or NAR) hashing. Serializes the file-system object in Nix
-     * Archive format and ingest that
-     */
-    Recursive = true
-};
-
-/**
  * Compute the prefix to the hash algorithm which indicates how the
  * files were ingested.
  */
 std::string makeFileIngestionPrefix(FileIngestionMethod m);
 
 /**
- * An enumeration of all the ways we can serialize file system objects.
+ * An enumeration of all the ways we can content-address store objects.
  *
  * Just the type of a content address. Combine with the hash itself, and
  * we have a `ContentAddress` as defined below. Combine that, in turn,
@@ -71,11 +57,7 @@ struct ContentAddressMethod
 
     GENERATE_CMP(ContentAddressMethod, me->raw);
 
-    /* The moral equivalent of `using Raw::Raw;` */
-    ContentAddressMethod(auto &&... arg)
-        : raw(std::forward<decltype(arg)>(arg)...)
-    { }
-
+    MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
 
     /**
      * Parse the prefix tag which indicates how the files
@@ -97,7 +79,7 @@ struct ContentAddressMethod
     /**
      * Parse a content addressing method and hash type.
      */
-    static std::pair<ContentAddressMethod, HashType> parse(std::string_view rawCaMethod);
+    static std::pair<ContentAddressMethod, HashAlgorithm> parse(std::string_view rawCaMethod);
 
     /**
      * Render a content addressing method and hash type in a
@@ -105,7 +87,15 @@ struct ContentAddressMethod
      *
      * The rough inverse of `parse()`.
      */
-    std::string render(HashType ht) const;
+    std::string render(HashAlgorithm ht) const;
+
+    /**
+     * Get the underlying way to content-address file system objects.
+     *
+     * Different ways of hashing store objects may use the same method
+     * for hashing file systeme objects.
+     */
+    FileIngestionMethod getFileIngestionMethod() const;
 };
 
 
@@ -114,63 +104,30 @@ struct ContentAddressMethod
  */
 
 /**
- * Somewhat obscure, used by \ref Derivation derivations and
- * `builtins.toFile` currently.
- */
-struct TextHash {
-    /**
-     * Hash of the contents of the text/file.
-     */
-    Hash hash;
-
-    GENERATE_CMP(TextHash, me->hash);
-};
-
-/**
- * Used by most store objects that are content-addressed.
- */
-struct FixedOutputHash {
-    /**
-     * How the file system objects are serialized
-     */
-    FileIngestionMethod method;
-    /**
-     * Hash of that serialization
-     */
-    Hash hash;
-
-    std::string printMethodAlgo() const;
-
-    GENERATE_CMP(FixedOutputHash, me->method, me->hash);
-};
-
-/**
  * We've accumulated several types of content-addressed paths over the
  * years; fixed-output derivations support multiple hash algorithms and
  * serialisation methods (flat file vs NAR). Thus, ‘ca’ has one of the
  * following forms:
  *
- * - ‘text:sha256:<sha256 hash of file contents>’: For paths
- *   computed by Store::makeTextPath() / Store::addTextToStore().
+ * - `TextIngestionMethod`:
+ *   ‘text:sha256:<sha256 hash of file contents>’
  *
- * - ‘fixed:<r?>:<ht>:<h>’: For paths computed by
- *   Store::makeFixedOutputPath() / Store::addToStore().
+ * - `FixedIngestionMethod`:
+ *   ‘fixed:<r?>:<hash type>:<hash of file contents>’
  */
 struct ContentAddress
 {
-    typedef std::variant<
-        TextHash,
-        FixedOutputHash
-    > Raw;
+    /**
+     * How the file system objects are serialized
+     */
+    ContentAddressMethod method;
 
-    Raw raw;
+    /**
+     * Hash of that serialization
+     */
+    Hash hash;
 
-    GENERATE_CMP(ContentAddress, me->raw);
-
-    /* The moral equivalent of `using Raw::Raw;` */
-    ContentAddress(auto &&... arg)
-        : raw(std::forward<decltype(arg)>(arg)...)
-    { }
+    GENERATE_CMP(ContentAddress, me->method, me->hash);
 
     /**
      * Compute the content-addressability assertion
@@ -182,20 +139,6 @@ struct ContentAddress
     static ContentAddress parse(std::string_view rawCa);
 
     static std::optional<ContentAddress> parseOpt(std::string_view rawCaOpt);
-
-    /**
-     * Create a `ContentAddress` from 2 parts:
-     *
-     * @param method Way ingesting the file system data.
-     *
-     * @param hash Hash of ingested file system data.
-     */
-    static ContentAddress fromParts(
-        ContentAddressMethod method, Hash hash) noexcept;
-
-    ContentAddressMethod getMethod() const;
-
-    const Hash & getHash() const;
 
     std::string printMethodAlgo() const;
 };
@@ -219,7 +162,8 @@ std::string renderContentAddress(std::optional<ContentAddress> ca);
  * References to other store objects are tracked with store paths, self
  * references however are tracked with a boolean.
  */
-struct StoreReferences {
+struct StoreReferences
+{
     /**
      * References to other store objects
      */
@@ -246,8 +190,13 @@ struct StoreReferences {
 };
 
 // This matches the additional info that we need for makeTextPath
-struct TextInfo {
-    TextHash hash;
+struct TextInfo
+{
+    /**
+     * Hash of the contents of the text/file.
+     */
+    Hash hash;
+
     /**
      * References to other store objects only; self references
      * disallowed
@@ -257,8 +206,18 @@ struct TextInfo {
     GENERATE_CMP(TextInfo, me->hash, me->references);
 };
 
-struct FixedOutputInfo {
-    FixedOutputHash hash;
+struct FixedOutputInfo
+{
+    /**
+     * How the file system objects are serialized
+     */
+    FileIngestionMethod method;
+
+    /**
+     * Hash of that serialization
+     */
+    Hash hash;
+
     /**
      * References to other store objects or this one.
      */
@@ -283,10 +242,7 @@ struct ContentAddressWithReferences
 
     GENERATE_CMP(ContentAddressWithReferences, me->raw);
 
-    /* The moral equivalent of `using Raw::Raw;` */
-    ContentAddressWithReferences(auto &&... arg)
-        : raw(std::forward<decltype(arg)>(arg)...)
-    { }
+    MAKE_WRAPPER_CONSTRUCTOR(ContentAddressWithReferences);
 
     /**
      * Create a `ContentAddressWithReferences` from a mere
@@ -303,11 +259,12 @@ struct ContentAddressWithReferences
      *
      * @param refs References to other store objects or oneself.
      *
-     * Do note that not all combinations are supported; `nullopt` is
-     * returns for invalid combinations.
+     * @note note that all combinations are supported. This is a
+     * *partial function* and exceptions will be thrown for invalid
+     * combinations.
      */
-    static std::optional<ContentAddressWithReferences> fromPartsOpt(
-        ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept;
+    static ContentAddressWithReferences fromParts(
+        ContentAddressMethod method, Hash hash, StoreReferences refs);
 
     ContentAddressMethod getMethod() const;
 

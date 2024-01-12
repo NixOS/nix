@@ -1,7 +1,8 @@
 #include "serialise.hh"
 #include "store-api.hh"
 #include "archive.hh"
-#include "worker-protocol.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 
 #include <algorithm>
 
@@ -29,7 +30,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
 {
     auto info = queryPathInfo(path);
 
-    HashSink hashSink(htSHA256);
+    HashSink hashSink(HashAlgorithm::SHA256);
     TeeSink teeSink(sink, hashSink);
 
     narFromPath(path, teeSink);
@@ -38,14 +39,16 @@ void Store::exportPath(const StorePath & path, Sink & sink)
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
     Hash hash = hashSink.currentHash().first;
-    if (hash != info->narHash && info->narHash != Hash(info->narHash.type))
+    if (hash != info->narHash && info->narHash != Hash(info->narHash.algo))
         throw Error("hash of path '%s' has changed from '%s' to '%s'!",
-            printStorePath(path), info->narHash.to_string(Base32, true), hash.to_string(Base32, true));
+                    printStorePath(path), info->narHash.to_string(HashFormat::Nix32, true), hash.to_string(HashFormat::Nix32, true));
 
     teeSink
         << exportMagic
         << printStorePath(path);
-    workerProtoWrite(*this, teeSink, info->references);
+    CommonProto::write(*this,
+        CommonProto::WriteConn { .to = teeSink },
+        info->references);
     teeSink
         << (info->deriver ? printStorePath(*info->deriver) : "")
         << 0;
@@ -62,7 +65,7 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         /* Extract the NAR from the source. */
         StringSink saved;
         TeeSource tee { source, saved };
-        ParseSink ether;
+        NullParseSink ether;
         parseDump(ether, tee);
 
         uint32_t magic = readInt(source);
@@ -73,9 +76,10 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         //Activity act(*logger, lvlInfo, "importing path '%s'", info.path);
 
-        auto references = WorkerProto<StorePathSet>::read(*this, source);
+        auto references = CommonProto::Serialise<StorePathSet>::read(*this,
+            CommonProto::ReadConn { .from = source });
         auto deriver = readString(source);
-        auto narHash = hashString(htSHA256, saved.s);
+        auto narHash = hashString(HashAlgorithm::SHA256, saved.s);
 
         ValidPathInfo info { path, narHash };
         if (deriver != "")

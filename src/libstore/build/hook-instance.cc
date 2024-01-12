@@ -1,18 +1,20 @@
 #include "globals.hh"
 #include "hook-instance.hh"
+#include "file-system.hh"
+#include "child.hh"
 
 namespace nix {
 
 HookInstance::HookInstance()
 {
-    debug("starting build hook '%s'", settings.buildHook);
+    debug("starting build hook '%s'", concatStringsSep(" ", settings.buildHook.get()));
 
-    auto buildHookArgs = tokenizeString<std::list<std::string>>(settings.buildHook.get());
+    auto buildHookArgs = settings.buildHook.get();
 
     if (buildHookArgs.empty())
         throw Error("'build-hook' setting is empty");
 
-    auto buildHook = buildHookArgs.front();
+    auto buildHook = canonPath(buildHookArgs.front());
     buildHookArgs.pop_front();
 
     Strings args;

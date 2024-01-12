@@ -5,10 +5,8 @@
 
 #include "pathlocks.hh"
 #include "store-api.hh"
-#include "local-fs-store.hh"
-#include "gc-store.hh"
+#include "indirect-root-store.hh"
 #include "sync.hh"
-#include "util.hh"
 
 #include <chrono>
 #include <future>
@@ -41,17 +39,36 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
-    Setting<bool> requireSigs{(StoreConfig*) this,
+    Setting<bool> requireSigs{this,
         settings.requireSigs,
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
+
+    Setting<bool> readOnly{this,
+        false,
+        "read-only",
+        R"(
+          Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
+
+          Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
+
+          Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
+
+          > **Warning**
+          > Do not use this unless the filesystem is read-only.
+          >
+          > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
+          > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
+        )"};
 
     const std::string name() override { return "Local Store"; }
 
     std::string doc() override;
 };
 
-class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
+class LocalStore : public virtual LocalStoreConfig
+    , public virtual IndirectRootStore
+    , public virtual GcStore
 {
 private:
 
@@ -148,7 +165,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryStaticPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -160,12 +177,11 @@ public:
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
-
-    StorePath addTextToStore(
+    StorePath addToStoreFromDump(
+        Source & dump,
         std::string_view name,
-        std::string_view s,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override;
 
@@ -192,6 +208,12 @@ private:
 
 public:
 
+    /**
+     * Implementation of IndirectRootStore::addIndirectRoot().
+     *
+     * The weak reference merely is a symlink to `path' from
+     * /nix/var/nix/gcroots/auto/<hash of `path'>.
+     */
     void addIndirectRoot(const Path & path) override;
 
 private:
@@ -269,6 +291,10 @@ public:
 
 private:
 
+    /**
+     * Retrieve the current version of the database schema.
+     * If the database does not exist yet, the version returned will be 0.
+     */
     int getSchema();
 
     void openDB(State & state, bool create);
@@ -286,8 +312,8 @@ private:
      */
     void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const StringSet & store,
-        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(const StorePath & path, const StorePathSet & store,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
@@ -323,19 +349,6 @@ private:
     void signPathInfo(ValidPathInfo & info);
     void signRealisation(Realisation &);
 
-    // XXX: Make a generic `Store` method
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
-        const HashType & hashType,
-        const StorePath & path);
-
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
-        const HashType & hashType,
-        const Path & path,
-        const std::string_view pathHash
-    );
-
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
     friend struct LocalDerivationGoal;
@@ -343,39 +356,5 @@ private:
     friend struct SubstitutionGoal;
     friend struct DerivationGoal;
 };
-
-
-typedef std::pair<dev_t, ino_t> Inode;
-typedef std::set<Inode> InodesSeen;
-
-
-/**
- * "Fix", or canonicalise, the meta-data of the files in a store path
- * after it has been built.  In particular:
- *
- * - the last modification date on each file is set to 1 (i.e.,
- *   00:00:01 1/1/1970 UTC)
- *
- * - the permissions are set of 444 or 555 (i.e., read-only with or
- *   without execute permission; setuid bits etc. are cleared)
- *
- * - the owner and group are set to the Nix user and group, if we're
- *   running as root.
- *
- * If uidRange is not empty, this function will throw an error if it
- * encounters files owned by a user outside of the closed interval
- * [uidRange->first, uidRange->second].
- */
-void canonicalisePathMetaData(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-    InodesSeen & inodesSeen);
-void canonicalisePathMetaData(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange);
-
-void canonicaliseTimestampAndPermissions(const Path & path);
-
-MakeError(PathInUse, Error);
 
 }

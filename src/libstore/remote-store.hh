@@ -17,16 +17,15 @@ class Pid;
 struct FdSink;
 struct FdSource;
 template<typename T> class Pool;
-struct ConnectionHandle;
 
 struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+    const Setting<int> maxConnections{this, 1, "max-connections",
         "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this,
+    const Setting<unsigned int> maxConnectionAge{this,
         std::numeric_limits<unsigned int>::max(),
         "max-connection-age",
         "Maximum age of a connection before it is closed."};
@@ -63,7 +62,7 @@ public:
 
     StorePathSet queryDerivationOutputs(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
@@ -75,18 +74,23 @@ public:
      * Add a content-addressable store path. `dump` will be drained.
      */
     ref<const ValidPathInfo> addCAToStore(
-        Source & dump,
-        std::string_view name,
-        ContentAddressMethod caMethod,
-        HashType hashType,
-        const StorePathSet & references,
-        RepairFlag repair);
+            Source & dump,
+            std::string_view name,
+            ContentAddressMethod caMethod,
+            HashAlgorithm hashAlgo,
+            const StorePathSet & references,
+            RepairFlag repair);
 
     /**
-     * Add a content-addressable store path. Does not support references. `dump` will be drained.
+     * Add a content-addressable store path. `dump` will be drained.
      */
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -101,12 +105,6 @@ public:
         Activity & act,
         RepairFlag repair,
         CheckSigsFlag checkSigs) override;
-
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;
 
@@ -126,8 +124,6 @@ public:
     void ensurePath(const StorePath & path) override;
 
     void addTempRoot(const StorePath & path) override;
-
-    void addIndirectRoot(const Path & path) override;
 
     Roots findRoots(bool censor) override;
 
@@ -166,21 +162,7 @@ public:
 
     void flushBadConnections();
 
-    struct Connection
-    {
-        FdSink to;
-        FdSource from;
-        unsigned int daemonVersion;
-        std::optional<TrustedFlag> remoteTrustsUs;
-        std::optional<std::string> daemonNixVersion;
-        std::chrono::time_point<std::chrono::steady_clock> startTime;
-
-        virtual ~Connection();
-
-        virtual void closeWrite() = 0;
-
-        std::exception_ptr processStderr(Sink * sink = 0, Source * source = 0, bool flush = true);
-    };
+    struct Connection;
 
     ref<Connection> openConnectionWrapper();
 
@@ -196,11 +178,13 @@ protected:
 
     void setOptions() override;
 
+    struct ConnectionHandle;
+
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
 
-    virtual ref<FSAccessor> getFSAccessor() override;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 
@@ -212,6 +196,5 @@ private:
         const std::vector<DerivedPath> & paths,
         std::shared_ptr<Store> evalStore);
 };
-
 
 }

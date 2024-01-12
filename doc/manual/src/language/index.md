@@ -83,7 +83,8 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A multi-line string. Strips common prefixed whitespace. Evaluates to `"multi\n line\n  string"`.
+   <!-- FIXME: using two no-break spaces, because apparently mdBook swallows the second regular space! -->
+   A multi-line string. Strips common prefixed whitespace. Evaluates to `"multi\n line\n  string"`.
 
   </td>
  </tr>

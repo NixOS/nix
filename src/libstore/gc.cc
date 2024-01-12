@@ -1,8 +1,14 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
-#include "local-fs-store.hh"
 #include "finally.hh"
+#include "unix-domain-socket.hh"
+#include "signals.hh"
+
+#if !defined(__linux__)
+// For shelling out to lsof
+# include "processes.hh"
+#endif
 
 #include <functional>
 #include <queue>
@@ -44,13 +50,13 @@ static void makeSymlink(const Path & link, const Path & target)
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    std::string hash = hashString(htSHA1, path).to_string(Base32, false);
+    std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
 
 
-Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
+Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
     Path gcRoot(canonPath(_gcRoot));
 
@@ -110,6 +116,11 @@ void LocalStore::createTempRootsFile()
 
 void LocalStore::addTempRoot(const StorePath & path)
 {
+    if (readOnly) {
+      debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
+      return;
+    }
+
     createTempRootsFile();
 
     /* Open/create the global GC lock file. */
@@ -141,7 +152,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                 /* The garbage collector may have exited or not
                    created the socket yet, so we need to restart. */
                 if (e.errNo == ECONNREFUSED || e.errNo == ENOENT) {
-                    debug("GC socket connection refused: %s", e.msg())
+                    debug("GC socket connection refused: %s", e.msg());
                     fdRootsSocket->close();
                     goto restart;
                 }
@@ -319,9 +330,7 @@ typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots
 
 static void readProcLink(const std::string & file, UncheckedRoots & roots)
 {
-    /* 64 is the starting buffer size gnu readlink uses... */
-    auto bufsiz = ssize_t{64};
-try_again:
+    constexpr auto bufsiz = PATH_MAX;
     char buf[bufsiz];
     auto res = readlink(file.c_str(), buf, bufsiz);
     if (res == -1) {
@@ -330,10 +339,7 @@ try_again:
         throw SysError("reading symlink");
     }
     if (res == bufsiz) {
-        if (SSIZE_MAX / 2 < bufsiz)
-            throw Error("stupidly long symlink");
-        bufsiz *= 2;
-        goto try_again;
+        throw Error("overly long symlink starting with '%1%'", std::string_view(buf, bufsiz));
     }
     if (res > 0 && buf[0] == '/')
         roots[std::string(static_cast<char *>(buf), res)]
@@ -568,7 +574,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     /* On macOS, accepted sockets inherit the
                        non-blocking flag from the server socket, so
                        explicitly make it blocking. */
-                    if (fcntl(fdServer.get(), F_SETFL, fcntl(fdServer.get(), F_GETFL) & ~O_NONBLOCK) == -1)
+                    if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
                         abort();
 
                     while (true) {
@@ -777,7 +783,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    /* Synchronisation point for testing, see tests/gc-non-blocking.sh. */
+    /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
     if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
         readFile(*p);
 

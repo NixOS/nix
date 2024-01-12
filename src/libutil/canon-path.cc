@@ -1,5 +1,5 @@
 #include "canon-path.hh"
-#include "util.hh"
+#include "file-system.hh"
 
 namespace nix {
 
@@ -12,6 +12,13 @@ CanonPath::CanonPath(std::string_view raw)
 CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
     : path(absPath((Path) raw, root.abs()))
 { }
+
+CanonPath::CanonPath(const std::vector<std::string> & elems)
+    : path("/")
+{
+    for (auto & s : elems)
+        push(s);
+}
 
 CanonPath CanonPath::fromCwd(std::string_view path)
 {
