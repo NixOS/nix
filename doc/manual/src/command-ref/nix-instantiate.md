@@ -179,12 +179,7 @@ $ nix-instantiate --eval --xml --expr '{ x = {}; }'
     </attr>
   </attrs>
 </expr>
-```
 
-Note that `y` is left unevaluated (the XML representation doesn’t
-attempt to show non-normal forms).
-
-```console
 $ nix-instantiate --eval --xml --strict --expr '{ x = {}; }'
 <?xml version='1.0' encoding='utf-8'?>
 <expr>
