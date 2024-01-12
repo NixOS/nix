@@ -701,7 +701,8 @@ struct GitExportIgnoreInputAccessor : FilteringInputAccessor {
         }
     }
 
-    bool isExportIgnored(const CanonPath & path) {
+    bool isExportIgnored(const CanonPath & path)
+    {
         const char *exportIgnoreEntry = nullptr;
 
         // GIT_ATTR_CHECK_INDEX_ONLY:
@@ -721,7 +722,8 @@ struct GitExportIgnoreInputAccessor : FilteringInputAccessor {
         }
     }
 
-    bool isAllowed(const CanonPath & path) override {
+    bool isAllowed(const CanonPath & path) override
+    {
         return !isExportIgnored(path);
     }
 
