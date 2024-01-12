@@ -385,6 +385,7 @@ public:
     void allowExecute(bool allow);
 
     friend class AccessControlList;
+    friend class Native::AccessControlList;
 
 private:
     /**
@@ -425,6 +426,11 @@ public:
      * Throws a SysError on failure.
      */
     void set(std::filesystem::path file);
+
+private:
+#ifndef __APPLE__
+    Permissions calculateMask(Native::AccessControlList acl);
+#endif
 };
 
 }

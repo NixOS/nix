@@ -367,6 +367,18 @@ std::string printTag(Tag tag)
     }, tag);
 }
 
+#ifndef __APPLE__
+Permissions AccessControlList::calculateMask(Native::AccessControlList acl)
+{
+    std::set<Native::Permission> all;
+    for (auto [tag, perms] : acl) {
+        if (std::get_if<User>(&tag) || std::get_if<Group>(&tag) || std::get_if<Native::GroupObj>(&tag) || std::get_if<Native::Other>(&tag)) {
+             all.insert(perms.begin(), perms.end());
+        }
+    }
+    return all;
+}
+#endif
 
 AccessControlList::AccessControlList(std::filesystem::path p)
 {
@@ -396,7 +408,7 @@ void AccessControlList::set(std::filesystem::path p)
     native[GroupObj {}] = current[GroupObj {}];
     native[Other {}] = current[Other {}];
     if (!empty())
-        native[Mask {}] = {Permission::Read, Permission::Write, Permission::Execute};
+        native[Mask {}] = calculateMask(native);
     if (current == native) return;
 #endif
     native.set(p);
