@@ -660,12 +660,12 @@ struct GitInputAccessor : InputAccessor
     }
 };
 
-struct GitExportIgnoreInputAccessor : FilteringInputAccessor {
+struct GitExportIgnoreInputAccessor : CachingFilteringInputAccessor {
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 
     GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<InputAccessor> next, std::optional<Hash> rev)
-        : FilteringInputAccessor(next, [&](const CanonPath & path) {
+        : CachingFilteringInputAccessor(next, [&](const CanonPath & path) {
             return RestrictedPathError(fmt("'%s' does not exist because it was fetched with exportIgnore enabled", path));
         })
         , repo(repo)
@@ -722,7 +722,7 @@ struct GitExportIgnoreInputAccessor : FilteringInputAccessor {
         }
     }
 
-    bool isAllowed(const CanonPath & path) override
+    bool isAllowedUncached(const CanonPath & path) override
     {
         return !isExportIgnored(path);
     }
