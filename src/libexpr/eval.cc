@@ -1388,7 +1388,9 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     for (auto & attr : *vAttrs->attrs)
                         allAttrNames.insert(state.symbols[attr.name]);
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
-                    state.error("attribute '%1%' missing", state.symbols[name])
+                    state.error("attribute '%1%' missing: %2%",
+                                state.symbols[name],
+                                ValuePrinter(state, *vAttrs, debugPrintOptions))
                         .atPos(pos).withSuggestions(suggestions).withFrame(env, *this).debugThrow<EvalError>();
                 }
             }

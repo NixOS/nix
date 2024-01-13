@@ -1,5 +1,6 @@
 #include "command.hh"
 #include "common-args.hh"
+#include "print.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "filetransfer.hh"
@@ -215,7 +216,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             /* Extract the URL. */
             auto * attr = v.attrs->get(state->symbols.create("urls"));
             if (!attr)
-                throw Error("attribute 'urls' missing");
+                throw Error("attribute 'urls' missing: %s", ValuePrinter(*state, v, debugPrintOptions));
             state->forceList(*attr->value, noPos, "while evaluating the urls to prefetch");
             if (attr->value->listSize() < 1)
                 throw Error("'urls' list is empty");

@@ -1,4 +1,5 @@
 #include "primops.hh"
+#include "print.hh"
 #include "store-api.hh"
 #include "realisation.hh"
 #include "make-content-addressed.hh"
@@ -160,7 +161,9 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
     if (!fromPath)
         throw Error({
-            .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath"),
+            .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure': %s",
+                           "fromPath",
+                           ValuePrinter(state, *args[0], debugPrintOptions)),
             .errPos = state.positions[pos]
         });
 
@@ -178,7 +181,9 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
     if (!fromStoreUrl)
         throw Error({
-            .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore"),
+            .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'",
+                           "fromStore",
+                           ValuePrinter(state, *args[0], debugPrintOptions)),
             .errPos = state.positions[pos]
         });
 

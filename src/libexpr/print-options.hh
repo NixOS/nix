@@ -49,4 +49,18 @@ struct PrintOptions
     size_t maxStringLength = std::numeric_limits<size_t>::max();
 };
 
+/**
+ * `PrintOptions` suitable for debugging.
+ *
+ * These options are used for printing values in error messages without
+ * printing "too much" output.
+ */
+static PrintOptions debugPrintOptions = PrintOptions {
+    .ansiColors = true,
+    .maxDepth = 10,
+    .maxAttrs = 10,
+    .maxListItems = 10,
+    .maxStringLength = 1024
+};
+
 }
