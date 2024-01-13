@@ -1,5 +1,6 @@
 #include "environment-variables.hh"
 #include "file-system.hh"
+#include "file-path-impl.hh"
 #include "signals.hh"
 #include "finally.hh"
 #include "serialise.hh"
@@ -21,11 +22,18 @@ namespace fs = std::filesystem;
 
 namespace nix {
 
+/** Treat the string as possibly an absolute path, by inspecting the start of it. Return whether it was probably intended to be absolute. */
+static bool isAbsolute(PathView path)
+{
+    return !path.empty() && path[0] == '/';
+}
+
+
 Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
 {
     std::string scratch;
 
-    if (path.empty() || path[0] != '/') {
+    if (!isAbsolute(path)) {
         // In this case we need to call `canonPath` on a newly-created
         // string. We set `scratch` to that string first, and then set
         // `path` to `scratch`. This ensures the newly-created string
@@ -58,69 +66,39 @@ Path canonPath(PathView path, bool resolveSymlinks)
 {
     assert(path != "");
 
-    std::string s;
-    s.reserve(256);
-
-    if (path[0] != '/')
+    if (!isAbsolute(path))
         throw Error("not an absolute path: '%1%'", path);
 
+    /* This just exists because we cannot set the target of `remaining`
+       (the callback parameter) directly to a newly-constructed string,
+       since it is `std::string_view`. */
     std::string temp;
 
     /* Count the number of times we follow a symlink and stop at some
        arbitrary (but high) limit to prevent infinite loops. */
     unsigned int followCount = 0, maxFollow = 1024;
 
-    while (1) {
-
-        /* Skip slashes. */
-        while (!path.empty() && path[0] == '/') path.remove_prefix(1);
-        if (path.empty()) break;
-
-        /* Ignore `.'. */
-        if (path == "." || path.substr(0, 2) == "./")
-            path.remove_prefix(1);
-
-        /* If `..', delete the last component. */
-        else if (path == ".." || path.substr(0, 3) == "../")
-        {
-            if (!s.empty()) s.erase(s.rfind('/'));
-            path.remove_prefix(2);
-        }
-
-        /* Normal component; copy it. */
-        else {
-            s += '/';
-            if (const auto slash = path.find('/'); slash == path.npos) {
-                s += path;
-                path = {};
-            } else {
-                s += path.substr(0, slash);
-                path = path.substr(slash);
-            }
-
-            /* If s points to a symlink, resolve it and continue from there */
-            if (resolveSymlinks && isLink(s)) {
+    return canonPathInner(
+        path,
+        [&followCount, &temp, maxFollow, resolveSymlinks]
+        (std::string & result, std::string_view & remaining) {
+            if (resolveSymlinks && isLink(result)) {
                 if (++followCount >= maxFollow)
-                    throw Error("infinite symlink recursion in path '%1%'", path);
-                temp = concatStrings(readLink(s), path);
-                path = temp;
-                if (!temp.empty() && temp[0] == '/') {
-                    s.clear();  /* restart for symlinks pointing to absolute path */
+                    throw Error("infinite symlink recursion in path '%0%'", remaining);
+                remaining = (temp = concatStrings(readLink(result), remaining));
+                if (isAbsolute(remaining)) {
+                    /* restart for symlinks pointing to absolute path */
+                    result.clear();
                 } else {
-                    s = dirOf(s);
-                    if (s == "/") {  // we don’t want trailing slashes here, which dirOf only produces if s = /
-                        s.clear();
+                    result = dirOf(result);
+                    if (result == "/") {
+                        /* we don’t want trailing slashes here, which `dirOf`
+                           only produces if `result = /` */
+                        result.clear();
                     }
                 }
             }
-        }
-    }
-
-    if (s.empty()) {
-        s = "/";
-    }
-
-    return s;
+        });
 }
 
 
