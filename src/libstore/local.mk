@@ -43,17 +43,28 @@ ifdef HOST_WINDOWS
   INCLUDE_libstore += -I $(d)/windows
 endif
 
+ifdef HOST_WINDOWS
+NIX_ROOT = N:\\\\
+else
+NIX_ROOT =
+endif
+
+# Prefix all but `NIX_STORE_DIR`, since we aren't doing a local store
+# yet so a "logical" store dir that is the same as unix is prefered.
+#
+# Also, it keeps the unit tests working.
+
 libstore_CXXFLAGS += \
  $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libstore) \
- -DNIX_PREFIX=\"$(prefix)\" \
+ -DNIX_PREFIX=\"$(NIX_ROOT)$(prefix)\" \
  -DNIX_STORE_DIR=\"$(storedir)\" \
- -DNIX_DATA_DIR=\"$(datadir)\" \
- -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
- -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
- -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
- -DNIX_BIN_DIR=\"$(bindir)\" \
- -DNIX_MAN_DIR=\"$(mandir)\" \
- -DLSOF=\"$(lsof)\"
+ -DNIX_DATA_DIR=\"$(NIX_ROOT)$(datadir)\" \
+ -DNIX_STATE_DIR=\"$(NIX_ROOT)$(localstatedir)/nix\" \
+ -DNIX_LOG_DIR=\"$(NIX_ROOT)$(localstatedir)/log/nix\" \
+ -DNIX_CONF_DIR=\"$(NIX_ROOT)$(sysconfdir)/nix\" \
+ -DNIX_BIN_DIR=\"$(NIX_ROOT)$(bindir)\" \
+ -DNIX_MAN_DIR=\"$(NIX_ROOT)$(mandir)\" \
+ -DLSOF=\"$(NIX_ROOT)$(lsof)\"
 
 ifeq ($(embedded_sandbox_shell),yes)
 libstore_CXXFLAGS += -DSANDBOX_SHELL=\"__embedded_sandbox_shell__\"
