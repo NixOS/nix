@@ -167,12 +167,13 @@
 
 - [Nix expression]{#gloss-nix-expression}
 
-  A high-level description of software packages and compositions
-  thereof. Deploying software using Nix entails writing Nix
-  expressions for your packages. Nix expressions specify [derivations][derivation],
-  which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
-  These derivations can then be [realised][realise] to produce
-  [outputs][output].
+  1. Commonly, a high-level description of software packages and compositions
+    thereof. Deploying software using Nix entails writing Nix
+    expressions for your packages. Nix expressions specify [derivations][derivation],
+    which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
+    These derivations can then be [realised][realise] to produce [outputs][output].
+
+  2. A syntactically valid use of the [Nix language]. For example, the contents of a `.nix` file form an expression.
 
 - [reference]{#gloss-reference}
 
@@ -287,3 +288,6 @@
   These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
 
   See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/contributing/experimental-features.md).
+
+
+[Nix language]: ./language/index.md
