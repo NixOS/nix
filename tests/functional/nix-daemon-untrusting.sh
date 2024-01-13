@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec nix daemon --force-untrusted "$@"
+exec nix-daemon --force-untrusted "$@"
