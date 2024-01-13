@@ -449,7 +449,7 @@ void Worker::waitForInput()
                 } else {
                     printMsg(lvlVomit, "%1%: read %2% bytes",
                         goal->getName(), rd);
-                    std::string data((char *) buffer.data(), rd);
+                    std::string_view data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
                 }
