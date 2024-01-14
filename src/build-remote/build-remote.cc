@@ -111,6 +111,13 @@ static int main_build_remote(int argc, char * * argv)
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
+
+            std::string drvstr;
+            if (drvPath.has_value())
+                drvstr = drvPath->to_string();
+            else
+                drvstr = "<unknown>";
+
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
             /* It would be possible to build locally after some builds clear out,
@@ -137,14 +144,19 @@ static int main_build_remote(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
-                    if (m.enabled
-                        && (neededSystem == "builtin"
-                            || std::find(m.systemTypes.begin(),
-                                m.systemTypes.end(),
-                                neededSystem) != m.systemTypes.end()) &&
-                        m.allSupported(requiredFeatures) &&
-                        m.mandatoryMet(requiredFeatures))
-                    {
+                    if (!m.enabled) {
+                        debug("declined remote machine '%s' because it is disabled", storeUri);
+                    } else if (neededSystem != "builtin" &&
+                        std::find(m.systemTypes.begin(), m.systemTypes.end(), neededSystem)
+                        == m.systemTypes.end()) {
+                        debug("declined remote machine '%s' for building '%s' because it does not have the needed system type '%s", m.storeUri, drvstr, neededSystem);
+                    } else if (!m.allSupported(requiredFeatures)) {
+                        std::string joinedFeatures = concatStringsSep(" ", requiredFeatures); // includes leading space
+                        debug("declined remote machine '%s' for building '%s' because it does not have all required features: [ %s ]", m.storeUri, drvstr, joinedFeatures);
+                    } else if (!m.mandatoryMet(requiredFeatures)) {
+                        std::string joinedFeatures = concatStringsSep(" ", requiredFeatures); // includes leading space
+                        debug("declined remote machine '%s' for building '%s' because the derivation does not have all mandatory features to build on that machine: [ %s ]", m.storeUri, drvstr, joinedFeatures);
+                    } else {
                         rightType = true;
                         AutoCloseFD free;
                         uint64_t load = 0;
@@ -199,12 +211,6 @@ static int main_build_remote(int argc, char * * argv)
                             errorText += "\n([%s], %s, [%s], [%s])";
 
                         // add the template values.
-                        std::string drvstr;
-                        if (drvPath.has_value())
-                            drvstr = drvPath->to_string();
-                        else
-                            drvstr = "<unknown>";
-
                         auto error = hintformat(errorText);
                         error
                             % drvstr
