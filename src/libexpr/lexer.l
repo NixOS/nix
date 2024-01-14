@@ -130,7 +130,7 @@ else        { return ELSE; }
 assert      { return ASSERT; }
 with        { return WITH; }
 let         { return LET; }
-in          { return IN; }
+in          { return IN_KW; }
 rec         { return REC; }
 inherit     { return INHERIT; }
 or          { return OR_KW; }
@@ -156,7 +156,7 @@ or          { return OR_KW; }
                       .errPos = data->state.positions[CUR_POS],
                   });
               }
-              return INT;
+              return INT_LIT;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
@@ -165,7 +165,7 @@ or          { return OR_KW; }
                       .msg = hintfmt("invalid float '%1%'", yytext),
                       .errPos = data->state.positions[CUR_POS],
                   });
-              return FLOAT;
+              return FLOAT_LIT;
             }
 
 \$\{        { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
