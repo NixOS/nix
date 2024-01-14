@@ -44,6 +44,67 @@ struct UnixPathTrait
 
 
 /**
+ * Windows-style path primitives.
+ *
+ * The character type is a parameter because while windows paths rightly
+ * work over UTF-16 (*) using `wchar_t`, at the current time we are
+ * often manipulating them converted to UTF-8 (*) using `char`.
+ *
+ * (Actually neither are guaranteed to be valid unicode; both are
+ * arbitrary non-0 8- or 16-bit bytes. But for charcters with specifical
+ * meaning like '/', '\\', ':', etc., we refer to an encoding scheme,
+ * and also for sake of UIs that display paths a text.)
+ */
+template<class CharT0>
+struct WindowsPathTrait
+{
+    using CharT = CharT0;
+
+    using String = std::basic_string<CharT>;
+
+    using StringView = std::basic_string_view<CharT>;
+
+    constexpr static CharT preferredSep = '\\';
+
+    static inline bool isPathSep(CharT c)
+    {
+        return c == '/' || c == preferredSep;
+    }
+
+    static size_t findPathSep(StringView path, size_t from = 0)
+    {
+        size_t p1 = path.find('/', from);
+        size_t p2 = path.find(preferredSep, from);
+        return p1 == String::npos ? p2 :
+               p2 == String::npos ? p1 :
+               std::min(p1, p2);
+    }
+
+    static size_t rfindPathSep(StringView path, size_t from = String::npos)
+    {
+        size_t p1 = path.rfind('/', from);
+        size_t p2 = path.rfind(preferredSep, from);
+        return p1 == String::npos ? p2 :
+               p2 == String::npos ? p1 :
+               std::max(p1, p2);
+    }
+};
+
+
+/**
+ * @todo Revisit choice of `char` or `wchar_t` for `WindowsPathTrait`
+ * argument.
+ */
+using NativePathTrait =
+#ifdef _WIN32
+    WindowsPathTrait<char>
+#else
+    UnixPathTrait
+#endif
+    ;
+
+
+/**
  * Core pure path canonicalization algorithm.
  *
  * @param hookComponent

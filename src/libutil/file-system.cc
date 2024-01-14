@@ -22,10 +22,14 @@ namespace fs = std::filesystem;
 
 namespace nix {
 
-/** Treat the string as possibly an absolute path, by inspecting the start of it. Return whether it was probably intended to be absolute. */
+/**
+ * Treat the string as possibly an absolute path, by inspecting the
+ * start of it. Return whether it was probably intended to be
+ * absolute.
+ */
 static bool isAbsolute(PathView path)
 {
-    return !path.empty() && path[0] == '/';
+    return fs::path { path }.is_absolute();
 }
 
 
@@ -69,6 +73,9 @@ Path canonPath(PathView path, bool resolveSymlinks)
     if (!isAbsolute(path))
         throw Error("not an absolute path: '%1%'", path);
 
+    // For Windows
+    auto rootName = fs::path { path }.root_name();
+
     /* This just exists because we cannot set the target of `remaining`
        (the callback parameter) directly to a newly-constructed string,
        since it is `std::string_view`. */
@@ -78,7 +85,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
        arbitrary (but high) limit to prevent infinite loops. */
     unsigned int followCount = 0, maxFollow = 1024;
 
-    return canonPathInner<UnixPathTrait>(
+    auto ret = canonPathInner<NativePathTrait>(
         path,
         [&followCount, &temp, maxFollow, resolveSymlinks]
         (std::string & result, std::string_view & remaining) {
@@ -99,6 +106,10 @@ Path canonPath(PathView path, bool resolveSymlinks)
                 }
             }
         });
+
+    if (!rootName.empty())
+        ret = rootName.string() + std::move(ret);
+    return ret;
 }
 
 

@@ -9,6 +9,14 @@
 
 #include <numeric>
 
+#ifdef _WIN32
+# define FS_SEP "\\"
+# define FS_ROOT "C:" FS_SEP // Need a mounted one, C drive is likely
+#else
+# define FS_SEP "/"
+# define FS_ROOT FS_SEP
+#endif
+
 namespace nix {
 
 /* ----------- tests for util.hh ------------------------------------------------*/
@@ -18,9 +26,9 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(absPath, doesntChangeRoot) {
-        auto p = absPath("/");
+        auto p = absPath(FS_ROOT);
 
-        ASSERT_EQ(p, "/");
+        ASSERT_EQ(p, FS_ROOT);
     }
 
 
@@ -53,11 +61,11 @@ namespace nix {
 
 
     TEST(absPath, pathIsCanonicalised) {
-        auto path = "/some/path/with/trailing/dot/.";
+        auto path = FS_ROOT "some/path/with/trailing/dot/.";
         auto p1 = absPath(path);
         auto p2 = absPath(p1);
 
-        ASSERT_EQ(p1, "/some/path/with/trailing/dot");
+        ASSERT_EQ(p1, FS_ROOT "some" FS_SEP "path" FS_SEP "with" FS_SEP "trailing" FS_SEP "dot");
         ASSERT_EQ(p1, p2);
     }
 
@@ -66,24 +74,24 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(canonPath, removesTrailingSlashes) {
-        auto path = "/this/is/a/path//";
+        auto path = FS_ROOT "this/is/a/path//";
         auto p = canonPath(path);
 
-        ASSERT_EQ(p, "/this/is/a/path");
+        ASSERT_EQ(p, FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path");
     }
 
     TEST(canonPath, removesDots) {
-        auto path = "/this/./is/a/path/./";
+        auto path = FS_ROOT "this/./is/a/path/./";
         auto p = canonPath(path);
 
-        ASSERT_EQ(p, "/this/is/a/path");
+        ASSERT_EQ(p, FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path");
     }
 
     TEST(canonPath, removesDots2) {
-        auto path = "/this/a/../is/a////path/foo/..";
+        auto path = FS_ROOT "this/a/../is/a////path/foo/..";
         auto p = canonPath(path);
 
-        ASSERT_EQ(p, "/this/is/a/path");
+        ASSERT_EQ(p, FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path");
     }
 
     TEST(canonPath, requiresAbsolutePath) {
@@ -197,7 +205,7 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(pathExists, rootExists) {
-        ASSERT_TRUE(pathExists("/"));
+        ASSERT_TRUE(pathExists(FS_ROOT));
     }
 
     TEST(pathExists, cwdExists) {
