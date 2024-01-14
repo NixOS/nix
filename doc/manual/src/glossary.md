@@ -22,6 +22,30 @@
 
   [store derivation]: #gloss-store-derivation
 
+- [store derivation output reference]{#gloss-store-derivation-output-reference}
+
+  The string resulting from the concatenation of:
+
+  - The path to a [store derivation](#gloss-store-derivation)
+  - The character `^`
+  - Either:
+    - one of the store derivation's [output names](#gloss-output-name) or
+    - the character `*` denoting all outputs of the derivation
+
+  > **Example**
+  >
+  > Reference to all outputs of a given `stdenv-linux` derivation:
+  >
+  > `/nix/store/xvni94ndxy75v1wdpshk8k0l75nwyc54-stdenv-linux.drv^*`
+
+  > **Example**
+  >
+  > Reference to the `man` output of a given `bash-5.2-p15` derivation:
+  >
+  > `/nix/store/llil5bng8p7203l25mqb5lwdhlaya4d9-bash-5.2-p15.drv^man`
+
+  [store derivation output reference]: #gloss-store-derivation-output-reference
+
 - [instantiate]{#gloss-instantiate}, instantiation
 
   Save an evaluated [derivation] as a [store derivation] in the Nix [store].
@@ -213,6 +237,11 @@
   See [the `outputs` argument to the `derivation` function](@docroot@/language/derivations.md#attr-outputs) for details.
 
   [output]: #gloss-output
+
+- [output name]{#gloss-output-name}
+
+  A string identifier, such as `out` or `man`, given to each output of a derivation.
+  See [the `outputs` argument to the `derivation` function](@docroot@/language/derivations.md#attr-outputs) for details; the `outputs` argument is a list and each element of this list is an output name.
 
 - [output path]{#gloss-output-path}
 

@@ -59,6 +59,7 @@ These are command line arguments that represent something that can be realised i
 The following types of installable are supported by most commands:
 
 - [Flake output attribute](#flake-output-attribute) (experimental)
+- [Store derivation output reference](@docroot@/glossary.md#gloss-store-derivation-output-reference)
 - [Store path](#store-path)
 - [Nix file](#nix-file), optionally qualified by an attribute path
 - [Nix expression](#nix-expression), optionally qualified by an attribute path
