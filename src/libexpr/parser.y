@@ -18,6 +18,7 @@
 
 #include <variant>
 
+#include "finally.hh"
 #include "util.hh"
 #include "users.hh"
 
@@ -60,7 +61,6 @@ namespace nix {
         Expr * result;
         SourcePath basePath;
         PosTable::Origin origin;
-        std::optional<ErrorInfo> error;
     };
 
 }
@@ -315,10 +315,10 @@ static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
-    data->error = {
+    throw ParseError({
         .msg = hintfmt(error),
         .errPos = data->state.positions[makeCurPos(*loc, data)]
-    };
+    });
 }
 
 
@@ -689,11 +689,10 @@ Expr * EvalState::parse(
     };
 
     yylex_init(&scanner);
-    yy_scan_buffer(text, length, scanner);
-    int res = yyparse(scanner, &data);
-    yylex_destroy(scanner);
+    Finally _destroy([&] { yylex_destroy(scanner); });
 
-    if (res) throw ParseError(data.error.value());
+    yy_scan_buffer(text, length, scanner);
+    yyparse(scanner, &data);
 
     data.result->bindVars(*this, staticEnv);
 
