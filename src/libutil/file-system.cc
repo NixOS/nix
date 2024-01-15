@@ -21,9 +21,16 @@ namespace fs = std::filesystem;
 
 namespace nix {
 
-Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
+Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
 {
+    std::string scratch;
+
     if (path[0] != '/') {
+        // In this case we need to call `canonPath` on a newly-created
+        // string. We set `scratch` to that string first, and then set
+        // `path` to `scratch`. This ensures the newly-created string
+        // lives long enough for the call to `canonPath`, and allows us
+        // to just accept a `std::string_view`.
         if (!dir) {
 #ifdef __GNU__
             /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
@@ -35,12 +42,13 @@ Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
             if (!getcwd(buf, sizeof(buf)))
 #endif
                 throw SysError("cannot get cwd");
-            path = concatStrings(buf, "/", path);
+            scratch = concatStrings(buf, "/", path);
 #ifdef __GNU__
             free(buf);
 #endif
         } else
-            path = concatStrings(*dir, "/", path);
+            scratch = concatStrings(*dir, "/", path);
+        path = scratch;
     }
     return canonPath(path, resolveSymlinks);
 }
