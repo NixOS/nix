@@ -49,7 +49,7 @@ struct ParserState {
     Formals * validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos,
         std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
-    PosIdx makeCurPos(const ParserLocation & loc);
+    PosIdx at(const ParserLocation & loc);
 };
 
 inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
@@ -254,7 +254,7 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
     return new ExprConcatStrings(pos, true, es2);
 }
 
-inline PosIdx ParserState::makeCurPos(const ParserLocation & loc)
+inline PosIdx ParserState::at(const ParserLocation & loc)
 {
     return state.positions.add(origin, loc.first_line, loc.first_column);
 }

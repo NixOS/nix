@@ -45,14 +45,14 @@ YY_DECL;
 
 using namespace nix;
 
-#define CUR_POS state->makeCurPos(*yylocp)
+#define CUR_POS state->at(*yylocp)
 
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
 {
     throw ParseError({
         .msg = hintfmt(error),
-        .errPos = state->state.positions[state->makeCurPos(*loc)]
+        .errPos = state->state.positions[state->at(*loc)]
     });
 }
 
@@ -158,21 +158,21 @@ expr_op
   | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(state->symbols.create("__sub")), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprCall(state->makeCurPos(@2), new ExprVar(state->symbols.create("__lessThan")), {$1, $3}); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(state->makeCurPos(@2), new ExprVar(state->symbols.create("__lessThan")), {$3, $1})); }
-  | expr_op '>' expr_op { $$ = new ExprCall(state->makeCurPos(@2), new ExprVar(state->symbols.create("__lessThan")), {$3, $1}); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(state->makeCurPos(@2), new ExprVar(state->symbols.create("__lessThan")), {$1, $3})); }
-  | expr_op AND expr_op { $$ = new ExprOpAnd(state->makeCurPos(@2), $1, $3); }
-  | expr_op OR expr_op { $$ = new ExprOpOr(state->makeCurPos(@2), $1, $3); }
-  | expr_op IMPL expr_op { $$ = new ExprOpImpl(state->makeCurPos(@2), $1, $3); }
-  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->makeCurPos(@2), $1, $3); }
+  | expr_op '<' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->symbols.create("__lessThan")), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(state->at(@2), new ExprVar(state->symbols.create("__lessThan")), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->symbols.create("__lessThan")), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(state->at(@2), new ExprVar(state->symbols.create("__lessThan")), {$1, $3})); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd(state->at(@2), $1, $3); }
+  | expr_op OR expr_op { $$ = new ExprOpOr(state->at(@2), $1, $3); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl(state->at(@2), $1, $3); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->at(@2), $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(state->makeCurPos(@2), false, new std::vector<std::pair<PosIdx, Expr *> >({{state->makeCurPos(@1), $1}, {state->makeCurPos(@3), $3}})); }
-  | expr_op '-' expr_op { $$ = new ExprCall(state->makeCurPos(@2), new ExprVar(state->symbols.create("__sub")), {$1, $3}); }
-  | expr_op '*' expr_op { $$ = new ExprCall(state->makeCurPos(@2), new ExprVar(state->symbols.create("__mul")), {$1, $3}); }
-  | expr_op '/' expr_op { $$ = new ExprCall(state->makeCurPos(@2), new ExprVar(state->symbols.create("__div")), {$1, $3}); }
-  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(state->makeCurPos(@2), $1, $3); }
+    { $$ = new ExprConcatStrings(state->at(@2), false, new std::vector<std::pair<PosIdx, Expr *> >({{state->at(@1), $1}, {state->at(@3), $3}})); }
+  | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->symbols.create("__sub")), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->symbols.create("__mul")), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->symbols.create("__div")), {$1, $3}); }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(state->at(@2), $1, $3); }
   | expr_app
   ;
 
@@ -216,7 +216,7 @@ expr_simple
   }
   | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
-      $2->insert($2->begin(), {state->makeCurPos(@1), $1});
+      $2->insert($2->begin(), {state->at(@1), $1});
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
@@ -255,13 +255,13 @@ string_parts
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $1->emplace_back(state->makeCurPos(@2), new ExprString(std::string($2))); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->makeCurPos(@2), $3); }
-  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(state->makeCurPos(@1), $2); }
+  { $$ = $1; $1->emplace_back(state->at(@2), new ExprString(std::string($2))); }
+  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), $3); }
+  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(state->at(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new std::vector<std::pair<PosIdx, Expr *>>;
-      $$->emplace_back(state->makeCurPos(@1), new ExprString(std::string($1)));
-      $$->emplace_back(state->makeCurPos(@2), $3);
+      $$->emplace_back(state->at(@1), new ExprString(std::string($1)));
+      $$->emplace_back(state->at(@2), $3);
     }
   ;
 
@@ -286,19 +286,19 @@ path_start
   ;
 
 ind_string_parts
-  : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(state->makeCurPos(@2), $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->makeCurPos(@2), $3); }
+  : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(state->at(@2), $2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), $3); }
   | { $$ = new std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>; }
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; state->addAttr($$, std::move(*$2), $4, state->makeCurPos(@2)); delete $2; }
+  : binds attrpath '=' expr ';' { $$ = $1; state->addAttr($$, std::move(*$2), $4, state->at(@2)); delete $2; }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & i : *$3) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, state->makeCurPos(@3), $$->attrs[i.symbol].pos);
-          auto pos = state->makeCurPos(@3);
+              state->dupAttr(i.symbol, state->at(@3), $$->attrs[i.symbol].pos);
+          auto pos = state->at(@3);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
       delete $3;
@@ -308,12 +308,12 @@ binds
       /* !!! Should ensure sharing of the expression in $4. */
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, state->makeCurPos(@6), $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), state->makeCurPos(@6)));
+              state->dupAttr(i.symbol, state->at(@6), $$->attrs[i.symbol].pos);
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), state->at(@6)));
       }
       delete $6;
     }
-  | { $$ = new ExprAttrs(state->makeCurPos(@0)); }
+  | { $$ = new ExprAttrs(state->at(@0)); }
   ;
 
 attrs
@@ -327,7 +327,7 @@ attrs
       } else
           throw ParseError({
               .msg = hintfmt("dynamic attributes not allowed in inherit"),
-              .errPos = state->state.positions[state->makeCurPos(@2)]
+              .errPos = state->state.positions[state->at(@2)]
           });
     }
   | { $$ = new AttrPath; }
