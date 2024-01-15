@@ -156,6 +156,11 @@
   builder can rely on external inputs such as the network or the
   system time) but the Nix model assumes it.
 
+- [impure derivation]{#gloss-impure-derivation}
+
+  [An experimental feature](#@docroot@/contributing/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
+  so that they are always rebuilt, and their outputs not reused by subsequent calls to realise them.
+
 - [Nix database]{#gloss-nix-database}
 
   An SQlite database to track [reference]s between [store object]s.
