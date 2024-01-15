@@ -51,24 +51,19 @@ TEST_F(nix_api_expr_test, nix_expr_eval_drv)
 {
     auto expr = R"(derivation { name = "myname"; builder = "mybuilder"; system = "mysystem"; })";
     nix_expr_eval_from_string(nullptr, state, expr, ".", value);
-    nix_value_force(nullptr, state, value);
-
     ASSERT_EQ(NIX_TYPE_ATTRS, nix_get_type(nullptr, value));
 
-    auto stateFn = nix_state_create(nullptr, nullptr, store);
-    auto valueFn = nix_alloc_value(nullptr, state);
+    EvalState * stateFn = nix_state_create(nullptr, nullptr, store);
+    Value * valueFn = nix_alloc_value(nullptr, state);
     nix_expr_eval_from_string(nullptr, stateFn, "builtins.toString", ".", valueFn);
-
     ASSERT_EQ(NIX_TYPE_FUNCTION, nix_get_type(nullptr, valueFn));
 
-    auto stateResult = nix_state_create(nullptr, nullptr, store);
-    auto valueResult = nix_alloc_value(nullptr, stateResult);
-
+    EvalState * stateResult = nix_state_create(nullptr, nullptr, store);
+    Value * valueResult = nix_alloc_value(nullptr, stateResult);
     nix_value_call(ctx, stateResult, valueFn, value, valueResult);
-    nix_value_force(nullptr, stateResult, valueResult);
+    ASSERT_EQ(NIX_TYPE_STRING, nix_get_type(nullptr, valueResult));
 
-    auto p = nix_get_string(nullptr, valueResult);
-
+    const char * p = nix_get_string(nullptr, valueResult);
     ASSERT_STREQ("/nix/store/40s0qmrfb45vlh6610rk29ym318dswdr-myname", p);
 
     // Clean up
@@ -79,4 +74,34 @@ TEST_F(nix_api_expr_test, nix_expr_eval_drv)
     nix_state_free(stateResult);
 }
 
+TEST_F(nix_api_expr_test, nix_build_drv)
+{
+    auto expr = R"(derivation { name = "myname";
+                                system = builtins.currentSystem;
+                                builder = "/bin/sh";
+                                args = [ "-c" "echo hello world > $out" ];
+                              })";
+    nix_expr_eval_from_string(nullptr, state, expr, ".", value);
+
+    Value * drvPathValue = nix_get_attr_byname(nullptr, value, state, "drvPath");
+    const char * drvPath = nix_get_string(nullptr, drvPathValue);
+    ASSERT_STREQ("/nix/store/5fxx84dpz59ch79wf9x8ja715p7hf3q1-myname.drv", drvPath);
+
+    StorePath * drvStorePath = nix_store_parse_path(ctx, store, drvPath);
+    ASSERT_EQ(true, nix_store_is_valid_path(nullptr, store, drvStorePath));
+
+    Value * outPathValue = nix_get_attr_byname(nullptr, value, state, "outPath");
+    const char * outPath = nix_get_string(nullptr, outPathValue);
+    ASSERT_STREQ("/nix/store/rp0xk0641l8hpdb84fsx3kwwrl45pxan-myname", outPath);
+
+    StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath);
+    ASSERT_EQ(false, nix_store_is_valid_path(nullptr, store, outStorePath));
+
+    nix_store_build(ctx, store, drvStorePath, nullptr, nullptr);
+    ASSERT_EQ(true, nix_store_is_valid_path(nullptr, store, outStorePath));
+
+    // Clean up
+    nix_store_path_free(drvStorePath);
+    nix_store_path_free(outStorePath);
+}
 }
