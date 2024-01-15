@@ -27,6 +27,15 @@
 #include "eval-settings.hh"
 #include "globals.hh"
 
+// using C a struct allows us to avoid having to define the special
+// members that using string_view here would implicitly delete.
+struct StringToken {
+  const char * p;
+  size_t l;
+  bool hasIndentation;
+  operator std::string_view() const { return {p, l}; }
+};
+
 namespace nix {
 
 #define YYLTYPE ::nix::ParserLocation
@@ -61,18 +70,17 @@ namespace nix {
         Expr * result;
         SourcePath basePath;
         PosTable::Origin origin;
+
+        void dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
+        void dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos);
+        void addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos);
+        Formals * validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
+        Expr * stripIndentation(const PosIdx pos,
+            std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
+        PosIdx makeCurPos(const ParserLocation & loc);
     };
 
 }
-
-// using C a struct allows us to avoid having to define the special
-// members that using string_view here would implicitly delete.
-struct StringToken {
-  const char * p;
-  size_t l;
-  bool hasIndentation;
-  operator std::string_view() const { return {p, l}; }
-};
 
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParseData * data)
@@ -94,7 +102,7 @@ using namespace nix;
 namespace nix {
 
 
-static void dupAttr(const EvalState & state, const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
+void ParseData::dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
          .msg = hintfmt("attribute '%1%' already defined at %2%",
@@ -103,7 +111,7 @@ static void dupAttr(const EvalState & state, const AttrPath & attrPath, const Po
     });
 }
 
-static void dupAttr(const EvalState & state, Symbol attr, const PosIdx pos, const PosIdx prevPos)
+void ParseData::dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
         .msg = hintfmt("attribute '%1%' already defined at %2%", state.symbols[attr], state.positions[prevPos]),
@@ -112,8 +120,7 @@ static void dupAttr(const EvalState & state, Symbol attr, const PosIdx pos, cons
 }
 
 
-static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
-    Expr * e, const PosIdx pos, const nix::EvalState & state)
+void ParseData::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos)
 {
     AttrPath::iterator i;
     // All attrpaths have at least one attr
@@ -126,10 +133,10 @@ static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
             if (j != attrs->attrs.end()) {
                 if (!j->second.inherited) {
                     ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                    if (!attrs2) dupAttr(state, attrPath, pos, j->second.pos);
+                    if (!attrs2) dupAttr(attrPath, pos, j->second.pos);
                     attrs = attrs2;
                 } else
-                    dupAttr(state, attrPath, pos, j->second.pos);
+                    dupAttr(attrPath, pos, j->second.pos);
             } else {
                 ExprAttrs * nested = new ExprAttrs;
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
@@ -156,12 +163,12 @@ static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
                 for (auto & ad : ae->attrs) {
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
-                        dupAttr(state, ad.first, j2->second.pos, ad.second.pos);
+                        dupAttr(ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs.emplace(ad.first, ad.second);
                 }
                 jAttrs->dynamicAttrs.insert(jAttrs->dynamicAttrs.end(), ae->dynamicAttrs.begin(), ae->dynamicAttrs.end());
             } else {
-                dupAttr(state, attrPath, pos, j->second.pos);
+                dupAttr(attrPath, pos, j->second.pos);
             }
         } else {
             // This attr path is not defined. Let's create it.
@@ -174,8 +181,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
 }
 
 
-static Formals * validateFormals(ParseData & data, Formals * formals,
-    PosIdx pos = noPos, Symbol arg = {})
+Formals * ParseData::validateFormals(Formals * formals, PosIdx pos, Symbol arg)
 {
     std::sort(formals->formals.begin(), formals->formals.end(),
         [] (const auto & a, const auto & b) {
@@ -191,21 +197,21 @@ static Formals * validateFormals(ParseData & data, Formals * formals,
     }
     if (duplicate)
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", data.symbols[duplicate->first]),
-            .errPos = data.state.positions[duplicate->second]
+            .msg = hintfmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
+            .errPos = state.positions[duplicate->second]
         });
 
     if (arg && formals->has(arg))
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", data.symbols[arg]),
-            .errPos = data.state.positions[pos]
+            .msg = hintfmt("duplicate formal function argument '%1%'", symbols[arg]),
+            .errPos = state.positions[pos]
         });
 
     return formals;
 }
 
 
-static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
+Expr * ParseData::stripIndentation(const PosIdx pos,
     std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
 {
     if (es.empty()) return new ExprString("");
@@ -302,12 +308,12 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
 }
 
 
-static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
+PosIdx ParseData::makeCurPos(const ParserLocation & loc)
 {
-    return data->state.positions.add(data->origin, loc.first_line, loc.first_column);
+    return state.positions.add(origin, loc.first_line, loc.first_column);
 }
 
-#define CUR_POS makeCurPos(*yylocp, data)
+#define CUR_POS data->makeCurPos(*yylocp)
 
 
 }
@@ -317,7 +323,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 {
     throw ParseError({
         .msg = hintfmt(error),
-        .errPos = data->state.positions[makeCurPos(*loc, data)]
+        .errPos = data->state.positions[data->makeCurPos(*loc)]
     });
 }
 
@@ -387,16 +393,16 @@ expr_function
   : ID ':' expr_function
     { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, validateFormals(*data, $2), $5); }
+    { $$ = new ExprLambda(CUR_POS, data->validateFormals($2), $5); }
   | '{' formals '}' '@' ID ':' expr_function
     {
       auto arg = data->symbols.create($5);
-      $$ = new ExprLambda(CUR_POS, arg, validateFormals(*data, $2, CUR_POS, arg), $7);
+      $$ = new ExprLambda(CUR_POS, arg, data->validateFormals($2, CUR_POS, arg), $7);
     }
   | ID '@' '{' formals '}' ':' expr_function
     {
       auto arg = data->symbols.create($1);
-      $$ = new ExprLambda(CUR_POS, arg, validateFormals(*data, $4, CUR_POS, arg), $7);
+      $$ = new ExprLambda(CUR_POS, arg, data->validateFormals($4, CUR_POS, arg), $7);
     }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
@@ -423,21 +429,21 @@ expr_op
   | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
-  | expr_op '>' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
-  | expr_op AND expr_op { $$ = new ExprOpAnd(makeCurPos(@2, data), $1, $3); }
-  | expr_op OR expr_op { $$ = new ExprOpOr(makeCurPos(@2, data), $1, $3); }
-  | expr_op IMPL expr_op { $$ = new ExprOpImpl(makeCurPos(@2, data), $1, $3); }
-  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(makeCurPos(@2, data), $1, $3); }
+  | expr_op '<' expr_op { $$ = new ExprCall(data->makeCurPos(@2), new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(data->makeCurPos(@2), new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = new ExprCall(data->makeCurPos(@2), new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(data->makeCurPos(@2), new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd(data->makeCurPos(@2), $1, $3); }
+  | expr_op OR expr_op { $$ = new ExprOpOr(data->makeCurPos(@2), $1, $3); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl(data->makeCurPos(@2), $1, $3); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(data->makeCurPos(@2), $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(makeCurPos(@2, data), false, new std::vector<std::pair<PosIdx, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
-  | expr_op '-' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
-  | expr_op '*' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
-  | expr_op '/' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__div")), {$1, $3}); }
-  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(makeCurPos(@2, data), $1, $3); }
+    { $$ = new ExprConcatStrings(data->makeCurPos(@2), false, new std::vector<std::pair<PosIdx, Expr *> >({{data->makeCurPos(@1), $1}, {data->makeCurPos(@3), $3}})); }
+  | expr_op '-' expr_op { $$ = new ExprCall(data->makeCurPos(@2), new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = new ExprCall(data->makeCurPos(@2), new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = new ExprCall(data->makeCurPos(@2), new ExprVar(data->symbols.create("__div")), {$1, $3}); }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(data->makeCurPos(@2), $1, $3); }
   | expr_app
   ;
 
@@ -476,12 +482,12 @@ expr_simple
   | FLOAT_LIT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(CUR_POS, data->symbols, std::move(*$2));
+      $$ = data->stripIndentation(CUR_POS, std::move(*$2));
       delete $2;
   }
   | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
-      $2->insert($2->begin(), {makeCurPos(@1, data), $1});
+      $2->insert($2->begin(), {data->makeCurPos(@1), $1});
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
@@ -520,13 +526,13 @@ string_parts
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(std::string($2))); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
-  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(makeCurPos(@1, data), $2); }
+  { $$ = $1; $1->emplace_back(data->makeCurPos(@2), new ExprString(std::string($2))); }
+  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(data->makeCurPos(@2), $3); }
+  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(data->makeCurPos(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new std::vector<std::pair<PosIdx, Expr *>>;
-      $$->emplace_back(makeCurPos(@1, data), new ExprString(std::string($1)));
-      $$->emplace_back(makeCurPos(@2, data), $3);
+      $$->emplace_back(data->makeCurPos(@1), new ExprString(std::string($1)));
+      $$->emplace_back(data->makeCurPos(@2), $3);
     }
   ;
 
@@ -551,19 +557,19 @@ path_start
   ;
 
 ind_string_parts
-  : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
+  : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(data->makeCurPos(@2), $2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(data->makeCurPos(@2), $3); }
   | { $$ = new std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>; }
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, std::move(*$2), $4, makeCurPos(@2, data), data->state); delete $2; }
+  : binds attrpath '=' expr ';' { $$ = $1; data->addAttr($$, std::move(*$2), $4, data->makeCurPos(@2)); delete $2; }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & i : *$3) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              dupAttr(data->state, i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
-          auto pos = makeCurPos(@3, data);
+              data->dupAttr(i.symbol, data->makeCurPos(@3), $$->attrs[i.symbol].pos);
+          auto pos = data->makeCurPos(@3);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
       delete $3;
@@ -573,12 +579,12 @@ binds
       /* !!! Should ensure sharing of the expression in $4. */
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              dupAttr(data->state, i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
+              data->dupAttr(i.symbol, data->makeCurPos(@6), $$->attrs[i.symbol].pos);
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), data->makeCurPos(@6)));
       }
       delete $6;
     }
-  | { $$ = new ExprAttrs(makeCurPos(@0, data)); }
+  | { $$ = new ExprAttrs(data->makeCurPos(@0)); }
   ;
 
 attrs
@@ -592,7 +598,7 @@ attrs
       } else
           throw ParseError({
               .msg = hintfmt("dynamic attributes not allowed in inherit"),
-              .errPos = data->state.positions[makeCurPos(@2, data)]
+              .errPos = data->state.positions[data->makeCurPos(@2)]
           });
     }
   | { $$ = new AttrPath; }
