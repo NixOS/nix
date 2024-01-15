@@ -9,6 +9,7 @@
 #include "error.hh"
 #include "logging.hh"
 #include "file-descriptor.hh"
+#include "util.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -35,6 +36,13 @@ namespace nix {
 
 struct Sink;
 struct Source;
+
+#ifdef __GNUC__
+/**
+ * GNU libc can malloc the path for you with the right length.
+ */
+std::unique_ptr<char, FreeDeleter> getCwd();
+#endif
 
 /**
  * @return An absolutized path, resolving paths relative to the
