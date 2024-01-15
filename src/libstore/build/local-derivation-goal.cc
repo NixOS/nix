@@ -2724,7 +2724,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             .outPath = newInfo.path
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
-            && drv->type().isPure())
+            && !drv->type().isImpure())
         {
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);

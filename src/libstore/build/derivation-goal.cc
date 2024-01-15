@@ -223,7 +223,7 @@ void DerivationGoal::haveDerivation()
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
-    if (!drv->type().isPure()) {
+    if (drv->type().isImpure()) {
         experimentalFeatureSettings.require(Xp::ImpureDerivations);
 
         for (auto & [outputName, output] : drv->outputs) {
@@ -304,7 +304,7 @@ void DerivationGoal::outputsSubstitutionTried()
 {
     trace("all outputs substituted (maybe)");
 
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
         done(BuildResult::TransientFailure, {},
@@ -397,9 +397,9 @@ void DerivationGoal::gaveUpOnSubstitution()
         for (const auto & [inputDrvPath, inputNode] : dynamic_cast<Derivation *>(drv.get())->inputDrvs.map) {
             /* Ensure that pure, non-fixed-output derivations don't
                depend on impure derivations. */
-            if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && drv->type().isPure() && !drv->type().isFixed()) {
+            if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure() && !drv->type().isFixed()) {
                 auto inputDrv = worker.evalStore.readDerivation(inputDrvPath);
-                if (!inputDrv.type().isPure())
+                if (inputDrv.type().isImpure())
                     throw Error("pure derivation '%s' depends on impure derivation '%s'",
                         worker.store.printStorePath(drvPath),
                         worker.store.printStorePath(inputDrvPath));
@@ -439,7 +439,7 @@ void DerivationGoal::gaveUpOnSubstitution()
 
 void DerivationGoal::repairClosure()
 {
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
 
     /* If we're repairing, we now know that our own outputs are valid.
        Now check whether the other paths in the outputs closure are
@@ -1100,7 +1100,7 @@ void DerivationGoal::resolvedFinished()
                   worker.store.printStorePath(resolvedDrvGoal->drvPath), outputName);
             }();
 
-            if (drv->type().isPure()) {
+            if (!drv->type().isImpure()) {
                 auto newRealisation = realisation;
                 newRealisation.id = DrvOutput { initialOutput->outputHash, outputName };
                 newRealisation.signatures.clear();
@@ -1395,7 +1395,7 @@ void DerivationGoal::flushLine()
 
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
     if (!useDerivation || drv->type().hasKnownOutputPaths()) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
@@ -1411,7 +1411,7 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDeri
 
 OutputPathMap DerivationGoal::queryDerivationOutputMap()
 {
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
     if (!useDerivation || drv->type().hasKnownOutputPaths()) {
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
@@ -1428,7 +1428,7 @@ OutputPathMap DerivationGoal::queryDerivationOutputMap()
 
 std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
 {
-    if (!drv->type().isPure()) return { false, {} };
+    if (drv->type().isImpure()) return { false, {} };
 
     bool checkHash = buildMode == bmRepair;
     auto wantedOutputsLeft = std::visit(overloaded {
