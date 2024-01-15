@@ -72,12 +72,14 @@ public:
 
     virtual void upsertFile(const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) = 0;
+        const std::string & mimeType,
+        std::map<std::string, std::string> tags = {}) = 0;
 
     void upsertFile(const std::string & path,
         // FIXME: use std::string_view
         std::string && data,
-        const std::string & mimeType);
+        const std::string & mimeType,
+        std::map<std::string, std::string> tags = {});
 
     /**
      * Dump the contents of the specified file to a sink.
@@ -104,7 +106,7 @@ private:
 
     std::string narInfoFileFor(const StorePath & storePath);
 
-    void writeNarInfo(ref<NarInfo> narInfo);
+    void writeNarInfo(ref<NarInfo> narInfo, std::map<std::string, std::string> tags={});
 
     ref<const ValidPathInfo> addToStoreCommon(
         Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,

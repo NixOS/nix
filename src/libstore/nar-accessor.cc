@@ -17,6 +17,8 @@ struct NarMember
 
     /* If this is a directory, all the children of the directory. */
     std::map<std::string, NarMember> children;
+
+    std::optional<std::string> content;
 };
 
 struct NarAccessor : public SourceAccessor
@@ -26,6 +28,8 @@ struct NarAccessor : public SourceAccessor
     GetNarBytes getNarBytes;
 
     NarMember root;
+
+    std::optional<std::function<bool(CanonPath&)>> loadContentsFilter;
 
     struct NarIndexer : ParseSink, Source
     {
@@ -37,6 +41,8 @@ struct NarAccessor : public SourceAccessor
         bool isExec = false;
 
         uint64_t pos = 0;
+
+        std::optional<CanonPath> currentRegularFile;
 
         NarIndexer(NarAccessor & acc, Source & source)
             : acc(acc), source(source)
@@ -76,10 +82,13 @@ struct NarAccessor : public SourceAccessor
                 .isExecutable = false,
                 .narOffset = 0
             } });
+            currentRegularFile = CanonPath(path);
         }
 
         void closeRegularFile() override
-        { }
+        {
+            currentRegularFile = std::nullopt;
+        }
 
         void isExecutable() override
         {
@@ -94,7 +103,13 @@ struct NarAccessor : public SourceAccessor
         }
 
         void receiveContents(std::string_view data) override
-        { }
+        {
+            if (acc.loadContentsFilter != std::nullopt) {
+                if (acc.loadContentsFilter.value()(currentRegularFile.value())) {
+                    parents.top()->content = std::string(data);
+                }
+            }
+        }
 
         void createSymlink(const Path & path, const std::string & target) override
         {
@@ -119,7 +134,7 @@ struct NarAccessor : public SourceAccessor
         parseDump(indexer, indexer);
     }
 
-    NarAccessor(Source & source)
+    NarAccessor(Source & source, std::optional<std::function<bool(CanonPath&)>> _loadContentsFilter): loadContentsFilter(_loadContentsFilter)
     {
         NarIndexer indexer(*this, source);
         parseDump(indexer, indexer);
@@ -208,8 +223,13 @@ struct NarAccessor : public SourceAccessor
 
         if (getNarBytes) return getNarBytes(*i.stat.narOffset, *i.stat.fileSize);
 
-        assert(nar);
-        return std::string(*nar, *i.stat.narOffset, *i.stat.fileSize);
+        if (nar) {
+            return std::string(*nar, *i.stat.narOffset, *i.stat.fileSize);
+        }
+
+        if (i.content != std::nullopt) return i.content.value();
+
+        throw Error("content of path %1% is not available with this NarAccessor", path);
     }
 
     std::string readLink(const CanonPath & path) override
@@ -226,9 +246,9 @@ ref<SourceAccessor> makeNarAccessor(std::string && nar)
     return make_ref<NarAccessor>(std::move(nar));
 }
 
-ref<SourceAccessor> makeNarAccessor(Source & source)
+ref<SourceAccessor> makeNarAccessor(Source & source, std::optional<std::function<bool(CanonPath&)>> loadContentsFilter)
 {
-    return make_ref<NarAccessor>(source);
+    return make_ref<NarAccessor>(source, loadContentsFilter);
 }
 
 ref<SourceAccessor> makeLazyNarAccessor(const std::string & listing,

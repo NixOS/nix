@@ -4,6 +4,7 @@
 #include "source-accessor.hh"
 
 #include <functional>
+#include <optional>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -17,7 +18,16 @@ struct Source;
  */
 ref<SourceAccessor> makeNarAccessor(std::string && nar);
 
-ref<SourceAccessor> makeNarAccessor(Source & source);
+/**
+ * Return an object that provides access to the contents of a NAR
+ * file.
+ *
+ * the readFile() member function only works for files where loadContentsFilter
+ * return true. The content of those files is stored in memory. For
+ * other files, and if loadContentsFilter is nullopt, readFile() throws
+ * an error.
+ */
+ref<SourceAccessor> makeNarAccessor(Source & source, std::optional<std::function<bool(CanonPath&)>> loadContentsFilter = std::nullopt);
 
 /**
  * Create a NAR accessor from a NAR listing (in the format produced by

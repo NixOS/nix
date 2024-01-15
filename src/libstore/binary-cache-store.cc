@@ -1,5 +1,6 @@
 #include "archive.hh"
 #include "binary-cache-store.hh"
+#include "canon-path.hh"
 #include "compression.hh"
 #include "derivations.hh"
 #include "source-accessor.hh"
@@ -64,9 +65,10 @@ void BinaryCacheStore::init()
 
 void BinaryCacheStore::upsertFile(const std::string & path,
     std::string && data,
-    const std::string & mimeType)
+    const std::string & mimeType,
+    std::map<std::string, std::string> tags)
 {
-    upsertFile(path, std::make_shared<std::stringstream>(std::move(data)), mimeType);
+    upsertFile(path, std::make_shared<std::stringstream>(std::move(data)), mimeType, tags);
 }
 
 void BinaryCacheStore::getFile(const std::string & path,
@@ -107,11 +109,11 @@ std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
     return std::string(storePath.hashPart()) + ".narinfo";
 }
 
-void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
+void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo, std::map<std::string, std::string> tags)
 {
     auto narInfoFile = narInfoFileFor(narInfo->path);
 
-    upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
+    upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo", tags);
 
     {
         auto state_(state.lock());
@@ -140,6 +142,8 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     AutoDelete autoDelete(fnTemp);
 
+    const CanonPath tagsFile { "/nix-support/tags.json" };
+
     auto now1 = std::chrono::steady_clock::now();
 
     /* Read the NAR simultaneously into a CompressionSink+FileSink (to
@@ -154,7 +158,8 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     auto compressionSink = makeCompressionSink(compression, teeSinkCompressed, parallelCompression, compressionLevel);
     TeeSink teeSinkUncompressed { *compressionSink, narHashSink };
     TeeSource teeSource { narSource, teeSinkUncompressed };
-    narAccessor = makeNarAccessor(teeSource);
+    // index the nar, and keep the content of tagsFile in memory in case it is present.
+    narAccessor = makeNarAccessor(teeSource, [&tagsFile](CanonPath& path) { return path == tagsFile; });
     compressionSink->finish();
     fileSink.flush();
     }
@@ -193,6 +198,23 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                 printStorePath(info.path), printStorePath(ref));
         }
 
+    /* load tags if applicable */
+    std::map<std::string, std::string> tags;
+    auto lstat = narAccessor->maybeLstat(tagsFile);
+    if (lstat.has_value() && lstat->type == SourceAccessor::Type::tRegular) {
+        std::string tags_str = narAccessor->readFile(tagsFile);
+        try {
+            nlohmann::json tags_json = nlohmann::json::parse(tags_str);
+            for (const auto& kv: tags_json.items()) {
+                std::string key = kv.key();
+                std::string value = kv.value().template get<std::string>();
+                tags[key] = value;
+            }
+        } catch (const nlohmann::json::exception& e) {
+            printMsg(lvlWarn, "could not read nar tags from %s in %s: %s", tagsFile, printStorePath(info.path), e.what());
+        }
+    }
+
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
     if (writeNARListing) {
@@ -201,7 +223,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
             {"root", listNar(ref<SourceAccessor>(narAccessor), CanonPath::root, true)},
         };
 
-        upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");
+        upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json", tags);
     }
 
     /* Optionally maintain an index of DWARF debug info files
@@ -228,7 +250,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
                 printMsg(lvlTalkative, "creating debuginfo link from '%s' to '%s'", key, target);
 
-                upsertFile(key, json.dump(), "application/json");
+                upsertFile(key, json.dump(), "application/json", tags);
             };
 
             std::regex regex1("^[0-9a-f]{2}$");
@@ -266,7 +288,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
         stats.narWrite++;
         upsertFile(narInfo->url,
             std::make_shared<std::fstream>(fnTemp, std::ios_base::in | std::ios_base::binary),
-            "application/x-nix-nar");
+            "application/x-nix-nar", tags);
     } else
         stats.narWriteAverted++;
 
@@ -277,7 +299,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     /* Atomically write the NAR info file.*/
     if (signer) narInfo->sign(*this, *signer);
 
-    writeNarInfo(narInfo);
+    writeNarInfo(narInfo, tags);
 
     stats.narInfoWrite++;
 
