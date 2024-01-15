@@ -22,6 +22,7 @@
 #include "fetch-to-store.hh"
 #include "tarball.hh"
 #include "flake/flakeref.hh"
+#include "parser-tab.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -2797,6 +2798,21 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
 
     searchPathResolved.emplace(value, res);
     return res;
+}
+
+
+Expr * EvalState::parse(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    std::shared_ptr<StaticEnv> & staticEnv)
+{
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, positions, rootFS);
+
+    result->bindVars(*this, staticEnv);
+
+    return result;
 }
 
 

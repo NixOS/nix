@@ -37,11 +37,12 @@ struct ParserLocation {
 };
 
 struct ParserState {
-    EvalState & state;
     SymbolTable & symbols;
+    PosTable & positions;
     Expr * result;
     SourcePath basePath;
     PosTable::Origin origin;
+    const ref<InputAccessor> rootFS;
 
     void dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
     void dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos);
@@ -56,16 +57,16 @@ inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, co
 {
     throw ParseError({
          .msg = hintfmt("attribute '%1%' already defined at %2%",
-             showAttrPath(state.symbols, attrPath), state.positions[prevPos]),
-         .errPos = state.positions[pos]
+             showAttrPath(symbols, attrPath), positions[prevPos]),
+         .errPos = positions[pos]
     });
 }
 
 inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
-        .msg = hintfmt("attribute '%1%' already defined at %2%", state.symbols[attr], state.positions[prevPos]),
-        .errPos = state.positions[pos]
+        .msg = hintfmt("attribute '%1%' already defined at %2%", symbols[attr], positions[prevPos]),
+        .errPos = positions[pos]
     });
 }
 
@@ -146,13 +147,13 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
     if (duplicate)
         throw ParseError({
             .msg = hintfmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
-            .errPos = state.positions[duplicate->second]
+            .errPos = positions[duplicate->second]
         });
 
     if (arg && formals->has(arg))
         throw ParseError({
             .msg = hintfmt("duplicate formal function argument '%1%'", symbols[arg]),
-            .errPos = state.positions[pos]
+            .errPos = positions[pos]
         });
 
     return formals;
@@ -256,7 +257,7 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
 
 inline PosIdx ParserState::at(const ParserLocation & loc)
 {
-    return state.positions.add(origin, loc.first_line, loc.first_column);
+    return positions.add(origin, loc.first_line, loc.first_column);
 }
 
 }
