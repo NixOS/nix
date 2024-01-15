@@ -419,6 +419,16 @@ EvalState::EvalState(
     , sPath(symbols.create("path"))
     , sPrefix(symbols.create("prefix"))
     , sOutputSpecified(symbols.create("outputSpecified"))
+    , exprSymbols{
+        .sub = symbols.create("__sub"),
+        .lessThan = symbols.create("__lessThan"),
+        .mul = symbols.create("__mul"),
+        .div = symbols.create("__div"),
+        .or_ = symbols.create("or"),
+        .findFile = symbols.create("__findFile"),
+        .nixPath = symbols.create("__nixPath"),
+        .body = symbols.create("body")
+    }
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
@@ -2808,7 +2818,7 @@ Expr * EvalState::parse(
     const SourcePath & basePath,
     std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, positions, rootFS);
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, positions, rootFS, exprSymbols);
 
     result->bindVars(*this, staticEnv);
 
