@@ -11,9 +11,9 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, hintformat hint)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint });
 }
 
 void throwExceptionSelfCheck(){
@@ -61,8 +61,7 @@ inline bool operator<(const Trace& lhs, const Trace& rhs)
     // This formats a freshly formatted hint string and then throws it away, which
     // shouldn't be much of a problem because it only runs when pos is equal, and this function is
     // used for trace printing, which is infrequent.
-    return std::forward_as_tuple(lhs.hint.str(), lhs.frame)
-        < std::forward_as_tuple(rhs.hint.str(), rhs.frame);
+    return lhs.hint.str() < rhs.hint.str();
 }
 inline bool operator> (const Trace& lhs, const Trace& rhs) { return rhs < lhs; }
 inline bool operator<=(const Trace& lhs, const Trace& rhs) { return !(lhs > rhs); }
@@ -373,7 +372,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     // prepended to each element of the trace
     auto ellipsisIndent = "  ";
 
-    bool frameOnly = false;
     if (!einfo.traces.empty()) {
         // Stack traces seen since we last printed a chunk of `duplicate frames
         // omitted`.
@@ -384,7 +382,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
         for (const auto & trace : einfo.traces) {
             if (trace.hint.str().empty()) continue;
-            if (frameOnly && !trace.frame) continue;
 
             if (!showTrace && count > 3) {
                 oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
@@ -400,7 +397,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
 
             count++;
-            frameOnly = trace.frame;
 
             printTrace(oss, ellipsisIndent, count, trace);
         }

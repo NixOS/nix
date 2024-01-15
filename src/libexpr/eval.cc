@@ -344,13 +344,7 @@ ErrorBuilder & ErrorBuilder::atPos(PosIdx pos)
 
 ErrorBuilder & ErrorBuilder::withTrace(PosIdx pos, const std::string_view text)
 {
-    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = false });
-    return *this;
-}
-
-ErrorBuilder & ErrorBuilder::withFrameTrace(PosIdx pos, const std::string_view text)
-{
-    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = true });
+    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)) });
     return *this;
 }
 
@@ -827,9 +821,9 @@ void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2)
     e.addTrace(nullptr, s, s2);
 }
 
-void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame) const
+void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const
 {
-    e.addTrace(positions[pos], hintfmt(s, s2), frame);
+    e.addTrace(positions[pos], hintfmt(s, s2));
 }
 
 static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
@@ -1582,9 +1576,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         "while calling %s",
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
-                        : "anonymous lambda",
-                        true);
-                    if (pos) addErrorTrace(e, pos, "from call site%s", "", true);
+                        : "anonymous lambda");
+                    if (pos) addErrorTrace(e, pos, "from call site%s", "");
                 }
                 throw;
             }
