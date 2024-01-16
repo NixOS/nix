@@ -10,7 +10,9 @@
 
 namespace nix {
 
-
+/**
+ * A "parsed" package attribute set.
+ */
 struct PackageInfo
 {
 public:
