@@ -15,9 +15,9 @@
 namespace nix {
 
 
-DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
+PackageInfos queryInstalled(EvalState & state, const Path & userEnv)
 {
-    DrvInfos elems;
+    PackageInfos elems;
     if (pathExists(userEnv + "/manifest.json"))
         throw Error("profile '%s' is incompatible with 'nix-env'; please use 'nix profile' instead", userEnv);
     auto manifestFile = userEnv + "/manifest.nix";
@@ -31,7 +31,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 }
 
 
-bool createUserEnv(EvalState & state, DrvInfos & elems,
+bool createUserEnv(EvalState & state, PackageInfos & elems,
     const Path & profile, bool keepDerivations,
     const std::string & lockToken)
 {
@@ -57,7 +57,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
         std::optional<StorePath> drvPath = keepDerivations ? i.queryDrvPath() : std::nullopt;
-        DrvInfo::Outputs outputs = i.queryOutputs(true, true);
+        PackageInfo::Outputs outputs = i.queryOutputs(true, true);
         StringSet metaNames = i.queryMetaNames();
 
         auto attrs = state.buildBindings(7 + outputs.size());
