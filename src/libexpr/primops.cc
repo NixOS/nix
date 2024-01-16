@@ -37,6 +37,8 @@
 #include <dlfcn.h>
 
 #include <cmath>
+#include <fstream>
+#include <filesystem>
 
 namespace nix {
 
@@ -159,21 +161,6 @@ void readAccessStatus(EvalState & state, Attr & attr, LocalGranularAccessStore::
                 .errPos = state.positions[subAttr.pos]
             }));
     }
-}
-
-void ensureAccess(LocalGranularAccessStore::AccessStatus * accessStatus, std::string_view description, LocalGranularAccessStore & store)
-{
-    if (!accessStatus->isProtected) return;
-    uid_t uid = getuid();
-    auto groups = store.getSubjectGroups(uid);
-    for (auto entity : accessStatus->entities) {
-        if (std::visit(overloaded {
-            [&](ACL::User u) { return u.uid == uid; },
-            [&](ACL::Group g) { return groups.contains(g); }
-        }, entity))
-            return;
-    }
-    throw AccessDenied("you (%s) would not have access to %s; ensure that you do by adding yourself or a group you're in to the list", getUserName(uid), description);
 }
 
 /**
@@ -1454,8 +1441,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
             if (derivation != attr->value->attrs->end()) {
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *derivation, &status, "__permissions.drv", "builtins.derivationStrict");
-                ensureAccess(&status, state.store->printStorePath(drvPath), require<LocalGranularAccessStore>(*state.store));
-                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(drvPath, status);
+                require<LocalGranularAccessStore>(*state.store).setAccessStatus(drvPath, status, true);
             }
         }
     }
@@ -1475,27 +1461,25 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                                 "while evaluating the `__permissions.outputs` "
                                 "attribute passed to builtins.derivationStrict");
                 for (auto & output : *outputs->value->attrs) {
-                    if (!drv.outputs.contains(state.symbols[output.name])) 
+                    if (!drv.outputs.contains(state.symbols[output.name]))
                         state.debugThrowLastTrace(EvalError({
                             .msg = hintfmt("derivation has no output %s", state.symbols[output.name]),
                             .errPos = state.positions[output.pos]
                         }));
                     LocalGranularAccessStore::AccessStatus status;
                     readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
-                    ensureAccess(&status, fmt("output %s of derivation %s", state.symbols[output.name], drvPathS), require<LocalGranularAccessStore>(*state.store));
-                    require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status);
+                    require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status, true);
                 }
             }
             auto log = attr->value->attrs->find(state.sLog);
             if (log != attr->value->attrs->end()) {
                 LocalGranularAccessStore::AccessStatus status;
                 readAccessStatus(state, *log, &status, "__permissions.log", "builtins.derivationStrict");
-                ensureAccess(&status, fmt("log of derivation %s", drvPathS), require<LocalGranularAccessStore>(*state.store));
-                require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(StoreObjectDerivationLog {drvPath}, status);
+                require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationLog {drvPath}, status, true);
             }
         }
     }
-    
+
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
@@ -2285,6 +2269,15 @@ bool EvalState::callPathFilter(
     return forceBool(res, pos, "while evaluating the return value of the path filter function");
 }
 
+
+void assertReadable(const Path &p){
+  std::ifstream path_file(p);
+  if (!path_file) {
+      throw Error(fmt("Could not access file (%s) permissions may be missing", p));
+  }
+  path_file.close();
+}
+
 static void addPath(
     EvalState & state,
     const PosIdx pos,
@@ -2330,16 +2323,39 @@ static void addPath(
                 .references = {},
             });
 
-        // Commented out because computeStorePathForPath needs reading access to the path.
-        // But this should not be needed if the path is already in the store and is fixed output derivation.
-        // For the case where the file is private but a public derivation depends on it.
+        if (accessStatus && !settings.readOnlyMode) {
+          if (expectedStorePath) {
+            if (pathExists(state.store->toRealPath(*expectedStorePath))) {
+              auto curStatus = require<LocalGranularAccessStore>(*state.store).getAccessStatus(*expectedStorePath);
+              if (curStatus != *accessStatus && !require<LocalGranularAccessStore>(*state.store).canAccess(*expectedStorePath)) {
+                  // It's ok to update the permission of a store path if we have read access to the original file.
 
-        // TODO: why is this needed ?
-        // if (accessStatus && !settings.readOnlyMode) {
-        //     StorePath dstPath = state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first;
-        //     ensureAccess(&*accessStatus, state.store->printStorePath(dstPath));
-        //     require<LocalGranularAccessStore>(*state.store).setFutureAccessStatus(dstPath, *accessStatus);
-        // }
+                  if(std::filesystem::is_directory(path.path.abs())){
+                    for (const auto& dirEntry : std::filesystem::recursive_directory_iterator(path.path.abs())){
+                        if (std::filesystem::is_directory(dirEntry)) continue;
+                        assertReadable(dirEntry.path());
+                    }
+                  }
+                  else {
+                      assertReadable(path.path.abs());
+                  }
+              }
+            }
+
+            require<LocalGranularAccessStore>(*state.store).setAccessStatus(*expectedStorePath, *accessStatus, true);
+          } else {
+            // computeStorePathForPath should fail if we do not have access to the original path
+            //StorePath dstPath = state.store->computeStorePathForPath(name, path, method, htSHA256, filter) .first;
+            auto source = sinkToSource([&](Sink & sink) {
+                if (method == FileIngestionMethod::Recursive)
+                    dumpPath(path.path.abs(), sink, defaultPathFilter);
+                else
+                    readFile(path.path.abs(), sink);
+            });
+            StorePath dstPath = state.store->computeStorePathFromDump(*source, name, method, HashAlgorithm::SHA256).first;
+            require<LocalGranularAccessStore>(*state.store).setAccessStatus(dstPath, *accessStatus, true);
+          }
+        }
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             auto dstPath = path.fetchToStore(state.store, name, method, filter.get(), state.repair);

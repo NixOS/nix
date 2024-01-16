@@ -16,7 +16,7 @@ struct CmdStoreAccessProtect : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-repair.md"
+          #include "store-access-protect.md"
           ;
     }
 
@@ -24,12 +24,12 @@ struct CmdStoreAccessProtect : StorePathsCommand
     {
         auto & localStore = require<LocalGranularAccessStore>(*store);
         for (auto & path : storePaths) {
-            auto status = localStore.getCurrentAccessStatus(path);
+            auto status = localStore.getAccessStatus(path);
             if (!status.entities.empty())
                 warn("There are some users or groups who have access to path %s; consider removing them with \n" ANSI_BOLD "nix store access revoke --all-entities %s" ANSI_NORMAL, localStore.printStorePath(path), localStore.printStorePath(path));
             if (!localStore.isValidPath(path)) warn("Path %s does not exist yet; permissions will be applied as soon as it is added to the store", localStore.printStorePath(path));
             status.isProtected = true;
-            localStore.setCurrentAccessStatus(path, status);
+            localStore.setAccessStatus(path, status, false);
         }
     }
 };

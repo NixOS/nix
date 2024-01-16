@@ -924,38 +924,21 @@ void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
     readInt(conn->from);
 }
 
-void RemoteStore::setCurrentAccessStatus(const StoreObject & storeObject, const RemoteStore::AccessStatus & status)
+void RemoteStore::setAccessStatus(const StoreObject & storeObject, const RemoteStore::AccessStatus & status, const bool & ensureAccessCheck)
 {
     auto conn(getConnection());
-    conn->to << WorkerProto::Op::SetCurrentAccessStatus;
+    conn->to << WorkerProto::Op::SetAccessStatus;
     WorkerProto::Serialise<StoreObject>::write(*this, *conn, storeObject);
     WorkerProto::Serialise<AccessStatus>::write(*this, *conn, status);
-    conn.processStderr();
-    readInt(conn->from);
-}
-void RemoteStore::setFutureAccessStatus(const StoreObject & storeObject, const RemoteStore::AccessStatus & status)
-{
-    auto conn(getConnection());
-    conn->to << WorkerProto::Op::SetFutureAccessStatus;
-    WorkerProto::Serialise<StoreObject>::write(*this, *conn, storeObject);
-    WorkerProto::Serialise<AccessStatus>::write(*this, *conn, status);
+    WorkerProto::Serialise<bool>::write(*this, *conn, ensureAccessCheck);
     conn.processStderr();
     readInt(conn->from);
 }
 
-RemoteStore::AccessStatus RemoteStore::getCurrentAccessStatus(const StoreObject & storeObject)
+RemoteStore::AccessStatus RemoteStore::getAccessStatus(const StoreObject & storeObject)
 {
     auto conn(getConnection());
-    conn->to << WorkerProto::Op::GetCurrentAccessStatus;
-    WorkerProto::Serialise<StoreObject>::write(*this, *conn, storeObject);
-    conn.processStderr();
-    auto status = WorkerProto::Serialise<AccessStatus>::read(*this, *conn);
-    return status;
-}
-RemoteStore::AccessStatus RemoteStore::getFutureAccessStatus(const StoreObject & storeObject)
-{
-    auto conn(getConnection());
-    conn->to << WorkerProto::Op::GetFutureAccessStatus;
+    conn->to << WorkerProto::Op::GetAccessStatus;
     WorkerProto::Serialise<StoreObject>::write(*this, *conn, storeObject);
     conn.processStderr();
     auto status = WorkerProto::Serialise<AccessStatus>::read(*this, *conn);

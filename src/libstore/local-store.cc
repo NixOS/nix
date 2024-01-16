@@ -862,7 +862,7 @@ void LocalStore::queryReferrers(State & state, const StorePath & path, StorePath
 {
     auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));
 
-    if (!canAccess(path, false)) throw AccessDenied("Access Denied");
+    if (!canAccess(path)) throw AccessDenied("Access Denied");
 
     while (useQueryReferrers.next())
         referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
@@ -880,7 +880,7 @@ void LocalStore::queryReferrers(const StorePath & path, StorePathSet & referrers
 
 StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 {
-    if (!canAccess(path, false)) throw AccessDenied("Access Denied");
+    if (!canAccess(path)) throw AccessDenied("Access Denied");
     return retrySQLite<StorePathSet>([&]() {
         auto state(_state.lock());
 
@@ -974,7 +974,7 @@ void LocalStore::syncPathPermissions(const ValidPathInfo & info)
                up resetting the permissions to the default ones */
             // futurePermissions.erase(info.path);
             if (info.accessStatus)
-                addAllowedEntitiesCurrent(info.path, info.accessStatus->entities);
+                addAllowedEntities(info.path, info.accessStatus->entities);
         } else if (info.accessStatus) {
             setCurrentAccessStatus(realPath, *info.accessStatus);
         } else {
@@ -1060,40 +1060,48 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
 {
     experimentalFeatureSettings.require(Xp::ACLs);
 
-    // This check is deactivated for now
-    // It makes the public example3 derivation (from acls.nix) fail because it depends on the private derivation example 2.
-    // However it does not look like a runtime dependency.
-    if (false && isInStore(path)) {
+
+    // We check that everyone who has access to the path has access to runtimes dependencies
+    if (isInStore(path)) {
         StorePath storePath(baseNameOf(path));
 
         // FIXME(acls): cache is broken when called from registerValidPaths
 
-        std::promise<ref<const ValidPathInfo>> promise;
+        // We do not check paths referenced by drv files, as these are not really runtimes dependencies
+        // Skipping the check is needed if we want to build a derivation (B) which depends on a public output of another derivation (A),
+        // but we do not have access to the private inputs of A.
+        // In this case we need access to `B.drv` but do not need access to the private input that is referenced transitively.
+        if (!storePath.isDerivation()){
 
-        queryPathInfoUncached(storePath,
-            {[&](std::future<std::shared_ptr<const ValidPathInfo>> result) {
-                try {
-                    promise.set_value(ref(result.get()));
-                } catch (...) {
-                    promise.set_exception(std::current_exception());
+            std::promise<std::shared_ptr<const ValidPathInfo>> promise;
+
+            queryPathInfoUncached(storePath,
+                {[&](std::future<std::shared_ptr<const ValidPathInfo>> result) {
+                    try {
+                        promise.set_value(result.get());
+                    } catch (...) {
+                        promise.set_exception(std::current_exception());
+                    }
+                }});
+
+            auto info = promise.get_future().get();
+
+            if (info){
+                for (auto reference : info->references) {
+                    if (reference == storePath) continue;
+                    auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
+                    if (!otherStatus.isProtected) continue;
+                    if (!status.isProtected)
+                        throw AccessDenied("can not make %s non-protected because it references a protected path %s", path, printStorePath(reference));
+                    std::vector<AccessControlEntity> difference;
+                    std::set_difference(status.entities.begin(), status.entities.end(), otherStatus.entities.begin(), otherStatus.entities.end(),std::inserter(difference, difference.begin()));
+
+                    if (! difference.empty()) {
+                        std::string entities;
+                        for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
+                        throw AccessDenied("can not allow %s access to %s because it references path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(reference));
+                    }
                 }
-            }});
-
-        auto info = promise.get_future().get();
-
-        for (auto reference : info->references) {
-            if (reference == storePath) continue;
-            auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
-            if (!otherStatus.isProtected) continue;
-            if (!status.isProtected)
-                throw AccessDenied("can not make %s non-protected because it references a protected path %s", path, printStorePath(reference));
-            std::vector<AccessControlEntity> difference;
-            std::set_difference(status.entities.begin(), status.entities.end(), otherStatus.entities.begin(), otherStatus.entities.end(), difference.begin());
-
-            if (! difference.empty()) {
-                std::string entities;
-                for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
-                throw AccessDenied("can not allow %s access to %s because it references path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(reference));
             }
         }
     }
@@ -1160,24 +1168,71 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
     acl.set(path);
 }
 
-void LocalStore::setFutureAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
+void LocalStore::ensureAccess(const AccessStatus & accessStatus, const StoreObject & object)
 {
-    // If adding future permissions to a StoreObjectDerivationOutput,
-    // also add permissions to the paths that will exist in the future.
-    std::visit(overloaded {
-        [&](StorePath p) {},
-        [&](StoreObjectDerivationOutput p) {
-                auto drv = readDerivation(p.drvPath);
-                auto outputHashes = staticOutputHashes(*this, drv);
+    auto description = std::visit(
+        overloaded{
+            [&](StorePath p) {
+                return fmt("path %s", printStorePath(p));
+            },
+            [&](StoreObjectDerivationOutput b) {
+                auto drv = readDerivation(b.drvPath);
+                auto outputHashes =
+                    staticOutputHashes(*this, drv);
                 auto drvOutputs = drv.outputsAndOptPaths(*this);
-                if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
-                    auto path = *drvOutputs.at(p.output).second;
-                    futurePermissions[path] = status;
+                bool known = drvOutputs.contains(b.output) &&
+                                drvOutputs.at(b.output).second;
+                if (known) {
+                    auto realPath = printStorePath(*drvOutputs.at(b.output).second);
+                    return fmt("path %s", realPath);
+                } else {
+                    return fmt("output %s of derivation %s", b.output, printStorePath(b.drvPath));
                 }
-        },
-        [&](StoreObjectDerivationLog l){}
-    }, storePathstoreObject);
-    futurePermissions[storePathstoreObject] = status;
+            },
+            [&](StoreObjectDerivationLog l) {
+                return fmt("build log of derivation %s", printStorePath(l.drvPath));
+            }
+        }, object);
+
+    if (!accessStatus.isProtected) return;
+    uid_t uid = getuid();
+    if (effectiveUser) uid = effectiveUser->uid;
+    auto groups = getSubjectGroups(uid);
+    for (auto entity : accessStatus.entities) {
+        if (std::visit(overloaded {
+            [&](ACL::User u) { return u.uid == uid; },
+            [&](ACL::Group g) { return groups.contains(g); }
+        }, entity))
+            return;
+    }
+    throw AccessDenied("you (%s) would not have access to %s; ensure that you do by adding yourself or a group you're in to the list", getUserName(uid), description);
+}
+
+
+void LocalStore::setAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status, const bool & ensureAccessCheck)
+{
+    if (ensureAccessCheck) ensureAccess(status, storePathstoreObject);
+    if (pathOfStoreObjectExists(storePathstoreObject)){
+        setCurrentAccessStatus(storePathstoreObject, status);
+    }
+    else {
+        // If adding future permissions to a StoreObjectDerivationOutput,
+        // also add permissions to the paths that will exist in the future.
+        std::visit(overloaded {
+            [&](StorePath p) {},
+            [&](StoreObjectDerivationOutput p) {
+                    auto drv = readDerivation(p.drvPath);
+                    auto outputHashes = staticOutputHashes(*this, drv);
+                    auto drvOutputs = drv.outputsAndOptPaths(*this);
+                    if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                        auto path = *drvOutputs.at(p.output).second;
+                        futurePermissions[path] = status;
+                    }
+            },
+            [&](StoreObjectDerivationLog l){}
+        }, storePathstoreObject);
+        futurePermissions[storePathstoreObject] = status;
+    }
 }
 
 void LocalStore::setCurrentAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
@@ -1222,10 +1277,10 @@ void LocalStore::setCurrentAccessStatus(const StoreObject & storePathstoreObject
 
             auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
 
-            if (pathExists(logPath)) {
-                setCurrentAccessStatus(logPath, status);
+            if (!pathExists(logPath)){
+                throw Error("setCurrentAccessStatus log path does not exists (%s)", logPath);
             }
-            throw Error("setCurrentAccessStatus log path does not exists (%s)", logPath);
+            setCurrentAccessStatus(logPath, status);
         }
     }, storePathstoreObject);
 }
@@ -1293,21 +1348,26 @@ LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const StoreObject & 
 void LocalStore::grantBuildUserAccess(const StorePath & storePath, const LocalStore::AccessControlEntity & buildUser)
 {
     // The builder-permissions directory remembers permissions to remove at the end of the build.
-    auto status = getCurrentAccessStatus(storePath);
+    auto status = getAccessStatus(storePath);
     if (! status.entities.contains(buildUser)){
         auto basePath = stateDir + "/acls/builder-permissions/" + storePath.to_string();
         std::visit(overloaded {
             [&](ACL::User u) { createDirs(basePath + "/users/" + std::to_string(u.uid)); },
             [&](ACL::Group g) { createDirs(basePath + "/groups/" + std::to_string(g.gid)); },
         }, buildUser);
-        addAllowedEntitiesCurrent(storePath, {buildUser});
+        addAllowedEntities(storePath, {buildUser});
     }
 }
 
 
-LocalStore::AccessStatus LocalStore::getFutureAccessStatus(const StoreObject & storeObject)
+LocalStore::AccessStatus LocalStore::getAccessStatus(const StoreObject & storeObject)
 {
-    return futurePermissions.at(storeObject);
+    if (futurePermissions.contains(storeObject)){
+        return futurePermissions[storeObject];
+    }
+    else {
+        return getCurrentAccessStatus(storeObject);
+    }
 }
 
 std::optional<LocalStore::AccessStatus> LocalStore::getFutureAccessStatusOpt(const StoreObject & storeObject)
@@ -1370,7 +1430,7 @@ void LocalStore::revokeBuildUserAccess(const StorePath & storePath, const LocalS
         [&](ACL::User u) { return std::filesystem::remove((basePath + "/users/" + std::to_string(u.uid)).c_str()); },
         [&](ACL::Group g) { return std::filesystem::remove((basePath + "/groups/" + std::to_string(g.gid)).c_str()); },
     }, buildUser);
-    if (builderPermissionExisted) removeAllowedEntitiesCurrent(storePath, {buildUser});
+    if (builderPermissionExisted) removeAllowedEntities(storePath, {buildUser});
 }
 
 void LocalStore::revokeBuildUserAccess(const StorePath & storePath)
@@ -1470,7 +1530,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
     addTempRoot(info.path);
 
-    if (repair || !isValidPath(info.path) || !canAccess(info.path, false)) {
+    if (repair || !isValidPath(info.path) || !canAccess(info.path)) {
 
         PathLocks outputLock;
 
@@ -1528,7 +1588,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             registerValidPath(info);
 
-        } else if (effectiveUser && !canAccess(info.path, false)) {
+        } else if (effectiveUser && !canAccess(info.path)) {
             auto curInfo = queryPathInfo(info.path);
             HashSink hashSink(HashAlgorithm::SHA256);
             source.drainInto(hashSink);
@@ -1536,7 +1596,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             /* Check that both new and old info matches */
             // checkInfoValidity(hashSink.finish());
             // checkInfoValidity({curInfo->narHash, curInfo->narSize});
-            addAllowedEntitiesFuture(info.path, {*effectiveUser});
+            addAllowedEntities(info.path, {*effectiveUser});
         }
 
         outputLock.setDeletion(true);

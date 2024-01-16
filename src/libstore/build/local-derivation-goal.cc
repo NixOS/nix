@@ -247,8 +247,8 @@ void LocalDerivationGoal::tryLocalBuild()
     if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
         if (auto localStore = dynamic_cast<LocalStore*>(&worker.store)) {
             for (auto path : inputPaths) {
-                if (localStore->getCurrentAccessStatus(path).isProtected) {
-                    if (!localStore->canAccess(path, false))
+                if (localStore->getAccessStatus(path).isProtected) {
+                    if (!localStore->canAccess(path))
                         throw AccessDenied(
                             "%s (uid %d) does not have access to path %s",
                             getUserName(localStore->effectiveUser->uid),
@@ -871,7 +871,7 @@ void LocalDerivationGoal::startBuilder()
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
     printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
-    
+
     for (auto & i : drv->env)
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
@@ -2451,7 +2451,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
             StoreObjectDerivationOutput thisOutput(drvPath, outputName);
             if (localStore.futurePermissions.contains(thisOutput)) {
-                localStore.setFutureAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput]);
+                localStore.setAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput], false);
             }
             /* Store the final path */
             finalOutputs.insert_or_assign(outputName, finalStorePath);
@@ -2747,7 +2747,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 // Is this needed ?
                 // Can give to many permission, if test user tries to build a path that already exists
                 // but on which it does not have permission.
-                // localStore.addAllowedEntitiesCurrent(oldInfo.path, {*localStore.effectiveUser});
+                // localStore.addAllowedEntities(oldInfo.path, {*localStore.effectiveUser});
             }
 
             continue;
@@ -2784,7 +2784,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         StoreObjectDerivationLog log { drvPath };
         /* Since all outputs are known to be matching, give access to the log */
         if (localStore.effectiveUser && !localStore.canAccess(log, false))
-            localStore.addAllowedEntitiesFuture(log, {*localStore.effectiveUser});
+            localStore.addAllowedEntities(log, {*localStore.effectiveUser});
 
         /* In case of fixed-output derivations, if there are
            mismatches on `--check` an error must be thrown as this is
