@@ -271,6 +271,21 @@
 
   The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
 
+- [package]{#package}
+
+  1. A software package; a collection of files and other data.
+
+  2. A [package attribute set].
+
+- [package attribute set]{#package-attribute-set}
+
+  An [attribute set] containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
+  - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
+  - attributes that declare something about how the package is supposed to be installed or used,
+  - other metadata or arbitrary attributes.
+
+  [package attribute set]: #package-attribute-set
+
 - [string interpolation]{#gloss-string-interpolation}
 
   Expanding expressions enclosed in `${ }` within a [string], [path], or [attribute name].
