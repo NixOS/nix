@@ -62,7 +62,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 std::cout << std::endl;
             }
         } else {
-            DrvInfos drvs;
+            PackageInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
             for (auto & i : drvs) {
                 auto drvPath = i.requireDrvPath();

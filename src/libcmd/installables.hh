@@ -12,7 +12,7 @@
 
 namespace nix {
 
-struct DrvInfo;
+struct PackageInfo;
 
 enum class Realise {
     /**

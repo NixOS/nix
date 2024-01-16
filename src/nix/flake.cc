@@ -395,11 +395,11 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
             try {
-                auto drvInfo = getDerivation(*state, v, false);
-                if (!drvInfo)
+                auto packageInfo = getDerivation(*state, v, false);
+                if (!packageInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
                 // FIXME: check meta attributes
-                return drvInfo->queryDrvPath();
+                return packageInfo->queryDrvPath();
             } catch (Error & e) {
                 e.addTrace(resolve(pos), hintfmt("while checking the derivation '%s'", attrPath));
                 reportError(e);

@@ -168,11 +168,11 @@ struct ProfileManifest
             state.allowPath(state.store->followLinksToStore(profile));
             state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
 
-            auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
+            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile));
 
-            for (auto & drvInfo : drvInfos) {
+            for (auto & packageInfo : packageInfos) {
                 ProfileElement element;
-                element.storePaths = {drvInfo.queryOutPath()};
+                element.storePaths = {packageInfo.queryOutPath()};
                 addElement(std::move(element));
             }
         }

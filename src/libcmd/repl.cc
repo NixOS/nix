@@ -450,10 +450,10 @@ static bool isVarName(std::string_view s)
 
 
 StorePath NixRepl::getDerivationPath(Value & v) {
-    auto drvInfo = getDerivation(*state, v, false);
-    if (!drvInfo)
+    auto packageInfo = getDerivation(*state, v, false);
+    if (!packageInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    auto drvPath = drvInfo->queryDrvPath();
+    auto drvPath = packageInfo->queryDrvPath();
     if (!drvPath)
         throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
     if (!state->store->isValidPath(*drvPath))
