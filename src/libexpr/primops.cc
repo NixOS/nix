@@ -3712,15 +3712,28 @@ static RegisterPrimOp primop_toString({
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     int start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
-    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
-    NixStringContext context;
-    auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
     if (start < 0)
         state.debugThrowLastTrace(EvalError({
             .msg = hintfmt("negative start position in 'substring'"),
             .errPos = state.positions[pos]
         }));
+
+
+    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+
+    // Special-case on empty substring to avoid O(n) strlen
+    // This allows for the use of empty substrings to efficently capture string context
+    if (len == 0) {
+        state.forceValue(*args[2], pos);
+        if (args[2]->type() == nString) {
+            v.mkString("", args[2]->context());
+            return;
+        }
+    }
+
+    NixStringContext context;
+    auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
     v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
 }

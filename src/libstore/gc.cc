@@ -413,7 +413,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         unchecked[i->str()].emplace(envFile);
-                } catch (SysError & e) {
+                } catch (SystemError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
                     throw;

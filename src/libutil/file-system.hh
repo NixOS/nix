@@ -41,7 +41,7 @@ struct Source;
  * specified directory, or the current directory otherwise.  The path
  * is also canonicalised.
  */
-Path absPath(Path path,
+Path absPath(PathView path,
     std::optional<PathView> dir = {},
     bool resolveSymlinks = false);
 

@@ -93,9 +93,17 @@ struct NixRepl
     void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace & dt);
 
-    typedef std::set<Value *> ValuesSeen;
-    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
-    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
+    void printValue(std::ostream & str,
+                              Value & v,
+                              unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
+    {
+        ::nix::printValue(*state, str, v, PrintOptions {
+            .ansiColors = true,
+            .force = true,
+            .derivationPaths = true,
+            .maxDepth = maxDepth
+        });
+    }
 };
 
 std::string removeWhitespace(std::string s)
@@ -246,7 +254,7 @@ void NixRepl::mainLoop()
     rl_readline_name = "nix-repl";
     try {
         createDirs(dirOf(historyFile));
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         logWarning(e.info());
     }
 #ifndef USE_READLINE
@@ -708,7 +716,8 @@ bool NixRepl::processLine(std::string line)
     else if (command == ":p" || command == ":print") {
         Value v;
         evalString(arg, v);
-        printValue(std::cout, v, 1000000000) << std::endl;
+        printValue(std::cout, v);
+        std::cout << std::endl;
     }
 
     else if (command == ":q" || command == ":quit") {
@@ -770,7 +779,8 @@ bool NixRepl::processLine(std::string line)
         } else {
             Value v;
             evalString(line, v);
-            printValue(std::cout, v, 1) << std::endl;
+            printValue(std::cout, v, 1);
+            std::cout << std::endl;
         }
     }
 
@@ -889,144 +899,6 @@ void NixRepl::evalString(std::string s, Value & v)
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
-}
-
-
-std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth)
-{
-    ValuesSeen seen;
-    return printValue(str, v, maxDepth, seen);
-}
-
-
-
-
-// FIXME: lot of cut&paste from Nix's eval.cc.
-std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen)
-{
-    str.flush();
-    checkInterrupt();
-
-    state->forceValue(v, v.determinePos(noPos));
-
-    switch (v.type()) {
-
-    case nInt:
-        str << ANSI_CYAN << v.integer << ANSI_NORMAL;
-        break;
-
-    case nBool:
-        str << ANSI_CYAN;
-        printLiteralBool(str, v.boolean);
-        str << ANSI_NORMAL;
-        break;
-
-    case nString:
-        str << ANSI_WARNING;
-        printLiteralString(str, v.string_view());
-        str << ANSI_NORMAL;
-        break;
-
-    case nPath:
-        str << ANSI_GREEN << v.path().to_string() << ANSI_NORMAL; // !!! escaping?
-        break;
-
-    case nNull:
-        str << ANSI_CYAN "null" ANSI_NORMAL;
-        break;
-
-    case nAttrs: {
-        seen.insert(&v);
-
-        bool isDrv = state->isDerivation(v);
-
-        if (isDrv) {
-            str << "«derivation ";
-            Bindings::iterator i = v.attrs->find(state->sDrvPath);
-            NixStringContext context;
-            if (i != v.attrs->end())
-                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
-            else
-                str << "???";
-            str << "»";
-        }
-
-        else if (maxDepth > 0) {
-            str << "{ ";
-
-            typedef std::map<std::string, Value *> Sorted;
-            Sorted sorted;
-            for (auto & i : *v.attrs)
-                sorted.emplace(state->symbols[i.name], i.value);
-
-            for (auto & i : sorted) {
-                printAttributeName(str, i.first);
-                str << " = ";
-                if (seen.count(i.second))
-                    str << "«repeated»";
-                else
-                    try {
-                        printValue(str, *i.second, maxDepth - 1, seen);
-                    } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
-                    }
-                str << "; ";
-            }
-
-            str << "}";
-        } else
-            str << "{ ... }";
-
-        break;
-    }
-
-    case nList:
-        seen.insert(&v);
-
-        str << "[ ";
-        if (maxDepth > 0)
-            for (auto elem : v.listItems()) {
-                if (seen.count(elem))
-                    str << "«repeated»";
-                else
-                    try {
-                        printValue(str, *elem, maxDepth - 1, seen);
-                    } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
-                    }
-                str << " ";
-            }
-        else
-            str << "... ";
-        str << "]";
-        break;
-
-    case nFunction:
-        if (v.isLambda()) {
-            std::ostringstream s;
-            s << state->positions[v.lambda.fun->pos];
-            str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
-        } else if (v.isPrimOp()) {
-            str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
-        } else if (v.isPrimOpApp()) {
-            str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
-        } else {
-            abort();
-        }
-        break;
-
-    case nFloat:
-        str << v.fpoint;
-        break;
-
-    case nThunk:
-    case nExternal:
-    default:
-        str << ANSI_RED "«unknown»" ANSI_NORMAL;
-        break;
-    }
-
-    return str;
 }
 
 

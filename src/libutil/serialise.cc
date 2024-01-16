@@ -53,7 +53,7 @@ void FdSink::writeUnbuffered(std::string_view data)
     written += data.size();
     try {
         writeFull(fd, data);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         _good = false;
         throw;
     }

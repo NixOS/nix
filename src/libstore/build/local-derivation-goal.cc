@@ -1495,7 +1495,7 @@ void LocalDerivationGoal::startDaemon()
                     daemon::processConnection(store, from, to,
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
-                } catch (SysError &) {
+                } catch (SystemError &) {
                     ignoreException();
                 }
             });
@@ -1707,7 +1707,7 @@ void LocalDerivationGoal::runChild()
         try {
             if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
                 netrcData = readFile(settings.netrcFile);
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
 
 #if __linux__
         if (useChroot) {

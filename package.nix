@@ -236,7 +236,6 @@ in {
     openssl
     sqlite
     xz
-  ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
     ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [
     lowdown
@@ -310,7 +309,7 @@ in {
   ] ++ lib.optional (doBuild && stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
        "LDFLAGS=-fuse-ld=gold"
     ++ lib.optional (doBuild && stdenv.hostPlatform.isStatic) "--enable-embedded-sandbox-shell"
-    ++ lib.optional buildUnitTests "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include";
+    ;
 
   enableParallelBuilding = true;
 

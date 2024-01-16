@@ -6,11 +6,11 @@ namespace nix {
 CanonPath CanonPath::root = CanonPath("/");
 
 CanonPath::CanonPath(std::string_view raw)
-    : path(absPath((Path) raw, "/"))
+    : path(absPath(raw, "/"))
 { }
 
 CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
-    : path(absPath((Path) raw, root.abs()))
+    : path(absPath(raw, root.abs()))
 { }
 
 CanonPath::CanonPath(const std::vector<std::string> & elems)
@@ -22,7 +22,7 @@ CanonPath::CanonPath(const std::vector<std::string> & elems)
 
 CanonPath CanonPath::fromCwd(std::string_view path)
 {
-    return CanonPath(unchecked_t(), absPath((Path) path));
+    return CanonPath(unchecked_t(), absPath(path));
 }
 
 std::optional<CanonPath> CanonPath::parent() const
