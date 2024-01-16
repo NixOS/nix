@@ -52,9 +52,9 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 {
     C result;
     auto pos = s.find_first_not_of(separators, 0);
-    while (pos != std::string_view::npos) {
+    while (pos != s.npos) {
         auto end = s.find_first_of(separators, pos + 1);
-        if (end == std::string_view::npos) end = s.size();
+        if (end == s.npos) end = s.size();
         result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
@@ -69,7 +69,7 @@ template std::vector<std::string> tokenizeString(std::string_view s, std::string
 std::string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
-    return i == std::string_view::npos ? "" : std::string(s, 0, i + 1);
+    return i == s.npos ? "" : std::string(s, 0, i + 1);
 }
 
 
@@ -89,7 +89,7 @@ std::string replaceStrings(
 {
     if (from.empty()) return res;
     size_t pos = 0;
-    while ((pos = res.find(from, pos)) != std::string::npos) {
+    while ((pos = res.find(from, pos)) != res.npos) {
         res.replace(pos, from.size(), to);
         pos += to.size();
     }
@@ -102,7 +102,7 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
     for (auto & i : rewrites) {
         if (i.first == i.second) continue;
         size_t j = 0;
-        while ((j = s.find(i.first, j)) != std::string::npos)
+        while ((j = s.find(i.first, j)) != s.npos)
             s.replace(j, i.first.size(), i.second);
     }
     return s;
@@ -122,12 +122,11 @@ bool hasSuffix(std::string_view s, std::string_view suffix)
 }
 
 
-std::string toLower(const std::string & s)
+std::string toLower(std::string s)
 {
-    std::string r(s);
-    for (auto & c : r)
+    for (auto & c : s)
         c = std::tolower(c);
-    return r;
+    return s;
 }
 
 
@@ -135,7 +134,7 @@ std::string shellEscape(const std::string_view s)
 {
     std::string r;
     r.reserve(s.size() + 2);
-    r += "'";
+    r += '\'';
     for (auto & i : s)
         if (i == '\'') r += "'\\''"; else r += i;
     r += '\'';
@@ -184,7 +183,7 @@ std::string base64Encode(std::string_view s)
 std::string base64Decode(std::string_view s)
 {
     constexpr char npos = -1;
-    constexpr std::array<char, 256> base64DecodeChars = [&]() {
+    constexpr std::array<char, 256> base64DecodeChars = [&] {
         std::array<char, 256>  result{};
         for (auto& c : result)
             c = npos;
