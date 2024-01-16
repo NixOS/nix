@@ -273,7 +273,7 @@
 
 - [package]{#package}
 
-  1. A software package; typically a collection of programs, files and data.
+  1. A software package; a collection of files and other data.
 
   2. A [package attribute set].
 
