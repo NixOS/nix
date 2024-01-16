@@ -1,3 +1,4 @@
+#include "error.hh"
 #include "fetchers.hh"
 #include "users.hh"
 #include "cache.hh"
@@ -9,7 +10,6 @@
 #include "processes.hh"
 #include "git.hh"
 #include "fs-input-accessor.hh"
-#include "filtering-input-accessor.hh"
 #include "mounted-input-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
@@ -174,7 +174,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "allRefs" || name == "verifyCommit")
+            else if (name == "shallow" || name == "submodules" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -199,6 +199,7 @@ struct GitInputScheme : InputScheme
             "rev",
             "shallow",
             "submodules",
+            "exportIgnore",
             "lastModified",
             "revCount",
             "narHash",
@@ -250,6 +251,8 @@ struct GitInputScheme : InputScheme
             url.query.insert_or_assign("shallow", "1");
         if (getSubmodulesAttr(input))
             url.query.insert_or_assign("submodules", "1");
+        if (maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false))
+            url.query.insert_or_assign("exportIgnore", "1");
         if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
             url.query.insert_or_assign("verifyCommit", "1");
         auto publicKeys = getPublicKeys(input.attrs);
@@ -370,6 +373,11 @@ struct GitInputScheme : InputScheme
     bool getSubmodulesAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    }
+
+    bool getExportIgnoreAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false);
     }
 
     bool getAllRefsAttr(const Input & input) const
@@ -600,7 +608,8 @@ struct GitInputScheme : InputScheme
 
         verifyCommit(input, repo);
 
-        auto accessor = repo->getAccessor(rev);
+        bool exportIgnore = getExportIgnoreAttr(input);
+        auto accessor = repo->getAccessor(rev, exportIgnore);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
@@ -610,7 +619,7 @@ struct GitInputScheme : InputScheme
         if (getSubmodulesAttr(input)) {
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
-            for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev)) {
+            for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
                 auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
                 debug("Git submodule %s: %s %s %s -> %s",
                     submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
@@ -620,6 +629,7 @@ struct GitInputScheme : InputScheme
                 if (submodule.branch != "")
                     attrs.insert_or_assign("ref", submodule.branch);
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
+                attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
@@ -650,10 +660,13 @@ struct GitInputScheme : InputScheme
             for (auto & submodule : repoInfo.workdirInfo.submodules)
                 repoInfo.workdirInfo.files.insert(submodule.path);
 
+        auto repo = GitRepo::openRepo(CanonPath(repoInfo.url), false, false);
+
+        auto exportIgnore = getExportIgnoreAttr(input);
+
         ref<InputAccessor> accessor =
-            AllowListInputAccessor::create(
-                makeFSInputAccessor(CanonPath(repoInfo.url)),
-                std::move(repoInfo.workdirInfo.files),
+            repo->getAccessor(repoInfo.workdirInfo,
+                exportIgnore,
                 makeNotAllowedError(repoInfo.url));
 
         /* If the repo has submodules, return a mounted input accessor
@@ -667,6 +680,8 @@ struct GitInputScheme : InputScheme
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", submodulePath.abs());
+                attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
@@ -725,6 +740,16 @@ struct GitInputScheme : InputScheme
 
         auto repoInfo = getRepoInfo(input);
 
+        if (getExportIgnoreAttr(input)
+            && getSubmodulesAttr(input)) {
+            /* In this situation, we don't have a git CLI behavior that we can copy.
+               `git archive` does not support submodules, so it is unclear whether
+               rules from the parent should affect the submodule or not.
+               When git may eventually implement this, we need Nix to match its
+               behavior. */
+            throw UnimplementedError("exportIgnore and submodules are not supported together yet");
+        }
+
         auto [accessor, final] =
             input.getRef() || input.getRev() || !repoInfo.isLocal
             ? getAccessorFromCommit(store, repoInfo, std::move(input))
@@ -738,7 +763,7 @@ struct GitInputScheme : InputScheme
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "");
+            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
         else
             return std::nullopt;
     }

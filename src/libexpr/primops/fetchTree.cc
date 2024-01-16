@@ -1,3 +1,4 @@
+#include "libfetchers/attrs.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
@@ -25,7 +26,7 @@ void emitTreeAttrs(
 {
     assert(input.isLocked());
 
-    auto attrs = state.buildBindings(10);
+    auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
@@ -135,6 +136,10 @@ static void fetchTree(
                     state.symbols[attr.name], showType(*attr.value)));
         }
 
+        if (params.isFetchGit && !attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+            attrs.emplace("exportIgnore", Explicit<bool>{true});
+        }
+
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.debugThrowLastTrace(EvalError({
@@ -152,6 +157,9 @@ static void fetchTree(
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
             attrs.emplace("url", fixGitURL(url));
+            if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+                attrs.emplace("exportIgnore", Explicit<bool>{true});
+            }
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
@@ -592,6 +600,13 @@ static RegisterPrimOp primop_fetchGit({
       - `submodules` (default: `false`)
 
         A Boolean parameter that specifies whether submodules should be checked out.
+
+      - `exportIgnore` (default: `true`)
+
+        A Boolean parameter that specifies whether `export-ignore` from `.gitattributes` should be applied.
+        This approximates part of the `git archive` behavior.
+
+        Enabling this option is not recommended because it is unknown whether the Git developers commit to the reproducibility of `export-ignore` in newer Git versions.
 
       - `shallow` (default: `false`)
 

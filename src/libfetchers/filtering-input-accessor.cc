@@ -80,4 +80,13 @@ ref<AllowListInputAccessor> AllowListInputAccessor::create(
     return make_ref<AllowListInputAccessorImpl>(next, std::move(allowedPaths), std::move(makeNotAllowedError));
 }
 
+bool CachingFilteringInputAccessor::isAllowed(const CanonPath & path)
+{
+    auto i = cache.find(path);
+    if (i != cache.end()) return i->second;
+    auto res = isAllowedUncached(path);
+    cache.emplace(path, res);
+    return res;
+}
+
 }
