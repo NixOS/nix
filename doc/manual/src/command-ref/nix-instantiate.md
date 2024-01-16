@@ -44,9 +44,10 @@ standard input.
 
     > **Warning**
     >
-    > This option produces ambiguous output which is not suitable for machine
-    > consumption. For example, these two Nix expressions print the same result
-    > despite having different types:
+    > This option produces output which can be parsed as a Nix expression which
+    > will produce a different result than the input expression when evaluated.
+    > For example, these two Nix expressions print the same result despite
+    > having different meaning:
     >
     > ```console
     > $ nix-instantiate --eval --expr '{ a = {}; }'
@@ -179,12 +180,7 @@ $ nix-instantiate --eval --xml --expr '{ x = {}; }'
     </attr>
   </attrs>
 </expr>
-```
 
-Note that `y` is left unevaluated (the XML representation doesn’t
-attempt to show non-normal forms).
-
-```console
 $ nix-instantiate --eval --xml --strict --expr '{ x = {}; }'
 <?xml version='1.0' encoding='utf-8'?>
 <expr>
