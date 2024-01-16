@@ -154,6 +154,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                 if (e.errNo == ECONNREFUSED || e.errNo == ENOENT) {
                     debug("GC socket connection refused: %s", e.msg());
                     fdRootsSocket->close();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     goto restart;
                 }
                 throw;
