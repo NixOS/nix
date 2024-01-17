@@ -6,6 +6,8 @@
 
 namespace nix {
 
+struct StoreDirConfig;
+
 /**
  * This is a deprecated old type just for use by the old CLI, and older
  * versions of the RPC protocols. In new code don't use it; you want
@@ -19,7 +21,7 @@ struct StorePathWithOutputs
     StorePath path;
     std::set<std::string> outputs;
 
-    std::string to_string(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
 
     DerivedPath toDerivedPath() const;
 
@@ -32,14 +34,14 @@ std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs>)
 
 std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
 
-class Store;
-
 /**
  * Split a string specifying a derivation and a set of outputs
  * (/nix/store/hash-foo!out1,out2,...) into the derivation path
  * and the outputs.
  */
-StorePathWithOutputs parsePathWithOutputs(const Store & store, std::string_view pathWithOutputs);
+StorePathWithOutputs parsePathWithOutputs(const StoreDirConfig & store, std::string_view pathWithOutputs);
+
+class Store;
 
 StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathWithOutputs);
 

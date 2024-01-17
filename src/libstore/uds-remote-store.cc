@@ -1,4 +1,5 @@
 #include "uds-remote-store.hh"
+#include "unix-domain-socket.hh"
 #include "worker-protocol.hh"
 
 #include <sys/types.h>

@@ -5,7 +5,7 @@
 
 #include <setjmp.h>
 
-#ifdef READLINE
+#ifdef USE_READLINE
 #include <readline/history.h>
 #include <readline/readline.h>
 #else
@@ -22,6 +22,7 @@ extern "C" {
 #include "repl.hh"
 
 #include "ansicolor.hh"
+#include "signals.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-cache.hh"
@@ -36,11 +37,12 @@ extern "C" {
 #include "globals.hh"
 #include "flake/flake.hh"
 #include "flake/lockfile.hh"
+#include "users.hh"
+#include "terminal.hh"
 #include "editor-for.hh"
 #include "finally.hh"
 #include "markdown.hh"
 #include "local-fs-store.hh"
-#include "progress-bar.hh"
 #include "print.hh"
 
 #if HAVE_BOEHMGC
@@ -91,9 +93,17 @@ struct NixRepl
     void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace & dt);
 
-    typedef std::set<Value *> ValuesSeen;
-    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
-    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
+    void printValue(std::ostream & str,
+                              Value & v,
+                              unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
+    {
+        ::nix::printValue(*state, str, v, PrintOptions {
+            .ansiColors = true,
+            .force = true,
+            .derivationPaths = true,
+            .maxDepth = maxDepth
+        });
+    }
 };
 
 std::string removeWhitespace(std::string s)
@@ -110,7 +120,7 @@ NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalS
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
-    , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
+    , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
 }
@@ -219,7 +229,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     // prefer direct pos, but if noPos then try the expr.
     auto pos = dt.pos
         ? dt.pos
-        : static_cast<std::shared_ptr<AbstractPos>>(positions[dt.expr.getPos() ? dt.expr.getPos() : noPos]);
+        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
         out << pos;
@@ -244,28 +254,26 @@ void NixRepl::mainLoop()
     rl_readline_name = "nix-repl";
     try {
         createDirs(dirOf(historyFile));
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         logWarning(e.info());
     }
-#ifndef READLINE
+#ifndef USE_READLINE
     el_hist_size = 1000;
 #endif
     read_history(historyFile.c_str());
     auto oldRepl = curRepl;
     curRepl = this;
     Finally restoreRepl([&] { curRepl = oldRepl; });
-#ifndef READLINE
+#ifndef USE_READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #endif
 
-    /* Stop the progress bar because it interferes with the display of
-       the repl. */
-    stopProgressBar();
-
     std::string input;
 
     while (true) {
+        // Hide the progress bar while waiting for user input, so that it won't interfere.
+        logger->pause();
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
         if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
@@ -275,6 +283,7 @@ void NixRepl::mainLoop()
             logger->cout("");
             break;
         }
+        logger->resume();
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
@@ -441,10 +450,10 @@ static bool isVarName(std::string_view s)
 
 
 StorePath NixRepl::getDerivationPath(Value & v) {
-    auto drvInfo = getDerivation(*state, v, false);
-    if (!drvInfo)
+    auto packageInfo = getDerivation(*state, v, false);
+    if (!packageInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    auto drvPath = drvInfo->queryDrvPath();
+    auto drvPath = packageInfo->queryDrvPath();
     if (!drvPath)
         throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
     if (!state->store->isValidPath(*drvPath))
@@ -488,35 +497,40 @@ bool NixRepl::processLine(std::string line)
         std::cout
              << "The following commands are available:\n"
              << "\n"
-             << "  <expr>        Evaluate and print expression\n"
-             << "  <x> = <expr>  Bind expression to variable\n"
-             << "  :a <expr>     Add attributes from resulting set to scope\n"
-             << "  :b <expr>     Build a derivation\n"
-             << "  :bl <expr>    Build a derivation, creating GC roots in the working directory\n"
-             << "  :e <expr>     Open package or function in $EDITOR\n"
-             << "  :i <expr>     Build derivation, then install result into current profile\n"
-             << "  :l <path>     Load Nix expression and add it to scope\n"
-             << "  :lf <ref>     Load Nix flake and add it to scope\n"
-             << "  :p <expr>     Evaluate and print expression recursively\n"
-             << "  :q            Exit nix-repl\n"
-             << "  :r            Reload all files\n"
-             << "  :sh <expr>    Build dependencies of derivation, then start nix-shell\n"
-             << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n"
-             << "  :doc <expr>   Show documentation of a builtin function\n"
-             << "  :log <expr>   Show logs for a derivation\n"
-             << "  :te [bool]    Enable, disable or toggle showing traces for errors\n"
+             << "  <expr>                       Evaluate and print expression\n"
+             << "  <x> = <expr>                 Bind expression to variable\n"
+             << "  :a, :add <expr>              Add attributes from resulting set to scope\n"
+             << "  :b <expr>                    Build a derivation\n"
+             << "  :bl <expr>                   Build a derivation, creating GC roots in the\n"
+             << "                               working directory\n"
+             << "  :e, :edit <expr>             Open package or function in $EDITOR\n"
+             << "  :i <expr>                    Build derivation, then install result into\n"
+             << "                               current profile\n"
+             << "  :l, :load <path>             Load Nix expression and add it to scope\n"
+             << "  :lf, :load-flake <ref>       Load Nix flake and add it to scope\n"
+             << "  :p, :print <expr>            Evaluate and print expression recursively\n"
+             << "  :q, :quit                    Exit nix-repl\n"
+             << "  :r, :reload                  Reload all files\n"
+             << "  :sh <expr>                   Build dependencies of derivation, then start\n"
+             << "                               nix-shell\n"
+             << "  :t <expr>                    Describe result of evaluation\n"
+             << "  :u <expr>                    Build derivation, then start nix-shell\n"
+             << "  :doc <expr>                  Show documentation of a builtin function\n"
+             << "  :log <expr>                  Show logs for a derivation\n"
+             << "  :te, :trace-enable [bool]    Enable, disable or toggle showing traces for\n"
+             << "                               errors\n"
+             << "  :?, :help                    Brings up this help menu\n"
              ;
         if (state->debugRepl) {
              std::cout
              << "\n"
              << "        Debug mode commands\n"
-             << "  :env          Show env stack\n"
-             << "  :bt           Show trace stack\n"
-             << "  :st           Show current trace\n"
-             << "  :st <idx>     Change to another trace in the stack\n"
-             << "  :c            Go until end of program, exception, or builtins.break\n"
-             << "  :s            Go one step\n"
+             << "  :env             Show env stack\n"
+             << "  :bt, :backtrace  Show trace stack\n"
+             << "  :st              Show current trace\n"
+             << "  :st <idx>        Change to another trace in the stack\n"
+             << "  :c, :continue    Go until end of program, exception, or builtins.break\n"
+             << "  :s, :step        Go one step\n"
              ;
         }
 
@@ -702,7 +716,8 @@ bool NixRepl::processLine(std::string line)
     else if (command == ":p" || command == ":print") {
         Value v;
         evalString(arg, v);
-        printValue(std::cout, v, 1000000000) << std::endl;
+        printValue(std::cout, v);
+        std::cout << std::endl;
     }
 
     else if (command == ":q" || command == ":quit") {
@@ -764,7 +779,8 @@ bool NixRepl::processLine(std::string line)
         } else {
             Value v;
             evalString(line, v);
-            printValue(std::cout, v, 1) << std::endl;
+            printValue(std::cout, v, 1);
+            std::cout << std::endl;
         }
     }
 
@@ -882,145 +898,7 @@ void NixRepl::evalString(std::string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
-}
-
-
-std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth)
-{
-    ValuesSeen seen;
-    return printValue(str, v, maxDepth, seen);
-}
-
-
-
-
-// FIXME: lot of cut&paste from Nix's eval.cc.
-std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen)
-{
-    str.flush();
-    checkInterrupt();
-
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
-
-    switch (v.type()) {
-
-    case nInt:
-        str << ANSI_CYAN << v.integer << ANSI_NORMAL;
-        break;
-
-    case nBool:
-        str << ANSI_CYAN;
-        printLiteralBool(str, v.boolean);
-        str << ANSI_NORMAL;
-        break;
-
-    case nString:
-        str << ANSI_WARNING;
-        printLiteralString(str, v.string.s);
-        str << ANSI_NORMAL;
-        break;
-
-    case nPath:
-        str << ANSI_GREEN << v.path().to_string() << ANSI_NORMAL; // !!! escaping?
-        break;
-
-    case nNull:
-        str << ANSI_CYAN "null" ANSI_NORMAL;
-        break;
-
-    case nAttrs: {
-        seen.insert(&v);
-
-        bool isDrv = state->isDerivation(v);
-
-        if (isDrv) {
-            str << "«derivation ";
-            Bindings::iterator i = v.attrs->find(state->sDrvPath);
-            NixStringContext context;
-            if (i != v.attrs->end())
-                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
-            else
-                str << "???";
-            str << "»";
-        }
-
-        else if (maxDepth > 0) {
-            str << "{ ";
-
-            typedef std::map<std::string, Value *> Sorted;
-            Sorted sorted;
-            for (auto & i : *v.attrs)
-                sorted.emplace(state->symbols[i.name], i.value);
-
-            for (auto & i : sorted) {
-                printAttributeName(str, i.first);
-                str << " = ";
-                if (seen.count(i.second))
-                    str << "«repeated»";
-                else
-                    try {
-                        printValue(str, *i.second, maxDepth - 1, seen);
-                    } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
-                    }
-                str << "; ";
-            }
-
-            str << "}";
-        } else
-            str << "{ ... }";
-
-        break;
-    }
-
-    case nList:
-        seen.insert(&v);
-
-        str << "[ ";
-        if (maxDepth > 0)
-            for (auto elem : v.listItems()) {
-                if (seen.count(elem))
-                    str << "«repeated»";
-                else
-                    try {
-                        printValue(str, *elem, maxDepth - 1, seen);
-                    } catch (AssertionError & e) {
-                        str << ANSI_RED "«error: " << e.msg() << "»" ANSI_NORMAL;
-                    }
-                str << " ";
-            }
-        else
-            str << "... ";
-        str << "]";
-        break;
-
-    case nFunction:
-        if (v.isLambda()) {
-            std::ostringstream s;
-            s << state->positions[v.lambda.fun->pos];
-            str << ANSI_BLUE "«lambda @ " << filterANSIEscapes(s.str()) << "»" ANSI_NORMAL;
-        } else if (v.isPrimOp()) {
-            str << ANSI_MAGENTA "«primop»" ANSI_NORMAL;
-        } else if (v.isPrimOpApp()) {
-            str << ANSI_BLUE "«primop-app»" ANSI_NORMAL;
-        } else {
-            abort();
-        }
-        break;
-
-    case nFloat:
-        str << v.fpoint;
-        break;
-
-    case nThunk:
-    case nExternal:
-    default:
-        str << ANSI_RED "«unknown»" ANSI_NORMAL;
-        break;
-    }
-
-    return str;
+    state->forceValue(v, v.determinePos(noPos));
 }
 
 

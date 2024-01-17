@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "util.hh"
 #include "url.hh"
+#include "signals.hh"
 
 #include <sqlite3.h>
 

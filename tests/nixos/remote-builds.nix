@@ -90,22 +90,22 @@ in
 
     # Perform a build and check that it was performed on the builder.
     out = client.succeed(
-      "nix-build ${expr nodes.client.config 1} 2> build-output",
+      "nix-build ${expr nodes.client 1} 2> build-output",
       "grep -q Hello build-output"
     )
     builder1.succeed(f"test -e {out}")
 
     # And a parallel build.
-    paths = client.succeed(r'nix-store -r $(nix-instantiate ${expr nodes.client.config 2})\!out $(nix-instantiate ${expr nodes.client.config 3})\!out')
+    paths = client.succeed(r'nix-store -r $(nix-instantiate ${expr nodes.client 2})\!out $(nix-instantiate ${expr nodes.client 3})\!out')
     out1, out2 = paths.split()
     builder1.succeed(f"test -e {out1} -o -e {out2}")
     builder2.succeed(f"test -e {out1} -o -e {out2}")
 
     # And a failing build.
-    client.fail("nix-build ${expr nodes.client.config 5}")
+    client.fail("nix-build ${expr nodes.client 5}")
 
     # Test whether the build hook automatically skips unavailable builders.
     builder1.block()
-    client.succeed("nix-build ${expr nodes.client.config 4}")
+    client.succeed("nix-build ${expr nodes.client 4}")
   '';
 }

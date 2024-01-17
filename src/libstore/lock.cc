@@ -1,4 +1,5 @@
 #include "lock.hh"
+#include "file-system.hh"
 #include "globals.hh"
 #include "pathlocks.hh"
 
@@ -6,6 +7,31 @@
 #include <grp.h>
 
 namespace nix {
+
+#if __linux__
+
+static std::vector<gid_t> get_group_list(const char *username, gid_t group_id)
+{
+    std::vector<gid_t> gids;
+    gids.resize(32); // Initial guess
+
+    auto getgroupl_failed {[&] {
+        int ngroups = gids.size();
+        int err = getgrouplist(username, group_id, gids.data(), &ngroups);
+        gids.resize(ngroups);
+        return err == -1;
+    }};
+
+    // The first error means that the vector was not big enough.
+    // If it happens again, there is some different problem.
+    if (getgroupl_failed() && getgroupl_failed()) {
+        throw SysError("failed to get list of supplementary groups for '%s'", username);
+    }
+
+    return gids;
+}
+#endif
+
 
 struct SimpleUserLock : UserLock
 {
@@ -67,37 +93,14 @@ struct SimpleUserLock : UserLock
                     throw Error("the Nix user should not be a member of '%s'", settings.buildUsersGroup);
 
                 #if __linux__
-                /* Get the list of supplementary groups of this build
-                   user.  This is usually either empty or contains a
-                   group such as "kvm".  */
-                int ngroups = 32; // arbitrary initial guess
-                std::vector<gid_t> gids;
-                gids.resize(ngroups);
-
-                int err = getgrouplist(
-                    pw->pw_name, pw->pw_gid,
-                    gids.data(),
-                    &ngroups);
-
-                /* Our initial size of 32 wasn't sufficient, the
-                   correct size has been stored in ngroups, so we try
-                   again. */
-                if (err == -1) {
-                    gids.resize(ngroups);
-                    err = getgrouplist(
-                        pw->pw_name, pw->pw_gid,
-                        gids.data(),
-                        &ngroups);
-                }
-
-                // If it failed once more, then something must be broken.
-                if (err == -1)
-                    throw Error("failed to get list of supplementary groups for '%s'", pw->pw_name);
+                /* Get the list of supplementary groups of this user. This is
+                 * usually either empty or contains a group such as "kvm". */
 
                 // Finally, trim back the GID list to its real size.
-                for (auto i = 0; i < ngroups; i++)
-                    if (gids[i] != lock->gid)
-                        lock->supplementaryGIDs.push_back(gids[i]);
+                for (auto gid : get_group_list(pw->pw_name, pw->pw_gid)) {
+                    if (gid != lock->gid)
+                        lock->supplementaryGIDs.push_back(gid);
+                }
                 #endif
 
                 return lock;

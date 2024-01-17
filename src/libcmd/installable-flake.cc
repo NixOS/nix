@@ -28,6 +28,11 @@ namespace nix {
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
     std::vector<std::string> res;
+    if (attrPaths.size() == 1 && attrPaths.front().starts_with(".")){
+        attrPaths.front().erase(0,1);
+        res.push_back(attrPaths.front());
+        return res;
+    }
 
     for (auto & prefix : prefixes)
         res.push_back(prefix + *attrPaths.begin());
@@ -47,7 +52,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceValue(*aOutputs->value, [&]() { return aOutputs->value->determinePos(noPos); });
+    state.forceValue(*aOutputs->value, aOutputs->value->determinePos(noPos));
 
     return aOutputs->value;
 }

@@ -1,5 +1,4 @@
 #include "get-drvs.hh"
-#include "util.hh"
 #include "eval-inline.hh"
 #include "derivations.hh"
 #include "store-api.hh"
@@ -12,13 +11,13 @@
 namespace nix {
 
 
-DrvInfo::DrvInfo(EvalState & state, std::string attrPath, Bindings * attrs)
+PackageInfo::PackageInfo(EvalState & state, std::string attrPath, Bindings * attrs)
     : state(&state), attrs(attrs), attrPath(std::move(attrPath))
 {
 }
 
 
-DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
+PackageInfo::PackageInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
     : state(&state), attrs(nullptr), attrPath("")
 {
     auto [drvPath, selectedOutputs] = parsePathWithOutputs(*store, drvPathWithOutputs);
@@ -46,7 +45,7 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
 }
 
 
-std::string DrvInfo::queryName() const
+std::string PackageInfo::queryName() const
 {
     if (name == "" && attrs) {
         auto i = attrs->find(state->sName);
@@ -57,7 +56,7 @@ std::string DrvInfo::queryName() const
 }
 
 
-std::string DrvInfo::querySystem() const
+std::string PackageInfo::querySystem() const
 {
     if (system == "" && attrs) {
         auto i = attrs->find(state->sSystem);
@@ -67,7 +66,7 @@ std::string DrvInfo::querySystem() const
 }
 
 
-std::optional<StorePath> DrvInfo::queryDrvPath() const
+std::optional<StorePath> PackageInfo::queryDrvPath() const
 {
     if (!drvPath && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
@@ -81,7 +80,7 @@ std::optional<StorePath> DrvInfo::queryDrvPath() const
 }
 
 
-StorePath DrvInfo::requireDrvPath() const
+StorePath PackageInfo::requireDrvPath() const
 {
     if (auto drvPath = queryDrvPath())
         return *drvPath;
@@ -89,7 +88,7 @@ StorePath DrvInfo::requireDrvPath() const
 }
 
 
-StorePath DrvInfo::queryOutPath() const
+StorePath PackageInfo::queryOutPath() const
 {
     if (!outPath && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
@@ -103,7 +102,7 @@ StorePath DrvInfo::queryOutPath() const
 }
 
 
-DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall)
+PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall)
 {
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
@@ -156,7 +155,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall
         Outputs result;
         for (auto elem : outTI->listItems()) {
             if (elem->type() != nString) throw errMsg;
-            auto out = outputs.find(elem->string.s);
+            auto out = outputs.find(elem->c_str());
             if (out == outputs.end()) throw errMsg;
             result.insert(*out);
         }
@@ -165,7 +164,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall
 }
 
 
-std::string DrvInfo::queryOutputName() const
+std::string PackageInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutputName);
@@ -175,7 +174,7 @@ std::string DrvInfo::queryOutputName() const
 }
 
 
-Bindings * DrvInfo::getMeta()
+Bindings * PackageInfo::getMeta()
 {
     if (meta) return meta;
     if (!attrs) return 0;
@@ -187,7 +186,7 @@ Bindings * DrvInfo::getMeta()
 }
 
 
-StringSet DrvInfo::queryMetaNames()
+StringSet PackageInfo::queryMetaNames()
 {
     StringSet res;
     if (!getMeta()) return res;
@@ -197,9 +196,9 @@ StringSet DrvInfo::queryMetaNames()
 }
 
 
-bool DrvInfo::checkMeta(Value & v)
+bool PackageInfo::checkMeta(Value & v)
 {
-    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    state->forceValue(v, v.determinePos(noPos));
     if (v.type() == nList) {
         for (auto elem : v.listItems())
             if (!checkMeta(*elem)) return false;
@@ -217,7 +216,7 @@ bool DrvInfo::checkMeta(Value & v)
 }
 
 
-Value * DrvInfo::queryMeta(const std::string & name)
+Value * PackageInfo::queryMeta(const std::string & name)
 {
     if (!getMeta()) return 0;
     Bindings::iterator a = meta->find(state->symbols.create(name));
@@ -226,15 +225,15 @@ Value * DrvInfo::queryMeta(const std::string & name)
 }
 
 
-std::string DrvInfo::queryMetaString(const std::string & name)
+std::string PackageInfo::queryMetaString(const std::string & name)
 {
     Value * v = queryMeta(name);
     if (!v || v->type() != nString) return "";
-    return v->string.s;
+    return v->c_str();
 }
 
 
-NixInt DrvInfo::queryMetaInt(const std::string & name, NixInt def)
+NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
@@ -242,13 +241,13 @@ NixInt DrvInfo::queryMetaInt(const std::string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        if (auto n = string2Int<NixInt>(v->string.s))
+        if (auto n = string2Int<NixInt>(v->c_str()))
             return *n;
     }
     return def;
 }
 
-NixFloat DrvInfo::queryMetaFloat(const std::string & name, NixFloat def)
+NixFloat PackageInfo::queryMetaFloat(const std::string & name, NixFloat def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
@@ -256,14 +255,14 @@ NixFloat DrvInfo::queryMetaFloat(const std::string & name, NixFloat def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
-        if (auto n = string2Float<NixFloat>(v->string.s))
+        if (auto n = string2Float<NixFloat>(v->c_str()))
             return *n;
     }
     return def;
 }
 
 
-bool DrvInfo::queryMetaBool(const std::string & name, bool def)
+bool PackageInfo::queryMetaBool(const std::string & name, bool def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
@@ -271,14 +270,14 @@ bool DrvInfo::queryMetaBool(const std::string & name, bool def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            Boolean meta fields. */
-        if (strcmp(v->string.s, "true") == 0) return true;
-        if (strcmp(v->string.s, "false") == 0) return false;
+        if (v->string_view() == "true") return true;
+        if (v->string_view() == "false") return false;
     }
     return def;
 }
 
 
-void DrvInfo::setMeta(const std::string & name, Value * v)
+void PackageInfo::setMeta(const std::string & name, Value * v)
 {
     getMeta();
     auto attrs = state->buildBindings(1 + (meta ? meta->size() : 0));
@@ -301,18 +300,18 @@ typedef std::set<Bindings *> Done;
    The result boolean indicates whether it makes sense
    for the caller to recursively search for derivations in `v'. */
 static bool getDerivation(EvalState & state, Value & v,
-    const std::string & attrPath, DrvInfos & drvs, Done & done,
+    const std::string & attrPath, PackageInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
 {
     try {
-        state.forceValue(v, [&]() { return v.determinePos(noPos); });
+        state.forceValue(v, v.determinePos(noPos));
         if (!state.isDerivation(v)) return true;
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =
            derivation {...}; y = x;}'. */
         if (!done.insert(v.attrs).second) return false;
 
-        DrvInfo drv(state, attrPath, v.attrs);
+        PackageInfo drv(state, attrPath, v.attrs);
 
         drv.queryName();
 
@@ -327,11 +326,11 @@ static bool getDerivation(EvalState & state, Value & v,
 }
 
 
-std::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
+std::optional<PackageInfo> getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     Done done;
-    DrvInfos drvs;
+    PackageInfos drvs;
     getDerivation(state, v, "", drvs, done, ignoreAssertionFailures);
     if (drvs.size() != 1) return {};
     return std::move(drvs.front());
@@ -349,7 +348,7 @@ static std::regex attrRegex("[A-Za-z_][A-Za-z0-9-_+]*");
 
 static void getDerivations(EvalState & state, Value & vIn,
     const std::string & pathPrefix, Bindings & autoArgs,
-    DrvInfos & drvs, Done & done,
+    PackageInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
 {
     Value v;
@@ -402,7 +401,7 @@ static void getDerivations(EvalState & state, Value & vIn,
 
 
 void getDerivations(EvalState & state, Value & v, const std::string & pathPrefix,
-    Bindings & autoArgs, DrvInfos & drvs, bool ignoreAssertionFailures)
+    Bindings & autoArgs, PackageInfos & drvs, bool ignoreAssertionFailures)
 {
     Done done;
     getDerivations(state, v, pathPrefix, autoArgs, drvs, done, ignoreAssertionFailures);

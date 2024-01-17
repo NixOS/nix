@@ -1,3 +1,4 @@
+#include "current-process.hh"
 #include "command-installable-value.hh"
 #include "shared.hh"
 #include "eval.hh"

@@ -2,6 +2,7 @@
 
 #include "cgroup.hh"
 #include "util.hh"
+#include "file-system.hh"
 #include "finally.hh"
 
 #include <chrono>
@@ -94,7 +95,7 @@ static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
                     using namespace std::string_literals;
                     warn("killing stray builder process %d (%s)...",
                         pid, trim(replaceStrings(cmdline, "\0"s, " ")));
-                } catch (SysError &) {
+                } catch (SystemError &) {
                 }
             }
             // FIXME: pid wraparound

@@ -1,5 +1,11 @@
 programs-list :=
 
+ifdef HOST_WINDOWS
+  EXE_EXT = .exe
+else
+  EXE_EXT =
+endif
+
 # Build a program with symbolic name $(1).  The program is defined by
 # various variables prefixed by ‘$(1)_’:
 #
@@ -31,7 +37,7 @@ define build-program
   _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
   $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
   _libs := $$(foreach lib, $$($(1)_LIBS), $$(foreach lib2, $$($$(lib)_LIB_CLOSURE), $$($$(lib2)_PATH)))
-  $(1)_PATH := $$(_d)/$$($(1)_NAME)
+  $(1)_PATH := $$(_d)/$$($(1)_NAME)$(EXE_EXT)
 
   $$(eval $$(call create-dir, $$(_d)))
 
@@ -42,7 +48,7 @@ define build-program
 
   ifdef $(1)_INSTALL_DIR
 
-    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME)
+    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME)$(EXE_EXT)
 
     $$(eval $$(call create-dir, $$($(1)_INSTALL_DIR)))
 
@@ -87,6 +93,6 @@ define build-program
   # Phony target to run this program (typically as a dependency of 'check').
   .PHONY: $(1)_RUN
   $(1)_RUN: $$($(1)_PATH)
-	$(trace-test) $$($(1)_PATH)
+	$(trace-test) $$($(1)_ENV) $$($(1)_PATH)
 
 endef

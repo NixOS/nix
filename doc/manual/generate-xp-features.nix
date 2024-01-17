@@ -1,5 +1,5 @@
 with builtins;
-with import ./utils.nix;
+with import <nix/utils.nix>;
 
 let
   showExperimentalFeature = name: doc:
@@ -8,4 +8,6 @@ let
 
       ${doc}
     '';
-in xps: (concatStringsSep "\n" (attrValues (mapAttrs showExperimentalFeature xps)))
+in
+
+xps: (concatStringsSep "\n" (attrValues (mapAttrs showExperimentalFeature xps)))

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "derived-path.hh"
@@ -20,11 +21,8 @@ namespace nix {
  *
  * @param V A type to instantiate for each output. It should probably
  * should be an "optional" type so not every interior node has to have a
- * value. For example, the scheduler uses
- * `DerivedPathMap<std::weak_ptr<CreateDerivationAndRealiseGoal>>` to
- * remember which goals correspond to which outputs. `* const Something`
- * or `std::optional<Something>` would also be good choices for
- * "optional" types.
+ * value. `* const Something` or `std::optional<Something>` would be
+ * good choices for "optional" types.
  */
 template<typename V>
 struct DerivedPathMap {
@@ -48,6 +46,8 @@ struct DerivedPathMap {
          * The map of the root node.
          */
         Map childMap;
+
+        DECLARE_CMP(ChildNode);
     };
 
     /**
@@ -60,6 +60,8 @@ struct DerivedPathMap {
      */
     Map map;
 
+    DECLARE_CMP(DerivedPathMap);
+
     /**
      * Find the node for `k`, creating it if needed.
      *
@@ -68,6 +70,27 @@ struct DerivedPathMap {
      * by changing this node.
      */
     ChildNode & ensureSlot(const SingleDerivedPath & k);
+
+    /**
+     * Like `ensureSlot` but does not create the slot if it doesn't exist.
+     *
+     * Read the entire description of `ensureSlot` to understand an
+     * important caveat here that "have slot" does *not* imply "key is
+     * set in map". To ensure a key is set one would need to get the
+     * child node (with `findSlot` or `ensureSlot`) *and* check the
+     * `ChildNode::value`.
+     */
+    ChildNode * findSlot(const SingleDerivedPath & k);
 };
+
+
+DECLARE_CMP_EXT(
+    template<>,
+    DerivedPathMap<std::set<std::string>>::,
+    DerivedPathMap<std::set<std::string>>);
+DECLARE_CMP_EXT(
+    template<>,
+    DerivedPathMap<std::set<std::string>>::ChildNode::,
+    DerivedPathMap<std::set<std::string>>::ChildNode);
 
 }

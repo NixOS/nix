@@ -17,9 +17,8 @@ the build loop.
 
 # Prerequisites
 
-This tutorial assumes you have [configured an S3-compatible binary
-cache](../package-management/s3-substituter.md), and that the `root`
-user's default AWS profile can upload to the bucket.
+This tutorial assumes you have configured an [S3-compatible binary cache](@docroot@/command-ref/new-cli/nix3-help-stores.md#s3-binary-cache-store) as a [substituter](../command-ref/conf-file.md#conf-substituters),
+and that the `root` user's default AWS profile can upload to the bucket.
 
 # Set up a Signing Key
 
@@ -69,6 +68,8 @@ exec nix copy --to "s3://example-nix-cache" $OUT_PATHS
 > store sign`. Nix guarantees the paths will not contain any spaces,
 > however a store path might contain glob characters. The `set -f`
 > disables globbing in the shell.
+> If you want to upload the `.drv` file too, the `$DRV_PATH` variable
+> is also defined for the script and works just like `$OUT_PATHS`.
 
 Then make sure the hook program is executable by the `root` user:
 

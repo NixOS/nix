@@ -1,7 +1,9 @@
-// redirect rules for anchors ensure backwards compatibility of URLs.
-// this must be done on the client side, as web servers do not see the anchor part of the URL.
+// redirect rules for URL fragments (client-side) to prevent link rot.
+// this must be done on the client side, as web servers do not see the fragment part of the URL.
+// it will only work with JavaScript enabled in the browser, but this is the best we can do here.
+// see ./_redirects for path redirects (client-side)
 
-// redirections are declared as follows:
+// redirects are declared as follows:
 // each entry has as its key a path matching the requested URL path, relative to the mdBook document root.
 //
 //     IMPORTANT: it must specify the full path with file name and suffix
@@ -19,6 +21,7 @@ const redirects = {
     "chap-distributed-builds": "advanced-topics/distributed-builds.html",
     "chap-post-build-hook": "advanced-topics/post-build-hook.html",
     "chap-post-build-hook-caveats": "advanced-topics/post-build-hook.html#implementation-caveats",
+    "chap-writing-nix-expressions": "language/index.html",
     "part-command-ref": "command-ref/command-ref.html",
     "conf-allow-import-from-derivation": "command-ref/conf-file.html#conf-allow-import-from-derivation",
     "conf-allow-new-privileges": "command-ref/conf-file.html#conf-allow-new-privileges",
@@ -336,14 +339,13 @@ const redirects = {
     "simple-values": "#primitives",
     "lists": "#list",
     "strings": "#string",
-    "lists": "#list",
     "attribute-sets": "#attribute-set",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",
     "macos": "uninstall.html#macos",
     "uninstalling": "uninstall.html",
-  }
+  },
   "contributing/hacking.html": {
     "nix-with-flakes": "#building-nix-with-flakes",
     "classic-nix": "#building-nix",
@@ -355,6 +357,7 @@ const redirects = {
     "installer-tests": "testing.html#installer-tests",
     "one-time-setup": "testing.html#one-time-setup",
     "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
+    "characterization-testing": "#characterisation-testing-unit",
   }
 };
 

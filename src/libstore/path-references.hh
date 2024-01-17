@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "references.hh"
 #include "path.hh"

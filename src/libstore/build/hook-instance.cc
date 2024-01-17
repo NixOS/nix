@@ -1,5 +1,7 @@
 #include "globals.hh"
 #include "hook-instance.hh"
+#include "file-system.hh"
+#include "child.hh"
 
 namespace nix {
 

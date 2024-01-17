@@ -32,6 +32,14 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
     export NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_LINK"
 
+    # Populate bash completions, .desktop files, etc
+    if [ -z "${XDG_DATA_DIRS-}" ]; then
+        # According to XDG spec the default is /usr/local/share:/usr/share, don't set something that prevents that default
+        export XDG_DATA_DIRS="/usr/local/share:/usr/share:$NIX_LINK/share:/nix/var/nix/profiles/default/share"
+    else
+        export XDG_DATA_DIRS="$XDG_DATA_DIRS:$NIX_LINK/share:/nix/var/nix/profiles/default/share"
+    fi
+
     # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
     if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
         export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt

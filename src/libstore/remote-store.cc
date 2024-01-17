@@ -16,11 +16,13 @@
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"
+#include "signals.hh"
+
 #include <nlohmann/json.hpp>
 
 namespace nix {
 
-/* TODO: Separate these store impls into different files, give them better names */
+/* TODO: Separate these store types into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
     : RemoteStoreConfig(params)
     , Store(params)
@@ -172,7 +174,24 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
     auto ex = handle->processStderr(sink, source, flush);
     if (ex) {
         daemonException = true;
-        std::rethrow_exception(ex);
+        try {
+            std::rethrow_exception(ex);
+        } catch (const Error & e) {
+            // Nix versions before #4628 did not have an adequate behavior for reporting that the derivation format was upgraded.
+            // To avoid having to add compatibility logic in many places, we expect to catch almost all occurrences of the
+            // old incomprehensible error here, so that we can explain to users what's going on when their daemon is
+            // older than #4628 (2023).
+            if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations) &&
+                GET_PROTOCOL_MINOR(handle->daemonVersion) <= 35)
+            {
+                auto m = e.msg();
+                if (m.find("parsing derivation") != std::string::npos &&
+                    m.find("expected string") != std::string::npos &&
+                    m.find("Derive([") != std::string::npos)
+                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw derivation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
+            }
+            throw;
+        }
     }
 }
 
@@ -208,7 +227,7 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
         conn->to << WorkerProto::Op::QueryValidPaths;
         WorkerProto::write(*this, *conn, paths);
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
-            conn->to << (settings.buildersUseSubstitutes ? 1 : 0);
+            conn->to << maybeSubstitute;
         }
         conn.processStderr();
         return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
@@ -315,7 +334,8 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
             info = std::make_shared<ValidPathInfo>(
-                ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion), StorePath{path}));
+                StorePath{path},
+                WorkerProto::Serialise<UnkeyedValidPathInfo>::read(*this, *conn));
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
@@ -399,12 +419,12 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
-    Source & dump,
-    std::string_view name,
-    ContentAddressMethod caMethod,
-    HashType hashType,
-    const StorePathSet & references,
-    RepairFlag repair)
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod caMethod,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair)
 {
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
@@ -414,7 +434,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << WorkerProto::Op::AddToStore
             << name
-            << caMethod.render(hashType);
+            << caMethod.render(hashAlgo);
         WorkerProto::write(*this, *conn, references);
         conn->to << repair;
 
@@ -428,16 +448,16 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         }
 
         return make_ref<ValidPathInfo>(
-            ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion)));
+            WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
     }
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
 
         std::visit(overloaded {
             [&](const TextIngestionMethod & thm) -> void {
-                if (hashType != htSHA256)
+                if (hashAlgo != HashAlgorithm::SHA256)
                     throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
-                        name, printHashType(hashType));
+                        name, printHashAlgo(hashAlgo));
                 std::string s = dump.drain();
                 conn->to << WorkerProto::Op::AddTextToStore << name << s;
                 WorkerProto::write(*this, *conn, references);
@@ -447,9 +467,9 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                 conn->to
                     << WorkerProto::Op::AddToStore
                     << name
-                    << ((hashType == htSHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+                    << ((hashAlgo == HashAlgorithm::SHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
                     << (fim == FileIngestionMethod::Recursive ? 1 : 0)
-                    << printHashType(hashType);
+                    << printHashAlgo(hashAlgo);
 
                 try {
                     conn->to.written = 0;
@@ -484,10 +504,15 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, std::string_view name,
-      FileIngestionMethod method, HashType hashType, RepairFlag repair, const StorePathSet & references)
+StorePath RemoteStore::addToStoreFromDump(
+    Source & dump,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
-    return addCAToStore(dump, name, method, hashType, references, repair)->path;
+    return addCAToStore(dump, name, method, hashAlgo, references, repair)->path;
 }
 
 
@@ -524,7 +549,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << WorkerProto::Op::AddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(Base16, false);
+                 << info.narHash.to_string(HashFormat::Base16, false);
         WorkerProto::write(*this, *conn, info.references);
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
@@ -553,7 +578,12 @@ void RemoteStore::addMultipleToStore(
     auto source = sinkToSource([&](Sink & sink) {
         sink << pathsToCopy.size();
         for (auto & [pathInfo, pathSource] : pathsToCopy) {
-            pathInfo.write(sink, *this, 16);
+            WorkerProto::Serialise<ValidPathInfo>::write(*this,
+                 WorkerProto::WriteConn {
+                     .to = sink,
+                     .version = 16,
+                 },
+                 pathInfo);
             pathSource->drainInto(sink);
         }
     });
@@ -579,16 +609,6 @@ void RemoteStore::addMultipleToStore(
         Store::addMultipleToStore(source, repair, checkSigs);
 }
 
-
-StorePath RemoteStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    StringSource source(s);
-    return addCAToStore(source, name, TextIngestionMethod {}, htSHA256, references, repair)->path;
-}
 
 void RemoteStore::registerDrvOutput(const Realisation & info)
 {
@@ -638,33 +658,6 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     } catch (...) { return callback.rethrow(); }
 }
 
-static void writeDerivedPaths(RemoteStore & store, RemoteStore::Connection & conn, const std::vector<DerivedPath> & reqs)
-{
-    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 30) {
-        WorkerProto::write(store, conn, reqs);
-    } else {
-        Strings ss;
-        for (auto & p : reqs) {
-            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
-            std::visit(overloaded {
-                [&](const StorePathWithOutputs & s) {
-                    ss.push_back(s.to_string(store));
-                },
-                [&](const StorePath & drvPath) {
-                    throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
-                        store.printStorePath(drvPath),
-                        GET_PROTOCOL_MAJOR(conn.daemonVersion),
-                        GET_PROTOCOL_MINOR(conn.daemonVersion));
-                },
-                [&](std::monostate) {
-                    throw Error("wanted to build a derivation that is itself a build product, but the legacy 'ssh://' protocol doesn't support that. Try using 'ssh-ng://'");
-                },
-            }, sOrDrvPath);
-        }
-        conn.to << ss;
-    }
-}
-
 void RemoteStore::copyDrvsFromEvalStore(
     const std::vector<DerivedPath> & paths,
     std::shared_ptr<Store> evalStore)
@@ -694,7 +687,7 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
     auto conn(getConnection());
     conn->to << WorkerProto::Op::BuildPaths;
     assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
-    writeDerivedPaths(*this, *conn, drvPaths);
+    WorkerProto::write(*this, *conn, drvPaths);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
         conn->to << buildMode;
     else
@@ -718,7 +711,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
         conn->to << WorkerProto::Op::BuildPathsWithResults;
-        writeDerivedPaths(*this, *conn, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to << buildMode;
         conn.processStderr();
         return WorkerProto::Serialise<std::vector<KeyedBuildResult>>::read(*this, *conn);
@@ -798,20 +791,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res;
-    res.status = (BuildResult::Status) readInt(conn->from);
-    conn->from >> res.errorMsg;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
-        conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
-    }
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
-        auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, *conn);
-        for (auto && [output, realisation] : builtOutputs)
-            res.builtOutputs.insert_or_assign(
-                std::move(output.outputName),
-                std::move(realisation));
-    }
-    return res;
+    return WorkerProto::Serialise<BuildResult>::read(*this, *conn);
 }
 
 
@@ -912,7 +892,7 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
             // to prevent a deadlock.
             goto fallback;
         conn->to << WorkerProto::Op::QueryMissing;
-        writeDerivedPaths(*this, *conn, targets);
+        WorkerProto::write(*this, *conn, targets);
         conn.processStderr();
         willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
         willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
@@ -987,7 +967,7 @@ void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
     copyNAR(conn->from, sink);
 }
 
-ref<FSAccessor> RemoteStore::getFSAccessor()
+ref<SourceAccessor> RemoteStore::getFSAccessor(bool requireValidPath)
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
 }
@@ -1088,6 +1068,7 @@ void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sin
     std::thread stderrThread([&]()
     {
         try {
+            ReceiveInterrupts receiveInterrupts;
             processStderr(nullptr, nullptr, false);
         } catch (...) {
             ex = std::current_exception();

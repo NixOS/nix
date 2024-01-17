@@ -1,5 +1,6 @@
 #include "installable-value.hh"
 #include "eval-cache.hh"
+#include "fetch-to-store.hh"
 
 namespace nix {
 
@@ -44,7 +45,7 @@ ref<InstallableValue> InstallableValue::require(ref<Installable> installable)
 std::optional<DerivedPathWithInfo> InstallableValue::trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     if (v.type() == nPath) {
-        auto storePath = v.path().fetchToStore(state->store);
+        auto storePath = fetchToStore(*state->store, v.path());
         return {{
             .path = DerivedPath::Opaque {
                 .path = std::move(storePath),

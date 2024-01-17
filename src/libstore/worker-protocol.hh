@@ -1,7 +1,9 @@
 #pragma once
 ///@file
 
-#include "serialise.hh"
+#include <chrono>
+
+#include "common-protocol.hh"
 
 namespace nix {
 
@@ -9,7 +11,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION (1 << 8 | 35)
+#define PROTOCOL_VERSION (1 << 8 | 37)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -24,15 +26,15 @@ namespace nix {
 #define STDERR_RESULT         0x52534c54
 
 
-class Store;
+struct StoreDirConfig;
 struct Source;
 
 // items being serialised
 struct DerivedPath;
-struct DrvOutput;
-struct Realisation;
 struct BuildResult;
 struct KeyedBuildResult;
+struct ValidPathInfo;
+struct UnkeyedValidPathInfo;
 enum TrustedFlag : bool;
 
 
@@ -50,25 +52,28 @@ struct WorkerProto
     enum struct Op : uint64_t;
 
     /**
+     * Version type for the protocol.
+     *
+     * @todo Convert to struct with separate major vs minor fields.
+     */
+    using Version = unsigned int;
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
-     *
-     * This currently is just a `Source &`, but more fields will be added
-     * later.
      */
     struct ReadConn {
         Source & from;
+        Version version;
     };
 
     /**
      * A unidirectional write connection, to be used by the write half of the
      * canonical serializers below.
-     *
-     * This currently is just a `Sink &`, but more fields will be added
-     * later.
      */
     struct WriteConn {
         Sink & to;
+        Version version;
     };
 
     /**
@@ -97,8 +102,8 @@ struct WorkerProto
     // This makes for a quicker debug cycle, as desired.
 #if 0
     {
-        static T read(const Store & store, ReadConn conn);
-        static void write(const Store & store, WriteConn conn, const T & t);
+        static T read(const StoreDirConfig & store, ReadConn conn);
+        static void write(const StoreDirConfig & store, WriteConn conn, const T & t);
     };
 #endif
 
@@ -107,7 +112,7 @@ struct WorkerProto
      * infer the type instead of having to write it down explicitly.
      */
     template<typename T>
-    static void write(const Store & store, WriteConn conn, const T & t)
+    static void write(const StoreDirConfig & store, WriteConn conn, const T & t)
     {
         WorkerProto::Serialise<T>::write(store, conn, t);
     }
@@ -158,6 +163,7 @@ enum struct WorkerProto::Op : uint64_t
     AddMultipleToStore = 44,
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
+    AddPermRoot = 47,
 };
 
 /**
@@ -168,7 +174,7 @@ enum struct WorkerProto::Op : uint64_t
  */
 inline Sink & operator << (Sink & sink, WorkerProto::Op op)
 {
-    return sink << (uint64_t) op;
+    return sink << static_cast<uint64_t>(op);
 }
 
 /**
@@ -178,7 +184,7 @@ inline Sink & operator << (Sink & sink, WorkerProto::Op op)
  */
 inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
 {
-    return s << (uint64_t) op;
+    return s << static_cast<uint64_t>(op);
 }
 
 /**
@@ -191,58 +197,38 @@ inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
  * be legal specialization syntax. See below for what that looks like in
  * practice.
  */
-#define MAKE_WORKER_PROTO(T) \
-    struct WorkerProto::Serialise< T > { \
-        static T read(const Store & store, WorkerProto::ReadConn conn); \
-        static void write(const Store & store, WorkerProto::WriteConn conn, const T & t); \
+#define DECLARE_WORKER_SERIALISER(T) \
+    struct WorkerProto::Serialise< T > \
+    { \
+        static T read(const StoreDirConfig & store, WorkerProto::ReadConn conn); \
+        static void write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const T & t); \
     };
 
 template<>
-MAKE_WORKER_PROTO(std::string);
+DECLARE_WORKER_SERIALISER(DerivedPath);
 template<>
-MAKE_WORKER_PROTO(StorePath);
+DECLARE_WORKER_SERIALISER(BuildResult);
 template<>
-MAKE_WORKER_PROTO(ContentAddress);
+DECLARE_WORKER_SERIALISER(KeyedBuildResult);
 template<>
-MAKE_WORKER_PROTO(DerivedPath);
+DECLARE_WORKER_SERIALISER(ValidPathInfo);
 template<>
-MAKE_WORKER_PROTO(Realisation);
+DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
 template<>
-MAKE_WORKER_PROTO(DrvOutput);
+DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
 template<>
-MAKE_WORKER_PROTO(BuildResult);
-template<>
-MAKE_WORKER_PROTO(KeyedBuildResult);
-template<>
-MAKE_WORKER_PROTO(std::optional<TrustedFlag>);
+DECLARE_WORKER_SERIALISER(std::optional<std::chrono::microseconds>);
 
 template<typename T>
-MAKE_WORKER_PROTO(std::vector<T>);
+DECLARE_WORKER_SERIALISER(std::vector<T>);
 template<typename T>
-MAKE_WORKER_PROTO(std::set<T>);
+DECLARE_WORKER_SERIALISER(std::set<T>);
+template<typename... Ts>
+DECLARE_WORKER_SERIALISER(std::tuple<Ts...>);
 
+#define COMMA_ ,
 template<typename K, typename V>
-#define X_ std::map<K, V>
-MAKE_WORKER_PROTO(X_);
-#undef X_
-
-/**
- * These use the empty string for the null case, relying on the fact
- * that the underlying types never serialise to the empty string.
- *
- * We do this instead of a generic std::optional<T> instance because
- * ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
- * the same reason, we don't have a std::variant<T..> instances (ordinal
- * tags 0...n).
- *
- * We could the generic instances and then these as specializations for
- * compatability, but that's proven a bit finnicky, and also makes the
- * worker protocol harder to implement in other languages where such
- * specializations may not be allowed.
- */
-template<>
-MAKE_WORKER_PROTO(std::optional<StorePath>);
-template<>
-MAKE_WORKER_PROTO(std::optional<ContentAddress>);
+DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V>);
+#undef COMMA_
 
 }

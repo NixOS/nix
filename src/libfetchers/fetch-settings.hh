@@ -3,7 +3,6 @@
 
 #include "types.hh"
 #include "config.hh"
-#include "util.hh"
 
 #include <map>
 #include <limits>

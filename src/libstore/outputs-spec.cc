@@ -63,7 +63,7 @@ std::optional<std::pair<std::string_view, ExtendedOutputsSpec>> ExtendedOutputsS
     auto specOpt = OutputsSpec::parseOpt(s.substr(found + 1));
     if (!specOpt)
         return std::nullopt;
-    return std::pair { s.substr(0, found), ExtendedOutputsSpec::Explicit { *std::move(specOpt) } };
+    return std::pair { s.substr(0, found), ExtendedOutputsSpec::Explicit { std::move(*specOpt) } };
 }
 
 

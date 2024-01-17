@@ -1,7 +1,7 @@
 #include "value-to-xml.hh"
 #include "xml-writer.hh"
 #include "eval-inline.hh"
-#include "util.hh"
+#include "signals.hh"
 
 #include <cstdlib>
 
@@ -74,7 +74,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
         case nString:
             /* !!! show the context? */
             copyContext(v, context);
-            doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
+            doc.writeEmptyElement("string", singletonAttrs("value", v.c_str()));
             break;
 
         case nPath:
@@ -96,14 +96,14 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value, a->pos);
                     if (a->value->type() == nString)
-                        xmlAttrs["drvPath"] = drvPath = a->value->string.s;
+                        xmlAttrs["drvPath"] = drvPath = a->value->c_str();
                 }
 
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value, a->pos);
                     if (a->value->type() == nString)
-                        xmlAttrs["outPath"] = a->value->string.s;
+                        xmlAttrs["outPath"] = a->value->c_str();
                 }
 
                 XMLOpenElement _(doc, "derivation", xmlAttrs);

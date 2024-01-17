@@ -1,6 +1,6 @@
 # Name
 
-`nix-store --realise` - realise specified store paths
+`nix-store --realise` - build or fetch store objects
 
 # Synopsis
 
@@ -8,33 +8,39 @@
 
 # Description
 
-The operation `--realise` essentially “builds” the specified store
-paths. Realisation is a somewhat overloaded term:
 
-  - If the store path is a *derivation*, realisation ensures that the
-    output paths of the derivation are [valid] (i.e.,
-    the output path and its closure exist in the file system). This
-    can be done in several ways. First, it is possible that the
-    outputs are already valid, in which case we are done
-    immediately. Otherwise, there may be [substitutes]
-    that produce the outputs (e.g., by downloading them). Finally, the
-    outputs can be produced by running the build task described
-    by the derivation.
+Each of *paths* is processed as follows:
 
-  - If the store path is not a derivation, realisation ensures that the
-    specified path is valid (i.e., it and its closure exist in the file
-    system). If the path is already valid, we are done immediately.
-    Otherwise, the path and any missing paths in its closure may be
-    produced through substitutes. If there are no (successful)
-    substitutes, realisation fails.
+- If the path leads to a [store derivation]:
+  1. If it is not [valid], substitute the store derivation file itself.
+  2. Realise its [output paths]:
+    - Try to fetch from [substituters] the [store objects] associated with the output paths in the store derivation's [closure].
+      - With [content-addressed derivations] (experimental):
+        Determine the output paths to realise by querying content-addressed realisation entries in the [Nix database].
+    - For any store paths that cannot be substituted, produce the required store objects:
+      1. Realise all outputs of the derivation's dependencies
+      2. Run the derivation's [`builder`](@docroot@/language/derivations.md#attr-builder) executable
+         <!-- TODO: Link to build process page #8888 -->
+- Otherwise, and if the path is not already valid: Try to fetch the associated [store objects] in the path's [closure] from [substituters].
 
+If no substitutes are available and no store derivation is given, realisation fails.
+
+[store paths]: @docroot@/glossary.md#gloss-store-path
 [valid]: @docroot@/glossary.md#gloss-validity
-[substitutes]: @docroot@/glossary.md#gloss-substitute
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
+[output paths]: @docroot@/glossary.md#gloss-output-path
+[store objects]: @docroot@/glossary.md#gloss-store-object
+[closure]: @docroot@/glossary.md#gloss-closure
+[substituters]: @docroot@/command-ref/conf-file.md#conf-substituters
+[content-addressed derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
+[Nix database]: @docroot@/glossary.md#gloss-nix-database
 
-The output path of each derivation is printed on standard output. (For
-non-derivations argument, the argument itself is printed.)
+The resulting paths are printed on standard output.
+For non-derivation arguments, the argument itself is printed.
 
-The following flags are available:
+{{#include ../status-build-failure.md}}
+
+# Options
 
   - `--dry-run`\
     Print on standard error a description of what packages would be
@@ -54,8 +60,6 @@ The following flags are available:
     previous build, the new output path is left in
     `/nix/store/name.check.`
 
-{{#include ../status-build-failure.md}}
-
 {{#include ./opt-common.md}}
 
 {{#include ../opt-common.md}}
@@ -66,8 +70,6 @@ The following flags are available:
 
 This operation is typically used to build [store derivation]s produced by
 [`nix-instantiate`](@docroot@/command-ref/nix-instantiate.md):
-
-[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 ```console
 $ nix-store --realise $(nix-instantiate ./test.nix)

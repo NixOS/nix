@@ -43,7 +43,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
 
         sink.s = rewriteStrings(sink.s, rewrites);
 
-        HashModuloSink hashModuloSink(htSHA256, oldHashPart);
+        HashModuloSink hashModuloSink(HashAlgorithm::SHA256, oldHashPart);
         hashModuloSink(sink.s);
 
         auto narModuloHash = hashModuloSink.finish().first;
@@ -66,7 +66,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
         rsink2(sink.s);
         rsink2.flush();
 
-        info.narHash = hashString(htSHA256, sink2.s);
+        info.narHash = hashString(HashAlgorithm::SHA256, sink2.s);
         info.narSize = sink.s.size();
 
         StringSource source(sink2.s);

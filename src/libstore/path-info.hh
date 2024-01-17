@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "crypto.hh"
+#include "signature/signer.hh"
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
@@ -29,12 +29,11 @@ struct SubstitutablePathInfo
     uint64_t narSize;
 };
 
-typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
+using SubstitutablePathInfos = std::map<StorePath, SubstitutablePathInfo>;
 
 
-struct ValidPathInfo
+struct UnkeyedValidPathInfo
 {
-    StorePath path;
     std::optional<StorePath> deriver;
     /**
      * \todo document this
@@ -43,7 +42,7 @@ struct ValidPathInfo
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
-    uint64_t id; // internal use only
+    uint64_t id = 0; // internal use only
 
     /**
      * Whether the path is ultimately trusted, that is, it's a
@@ -72,13 +71,31 @@ struct ValidPathInfo
      */
     std::optional<ContentAddress> ca;
 
-    bool operator == (const ValidPathInfo & i) const
-    {
-        return
-            path == i.path
-            && narHash == i.narHash
-            && references == i.references;
-    }
+    UnkeyedValidPathInfo(const UnkeyedValidPathInfo & other) = default;
+
+    UnkeyedValidPathInfo(Hash narHash) : narHash(narHash) { };
+
+    DECLARE_CMP(UnkeyedValidPathInfo);
+
+    virtual ~UnkeyedValidPathInfo() { }
+
+    /**
+     * @param includeImpureInfo If true, variable elements such as the
+     * registration time are included.
+     */
+    virtual nlohmann::json toJSON(
+        const Store & store,
+        bool includeImpureInfo,
+        HashFormat hashFormat) const;
+    static UnkeyedValidPathInfo fromJSON(
+        const Store & store,
+        const nlohmann::json & json);
+};
+
+struct ValidPathInfo : UnkeyedValidPathInfo {
+    StorePath path;
+
+    DECLARE_CMP(ValidPathInfo);
 
     /**
      * Return a fingerprint of the store path to be used in binary
@@ -90,13 +107,13 @@ struct ValidPathInfo
      */
     std::string fingerprint(const Store & store) const;
 
-    void sign(const Store & store, const SecretKey & secretKey);
+    void sign(const Store & store, const Signer & signer);
 
-	/**
-	 * @return The `ContentAddressWithReferences` that determines the
-	 * store path for a content-addressed store object, `std::nullopt`
-	 * for an input-addressed store object.
-	 */
+    /**
+     * @return The `ContentAddressWithReferences` that determines the
+     * store path for a content-addressed store object, `std::nullopt`
+     * for an input-addressed store object.
+     */
     std::optional<ContentAddressWithReferences> contentAddressWithReferences() const;
 
     /**
@@ -122,20 +139,15 @@ struct ValidPathInfo
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 
-    ValidPathInfo(StorePath && path, Hash narHash) : path(std::move(path)), narHash(narHash) { };
-    ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
+    ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(std::move(path)) { };
+    ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info) : UnkeyedValidPathInfo(info), path(path) { };
 
     ValidPathInfo(const Store & store,
         std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
 
     virtual ~ValidPathInfo() { }
-
-    static ValidPathInfo read(Source & source, const Store & store, unsigned int format);
-    static ValidPathInfo read(Source & source, const Store & store, unsigned int format, StorePath && path);
-
-    void write(Sink & sink, const Store & store, unsigned int format, bool includePath = true) const;
 };
 
-typedef std::map<StorePath, ValidPathInfo> ValidPathInfos;
+using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 
 }

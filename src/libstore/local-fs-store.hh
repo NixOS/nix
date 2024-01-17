@@ -11,25 +11,21 @@ struct LocalFSStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    // FIXME: the (StoreConfig*) cast works around a bug in gcc that causes
-    // it to omit the call to the Setting constructor. Clang works fine
-    // either way.
-
-    const OptionalPathSetting rootDir{(StoreConfig*) this, std::nullopt,
+    const OptionalPathSetting rootDir{this, std::nullopt,
         "root",
         "Directory prefixed to all other paths."};
 
-    const PathSetting stateDir{(StoreConfig*) this,
+    const PathSetting stateDir{this,
         rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
         "state",
         "Directory where Nix will store state."};
 
-    const PathSetting logDir{(StoreConfig*) this,
+    const PathSetting logDir{this,
         rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
         "log",
         "directory where Nix will store log files."};
 
-    const PathSetting realStoreDir{(StoreConfig*) this,
+    const PathSetting realStoreDir{this,
         rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real",
         "Physical path of the Nix store."};
 };
@@ -47,7 +43,7 @@ public:
     LocalFSStore(const Params & params);
 
     void narFromPath(const StorePath & path, Sink & sink) override;
-    ref<FSAccessor> getFSAccessor() override;
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
 
     /**
      * Creates symlink from the `gcRoot` to the `storePath` and

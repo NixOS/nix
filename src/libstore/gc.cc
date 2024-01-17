@@ -2,6 +2,13 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "finally.hh"
+#include "unix-domain-socket.hh"
+#include "signals.hh"
+
+#if !defined(__linux__)
+// For shelling out to lsof
+# include "processes.hh"
+#endif
 
 #include <functional>
 #include <queue>
@@ -43,7 +50,7 @@ static void makeSymlink(const Path & link, const Path & target)
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    std::string hash = hashString(htSHA1, path).to_string(Base32, false);
+    std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
@@ -142,11 +149,12 @@ void LocalStore::addTempRoot(const StorePath & path)
             try {
                 nix::connect(fdRootsSocket->get(), socketPath);
             } catch (SysError & e) {
-                /* The garbage collector may have exited, so we need to
-                   restart. */
-                if (e.errNo == ECONNREFUSED) {
-                    debug("GC socket connection refused");
+                /* The garbage collector may have exited or not
+                   created the socket yet, so we need to restart. */
+                if (e.errNo == ECONNREFUSED || e.errNo == ENOENT) {
+                    debug("GC socket connection refused: %s", e.msg());
                     fdRootsSocket->close();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     goto restart;
                 }
                 throw;
@@ -323,9 +331,7 @@ typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots
 
 static void readProcLink(const std::string & file, UncheckedRoots & roots)
 {
-    /* 64 is the starting buffer size gnu readlink uses... */
-    auto bufsiz = ssize_t{64};
-try_again:
+    constexpr auto bufsiz = PATH_MAX;
     char buf[bufsiz];
     auto res = readlink(file.c_str(), buf, bufsiz);
     if (res == -1) {
@@ -334,10 +340,7 @@ try_again:
         throw SysError("reading symlink");
     }
     if (res == bufsiz) {
-        if (SSIZE_MAX / 2 < bufsiz)
-            throw Error("stupidly long symlink");
-        bufsiz *= 2;
-        goto try_again;
+        throw Error("overly long symlink starting with '%1%'", std::string_view(buf, bufsiz));
     }
     if (res > 0 && buf[0] == '/')
         roots[std::string(static_cast<char *>(buf), res)]
@@ -411,7 +414,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         unchecked[i->str()].emplace(envFile);
-                } catch (SysError & e) {
+                } catch (SystemError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
                     throw;
@@ -506,6 +509,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        downgrade our exclusive lock. */
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltWrite, true, "waiting for the big garbage collector lock...");
+
+    /* Synchronisation point to test ENOENT handling in
+       addTempRoot(), see tests/gc-non-blocking.sh. */
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC_1"))
+        readFile(*p);
 
     /* Start the server for receiving new roots. */
     auto socketPath = stateDir.get() + gcSocketPath;
@@ -629,6 +637,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
         roots.insert(root.first);
     }
+
+    /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
+        readFile(*p);
 
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
@@ -775,10 +787,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             }
         }
     };
-
-    /* Synchronisation point for testing, see tests/gc-concurrent.sh. */
-    if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
-        readFile(*p);
 
     /* Either delete all garbage paths, or just the specified
        paths (for gcDeleteSpecific). */

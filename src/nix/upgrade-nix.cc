@@ -1,3 +1,4 @@
+#include "processes.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"
@@ -13,7 +14,6 @@ using namespace nix;
 struct CmdUpgradeNix : MixDryRun, StoreCommand
 {
     Path profileDir;
-    std::string storePathsUrl = "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix";
 
     CmdUpgradeNix()
     {
@@ -29,7 +29,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             .longName = "nix-store-paths-url",
             .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
-            .handler = {&storePathsUrl}
+            .handler = {&(std::string&) settings.upgradeNixStorePathUrl}
         });
     }
 
@@ -43,7 +43,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
     std::string description() override
     {
-        return "upgrade Nix to the stable version declared in Nixpkgs";
+        return "upgrade Nix to the latest stable version";
     }
 
     std::string doc() override
@@ -144,7 +144,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = FileTransferRequest(storePathsUrl);
+        auto req = FileTransferRequest((std::string&) settings.upgradeNixStorePathUrl);
         auto res = getFileTransfer()->download(req);
 
         auto state = std::make_unique<EvalState>(SearchPath{}, store);

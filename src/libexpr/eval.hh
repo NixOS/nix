@@ -18,12 +18,19 @@
 
 namespace nix {
 
+/**
+ * We put a limit on primop arity because it lets us use a fixed size array on
+ * the stack. 8 is already an impractical number of arguments. Use an attrset
+ * argument for such overly complicated functions.
+ */
+constexpr size_t maxPrimOpArity = 8;
 
 class Store;
 class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
+struct MemoryInputAccessor;
 
 
 /**
@@ -69,7 +76,15 @@ struct PrimOp
      * Optional experimental for this to be gated on.
      */
     std::optional<ExperimentalFeature> experimentalFeature;
+
+    /**
+     * Validity check to be performed by functions that introduce primops,
+     * such as RegisterPrimOp() and Value::mkPrimOp().
+     */
+    void check();
 };
+
+std::ostream & operator<<(std::ostream & output, PrimOp & primOp);
 
 /**
  * Info about a constant
@@ -103,11 +118,6 @@ struct Constant
 struct Env
 {
     Env * up;
-    /**
-     * Number of of levels up to next `with` environment
-     */
-    unsigned short prevWith:14;
-    enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
 
@@ -119,7 +129,7 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
 void copyContext(const Value & v, NixStringContext & context);
 
 
-std::string printValue(const EvalState & state, const Value & v);
+std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
@@ -134,7 +144,7 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::shared_ptr<AbstractPos> pos;
+    std::shared_ptr<Pos> pos;
     const Expr & expr;
     const Env & env;
     hintformat hint;
@@ -203,15 +213,32 @@ public:
      */
     RepairFlag repair;
 
-    /**
-     * The allowed filesystem paths in restricted or pure evaluation
-     * mode.
-     */
-    std::optional<PathSet> allowedPaths;
-
     Bindings emptyBindings;
 
+    /**
+     * Empty list constant.
+     */
+    Value vEmptyList;
+
+    /**
+     * The accessor for the root filesystem.
+     */
+    const ref<InputAccessor> rootFS;
+
+    /**
+     * The in-memory filesystem for <nix/...> paths.
+     */
+    const ref<MemoryInputAccessor> corepkgsFS;
+
+    /**
+     * In-memory filesystem for internal, non-user-callable Nix
+     * expressions like call-flake.nix.
+     */
+    const ref<MemoryInputAccessor> internalFS;
+
     const SourcePath derivationInternal;
+
+    const SourcePath callFlakeInternal;
 
     /**
      * Store used to materialise .drv files.
@@ -223,7 +250,6 @@ public:
      */
     const ref<Store> buildStore;
 
-    RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
     /**
@@ -312,11 +338,6 @@ private:
     std::map<std::string, std::optional<std::string>> searchPathResolved;
 
     /**
-     * Cache used by checkSourcePath().
-     */
-    std::unordered_map<Path, SourcePath> resolvedPaths;
-
-    /**
      * Cache used by prim_match().
      */
     std::shared_ptr<RegexCache> regexCache;
@@ -365,12 +386,6 @@ public:
      */
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
-    /**
-     * Check whether access to a path is allowed and throw an error if
-     * not. Otherwise return the canonicalised path.
-     */
-    SourcePath checkSourcePath(const SourcePath & path);
-
     void checkURI(const std::string & uri);
 
     /**
@@ -405,16 +420,6 @@ public:
      */
     void evalFile(const SourcePath & path, Value & v, bool mustBeTrivial = false);
 
-    /**
-     * Like `evalFile`, but with an already parsed expression.
-     */
-    void cacheFile(
-        const SourcePath & path,
-        const SourcePath & resolvedPath,
-        Expr * e,
-        Value & v,
-        bool mustBeTrivial = false);
-
     void resetFileCache();
 
     /**
@@ -424,13 +429,15 @@ public:
     SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
-     * Try to resolve a search path value (not the optinal key part)
+     * Try to resolve a search path value (not the optional key part).
      *
      * If the specified search path element is a URI, download it.
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(const SearchPath::Path & path);
+    std::optional<std::string> resolveSearchPathPath(
+        const SearchPath::Path & elem,
+        bool initAccessControl = false);
 
     /**
      * Evaluate an expression to normal form
@@ -455,8 +462,7 @@ public:
      */
     inline void forceValue(Value & v, const PosIdx pos);
 
-    template <typename Callable>
-    inline void forceValue(Value & v, Callable getPos);
+    void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
     /**
      * Force a value, then recursively force list elements and
@@ -618,6 +624,11 @@ private:
         const SourcePath & basePath,
         std::shared_ptr<StaticEnv> & staticEnv);
 
+    /**
+     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run out of system stack.
+     */
+    size_t callDepth = 0;
+
 public:
 
     /**
@@ -709,15 +720,38 @@ public:
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
-     * Print statistics.
+     * Print statistics, if enabled.
+     *
+     * Performs a full memory GC before printing the statistics, so that the
+     * GC statistics are more accurate.
      */
-    void printStats();
+    void maybePrintStats();
+
+    /**
+     * Print statistics, unconditionally, cheaply, without performing a GC first.
+     */
+    void printStatistics();
+
+    /**
+     * Perform a full memory garbage collection - not incremental.
+     *
+     * @return true if Nix was built with GC and a GC was performed, false if not.
+     *              The return value is currently not thread safe - just the return value.
+     */
+    bool fullGC();
 
     /**
      * Realise the given context, and return a mapping from the placeholders
      * used to construct the associated value to their final store path
      */
     [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
+
+    /* Call the binary path filter predicate used builtins.path etc. */
+    bool callPathFilter(
+        Value * filterFun,
+        const SourcePath & path,
+        std::string_view pathArg,
+        PosIdx pos);
 
 private:
 
@@ -802,7 +836,12 @@ std::string showType(const Value & v);
 /**
  * If `path` refers to a directory, then append "/default.nix".
  */
-SourcePath resolveExprPath(const SourcePath & path);
+SourcePath resolveExprPath(SourcePath path);
+
+/**
+ * Whether a URI is allowed, assuming restrictEval is enabled
+ */
+bool isAllowedURI(std::string_view uri, const Strings & allowedPaths);
 
 struct InvalidPathError : EvalError
 {
@@ -812,8 +851,6 @@ struct InvalidPathError : EvalError
     ~InvalidPathError() throw () { };
 #endif
 };
-
-static const std::string corepkgsPrefix{"/__corepkgs__/"};
 
 template<class ErrorType>
 void ErrorBuilder::debugThrow()

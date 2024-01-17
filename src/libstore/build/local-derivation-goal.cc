@@ -15,7 +15,12 @@
 #include "json-utils.hh"
 #include "cgroup.hh"
 #include "personality.hh"
+#include "current-process.hh"
 #include "namespaces.hh"
+#include "child.hh"
+#include "unix-domain-socket.hh"
+#include "posix-fs-canonicalise.hh"
+#include "posix-source-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -227,7 +232,7 @@ void LocalDerivationGoal::tryLocalBuild()
         if (!buildUser) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                    fmt("waiting for UID to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
+                    fmt("waiting for a free build user ID for '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }
@@ -386,26 +391,26 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
     cleanupPostOutputsRegisteredModeCheck();
 }
 
-
 #if __linux__
-static void linkOrCopy(const Path & from, const Path & to)
-{
-    if (link(from.c_str(), to.c_str()) == -1) {
-        /* Hard-linking fails if we exceed the maximum link count on a
-           file (e.g. 32000 of ext3), which is quite possible after a
-           'nix-store --optimise'. FIXME: actually, why don't we just
-           bind-mount in this case?
-
-           It can also fail with EPERM in BeegFS v7 and earlier versions
-           or fail with EXDEV in OpenAFS
-           which don't allow hard-links to other directories */
-        if (errno != EMLINK && errno != EPERM && errno != EXDEV)
-            throw SysError("linking '%s' to '%s'", to, from);
-        copyPath(from, to);
+static void doBind(const Path & source, const Path & target, bool optional = false) {
+    debug("bind mounting '%1%' to '%2%'", source, target);
+    struct stat st;
+    if (stat(source.c_str(), &st) == -1) {
+        if (optional && errno == ENOENT)
+            return;
+        else
+            throw SysError("getting attributes of path '%1%'", source);
     }
-}
+    if (S_ISDIR(st.st_mode))
+        createDirs(target);
+    else {
+        createDirs(dirOf(target));
+        writeFile(target, "");
+    }
+    if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+        throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+};
 #endif
-
 
 void LocalDerivationGoal::startBuilder()
 {
@@ -581,7 +586,7 @@ void LocalDerivationGoal::startBuilder()
 
         /* Allow a user-configurable set of directories from the
            host file system. */
-        dirsInChroot.clear();
+        pathsInChroot.clear();
 
         for (auto i : settings.sandboxPaths.get()) {
             if (i.empty()) continue;
@@ -592,19 +597,19 @@ void LocalDerivationGoal::startBuilder()
             }
             size_t p = i.find('=');
             if (p == std::string::npos)
-                dirsInChroot[i] = {i, optional};
+                pathsInChroot[i] = {i, optional};
             else
-                dirsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
+                pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
         }
         if (hasPrefix(worker.store.storeDir, tmpDirInSandbox))
         {
             throw Error("`sandbox-build-dir` must not contain the storeDir");
         }
-        dirsInChroot[tmpDirInSandbox] = tmpDir;
+        pathsInChroot[tmpDirInSandbox] = tmpDir;
 
         /* Add the closure of store paths to the chroot. */
         StorePathSet closure;
-        for (auto & i : dirsInChroot)
+        for (auto & i : pathsInChroot)
             try {
                 if (worker.store.isInStore(i.second.source))
                     worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
@@ -615,7 +620,7 @@ void LocalDerivationGoal::startBuilder()
             }
         for (auto & i : closure) {
             auto p = worker.store.printStorePath(i);
-            dirsInChroot.insert_or_assign(p, p);
+            pathsInChroot.insert_or_assign(p, p);
         }
 
         PathSet allowedPaths = settings.allowedImpureHostPrefixes;
@@ -643,14 +648,14 @@ void LocalDerivationGoal::startBuilder()
 
             /* Allow files in __impureHostDeps to be missing; e.g.
                macOS 11+ has no /usr/lib/libSystem*.dylib */
-            dirsInChroot[i] = {i, true};
+            pathsInChroot[i] = {i, true};
         }
 
 #if __linux__
         /* Create a temporary directory in which we set up the chroot
            environment using bind-mounts.  We put it in the Nix store
-           to ensure that we can create hard-links to non-directory
-           inputs in the fake Nix store in the chroot (see below). */
+           so that the build outputs can be moved efficiently from the
+           chroot to their final location. */
         chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
         deletePath(chrootRootDir);
 
@@ -711,15 +716,12 @@ void LocalDerivationGoal::startBuilder()
         for (auto & i : inputPaths) {
             auto p = worker.store.printStorePath(i);
             Path r = worker.store.toRealPath(p);
-            if (S_ISDIR(lstat(r).st_mode))
-                dirsInChroot.insert_or_assign(p, r);
-            else
-                linkOrCopy(r, chrootRootDir + p);
+            pathsInChroot.insert_or_assign(p, r);
         }
 
         /* If we're repairing, checking or rebuilding part of a
            multiple-outputs derivation, it's possible that we're
-           rebuilding a path that is in settings.dirsInChroot
+           rebuilding a path that is in settings.sandbox-paths
            (typically the dependencies of /bin/sh).  Throw them
            out. */
         for (auto & i : drv->outputsAndOptPaths(worker.store)) {
@@ -729,7 +731,7 @@ void LocalDerivationGoal::startBuilder()
                is already in the sandbox, so we don't need to worry about
                removing it.  */
             if (i.second.second)
-                dirsInChroot.erase(worker.store.printStorePath(*i.second.second));
+                pathsInChroot.erase(worker.store.printStorePath(*i.second.second));
         }
 
         if (cgroup) {
@@ -787,9 +789,9 @@ void LocalDerivationGoal::startBuilder()
                 } else {
                     auto p = line.find('=');
                     if (p == std::string::npos)
-                        dirsInChroot[line] = line;
+                        pathsInChroot[line] = line;
                     else
-                        dirsInChroot[line.substr(0, p)] = line.substr(p + 1);
+                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
                 }
             }
         }
@@ -1065,8 +1067,8 @@ void LocalDerivationGoal::initTmpDir() {
             if (passAsFile.find(i.first) == passAsFile.end()) {
                 env[i.first] = i.second;
             } else {
-                auto hash = hashString(htSHA256, i.first);
-                std::string fn = ".attr-" + hash.to_string(Base32, false);
+                auto hash = hashString(HashAlgorithm::SHA256, i.first);
+                std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
@@ -1135,8 +1137,18 @@ void LocalDerivationGoal::initEnv()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (!derivationType->isSandboxed()) {
-        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
-            env[i] = getEnv(i).value_or("");
+        auto & impureEnv = settings.impureEnv.get();
+        if (!impureEnv.empty())
+            experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
+
+        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings())) {
+            auto envVar = impureEnv.find(i);
+            if (envVar != impureEnv.end()) {
+                env[i] = envVar->second;
+            } else {
+                env[i] = getEnv(i).value_or("");
+            }
+        }
     }
 
     /* Currently structured log messages piggyback on stderr, but we
@@ -1280,12 +1292,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
 
     StorePath addToStore(
         std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashType hashAlgo,
+        SourceAccessor & accessor,
+        const CanonPath & srcPath,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
         PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references) override
+        RepairFlag repair) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1295,26 +1308,15 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         goal.addDependency(info.path);
     }
 
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair = NoRepair) override
-    {
-        auto path = next->addTextToStore(name, s, references, repair);
-        goal.addDependency(path);
-        return path;
-    }
-
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        FileIngestionMethod method,
-        HashType hashAlgo,
-        RepairFlag repair,
-        const StorePathSet & references) override
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, references, repair);
         goal.addDependency(path);
         return path;
     }
@@ -1493,7 +1495,7 @@ void LocalDerivationGoal::startDaemon()
                     daemon::processConnection(store, from, to,
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
-                } catch (SysError &) {
+                } catch (SystemError &) {
                     ignoreException();
                 }
             });
@@ -1555,41 +1557,33 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
 
             Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
-            debug("bind-mounting %s -> %s", target, source);
 
-            if (pathExists(target))
+            if (pathExists(target)) {
+                // There is a similar debug message in doBind, so only run it in this block to not have double messages.
+                debug("bind-mounting %s -> %s", target, source);
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
+            }
 
-            auto st = lstat(source);
+            /* Bind-mount the path into the sandbox. This requires
+               entering its mount namespace, which is not possible
+               in multithreaded programs. So we do this in a
+               child process.*/
+            Pid child(startProcess([&]() {
 
-            if (S_ISDIR(st.st_mode)) {
+                if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
+                    throw SysError("entering sandbox user namespace");
 
-                /* Bind-mount the path into the sandbox. This requires
-                   entering its mount namespace, which is not possible
-                   in multithreaded programs. So we do this in a
-                   child process.*/
-                Pid child(startProcess([&]() {
+                if (setns(sandboxMountNamespace.get(), 0) == -1)
+                    throw SysError("entering sandbox mount namespace");
 
-                    if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
-                        throw SysError("entering sandbox user namespace");
+                doBind(source, target);
 
-                    if (setns(sandboxMountNamespace.get(), 0) == -1)
-                        throw SysError("entering sandbox mount namespace");
+                _exit(0);
+            }));
 
-                    createDirs(target);
-
-                    if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
-                        throw SysError("bind mount from '%s' to '%s' failed", source, target);
-
-                    _exit(0);
-                }));
-
-                int status = child.wait();
-                if (status != 0)
-                    throw Error("could not add path '%s' to sandbox", worker.store.printStorePath(path));
-
-            } else
-                linkOrCopy(source, target);
+            int status = child.wait();
+            if (status != 0)
+                throw Error("could not add path '%s' to sandbox", worker.store.printStorePath(path));
 
         #else
             throw Error("don't know how to make path '%s' (produced by a recursive Nix call) appear in the sandbox",
@@ -1620,6 +1614,8 @@ void setupSeccomp()
     Finally cleanup([&]() {
         seccomp_release(ctx);
     });
+
+    constexpr std::string_view nativeSystem = SYSTEM;
 
     if (nativeSystem == "x86_64-linux" &&
         seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
@@ -1711,7 +1707,7 @@ void LocalDerivationGoal::runChild()
         try {
             if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
                 netrcData = readFile(settings.netrcFile);
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
 
 #if __linux__
         if (useChroot) {
@@ -1779,7 +1775,7 @@ void LocalDerivationGoal::runChild()
             /* Set up a nearly empty /dev, unless the user asked to
                bind-mount the host /dev. */
             Strings ss;
-            if (dirsInChroot.find("/dev") == dirsInChroot.end()) {
+            if (pathsInChroot.find("/dev") == pathsInChroot.end()) {
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
@@ -1814,34 +1810,15 @@ void LocalDerivationGoal::runChild()
                         ss.push_back(path);
 
                 if (settings.caFile != "")
-                    dirsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
+                    pathsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
             }
 
-            for (auto & i : ss) dirsInChroot.emplace(i, i);
+            for (auto & i : ss) pathsInChroot.emplace(i, i);
 
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
                environment. */
-            auto doBind = [&](const Path & source, const Path & target, bool optional = false) {
-                debug("bind mounting '%1%' to '%2%'", source, target);
-                struct stat st;
-                if (stat(source.c_str(), &st) == -1) {
-                    if (optional && errno == ENOENT)
-                        return;
-                    else
-                        throw SysError("getting attributes of path '%1%'", source);
-                }
-                if (S_ISDIR(st.st_mode))
-                    createDirs(target);
-                else {
-                    createDirs(dirOf(target));
-                    writeFile(target, "");
-                }
-                if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-                    throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
-            };
-
-            for (auto & i : dirsInChroot) {
+            for (auto & i : pathsInChroot) {
                 if (i.second.source == "/proc") continue; // backwards compatibility
 
                 #if HAVE_EMBEDDED_SANDBOX_SHELL
@@ -1882,7 +1859,7 @@ void LocalDerivationGoal::runChild()
                if /dev/ptx/ptmx exists). */
             if (pathExists("/dev/pts/ptmx") &&
                 !pathExists(chrootRootDir + "/dev/ptmx")
-                && !dirsInChroot.count("/dev/pts"))
+                && !pathsInChroot.count("/dev/pts"))
             {
                 if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0)
                 {
@@ -2017,7 +1994,7 @@ void LocalDerivationGoal::runChild()
                 /* We build the ancestry before adding all inputPaths to the store because we know they'll
                    all have the same parents (the store), and there might be lots of inputs. This isn't
                    particularly efficient... I doubt it'll be a bottleneck in practice */
-                for (auto & i : dirsInChroot) {
+                for (auto & i : pathsInChroot) {
                     Path cur = i.first;
                     while (cur.compare("/") != 0) {
                         cur = dirOf(cur);
@@ -2025,7 +2002,7 @@ void LocalDerivationGoal::runChild()
                     }
                 }
 
-                /* And we want the store in there regardless of how empty dirsInChroot. We include the innermost
+                /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
                    path component this time, since it's typically /nix/store and we care about that. */
                 Path cur = worker.store.storeDir;
                 while (cur.compare("/") != 0) {
@@ -2036,7 +2013,7 @@ void LocalDerivationGoal::runChild()
                 /* Add all our input paths to the chroot */
                 for (auto & i : inputPaths) {
                     auto p = worker.store.printStorePath(i);
-                    dirsInChroot[p] = p;
+                    pathsInChroot[p] = p;
                 }
 
                 /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be configurable */
@@ -2067,7 +2044,7 @@ void LocalDerivationGoal::runChild()
                    without file-write* allowed, access() incorrectly returns EPERM
                  */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
-                for (auto & i : dirsInChroot) {
+                for (auto & i : pathsInChroot) {
                     if (i.first != i.second.source)
                         throw Error(
                             "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
@@ -2467,8 +2444,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 throw BuildError(
                     "output path %1% without valid stats info",
                     actualPath);
-            if (outputHash.method == ContentAddressMethod { FileIngestionMethod::Flat } ||
-                outputHash.method == ContentAddressMethod { TextIngestionMethod {} })
+            if (outputHash.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
             {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
@@ -2480,38 +2456,23 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             rewriteOutput(outputRewrites);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
-            HashModuloSink caSink { outputHash.hashType, oldHashPart };
-            std::visit(overloaded {
-                [&](const TextIngestionMethod &) {
-                    readFile(actualPath, caSink);
-                },
-                [&](const FileIngestionMethod & m2) {
-                    switch (m2) {
-                    case FileIngestionMethod::Recursive:
-                        dumpPath(actualPath, caSink);
-                        break;
-                    case FileIngestionMethod::Flat:
-                        readFile(actualPath, caSink);
-                        break;
-                    }
-                },
-            }, outputHash.method.raw);
-            auto got = caSink.finish().first;
+            auto got = ({
+                HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
+                PosixSourceAccessor accessor;
+                dumpPath(
+                    accessor, CanonPath { actualPath },
+                    caSink,
+                    outputHash.method.getFileIngestionMethod());
+                caSink.finish().first;
+            });
 
-            auto optCA = ContentAddressWithReferences::fromPartsOpt(
-                outputHash.method,
-                std::move(got),
-                rewriteRefs());
-            if (!optCA) {
-                // TODO track distinct failure modes separately (at the time of
-                // writing there is just one but `nullopt` is unclear) so this
-                // message can't get out of sync.
-                throw BuildError("output path '%s' has illegal content address, probably a spurious self-reference with text hashing");
-            }
             ValidPathInfo newInfo0 {
                 worker.store,
                 outputPathName(drv->name, outputName),
-                *std::move(optCA),
+                ContentAddressWithReferences::fromParts(
+                    outputHash.method,
+                    std::move(got),
+                    rewriteRefs()),
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {
@@ -2525,9 +2486,14 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                                std::string(newInfo0.path.hashPart())}});
             }
 
-            HashResult narHashAndSize = hashPath(htSHA256, actualPath);
-            newInfo0.narHash = narHashAndSize.first;
-            newInfo0.narSize = narHashAndSize.second;
+            {
+                PosixSourceAccessor accessor;
+                HashResult narHashAndSize = hashPath(
+                    accessor, CanonPath { actualPath },
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                newInfo0.narHash = narHashAndSize.first;
+                newInfo0.narSize = narHashAndSize.second;
+            }
 
             assert(newInfo0.ca);
             return newInfo0;
@@ -2545,7 +2511,10 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput(outputRewrites);
-                auto narHashAndSize = hashPath(htSHA256, actualPath);
+                PosixSourceAccessor accessor;
+                HashResult narHashAndSize = hashPath(
+                    accessor, CanonPath { actualPath },
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
@@ -2560,7 +2529,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.ca.method,
-                    .hashType = wanted.type,
+                    .hashAlgo = wanted.algo,
                 });
 
                 /* Check wanted hash */
@@ -2573,8 +2542,8 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     delayedException = std::make_exception_ptr(
                         BuildError("hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
                             worker.store.printStorePath(drvPath),
-                            wanted.to_string(SRI, true),
-                            got.to_string(SRI, true)));
+                            wanted.to_string(HashFormat::SRI, true),
+                            got.to_string(HashFormat::SRI, true)));
                 }
                 if (!newInfo0.references.empty())
                     delayedException = std::make_exception_ptr(
@@ -2597,7 +2566,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             [&](const DerivationOutput::Impure & doi) {
                 return newInfoFromCA(DerivationOutput::CAFloating {
                     .method = doi.method,
-                    .hashType = doi.hashType,
+                    .hashAlgo = doi.hashAlgo,
                 });
             },
 
@@ -2959,7 +2928,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),
-        Hash(htSHA256), outputPathName(drv->name, outputName));
+        Hash(HashAlgorithm::SHA256), outputPathName(drv->name, outputName));
 }
 
 
@@ -2967,7 +2936,7 @@ StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string()),
-        Hash(htSHA256), path.name());
+        Hash(HashAlgorithm::SHA256), path.name());
 }
 
 

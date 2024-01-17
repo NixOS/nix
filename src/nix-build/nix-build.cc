@@ -9,12 +9,13 @@
 
 #include <nlohmann/json.hpp>
 
+#include "current-process.hh"
 #include "parsed-derivations.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
+#include "realisation.hh"
 #include "derivations.hh"
-#include "util.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
 #include "eval.hh"
@@ -34,13 +35,14 @@ extern char * * environ __attribute__((weak));
  */
 static std::vector<std::string> shellwords(const std::string & s)
 {
-    std::regex whitespace("^(\\s+).*");
+    std::regex whitespace("^\\s+");
     auto begin = s.cbegin();
     std::vector<std::string> res;
     std::string cur;
     enum state {
         sBegin,
-        sQuote
+        sSingleQuote,
+        sDoubleQuote
     };
     state st = sBegin;
     auto it = begin;
@@ -50,26 +52,39 @@ static std::vector<std::string> shellwords(const std::string & s)
             if (regex_search(it, s.cend(), match, whitespace)) {
                 cur.append(begin, it);
                 res.push_back(cur);
-                cur.clear();
-                it = match[1].second;
+                it = match[0].second;
+                if (it == s.cend()) return res;
                 begin = it;
+                cur.clear();
             }
         }
         switch (*it) {
+            case '\'':
+                if (st != sDoubleQuote) {
+                    cur.append(begin, it);
+                    begin = it + 1;
+                    st = st == sBegin ? sSingleQuote : sBegin;
+                }
+                break;
             case '"':
-                cur.append(begin, it);
-                begin = it + 1;
-                st = st == sBegin ? sQuote : sBegin;
+                if (st != sSingleQuote) {
+                    cur.append(begin, it);
+                    begin = it + 1;
+                    st = st == sBegin ? sDoubleQuote : sBegin;
+                }
                 break;
             case '\\':
-                /* perl shellwords mostly just treats the next char as part of the string with no special processing */
-                cur.append(begin, it);
-                begin = ++it;
+                if (st != sSingleQuote) {
+                    /* perl shellwords mostly just treats the next char as part of the string with no special processing */
+                    cur.append(begin, it);
+                    begin = ++it;
+                }
                 break;
         }
     }
+    if (st != sBegin) throw Error("unterminated quote in shebang line");
     cur.append(begin, it);
-    if (!cur.empty()) res.push_back(cur);
+    res.push_back(cur);
     return res;
 }
 
@@ -128,12 +143,12 @@ static void main_nix_build(int argc, char * * argv)
                 for (auto line : lines) {
                     line = chomp(line);
                     std::smatch match;
-                    if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell (.*)$")))
+                    if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
                         for (const auto & word : shellwords(match[1].str()))
                             args.push_back(word);
                 }
             }
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
 
     struct MyArgs : LegacyArgs, MixEvalArgs
@@ -274,7 +289,7 @@ static void main_nix_build(int argc, char * * argv)
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
 
-    DrvInfos drvs;
+    PackageInfos drvs;
 
     /* Parse the expressions. */
     std::vector<Expr *> exprs;
@@ -292,12 +307,15 @@ static void main_nix_build(int argc, char * * argv)
                 } catch (Error & e) {};
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
                 if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
-                    drvs.push_back(DrvInfo(*state, evalStore, absolute));
+                    drvs.push_back(PackageInfo(*state, evalStore, absolute));
                 else
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
-                    exprs.push_back(state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state,
-                                        inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
+                    exprs.push_back(
+                        state->parseExprFromFile(
+                            resolveExprPath(
+                                lookupFileArg(*state,
+                                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i))));
             }
         }
 
@@ -332,7 +350,7 @@ static void main_nix_build(int argc, char * * argv)
                 takesNixShellAttr(vRoot) ? *autoArgsWithInNixShell : *autoArgs,
                 vRoot
             ).first);
-            state->forceValue(v, [&]() { return v.determinePos(noPos); });
+            state->forceValue(v, v.determinePos(noPos));
             getDerivations(
                 *state,
                 v,
@@ -344,7 +362,7 @@ static void main_nix_build(int argc, char * * argv)
         }
     }
 
-    state->printStats();
+    state->maybePrintStats();
 
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         /* Note: we do this even when !printMissing to efficiently
@@ -365,8 +383,8 @@ static void main_nix_build(int argc, char * * argv)
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
 
-        auto & drvInfo = drvs.front();
-        auto drv = evalStore->derivationFromPath(drvInfo.requireDrvPath());
+        auto & packageInfo = drvs.front();
+        auto drv = evalStore->derivationFromPath(packageInfo.requireDrvPath());
 
         std::vector<DerivedPath> pathsToBuild;
         RealisedPath::Set pathsToCopy;
@@ -406,8 +424,22 @@ static void main_nix_build(int argc, char * * argv)
             }
         }
 
+        std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> accumDerivedPath;
+
+        accumDerivedPath = [&](ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+            if (!inputNode.value.empty())
+                pathsToBuild.push_back(DerivedPath::Built {
+                    .drvPath = inputDrv,
+                    .outputs = OutputsSpec::Names { inputNode.value },
+                });
+            for (const auto & [outputName, childNode] : inputNode.childMap)
+                accumDerivedPath(
+                    make_ref<SingleDerivedPath>(SingleDerivedPath::Built { inputDrv, outputName }),
+                    childNode);
+        };
+
         // Build or fetch all dependencies of the derivation.
-        for (const auto & [inputDrv0, inputOutputs] : drv.inputDrvs) {
+        for (const auto & [inputDrv0, inputNode] : drv.inputDrvs.map) {
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
@@ -416,15 +448,12 @@ static void main_nix_build(int argc, char * * argv)
                         return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
                     }))
             {
-                pathsToBuild.push_back(DerivedPath::Built {
-                    .drvPath = makeConstantStorePathRef(inputDrv),
-                    .outputs = OutputsSpec::Names { inputOutputs },
-                });
+                accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);
                 pathsToCopy.insert(inputDrv);
             }
         }
         for (const auto & src : drv.inputSrcs) {
-            pathsToBuild.push_back(DerivedPath::Opaque{src});
+            pathsToBuild.emplace_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
         }
 
@@ -433,7 +462,7 @@ static void main_nix_build(int argc, char * * argv)
         if (dryRun) return;
 
         if (shellDrv) {
-            auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value());
+            auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value(), &*evalStore);
             shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
         }
 
@@ -482,15 +511,23 @@ static void main_nix_build(int argc, char * * argv)
 
         if (env.count("__json")) {
             StorePathSet inputs;
-            for (auto & [depDrvPath, wantedDepOutputs] : drv.inputDrvs) {
-                auto outputs = evalStore->queryPartialDerivationOutputMap(depDrvPath);
-                for (auto & i : wantedDepOutputs) {
+
+            std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
+
+            accumInputClosure = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+                auto outputs = store->queryPartialDerivationOutputMap(inputDrv, &*evalStore);
+                for (auto & i : inputNode.value) {
                     auto o = outputs.at(i);
                     store->computeFSClosure(*o, inputs);
                 }
-            }
+                for (const auto & [outputName, childNode] : inputNode.childMap)
+                    accumInputClosure(*outputs.at(outputName), childNode);
+            };
 
-            ParsedDerivation parsedDrv(drvInfo.requireDrvPath(), drv);
+            for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
+                accumInputClosure(inputDrv, inputNode);
+
+            ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
 
             if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
                 auto json = structAttrs.value();
@@ -583,10 +620,10 @@ static void main_nix_build(int argc, char * * argv)
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
-        for (auto & drvInfo : drvs) {
-            auto drvPath = drvInfo.requireDrvPath();
+        for (auto & packageInfo : drvs) {
+            auto drvPath = packageInfo.requireDrvPath();
 
-            auto outputName = drvInfo.queryOutputName();
+            auto outputName = packageInfo.queryOutputName();
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
@@ -616,7 +653,7 @@ static void main_nix_build(int argc, char * * argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = evalStore->queryPartialDerivationOutputMap(drvPath);
+            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath, &*evalStore);
 
             auto maybeOutputPath = builtOutputs.at(outputName);
             assert(maybeOutputPath);

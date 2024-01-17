@@ -82,7 +82,7 @@ let
       dir=NixOS-nixpkgs-${nixpkgs.shortRev}
       cp -prd ${nixpkgs} $dir
       # Set the correct timestamp in the tarball.
-      find $dir -print0 | xargs -0 touch -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${builtins.substring 12 2 nixpkgs.lastModifiedDate} --
+      find $dir -print0 | xargs -0 touch -h -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${builtins.substring 12 2 nixpkgs.lastModifiedDate} --
       tar cfz $out/archive/${nixpkgs.rev}.tar.gz $dir --hard-dereference
     '';
 in
@@ -144,7 +144,7 @@ in
           virtualisation.memorySize = 4096;
           nix.settings.substituters = lib.mkForce [ ];
           nix.extraOptions = "experimental-features = nix-command flakes";
-          networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
+          networking.hosts.${(builtins.head nodes.github.networking.interfaces.eth1.ipv4.addresses).address} =
             [ "channels.nixos.org" "api.github.com" "github.com" ];
           security.pki.certificateFiles = [ "${cert}/ca.crt" ];
         };
@@ -185,6 +185,10 @@ in
 
     client.succeed("nix registry pin nixpkgs")
     client.succeed("nix flake metadata nixpkgs --tarball-ttl 0 >&2")
+
+    # Test fetchTree on a github URL.
+    hash = client.succeed(f"nix eval --raw --expr '(fetchTree {info['url']}).narHash'")
+    assert hash == info['locked']['narHash']
 
     # Shut down the web server. The flake should be cached on the client.
     github.succeed("systemctl stop httpd.service")

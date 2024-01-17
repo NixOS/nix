@@ -1,6 +1,11 @@
 #include "logging.hh"
+#include "file-descriptor.hh"
+#include "environment-variables.hh"
+#include "terminal.hh"
 #include "util.hh"
 #include "config.hh"
+#include "source-path.hh"
+#include "position.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
@@ -111,7 +116,7 @@ void writeToStderr(std::string_view s)
 {
     try {
         writeFull(STDERR_FILENO, s, false);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
            errors to ensure that cleanup code that logs to stderr runs
            to completion if the other side of stderr has been closed
@@ -133,13 +138,13 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-void to_json(nlohmann::json & json, std::shared_ptr<AbstractPos> pos)
+void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
 {
     if (pos) {
         json["line"] = pos->line;
         json["column"] = pos->column;
         std::ostringstream str;
-        pos->print(str);
+        pos->print(str, true);
         json["file"] = str.str();
     } else {
         json["line"] = nullptr;
@@ -220,8 +225,8 @@ struct JSONLogger : Logger {
         json["level"] = lvl;
         json["type"] = type;
         json["text"] = s;
+        json["parent"] = parent;
         addFields(json, fields);
-        // FIXME: handle parent
         write(json);
     }
 

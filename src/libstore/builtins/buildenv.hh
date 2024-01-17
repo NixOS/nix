@@ -1,11 +1,13 @@
 #pragma once
 ///@file
 
-#include "derivations.hh"
 #include "store-api.hh"
 
 namespace nix {
 
+/**
+ * Think of this as a "store level package attrset", but stripped down to no more than the needs of buildenv.
+ */
 struct Package {
     Path path;
     bool active;

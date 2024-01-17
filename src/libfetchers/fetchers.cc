@@ -1,16 +1,38 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "input-accessor.hh"
+#include "source-path.hh"
+#include "fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
 
-std::unique_ptr<std::vector<std::shared_ptr<InputScheme>>> inputSchemes = nullptr;
+using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
+
+std::unique_ptr<InputSchemeMap> inputSchemes = nullptr;
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
 {
-    if (!inputSchemes) inputSchemes = std::make_unique<std::vector<std::shared_ptr<InputScheme>>>();
-    inputSchemes->push_back(std::move(inputScheme));
+    if (!inputSchemes)
+        inputSchemes = std::make_unique<InputSchemeMap>();
+    auto schemeName = inputScheme->schemeName();
+    if (inputSchemes->count(schemeName) > 0)
+        throw Error("Input scheme with name %s already registered", schemeName);
+    inputSchemes->insert_or_assign(schemeName, std::move(inputScheme));
+}
+
+nlohmann::json dumpRegisterInputSchemeInfo() {
+    using nlohmann::json;
+
+    auto res = json::object();
+
+    for (auto & [name, scheme] : *inputSchemes) {
+        auto & r = res[name] = json::object();
+        r["allowedAttrs"] = scheme->allowedAttrs();
+    }
+
+    return res;
 }
 
 Input Input::fromURL(const std::string & url, bool requireTree)
@@ -33,9 +55,10 @@ static void fixupInput(Input & input)
 
 Input Input::fromURL(const ParsedURL & url, bool requireTree)
 {
-    for (auto & inputScheme : *inputSchemes) {
+    for (auto & [_, inputScheme] : *inputSchemes) {
         auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
+            experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
             fixupInput(*res);
             return std::move(*res);
@@ -47,19 +70,49 @@ Input Input::fromURL(const ParsedURL & url, bool requireTree)
 
 Input Input::fromAttrs(Attrs && attrs)
 {
-    for (auto & inputScheme : *inputSchemes) {
-        auto res = inputScheme->inputFromAttrs(attrs);
-        if (res) {
-            res->scheme = inputScheme;
-            fixupInput(*res);
-            return std::move(*res);
-        }
-    }
+    auto schemeName = ({
+        auto schemeNameOpt = maybeGetStrAttr(attrs, "type");
+        if (!schemeNameOpt)
+            throw Error("'type' attribute to specify input scheme is required but not provided");
+        *std::move(schemeNameOpt);
+    });
 
-    Input input;
-    input.attrs = attrs;
-    fixupInput(input);
-    return input;
+    auto raw = [&]() {
+        // Return an input without a scheme; most operations will fail,
+        // but not all of them. Doing this is to support those other
+        // operations which are supposed to be robust on
+        // unknown/uninterpretable inputs.
+        Input input;
+        input.attrs = attrs;
+        fixupInput(input);
+        return input;
+    };
+
+    std::shared_ptr<InputScheme> inputScheme = ({
+        auto i = inputSchemes->find(schemeName);
+        i == inputSchemes->end() ? nullptr : i->second;
+    });
+
+    if (!inputScheme) return raw();
+
+    experimentalFeatureSettings.require(inputScheme->experimentalFeature());
+
+    auto allowedAttrs = inputScheme->allowedAttrs();
+
+    for (auto & [name, _] : attrs)
+        if (name != "type" && allowedAttrs.count(name) == 0)
+            throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
+
+    auto res = inputScheme->inputFromAttrs(attrs);
+    if (!res) return raw();
+    res->scheme = inputScheme;
+    fixupInput(*res);
+    return std::move(*res);
+}
+
+std::optional<std::string> Input::getFingerprint(ref<Store> store) const
+{
+    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
 }
 
 ParsedURL Input::toURL() const
@@ -82,14 +135,14 @@ std::string Input::to_string() const
     return toURL().to_string();
 }
 
+bool Input::isDirect() const
+{
+    return !scheme || scheme->isDirect(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;
-}
-
-bool Input::hasAllInfo() const
-{
-    return getNarHash() && scheme && scheme->hasAllInfo(*this);
 }
 
 bool Input::operator ==(const Input & other) const
@@ -107,7 +160,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
-std::pair<Tree, Input> Input::fetch(ref<Store> store) const
+std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
@@ -115,7 +168,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     /* The tree may already be in the Nix store, or it could be
        substituted (which is often faster than fetching from the
        original source). So check that. */
-    if (hasAllInfo()) {
+    if (getNarHash()) {
         try {
             auto storePath = computeStorePath(*store);
 
@@ -124,7 +177,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            return {Tree { .actualPath = store->toRealPath(storePath), .storePath = std::move(storePath) }, *this};
+            return {std::move(storePath), *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
@@ -139,18 +192,16 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }();
 
-    Tree tree {
-        .actualPath = store->toRealPath(storePath),
-        .storePath = storePath,
-    };
-
-    auto narHash = store->queryPathInfo(tree.storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+    auto narHash = store->queryPathInfo(storePath)->narHash;
+    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
     if (auto prevNarHash = getNarHash()) {
         if (narHash != *prevNarHash)
             throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), tree.actualPath, prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
+                to_string(),
+                store->printStorePath(storePath),
+                prevNarHash->to_string(HashFormat::SRI, true),
+                narHash.to_string(HashFormat::SRI, true));
     }
 
     if (auto prevLastModified = getLastModified()) {
@@ -173,9 +224,17 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
 
     input.locked = true;
 
-    assert(input.hasAllInfo());
+    return {std::move(storePath), input};
+}
 
-    return {std::move(tree), input};
+std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+{
+    try {
+        return scheme->getAccessor(store, *this);
+    } catch (Error & e) {
+        e.addTrace({}, "while fetching the input '%s'", to_string());
+        throw;
+    }
 }
 
 Input Input::applyOverrides(
@@ -198,12 +257,13 @@ std::optional<Path> Input::getSourcePath() const
     return scheme->getSourcePath(*this);
 }
 
-void Input::markChangedFile(
-    std::string_view file,
+void Input::putFile(
+    const CanonPath & path,
+    std::string_view contents,
     std::optional<std::string> commitMsg) const
 {
     assert(scheme);
-    return scheme->markChangedFile(*this, file, commitMsg);
+    return scheme->putFile(*this, path, contents, commitMsg);
 }
 
 std::string Input::getName() const
@@ -231,8 +291,8 @@ std::string Input::getType() const
 std::optional<Hash> Input::getNarHash() const
 {
     if (auto s = maybeGetStrAttr(attrs, "narHash")) {
-        auto hash = s->empty() ? Hash(htSHA256) : Hash::parseSRI(*s);
-        if (hash.type != htSHA256)
+        auto hash = s->empty() ? Hash(HashAlgorithm::SHA256) : Hash::parseSRI(*s);
+        if (hash.algo != HashAlgorithm::SHA256)
             throw UsageError("narHash must use SHA-256");
         return hash;
     }
@@ -254,8 +314,9 @@ std::optional<Hash> Input::getRev() const
         try {
             hash = Hash::parseAnyPrefixed(*s);
         } catch (BadHash &e) {
-            // Default to sha1 for backwards compatibility with existing flakes
-            hash = Hash::parseAny(*s, htSHA1);
+            // Default to sha1 for backwards compatibility with existing
+            // usages (e.g. `builtins.fetchTree` calls or flake inputs).
+            hash = Hash::parseAny(*s, HashAlgorithm::SHA1);
         }
     }
 
@@ -293,19 +354,45 @@ Input InputScheme::applyOverrides(
     return input;
 }
 
-std::optional<Path> InputScheme::getSourcePath(const Input & input)
+std::optional<Path> InputScheme::getSourcePath(const Input & input) const
 {
     return {};
 }
 
-void InputScheme::markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg)
+void InputScheme::putFile(
+    const Input & input,
+    const CanonPath & path,
+    std::string_view contents,
+    std::optional<std::string> commitMsg) const
 {
-    assert(false);
+    throw Error("input '%s' does not support modifying file '%s'", input.to_string(), path);
 }
 
 void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
+{
+    auto [accessor, input2] = getAccessor(store, input);
+    auto storePath = fetchToStore(*store, SourcePath(accessor), input2.getName());
+    return {storePath, input2};
+}
+
+std::pair<ref<InputAccessor>, Input> InputScheme::getAccessor(ref<Store> store, const Input & input) const
+{
+    throw UnimplementedError("InputScheme must implement fetch() or getAccessor()");
+}
+
+std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
+{
+    return {};
+}
+
+std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
+{
+    return ((nlohmann::json) publicKeys).dump();
 }
 
 }

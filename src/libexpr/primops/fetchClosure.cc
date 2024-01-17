@@ -1,5 +1,6 @@
 #include "primops.hh"
 #include "store-api.hh"
+#include "realisation.hh"
 #include "make-content-addressed.hh"
 #include "url.hh"
 
@@ -133,7 +134,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
         else if (attrName == "toPath") {
             state.forceValue(*attr.value, attr.pos);
-            bool isEmptyString = attr.value->type() == nString && attr.value->string.s == std::string("");
+            bool isEmptyString = attr.value->type() == nString && attr.value->string_view() == "";
             if (isEmptyString) {
                 toPath = StorePathOrGap {};
             }

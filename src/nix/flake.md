@@ -67,6 +67,11 @@ inputs.nixpkgs = {
 };
 ```
 
+Following [RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986#section-2.1),
+characters outside of the allowed range (i.e. neither [reserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.2)
+nor [unreserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.3))
+must be percent-encoded.
+
 ### Examples
 
 Here are some examples of flake references in their URL-like representation:
@@ -93,7 +98,15 @@ Here are some examples of flake references in their URL-like representation:
 
 ## Path-like syntax
 
-Flakes corresponding to a local path can also be referred to by a direct path reference, either `/absolute/path/to/the/flake` or `./relative/path/to/the/flake` (note that the leading `./` is mandatory for relative paths to avoid any ambiguity).
+Flakes corresponding to a local path can also be referred to by a direct
+path reference, either `/absolute/path/to/the/flake` or`./relative/path/to/the/flake`.
+Note that the leading `./` is mandatory for relative paths. If it is
+omitted, the path will be interpreted as [URL-like syntax](#url-like-syntax),
+which will cause error messages like this:
+
+```console
+error: cannot find flake 'flake:relative/path/to/the/flake' in the flake registries
+```
 
 The semantic of such a path is as follows:
 
@@ -103,10 +116,14 @@ The semantic of such a path is as follows:
     2. The filesystem root (/), or
     3. A folder on a different mount point.
 
+Contrary to URL-like references, path-like flake references can contain arbitrary unicode characters (except `#` and `?`).
+
 ### Examples
 
 * `.`: The flake to which the current directory belongs to.
 * `/home/alice/src/patchelf`: A flake in some other directory.
+* `./../sub directory/with Ûñî©ôδ€`: A flake in another relative directory that
+  has Unicode characters in its name.
 
 ## Flake reference attributes
 
@@ -144,18 +161,39 @@ can occur in *locked* flake references and are available to Nix code:
 
 Currently the `type` attribute can be one of the following:
 
-* `path`: arbitrary local directories, or local Git trees. The
-  required attribute `path` specifies the path of the flake. The URL
-  form is
+* `indirect`: *The default*. Indirection through the flake registry.
+  These have the form
 
   ```
-  [path:]<path>(\?<params)?
+  [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
   ```
 
-  where *path* is an absolute path.
+  These perform a lookup of `<flake-id>` in the flake registry. For
+  example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
+  references. The specified `rev` and/or `ref` are merged with the
+  entry in the registry; see [nix registry](./nix3-registry.md) for
+  details.
 
-  *path* must be a directory in the file system containing a file
-  named `flake.nix`.
+  For example, these are valid indirect flake references:
+
+  * `nixpkgs`
+  * `nixpkgs/nixos-unstable`
+  * `nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
+  * `nixpkgs/nixos-unstable/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
+  * `sub/dir` (if a flake named `sub` is in the registry)
+
+* `path`: arbitrary local directories. The required attribute `path`
+  specifies the path of the flake. The URL form is
+
+  ```
+  path:<path>(\?<params>)?
+  ```
+
+  where *path* is an absolute path to a directory in the file system
+  containing a file named `flake.nix`.
+
+  If the flake at *path* is not inside a git repository, the `path:`
+  prefix is implied and can be omitted.
 
   *path* generally must be an absolute path. However, on the command
   line, it can be a relative path (e.g. `.` or `./foo`) which is
@@ -164,14 +202,24 @@ Currently the `type` attribute can be one of the following:
   (e.g. `nixpkgs` is a registry lookup; `./nixpkgs` is a relative
   path).
 
+  For example, these are valid path flake references:
+
+  * `path:/home/user/sub/dir`
+  * `/home/user/sub/dir` (if `dir/flake.nix` is *not* in a git repository)
+  * `./sub/dir` (when used on the command line and `dir/flake.nix` is *not* in a git repository)
+
 * `git`: Git repositories. The location of the repository is specified
   by the attribute `url`.
 
   They have the URL form
 
   ```
-  git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
+  git(+http|+https|+ssh|+git|+file):(//<server>)?<path>(\?<params>)?
   ```
+
+  If *path* starts with `/` (or `./` when used as an argument on the
+  command line) and is a local path to a git repository, the leading
+  `git:` or `+file` prefixes are implied and can be omitted.
 
   The `ref` attribute defaults to resolving the `HEAD` reference.
 
@@ -188,6 +236,9 @@ Currently the `type` attribute can be one of the following:
 
   For example, the following are valid Git flake references:
 
+  * `git:/home/user/sub/dir`
+  * `/home/user/sub/dir` (if `dir/flake.nix` is in a git repository)
+  * `./sub/dir` (when used on the command line and `dir/flake.nix` is in a git repository)
   * `git+https://example.org/my/repo`
   * `git+https://example.org/my/repo?dir=flake1`
   * `git+ssh://git@github.com/NixOS/nix?ref=v1.2.3`
@@ -308,19 +359,6 @@ Currently the `type` attribute can be one of the following:
   * `sourcehut:~misterio/nix-colors?host=git.example.org`
   * `sourcehut:~misterio/nix-colors/182b4b8709b8ffe4e9774a4c5d6877bf6bb9a21c`
   * `sourcehut:~misterio/nix-colors/21c1a380a6915d890d408e9f22203436a35bb2de?host=hg.sr.ht`
-
-* `indirect`: Indirections through the flake registry. These have the
-  form
-
-  ```
-  [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
-  ```
-
-  These perform a lookup of `<flake-id>` in the flake registry. For
-  example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
-  references. The specified `rev` and/or `ref` are merged with the
-  entry in the registry; see [nix registry](./nix3-registry.md) for
-  details.
 
 # Flake format
 

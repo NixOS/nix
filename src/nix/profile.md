@@ -11,7 +11,7 @@ them to be rolled back easily.
 
 )""
 
-#include "doc/files/profiles.md.gen.hh"
+#include "generated-doc/files/profiles.md.gen.hh"
 
 R""(
 

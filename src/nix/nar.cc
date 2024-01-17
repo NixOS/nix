@@ -4,7 +4,7 @@ using namespace nix;
 
 struct CmdNar : NixMultiCommand
 {
-    CmdNar() : MultiCommand(RegisterCommand::getCommandsFor({"nar"}))
+    CmdNar() : NixMultiCommand("nar", RegisterCommand::getCommandsFor({"nar"}))
     { }
 
     std::string description() override
@@ -20,13 +20,6 @@ struct CmdNar : NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix nar' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdNar = registerCommand<CmdNar>("nar");

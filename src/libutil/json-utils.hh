@@ -78,20 +78,29 @@ namespace nlohmann {
  */
 template<typename T>
 struct adl_serializer<std::optional<T>> {
-    static std::optional<T> from_json(const json & json) {
+    /**
+     * @brief Convert a JSON type to an `optional<T>` treating
+     *        `null` as `std::nullopt`.
+     */
+    static void from_json(const json & json, std::optional<T> & t) {
         static_assert(
             nix::json_avoids_null<T>::value,
             "null is already in use for underlying type's JSON");
-        return json.is_null()
+        t = json.is_null()
             ? std::nullopt
-            : std::optional { adl_serializer<T>::from_json(json) };
+            : std::make_optional(json.template get<T>());
     }
-    static void to_json(json & json, std::optional<T> t) {
+
+    /**
+     *  @brief Convert an optional type to a JSON type  treating `std::nullopt`
+     *         as `null`.
+     */
+    static void to_json(json & json, const std::optional<T> & t) {
         static_assert(
             nix::json_avoids_null<T>::value,
             "null is already in use for underlying type's JSON");
         if (t)
-            adl_serializer<T>::to_json(json, *t);
+            json = *t;
         else
             json = nullptr;
     }

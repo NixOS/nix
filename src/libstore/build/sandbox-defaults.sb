@@ -68,6 +68,7 @@ R""(
 (allow file*
        (literal "/dev/null")
        (literal "/dev/random")
+       (literal "/dev/stderr")
        (literal "/dev/stdin")
        (literal "/dev/stdout")
        (literal "/dev/tty")

@@ -19,6 +19,7 @@
 #include <variant>
 
 #include "util.hh"
+#include "users.hh"
 
 #include "nixexpr.hh"
 #include "eval.hh"
@@ -26,6 +27,31 @@
 #include "globals.hh"
 
 namespace nix {
+
+#define YYLTYPE ::nix::ParserLocation
+    struct ParserLocation
+    {
+        int first_line, first_column;
+        int last_line, last_column;
+
+        // backup to recover from yyless(0)
+        int stashed_first_line, stashed_first_column;
+        int stashed_last_line, stashed_last_column;
+
+        void stash() {
+          stashed_first_line = first_line;
+          stashed_first_column = first_column;
+          stashed_last_line = last_line;
+          stashed_last_column = last_column;
+        }
+
+        void unstash() {
+          first_line = stashed_first_line;
+          first_column = stashed_first_column;
+          last_line = stashed_last_line;
+          last_column = stashed_last_column;
+        }
+    };
 
     struct ParseData
     {
@@ -339,11 +365,11 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <id> attr
 %token <id> ID
 %token <str> STR IND_STR
-%token <n> INT
-%token <nf> FLOAT
+%token <n> INT_LIT
+%token <nf> FLOAT_LIT
 %token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
-%token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
+%token IF THEN ELSE ASSERT WITH LET IN_KW REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
@@ -386,7 +412,7 @@ expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
-  | LET binds IN expr_function
+  | LET binds IN_KW expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
             .msg = hintfmt("dynamic attributes not allowed in let"),
@@ -456,8 +482,8 @@ expr_simple
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
-  | INT { $$ = new ExprInt($1); }
-  | FLOAT { $$ = new ExprFloat($1); }
+  | INT_LIT { $$ = new ExprInt($1); }
+  | FLOAT_LIT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, std::move(*$2));
@@ -520,7 +546,7 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(path);
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   | HPATH {
     if (evalSettings.pureEval) {
@@ -530,7 +556,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(path);
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   ;
 
@@ -646,13 +672,16 @@ formal
 
 #include "eval.hh"
 #include "filetransfer.hh"
-#include "fetchers.hh"
+#include "tarball.hh"
 #include "store-api.hh"
 #include "flake/flake.hh"
+#include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
 
 
 namespace nix {
 
+unsigned long Expr::nrExprs = 0;
 
 Expr * EvalState::parse(
     char * text,
@@ -682,17 +711,26 @@ Expr * EvalState::parse(
 }
 
 
-SourcePath resolveExprPath(const SourcePath & path)
+SourcePath resolveExprPath(SourcePath path)
 {
+    unsigned int followCount = 0, maxFollow = 1024;
+
     /* If `path' is a symlink, follow it.  This is so that relative
        path references work. */
-    auto path2 = path.resolveSymlinks();
+    while (!path.path.isRoot()) {
+        // Basic cycle/depth limit to avoid infinite loops.
+        if (++followCount >= maxFollow)
+            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+        auto p = path.parent().resolveSymlinks() + path.baseName();
+        if (p.lstat().type != InputAccessor::tSymlink) break;
+        path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
+    }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path2.lstat().type == InputAccessor::tDirectory)
-        return path2 + "default.nix";
+    if (path.resolveSymlinks().lstat().type == InputAccessor::tDirectory)
+        return path + "default.nix";
 
-    return path2;
+    return path;
 }
 
 
@@ -704,7 +742,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 
 Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto buffer = path.readFile();
+    auto buffer = path.resolveSymlinks().readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
@@ -755,11 +793,11 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
         auto r = *rOpt;
 
         Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return CanonPath(canonPath(res));
+        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
     }
 
     if (hasPrefix(path, "nix/"))
-        return CanonPath(concatStrings(corepkgsPrefix, path.substr(4)));
+        return {corepkgsFS, CanonPath(path.substr(3))};
 
     debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
@@ -771,7 +809,7 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0)
+std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = searchPathResolved.find(value);
@@ -782,13 +820,12 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(value), "source", false).tree.storePath;
+                store, EvalSettings::resolvePseudoUrl(value), "source", false).storePath;
             res = { store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
             });
-            res = std::nullopt;
         }
     }
 
@@ -796,12 +833,26 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", value);
-        auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
+        auto storePath = flakeRef.resolve(store).fetchTree(store).first;
         res = { store->toRealPath(storePath) };
     }
 
     else {
         auto path = absPath(value);
+
+        /* Allow access to paths in the search path. */
+        if (initAccessControl) {
+            allowPath(path);
+            if (store->isInStore(path)) {
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    for (auto & p : closure)
+                        allowPath(p);
+                } catch (InvalidPath &) { }
+            }
+        }
+
         if (pathExists(path))
             res = { path };
         else {
@@ -817,7 +868,7 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
     else
         debug("failed to resolve search path element '%s'", value);
 
-    searchPathResolved[value] = res;
+    searchPathResolved.emplace(value, res);
     return res;
 }
 

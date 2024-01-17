@@ -1,5 +1,5 @@
 set -e
-if [ -e .attrs.sh ]; then source .attrs.sh; fi
+if [ -e "$NIX_ATTRS_SH_FILE" ]; then source "$NIX_ATTRS_SH_FILE"; fi
 
 export IN_NIX_SHELL=impure
 export dontAddDisableDepTrack=1
@@ -101,7 +101,21 @@ __dumpEnv() {
 
         printf "}"
     done < <(printf "%s\n" "$__vars")
-    printf '\n  }\n}'
+    printf '\n  }'
+
+    if [ -e "$NIX_ATTRS_SH_FILE" ]; then
+        printf ',\n  "structuredAttrs": {\n    '
+        __escapeString ".attrs.sh"
+        printf ': '
+        __escapeString "$(<"$NIX_ATTRS_SH_FILE")"
+        printf ',\n    '
+        __escapeString ".attrs.json"
+        printf ': '
+        __escapeString "$(<"$NIX_ATTRS_JSON_FILE")"
+        printf '\n  }'
+    fi
+
+    printf '\n}'
 }
 
 __escapeString() {
@@ -117,7 +131,7 @@ __escapeString() {
 # In case of `__structuredAttrs = true;` the list of outputs is an associative
 # array with a format like `outname => /nix/store/hash-drvname-outname`, so `__olist`
 # must contain the array's keys (hence `${!...[@]}`) in this case.
-if [ -e .attrs.sh ]; then
+if [ -e "$NIX_ATTRS_SH_FILE" ]; then
     __olist="${!outputs[@]}"
 else
     __olist=$outputs

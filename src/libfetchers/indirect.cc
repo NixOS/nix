@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "url-parts.hh"
+#include "path.hh"
 
 namespace nix::fetchers {
 
@@ -19,7 +20,7 @@ struct IndirectInputScheme : InputScheme
         if (path.size() == 1) {
         } else if (path.size() == 2) {
             if (std::regex_match(path[1], revRegex))
-                rev = Hash::parseAny(path[1], htSHA1);
+                rev = Hash::parseAny(path[1], HashAlgorithm::SHA1);
             else if (std::regex_match(path[1], refRegex))
                 ref = path[1];
             else
@@ -30,7 +31,7 @@ struct IndirectInputScheme : InputScheme
             ref = path[1];
             if (!std::regex_match(path[2], revRegex))
                 throw BadURL("in flake URL '%s', '%s' is not a commit hash", url.url, path[2]);
-            rev = Hash::parseAny(path[2], htSHA1);
+            rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
         } else
             throw BadURL("GitHub URL '%s' is invalid", url.url);
 
@@ -41,7 +42,6 @@ struct IndirectInputScheme : InputScheme
         // FIXME: forbid query params?
 
         Input input;
-        input.direct = false;
         input.attrs.insert_or_assign("type", "indirect");
         input.attrs.insert_or_assign("id", id);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
@@ -50,20 +50,28 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
+    std::string_view schemeName() const override
+    {
+        return "indirect";
+    }
+
+    StringSet allowedAttrs() const override
+    {
+        return {
+            "id",
+            "ref",
+            "rev",
+            "narHash",
+        };
+    }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "indirect") return {};
-
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "id" && name != "ref" && name != "rev" && name != "narHash")
-                throw Error("unsupported indirect input attribute '%s'", name);
-
         auto id = getStrAttr(attrs, "id");
         if (!std::regex_match(id, flakeRegex))
             throw BadURL("'%s' is not a valid flake ID", id);
 
         Input input;
-        input.direct = false;
         input.attrs = attrs;
         return input;
     }
@@ -76,11 +84,6 @@ struct IndirectInputScheme : InputScheme
         if (auto ref = input.getRef()) { url.path += '/'; url.path += *ref; };
         if (auto rev = input.getRev()) { url.path += '/'; url.path += rev->gitRev(); };
         return url;
-    }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        return false;
     }
 
     Input applyOverrides(
@@ -98,6 +101,14 @@ struct IndirectInputScheme : InputScheme
     {
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
     }
+
+    std::optional<ExperimentalFeature> experimentalFeature() const override
+    {
+        return Xp::Flakes;
+    }
+
+    bool isDirect(const Input & input) const override
+    { return false; }
 };
 
 static auto rIndirectInputScheme = OnStartup([] { registerInputScheme(std::make_unique<IndirectInputScheme>()); });

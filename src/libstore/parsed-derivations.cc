@@ -122,7 +122,7 @@ bool ParsedDerivation::willBuildLocally(Store & localStore) const
 
 bool ParsedDerivation::substitutesAllowed() const
 {
-    return getBoolAttr("allowSubstitutes", true);
+    return settings.alwaysAllowSubstitutes ? true : getBoolAttr("allowSubstitutes", true);
 }
 
 bool ParsedDerivation::useUidRange() const
@@ -131,6 +131,41 @@ bool ParsedDerivation::useUidRange() const
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
+
+/**
+ * Write a JSON representation of store object metadata, such as the
+ * hash and the references.
+ */
+static nlohmann::json pathInfoToJSON(
+    Store & store,
+    const StorePathSet & storePaths)
+{
+    nlohmann::json::array_t jsonList = nlohmann::json::array();
+
+    for (auto & storePath : storePaths) {
+        auto info = store.queryPathInfo(storePath);
+
+        auto & jsonPath = jsonList.emplace_back(
+            info->toJSON(store, false, HashFormat::Nix32));
+
+        // Add the path to the object whose metadata we are including.
+        jsonPath["path"] = store.printStorePath(storePath);
+
+        jsonPath["valid"] = true;
+
+        jsonPath["closureSize"] = ({
+            uint64_t totalNarSize = 0;
+            StorePathSet closure;
+            store.computeFSClosure(info->path, closure, false, false);
+            for (auto & p : closure) {
+                auto info = store.queryPathInfo(p);
+                totalNarSize += info->narSize;
+            }
+            totalNarSize;
+        });
+    }
+    return jsonList;
+}
 
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
 {
@@ -152,8 +187,8 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
             StorePathSet storePaths;
             for (auto & p : *i)
                 storePaths.insert(store.parseStorePath(p.get<std::string>()));
-            json[i.key()] = store.pathInfoToJSON(
-                store.exportReferences(storePaths, inputPaths), false, true);
+            json[i.key()] = pathInfoToJSON(store,
+                store.exportReferences(storePaths, inputPaths));
         }
     }
 

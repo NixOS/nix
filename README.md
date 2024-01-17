@@ -7,21 +7,20 @@ Nix is a powerful package manager for Linux and other Unix systems that makes pa
 management reliable and reproducible. Please refer to the [Nix manual](https://nixos.org/nix/manual)
 for more details.
 
-## Installation
+## Installation and first steps
 
-On Linux and macOS the easiest way to install Nix is to run the following shell command
-(as a user other than root):
+Visit [nix.dev](https://nix.dev) for [installation instructions](https://nix.dev/tutorials/install-nix) and [beginner tutorials](https://nix.dev/tutorials/first-steps).
 
-```console
-$ curl -L https://nixos.org/nix/install | sh
-```
-
-Information on additional installation methods is available on the [Nix download page](https://nixos.org/download.html).
+Full reference documentation can be found in the [Nix manual](https://nixos.org/nix/manual).
 
 ## Building And Developing
 
 See our [Hacking guide](https://nixos.org/manual/nix/unstable/contributing/hacking.html) in our manual for instruction on how to
-to set up a development environment and build Nix from source.
+ set up a development environment and build Nix from source.
+
+## Contributing
+
+Check the [contributing guide](./CONTRIBUTING.md) if you want to get involved with developing Nix.
 
 ## Additional Resources
 
@@ -29,7 +28,6 @@ to set up a development environment and build Nix from source.
 - [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
 - [NixOS Discourse](https://discourse.nixos.org/)
 - [Matrix - #nix:nixos.org](https://matrix.to/#/#nix:nixos.org)
-- [IRC - #nixos on libera.chat](irc://irc.libera.chat/#nixos)
 
 ## License
 

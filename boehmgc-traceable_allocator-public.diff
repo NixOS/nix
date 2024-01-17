@@ -1,0 +1,12 @@
+diff --git a/include/gc_allocator.h b/include/gc_allocator.h
+index 597c7f13..587286be 100644
+--- a/include/gc_allocator.h
++++ b/include/gc_allocator.h
+@@ -312,6 +312,7 @@ public:
+ 
+ template<>
+ class traceable_allocator<void> {
++public:
+   typedef size_t      size_type;
+   typedef ptrdiff_t   difference_type;
+   typedef void*       pointer;

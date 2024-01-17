@@ -1,0 +1,30 @@
+let
+  contentAddressedByDefault = builtins.getEnv "NIX_TESTS_CA_BY_DEFAULT" == "1";
+  caArgs = if contentAddressedByDefault then {
+    __contentAddressed = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+  } else {};
+in
+
+rec {
+  shell = "@bash@";
+
+  path = "@coreutils@";
+
+  system = "@system@";
+
+  shared = builtins.getEnv "_NIX_TEST_SHARED";
+
+  mkDerivation = args:
+    derivation ({
+      inherit system;
+      builder = shell;
+      args = ["-e" args.builder or (builtins.toFile "builder-${args.name}.sh" ''
+        if [ -e "$NIX_ATTRS_SH_FILE" ]; then source $NIX_ATTRS_SH_FILE; fi;
+        eval "$buildCommand"
+      '')];
+      PATH = path;
+    } // caArgs // removeAttrs args ["builder" "meta"])
+    // { meta = args.meta or {}; };
+}

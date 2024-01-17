@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "util.hh"
+#include "file-descriptor.hh"
 
 namespace nix {
 

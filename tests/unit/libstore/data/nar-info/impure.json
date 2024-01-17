@@ -1,0 +1,20 @@
+{
+  "ca": "fixed:r:sha256:1lr187v6dck1rjh2j6svpikcfz53wyl3qrlcbb405zlh13x0khhh",
+  "compression": "xz",
+  "deriver": "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+  "downloadHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
+  "downloadSize": 4029176,
+  "narHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
+  "narSize": 34878,
+  "references": [
+    "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+    "/nix/store/n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
+  ],
+  "registrationTime": 23423,
+  "signatures": [
+    "asdf",
+    "qwer"
+  ],
+  "ultimate": true,
+  "url": "nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz"
+}

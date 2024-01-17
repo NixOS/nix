@@ -1,0 +1,9 @@
+error:
+       … while calling the 'addDrvOutputDependencies' builtin
+         at /pwd/lang/eval-fail-addDrvOutputDependencies-multi-elem-context.nix:18:4:
+           17|
+           18| in builtins.addDrvOutputDependencies combo-path
+             |    ^
+           19|
+
+       error: context of string '/nix/store/pg9yqs4yd85yhdm3f4i5dyaqp5jahrsz-fail.drv/nix/store/2dxd5frb715z451vbf7s8birlf3argbk-fail-2.drv' must have exactly one element, but has 2

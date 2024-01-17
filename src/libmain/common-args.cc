@@ -1,6 +1,9 @@
 #include "common-args.hh"
+#include "args/root.hh"
 #include "globals.hh"
+#include "logging.hh"
 #include "loggers.hh"
+#include "util.hh"
 
 namespace nix {
 
@@ -34,21 +37,21 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .description = "Set the Nix configuration setting *name* to *value* (overriding `nix.conf`).",
         .category = miscCategory,
         .labels = {"name", "value"},
-        .handler = {[](std::string name, std::string value) {
+        .handler = {[this](std::string name, std::string value) {
             try {
                 globalConfig.set(name, value);
             } catch (UsageError & e) {
-                if (!completions)
+                if (!getRoot().completions)
                     warn(e.what());
             }
         }},
-        .completer = [](size_t index, std::string_view prefix) {
+        .completer = [](AddCompletions & completions, size_t index, std::string_view prefix) {
             if (index == 0) {
                 std::map<std::string, Config::SettingInfo> settings;
                 globalConfig.getSettings(settings);
                 for (auto & s : settings)
                     if (hasPrefix(s.first, prefix))
-                        completions->add(s.first, fmt("Set the `%s` setting.", s.first));
+                        completions.add(s.first, fmt("Set the `%s` setting.", s.first));
             }
         }
     });

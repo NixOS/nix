@@ -154,8 +154,8 @@ downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
 downloadFile("binaryTarball.aarch64-darwin", "1");
-downloadFile("binaryTarballCross.x86_64-linux.armv6l-linux", "1");
-downloadFile("binaryTarballCross.x86_64-linux.armv7l-linux", "1");
+downloadFile("binaryTarballCross.x86_64-linux.armv6l-unknown-linux-gnueabihf", "1");
+downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
 downloadFile("installerScript", "1");
 
 # Upload docker images to dockerhub.

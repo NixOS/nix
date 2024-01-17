@@ -17,15 +17,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v22
+    - uses: cachix/install-nix-action@v25
       with:
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: "sandbox = true"
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v12
+    - uses: cachix/cachix-action@v14
       if: needs.check_secrets.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
@@ -58,14 +58,14 @@ jobs:
     outputs:
       installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v22
+    - uses: cachix/install-nix-action@v25
       with:
         install_url: https://releases.nixos.org/nix/nix-2.13.3/install
-    - uses: cachix/cachix-action@v12
+    - uses: cachix/cachix-action@v14
       with:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
@@ -82,9 +82,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v22
+    - uses: cachix/install-nix-action@v25
       with:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
@@ -101,6 +101,9 @@ jobs:
 
   docker_push_image:
     needs: [check_secrets, tests]
+    permissions:
+      contents: read
+      packages: write
     if: >-
       github.event_name == 'push' &&
       github.ref_name == 'master' &&
@@ -108,15 +111,15 @@ jobs:
       needs.check_secrets.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v22
+    - uses: cachix/install-nix-action@v25
       with:
         install_url: https://releases.nixos.org/nix/nix-2.13.3/install
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#default.version | tr -d \")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v12
+    - uses: cachix/cachix-action@v14
       if: needs.check_secrets.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
@@ -126,10 +129,30 @@ jobs:
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION nixos/nix:$NIX_VERSION
     - run: docker tag nix:$NIX_VERSION nixos/nix:master
+    # We'll deploy the newly built image to both Docker Hub and Github Container Registry.
+    #
+    # Push to Docker Hub first
     - name: Login to Docker Hub
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     - run: docker push nixos/nix:$NIX_VERSION
     - run: docker push nixos/nix:master
+    # Push to GitHub Container Registry as well
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Push image
+      run: |
+        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/nix
+        # Change all uppercase to lowercase
+        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+        docker tag nix:$NIX_VERSION $IMAGE_ID:$NIX_VERSION
+        docker tag nix:$NIX_VERSION $IMAGE_ID:master
+        docker push $IMAGE_ID:$NIX_VERSION
+        docker push $IMAGE_ID:master

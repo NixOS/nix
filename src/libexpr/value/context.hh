@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "comparator.hh"
 #include "derived-path.hh"
 #include "variant-wrapper.hh"
