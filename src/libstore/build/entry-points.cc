@@ -26,9 +26,9 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         }
         if (i->exitCode != Goal::ecSuccess) {
             if (auto i2 = dynamic_cast<DerivationGoal *>(i.get()))
-                failed.insert(std::string { i2->drvPath.to_string() });
+                failed.insert(printStorePath(i2->drvPath));
             else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
-                failed.insert(std::string { i2->storePath.to_string()});
+                failed.insert(printStorePath(i2->storePath));
         }
     }
 
