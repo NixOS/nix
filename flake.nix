@@ -156,7 +156,13 @@
             name = "nix-find-roots-${version}";
             inherit version;
 
-            src = "${self}/src/nix-find-roots";
+            src = fileset.toSource {
+              root = ./src/nix-find-roots;
+              fileset = /*fileset.intersect baseFiles (*/fileset.unions [
+                ./src/nix-find-roots/main.cc
+                ./src/nix-find-roots/lib
+              ]/*)*/;
+            };
 
             CXXFLAGS = prev.lib.optionalString prev.stdenv.hostPlatform.isStatic "-static";
 
@@ -384,7 +390,9 @@
         default = nix;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
-        nix-find-roots = nixpkgsFor.${system}.static.nix-find-roots;
+
+        inherit (nixpkgsFor.${system}.static) nix-find-roots;
+
         dockerImage =
           let
             pkgs = nixpkgsFor.${system}.native;

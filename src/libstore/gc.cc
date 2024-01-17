@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "finally.hh"
+#include "find-roots.hh"
 #include "unix-domain-socket.hh"
 #include "signals.hh"
 
@@ -9,7 +10,6 @@
 // For shelling out to lsof
 # include "processes.hh"
 #endif
-#include "find-roots.hh"
 
 #include <functional>
 #include <queue>
