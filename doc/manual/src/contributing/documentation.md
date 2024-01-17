@@ -172,7 +172,7 @@ Please observe these guidelines to ease reviews:
   > ```
   ````
 
-  Highlight syntax definiions as such, using [EBNF](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) notation:
+  Highlight syntax definitions as such, using [EBNF](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form) notation:
 
   ````
   > **Syntax**
