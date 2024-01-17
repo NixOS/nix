@@ -283,6 +283,18 @@ public:
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
     /**
+     * NOTE: this is not the final interface - to be modified in next commit.
+     *
+     * Asynchronous version that only queries the local narinfo cache and not
+     * the actual store.
+     *
+     * @return true if the path was known and the callback invoked
+     * @return false if the path was not known and the callback not invoked
+     * @throw InvalidPathError if the path is known to be invalid
+     */
+    bool queryPathInfoFromClientCache(const StorePath & path, Callback<ref<const ValidPathInfo>> & callback);
+
+    /**
      * Query the information about a realisation.
      */
     std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
