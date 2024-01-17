@@ -4,81 +4,82 @@
 
 - <a id="type-string" href="#type-string">String</a>
 
-  *Strings* can be written in three ways.
+> *string* = *double-quoted* | *indented* | *bare-uri*
+>
+> *double-quoted* = `"` (*char* | *doubleq-escaped* | *interpolated-expr*)* `"`
+>
+> *doubleq-escaped* = `\` (`n` | `r` | `t` | `"` | `${`)
+>
+> *[interpolated-expr]* = `${` *string-valued-expression* `}`
+>
+> *multiline* = *double-quoted*
+>
+> *indented* = `''` (*char* | *indented-escaped* | *interpolated-expr*)* `''`
+>
+> *indented-escaped* = `'` `''` | `''` `${` | `''\` (`n` | `r` | `t` | `\`) | `$` `$`
 
-  The most common way is to enclose the string between double quotes,
-  e.g., `"foo bar"`. Strings can span multiple lines. The special
-  characters `"` and `\` and the character sequence `${` must be
-  escaped by prefixing them with a backslash (`\`). Newlines, carriage
-  returns and tabs can be written as `\n`, `\r` and `\t`,
-  respectively.
+  *[interpolated-expr]*: ./string-interpolation.md
 
-  You can include the results of other expressions into a string by enclosing them in `${ }`, a feature known as [string interpolation].
+#### Quoted string
 
-  [string interpolation]: ./string-interpolation.md
+> *double-quoted* = `"` (*char* | *doubleq-escaped* | *interpolated-expr*)* `"`
+>
+> *doubleq-escaped* = `\` (`n` | `r` | `t` | `"` | `${` | `\`)
 
-  The second way to write string literals is as an *indented string*,
-  which is enclosed between pairs of *double single-quotes*, like so:
+The following characters require escaping in quoted strings:
+* `\n`: newline
+* `\r`: carriage return
+* `\t`: tab
+* `"`: double quote
+* `${`: start of a [string interpolation] block
 
-  ```nix
-  ''
-    This is the first line.
-    This is the second line.
-      This is the third line.
-  ''
-  ```
+#### Indented string
 
-  This kind of string literal intelligently strips indentation from
-  the start of each line. To be precise, it strips from each line a
-  number of spaces equal to the minimal indentation of the string as a
-  whole (disregarding the indentation of empty lines). For instance,
-  the first and second line are indented two spaces, while the third
-  line is indented four spaces. Thus, two spaces are stripped from
-  each line, so the resulting string is
+> *indented* = `''` (*char* | *indented-escaped* | *interpolated-expr*)* `''`
+>
+> *indented-escaped* = `'` `''` | `''` `${` | `''\` (`n` | `r` | `t` | `\`) | `$` `$`
 
-  ```nix
-  "This is the first line.\nThis is the second line.\n  This is the third line.\n"
-  ```
+Indeting strings automatically strip the following characters for convenience (an "empty line" contains only whitespace):
+* from the first line: if an empty line, the first newline character
+* from every line: whitespace common to start of all *non-empty* lines
 
-  Note that the whitespace and newline following the opening `''` is
-  ignored if there is no non-whitespace text on the initial line.
+Indented strings are primarily useful for allowing multi-line string literals to follow the indentation of the enclosing Nix expression, and easing escaping necessary for strings representing languages such as shell scripts and configuration files because `''` is much less common than `"`.
+For example:
+```nix
+stdenv.mkDerivation {
+    # other code would precede this
+postInstall =
+    ''
+    mkdir $out/bin $out/etc
+    cp foo $out/bin
+    echo "Hello World" > $out/etc/foo.conf
+    ${if enableBar then "cp bar $out/bin" else ""}
+    '';
+    # other code would follow this
+}
+```
 
-  Indented strings support [string interpolation].
+Automatic indent stripping makes the following two strings are equivalent:
+```nix
+''
+    This is the first line
+    This is the second line
+      This is the third line
+''
+```
+```nix
+"This is the first line\nThis is the second line\n  This is the third line\n"
+```
 
-  Since `${` and `''` have special meaning in indented strings, you
-  need a way to quote them. `$` can be escaped by prefixing it with
-  `''` (that is, two single quotes), i.e., `''$`. `''` can be escaped
-  by prefixing it with `'`, i.e., `'''`. `$` removes any special
-  meaning from the following `$`. Linefeed, carriage-return and tab
-  characters can be written as `''\n`, `''\r`, `''\t`, and `''\`
-  escapes any other character.
+#### Bare URIs
 
-  Indented strings are primarily useful in that they allow multi-line
-  string literals to follow the indentation of the enclosing Nix
-  expression, and that less escaping is typically necessary for
-  strings representing languages such as shell scripts and
-  configuration files because `''` is much less common than `"`.
-  Example:
+> *bare-uri* = [*uri*](http://www.ietf.org/rfc/rfc2396.txt)
 
-  ```nix
-  stdenv.mkDerivation {
-    ...
-    postInstall =
-      ''
-        mkdir $out/bin $out/etc
-        cp foo $out/bin
-        echo "Hello World" > $out/etc/foo.conf
-        ${if enableBar then "cp bar $out/bin" else ""}
-      '';
-    ...
-  }
-  ```
-
-  Finally, as a convenience, *URIs* as defined in appendix B of
-  [RFC 2396](http://www.ietf.org/rfc/rfc2396.txt) can be written *as
-  is*, without quotes. For instance, the string
-  `"http://example.org/foo.tar.bz2"` can also be written as
-  `http://example.org/foo.tar.bz2`.
+As a convenience, *URIs* as defined in appendix B of
+[RFC 2396](http://www.ietf.org/rfc/rfc2396.txt) can be written *as
+is*, without quotes. For instance, the string
+`"http://example.org/foo.tar.bz2"` can also be written as
+`http://example.org/foo.tar.bz2`.
 
 - <a id="type-number" href="#type-number">Number</a>
 
