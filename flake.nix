@@ -197,11 +197,11 @@
               perl-bindings = final.nix-perl-bindings;
             };
 
-            nix-perl-bindings = final.callPackage ./perl {
-              inherit fileset stdenv;
-            };
-
+          nix-perl-bindings = final.callPackage ./perl {
+            inherit fileset stdenv;
           };
+
+        };
 
     in {
       # A Nixpkgs overlay that overrides the 'nix' and
