@@ -153,7 +153,7 @@
           };
 
           nix-find-roots = prev.stdenv.mkDerivation {
-            name = "nix-find-roots-${version}";
+            pname = "nix-find-roots";
             inherit version;
 
             src = fileset.toSource {
