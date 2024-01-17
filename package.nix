@@ -174,7 +174,6 @@ in {
           ./mk
           (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
         ] ++ lib.optionals doBuild [
-          ./boehmgc-coroutine-sp-fallback.diff
           ./doc
           ./misc
           ./precompiled-headers.h
