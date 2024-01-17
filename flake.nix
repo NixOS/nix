@@ -163,10 +163,10 @@
             enableLargeConfig = true;
           }).overrideAttrs(o: {
             patches = (o.patches or []) ++ [
-              ./boehmgc-coroutine-sp-fallback.diff
+              ./dep-patches/boehmgc-coroutine-sp-fallback.diff
 
               # https://github.com/ivmai/bdwgc/pull/586
-              ./boehmgc-traceable_allocator-public.diff
+              ./dep-patches/boehmgc-traceable_allocator-public.diff
             ];
           });
 
