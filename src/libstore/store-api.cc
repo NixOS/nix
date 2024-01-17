@@ -685,8 +685,7 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
         && (expected.name() == Store::MissingName || expected.name() == actual.name());
 }
 
-bool Store::queryPathInfoFromClientCache(const StorePath & storePath,
-    Callback<ref<const ValidPathInfo>> & callback)
+std::optional<ref<const ValidPathInfo>> Store::queryPathInfoFromClientCache(const StorePath & storePath)
 {
     auto hashPart = std::string(storePath.hashPart());
 
@@ -696,8 +695,7 @@ bool Store::queryPathInfoFromClientCache(const StorePath & storePath,
             stats.narInfoReadAverted++;
             if (!res->didExist())
                 throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-            callback(ref<const ValidPathInfo>(res->value));
-            return true;
+            return ref(res->value);
         }
     }
 
@@ -713,12 +711,11 @@ bool Store::queryPathInfoFromClientCache(const StorePath & storePath,
                     !goodStorePath(storePath, res.second->path))
                     throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
             }
-            callback(ref<const ValidPathInfo>(res.second));
-            return true;
+            return ref(res.second);
         }
     }
 
-    return false;
+    return std::nullopt;
 }
 
 
@@ -728,8 +725,11 @@ void Store::queryPathInfo(const StorePath & storePath,
     auto hashPart = std::string(storePath.hashPart());
 
     try {
-        if (queryPathInfoFromClientCache(storePath, callback))
-            return;
+        auto r = queryPathInfoFromClientCache(storePath);
+        if (r.has_value()) {
+            ref<const ValidPathInfo> & info = *r;
+            return callback(ref(info));
+        }
     } catch (...) { return callback.rethrow(); }
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
