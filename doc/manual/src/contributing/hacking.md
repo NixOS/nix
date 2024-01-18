@@ -67,27 +67,6 @@ $ nix build
 
 You can also build Nix for one of the [supported platforms](#platforms).
 
-## Makefile variables
-
-You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run
-`make install`.
-
-You may want to set `MAKEFLAGS="-e -j $NIX_BUILD_CORES"` to allow environment
-variables to override `Makefile` variables.
-
-- `ENABLE_BUILD=yes` to enable building the C++ code.
-- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
-
-  The docs can take a while to build, so you may want to disable this for local development.
-- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
-- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
-- `OPTIMIZE=1` to enable optimizations.
-- `libraries=libutil programs=` to only build a specific library (this will
-  fail in the linking phase if you don't have the other libraries built, but is
-  useful for checking types).
-- `libraries= programs=nix` to only build a specific program (this will not, in
-  general, work, because the programs need the libraries).
-
 ## Building Nix
 
 To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
@@ -131,6 +110,26 @@ $ nix-build
 ```
 
 You can also build Nix for one of the [supported platforms](#platforms).
+
+## Makefile variables
+
+You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run `make install`.
+
+Run `make` with [`-e` / `--environment-overrides`](https://www.gnu.org/software/make/manual/make.html#index-_002de) to allow environment variables to override `Makefile` variables:
+
+- `ENABLE_BUILD=yes` to enable building the C++ code.
+- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
+
+  The docs can take a while to build, so you may want to disable this for local development.
+- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
+- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
+- `OPTIMIZE=1` to enable optimizations.
+- `libraries=libutil programs=` to only build a specific library.
+
+  This will fail in the linking phase if the other libraries haven't been built, but is useful for checking types.
+- `libraries= programs=nix` to only build a specific program.
+
+  This will not work in general, because the programs need the libraries.
 
 ## Platforms
 
