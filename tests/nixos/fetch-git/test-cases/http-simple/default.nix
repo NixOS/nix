@@ -1,10 +1,12 @@
+{ config, ... }:
 {
   description = "can fetch a git repo via http";
   script = ''
     # add a file to the repo
     client.succeed(f"""
-      echo chiang-mai > {repo.path}/thailand \
-      && {repo.git} add thailand \
+      echo ${config.name /* to make the git tree and store path unique */} > {repo.path}/test-case \
+      && echo chiang-mai > {repo.path}/thailand \
+      && {repo.git} add test-case thailand \
       && {repo.git} commit -m 'commit1'
     """)
 
