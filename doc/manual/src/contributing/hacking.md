@@ -115,7 +115,7 @@ You can also build Nix for one of the [supported platforms](#platforms).
 
 You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run `make install`.
 
-Run `make` with [`--environment-overrides`](https://www.gnu.org/software/make/manual/make.html#index-_002de) to allow environment variables to override `Makefile` variables:
+Run `make` with [`-e` / `--environment-overrides`](https://www.gnu.org/software/make/manual/make.html#index-_002de) to allow environment variables to override `Makefile` variables:
 
 - `ENABLE_BUILD=yes` to enable building the C++ code.
 - `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
