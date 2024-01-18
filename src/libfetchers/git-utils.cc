@@ -139,6 +139,7 @@ T peelObject(git_repository * repo, git_object * obj, git_object_t type)
 
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
+    /** Location of the repository on disk. */
     CanonPath path;
     Repository repo;
 
