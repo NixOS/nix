@@ -39,9 +39,6 @@ in
             The name of the test case.
 
             A repository with that name will be set up on the gitea server and locally.
-
-            This name can also be used to execute only a single test case via:
-              `nix build .#hydraJobs.fetch-git.{test-case-name}`
           '';
         };
         options.description = mkOption {

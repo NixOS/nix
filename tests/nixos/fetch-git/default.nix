@@ -24,7 +24,7 @@
   testCases =
     map
     (testCaseName: {...}: {
-      imports = ["${./test-cases}/${testCaseName}"];
+      imports = [ (./test-cases + "/${testCaseName}") ];
       # ensures tests are named like their directories they are defined in
       name = testCaseName;
     })
