@@ -153,7 +153,7 @@ struct FdSource : BufferedSource
 {
     int fd;
     size_t read = 0;
-    std::string endOfFileError{"unexpected end-of-file"};
+    BackedStringView endOfFileError{"unexpected end-of-file"};
 
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
