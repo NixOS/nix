@@ -8,7 +8,7 @@
       && {repo.git} commit -m 'commit1'
     """)
 
-    # memoize the revision
+    # save the revision
     rev1 = client.succeed(f"""
       {repo.git} rev-parse HEAD
     """).strip()
