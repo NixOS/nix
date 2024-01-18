@@ -58,6 +58,15 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         RepairFlag repair, CheckSigsFlag checkSigs) override
     { unsupported("addToStore"); }
 
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override
+    { unsupported("addToStore"); }
+
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
 

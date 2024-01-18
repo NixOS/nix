@@ -466,8 +466,7 @@ public:
         ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
-        RepairFlag repair = NoRepair)
-    { unsupported("addToStoreFromDump"); }
+        RepairFlag repair = NoRepair) = 0;
 
     /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path

@@ -69,6 +69,15 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         RepairFlag repair) override
     { unsupported("addToStore"); }
 
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override
+    { unsupported("addToStore"); }
+
 private:
 
     void putBuildSettings(Connection & conn);
