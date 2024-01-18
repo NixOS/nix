@@ -15,6 +15,14 @@
 
 namespace nix {
 
+std::string UnmountedUDSRemoteStoreConfig::doc()
+{
+    return
+        #include "unmounted-uds-remote-store.md"
+        ;
+}
+
+
 std::string UDSRemoteStoreConfig::doc()
 {
     return
@@ -23,15 +31,37 @@ std::string UDSRemoteStoreConfig::doc()
 }
 
 
+UnmountedUDSRemoteStore::UnmountedUDSRemoteStore(const Params & params)
+    : StoreConfig(params)
+    , RemoteStoreConfig(params)
+    , UnmountedUDSRemoteStoreConfig(params)
+    , Store(params)
+    , RemoteStore(params)
+{
+}
+
+
 UDSRemoteStore::UDSRemoteStore(const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
     , RemoteStoreConfig(params)
+    , UnmountedUDSRemoteStoreConfig(params)
     , UDSRemoteStoreConfig(params)
     , Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)
+    , UnmountedUDSRemoteStore(params)
 {
+}
+
+
+UnmountedUDSRemoteStore::UnmountedUDSRemoteStore(
+    const std::string scheme,
+    std::string socket_path,
+    const Params & params)
+    : UnmountedUDSRemoteStore(params)
+{
+    path.emplace(socket_path);
 }
 
 
@@ -45,23 +75,23 @@ UDSRemoteStore::UDSRemoteStore(
 }
 
 
-std::string UDSRemoteStore::getUri()
+std::string UnmountedUDSRemoteStore::getUri()
 {
     if (path) {
-        return std::string("unix://") + *path;
+        return *uriSchemes().begin() + "://" + *path;
     } else {
         return "daemon";
     }
 }
 
 
-void UDSRemoteStore::Connection::closeWrite()
+void UnmountedUDSRemoteStore::Connection::closeWrite()
 {
     shutdown(fd.get(), SHUT_WR);
 }
 
 
-ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
+ref<RemoteStore::Connection> UnmountedUDSRemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();
 
@@ -88,6 +118,7 @@ void UDSRemoteStore::addIndirectRoot(const Path & path)
 }
 
 
+static RegisterStoreImplementation<UnmountedUDSRemoteStore, UnmountedUDSRemoteStoreConfig> regUnmountedUDSRemoteStore;
 static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regUDSRemoteStore;
 
 }

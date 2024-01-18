@@ -496,7 +496,7 @@ static int main_nix_daemon(int argc, char * * argv)
                 experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
                 isTrustedOpt = std::nullopt;
             } else if (*arg == "--process-ops") {
-                experimentalFeatureSettings.require(Xp::MountedSSHStore);
+                experimentalFeatureSettings.require(Xp::RemoteStoreMountVariations);
                 processOps = true;
             } else return false;
             return true;
@@ -561,7 +561,7 @@ struct CmdDaemon : StoreCommand
             .handler = {[&]() {
                 processOps = true;
             }},
-            .experimentalFeature = Xp::MountedSSHStore,
+            .experimentalFeature = Xp::RemoteStoreMountVariations,
         });
     }
 

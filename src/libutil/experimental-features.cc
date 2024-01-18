@@ -262,10 +262,13 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         )",
     },
     {
-        .tag = Xp::MountedSSHStore,
-        .name = "mounted-ssh-store",
+        .tag = Xp::RemoteStoreMountVariations,
+        .name = "remote-store-mount-variations",
         .description = R"(
-            Allow the use of the [`mounted SSH store`](@docroot@/command-ref/new-cli/nix3-help-stores.html#experimental-ssh-store-with-filesytem-mounted).
+            Allow the use of the
+            [`mounted SSH store`](@docroot@/command-ref/new-cli/nix3-help-stores.html#experimental-ssh-store-with-filesytem-mounted)
+            and
+            [`unmounted Unix domain socket store`](@docroot@/command-ref/new-cli/nix3-help-stores.html#local-daemon-store-without-filesystem-mounted).
         )",
     },
     {

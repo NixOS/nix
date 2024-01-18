@@ -119,7 +119,7 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
 
     std::optional<ExperimentalFeature> experimentalFeature() const override
     {
-        return ExperimentalFeature::MountedSSHStore;
+        return ExperimentalFeature::RemoteStoreMountVariations;
     }
 };
 
