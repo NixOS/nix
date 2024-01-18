@@ -15,6 +15,7 @@
 in {
   imports = [
     ../testsupport/setup.nix
+    ../testsupport/gitea-repo.nix
   ];
   nodes = {
     gitea = { pkgs, ... }: {
@@ -96,5 +97,6 @@ in {
     client.succeed("""
       ssh root@gitea true
     """)
+
   '';
 }
