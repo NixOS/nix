@@ -1049,7 +1049,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     Finally cleanup = [&]() {
         if (!narRead) {
             NullParseSink sink;
-            parseDump(sink, source);
+            try {
+                parseDump(sink, source);
+            } catch (...) {
+                ignoreException();
+            }
         }
     };
 
