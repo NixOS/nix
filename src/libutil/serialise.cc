@@ -132,7 +132,7 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
         n = ::read(fd, data, len);
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
-    if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
+    if (n == 0) { _good = false; throw EndOfFile(std::string(*endOfFileError)); }
     read += n;
     return n;
 }
