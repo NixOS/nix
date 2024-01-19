@@ -2092,7 +2092,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
         })
         : ({
             StringSource s { contents };
-            state.store->addToStoreFromDump(s, name, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
         });
 
     /* Note: we don't need to add `context' to the context of the

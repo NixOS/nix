@@ -180,7 +180,8 @@ public:
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override;

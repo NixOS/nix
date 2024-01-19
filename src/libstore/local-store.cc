@@ -1148,7 +1148,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 StorePath LocalStore::addToStoreFromDump(
     Source & source0,
     std::string_view name,
-    ContentAddressMethod method,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     RepairFlag repair)
@@ -1201,7 +1202,13 @@ StorePath LocalStore::addToStoreFromDump(
     Path tempDir;
     AutoCloseFD tempDirFd;
 
-    if (!inMemory) {
+    bool methodsMatch = (FileIngestionMethod) dumpMethod == hashMethod;
+
+    /* If the methods don't match, our streaming hash of the dump is the
+       wrong sort, and we need to rehash. */
+    bool inMemoryAndDontNeedRestore = inMemory && methodsMatch;
+
+    if (!inMemoryAndDontNeedRestore) {
         /* Drain what we pulled so far, and then keep on pulling */
         StringSource dumpSource { dump };
         ChainSource bothSource { dumpSource, source };
@@ -1210,40 +1217,23 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
-        auto fim = method.getFileIngestionMethod();
-        switch (fim) {
-        case FileIngestionMethod::Flat:
-        case FileIngestionMethod::Recursive:
-            restorePath(tempPath, bothSource, (FileSerialisationMethod) fim);
-            break;
-        case FileIngestionMethod::Git: {
-            RestoreSink sink;
-            sink.dstPath = tempPath;
-            auto accessor = getFSAccessor();
-            git::restore(sink, bothSource, [&](Hash childHash) {
-                return std::pair<SourceAccessor *, CanonPath> {
-                    &*accessor,
-                    CanonPath {
-                        printStorePath(this->makeFixedOutputPath("git", FixedOutputInfo {
-                            .method = FileIngestionMethod::Git,
-                            .hash = childHash,
-                        }))
-                    },
-                };
-            });
-            break;
-        }
-        }
+        restorePath(tempPath, bothSource, dumpMethod);
 
         dumpBuffer.reset();
         dump = {};
     }
 
-    auto [hash, size] = hashSink->finish();
+    auto [dumpHash, size] = hashSink->finish();
+
+    PosixSourceAccessor accessor;
 
     auto desc = ContentAddressWithReferences::fromParts(
-        method,
-        hash,
+        hashMethod,
+        methodsMatch
+            ? dumpHash
+            : hashPath(
+                accessor, CanonPath { tempPath },
+                hashMethod.getFileIngestionMethod(), hashAlgo),
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1269,32 +1259,19 @@ StorePath LocalStore::addToStoreFromDump(
 
             autoGC();
 
-            if (inMemory) {
+            if (inMemoryAndDontNeedRestore) {
                 StringSource dumpSource { dump };
                 /* Restore from the buffer in memory. */
-                auto fim = method.getFileIngestionMethod();
+                auto fim = hashMethod.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::Recursive:
                     restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
                     break;
-                case FileIngestionMethod::Git: {
-                    RestoreSink sink;
-                    sink.dstPath = realPath;
-                    auto accessor = getFSAccessor();
-                    git::restore(sink, dumpSource, [&](Hash childHash) {
-                        return std::pair<SourceAccessor *, CanonPath> {
-                            &*accessor,
-                            CanonPath {
-                                printStorePath(this->makeFixedOutputPath("git", FixedOutputInfo {
-                                    .method = FileIngestionMethod::Git,
-                                    .hash = childHash,
-                                }))
-                            },
-                        };
-                    });
-                    break;
-                }
+                case FileIngestionMethod::Git:
+                    // doesn't correspond to serialization method, so
+                    // this should be unreachable
+                    assert(false);
                 }
             } else {
                 /* Move the temporary path we restored above. */
@@ -1303,8 +1280,8 @@ StorePath LocalStore::addToStoreFromDump(
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
-            auto narHash = std::pair { hash, size };
-            if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+            auto narHash = std::pair { dumpHash, size };
+            if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();

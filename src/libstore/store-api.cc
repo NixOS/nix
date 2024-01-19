@@ -197,40 +197,23 @@ StorePath Store::addToStore(
     PathFilter & filter,
     RepairFlag repair)
 {
+    FileSerialisationMethod fsm;
+    switch (method.getFileIngestionMethod()) {
+    case FileIngestionMethod::Flat:
+        fsm = FileSerialisationMethod::Flat;
+        break;
+    case FileIngestionMethod::Recursive:
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    case FileIngestionMethod::Git:
+        // Use NAR; Git is not a serialization method
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    }
     auto source = sinkToSource([&](Sink & sink) {
-        auto fim = method.getFileIngestionMethod();
-        switch (fim) {
-        case FileIngestionMethod::Flat:
-        case FileIngestionMethod::Recursive:
-        {
-            dumpPath(accessor, path, sink, (FileSerialisationMethod) fim, filter);
-            break;
-        }
-        case FileIngestionMethod::Git:
-        {
-            git::dump(
-                accessor, path,
-                sink,
-                // recursively add to store if path is a directory
-                [&](const CanonPath & path) -> git::TreeEntry {
-                    auto storePath = addToStore("git", accessor, path, method, hashAlgo, references, filter, repair);
-                    auto info = queryPathInfo(storePath);
-                    assert(info->ca);
-                    assert(info->ca->method == FileIngestionMethod::Git);
-                    auto stat = getFSAccessor()->lstat(CanonPath(printStorePath(storePath)));
-                    auto gitModeOpt = git::convertMode(stat.type);
-                    assert(gitModeOpt);
-                    return {
-                        .mode = *gitModeOpt,
-                        .hash = info->ca->hash,
-                    };
-                },
-                filter);
-            break;
-        }
-        }
+        dumpPath(accessor, path, sink, fsm, filter);
     });
-    return addToStoreFromDump(*source, name, method, hashAlgo, references, repair);
+    return addToStoreFromDump(*source, name, fsm, method, hashAlgo, references, repair);
 }
 
 void Store::addMultipleToStore(

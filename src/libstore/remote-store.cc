@@ -509,12 +509,28 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 StorePath RemoteStore::addToStoreFromDump(
     Source & dump,
     std::string_view name,
-    ContentAddressMethod method,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     RepairFlag repair)
 {
-    return addCAToStore(dump, name, method, hashAlgo, references, repair)->path;
+    FileSerialisationMethod fsm;
+    switch (hashMethod.getFileIngestionMethod()) {
+    case FileIngestionMethod::Flat:
+        fsm = FileSerialisationMethod::Flat;
+        break;
+    case FileIngestionMethod::Recursive:
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    case FileIngestionMethod::Git:
+        // Use NAR; Git is not a serialization method
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    }
+    if (fsm != dumpMethod)
+        unsupported("RemoteStore::addToStoreFromDump doesn't support this `dumpMethod` `hashMethod` combination");
+    return addCAToStore(dump, name, hashMethod, hashAlgo, references, repair)->path;
 }
 
 

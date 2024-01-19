@@ -1312,12 +1312,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, references, repair);
+        auto path = next->addToStoreFromDump(dump, name, dumpMethod, hashMethod, hashAlgo, references, repair);
         goal.addDependency(path);
         return path;
     }
