@@ -982,6 +982,11 @@ void copyStorePath(
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+    /* Bail out early (before starting a download from srcStore) if
+       dstStore already has this path. */
+    if (!repair && dstStore.isValidPath(storePath))
+        return;
+
     auto srcUri = srcStore.getUri();
     auto dstUri = dstStore.getUri();
     auto storePathS = srcStore.printStorePath(storePath);
