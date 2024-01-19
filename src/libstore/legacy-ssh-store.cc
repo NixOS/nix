@@ -61,28 +61,27 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
 
+    StringSink saved;
+    TeeSource tee(conn->from, saved);
     try {
         conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
         conn->to.flush();
 
-        StringSink saved;
-        try {
-            TeeSource tee(conn->from, saved);
-            unsigned int magic = readInt(tee);
-            if (magic != SERVE_MAGIC_2)
-                throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
-        } catch (SerialisationError & e) {
-            /* In case the other side is waiting for our input,
-               close it. */
-            conn->sshConn->in.close();
-            auto msg = conn->from.drain();
-            throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-                host, chomp(saved.s + msg));
-        }
+        unsigned int magic = readInt(conn->from);
+        if (magic != SERVE_MAGIC_2)
+            throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
         conn->remoteVersion = readInt(conn->from);
         if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
             throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
-
+    } catch (SerialisationError & e) {
+        // in.close(): Don't let the remote block on us not writing.
+        conn->sshConn->in.close();
+        {
+            NullSink nullSink;
+            conn->from.drainInto(nullSink);
+        }
+        throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
+            host, chomp(saved.s));
     } catch (EndOfFile & e) {
         throw Error("cannot connect to '%1%'", host);
     }
