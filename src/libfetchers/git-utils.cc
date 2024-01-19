@@ -387,13 +387,20 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         //       then use code that was removed in this commit (see blame)
 
         auto dir = this->path;
+        Strings gitArgs;
+        if (shallow) {
+            gitArgs = { "-C", dir.abs(), "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
+        }
+        else {
+            gitArgs = { "-C", dir.abs(), "fetch", "--quiet", "--force", "--", url, refspec };
+        }
 
         runProgram(RunOptions {
             .program = "git",
             .searchPath = true,
             // FIXME: git stderr messes up our progress indicator, so
             // we're using --quiet for now. Should process its stderr.
-            .args = { "-C", path.abs(), "fetch", "--quiet", "--force", "--", url, refspec },
+            .args = gitArgs,
             .input = {},
             .isInteractive = true
         });
