@@ -685,7 +685,8 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
         && (expected.name() == Store::MissingName || expected.name() == actual.name());
 }
 
-std::optional<ref<const ValidPathInfo>> Store::queryPathInfoFromClientCache(const StorePath & storePath)
+
+std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClientCache(const StorePath & storePath)
 {
     auto hashPart = std::string(storePath.hashPart());
 
@@ -693,9 +694,10 @@ std::optional<ref<const ValidPathInfo>> Store::queryPathInfoFromClientCache(cons
         auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
         if (res && res->isKnownNow()) {
             stats.narInfoReadAverted++;
-            if (!res->didExist())
-                throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-            return ref(res->value);
+            if (res->didExist())
+                return std::make_optional(res->value);
+            else
+                return std::make_optional(nullptr);
         }
     }
 
@@ -709,9 +711,10 @@ std::optional<ref<const ValidPathInfo>> Store::queryPathInfoFromClientCache(cons
                     res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
                 if (res.first == NarInfoDiskCache::oInvalid ||
                     !goodStorePath(storePath, res.second->path))
-                    throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
+                    return std::make_optional(nullptr);
             }
-            return ref(res.second);
+            assert(res.second);
+            return std::make_optional(res.second);
         }
     }
 
@@ -727,8 +730,11 @@ void Store::queryPathInfo(const StorePath & storePath,
     try {
         auto r = queryPathInfoFromClientCache(storePath);
         if (r.has_value()) {
-            ref<const ValidPathInfo> & info = *r;
-            return callback(ref(info));
+            std::shared_ptr<const ValidPathInfo> & info = *r;
+            if (info)
+                return callback(ref(info));
+            else
+                throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
         }
     } catch (...) { return callback.rethrow(); }
 

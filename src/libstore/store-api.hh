@@ -283,16 +283,14 @@ public:
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
     /**
-     * NOTE: this is not the final interface - to be modified in next commit.
-     *
      * Version of queryPathInfo() that only queries the local narinfo cache and not
      * the actual store.
      *
-     * @return `std::make_optional(vpi)` if the path is known
-     * @return `std::null_opt` if the path was not known to be valid or invalid
-     * @throw InvalidPathError if the path is known to be invalid
+     * @return `std::nullopt` if nothing is known about the path in the local narinfo cache.
+     * @return `std::make_optional(nullptr)` if the path is known to not exist.
+     * @return `std::make_optional(validPathInfo)` if the path is known to exist.
      */
-    std::optional<ref<const ValidPathInfo>> queryPathInfoFromClientCache(const StorePath & path);
+    std::optional<std::shared_ptr<const ValidPathInfo>> queryPathInfoFromClientCache(const StorePath & path);
 
     /**
      * Query the information about a realisation.
