@@ -828,11 +828,9 @@ static void opServe(Strings opFlags, Strings opArgs)
     FdSink out(STDOUT_FILENO);
 
     /* Exchange the greeting. */
-    unsigned int magic = readInt(in);
-    if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
-    out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
-    out.flush();
-    ServeProto::Version clientVersion = readInt(in);
+    ServeProto::Version clientVersion =
+        ServeProto::BasicServerConnection::handshake(
+            out, in, SERVE_PROTOCOL_VERSION);
 
     ServeProto::ReadConn rconn {
         .from = in,

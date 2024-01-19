@@ -132,4 +132,26 @@ struct ServeProto::BasicClientConnection
         const ServeProto::BuildOptions & options);
 };
 
+struct ServeProto::BasicServerConnection
+{
+    /**
+     * Establishes connection, negotiating version.
+     *
+     * @return the version provided by the other side of the
+     * connection.
+     *
+     * @param to Taken by reference to allow for various error handling
+     * mechanisms.
+     *
+     * @param from Taken by reference to allow for various error
+     * handling mechanisms.
+     *
+     * @param localVersion Our version which is sent over
+     */
+    static ServeProto::Version handshake(
+        BufferedSink & to,
+        Source & from,
+        ServeProto::Version localVersion);
+};
+
 }

@@ -22,6 +22,18 @@ ServeProto::Version ServeProto::BasicClientConnection::handshake(
     return remoteVersion;
 }
 
+ServeProto::Version ServeProto::BasicServerConnection::handshake(
+    BufferedSink & to,
+    Source & from,
+    ServeProto::Version localVersion)
+{
+    unsigned int magic = readInt(from);
+    if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
+    to << SERVE_MAGIC_2 << localVersion;
+    to.flush();
+    return readInt(from);
+}
+
 
 StorePathSet ServeProto::BasicClientConnection::queryValidPaths(
     const Store & store,

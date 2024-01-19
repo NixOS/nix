@@ -65,6 +65,7 @@ struct ServeProto
      * @todo remove once Hydra uses Store abstraction consistently.
      */
     struct BasicClientConnection;
+    struct BasicServerConnection;
 
     /**
      * Data type for canonical pairs of serialisers for the serve protocol.
