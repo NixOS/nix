@@ -139,6 +139,7 @@ T peelObject(git_repository * repo, git_object * obj, git_object_t type)
 
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
+    /** Location of the repository on disk. */
     CanonPath path;
     Repository repo;
 
@@ -382,27 +383,20 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         Activity act(*logger, lvlTalkative, actFetchTree, fmt("fetching Git repository '%s'", url));
 
-        Remote remote;
+        // TODO: implement git-credential helper support (preferably via libgit2, which as of 2024-01 does not support that)
+        //       then use code that was removed in this commit (see blame)
 
-        if (git_remote_create_anonymous(Setter(remote), *this, url.c_str()))
-            throw Error("cannot create Git remote '%s': %s", url, git_error_last()->message);
+        auto dir = this->path;
 
-        char * refspecs[] = {(char *) refspec.c_str()};
-        git_strarray refspecs2 {
-            .strings = refspecs,
-            .count = 1
-        };
-
-        git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
-        // FIXME: for some reason, shallow fetching over ssh barfs
-        // with "could not read from remote repository".
-        opts.depth = shallow && parseURL(url).scheme != "ssh" ? 1 : GIT_FETCH_DEPTH_FULL;
-        opts.callbacks.payload = &act;
-        opts.callbacks.sideband_progress = sidebandProgressCallback;
-        opts.callbacks.transfer_progress = transferProgressCallback;
-
-        if (git_remote_fetch(remote.get(), &refspecs2, &opts, nullptr))
-            throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
+        runProgram(RunOptions {
+            .program = "git",
+            .searchPath = true,
+            // FIXME: git stderr messes up our progress indicator, so
+            // we're using --quiet for now. Should process its stderr.
+            .args = { "-C", path.abs(), "fetch", "--quiet", "--force", "--", url, refspec },
+            .input = {},
+            .isInteractive = true
+        });
     }
 
     void verifyCommit(
