@@ -38,7 +38,6 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         addFlag({
             .longName  = "mode",
-            .shortName = 'n',
             .description = R"(
     How to compute the hash of the input.
     One of:
