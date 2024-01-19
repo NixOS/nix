@@ -50,10 +50,12 @@ bool touchCacheFile(const Path & path, time_t touch_time)
     return lutimes(path.c_str(), times) == 0;
 }
 
-Path getCachePath(std::string_view key)
+Path getCachePath(std::string_view key, bool shallow)
 {
-    return getCacheDir() + "/nix/gitv3/" +
-        hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false);
+    return getCacheDir()
+    + "/nix/gitv3/"
+    + hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false)
+    + (shallow ? "-shallow" : "");
 }
 
 // Returns the name of the HEAD branch.
@@ -92,7 +94,8 @@ std::optional<std::string> readHead(const Path & path)
 // Persist the HEAD ref from the remote repo in the local cached repo.
 bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
 {
-    Path cacheDir = getCachePath(actualUrl);
+    // set shallow=false as HEAD will never be queried for a shallow repo
+    Path cacheDir = getCachePath(actualUrl, false);
     try {
         runProgram("git", true, { "-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef });
     } catch (ExecError &e) {
@@ -107,7 +110,8 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl)
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
-    Path cacheDir = getCachePath(actualUrl);
+    // set shallow=false as HEAD will never be queried for a shallow repo
+    Path cacheDir = getCachePath(actualUrl, false);
     Path headRefFile = cacheDir + "/HEAD";
 
     time_t now = time(0);
@@ -508,7 +512,7 @@ struct GitInputScheme : InputScheme
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", GitRepo::openRepo(CanonPath(repoDir))->resolveRef(ref).gitRev());
         } else {
-            Path cacheDir = getCachePath(repoInfo.url);
+            Path cacheDir = getCachePath(repoInfo.url, getShallowAttr(input));
             repoDir = cacheDir;
             repoInfo.gitDir = ".";
 
