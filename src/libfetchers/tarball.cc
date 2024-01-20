@@ -146,8 +146,7 @@ DownloadTarballResult downloadTarball(
             .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
 
-    auto res = downloadFile(store, url, name, locked, headers);
-    assert(res.storePathValid);
+    auto res = downloadFile(store, url, name, locked, headers, cached.has_value());
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -158,6 +157,11 @@ DownloadTarballResult downloadTarball(
     } else {
         Path tmpDir = createTempDir();
         AutoDelete autoDelete(tmpDir, true);
+        if (!res.storePathValid) {
+            debug("source etag didn't match unpacked etag, or server returned 304 with a different etag.");
+            res = downloadFile(store, url, name, locked);
+            assert(res.storePathValid);
+        }
         unpackTarfile(store->toRealPath(res.storePath), tmpDir);
         auto members = readDirectory(tmpDir);
         if (members.size() != 1)
