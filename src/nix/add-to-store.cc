@@ -53,7 +53,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             }},
         });
 
-        addFlag(Flag::mkHashAlgoFlag("hash-algo", &hashAlgo));
+        addFlag(Flag::mkHashAlgoFlag(&hashAlgo));
     }
 
     void run(ref<Store> store) override
