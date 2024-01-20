@@ -6,11 +6,12 @@
 #include "references.hh"
 #include "archive.hh"
 #include "posix-source-accessor.hh"
+#include "misc-store-flags.hh"
 
 using namespace nix;
 
 /**
- * Base for `nix hash file` (deprecated), `nix hash path` and `nix-hash` (legacy).
+ * Base for `nix hash path`, `nix hash file` (deprecated), and `nix-hash` (legacy).
  *
  * Deprecation Issue: https://github.com/NixOS/nix/issues/8876
  */
@@ -19,12 +20,21 @@ struct CmdHashBase : Command
     FileIngestionMethod mode;
     HashFormat hashFormat = HashFormat::SRI;
     bool truncate = false;
-    HashAlgorithm ha = HashAlgorithm::SHA256;
+    HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
     explicit CmdHashBase(FileIngestionMethod mode) : mode(mode)
     {
+        expectArgs({
+            .label = "paths",
+            .handler = {&paths},
+            .completer = completePath
+        });
+
+        // FIXME The following flags should be deprecated, but we don't
+        // yet have a mechanism for that.
+
         addFlag({
             .longName = "sri",
             .description = "Print the hash in SRI format.",
@@ -49,22 +59,7 @@ struct CmdHashBase : Command
             .handler = {&hashFormat, HashFormat::Base16},
         });
 
-        addFlag(Flag::mkHashAlgoFlag("type", &ha));
-
-        #if 0
-        addFlag({
-            .longName = "modulo",
-            .description = "Compute the hash modulo the specified string.",
-            .labels = {"modulus"},
-            .handler = {&modulus},
-        });
-        #endif\
-
-        expectArgs({
-            .label = "paths",
-            .handler = {&paths},
-            .completer = completePath
-        });
+        addFlag(flag::hashAlgo("type", &hashAlgo));
     }
 
     std::string description() override
@@ -85,9 +80,9 @@ struct CmdHashBase : Command
 
             std::unique_ptr<AbstractHashSink> hashSink;
             if (modulus)
-                hashSink = std::make_unique<HashModuloSink>(ha, *modulus);
+                hashSink = std::make_unique<HashModuloSink>(hashAlgo, *modulus);
             else
-                hashSink = std::make_unique<HashSink>(ha);
+                hashSink = std::make_unique<HashSink>(hashAlgo);
 
             auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
             dumpPath(accessor, canonPath, *hashSink, mode);
@@ -99,15 +94,53 @@ struct CmdHashBase : Command
     }
 };
 
+/**
+ * `nix hash path`
+ */
+struct CmdHashPath : CmdHashBase
+{
+    CmdHashPath()
+        : CmdHashBase(FileIngestionMethod::Recursive)
+    {
+        addFlag(flag::hashAlgo("algo", &hashAlgo));
+        addFlag(flag::fileIngestionMethod(&mode));
+        addFlag(flag::hashFormatWithDefault("format", &hashFormat));
+        #if 0
+        addFlag({
+            .longName = "modulo",
+            .description = "Compute the hash modulo the specified string.",
+            .labels = {"modulus"},
+            .handler = {&modulus},
+        });
+        #endif
+    }
+};
+
+/**
+ * For deprecated `nix hash file`
+ *
+ * Deprecation Issue: https://github.com/NixOS/nix/issues/8876
+ */
+struct CmdHashFile : CmdHashBase
+{
+    CmdHashFile()
+        : CmdHashBase(FileIngestionMethod::Flat)
+    {
+    }
+};
+
+/**
+ * For deprecated `nix hash to-*`
+ */
 struct CmdToBase : Command
 {
     HashFormat hashFormat;
-    std::optional<HashAlgorithm> ht;
+    std::optional<HashAlgorithm> hashAlgo;
     std::vector<std::string> args;
 
     CmdToBase(HashFormat hashFormat) : hashFormat(hashFormat)
     {
-        addFlag(Flag::mkHashAlgoOptFlag("type", &ht));
+        addFlag(flag::hashAlgoOpt("type", &hashAlgo));
         expectArgs("strings", &args);
     }
 
@@ -124,7 +157,7 @@ struct CmdToBase : Command
     {
         warn("The old format conversion sub commands of `nix hash` where deprecated in favor of `nix hash convert`.");
         for (auto s : args)
-            logger->cout(Hash::parseAny(s, ht).to_string(hashFormat, hashFormat == HashFormat::SRI));
+            logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }
 };
 
@@ -139,9 +172,9 @@ struct CmdHashConvert : Command
     std::vector<std::string> hashStrings;
 
     CmdHashConvert(): to(HashFormat::SRI) {
-        addFlag(Args::Flag::mkHashFormatOptFlag("from", &from));
-        addFlag(Args::Flag::mkHashFormatFlagWithDefault("to", &to));
-        addFlag(Args::Flag::mkHashAlgoOptFlag(&algo));
+        addFlag(flag::hashFormatOpt("from", &from));
+        addFlag(flag::hashFormatWithDefault("to", &to));
+        addFlag(flag::hashAlgoOpt(&algo));
         expectArgs({
            .label = "hashes",
            .handler = {&hashStrings},
@@ -181,8 +214,8 @@ struct CmdHash : NixMultiCommand
             "hash",
             {
                 {"convert", []() { return make_ref<CmdHashConvert>();}},
-                {"file", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Flat);; }},
-                {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
+                {"path", []() { return make_ref<CmdHashPath>(); }},
+                {"file", []() { return make_ref<CmdHashFile>(); }},
                 {"to-base16", []() { return make_ref<CmdToBase>(HashFormat::Base16); }},
                 {"to-base32", []() { return make_ref<CmdToBase>(HashFormat::Nix32); }},
                 {"to-base64", []() { return make_ref<CmdToBase>(HashFormat::Base64); }},
@@ -206,7 +239,7 @@ static int compatNixHash(int argc, char * * argv)
     // Wait until `nix hash convert` is not hidden behind experimental flags anymore.
     // warn("`nix-hash` has been deprecated in favor of `nix hash convert`.");
 
-    std::optional<HashAlgorithm> ha;
+    std::optional<HashAlgorithm> hashAlgo;
     bool flat = false;
     HashFormat hashFormat = HashFormat::Base16;
     bool truncate = false;
@@ -226,7 +259,7 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--truncate") truncate = true;
         else if (*arg == "--type") {
             std::string s = getArg(*arg, arg, end);
-            ha = parseHashAlgo(s);
+            hashAlgo = parseHashAlgo(s);
         }
         else if (*arg == "--to-base16") {
             op = opTo;
@@ -253,8 +286,8 @@ static int compatNixHash(int argc, char * * argv)
 
     if (op == opHash) {
         CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
-        if (!ha.has_value()) ha = HashAlgorithm::MD5;
-        cmd.ha = ha.value();
+        if (!hashAlgo.has_value()) hashAlgo = HashAlgorithm::MD5;
+        cmd.hashAlgo = hashAlgo.value();
         cmd.hashFormat = hashFormat;
         cmd.truncate = truncate;
         cmd.paths = ss;
@@ -264,7 +297,7 @@ static int compatNixHash(int argc, char * * argv)
     else {
         CmdToBase cmd(hashFormat);
         cmd.args = ss;
-        if (ha.has_value()) cmd.ht = ha;
+        if (hashAlgo.has_value()) cmd.hashAlgo = hashAlgo;
         cmd.run();
     }
 
