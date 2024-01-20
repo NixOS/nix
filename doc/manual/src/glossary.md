@@ -127,7 +127,7 @@
   non-[fixed-output](#gloss-fixed-output-derivation)
   derivation.
 
-- [output-addressed store object]{#gloss-output-addressed-store-object}
+- [content-addressed store object]{#gloss-content-addressed-store-object}
 
   A [store object] whose [store path] is determined by its contents.
   This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
