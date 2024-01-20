@@ -13,6 +13,7 @@ namespace nix::fetchers {
 
 struct DownloadFileResult
 {
+    bool storePathValid;
     StorePath storePath;
     std::string etag;
     std::string effectiveUrl;
@@ -24,7 +25,8 @@ DownloadFileResult downloadFile(
     const std::string & url,
     const std::string & name,
     bool locked,
-    const Headers & headers = {});
+    const Headers & headers = {},
+    bool onlyIfChanged = false);
 
 struct DownloadTarballResult
 {

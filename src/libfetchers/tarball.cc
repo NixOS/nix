@@ -17,7 +17,8 @@ DownloadFileResult downloadFile(
     const std::string & url,
     const std::string & name,
     bool locked,
-    const Headers & headers)
+    const Headers & headers,
+    bool onlyIfChanged)
 {
     // FIXME: check store
 
@@ -32,6 +33,7 @@ DownloadFileResult downloadFile(
     auto useCached = [&]() -> DownloadFileResult
     {
         return {
+            .storePathValid = cached->storePathValid,
             .storePath = std::move(cached->storePath),
             .etag = getStrAttr(cached->infoAttrs, "etag"),
             .effectiveUrl = getStrAttr(cached->infoAttrs, "url"),
@@ -39,18 +41,19 @@ DownloadFileResult downloadFile(
         };
     };
 
-    if (cached && !cached->expired && cached->storePathValid)
+    bool storePathUseable = cached && (cached->storePathValid || onlyIfChanged);
+    if (storePathUseable && !cached->expired)
         return useCached();
 
     FileTransferRequest request(url);
     request.headers = headers;
-    if (cached && cached->storePathValid)
+    if (storePathUseable)
         request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
     FileTransferResult res;
     try {
         res = getFileTransfer()->download(request);
     } catch (FileTransferError & e) {
-        if (cached && cached->storePathValid) {
+        if (storePathUseable) {
             warn("%s; using cached version", e.msg());
             return useCached();
         } else
@@ -69,7 +72,7 @@ DownloadFileResult downloadFile(
     std::optional<StorePath> storePath;
 
     if (res.cached) {
-        assert(cached && cached->storePathValid);
+        assert(storePathUseable);
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
@@ -111,6 +114,7 @@ DownloadFileResult downloadFile(
             locked);
 
     return {
+        .storePathValid = true,
         .storePath = std::move(*storePath),
         .etag = res.etag,
         .effectiveUrl = res.effectiveUri,
@@ -143,6 +147,7 @@ DownloadTarballResult downloadTarball(
         };
 
     auto res = downloadFile(store, url, name, locked, headers);
+    assert(res.storePathValid);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -280,6 +285,7 @@ struct FileInputScheme : CurlInputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
     {
         auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
+        assert(file.storePathValid);
         return {std::move(file.storePath), input};
     }
 };
