@@ -63,6 +63,7 @@ struct Cache
     struct Result
     {
         bool expired = false;
+        bool storePathValid;
         Attrs infoAttrs;
         StorePath storePath;
     };

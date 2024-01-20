@@ -39,18 +39,18 @@ DownloadFileResult downloadFile(
         };
     };
 
-    if (cached && !cached->expired)
+    if (cached && !cached->expired && cached->storePathValid)
         return useCached();
 
     FileTransferRequest request(url);
     request.headers = headers;
-    if (cached)
+    if (cached && cached->storePathValid)
         request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
     FileTransferResult res;
     try {
         res = getFileTransfer()->download(request);
     } catch (FileTransferError & e) {
-        if (cached) {
+        if (cached && cached->storePathValid) {
             warn("%s; using cached version", e.msg());
             return useCached();
         } else
@@ -69,7 +69,7 @@ DownloadFileResult downloadFile(
     std::optional<StorePath> storePath;
 
     if (res.cached) {
-        assert(cached);
+        assert(cached && cached->storePathValid);
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
@@ -132,6 +132,8 @@ DownloadTarballResult downloadTarball(
     });
 
     auto cached = getCache()->lookupExpired(*store, inAttrs);
+    if (!cached->storePathValid)
+        cached = std::nullopt;
 
     if (cached && !cached->expired)
         return {
