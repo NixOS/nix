@@ -1692,7 +1692,11 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
 
         else
-            error("attempt to call something which is not a function but %1%", showType(vCur)).atPos(pos).debugThrow<TypeError>();
+            error("attempt to call something which is not a function but %1%: %2%",
+                    showType(vCur),
+                    ValuePrinter(*this, vCur, errorPrintOptions))
+                .atPos(pos)
+                .debugThrow<TypeError>();
     }
 
     vRes = vCur;
