@@ -44,14 +44,14 @@ std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::strin
     if (i == attrs.end()) return {};
     if (auto v = std::get_if<std::string>(&i->second))
         return *v;
-    throw Error("input attribute '%s' is not a string %s", name, attrsToJSON(attrs).dump());
+    throw Error("input attribute '%s' is not a string: %s", name, attrsToJSON(attrs).dump());
 }
 
 std::string getStrAttr(const Attrs & attrs, const std::string & name)
 {
     auto s = maybeGetStrAttr(attrs, name);
     if (!s)
-        throw Error("input attribute '%s' is missing", name);
+        throw Error("input attribute '%s' is missing: %s", name, attrsToJSON(attrs).dump());
     return *s;
 }
 
@@ -61,14 +61,14 @@ std::optional<uint64_t> maybeGetIntAttr(const Attrs & attrs, const std::string &
     if (i == attrs.end()) return {};
     if (auto v = std::get_if<uint64_t>(&i->second))
         return *v;
-    throw Error("input attribute '%s' is not an integer", name);
+    throw Error("input attribute '%s' is not an integer: %s", name, attrsToJSON(attrs).dump());
 }
 
 uint64_t getIntAttr(const Attrs & attrs, const std::string & name)
 {
     auto s = maybeGetIntAttr(attrs, name);
     if (!s)
-        throw Error("input attribute '%s' is missing", name);
+        throw Error("input attribute '%s' is missing: %s", name, attrsToJSON(attrs).dump());
     return *s;
 }
 
@@ -85,7 +85,7 @@ bool getBoolAttr(const Attrs & attrs, const std::string & name)
 {
     auto s = maybeGetBoolAttr(attrs, name);
     if (!s)
-        throw Error("input attribute '%s' is missing", name);
+        throw Error("input attribute '%s' is missing: %s", name, attrsToJSON(attrs).dump());
     return *s;
 }
 

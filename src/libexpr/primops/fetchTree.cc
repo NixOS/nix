@@ -2,6 +2,7 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
+#include "print.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "filetransfer.hh"
@@ -107,7 +108,8 @@ static void fetchTree(
             type = state.forceStringNoCtx(*aType->value, aType->pos, "while evaluating the `type` attribute passed to builtins.fetchTree");
         } else if (!type)
             state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree': %s",
+                               ValuePrinter(state, *args[0], debugPrintOptions)),
                 .errPos = state.positions[pos]
             }));
 

@@ -1,6 +1,7 @@
 #include "installable-flake.hh"
 #include "command-installable-value.hh"
 #include "common-args.hh"
+#include "print.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
@@ -118,7 +119,7 @@ struct CmdBundle : InstallableValueCommand
         if (!outLink) {
             auto * attr = vRes->attrs->get(evalState->sName);
             if (!attr)
-                throw Error("attribute 'name' missing");
+                throw Error("attribute 'name' missing: %s", ValuePrinter(*evalState, *vRes, debugPrintOptions));
             outLink = evalState->forceStringNoCtx(*attr->value, attr->pos, "");
         }
 

@@ -9,6 +9,7 @@
 #include "json-to-value.hh"
 #include "names.hh"
 #include "path-references.hh"
+#include "print.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "processes.hh"
@@ -637,7 +638,12 @@ static Bindings::iterator getAttr(
 {
     Bindings::iterator value = attrSet->find(attrSym);
     if (value == attrSet->end()) {
-        state.error("attribute '%s' missing", state.symbols[attrSym]).withTrace(noPos, errorCtx).debugThrow<TypeError>();
+        Value attrSetValue;
+        attrSetValue.mkAttrs(attrSet);
+        state.error("attribute '%s' missing: %s",
+                    state.symbols[attrSym],
+                    ValuePrinter(state, attrSetValue, debugPrintOptions))
+            .withTrace(value->pos, errorCtx).debugThrow<TypeError>();
     }
     return value;
 }
@@ -1280,17 +1286,25 @@ drvName, Bindings * attrs, Value & v)
     }
 
     /* Do we have all required attributes? */
-    if (drv.builder == "")
+    if (drv.builder == "") {
+        Value attrsValue;
+        attrsValue.mkAttrs(attrs);
         state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("required attribute 'builder' missing"),
-            .errPos = state.positions[noPos]
+            .msg = hintfmt("required attribute 'builder' missing: %s",
+                           ValuePrinter(state, attrsValue, debugPrintOptions)),
+            .errPos = state.positions[attrs->pos]
         }));
+    }
 
-    if (drv.platform == "")
+    if (drv.platform == "") {
+        Value attrsValue;
+        attrsValue.mkAttrs(attrs);
         state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("required attribute 'system' missing"),
-            .errPos = state.positions[noPos]
+            .msg = hintfmt("required attribute 'system' missing: %s",
+                           ValuePrinter(state, attrsValue, debugPrintOptions)),
+            .errPos = state.positions[attrs->pos]
         }));
+    }
 
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName) &&
@@ -1300,7 +1314,7 @@ drvName, Bindings * attrs, Value & v)
     {
         state.debugThrowLastTrace(EvalError({
             .msg = hintfmt("derivation names are allowed to end in '%s' only if they produce a single derivation file", drvExtension),
-            .errPos = state.positions[noPos]
+            .errPos = state.positions[attrs->pos]
         }));
     }
 
@@ -1312,7 +1326,7 @@ drvName, Bindings * attrs, Value & v)
         if (outputs.size() != 1 || *(outputs.begin()) != "out")
             state.debugThrowLastTrace(Error({
                 .msg = hintfmt("multiple outputs are not supported in fixed-output derivations"),
-                .errPos = state.positions[noPos]
+                .errPos = state.positions[attrs->pos]
             }));
 
         auto h = newHashAllowEmpty(*outputHash, parseHashAlgoOpt(outputHashAlgo));
@@ -1334,7 +1348,7 @@ drvName, Bindings * attrs, Value & v)
         if (contentAddressed && isImpure)
             throw EvalError({
                 .msg = hintfmt("derivation cannot be both content-addressed and impure"),
-                .errPos = state.positions[noPos]
+                .errPos = state.positions[attrs->pos]
             });
 
         auto ha = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
@@ -1378,7 +1392,7 @@ drvName, Bindings * attrs, Value & v)
                 if (!h)
                     throw AssertionError({
                         .msg = hintfmt("derivation produced no hash for output '%s'", i),
-                        .errPos = state.positions[noPos],
+                        .errPos = state.positions[attrs->pos],
                     });
                 auto outPath = state.store->makeOutputPath(i, *h, drvName);
                 drv.env[i] = state.store->printStorePath(outPath);
@@ -2350,7 +2364,8 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     }
     if (!path)
         state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("missing required 'path' attribute in the first argument to builtins.path"),
+            .msg = hintfmt("missing required 'path' attribute in the first argument to builtins.path: %s",
+                           ValuePrinter(state, *args[0], debugPrintOptions)),
             .errPos = state.positions[pos]
         }));
     if (name.empty())
@@ -2855,7 +2870,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
 
     for (unsigned int n = 0; n < listSize; ++n) {
         Value * vElem = listElems[n];
-        state.forceAttrs(*vElem, noPos, "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
+        state.forceAttrs(*vElem, vElem->determinePos(noPos), "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
         for (auto & attr : *vElem->attrs)
             attrsSeen[attr.name].first++;
     }
