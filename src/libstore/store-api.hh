@@ -257,17 +257,6 @@ public:
     virtual StorePathSet queryValidPaths(const StorePathSet & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute);
 
-    /**
-     * Query the set of all valid paths. Note that for some store
-     * backends, the name part of store paths may be replaced by 'x'
-     * (i.e. you'll get /nix/store/<hash>-x rather than
-     * /nix/store/<hash>-<name>). Use queryPathInfo() to obtain the
-     * full store path. FIXME: should return a set of
-     * std::variant<StorePath, HashPart> to get rid of this hack.
-     */
-    virtual StorePathSet queryAllValidPaths()
-    { unsupported("queryAllValidPaths"); }
-
     constexpr static const char * MissingName = "x";
 
     /**
@@ -333,13 +322,6 @@ protected:
         Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
 
 public:
-
-    /**
-     * Queries the set of incoming FS references for a store path.
-     * The result is not cleared.
-     */
-    virtual void queryReferrers(const StorePath & path, StorePathSet & referrers)
-    { unsupported("queryReferrers"); }
 
     /**
      * @return all currently valid derivations that have `path` as an
@@ -643,11 +625,11 @@ public:
      * returned.
      */
     virtual void computeFSClosure(const StorePathSet & paths,
-        StorePathSet & out, bool flipDirection = false,
+        StorePathSet & out,
         bool includeOutputs = false, bool includeDerivers = false);
 
     void computeFSClosure(const StorePath & path,
-        StorePathSet & out, bool flipDirection = false,
+        StorePathSet & out,
         bool includeOutputs = false, bool includeDerivers = false);
 
     /**

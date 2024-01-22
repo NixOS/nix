@@ -1224,10 +1224,16 @@ struct RestrictedStoreConfig : virtual LocalFSStoreConfig
     const std::string name() { return "Restricted Store"; }
 };
 
-/* A wrapper around LocalStore that only allows building/querying of
-   paths that are in the input closures of the build or were added via
-   recursive Nix calls. */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
+/**
+ * A wrapper around `LocalStore` that only allows building/querying of
+ * paths that are in the input closures of the build or were added via
+ * recursive Nix calls.
+ */
+struct RestrictedStore
+    : public virtual RestrictedStoreConfig
+    , public virtual IndirectRootStore
+    , public virtual GcStore
+    , public virtual ReferrersStore
 {
     ref<LocalStore> next;
 

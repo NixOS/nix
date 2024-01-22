@@ -7,6 +7,7 @@
 #include "store-api.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
+#include "referrers-store.hh"
 
 
 namespace nix {
@@ -38,7 +39,9 @@ struct RemoteStoreConfig : virtual StoreConfig
 class RemoteStore : public virtual RemoteStoreConfig,
     public virtual Store,
     public virtual GcStore,
-    public virtual LogStore
+    public virtual LogStore,
+    public virtual ReferrersStore
+
 {
 public:
 

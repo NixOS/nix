@@ -3,6 +3,8 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "store-api.hh"
+#include "referrers-store.hh"
+#include "store-cast.hh"
 #include "thread-pool.hh"
 #include "realisation.hh"
 #include "topo-sort.hh"
@@ -12,52 +14,18 @@
 
 namespace nix {
 
-void Store::computeFSClosure(const StorePathSet & startPaths,
-    StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
+typedef std::set<StorePath> QueryDeps(const StorePath & path, std::future<ref<const ValidPathInfo>> &);
+
+static void computeClosure(
+    Store & store,
+    std::function<QueryDeps> queryDeps,
+    const StorePathSet & startPaths,
+    StorePathSet & paths_,
+    bool includeOutputs, bool includeDerivers)
 {
-    std::function<std::set<StorePath>(const StorePath & path, std::future<ref<const ValidPathInfo>> &)> queryDeps;
-    if (flipDirection)
-        queryDeps = [&](const StorePath& path,
-                        std::future<ref<const ValidPathInfo>> & fut) {
-            StorePathSet res;
-            StorePathSet referrers;
-            queryReferrers(path, referrers);
-            for (auto& ref : referrers)
-                if (ref != path)
-                    res.insert(ref);
-
-            if (includeOutputs)
-                for (auto& i : queryValidDerivers(path))
-                    res.insert(i);
-
-            if (includeDerivers && path.isDerivation())
-                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
-                    if (maybeOutPath && isValidPath(*maybeOutPath))
-                        res.insert(*maybeOutPath);
-            return res;
-        };
-    else
-        queryDeps = [&](const StorePath& path,
-                        std::future<ref<const ValidPathInfo>> & fut) {
-            StorePathSet res;
-            auto info = fut.get();
-            for (auto& ref : info->references)
-                if (ref != path)
-                    res.insert(ref);
-
-            if (includeOutputs && path.isDerivation())
-                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
-                    if (maybeOutPath && isValidPath(*maybeOutPath))
-                        res.insert(*maybeOutPath);
-
-            if (includeDerivers && info->deriver && isValidPath(*info->deriver))
-                res.insert(*info->deriver);
-            return res;
-        };
-
     computeClosure<StorePath>(
         startPaths, paths_,
-        [&](const StorePath& path,
+        [&](const StorePath & path,
             std::function<void(std::promise<std::set<StorePath>>&)>
                 processEdges) {
             std::promise<std::set<StorePath>> promise;
@@ -70,17 +38,75 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                             promise.set_exception(std::current_exception());
                         }
                     };
-            queryPathInfo(path, getDependencies);
+            store.queryPathInfo(path, getDependencies);
             processEdges(promise);
         });
 }
 
-void Store::computeFSClosure(const StorePath & startPath,
-    StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
+void ReferrersStore::computeFSCoClosure(const StorePathSet & startPaths,
+    StorePathSet & paths_, bool includeOutputs, bool includeDerivers)
+{
+    std::function<QueryDeps> queryDeps;
+    queryDeps = [&](const StorePath & path,
+                    std::future<ref<const ValidPathInfo>> & fut) {
+        StorePathSet res;
+        StorePathSet referrers;
+        queryReferrers(path, referrers);
+        for (auto& ref : referrers)
+            if (ref != path)
+                res.insert(ref);
+
+        if (includeOutputs)
+            for (auto& i : queryValidDerivers(path))
+                res.insert(i);
+
+        if (includeDerivers && path.isDerivation())
+            for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                if (maybeOutPath && isValidPath(*maybeOutPath))
+                    res.insert(*maybeOutPath);
+        return res;
+    };
+    computeClosure(*this, queryDeps, startPaths, paths_, includeOutputs, includeDerivers);
+}
+
+void Store::computeFSClosure(const StorePathSet & startPaths,
+    StorePathSet & paths_, bool includeOutputs, bool includeDerivers)
+{
+    std::function<QueryDeps> queryDeps;
+    queryDeps = [&](const StorePath& path,
+                    std::future<ref<const ValidPathInfo>> & fut) {
+        StorePathSet res;
+        auto info = fut.get();
+        for (auto& ref : info->references)
+            if (ref != path)
+                res.insert(ref);
+
+        if (includeOutputs && path.isDerivation())
+            for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                if (maybeOutPath && isValidPath(*maybeOutPath))
+                    res.insert(*maybeOutPath);
+
+        if (includeDerivers && info->deriver && isValidPath(*info->deriver))
+            res.insert(*info->deriver);
+        return res;
+    };
+    computeClosure(*this, queryDeps, startPaths, paths_, includeOutputs, includeDerivers);
+}
+
+void ReferrersStore::computeFSCoClosure(const StorePath & startPath,
+    StorePathSet & paths_, bool includeOutputs, bool includeDerivers)
 {
     StorePathSet paths;
     paths.insert(startPath);
-    computeFSClosure(paths, paths_, flipDirection, includeOutputs, includeDerivers);
+    computeFSCoClosure(paths, paths_, includeOutputs, includeDerivers);
+}
+
+void Store::computeFSClosure(const StorePath & startPath,
+    StorePathSet & paths_, bool includeOutputs, bool includeDerivers)
+{
+    StorePathSet paths;
+    paths.insert(startPath);
+    computeFSClosure(paths, paths_, includeOutputs, includeDerivers);
 }
 
 

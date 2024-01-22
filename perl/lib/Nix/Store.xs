@@ -143,12 +143,12 @@ SV * queryPathFromHashPart(char * hashPart)
         }
 
 
-SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
+SV * computeFSClosure(int includeOutputs, ...)
     PPCODE:
         try {
             StorePathSet paths;
             for (int n = 2; n < items; ++n)
-                store()->computeFSClosure(store()->parseStorePath(SvPV_nolen(ST(n))), paths, flipDirection, includeOutputs);
+                store()->computeFSClosure(store()->parseStorePath(SvPV_nolen(ST(n))), paths, includeOutputs);
             for (auto & i : paths)
                 XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {

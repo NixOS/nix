@@ -720,7 +720,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 try {
                     StorePathSet closure;
                     computeFSClosure(*path, closure,
-                        /* flipDirection */ false, gcKeepOutputs, gcKeepDerivations);
+                        gcKeepOutputs, gcKeepDerivations);
                     for (auto & p : closure)
                         alive.insert(p);
                 } catch (InvalidPath &) { }

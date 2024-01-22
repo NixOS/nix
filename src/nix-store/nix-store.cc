@@ -6,6 +6,7 @@
 #include "store-cast.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
+#include "referrers-store.hh"
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
@@ -355,18 +356,22 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & i : opArgs) {
                 auto ps = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : ps) {
-                    if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
+                    if (query == qRequisites) store->computeFSClosure(j, paths, includeOutputs);
                     else if (query == qReferences) {
                         for (auto & p : store->queryPathInfo(j)->references)
                             paths.insert(p);
                     }
                     else if (query == qReferrers) {
+                        auto & referrersStore = require<ReferrersStore>(*store);
                         StorePathSet tmp;
-                        store->queryReferrers(j, tmp);
+                        referrersStore.queryReferrers(j, tmp);
                         for (auto & i : tmp)
                             paths.insert(i);
                     }
-                    else if (query == qReferrersClosure) store->computeFSClosure(j, paths, true);
+                    else if (query == qReferrersClosure) {
+                        auto & referrersStore = require<ReferrersStore>(*store);
+                        referrersStore.computeFSCoClosure(j, paths);
+                    }
                 }
             }
             auto sorted = store->topoSortPaths(paths);
@@ -456,16 +461,17 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qRoots: {
+            auto & referrersStore = require<ReferrersStore>(*store);
+            auto & gcStore = require<GcStore>(*store);
             StorePathSet args;
             for (auto & i : opArgs)
                 for (auto & p : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
                     args.insert(p);
 
             StorePathSet referrers;
-            store->computeFSClosure(
-                args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
+            referrersStore.computeFSCoClosure(
+                args, referrers, settings.gcKeepOutputs, settings.gcKeepDerivations);
 
-            auto & gcStore = require<GcStore>(*store);
             Roots roots = gcStore.findRoots(false);
             for (auto & [target, links] : roots)
                 if (referrers.find(target) != referrers.end())
@@ -526,12 +532,13 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 
 static void opDumpDB(Strings opFlags, Strings opArgs)
 {
+    auto & visibleStore = require<VisibleStore>(*store);
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty()) {
         for (auto & i : opArgs)
             cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
     } else {
-        for (auto & i : store->queryAllValidPaths())
+        for (auto & i : visibleStore.queryAllValidPaths())
             cout << store->makeValidityRegistration({i}, true, true);
     }
 }

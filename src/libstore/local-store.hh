@@ -6,6 +6,7 @@
 #include "pathlocks.hh"
 #include "store-api.hh"
 #include "indirect-root-store.hh"
+#include "referrers-store.hh"
 #include "sync.hh"
 
 #include <chrono>
@@ -69,6 +70,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 class LocalStore : public virtual LocalStoreConfig
     , public virtual IndirectRootStore
     , public virtual GcStore
+    , public virtual ReferrersStore
 {
 private:
 

@@ -253,11 +253,11 @@ void LegacySSHStore::buildPaths(const std::vector<DerivedPath> & drvPaths, Build
 
 
 void LegacySSHStore::computeFSClosure(const StorePathSet & paths,
-    StorePathSet & out, bool flipDirection,
+    StorePathSet & out,
     bool includeOutputs, bool includeDerivers)
 {
-    if (flipDirection || includeDerivers) {
-        Store::computeFSClosure(paths, out, flipDirection, includeOutputs, includeDerivers);
+    if (includeDerivers) {
+        Store::computeFSClosure(paths, out, includeOutputs, includeDerivers);
         return;
     }
 

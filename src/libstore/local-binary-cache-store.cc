@@ -1,4 +1,5 @@
 #include "binary-cache-store.hh"
+#include "visible-store.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 
@@ -20,7 +21,7 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     }
 };
 
-class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore
+class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore, public virtual VisibleStore
 {
 private:
 
