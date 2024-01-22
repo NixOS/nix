@@ -22,45 +22,10 @@ std::string LegacySSHStoreConfig::doc()
 }
 
 
-struct LegacySSHStore::Connection
+struct LegacySSHStore::Connection : public ServeProto::BasicClientConnection
 {
     std::unique_ptr<SSHMaster::Connection> sshConn;
-    FdSink to;
-    FdSource from;
-    ServeProto::Version remoteVersion;
     bool good = true;
-
-    /**
-     * Coercion to `ServeProto::ReadConn`. This makes it easy to use the
-     * factored out serve protocol searlizers with a
-     * `LegacySSHStore::Connection`.
-     *
-     * The serve protocol connection types are unidirectional, unlike
-     * this type.
-     */
-    operator ServeProto::ReadConn ()
-    {
-        return ServeProto::ReadConn {
-            .from = from,
-            .version = remoteVersion,
-        };
-    }
-
-    /*
-     * Coercion to `ServeProto::WriteConn`. This makes it easy to use the
-     * factored out serve protocol searlizers with a
-     * `LegacySSHStore::Connection`.
-     *
-     * The serve protocol connection types are unidirectional, unlike
-     * this type.
-     */
-    operator ServeProto::WriteConn ()
-    {
-        return ServeProto::WriteConn {
-            .to = to,
-            .version = remoteVersion,
-        };
-    }
 };
 
 
@@ -96,28 +61,20 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
 
+    StringSink saved;
+    TeeSource tee(conn->from, saved);
     try {
-        conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
-        conn->to.flush();
-
-        StringSink saved;
-        try {
-            TeeSource tee(conn->from, saved);
-            unsigned int magic = readInt(tee);
-            if (magic != SERVE_MAGIC_2)
-                throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
-        } catch (SerialisationError & e) {
-            /* In case the other side is waiting for our input,
-               close it. */
-            conn->sshConn->in.close();
-            auto msg = conn->from.drain();
-            throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-                host, chomp(saved.s + msg));
+        conn->remoteVersion = ServeProto::BasicClientConnection::handshake(
+            conn->to, tee, SERVE_PROTOCOL_VERSION, host);
+    } catch (SerialisationError & e) {
+        // in.close(): Don't let the remote block on us not writing.
+        conn->sshConn->in.close();
+        {
+            NullSink nullSink;
+            conn->from.drainInto(nullSink);
         }
-        conn->remoteVersion = readInt(conn->from);
-        if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
-            throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
-
+        throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
+            host, chomp(saved.s));
     } catch (EndOfFile & e) {
         throw Error("cannot connect to '%1%'", host);
     }
@@ -232,16 +189,16 @@ void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
 }
 
 
-void LegacySSHStore::putBuildSettings(Connection & conn)
+static ServeProto::BuildOptions buildSettings()
 {
-    ServeProto::write(*this, conn, ServeProto::BuildOptions {
+    return {
         .maxSilentTime = settings.maxSilentTime,
         .buildTimeout = settings.buildTimeout,
         .maxLogSize = settings.maxLogSize,
         .nrRepeats = 0, // buildRepeat hasn't worked for ages anyway
         .enforceDeterminism = 0,
         .keepFailed = settings.keepFailed,
-    });
+    };
 }
 
 
@@ -250,14 +207,7 @@ BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const Bas
 {
     auto conn(connections->get());
 
-    conn->to
-        << ServeProto::Command::BuildDerivation
-        << printStorePath(drvPath);
-    writeDerivation(conn->to, *this, drv);
-
-    putBuildSettings(*conn);
-
-    conn->to.flush();
+    conn->putBuildDerivationRequest(*this, drvPath, drv, buildSettings());
 
     return ServeProto::Serialise<BuildResult>::read(*this, *conn);
 }
@@ -288,7 +238,7 @@ void LegacySSHStore::buildPaths(const std::vector<DerivedPath> & drvPaths, Build
     }
     conn->to << ss;
 
-    putBuildSettings(*conn);
+    ServeProto::write(*this, *conn, buildSettings());
 
     conn->to.flush();
 
@@ -328,15 +278,8 @@ StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths,
     SubstituteFlag maybeSubstitute)
 {
     auto conn(connections->get());
-
-    conn->to
-        << ServeProto::Command::QueryValidPaths
-        << false // lock
-        << maybeSubstitute;
-    ServeProto::write(*this, *conn, paths);
-    conn->to.flush();
-
-    return ServeProto::Serialise<StorePathSet>::read(*this, *conn);
+    return conn->queryValidPaths(*this,
+        false, paths, maybeSubstitute);
 }
 
 
