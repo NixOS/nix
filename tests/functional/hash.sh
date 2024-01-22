@@ -87,7 +87,7 @@ try3() {
     # $2 = expected hash in base16
     # $3 = expected hash in base32
     # $4 = expected hash in base64
-    h64=$(nix hash convert --algo "$1" --to base64 "$2")
+    h64=$(nix hash convert --hash-algo "$1" --to base64 "$2")
     [ "$h64" = "$4" ]
     h64=$(nix-hash --type "$1" --to-base64 "$2")
     [ "$h64" = "$4" ]
@@ -95,13 +95,13 @@ try3() {
     h64=$(nix hash to-base64 --type "$1" "$2")
     [ "$h64" = "$4" ]
 
-    sri=$(nix hash convert --algo "$1" --to sri "$2")
+    sri=$(nix hash convert --hash-algo "$1" --to sri "$2")
     [ "$sri" = "$1-$4" ]
     sri=$(nix-hash --type "$1" --to-sri "$2")
     [ "$sri" = "$1-$4" ]
     sri=$(nix hash to-sri --type "$1" "$2")
     [ "$sri" = "$1-$4" ]
-    h32=$(nix hash convert --algo "$1" --to base32 "$2")
+    h32=$(nix hash convert --hash-algo "$1" --to base32 "$2")
     [ "$h32" = "$3" ]
     h32=$(nix-hash --type "$1" --to-base32 "$2")
     [ "$h32" = "$3" ]
@@ -110,7 +110,7 @@ try3() {
     h16=$(nix-hash --type "$1" --to-base16 "$h32")
     [ "$h16" = "$2" ]
 
-    h16=$(nix hash convert --algo "$1" --to base16 "$h64")
+    h16=$(nix hash convert --hash-algo "$1" --to base16 "$h64")
     [ "$h16" = "$2" ]
     h16=$(nix hash to-base16 --type "$1" "$h64")
     [ "$h16" = "$2" ]
@@ -143,40 +143,40 @@ try3() {
     # Auto-detecting the input from algo and length.
     #
 
-    sri=$(nix hash convert --algo "$1" "$2")
+    sri=$(nix hash convert --hash-algo "$1" "$2")
     [ "$sri" = "$1-$4" ]
-    sri=$(nix hash convert --algo "$1" "$3")
+    sri=$(nix hash convert --hash-algo "$1" "$3")
     [ "$sri" = "$1-$4" ]
-    sri=$(nix hash convert --algo "$1" "$4")
+    sri=$(nix hash convert --hash-algo "$1" "$4")
     [ "$sri" = "$1-$4" ]
 
-    sri=$(nix hash convert --algo "$1" "$2")
+    sri=$(nix hash convert --hash-algo "$1" "$2")
     [ "$sri" = "$1-$4" ]
-    sri=$(nix hash convert --algo "$1" "$3")
+    sri=$(nix hash convert --hash-algo "$1" "$3")
     [ "$sri" = "$1-$4" ]
-    sri=$(nix hash convert --algo "$1" "$4")
+    sri=$(nix hash convert --hash-algo "$1" "$4")
     [ "$sri" = "$1-$4" ]
 
     #
     # Asserting input format succeeds.
     #
 
-    sri=$(nix hash convert --algo "$1" --from base16 "$2")
+    sri=$(nix hash convert --hash-algo "$1" --from base16 "$2")
     [ "$sri" = "$1-$4" ]
-    sri=$(nix hash convert --algo "$1" --from nix32 "$3")
+    sri=$(nix hash convert --hash-algo "$1" --from nix32 "$3")
     [ "$sri" = "$1-$4" ]
-    sri=$(nix hash convert --algo "$1" --from base64 "$4")
+    sri=$(nix hash convert --hash-algo "$1" --from base64 "$4")
     [ "$sri" = "$1-$4" ]
 
     #
     # Asserting input format fails.
     #
 
-    fail=$(nix hash convert --algo "$1" --from nix32 "$2" 2>&1 || echo "exit: $?")
+    fail=$(nix hash convert --hash-algo "$1" --from nix32 "$2" 2>&1 || echo "exit: $?")
     [[ "$fail" == *"error: input hash"*"exit: 1" ]]
-    fail=$(nix hash convert --algo "$1" --from base16 "$3" 2>&1 || echo "exit: $?")
+    fail=$(nix hash convert --hash-algo "$1" --from base16 "$3" 2>&1 || echo "exit: $?")
     [[ "$fail" == *"error: input hash"*"exit: 1" ]]
-    fail=$(nix hash convert --algo "$1" --from nix32 "$4" 2>&1 || echo "exit: $?")
+    fail=$(nix hash convert --hash-algo "$1" --from nix32 "$4" 2>&1 || echo "exit: $?")
     [[ "$fail" == *"error: input hash"*"exit: 1" ]]
 
 }
