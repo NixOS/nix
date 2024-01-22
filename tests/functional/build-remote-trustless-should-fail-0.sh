@@ -4,6 +4,7 @@ enableFeatures "daemon-trust-override"
 
 restartDaemon
 
+requireSandboxSupport
 [[ $busybox =~ busybox ]] || skipTest "no busybox"
 
 unset NIX_STORE_DIR

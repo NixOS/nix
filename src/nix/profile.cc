@@ -10,6 +10,8 @@
 #include "../nix-env/user-env.hh"
 #include "profiles.hh"
 #include "names.hh"
+#include "url.hh"
+#include "flake/url-name.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -79,11 +81,6 @@ struct ProfileElement
         return showVersions(versions);
     }
 
-    bool operator < (const ProfileElement & other) const
-    {
-        return std::tuple(identifier(), storePaths) < std::tuple(other.identifier(), other.storePaths);
-    }
-
     void updateStorePaths(
         ref<Store> evalStore,
         ref<Store> store,
@@ -106,7 +103,9 @@ struct ProfileElement
 
 struct ProfileManifest
 {
-    std::vector<ProfileElement> elements;
+    using ProfileElementName = std::string;
+
+    std::map<ProfileElementName, ProfileElement> elements;
 
     ProfileManifest() { }
 
@@ -126,6 +125,7 @@ struct ProfileManifest
                     sOriginalUrl = "originalUri";
                     break;
                 case 2:
+                case 3:
                     sUrl = "url";
                     sOriginalUrl = "originalUrl";
                     break;
@@ -133,7 +133,9 @@ struct ProfileManifest
                     throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
             }
 
-            for (auto & e : json["elements"]) {
+            auto elems = json["elements"];
+            for (auto & elem : elems.items()) {
+                auto & e = elem.value();
                 ProfileElement element;
                 for (auto & p : e["storePaths"])
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
@@ -149,7 +151,15 @@ struct ProfileManifest
                         e["outputs"].get<ExtendedOutputsSpec>()
                     };
                 }
-                elements.emplace_back(std::move(element));
+
+                std::string name =
+                    elems.is_object()
+                    ? elem.key()
+                    : element.source
+                    ? getNameFromURL(parseURL(element.source->to_string())).value_or(element.identifier())
+                    : element.identifier();
+
+                addElement(name, std::move(element));
             }
         }
 
@@ -158,20 +168,39 @@ struct ProfileManifest
             state.allowPath(state.store->followLinksToStore(profile));
             state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
 
-            auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
+            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile));
 
-            for (auto & drvInfo : drvInfos) {
+            for (auto & packageInfo : packageInfos) {
                 ProfileElement element;
-                element.storePaths = {drvInfo.queryOutPath()};
-                elements.emplace_back(std::move(element));
+                element.storePaths = {packageInfo.queryOutPath()};
+                addElement(std::move(element));
             }
         }
     }
 
+    void addElement(std::string_view nameCandidate, ProfileElement element)
+    {
+        std::string finalName(nameCandidate);
+        for (int i = 1; elements.contains(finalName); ++i)
+            finalName = nameCandidate + "-" + std::to_string(i);
+
+        elements.insert_or_assign(finalName, std::move(element));
+    }
+
+    void addElement(ProfileElement element)
+    {
+        auto name =
+            element.source
+            ? getNameFromURL(parseURL(element.source->to_string()))
+            : std::nullopt;
+        auto name2 = name ? *name : element.identifier();
+        addElement(name2, std::move(element));
+    }
+
     nlohmann::json toJSON(Store & store) const
     {
-        auto array = nlohmann::json::array();
-        for (auto & element : elements) {
+        auto es = nlohmann::json::object();
+        for (auto & [name, element] : elements) {
             auto paths = nlohmann::json::array();
             for (auto & path : element.storePaths)
                 paths.push_back(store.printStorePath(path));
@@ -185,11 +214,11 @@ struct ProfileManifest
                 obj["attrPath"] = element.source->attrPath;
                 obj["outputs"] = element.source->outputs;
             }
-            array.push_back(obj);
+            es[name] = obj;
         }
         nlohmann::json json;
-        json["version"] = 2;
-        json["elements"] = array;
+        json["version"] = 3;
+        json["elements"] = es;
         return json;
     }
 
@@ -200,7 +229,7 @@ struct ProfileManifest
         StorePathSet references;
 
         Packages pkgs;
-        for (auto & element : elements) {
+        for (auto & [name, element] : elements) {
             for (auto & path : element.storePaths) {
                 if (element.active)
                     pkgs.emplace_back(store->printStorePath(path), true, element.priority);
@@ -216,7 +245,7 @@ struct ProfileManifest
         StringSink sink;
         dumpPath(tempDir, sink);
 
-        auto narHash = hashString(htSHA256, sink.s);
+        auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
 
         ValidPathInfo info {
             *store,
@@ -242,33 +271,27 @@ struct ProfileManifest
 
     static void printDiff(const ProfileManifest & prev, const ProfileManifest & cur, std::string_view indent)
     {
-        auto prevElems = prev.elements;
-        std::sort(prevElems.begin(), prevElems.end());
-
-        auto curElems = cur.elements;
-        std::sort(curElems.begin(), curElems.end());
-
-        auto i = prevElems.begin();
-        auto j = curElems.begin();
+        auto i = prev.elements.begin();
+        auto j = cur.elements.begin();
 
         bool changes = false;
 
-        while (i != prevElems.end() || j != curElems.end()) {
-            if (j != curElems.end() && (i == prevElems.end() || i->identifier() > j->identifier())) {
-                logger->cout("%s%s: ∅ -> %s", indent, j->identifier(), j->versions());
+        while (i != prev.elements.end() || j != cur.elements.end()) {
+            if (j != cur.elements.end() && (i == prev.elements.end() || i->first > j->first)) {
+                logger->cout("%s%s: ∅ -> %s", indent, j->second.identifier(), j->second.versions());
                 changes = true;
                 ++j;
             }
-            else if (i != prevElems.end() && (j == curElems.end() || i->identifier() < j->identifier())) {
-                logger->cout("%s%s: %s -> ∅", indent, i->identifier(), i->versions());
+            else if (i != prev.elements.end() && (j == cur.elements.end() || i->first < j->first)) {
+                logger->cout("%s%s: %s -> ∅", indent, i->second.identifier(), i->second.versions());
                 changes = true;
                 ++i;
             }
             else {
-                auto v1 = i->versions();
-                auto v2 = j->versions();
+                auto v1 = i->second.versions();
+                auto v2 = j->second.versions();
                 if (v1 != v2) {
-                    logger->cout("%s%s: %s -> %s", indent, i->identifier(), v1, v2);
+                    logger->cout("%s%s: %s -> %s", indent, i->second.identifier(), v1, v2);
                     changes = true;
                 }
                 ++i;
@@ -367,7 +390,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
             element.updateStorePaths(getEvalStore(), store, res);
 
-            manifest.elements.push_back(std::move(element));
+            manifest.addElement(std::move(element));
         }
 
         try {
@@ -377,7 +400,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             //       See https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
             auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
                 for (auto it = begin; it != end; it++) {
-                    auto profileElement = *it;
+                    auto & profileElement = it->second;
                     for (auto & storePath : profileElement.storePaths) {
                         if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
                             return std::pair(conflictError.fileA, profileElement.toInstallables(*store));
@@ -445,7 +468,7 @@ public:
         std::string pattern;
         std::regex  reg;
     };
-    typedef std::variant<size_t, Path, RegexPattern> Matcher;
+    typedef std::variant<Path, RegexPattern> Matcher;
 
     std::vector<Matcher> getMatchers(ref<Store> store)
     {
@@ -453,7 +476,7 @@ public:
 
         for (auto & s : _matchers) {
             if (auto n = string2Int<size_t>(s))
-                res.push_back(*n);
+                throw Error("'nix profile' no longer supports indices ('%d')", *n);
             else if (store->isStorePath(s))
                 res.push_back(s);
             else
@@ -463,16 +486,17 @@ public:
         return res;
     }
 
-    bool matches(const Store & store, const ProfileElement & element, size_t pos, const std::vector<Matcher> & matchers)
+    bool matches(
+        const Store & store,
+        const std::string & name,
+        const ProfileElement & element,
+        const std::vector<Matcher> & matchers)
     {
         for (auto & matcher : matchers) {
-            if (auto n = std::get_if<size_t>(&matcher)) {
-                if (*n == pos) return true;
-            } else if (auto path = std::get_if<Path>(&matcher)) {
+            if (auto path = std::get_if<Path>(&matcher)) {
                 if (element.storePaths.count(store.parseStorePath(*path))) return true;
             } else if (auto regex = std::get_if<RegexPattern>(&matcher)) {
-                if (element.source
-                    && std::regex_match(element.source->attrPath, regex->reg))
+                if (std::regex_match(name, regex->reg))
                     return true;
             }
         }
@@ -503,10 +527,9 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         ProfileManifest newManifest;
 
-        for (size_t i = 0; i < oldManifest.elements.size(); ++i) {
-            auto & element(oldManifest.elements[i]);
-            if (!matches(*store, element, i, matchers)) {
-                newManifest.elements.push_back(std::move(element));
+        for (auto & [name, element] : oldManifest.elements) {
+            if (!matches(*store, name, element, matchers)) {
+                newManifest.elements.insert_or_assign(name, std::move(element));
             } else {
                 notice("removing '%s'", element.identifier());
             }
@@ -519,11 +542,9 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         if (removedCount == 0) {
             for (auto matcher: matchers) {
-                if (const size_t * index = std::get_if<size_t>(&matcher)){
-                    warn("'%d' is not a valid index", *index);
-                } else if (const Path * path = std::get_if<Path>(&matcher)){
+                if (const Path * path = std::get_if<Path>(&matcher)) {
                     warn("'%s' does not match any paths", *path);
-                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
+                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)) {
                     warn("'%s' does not match any packages", regex->pattern);
                 }
             }
@@ -554,64 +575,82 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         auto matchers = getMatchers(store);
 
         Installables installables;
-        std::vector<size_t> indices;
+        std::vector<ProfileElement *> elems;
 
+        auto matchedCount = 0;
         auto upgradedCount = 0;
 
-        for (size_t i = 0; i < manifest.elements.size(); ++i) {
-            auto & element(manifest.elements[i]);
-            if (element.source
-                && !element.source->originalRef.input.isLocked()
-                && matches(*store, element, i, matchers))
-            {
-                upgradedCount++;
-
-                Activity act(*logger, lvlChatty, actUnknown,
-                    fmt("checking '%s' for updates", element.source->attrPath));
-
-                auto installable = make_ref<InstallableFlake>(
-                    this,
-                    getEvalState(),
-                    FlakeRef(element.source->originalRef),
-                    "",
-                    element.source->outputs,
-                    Strings{element.source->attrPath},
-                    Strings{},
-                    lockFlags);
-
-                auto derivedPaths = installable->toDerivedPaths();
-                if (derivedPaths.empty()) continue;
-                auto * infop = dynamic_cast<ExtraPathInfoFlake *>(&*derivedPaths[0].info);
-                // `InstallableFlake` should use `ExtraPathInfoFlake`.
-                assert(infop);
-                auto & info = *infop;
-
-                if (element.source->lockedRef == info.flake.lockedRef) continue;
-
-                printInfo("upgrading '%s' from flake '%s' to '%s'",
-                    element.source->attrPath, element.source->lockedRef, info.flake.lockedRef);
-
-                element.source = ProfileElementSource {
-                    .originalRef = installable->flakeRef,
-                    .lockedRef = info.flake.lockedRef,
-                    .attrPath = info.value.attrPath,
-                    .outputs = installable->extendedOutputsSpec,
-                };
-
-                installables.push_back(installable);
-                indices.push_back(i);
+        for (auto & [name, element] : manifest.elements) {
+            if (!matches(*store, name, element, matchers)) {
+                continue;
             }
+
+            matchedCount++;
+
+            if (!element.source) {
+                warn(
+                    "Found package '%s', but it was not installed from a flake, so it can't be checked for upgrades!",
+                    element.identifier()
+                );
+                continue;
+            }
+            if (element.source->originalRef.input.isLocked()) {
+                warn(
+                    "Found package '%s', but it was installed from a locked flake reference so it can't be upgraded!",
+                    element.identifier()
+                );
+                continue;
+            }
+
+            upgradedCount++;
+
+            Activity act(*logger, lvlChatty, actUnknown,
+                fmt("checking '%s' for updates", element.source->attrPath));
+
+            auto installable = make_ref<InstallableFlake>(
+                this,
+                getEvalState(),
+                FlakeRef(element.source->originalRef),
+                "",
+                element.source->outputs,
+                Strings{element.source->attrPath},
+                Strings{},
+                lockFlags);
+
+            auto derivedPaths = installable->toDerivedPaths();
+            if (derivedPaths.empty()) continue;
+            auto * infop = dynamic_cast<ExtraPathInfoFlake *>(&*derivedPaths[0].info);
+            // `InstallableFlake` should use `ExtraPathInfoFlake`.
+            assert(infop);
+            auto & info = *infop;
+
+            if (element.source->lockedRef == info.flake.lockedRef) continue;
+
+            printInfo("upgrading '%s' from flake '%s' to '%s'",
+                element.source->attrPath, element.source->lockedRef, info.flake.lockedRef);
+
+            element.source = ProfileElementSource {
+                .originalRef = installable->flakeRef,
+                .lockedRef = info.flake.lockedRef,
+                .attrPath = info.value.attrPath,
+                .outputs = installable->extendedOutputsSpec,
+            };
+
+            installables.push_back(installable);
+            elems.push_back(&element);
         }
 
         if (upgradedCount == 0) {
-            for (auto & matcher : matchers) {
-                if (const size_t * index = std::get_if<size_t>(&matcher)){
-                    warn("'%d' is not a valid index", *index);
-                } else if (const Path * path = std::get_if<Path>(&matcher)){
-                    warn("'%s' does not match any paths", *path);
-                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
-                    warn("'%s' does not match any packages", regex->pattern);
+            if (matchedCount == 0) {
+                for (auto & matcher : matchers) {
+                    if (const Path * path = std::get_if<Path>(&matcher)) {
+                        warn("'%s' does not match any paths", *path);
+                    } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)) {
+                        warn("'%s' does not match any packages", regex->pattern);
+                    }
                 }
+            } else {
+                warn("Found some packages but none of them could be upgraded.");
             }
             warn ("Use 'nix profile list' to see the current profile.");
         }
@@ -622,7 +661,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
         for (size_t i = 0; i < installables.size(); ++i) {
             auto & installable = installables.at(i);
-            auto & element = manifest.elements[indices.at(i)];
+            auto & element = *elems.at(i);
             element.updateStorePaths(
                 getEvalStore(),
                 store,
@@ -654,11 +693,11 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         if (json) {
             std::cout << manifest.toJSON(*store).dump() << "\n";
         } else {
-            for (size_t i = 0; i < manifest.elements.size(); ++i) {
-                auto & element(manifest.elements[i]);
+            for (const auto & [i, e] : enumerate(manifest.elements)) {
+                auto & [name, element] = e;
                 if (i) logger->cout("");
-                logger->cout("Index:              " ANSI_BOLD "%s" ANSI_NORMAL "%s",
-                    i,
+                logger->cout("Name:               " ANSI_BOLD "%s" ANSI_NORMAL "%s",
+                    name,
                     element.active ? "" : " " ANSI_RED "(inactive)" ANSI_NORMAL);
                 if (element.source) {
                     logger->cout("Flake attribute:    %s%s", element.source->attrPath, element.source->outputs.to_string());
@@ -825,7 +864,9 @@ struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRu
 struct CmdProfile : NixMultiCommand
 {
     CmdProfile()
-        : MultiCommand({
+        : NixMultiCommand(
+            "profile",
+            {
               {"install", []() { return make_ref<CmdProfileInstall>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
@@ -847,13 +888,6 @@ struct CmdProfile : NixMultiCommand
         return
           #include "profile.md"
           ;
-    }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix profile' requires a sub-command.");
-        command->second->run();
     }
 };
 

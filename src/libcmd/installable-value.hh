@@ -6,7 +6,7 @@
 
 namespace nix {
 
-struct DrvInfo;
+struct PackageInfo;
 struct SourceExprCommand;
 
 namespace eval_cache { class EvalCache; class AttrCursor; }

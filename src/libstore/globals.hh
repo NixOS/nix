@@ -117,10 +117,11 @@ public:
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
         R"(
-          The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
           to use for most operations.
-          See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md)
-          for supported store types and settings.
+          See the
+          [Store Types](@docroot@/store/types/index.md)
+          section of the manual for supported store types and settings.
         )"};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
@@ -143,20 +144,25 @@ public:
      */
     bool verboseBuild = true;
 
-    Setting<size_t> logLines{this, 10, "log-lines",
+    Setting<size_t> logLines{this, 25, "log-lines",
         "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
         this, 1, "max-jobs",
         R"(
-          This option defines the maximum number of jobs that Nix will try to
-          build in parallel. The default is `1`. The special value `auto`
-          causes Nix to use the number of CPUs in your system. `0` is useful
-          when using remote builders to prevent any local builds (except for
-          `preferLocalBuild` derivation attribute which executes locally
-          regardless). It can be overridden using the `--max-jobs` (`-j`)
-          command line switch.
+          Maximum number of jobs that Nix will try to build locally in parallel.
+
+          The special value `auto` causes Nix to use the number of CPUs in your system.
+          Use `0` to disable local builds and directly use the remote machines specified in [`builders`](#conf-builders).
+          This will not affect derivations that have [`preferLocalBuild = true`](@docroot@/language/advanced-attributes.md#adv-attr-preferLocalBuild), which are always built locally.
+
+          > **Note**
+          >
+          > The number of CPU cores to use for each build job is independently determined by the [`cores`](#conf-cores) setting.
+
+          <!-- TODO(@fricklerhandwerk): would be good to have those shorthands for common options as part of the specification -->
+          The setting can be overridden using the `--max-jobs` (`-j`) command line switch.
         )",
         {"build-max-jobs"}};
 
@@ -183,7 +189,9 @@ public:
           command line switch and defaults to `1`. The value `0` means that
           the builder should use all available CPU cores in the system.
         )",
-        {"build-cores"}, false};
+        {"build-cores"},
+        // Don't document the machine-specific default value
+        false};
 
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
@@ -198,7 +206,7 @@ public:
           Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
-          The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
+          The following system types are widely used, as Nix is actively supported on these platforms:
 
           - `x86_64-linux`
           - `x86_64-darwin`
@@ -211,7 +219,11 @@ public:
           In general, you do not have to modify this setting.
           While you can force Nix to run a Darwin-specific `builder` executable on a Linux machine, the result would obviously be wrong.
 
-          This value is available in the Nix language as [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem).
+          This value is available in the Nix language as
+          [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+          if the
+          [`eval-system`](#conf-eval-system)
+          configuration option is set as the empty string.
         )"};
 
     Setting<time_t> maxSilentTime{
@@ -265,21 +277,16 @@ public:
     Setting<bool> alwaysAllowSubstitutes{
         this, false, "always-allow-substitutes",
         R"(
-          If set to `true`, Nix will ignore the `allowSubstitutes` attribute in
-          derivations and always attempt to use available substituters.
-          For more information on `allowSubstitutes`, see [the manual chapter on advanced attributes](../language/advanced-attributes.md).
+          If set to `true`, Nix will ignore the [`allowSubstitutes`](@docroot@/language/advanced-attributes.md) attribute in derivations and always attempt to use [available substituters](#conf-substituters).
         )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
         R"(
-          If set to `true`, Nix will instruct remote build machines to use
-          their own binary substitutes if available. In practical terms, this
-          means that remote hosts will fetch as many build dependencies as
-          possible from their own substitutes (e.g, from `cache.nixos.org`),
-          instead of waiting for this host to upload them all. This can
-          drastically reduce build times if the network connection between
-          this computer and the remote build host is slow.
+          If set to `true`, Nix will instruct [remote build machines](#conf-builders) to use their own [`substituters`](#conf-substituters) if available.
+
+          It means that remote build hosts will fetch as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
+          This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
@@ -629,11 +636,11 @@ public:
 
           At least one of the following condition must be met
           for Nix to accept copying a store object from another
-          Nix store (such as a substituter):
+          Nix store (such as a [substituter](#conf-substituters)):
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
+          - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
 
@@ -699,7 +706,10 @@ public:
 
           Build systems will usually detect the target platform to be the current physical system and therefore produce machine code incompatible with what may be intended in the derivation.
           You should design your derivation's `builder` accordingly and cross-check the results when using this option against natively-built versions of your derivation.
-        )", {}, false};
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
     Setting<StringSet> systemFeatures{
         this,
@@ -744,15 +754,18 @@ public:
             [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
 
             Included by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
-        )", {}, false};
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
     Setting<Strings> substituters{
         this,
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store]{@docroot@/glossary.md##gloss-store} from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
@@ -770,7 +783,7 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
-          A list of [Nix store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format), separated by whitespace.
+          A list of [Nix store URLs](@docroot@/store/types/index.md#store-url-format), separated by whitespace.
           These are not used by default, but users of the Nix daemon can enable them by specifying [`substituters`](#conf-substituters).
 
           Unprivileged users (those set in only [`allowed-users`](#conf-allowed-users) but not [`trusted-users`](#conf-trusted-users)) can pass as `substituters` only those URLs listed in `trusted-substituters`.
@@ -938,7 +951,9 @@ public:
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
         )"};
+#endif
 
+#if HAVE_ACL_SUPPORT
     Setting<StringSet> ignoredAcls{
         this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(

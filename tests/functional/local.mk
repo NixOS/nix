@@ -2,6 +2,7 @@ nix_tests = \
   test-infra.sh \
   init.sh \
   flakes/flakes.sh \
+  flakes/develop.sh \
   flakes/run.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
@@ -69,7 +70,9 @@ nix_tests = \
   build-remote-trustless-should-pass-2.sh \
   build-remote-trustless-should-pass-3.sh \
   build-remote-trustless-should-fail-0.sh \
+  build-remote-with-mounted-ssh-ng.sh \
   nar-access.sh \
+  impure-eval.sh \
   pure-eval.sh \
   eval.sh \
   repl.sh \
@@ -127,21 +130,21 @@ nix_tests = \
   impure-env.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
-	nix_tests += compute-levels.sh
+  nix_tests += compute-levels.sh
 endif
 
 ifeq ($(ENABLE_BUILD), yes)
-	nix_tests += test-libstoreconsumer.sh
+  nix_tests += test-libstoreconsumer.sh
 
-	ifeq ($(BUILD_SHARED_LIBS), 1)
-		nix_tests += plugins.sh
-	endif
+  ifeq ($(BUILD_SHARED_LIBS), 1)
+    nix_tests += plugins.sh
+  endif
 endif
 
 $(d)/test-libstoreconsumer.sh.test $(d)/test-libstoreconsumer.sh.test-debug: \
-  $(d)/test-libstoreconsumer/test-libstoreconsumer
+  $(buildprefix)$(d)/test-libstoreconsumer/test-libstoreconsumer
 $(d)/plugins.sh.test $(d)/plugins.sh.test-debug: \
-  $(d)/plugins/libplugintest.$(SO_EXT)
+  $(buildprefix)$(d)/plugins/libplugintest.$(SO_EXT)
 
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 

@@ -51,9 +51,7 @@ git -C $repo add differentbranch
 git -C $repo commit -m 'Test2'
 git -C $repo checkout master
 devrev=$(git -C $repo rev-parse devtest)
-out=$(nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }" 2>&1) || status=$?
-[[ $status == 1 ]]
-[[ $out =~ 'Cannot find Git revision' ]]
+nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }"
 
 [[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; allRefs = true; } + \"/differentbranch\")") = 'different file' ]]
 
@@ -185,11 +183,7 @@ path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = 
 # Nuke the cache
 rm -rf $TEST_HOME/.cache/nix
 
-# Try again, but without 'git' on PATH. This should fail.
-NIX=$(command -v nix)
-(! PATH= $NIX eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath" )
-
-# Try again, with 'git' available.  This should work.
+# Try again. This should work.
 path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
 [[ $path3 = $path5 ]]
 
@@ -235,12 +229,25 @@ rev_tag2=$(git -C $repo rev-parse refs/tags/tag2)
 [[ $rev_tag2_nix = $rev_tag2 ]]
 unset _NIX_FORCE_HTTP
 
+# Ensure .gitattributes is respected
+touch $repo/not-exported-file
+touch $repo/exported-wonky
+echo "/not-exported-file export-ignore" >> $repo/.gitattributes
+echo "/exported-wonky export-ignore=wonk" >> $repo/.gitattributes
+git -C $repo add not-exported-file exported-wonky .gitattributes
+git -C $repo commit -m 'Bla6'
+rev5=$(git -C $repo rev-parse HEAD)
+path12=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev5\"; }).outPath")
+[[ ! -e $path12/not-exported-file ]]
+[[ -e $path12/exported-wonky ]]
+
 # should fail if there is no repo
 rm -rf $repo/.git
 (! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # should succeed for a repo without commits
 git init $repo
+git -C $repo add hello # need to add at least one file to cause the root of the repo to be visible
 path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # should succeed for a path with a space

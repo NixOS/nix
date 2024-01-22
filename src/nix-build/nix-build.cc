@@ -14,6 +14,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
+#include "realisation.hh"
 #include "derivations.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
@@ -147,7 +148,7 @@ static void main_nix_build(int argc, char * * argv)
                             args.push_back(word);
                 }
             }
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
 
     struct MyArgs : LegacyArgs, MixEvalArgs
@@ -288,7 +289,7 @@ static void main_nix_build(int argc, char * * argv)
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
 
-    DrvInfos drvs;
+    PackageInfos drvs;
 
     /* Parse the expressions. */
     std::vector<Expr *> exprs;
@@ -306,12 +307,15 @@ static void main_nix_build(int argc, char * * argv)
                 } catch (Error & e) {};
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
                 if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
-                    drvs.push_back(DrvInfo(*state, evalStore, absolute));
+                    drvs.push_back(PackageInfo(*state, evalStore, absolute));
                 else
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
-                    exprs.push_back(state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state,
-                                        inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
+                    exprs.push_back(
+                        state->parseExprFromFile(
+                            resolveExprPath(
+                                lookupFileArg(*state,
+                                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i))));
             }
         }
 
@@ -346,7 +350,7 @@ static void main_nix_build(int argc, char * * argv)
                 takesNixShellAttr(vRoot) ? *autoArgsWithInNixShell : *autoArgs,
                 vRoot
             ).first);
-            state->forceValue(v, [&]() { return v.determinePos(noPos); });
+            state->forceValue(v, v.determinePos(noPos));
             getDerivations(
                 *state,
                 v,
@@ -379,8 +383,8 @@ static void main_nix_build(int argc, char * * argv)
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
 
-        auto & drvInfo = drvs.front();
-        auto drv = evalStore->derivationFromPath(drvInfo.requireDrvPath());
+        auto & packageInfo = drvs.front();
+        auto drv = evalStore->derivationFromPath(packageInfo.requireDrvPath());
 
         std::vector<DerivedPath> pathsToBuild;
         RealisedPath::Set pathsToCopy;
@@ -458,7 +462,7 @@ static void main_nix_build(int argc, char * * argv)
         if (dryRun) return;
 
         if (shellDrv) {
-            auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value());
+            auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value(), &*evalStore);
             shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
         }
 
@@ -511,7 +515,7 @@ static void main_nix_build(int argc, char * * argv)
             std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
 
             accumInputClosure = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-                auto outputs = evalStore->queryPartialDerivationOutputMap(inputDrv);
+                auto outputs = store->queryPartialDerivationOutputMap(inputDrv, &*evalStore);
                 for (auto & i : inputNode.value) {
                     auto o = outputs.at(i);
                     store->computeFSClosure(*o, inputs);
@@ -523,7 +527,7 @@ static void main_nix_build(int argc, char * * argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            ParsedDerivation parsedDrv(drvInfo.requireDrvPath(), drv);
+            ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
 
             if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
                 auto json = structAttrs.value();
@@ -616,10 +620,10 @@ static void main_nix_build(int argc, char * * argv)
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
-        for (auto & drvInfo : drvs) {
-            auto drvPath = drvInfo.requireDrvPath();
+        for (auto & packageInfo : drvs) {
+            auto drvPath = packageInfo.requireDrvPath();
 
-            auto outputName = drvInfo.queryOutputName();
+            auto outputName = packageInfo.queryOutputName();
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
@@ -649,7 +653,7 @@ static void main_nix_build(int argc, char * * argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = evalStore->queryPartialDerivationOutputMap(drvPath);
+            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath, &*evalStore);
 
             auto maybeOutputPath = builtOutputs.at(outputName);
             assert(maybeOutputPath);

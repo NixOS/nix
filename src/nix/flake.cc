@@ -89,7 +89,13 @@ public:
             .label="inputs",
             .optional=true,
             .handler={[&](std::string inputToUpdate){
-                auto inputPath = flake::parseInputPath(inputToUpdate);
+                InputPath inputPath;
+                try {
+                    inputPath = flake::parseInputPath(inputToUpdate);
+                } catch (Error & e) {
+                    warn("Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.", inputToUpdate, inputToUpdate);
+                    throw e;
+                }
                 if (lockFlags.inputUpdates.contains(inputPath))
                     warn("Input '%s' was specified multiple times. You may have done this by accident.");
                 lockFlags.inputUpdates.insert(inputPath);
@@ -389,11 +395,11 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
             try {
-                auto drvInfo = getDerivation(*state, v, false);
-                if (!drvInfo)
+                auto packageInfo = getDerivation(*state, v, false);
+                if (!packageInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
                 // FIXME: check meta attributes
-                return drvInfo->queryDrvPath();
+                return packageInfo->queryDrvPath();
             } catch (Error & e) {
                 e.addTrace(resolve(pos), hintfmt("while checking the derivation '%s'", attrPath));
                 reportError(e);
@@ -1393,7 +1399,9 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
-        : MultiCommand({
+        : NixMultiCommand(
+            "flake",
+            {
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
                 {"lock", []() { return make_ref<CmdFlakeLock>(); }},
                 {"metadata", []() { return make_ref<CmdFlakeMetadata>(); }},
@@ -1423,10 +1431,8 @@ struct CmdFlake : NixMultiCommand
 
     void run() override
     {
-        if (!command)
-            throw UsageError("'nix flake' requires a sub-command.");
         experimentalFeatureSettings.require(Xp::Flakes);
-        command->second->run();
+        NixMultiCommand::run();
     }
 };
 

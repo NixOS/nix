@@ -153,12 +153,13 @@ struct FdSource : BufferedSource
 {
     int fd;
     size_t read = 0;
+    BackedStringView endOfFileError{"unexpected end-of-file"};
 
     FdSource() : fd(-1) { }
     FdSource(int fd) : fd(fd) { }
-    FdSource(FdSource&&) = default;
+    FdSource(FdSource &&) = default;
 
-    FdSource& operator=(FdSource && s)
+    FdSource & operator=(FdSource && s)
     {
         fd = s.fd;
         s.fd = -1;

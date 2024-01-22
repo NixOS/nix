@@ -2,6 +2,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "common-args.hh"
+#include "nar-info.hh"
 
 #include <algorithm>
 #include <array>
@@ -54,7 +55,7 @@ static json pathInfoToJSON(
 
                 jsonObject["closureSize"] = getStoreObjectsTotalSize(store, closure);
 
-                if (auto * narInfo = dynamic_cast<const NarInfo *>(&*info)) {
+                if (dynamic_cast<const NarInfo *>(&*info)) {
                     uint64_t totalDownloadSize = 0;
                     for (auto & p : closure) {
                         auto depInfo = store.queryPathInfo(p);

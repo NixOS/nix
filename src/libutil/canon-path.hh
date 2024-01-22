@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include <set>
+#include <vector>
 
 namespace nix {
 
@@ -46,6 +47,11 @@ public:
         : path(std::move(path))
     { }
 
+    /**
+     * Construct a canon path from a vector of elements.
+     */
+    CanonPath(const std::vector<std::string> & elems);
+
     static CanonPath fromCwd(std::string_view path = ".");
 
     static CanonPath root;
@@ -81,6 +87,13 @@ public:
 
     std::string_view rel() const
     { return ((std::string_view) path).substr(1); }
+
+    const char * rel_c_str() const
+    {
+        auto cs = path.c_str();
+        assert(cs[0]); // for safety if invariant is broken
+        return &cs[1];
+    }
 
     struct Iterator
     {
@@ -199,8 +212,19 @@ public:
      * `CanonPath(this.makeRelative(x), this) == path`.
      */
     std::string makeRelative(const CanonPath & path) const;
+
+    friend class std::hash<CanonPath>;
 };
 
 std::ostream & operator << (std::ostream & stream, const CanonPath & path);
 
 }
+
+template<>
+struct std::hash<nix::CanonPath>
+{
+    std::size_t operator ()(const nix::CanonPath & s) const noexcept
+    {
+        return std::hash<std::string>{}(s.path);
+    }
+};

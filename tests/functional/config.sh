@@ -40,20 +40,20 @@ files=$(nix-build --verbose --version | grep "User config" | cut -d ':' -f2- | x
 # Test that it's possible to load the config from a custom location
 here=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
 export NIX_USER_CONF_FILES=$here/config/nix-with-substituters.conf
-var=$(nix show-config | grep '^substituters =' | cut -d '=' -f 2 | xargs)
+var=$(nix config show | grep '^substituters =' | cut -d '=' -f 2 | xargs)
 [[ $var == https://example.com ]]
 
 # Test that it's possible to load config from the environment
-prev=$(nix show-config | grep '^cores' | cut -d '=' -f 2 | xargs)
+prev=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
 export NIX_CONFIG="cores = 4242"$'\n'"experimental-features = nix-command flakes"
-exp_cores=$(nix show-config | grep '^cores' | cut -d '=' -f 2 | xargs)
-exp_features=$(nix show-config | grep '^experimental-features' | cut -d '=' -f 2 | xargs)
+exp_cores=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
+exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2 | xargs)
 [[ $prev != $exp_cores ]]
 [[ $exp_cores == "4242" ]]
 # flakes implies fetch-tree
 [[ $exp_features == "fetch-tree flakes nix-command" ]]
 
 # Test that it's possible to retrieve a single setting's value
-val=$(nix show-config | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)
-val2=$(nix show-config warn-dirty)
+val=$(nix config show | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)
+val2=$(nix config show warn-dirty)
 [[ $val == $val2 ]]

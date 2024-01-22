@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <chrono>
+
 #include "common-protocol.hh"
 
 namespace nix {
@@ -9,7 +11,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION (1 << 8 | 35)
+#define PROTOCOL_VERSION (1 << 8 | 37)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -24,7 +26,7 @@ namespace nix {
 #define STDERR_RESULT         0x52534c54
 
 
-class Store;
+struct StoreDirConfig;
 struct Source;
 
 // items being serialised
@@ -100,8 +102,8 @@ struct WorkerProto
     // This makes for a quicker debug cycle, as desired.
 #if 0
     {
-        static T read(const Store & store, ReadConn conn);
-        static void write(const Store & store, WriteConn conn, const T & t);
+        static T read(const StoreDirConfig & store, ReadConn conn);
+        static void write(const StoreDirConfig & store, WriteConn conn, const T & t);
     };
 #endif
 
@@ -110,7 +112,7 @@ struct WorkerProto
      * infer the type instead of having to write it down explicitly.
      */
     template<typename T>
-    static void write(const Store & store, WriteConn conn, const T & t)
+    static void write(const StoreDirConfig & store, WriteConn conn, const T & t)
     {
         WorkerProto::Serialise<T>::write(store, conn, t);
     }
@@ -161,6 +163,7 @@ enum struct WorkerProto::Op : uint64_t
     AddMultipleToStore = 44,
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
+    AddPermRoot = 47,
 };
 
 /**
@@ -197,8 +200,8 @@ inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
 #define DECLARE_WORKER_SERIALISER(T) \
     struct WorkerProto::Serialise< T > \
     { \
-        static T read(const Store & store, WorkerProto::ReadConn conn); \
-        static void write(const Store & store, WorkerProto::WriteConn conn, const T & t); \
+        static T read(const StoreDirConfig & store, WorkerProto::ReadConn conn); \
+        static void write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const T & t); \
     };
 
 template<>
@@ -213,6 +216,8 @@ template<>
 DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
 template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
+template<>
+DECLARE_WORKER_SERIALISER(std::optional<std::chrono::microseconds>);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);

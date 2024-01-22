@@ -15,8 +15,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <sodium/core.h>
-
 #ifdef __GLIBC__
 # include <gnu/lib-names.h>
 # include <nss.h>
@@ -116,7 +114,14 @@ Settings::Settings()
 
 void loadConfFile()
 {
-    globalConfig.applyConfigFile(settings.nixConfDir + "/nix.conf");
+    auto applyConfigFile = [&](const Path & path) {
+        try {
+            std::string contents = readFile(path);
+            globalConfig.applyConfig(contents, path);
+        } catch (SystemError &) { }
+    };
+
+    applyConfigFile(settings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
@@ -124,7 +129,7 @@ void loadConfFile()
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        globalConfig.applyConfigFile(*file);
+        applyConfigFile(*file);
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
@@ -401,9 +406,6 @@ void assertLibStoreInitialized() {
 void initLibStore() {
 
     initLibUtil();
-
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
 
     loadConfFile();
 

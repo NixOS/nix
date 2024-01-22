@@ -15,7 +15,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
 
     worker.run(goals);
 
-    StorePathSet failed;
+    StringSet failed;
     std::optional<Error> ex;
     for (auto & i : goals) {
         if (i->ex) {
@@ -26,9 +26,9 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         }
         if (i->exitCode != Goal::ecSuccess) {
             if (auto i2 = dynamic_cast<DerivationGoal *>(i.get()))
-                failed.insert(i2->drvPath);
+                failed.insert(printStorePath(i2->drvPath));
             else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
-                failed.insert(i2->storePath);
+                failed.insert(printStorePath(i2->storePath));
         }
     }
 
@@ -37,7 +37,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         throw std::move(*ex);
     } else if (!failed.empty()) {
         if (ex) logError(ex->info());
-        throw Error(worker.failingExitStatus(), "build of %s failed", showPaths(failed));
+        throw Error(worker.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
     }
 }
 

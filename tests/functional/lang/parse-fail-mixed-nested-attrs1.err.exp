@@ -1,7 +1,5 @@
 error: attribute 'z' already defined at «stdin»:3:16
-
        at «stdin»:2:3:
-
             1| {
             2|   x.z = 3;
              |   ^

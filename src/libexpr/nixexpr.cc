@@ -9,57 +9,7 @@
 
 namespace nix {
 
-struct PosAdapter : AbstractPos
-{
-    Pos::Origin origin;
-
-    PosAdapter(Pos::Origin origin)
-        : origin(std::move(origin))
-    {
-    }
-
-    std::optional<std::string> getSource() const override
-    {
-        return std::visit(overloaded {
-            [](const Pos::none_tag &) -> std::optional<std::string> {
-                return std::nullopt;
-            },
-            [](const Pos::Stdin & s) -> std::optional<std::string> {
-                // Get rid of the null terminators added by the parser.
-                return std::string(s.source->c_str());
-            },
-            [](const Pos::String & s) -> std::optional<std::string> {
-                // Get rid of the null terminators added by the parser.
-                return std::string(s.source->c_str());
-            },
-            [](const SourcePath & path) -> std::optional<std::string> {
-                try {
-                    return path.readFile();
-                } catch (Error &) {
-                    return std::nullopt;
-                }
-            }
-        }, origin);
-    }
-
-    void print(std::ostream & out) const override
-    {
-        std::visit(overloaded {
-            [&](const Pos::none_tag &) { out << "«none»"; },
-            [&](const Pos::Stdin &) { out << "«stdin»"; },
-            [&](const Pos::String & s) { out << "«string»"; },
-            [&](const SourcePath & path) { out << path; }
-        }, origin);
-    }
-};
-
-Pos::operator std::shared_ptr<AbstractPos>() const
-{
-    auto pos = std::make_shared<PosAdapter>(origin);
-    pos->line = line;
-    pos->column = column;
-    return pos;
-}
+ExprBlackHole eBlackHole;
 
 // FIXME: remove, because *symbols* are abstract and do not have a single
 //        textual representation; see printIdentifier()
@@ -266,17 +216,6 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
 }
 
 
-std::ostream & operator << (std::ostream & str, const Pos & pos)
-{
-    if (auto pos2 = (std::shared_ptr<AbstractPos>) pos) {
-        str << *pos2;
-    } else
-        str << "undefined position";
-
-    return str;
-}
-
-
 std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 {
     std::ostringstream out;
@@ -331,6 +270,8 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
+    fromWith = nullptr;
+
     /* Check whether the variable appears in the environment.  If so,
        set its level and displacement. */
     const StaticEnv * curEnv;
@@ -342,7 +283,6 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
         } else {
             auto i = curEnv->find(name);
             if (i != curEnv->vars.end()) {
-                fromWith = false;
                 this->level = level;
                 displ = i->second;
                 return;
@@ -358,7 +298,8 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
             .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
             .errPos = es.positions[pos]
         });
-    fromWith = true;
+    for (auto * e = env.get(); e && !fromWith; e = e->up)
+        fromWith = e->isWith;
     this->level = withLevel;
 }
 
@@ -391,7 +332,7 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
         es.exprEnvs.insert(std::make_pair(this, env));
 
     if (recursive) {
-        auto newEnv = std::make_shared<StaticEnv>(false, env.get(), recursive ? attrs.size() : 0);
+        auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), recursive ? attrs.size() : 0);
 
         Displacement displ = 0;
         for (auto & i : attrs)
@@ -433,7 +374,7 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
         es.exprEnvs.insert(std::make_pair(this, env));
 
     auto newEnv = std::make_shared<StaticEnv>(
-        false, env.get(),
+        nullptr, env.get(),
         (hasFormals() ? formals->formals.size() : 0) +
         (!arg ? 0 : 1));
 
@@ -469,7 +410,7 @@ void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
-    auto newEnv = std::make_shared<StaticEnv>(false, env.get(), attrs->attrs.size());
+    auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs->attrs.size());
 
     Displacement displ = 0;
     for (auto & i : attrs->attrs)
@@ -488,6 +429,10 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
+    parentWith = nullptr;
+    for (auto * e = env.get(); e && !parentWith; e = e->up)
+        parentWith = e->isWith;
+
     /* Does this `with' have an enclosing `with'?  If so, record its
        level so that `lookupVar' can look up variables in the previous
        `with' if this one doesn't contain the desired attribute. */
@@ -504,7 +449,7 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
         es.exprEnvs.insert(std::make_pair(this, env));
 
     attrs->bindVars(es, env);
-    auto newEnv = std::make_shared<StaticEnv>(true, env.get());
+    auto newEnv = std::make_shared<StaticEnv>(this, env.get());
     body->bindVars(es, newEnv);
 }
 

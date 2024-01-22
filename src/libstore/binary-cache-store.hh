@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "crypto.hh"
+#include "signature/local-keys.hh"
 #include "store-api.hh"
 #include "log-store.hh"
 
@@ -57,8 +57,7 @@ class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
 {
 
 private:
-
-    std::unique_ptr<SecretKey> secretKey;
+    std::unique_ptr<Signer> signer;
 
 protected:
 
@@ -123,22 +122,22 @@ public:
     void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     StorePath addToStore(
         std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashType hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references) override;
-
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
+        SourceAccessor & accessor,
+        const CanonPath & srcPath,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
         const StorePathSet & references,
+        PathFilter & filter,
         RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;

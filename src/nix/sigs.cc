@@ -112,7 +112,7 @@ struct CmdSign : StorePathsCommand
 
     std::string description() override
     {
-        return "sign store paths";
+        return "sign store paths with a local key";
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override
@@ -121,6 +121,7 @@ struct CmdSign : StorePathsCommand
             throw UsageError("you must specify a secret key file using '-k'");
 
         SecretKey secretKey(readFile(secretKeyFile));
+        LocalSigner signer(std::move(secretKey));
 
         size_t added{0};
 
@@ -129,7 +130,7 @@ struct CmdSign : StorePathsCommand
 
             auto info2(*info);
             info2.sigs.clear();
-            info2.sign(*store, secretKey);
+            info2.sign(*store, signer);
             assert(!info2.sigs.empty());
 
             if (!info->sigs.count(*info2.sigs.begin())) {
@@ -205,7 +206,9 @@ struct CmdKeyConvertSecretToPublic : Command
 struct CmdKey : NixMultiCommand
 {
     CmdKey()
-        : MultiCommand({
+        : NixMultiCommand(
+            "key",
+            {
                 {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
                 {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
             })
@@ -218,13 +221,6 @@ struct CmdKey : NixMultiCommand
     }
 
     Category category() override { return catUtility; }
-
-    void run() override
-    {
-        if (!command)
-            throw UsageError("'nix key' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdKey = registerCommand<CmdKey>("key");

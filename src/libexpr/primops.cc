@@ -4,6 +4,7 @@
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
+#include "gc-small-vector.hh"
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
@@ -14,6 +15,8 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "fs-input-accessor.hh"
+#include "fetch-to-store.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -82,16 +85,15 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
-    store->buildPaths(buildReqs);
+    buildStore->buildPaths(buildReqs, bmNormal, store);
+
+    StorePathSet outputsToCopyAndAllow;
 
     for (auto & drv : drvs) {
-        auto outputs = resolveDerivedPath(*store, drv);
+        auto outputs = resolveDerivedPath(*buildStore, drv, &*store);
         for (auto & [outputName, outputPath] : outputs) {
-            /* Add the output of this derivations to the allowed
-               paths. */
-            if (allowedPaths) {
-                allowPath(outputPath);
-            }
+            outputsToCopyAndAllow.insert(outputPath);
+
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                 res.insert_or_assign(
@@ -100,36 +102,35 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                             .drvPath = drv.drvPath,
                             .output = outputName,
                         }).render(),
-                    store->printStorePath(outputPath)
+                    buildStore->printStorePath(outputPath)
                 );
             }
         }
     }
 
+    if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
+    for (auto & outputPath : outputsToCopyAndAllow) {
+        /* Add the output of this derivations to the allowed
+           paths. */
+        allowPath(store->toRealPath(outputPath));
+    }
+
     return res;
 }
 
-struct RealisePathFlags {
-    // Whether to check that the path is allowed in pure eval mode
-    bool checkForPureEval = true;
-};
-
-static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, const RealisePathFlags flags = {})
+static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bool resolveSymlinks = true)
 {
     NixStringContext context;
 
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        if (!context.empty()) {
+        if (!context.empty() && path.accessor == state.rootFS) {
             auto rewrites = state.realiseContext(context);
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
-            return {path.accessor, CanonPath(realPath)};
+            path = {path.accessor, CanonPath(realPath)};
         }
-
-        return flags.checkForPureEval
-            ? state.checkSourcePath(path)
-            : path;
+        return resolveSymlinks ? path.resolveSymlinks() : path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -169,7 +170,7 @@ static void mkOutputString(
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath);
+    auto path = realisePath(state, pos, vPath, false);
     auto path2 = path.path.abs();
 
     // FIXME
@@ -221,7 +222,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
-            auto staticEnv = std::make_shared<StaticEnv>(false, state.staticBaseEnv.get(), vScope->attrs->size());
+            auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs->size());
 
             unsigned int displ = 0;
             for (auto & attr : *vScope->attrs) {
@@ -445,9 +446,7 @@ static RegisterPrimOp primop_isNull({
     .doc = R"(
       Return `true` if *e* evaluates to `null`, and `false` otherwise.
 
-      > **Warning**
-      >
-      > This function is *deprecated*; just write `e == null` instead.
+      This is equivalent to `e == null`.
     )",
     .fun = prim_isNull,
 });
@@ -593,7 +592,7 @@ struct CompareValues
                 case nFloat:
                     return v1->fpoint < v2->fpoint;
                 case nString:
-                    return v1->string_view().compare(v2->string_view()) < 0;
+                    return strcmp(v1->c_str(), v2->c_str()) < 0;
                 case nPath:
                     // Note: we don't take the accessor into account
                     // since it's not obvious how to compare them in a
@@ -1316,7 +1315,7 @@ drvName, Bindings * attrs, Value & v)
                 .errPos = state.positions[noPos]
             }));
 
-        auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
+        auto h = newHashAllowEmpty(*outputHash, parseHashAlgoOpt(outputHashAlgo));
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
@@ -1338,7 +1337,7 @@ drvName, Bindings * attrs, Value & v)
                 .errPos = state.positions[noPos]
             });
 
-        auto ht = parseHashTypeOpt(outputHashAlgo).value_or(htSHA256);
+        auto ha = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
         auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
 
         for (auto & i : outputs) {
@@ -1347,13 +1346,13 @@ drvName, Bindings * attrs, Value & v)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
                         .method = method,
-                        .hashType = ht,
+                        .hashAlgo = ha,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
                         .method = method,
-                        .hashType = ht,
+                        .hashAlgo = ha,
                     });
         }
     }
@@ -1492,7 +1491,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
         }));
 
     NixStringContext context;
-    auto path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'")).path;
+    auto path = state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'").path;
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -1532,29 +1531,19 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto & arg = *args[0];
-
-    /* We don’t check the path right now, because we don’t want to
-       throw if the path isn’t allowed, but just return false (and we
-       can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `arg` tries to
-       access an unauthorized path). */
-    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
-
-    /* SourcePath doesn't know about trailing slash. */
-    auto mustBeDir = arg.type() == nString
-        && (arg.string_view().ends_with("/")
-            || arg.string_view().ends_with("/."));
-
     try {
-        auto checked = state.checkSourcePath(path);
-        auto st = checked.maybeLstat();
+        auto & arg = *args[0];
+
+        auto path = realisePath(state, pos, arg);
+
+        /* SourcePath doesn't know about trailing slash. */
+        auto mustBeDir = arg.type() == nString
+            && (arg.string_view().ends_with("/")
+                || arg.string_view().ends_with("/."));
+
+        auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);
-    } catch (SysError & e) {
-        /* Don't give away info from errors while canonicalising
-           ‘path’ in restricted mode. */
-        v.mkBool(false);
     } catch (RestrictedPathError & e) {
         v.mkBool(false);
     }
@@ -1698,7 +1687,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     auto path = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.findFile");
 
-    v.mkPath(state.checkSourcePath(state.findFile(searchPath, path, pos)));
+    v.mkPath(state.findFile(searchPath, path, pos));
 }
 
 static RegisterPrimOp primop_findFile(PrimOp {
@@ -1753,17 +1742,17 @@ static RegisterPrimOp primop_findFile(PrimOp {
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto type = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashFile");
-    std::optional<HashType> ht = parseHashType(type);
-    if (!ht)
+    auto algo = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashFile");
+    std::optional<HashAlgorithm> ha = parseHashAlgo(algo);
+    if (!ha)
         state.debugThrowLastTrace(Error({
-            .msg = hintfmt("unknown hash type '%1%'", type),
+            .msg = hintfmt("unknown hash algo '%1%'", algo),
             .errPos = state.positions[pos]
         }));
 
     auto path = realisePath(state, pos, *args[1]);
 
-    v.mkString(hashString(*ht, path.readFile()).to_string(HashFormat::Base16, false));
+    v.mkString(hashString(*ha, path.readFile()).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -1788,7 +1777,7 @@ static std::string_view fileTypeToString(InputAccessor::Type type)
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = realisePath(state, pos, *args[0], false);
     /* Retrieve the directory entry type and stringize it. */
     v.mkString(fileTypeToString(path.lstat().type));
 }
@@ -2089,8 +2078,14 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     }
 
     auto storePath = settings.readOnlyMode
-        ? state.store->computeStorePathForText(name, contents, refs)
-        : state.store->addTextToStore(name, contents, refs, state.repair);
+        ? state.store->makeFixedOutputPathFromCA(name, TextInfo {
+            .hash = hashString(HashAlgorithm::SHA256, contents),
+            .references = std::move(refs),
+        })
+        : ({
+            StringSource s { contents };
+            state.store->addToStoreFromDump(s, name, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+        });
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
@@ -2177,11 +2172,35 @@ static RegisterPrimOp primop_toFile({
     .fun = prim_toFile,
 });
 
+bool EvalState::callPathFilter(
+    Value * filterFun,
+    const SourcePath & path,
+    std::string_view pathArg,
+    PosIdx pos)
+{
+    auto st = path.lstat();
+
+    /* Call the filter function.  The first argument is the path, the
+       second is a string indicating the type of the file. */
+    Value arg1;
+    arg1.mkString(pathArg);
+
+    Value arg2;
+    // assert that type is not "unknown"
+    arg2.mkString(fileTypeToString(st.type));
+
+    Value * args []{&arg1, &arg2};
+    Value res;
+    callFunction(*filterFun, 2, args, res, pos);
+
+    return forceBool(res, pos, "while evaluating the return value of the path filter function");
+}
+
 static void addPath(
     EvalState & state,
     const PosIdx pos,
     std::string_view name,
-    Path path,
+    SourcePath path,
     Value * filterFun,
     FileIngestionMethod method,
     const std::optional<Hash> expectedHash,
@@ -2189,48 +2208,29 @@ static void addPath(
     const NixStringContext & context)
 {
     try {
-        // FIXME: handle CA derivation outputs (where path needs to
-        // be rewritten to the actual output).
-        auto rewrites = state.realiseContext(context);
-        path = state.toRealPath(rewriteStrings(path, rewrites), context);
-
         StorePathSet refs;
 
-        if (state.store->isInStore(path)) {
+        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
+            // FIXME: handle CA derivation outputs (where path needs to
+            // be rewritten to the actual output).
+            auto rewrites = state.realiseContext(context);
+            path = {state.rootFS, CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context))};
+
             try {
-                auto [storePath, subPath] = state.store->toStorePath(path);
+                auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
                 // FIXME: we should scanForReferences on the path before adding it
                 refs = state.store->queryPathInfo(storePath)->references;
-                path = state.store->toRealPath(storePath) + subPath;
+                path = {state.rootFS, CanonPath(state.store->toRealPath(storePath) + subPath)};
             } catch (Error &) { // FIXME: should be InvalidPathError
             }
         }
 
-        path = evalSettings.pureEval && expectedHash
-            ? path
-            : state.checkSourcePath(state.rootPath(CanonPath(path))).path.abs();
-
-        PathFilter filter = filterFun ? ([&](const Path & path) {
-            auto st = lstat(path);
-
-            /* Call the filter function.  The first argument is the path,
-               the second is a string indicating the type of the file. */
-            Value arg1;
-            arg1.mkString(path);
-
-            Value arg2;
-            arg2.mkString(
-                S_ISREG(st.st_mode) ? "regular" :
-                S_ISDIR(st.st_mode) ? "directory" :
-                S_ISLNK(st.st_mode) ? "symlink" :
-                "unknown" /* not supported, will fail! */);
-
-            Value * args []{&arg1, &arg2};
-            Value res;
-            state.callFunction(*filterFun, 2, args, res, pos);
-
-            return state.forceBool(res, pos, "while evaluating the return value of the path filter function");
-        }) : defaultPathFilter;
+        std::unique_ptr<PathFilter> filter;
+        if (filterFun)
+            filter = std::make_unique<PathFilter>([&](const Path & p) {
+                auto p2 = CanonPath(p);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
+            });
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
@@ -2241,7 +2241,7 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, method, &filter, state.repair);
+            auto dstPath = fetchToStore(*state.store, path, name, method, filter.get(), state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
@@ -2260,7 +2260,8 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
     auto path = state.coerceToPath(pos, *args[1], context,
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
-    addPath(state, pos, path.baseName(), path.path.abs(), args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+
+    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2340,7 +2341,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
         else if (n == "recursive")
             method = FileIngestionMethod { state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path") };
         else if (n == "sha256")
-            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), htSHA256);
+            expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("unsupported argument '%1%' to 'addPath'", state.symbols[attr.name]),
@@ -2355,7 +2356,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     if (name.empty())
         name = path->baseName();
 
-    addPath(state, pos, name, path->path.abs(), filterFun, method, expectedHash, v, context);
+    addPath(state, pos, name, *path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({
@@ -2374,7 +2375,7 @@ static RegisterPrimOp primop_path({
           like `@`.
 
         - filter\
-          A function of the type expected by `builtins.filterSource`,
+          A function of the type expected by [`builtins.filterSource`](#builtins-filterSource),
           with the same semantics.
 
         - recursive\
@@ -2412,7 +2413,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
         (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return v1->string_view().compare(v2->string_view()) < 0; });
+              [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -2729,7 +2730,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.catAttrs"));
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
-    boost::container::small_vector<Value *, nonRecursiveStackReservation> res(args[1]->listSize());
+    SmallValueVector<nonRecursiveStackReservation> res(args[1]->listSize());
     size_t found = 0;
 
     for (auto v2 : args[1]->listItems()) {
@@ -3064,7 +3065,7 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    boost::container::small_vector<Value *, nonRecursiveStackReservation> vs(args[1]->listSize());
+    SmallValueVector<nonRecursiveStackReservation> vs(args[1]->listSize());
     size_t k = 0;
 
     bool same = true;
@@ -3178,9 +3179,16 @@ static RegisterPrimOp primop_foldlStrict({
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
       e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
-      ...`. For example, `foldl' (x: y: x + y) 0 [1 2 3]` evaluates to 6.
-      The return value of each application of `op` is evaluated immediately,
-      even for intermediate values.
+      ...`.
+
+      For example, `foldl' (acc: elem: acc + elem) 0 [1 2 3]` evaluates
+      to `6` and `foldl' (acc: elem: { "${elem}" = elem; } // acc) {}
+      ["a" "b"]` evaluates to `{ a = "a"; b = "b"; }`.
+
+      The first argument of `op` is the accumulator whereas the second
+      argument is the current element being processed. The return value
+      of each application of `op` is evaluated immediately, even for
+      intermediate values.
     )",
     .fun = prim_foldlStrict,
 });
@@ -3453,13 +3461,14 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
     auto nrLists = args[1]->listSize();
 
-    boost::container::small_vector<Value, conservativeStackReservation> lists(nrLists);
+    // List of returned lists before concatenation. References to these Values must NOT be persisted.
+    SmallTemporaryValueVector<conservativeStackReservation> lists(nrLists);
     size_t len = 0;
 
     for (unsigned int n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listElems()[n];
         state.callFunction(*args[0], *vElem, lists[n], pos);
-        state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to buitlins.concatMap");
+        state.forceList(lists[n], lists[n].determinePos(args[0]->determinePos(pos)), "while evaluating the return value of the function passed to builtins.concatMap");
         len += lists[n].listSize();
     }
 
@@ -3703,15 +3712,28 @@ static RegisterPrimOp primop_toString({
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     int start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
-    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
-    NixStringContext context;
-    auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
     if (start < 0)
         state.debugThrowLastTrace(EvalError({
             .msg = hintfmt("negative start position in 'substring'"),
             .errPos = state.positions[pos]
         }));
+
+
+    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+
+    // Special-case on empty substring to avoid O(n) strlen
+    // This allows for the use of empty substrings to efficently capture string context
+    if (len == 0) {
+        state.forceValue(*args[2], pos);
+        if (args[2]->type() == nString) {
+            v.mkString("", args[2]->context());
+            return;
+        }
+    }
+
+    NixStringContext context;
+    auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
     v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
 }
@@ -3757,18 +3779,18 @@ static RegisterPrimOp primop_stringLength({
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto type = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashString");
-    std::optional<HashType> ht = parseHashType(type);
-    if (!ht)
+    auto algo = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashString");
+    std::optional<HashAlgorithm> ha = parseHashAlgo(algo);
+    if (!ha)
         state.debugThrowLastTrace(Error({
-            .msg = hintfmt("unknown hash type '%1%'", type),
+            .msg = hintfmt("unknown hash algo '%1%'", algo),
             .errPos = state.positions[pos]
         }));
 
     NixStringContext context; // discarded
     auto s = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.hashString");
 
-    v.mkString(hashString(*ht, s).to_string(HashFormat::Base16, false));
+    v.mkString(hashString(*ha, s).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({
@@ -3791,15 +3813,15 @@ static void prim_convertHash(EvalState & state, const PosIdx pos, Value * * args
     auto hash = state.forceStringNoCtx(*iteratorHash->value, pos, "while evaluating the attribute 'hash'");
 
     Bindings::iterator iteratorHashAlgo = inputAttrs->find(state.symbols.create("hashAlgo"));
-    std::optional<HashType> ht = std::nullopt;
+    std::optional<HashAlgorithm> ha = std::nullopt;
     if (iteratorHashAlgo != inputAttrs->end()) {
-        ht = parseHashType(state.forceStringNoCtx(*iteratorHashAlgo->value, pos, "while evaluating the attribute 'hashAlgo'"));
+        ha = parseHashAlgo(state.forceStringNoCtx(*iteratorHashAlgo->value, pos, "while evaluating the attribute 'hashAlgo'"));
     }
 
     Bindings::iterator iteratorToHashFormat = getAttr(state, state.symbols.create("toHashFormat"), args[0]->attrs, "while locating the attribute 'toHashFormat'");
     HashFormat hf = parseHashFormat(state.forceStringNoCtx(*iteratorToHashFormat->value, pos, "while evaluating the attribute 'toHashFormat'"));
 
-    v.mkString(Hash::parseAny(hash, ht).to_string(hf, hf == HashFormat::SRI));
+    v.mkString(Hash::parseAny(hash, ha).to_string(hf, hf == HashFormat::SRI));
 }
 
 static RegisterPrimOp primop_convertHash({
@@ -3828,7 +3850,8 @@ static RegisterPrimOp primop_convertHash({
 
         The format of the resulting hash. Must be one of
         - `"base16"`
-        - `"base32"`
+        - `"nix32"`
+        - `"base32"` (deprecated alias for `"nix32"`)
         - `"base64"`
         - `"sri"`
 
@@ -4385,13 +4408,16 @@ void EvalState::createBaseEnv()
         .impureOnly = true,
     });
 
-    if (!evalSettings.pureEval) {
-        v.mkString(settings.thisSystem.get());
-    }
+    if (!evalSettings.pureEval)
+        v.mkString(evalSettings.getCurrentSystem());
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
-          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+          The value of the
+          [`eval-system`](@docroot@/command-ref/conf-file.md#conf-eval-system)
+          or else
+          [`system`](@docroot@/command-ref/conf-file.md#conf-system)
+          configuration option.
 
           It can be used to set the `system` attribute for [`builtins.derivation`](@docroot@/language/derivations.md) such that the resulting derivation can be built on the same system that evaluates the Nix expression:
 
@@ -4440,7 +4466,7 @@ void EvalState::createBaseEnv()
         .doc = R"(
           Logical file system location of the [Nix store](@docroot@/glossary.md#gloss-store) currently in use.
 
-          This value is determined by the `store` parameter in [Store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md):
+          This value is determined by the `store` parameter in [Store URLs](@docroot@/store/types/index.md#store-url-format):
 
           ```shell-session
           $ nix-instantiate --store 'dummy://?store=/blah' --eval --expr builtins.storeDir

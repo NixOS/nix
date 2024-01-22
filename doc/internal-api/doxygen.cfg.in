@@ -39,17 +39,21 @@ INPUT                  = \
   src/libcmd \
   src/libexpr \
   src/libexpr/flake \
-  src/libexpr/tests \
-  src/libexpr/tests/value \
+  tests/unit/libexpr \
+  tests/unit/libexpr/value \
+  tests/unit/libexpr/test \
+  tests/unit/libexpr/test/value \
   src/libexpr/value \
   src/libfetchers \
   src/libmain \
   src/libstore \
   src/libstore/build \
   src/libstore/builtins \
-  src/libstore/tests \
+  tests/unit/libstore \
+  tests/unit/libstore/test \
   src/libutil \
-  src/libutil/tests \
+  tests/unit/libutil \
+  tests/unit/libutil/test \
   src/nix \
   src/nix-env \
   src/nix-store
@@ -77,7 +81,7 @@ EXPAND_ONLY_PREDEF     = YES
 # RECURSIVE has no effect here.
 # This tag requires that the tag SEARCH_INCLUDES is set to YES.
 
-INCLUDE_PATH           = @RAPIDCHECK_HEADERS@
+INCLUDE_PATH           =
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
 # tag can be used to specify a list of macro names that should be expanded. The

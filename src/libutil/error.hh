@@ -25,6 +25,7 @@
 #include <memory>
 #include <map>
 #include <optional>
+#include <compare>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -62,51 +63,28 @@ struct LinesOfCode {
     std::optional<std::string> nextLineOfCode;
 };
 
-/**
- * An abstract type that represents a location in a source file.
- */
-struct AbstractPos
-{
-    uint32_t line = 0;
-    uint32_t column = 0;
-
-    /**
-     * An AbstractPos may be a "null object", representing an unknown position.
-     *
-     * Return true if this position is known.
-     */
-    inline operator bool() const { return line != 0; };
-
-    /**
-     * Return the contents of the source file.
-     */
-    virtual std::optional<std::string> getSource() const
-    { return std::nullopt; };
-
-    virtual void print(std::ostream & out) const = 0;
-
-    std::optional<LinesOfCode> getCodeLines() const;
-
-    virtual ~AbstractPos() = default;
-};
-
-std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
+struct Pos;
 
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const AbstractPos & errPos,
+    const Pos & errPos,
     const LinesOfCode & loc);
 
 struct Trace {
-    std::shared_ptr<AbstractPos> pos;
+    std::shared_ptr<Pos> pos;
     hintformat hint;
     bool frame;
 };
 
+inline bool operator<(const Trace& lhs, const Trace& rhs);
+inline bool operator> (const Trace& lhs, const Trace& rhs);
+inline bool operator<=(const Trace& lhs, const Trace& rhs);
+inline bool operator>=(const Trace& lhs, const Trace& rhs);
+
 struct ErrorInfo {
     Verbosity level;
     hintformat msg;
-    std::shared_ptr<AbstractPos> errPos;
+    std::shared_ptr<Pos> errPos;
     std::list<Trace> traces;
 
     Suggestions suggestions;
@@ -177,12 +155,12 @@ public:
     }
 
     template<typename... Args>
-    void addTrace(std::shared_ptr<AbstractPos> && e, std::string_view fs, const Args & ... args)
+    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
     {
         addTrace(std::move(e), hintfmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame = false);
+    void addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
 
@@ -200,20 +178,50 @@ MakeError(Error, BaseError);
 MakeError(UsageError, Error);
 MakeError(UnimplementedError, Error);
 
-class SysError : public Error
+/**
+ * To use in catch-blocks.
+ */
+MakeError(SystemError, Error);
+
+/**
+ * POSIX system error, created using `errno`, `strerror` friends.
+ *
+ * Throw this, but prefer not to catch this, and catch `SystemError`
+ * instead. This allows implementations to freely switch between this
+ * and `WinError` without breaking catch blocks.
+ *
+ * However, it is permissible to catch this and rethrow so long as
+ * certain conditions are not met (e.g. to catch only if `errNo =
+ * EFooBar`). In that case, try to also catch the equivalent `WinError`
+ * code.
+ *
+ * @todo Rename this to `PosixError` or similar. At this point Windows
+ * support is too WIP to justify the code churn, but if it is finished
+ * then a better identifier becomes moe worth it.
+ */
+class SysError : public SystemError
 {
 public:
     int errNo;
 
+    /**
+     * Construct using the explicitly-provided error number. `strerror`
+     * will be used to try to add additional information to the message.
+     */
     template<typename... Args>
-    SysError(int errNo_, const Args & ... args)
-        : Error("")
+    SysError(int errNo, const Args & ... args)
+        : SystemError(""), errNo(errNo)
     {
-        errNo = errNo_;
         auto hf = hintfmt(args...);
         err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
     }
 
+    /**
+     * Construct using the ambient `errno`.
+     *
+     * Be sure to not perform another `errno`-modifying operation before
+     * calling this constructor!
+     */
     template<typename... Args>
     SysError(const Args & ... args)
         : SysError(errno, args ...)
@@ -221,7 +229,9 @@ public:
     }
 };
 
-/** Throw an exception for the purpose of checking that exception handling works; see 'initLibUtil()'.
+/**
+ * Throw an exception for the purpose of checking that exception
+ * handling works; see 'initLibUtil()'.
  */
 void throwExceptionSelfCheck();
 

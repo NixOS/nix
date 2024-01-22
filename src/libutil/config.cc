@@ -88,10 +88,9 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
-void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
-    unsigned int pos = 0;
 
-    std::vector<std::pair<std::string, std::string>> parsedContents;
+static void applyConfigInner(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
+    unsigned int pos = 0;
 
     while (pos < contents.size()) {
         std::string line;
@@ -122,7 +121,12 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
                 throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
             auto p = absPath(tokens[1], dirOf(path));
             if (pathExists(p)) {
-                applyConfigFile(p);
+                try {
+                    std::string includedContents = readFile(path);
+                    applyConfigInner(includedContents, p, parsedContents);
+                } catch (SystemError &) {
+                    // TODO: Do we actually want to ignore this? Or is it better to fail?
+                }
             } else if (!ignoreMissing) {
                 throw Error("file '%1%' included from '%2%' not found", p, path);
             }
@@ -142,6 +146,12 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
             concatStringsSep(" ", Strings(i, tokens.end())),
         });
     };
+}
+
+void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
+    std::vector<std::pair<std::string, std::string>> parsedContents;
+
+    applyConfigInner(contents, path, parsedContents);
 
     // First apply experimental-feature related settings
     for (const auto & [name, value] : parsedContents)
@@ -152,14 +162,6 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
     for (const auto & [name, value] : parsedContents)
         if (name != "experimental-features" && name != "extra-experimental-features")
             set(name, value);
-}
-
-void AbstractConfig::applyConfigFile(const Path & path)
-{
-    try {
-        std::string contents = readFile(path);
-        applyConfig(contents, path);
-    } catch (SysError &) { }
 }
 
 void Config::resetOverridden()

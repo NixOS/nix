@@ -9,19 +9,10 @@ R""(
   # nix profile upgrade '.*'
   ```
 
-* Upgrade a specific package:
+* Upgrade a specific package by name:
 
   ```console
-  # nix profile upgrade packages.x86_64-linux.hello
-  ```
-
-* Upgrade a specific profile element by number:
-
-  ```console
-  # nix profile list
-  0 flake:nixpkgs#legacyPackages.x86_64-linux.spotify …
-
-  # nix profile upgrade 0
+  # nix profile upgrade hello
   ```
 
 # Description
