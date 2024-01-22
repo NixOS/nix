@@ -1,4 +1,4 @@
-{ config, lib, hostPkgs, ... }:
+test@{ config, lib, hostPkgs, ... }:
 
 let
   pkgs = config.nodes.client.nixpkgs.pkgs;
@@ -28,12 +28,27 @@ let
 in
 
 {
-  name = "remote-builds-ssh-ng";
+  name = lib.mkDefault "remote-builds-ssh-ng";
+
+  # TODO expand module shorthand syntax instead of use imports
+  imports = [{
+    options = {
+      builders.config = lib.mkOption {
+        type = lib.types.deferredModule;
+        description = ''
+          Configuration to add to the builder nodes.
+        '';
+        default = { };
+      };
+    };
+  }];
 
   nodes =
     { builder =
       { config, pkgs, ... }:
-      { services.openssh.enable = true;
+      {
+        imports = [ test.config.builders.config ];
+        services.openssh.enable = true;
         virtualisation.writableStore = true;
         nix.settings.sandbox = true;
         nix.settings.substituters = lib.mkForce [ ];
