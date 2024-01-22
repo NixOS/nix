@@ -42,29 +42,31 @@ in
     name = lib.mkDefault "remote-builds-ssh-ng";
 
     nodes =
-      { builder =
-        { config, pkgs, ... }:
-        {
-          imports = [ test.config.builders.config ];
-          services.openssh.enable = true;
-          virtualisation.writableStore = true;
-          nix.settings.sandbox = true;
-          nix.settings.substituters = lib.mkForce [ ];
-        };
+      {
+        builder =
+          { config, pkgs, ... }:
+          {
+            imports = [ test.config.builders.config ];
+            services.openssh.enable = true;
+            virtualisation.writableStore = true;
+            nix.settings.sandbox = true;
+            nix.settings.substituters = lib.mkForce [ ];
+          };
 
         client =
           { config, lib, pkgs, ... }:
-          { nix.settings.max-jobs = 0; # force remote building
+          {
+            nix.settings.max-jobs = 0; # force remote building
             nix.distributedBuilds = true;
             nix.buildMachines =
-              [ { hostName = "builder";
-                  sshUser = "root";
-                  sshKey = "/root/.ssh/id_ed25519";
-                  system = "i686-linux";
-                  maxJobs = 1;
-                  protocol = "ssh-ng";
-                }
-              ];
+              [{
+                hostName = "builder";
+                sshUser = "root";
+                sshKey = "/root/.ssh/id_ed25519";
+                system = "i686-linux";
+                maxJobs = 1;
+                protocol = "ssh-ng";
+              }];
             virtualisation.writableStore = true;
             virtualisation.additionalPaths = [ config.system.build.extraUtils ];
             nix.settings.substituters = lib.mkForce [ ];

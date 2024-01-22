@@ -51,21 +51,26 @@ in
     name = lib.mkDefault "remote-builds";
 
     nodes =
-      { builder1 = builder;
+      {
+        builder1 = builder;
         builder2 = builder;
 
         client =
           { config, lib, pkgs, ... }:
-          { nix.settings.max-jobs = 0; # force remote building
+          {
+            nix.settings.max-jobs = 0; # force remote building
             nix.distributedBuilds = true;
             nix.buildMachines =
-              [ { hostName = "builder1";
+              [
+                {
+                  hostName = "builder1";
                   sshUser = "root";
                   sshKey = "/root/.ssh/id_ed25519";
                   system = "i686-linux";
                   maxJobs = 1;
                 }
-                { hostName = "builder2";
+                {
+                  hostName = "builder2";
                   sshUser = "root";
                   sshKey = "/root/.ssh/id_ed25519";
                   system = "i686-linux";
