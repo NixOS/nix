@@ -52,7 +52,8 @@ bool SSHMaster::isMasterRunning() {
     return res.first == 0;
 }
 
-std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
+std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(
+    Strings && command, Strings && extraSshArgs)
 {
     Path socketPath = startMaster();
 
@@ -84,18 +85,19 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
 
         Strings args;
 
-        if (fakeSSH) {
-            args = { "bash", "-c" };
-        } else {
+        if (!fakeSSH) {
             args = { "ssh", host.c_str(), "-x" };
             addCommonSSHOpts(args);
             if (socketPath != "")
                 args.insert(args.end(), {"-S", socketPath});
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
+            args.splice(args.end(), std::move(extraSshArgs));
+            args.push_back("--");
         }
 
-        args.push_back(command);
+        args.splice(args.end(), std::move(command));
+
         execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
 
         // could not exec ssh/bash
