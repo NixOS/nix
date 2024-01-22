@@ -133,7 +133,7 @@ static SerialisationError badArchive(const std::string & s)
 }
 
 
-static void parseContents(ParseSink & sink, Source & source, const Path & path)
+static void parseContents(FileSystemObjectSink & sink, Source & source, const Path & path)
 {
     uint64_t size = readLongLong(source);
 
@@ -164,7 +164,7 @@ struct CaseInsensitiveCompare
 };
 
 
-static void parse(ParseSink & sink, Source & source, const Path & path)
+static void parse(FileSystemObjectSink & sink, Source & source, const Path & path)
 {
     std::string s;
 
@@ -266,7 +266,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
 }
 
 
-void parseDump(ParseSink & sink, Source & source)
+void parseDump(FileSystemObjectSink & sink, Source & source)
 {
     std::string version;
     try {
@@ -294,7 +294,7 @@ void copyNAR(Source & source, Sink & sink)
     // FIXME: if 'source' is the output of dumpPath() followed by EOF,
     // we should just forward all data directly without parsing.
 
-    NullParseSink parseSink; /* just parse the NAR */
+    NullFileSystemObjectSink parseSink; /* just parse the NAR */
 
     TeeSource wrapper { source, sink };
 

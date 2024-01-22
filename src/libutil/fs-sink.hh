@@ -11,7 +11,7 @@ namespace nix {
 /**
  * \todo Fix this API, it sucks.
  */
-struct ParseSink
+struct FileSystemObjectSink
 {
     virtual void createDirectory(const Path & path) = 0;
 
@@ -33,12 +33,12 @@ struct ParseSink
  */
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & sourcePath,
-    ParseSink & sink, const Path & destPath);
+    FileSystemObjectSink & sink, const Path & destPath);
 
 /**
  * Ignore everything and do nothing
  */
-struct NullParseSink : ParseSink
+struct NullFileSystemObjectSink : FileSystemObjectSink
 {
     void createDirectory(const Path & path) override { }
     void receiveContents(std::string_view data) override { }
@@ -51,7 +51,7 @@ struct NullParseSink : ParseSink
 /**
  * Write files at the given path
  */
-struct RestoreSink : ParseSink
+struct RestoreSink : FileSystemObjectSink
 {
     Path dstPath;
 
@@ -75,7 +75,7 @@ private:
  * `receiveContents` to the underlying `Sink`. For anything but a single
  * file, set `regular = true` so the caller can fail accordingly.
  */
-struct RegularFileSink : ParseSink
+struct RegularFileSink : FileSystemObjectSink
 {
     bool regular = true;
     Sink & sink;

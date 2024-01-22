@@ -7,7 +7,7 @@ namespace nix {
 
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & from,
-    ParseSink & sink, const Path & to)
+    FileSystemObjectSink & sink, const Path & to)
 {
     auto stat = accessor.lstat(from);
 

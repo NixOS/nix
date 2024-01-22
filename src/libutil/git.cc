@@ -54,7 +54,7 @@ static std::string getString(Source & source, int n)
 
 
 void parse(
-    ParseSink & sink,
+    FileSystemObjectSink & sink,
     const Path & sinkPath,
     Source & source,
     std::function<SinkHook> hook,
@@ -133,7 +133,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
 }
 
 
-void restore(ParseSink & sink, Source & source, std::function<RestoreHook> hook)
+void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook)
 {
     parse(sink, "", source, [&](Path name, TreeEntry entry) {
         auto [accessor, from] = hook(entry.hash);

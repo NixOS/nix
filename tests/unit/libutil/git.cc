@@ -119,7 +119,7 @@ const static Tree tree = {
 TEST_F(GitTest, tree_read) {
     readTest("tree.bin", [&](const auto & encoded) {
         StringSource in { encoded };
-        NullParseSink out;
+        NullFileSystemObjectSink out;
         Tree got;
         parse(out, "", in, [&](auto & name, auto entry) {
             auto name2 = name;

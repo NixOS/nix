@@ -60,7 +60,7 @@ using Tree = std::map<std::string, TreeEntry>;
 using SinkHook = void(const Path & name, TreeEntry entry);
 
 void parse(
-    ParseSink & sink, const Path & sinkPath,
+    FileSystemObjectSink & sink, const Path & sinkPath,
     Source & source,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
@@ -81,7 +81,7 @@ using RestoreHook = std::pair<SourceAccessor *, CanonPath>(Hash);
 /**
  * Wrapper around `parse` and `RestoreSink`
  */
-void restore(ParseSink & sink, Source & source, std::function<RestoreHook> hook);
+void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook);
 
 /**
  * Dumps a single file to a sink

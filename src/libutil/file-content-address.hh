@@ -35,7 +35,7 @@ void dumpPath(
 /**
  * Restore a serialization of the given file system object.
  *
- * @TODO use an arbitrary `ParseSink`.
+ * @TODO use an arbitrary `FileSystemObjectSink`.
  */
 void restorePath(
     const Path & path,

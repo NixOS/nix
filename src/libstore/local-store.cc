@@ -1048,7 +1048,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     bool narRead = false;
     Finally cleanup = [&]() {
         if (!narRead) {
-            NullParseSink sink;
+            NullFileSystemObjectSink sink;
             try {
                 parseDump(sink, source);
             } catch (...) {

@@ -27,7 +27,7 @@ struct NarAccessor : public SourceAccessor
 
     NarMember root;
 
-    struct NarIndexer : ParseSink, Source
+    struct NarIndexer : FileSystemObjectSink, Source
     {
         NarAccessor & acc;
         Source & source;

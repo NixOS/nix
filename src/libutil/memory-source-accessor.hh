@@ -75,7 +75,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
 /**
  * Write to a `MemorySourceAccessor` at the given path
  */
-struct MemorySink : ParseSink
+struct MemorySink : FileSystemObjectSink
 {
     MemorySourceAccessor & dst;
 

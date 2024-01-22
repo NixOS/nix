@@ -424,12 +424,12 @@ ValidPathInfo Store::addToStoreSlow(
        information to narSink. */
     TeeSource tapped { *fileSource, narSink };
 
-    NullParseSink blank;
+    NullFileSystemObjectSink blank;
     auto & parseSink = method.getFileIngestionMethod() == FileIngestionMethod::Flat
-        ? (ParseSink &) fileSink
+        ? (FileSystemObjectSink &) fileSink
         : method.getFileIngestionMethod() == FileIngestionMethod::Recursive
-        ? (ParseSink &) blank
-        : (abort(), (ParseSink &)*(ParseSink *)nullptr); // handled both cases
+        ? (FileSystemObjectSink &) blank
+        : (abort(), (FileSystemObjectSink &)*(FileSystemObjectSink *)nullptr); // handled both cases
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */
