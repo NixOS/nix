@@ -262,6 +262,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
 {
     std::string url;
     bool executable = false;
+    bool unpack = false;
     std::optional<std::string> name;
     HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
     std::optional<Hash> expectedHash;
@@ -294,6 +295,14 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             .handler = {&executable, true},
         });
 
+        addFlag({
+            .longName = "unpack",
+            .description =
+                "Unpack the archive (which must be a tarball or zip file) and add "
+                "the result to the Nix store.",
+            .handler = {&unpack, true},
+        });
+
         expectArg("url", &url);
     }
 
@@ -310,7 +319,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
     }
     void run(ref<Store> store) override
     {
-        auto [storePath, hash] = prefetchFile(store, url, name, hashAlgo, expectedHash, false, executable);
+        auto [storePath, hash] = prefetchFile(store, url, name, hashAlgo, expectedHash, unpack, executable);
 
         if (json) {
             auto res = nlohmann::json::object();
