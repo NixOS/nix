@@ -174,11 +174,12 @@ static void fetchTree(
     if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isLocked())
+    if (evalSettings.pureEval && !input.isLocked()) {
         if (params.isFetchGit)
             state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchGit' requires a locked input, at %s", state.positions[pos]));
         else
             state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+    }
 
     state.checkURI(input.toURLString());
 
