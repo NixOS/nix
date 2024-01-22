@@ -28,96 +28,95 @@ let
 in
 
 {
-  name = lib.mkDefault "remote-builds-ssh-ng";
-
-  # TODO expand module shorthand syntax instead of use imports
-  imports = [{
-    options = {
-      builders.config = lib.mkOption {
-        type = lib.types.deferredModule;
-        description = ''
-          Configuration to add to the builder nodes.
-        '';
-        default = { };
-      };
+  options = {
+    builders.config = lib.mkOption {
+      type = lib.types.deferredModule;
+      description = ''
+        Configuration to add to the builder nodes.
+      '';
+      default = { };
     };
-  }];
+  };
 
-  nodes =
-    { builder =
-      { config, pkgs, ... }:
-      {
-        imports = [ test.config.builders.config ];
-        services.openssh.enable = true;
-        virtualisation.writableStore = true;
-        nix.settings.sandbox = true;
-        nix.settings.substituters = lib.mkForce [ ];
-      };
+  config = {
+    name = lib.mkDefault "remote-builds-ssh-ng";
 
-      client =
-        { config, lib, pkgs, ... }:
-        { nix.settings.max-jobs = 0; # force remote building
-          nix.distributedBuilds = true;
-          nix.buildMachines =
-            [ { hostName = "builder";
-                sshUser = "root";
-                sshKey = "/root/.ssh/id_ed25519";
-                system = "i686-linux";
-                maxJobs = 1;
-                protocol = "ssh-ng";
-              }
-            ];
+    nodes =
+      { builder =
+        { config, pkgs, ... }:
+        {
+          imports = [ test.config.builders.config ];
+          services.openssh.enable = true;
           virtualisation.writableStore = true;
-          virtualisation.additionalPaths = [ config.system.build.extraUtils ];
+          nix.settings.sandbox = true;
           nix.settings.substituters = lib.mkForce [ ];
-          programs.ssh.extraConfig = "ConnectTimeout 30";
         };
-    };
 
-  testScript = { nodes }: ''
-    # fmt: off
-    import subprocess
+        client =
+          { config, lib, pkgs, ... }:
+          { nix.settings.max-jobs = 0; # force remote building
+            nix.distributedBuilds = true;
+            nix.buildMachines =
+              [ { hostName = "builder";
+                  sshUser = "root";
+                  sshKey = "/root/.ssh/id_ed25519";
+                  system = "i686-linux";
+                  maxJobs = 1;
+                  protocol = "ssh-ng";
+                }
+              ];
+            virtualisation.writableStore = true;
+            virtualisation.additionalPaths = [ config.system.build.extraUtils ];
+            nix.settings.substituters = lib.mkForce [ ];
+            programs.ssh.extraConfig = "ConnectTimeout 30";
+          };
+      };
 
-    start_all()
+    testScript = { nodes }: ''
+      # fmt: off
+      import subprocess
 
-    # Create an SSH key on the client.
-    subprocess.run([
-      "${hostPkgs.openssh}/bin/ssh-keygen", "-t", "ed25519", "-f", "key", "-N", ""
-    ], capture_output=True, check=True)
-    client.succeed("mkdir -p -m 700 /root/.ssh")
-    client.copy_from_host("key", "/root/.ssh/id_ed25519")
-    client.succeed("chmod 600 /root/.ssh/id_ed25519")
+      start_all()
 
-    # Install the SSH key on the builder.
-    client.wait_for_unit("network.target")
-    builder.succeed("mkdir -p -m 700 /root/.ssh")
-    builder.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
-    builder.wait_for_unit("sshd")
-    client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
+      # Create an SSH key on the client.
+      subprocess.run([
+        "${hostPkgs.openssh}/bin/ssh-keygen", "-t", "ed25519", "-f", "key", "-N", ""
+      ], capture_output=True, check=True)
+      client.succeed("mkdir -p -m 700 /root/.ssh")
+      client.copy_from_host("key", "/root/.ssh/id_ed25519")
+      client.succeed("chmod 600 /root/.ssh/id_ed25519")
 
-    # Perform a build
-    out = client.succeed("nix-build ${expr nodes.client 1} 2> build-output")
+      # Install the SSH key on the builder.
+      client.wait_for_unit("network.target")
+      builder.succeed("mkdir -p -m 700 /root/.ssh")
+      builder.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
+      builder.wait_for_unit("sshd")
+      client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
 
-    # Verify that the build was done on the builder
-    builder.succeed(f"test -e {out.strip()}")
+      # Perform a build
+      out = client.succeed("nix-build ${expr nodes.client 1} 2> build-output")
 
-    # Print the build log, prefix the log lines to avoid nix intercepting lines starting with @nix
-    buildOutput = client.succeed("sed -e 's/^/build-output:/' build-output")
-    print(buildOutput)
+      # Verify that the build was done on the builder
+      builder.succeed(f"test -e {out.strip()}")
 
-    # Make sure that we get the expected build output
-    client.succeed("grep -qF Hello build-output")
+      # Print the build log, prefix the log lines to avoid nix intercepting lines starting with @nix
+      buildOutput = client.succeed("sed -e 's/^/build-output:/' build-output")
+      print(buildOutput)
 
-    # We don't want phase reporting in the build output
-    client.fail("grep -qF '@nix' build-output")
+      # Make sure that we get the expected build output
+      client.succeed("grep -qF Hello build-output")
 
-    # Get the log file
-    client.succeed(f"nix-store --read-log {out.strip()} > log-output")
-    # Prefix the log lines to avoid nix intercepting lines starting with @nix
-    logOutput = client.succeed("sed -e 's/^/log-file:/' log-output")
-    print(logOutput)
+      # We don't want phase reporting in the build output
+      client.fail("grep -qF '@nix' build-output")
 
-    # Check that we get phase reporting in the log file
-    client.succeed("grep -q '@nix {\"action\":\"setPhase\",\"phase\":\"buildPhase\"}' log-output")
-  '';
+      # Get the log file
+      client.succeed(f"nix-store --read-log {out.strip()} > log-output")
+      # Prefix the log lines to avoid nix intercepting lines starting with @nix
+      logOutput = client.succeed("sed -e 's/^/log-file:/' log-output")
+      print(logOutput)
+
+      # Check that we get phase reporting in the log file
+      client.succeed("grep -q '@nix {\"action\":\"setPhase\",\"phase\":\"buildPhase\"}' log-output")
+    '';
+  };
 }
