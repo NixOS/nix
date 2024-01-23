@@ -119,7 +119,7 @@ struct TunnelLogger : public Logger
             if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
                 to << STDERR_ERROR << *ex;
             } else {
-                to << STDERR_ERROR << ex->what() << ex->status;
+                to << STDERR_ERROR << ex->what() << ex->info().status;
             }
         }
     }

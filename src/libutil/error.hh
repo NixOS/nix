@@ -84,8 +84,13 @@ inline bool operator>=(const Trace& lhs, const Trace& rhs);
 struct ErrorInfo {
     Verbosity level;
     hintformat msg;
-    std::shared_ptr<Pos> errPos;
+    std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
+
+    /**
+     * Exit status.
+     */
+    unsigned int status = 1;
 
     Suggestions suggestions;
 
@@ -103,18 +108,21 @@ class BaseError : public std::exception
 protected:
     mutable ErrorInfo err;
 
+    /**
+     * Cached formatted contents of `err.msg`.
+     */
     mutable std::optional<std::string> what_;
+    /**
+     * Format `err.msg` and set `what_` to the resulting value.
+     */
     const std::string & calcWhat() const;
 
 public:
-    unsigned int status = 1; // exit status
-
     BaseError(const BaseError &) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...) }
-        , status(status)
+        : err { .level = lvlError, .msg = hintfmt(args...), .status = status }
     { }
 
     template<typename... Args>
@@ -148,6 +156,15 @@ public:
 
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
+
+    void withExitStatus(unsigned int status)
+    {
+        err.status = status;
+    }
+
+    void atPos(std::shared_ptr<Pos> pos) {
+        err.pos = pos;
+    }
 
     void pushTrace(Trace trace)
     {

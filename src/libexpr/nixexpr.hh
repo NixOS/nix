@@ -9,27 +9,12 @@
 #include "error.hh"
 #include "chunked-vector.hh"
 #include "position.hh"
+#include "eval-error.hh"
 #include "pos-idx.hh"
 #include "pos-table.hh"
 
 namespace nix {
 
-
-MakeError(EvalError, Error);
-MakeError(ParseError, Error);
-MakeError(AssertionError, EvalError);
-MakeError(ThrownError, AssertionError);
-MakeError(Abort, EvalError);
-MakeError(TypeError, EvalError);
-MakeError(UndefinedVarError, Error);
-MakeError(MissingArgumentError, EvalError);
-
-class InfiniteRecursionError : public EvalError
-{
-    friend class EvalState;
-public:
-    using EvalError::EvalError;
-};
 
 struct Env;
 struct Value;

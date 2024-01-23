@@ -66,7 +66,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
 {
     throw ParseError({
         .msg = hintfmt(error),
-        .errPos = state->positions[state->at(*loc)]
+        .pos = state->positions[state->at(*loc)]
     });
 }
 
@@ -155,7 +155,7 @@ expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
             .msg = hintfmt("dynamic attributes not allowed in let"),
-            .errPos = state->positions[CUR_POS]
+            .pos = state->positions[CUR_POS]
         });
       $$ = new ExprLet($2, $4);
     }
@@ -245,7 +245,7 @@ expr_simple
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
-              .errPos = state->positions[CUR_POS]
+              .pos = state->positions[CUR_POS]
           });
       $$ = new ExprString(std::string($1));
   }
@@ -341,7 +341,7 @@ attrs
       } else
           throw ParseError({
               .msg = hintfmt("dynamic attributes not allowed in inherit"),
-              .errPos = state->positions[state->at(@2)]
+              .pos = state->positions[state->at(@2)]
           });
     }
   | { $$ = new AttrPath; }

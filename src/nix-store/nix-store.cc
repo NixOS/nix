@@ -950,8 +950,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->buildPaths(toDerivedPaths(paths));
                     out << 0;
                 } catch (Error & e) {
-                    assert(e.status);
-                    out << e.status << e.msg();
+                    assert(e.info().status);
+                    out << e.info().status << e.msg();
                 }
                 break;
             }

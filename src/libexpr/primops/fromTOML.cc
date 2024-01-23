@@ -83,10 +83,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
     try {
         visit(val, toml::parse(tomlStream, "fromTOML" /* the "filename" */));
     } catch (std::exception & e) { // TODO: toml::syntax_error
-        throw EvalError({
-            .msg = hintfmt("while parsing a TOML string: %s", e.what()),
-            .errPos = state.positions[pos]
-        });
+        state.error<EvalError>("while parsing TOML: %s", e.what()).atPos(pos).debugThrow();
     }
 }
 

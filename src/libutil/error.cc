@@ -335,7 +335,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
      *      try {
      *          e->eval(*this, env, v);
      *          if (v.type() != nAttrs)
-     *              throwTypeError("expected a set but found %1%", v);
+     *              error<TypeError>("expected a set but found %1%", v);
      *      } catch (Error & e) {
      *          e.addTrace(pos, errorCtx);
      *          throw;
@@ -349,7 +349,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
      *      e->eval(*this, env, v);
      *      try {
      *          if (v.type() != nAttrs)
-     *              throwTypeError("expected a set but found %1%", v);
+     *              error<TypeError>("expected a set but found %1%", v);
      *      } catch (Error & e) {
      *          e.addTrace(pos, errorCtx);
      *          throw;
@@ -411,7 +411,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     oss << einfo.msg << "\n";
 
-    printPosMaybe(oss, "", einfo.errPos);
+    printPosMaybe(oss, "", einfo.pos);
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {

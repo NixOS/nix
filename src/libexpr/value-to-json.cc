@@ -80,7 +80,7 @@ json printValueAsJSON(EvalState & state, bool strict,
                 try {
                     out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
                 } catch (Error & e) {
-                    e.addTrace({},
+                    e.addTrace(state.positions[pos],
                         hintfmt("while evaluating list element at index %1%", i));
                     throw;
                 }
@@ -99,13 +99,12 @@ json printValueAsJSON(EvalState & state, bool strict,
 
         case nThunk:
         case nFunction:
-            auto e = TypeError({
-                .msg = hintfmt("cannot convert %1% to JSON", showType(v)),
-                .errPos = state.positions[v.determinePos(pos)]
-            });
-            e.addTrace(state.positions[pos], hintfmt("message for the trace"));
-            state.debugThrowLastTrace(e);
-            throw e;
+            state.error<TypeError>(
+                "cannot convert %1% to JSON",
+                showType(v)
+            )
+            .atPos(v.determinePos(pos))
+            .debugThrow();
     }
     return out;
 }
@@ -119,7 +118,8 @@ void printValueAsJSON(EvalState & state, bool strict,
 json ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
     NixStringContext & context, bool copyToStore) const
 {
-    state.debugThrowLastTrace(TypeError("cannot convert %1% to JSON", showType()));
+    state.error<TypeError>("cannot convert %1% to JSON", showType())
+    .debugThrow();
 }
 
 

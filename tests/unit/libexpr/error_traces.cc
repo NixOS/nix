@@ -12,33 +12,33 @@ namespace nix {
 
     TEST_F(ErrorTraceTest, TraceBuilder) {
         ASSERT_THROW(
-            state.error("Not much").debugThrow<EvalError>(),
+            state.error<EvalError>("puppy").debugThrow(),
             EvalError
         );
 
         ASSERT_THROW(
-            state.error("Not much").withTrace(noPos, "No more").debugThrow<EvalError>(),
+            state.error<EvalError>("puppy").withTrace(noPos, "doggy").debugThrow(),
             EvalError
         );
 
         ASSERT_THROW(
             try {
                 try {
-                    state.error("Not much").withTrace(noPos, "No more").debugThrow<EvalError>();
+                    state.error<EvalError>("puppy").withTrace(noPos, "doggy").debugThrow();
                 } catch (Error & e) {
-                    e.addTrace(state.positions[noPos], "Something", "");
+                    e.addTrace(state.positions[noPos], "beans", "");
                     throw;
                 }
             } catch (BaseError & e) {
                 ASSERT_EQ(PrintToString(e.info().msg),
-                          PrintToString(hintfmt("Not much")));
+                          PrintToString(hintfmt("puppy")));
                 auto trace = e.info().traces.rbegin();
                 ASSERT_EQ(e.info().traces.size(), 2);
                 ASSERT_EQ(PrintToString(trace->hint),
-                          PrintToString(hintfmt("No more")));
+                          PrintToString(hintfmt("doggy")));
                 trace++;
                 ASSERT_EQ(PrintToString(trace->hint),
-                          PrintToString(hintfmt("Something")));
+                          PrintToString(hintfmt("beans")));
                 throw;
             }
             , EvalError
@@ -47,12 +47,12 @@ namespace nix {
 
     TEST_F(ErrorTraceTest, NestedThrows) {
         try {
-            state.error("Not much").withTrace(noPos, "No more").debugThrow<EvalError>();
+            state.error<EvalError>("puppy").withTrace(noPos, "doggy").debugThrow();
         } catch (BaseError & e) {
             try {
-                state.error("Not much more").debugThrow<EvalError>();
+                state.error<EvalError>("beans").debugThrow();
             } catch (Error & e2) {
-                e.addTrace(state.positions[noPos], "Something", "");
+                e.addTrace(state.positions[noPos], "beans2", "");
                 //e2.addTrace(state.positions[noPos], "Something", "");
                 ASSERT_TRUE(e.info().traces.size() == 2);
                 ASSERT_TRUE(e2.info().traces.size() == 0);
