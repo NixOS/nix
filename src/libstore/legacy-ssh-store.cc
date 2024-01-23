@@ -55,9 +55,14 @@ LegacySSHStore::LegacySSHStore(const std::string & scheme, const std::string & h
 ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    conn->sshConn = master.startCommand(
-        fmt("%s --serve --write", remoteProgram)
-        + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
+    Strings command = remoteProgram.get();
+    command.push_back("--serve");
+    command.push_back("--write");
+    if (remoteStore.get() != "") {
+        command.push_back("--store");
+        command.push_back(remoteStore.get());
+    }
+    conn->sshConn = master.startCommand(std::move(command));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
 
