@@ -13,6 +13,7 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 #include "store-dir-config.hh"
+#include "store-uri.hh"
 #include "source-path.hh"
 
 #include <nlohmann/json_fwd.hpp>
@@ -102,7 +103,7 @@ typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 struct StoreConfig : public StoreDirConfig
 {
-    typedef std::map<std::string, std::string> Params;
+    using Params = StoreURI::Params;
 
     using StoreDirConfig::StoreDirConfig;
 
@@ -852,34 +853,13 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
 /**
  * @return a Store object to access the Nix store denoted by
  * ‘uri’ (slight misnomer...).
- *
- * @param uri Supported values are:
- *
- * - ‘local’: The Nix store in /nix/store and database in
- *   /nix/var/nix/db, accessed directly.
- *
- * - ‘daemon’: The Nix store accessed via a Unix domain socket
- *   connection to nix-daemon.
- *
- * - ‘unix://<path>’: The Nix store accessed via a Unix domain socket
- *   connection to nix-daemon, with the socket located at <path>.
- *
- * - ‘auto’ or ‘’: Equivalent to ‘local’ or ‘daemon’ depending on
- *   whether the user has write access to the local Nix
- *   store/database.
- *
- * - ‘file://<path>’: A binary cache stored in <path>.
- *
- * - ‘https://<path>’: A binary cache accessed via HTTP.
- *
- * - ‘s3://<path>’: A writable binary cache stored on Amazon's Simple
- *   Storage Service.
- *
- * - ‘ssh://[user@]<host>’: A remote Nix store accessed by running
- *   ‘nix-store --serve’ via SSH.
- *
- * You can pass parameters to the store type by appending
- * ‘?key=value&key=value&...’ to the URI.
+ */
+ref<Store> openStore(StoreURI && storeURI);
+
+
+/**
+ * Convenient function to `StoreURI::parse` a raw unparsed store URI and
+ * `openStore` it.
  */
 ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
     const Store::Params & extraParams = Store::Params());
@@ -942,11 +922,6 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
     std::optional<HashResult> hashGiven = std::nullopt);
-
-/**
- * Split URI into protocol+hierarchy part and its parameter set.
- */
-std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
 const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 
