@@ -351,7 +351,7 @@ fi
 AS_IF([test "$ENABLE_UNIT_TESTS" == "yes"],[
 
 # Look for gtest.
-PKG_CHECK_MODULES([GTEST], [gtest_main])
+PKG_CHECK_MODULES([GTEST], [gtest_main gmock_main])
 
 # Look for rapidcheck.
 PKG_CHECK_MODULES([RAPIDCHECK], [rapidcheck rapidcheck_gtest])
