@@ -38,6 +38,11 @@ Machine::Machine(decltype(storeUri) storeUri,
     sshPublicHostKey(sshPublicHostKey)
 {}
 
+bool Machine::systemSupported(const std::string & system) const
+{
+    return system == "builtin" || (systemTypes.count(system) > 0);
+}
+
 bool Machine::allSupported(const std::set<std::string> & features) const
 {
     return std::all_of(features.begin(), features.end(),

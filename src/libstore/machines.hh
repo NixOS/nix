@@ -20,6 +20,12 @@ struct Machine {
     bool enabled = true;
 
     /**
+     * @return Whether `system` is either `"builtin"` or in
+     * `systemTypes`.
+     */
+    bool systemSupported(const std::string & system) const;
+
+    /**
      * @return Whether `features` is a subset of the union of `supportedFeatures` and
      * `mandatoryFeatures`
      */

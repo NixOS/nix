@@ -137,9 +137,8 @@ static int main_build_remote(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
-                    if (m.enabled
-                        && (neededSystem == "builtin"
-                            || m.systemTypes.count(neededSystem) > 0) &&
+                    if (m.enabled &&
+                        m.systemSupported(neededSystem) &&
                         m.allSupported(requiredFeatures) &&
                         m.mandatoryMet(requiredFeatures))
                     {
