@@ -86,7 +86,10 @@ struct StoreURI {
 
     auto operator <=> (const StoreURI & rhs) const = default;
 
+    std::string render() const;
+
     static StoreURI parse(const std::string & uri, const Params & extraParams = Params {});
+
 };
 
 /**

@@ -4,6 +4,7 @@
 #include "url.hh"
 #include "store-uri.hh"
 #include "file-system.hh"
+#include "util.hh"
 
 namespace nix {
 
@@ -44,6 +45,33 @@ static bool isNonUriPath(const std::string & spec)
         // Has at least one path separator, and so isn't a single word that
         // might be special like "auto"
         && spec.find("/") != std::string::npos;
+}
+
+
+std::string StoreURI::render() const
+{
+    std::string res;
+
+    std::visit(overloaded {
+        [&](const StoreURI::Auto &) {
+            res = "auto";
+        },
+        [&](const StoreURI::Daemon &) {
+            res = "daemon";
+        },
+        [&](const StoreURI::Local &) {
+            res = "local";
+        },
+        [&](const StoreURI::Generic & g) {
+            res = g.scheme;
+            res += "://";
+            res += g.authority;
+        },
+    }, variant);
+
+    res += encodeQuery(params);
+
+    return res;
 }
 
 
