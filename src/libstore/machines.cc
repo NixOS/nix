@@ -38,6 +38,11 @@ Machine::Machine(decltype(storeUri) storeUri,
     sshPublicHostKey(sshPublicHostKey)
 {}
 
+bool Machine::systemSupported(const std::string & system) const
+{
+    return system == "builtin" || (systemTypes.count(system) > 0);
+}
+
 bool Machine::allSupported(const std::set<std::string> & features) const
 {
     return std::all_of(features.begin(), features.end(),
@@ -145,7 +150,7 @@ static Machine parseBuilderLine(const std::string & line)
 
     return {
         tokens[0],
-        isSet(1) ? tokenizeString<std::vector<std::string>>(tokens[1], ",") : std::vector<std::string>{settings.thisSystem},
+        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : std::set<std::string>{settings.thisSystem},
         isSet(2) ? tokens[2] : "",
         isSet(3) ? parseUnsignedIntField(3) : 1U,
         isSet(4) ? parseUnsignedIntField(4) : 1U,
