@@ -3,24 +3,16 @@
 #include "file-system.hh"
 #include "util.hh"
 
+#include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>
 
 using testing::Contains;
 using testing::ElementsAre;
-using testing::EndsWith;
 using testing::Eq;
 using testing::Field;
 using testing::SizeIs;
 
-using nix::absPath;
-using nix::FormatError;
-using nix::UsageError;
-using nix::getMachines;
-using nix::Machine;
-using nix::Machines;
-using nix::pathExists;
-using nix::Settings;
-using nix::settings;
+using namespace nix;
 
 class Environment : public ::testing::Environment {
   public:
@@ -40,7 +32,7 @@ TEST(machines, getMachinesUriOnly) {
     settings.builders = "nix@scratchy.labs.cs.uu.nl";
     Machines actual = getMachines();
     ASSERT_THAT(actual, SizeIs(1));
-    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq("ssh://nix@scratchy.labs.cs.uu.nl")));
+    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("TEST_ARCH-TEST_OS")));
     EXPECT_THAT(actual[0], Field(&Machine::sshKey, SizeIs(0)));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(1)));
@@ -54,7 +46,7 @@ TEST(machines, getMachinesDefaults) {
     settings.builders = "nix@scratchy.labs.cs.uu.nl - - - - - - -";
     Machines actual = getMachines();
     ASSERT_THAT(actual, SizeIs(1));
-    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq("ssh://nix@scratchy.labs.cs.uu.nl")));
+    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("TEST_ARCH-TEST_OS")));
     EXPECT_THAT(actual[0], Field(&Machine::sshKey, SizeIs(0)));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(1)));
@@ -64,20 +56,31 @@ TEST(machines, getMachinesDefaults) {
     EXPECT_THAT(actual[0], Field(&Machine::sshPublicHostKey, SizeIs(0)));
 }
 
+MATCHER_P(AuthorityMatches, authority, "") {
+    *result_listener
+        << "where the authority of "
+        << arg.render()
+        << " is "
+        << authority;
+    auto * generic = std::get_if<StoreReference::Specified>(&arg.variant);
+    if (!generic) return false;
+    return generic->authority == authority;
+}
+
 TEST(machines, getMachinesWithNewLineSeparator) {
     settings.builders = "nix@scratchy.labs.cs.uu.nl\nnix@itchy.labs.cs.uu.nl";
     Machines actual = getMachines();
     ASSERT_THAT(actual, SizeIs(2));
-    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, EndsWith("nix@scratchy.labs.cs.uu.nl"))));
-    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, EndsWith("nix@itchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
 }
 
 TEST(machines, getMachinesWithSemicolonSeparator) {
     settings.builders = "nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl";
     Machines actual = getMachines();
     EXPECT_THAT(actual, SizeIs(2));
-    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, EndsWith("nix@scratchy.labs.cs.uu.nl"))));
-    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, EndsWith("nix@itchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
 }
 
 TEST(machines, getMachinesWithCorrectCompleteSingleBuilder) {
@@ -86,7 +89,7 @@ TEST(machines, getMachinesWithCorrectCompleteSingleBuilder) {
                         "benchmark SSH+HOST+PUBLIC+KEY+BASE64+ENCODED==";
     Machines actual = getMachines();
     ASSERT_THAT(actual, SizeIs(1));
-    EXPECT_THAT(actual[0], Field(&Machine::storeUri, EndsWith("nix@scratchy.labs.cs.uu.nl")));
+    EXPECT_THAT(actual[0], Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl")));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("i686-linux")));
     EXPECT_THAT(actual[0], Field(&Machine::sshKey, Eq("/home/nix/.ssh/id_scratchy_auto")));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(8)));
@@ -104,7 +107,7 @@ TEST(machines,
         "KEY+BASE64+ENCODED==";
     Machines actual = getMachines();
     ASSERT_THAT(actual, SizeIs(1));
-    EXPECT_THAT(actual[0], Field(&Machine::storeUri, EndsWith("nix@scratchy.labs.cs.uu.nl")));
+    EXPECT_THAT(actual[0], Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl")));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("i686-linux")));
     EXPECT_THAT(actual[0], Field(&Machine::sshKey, Eq("/home/nix/.ssh/id_scratchy_auto")));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(8)));
@@ -120,7 +123,7 @@ TEST(machines, getMachinesWithMultiOptions) {
                         "MandatoryFeature1,MandatoryFeature2";
     Machines actual = getMachines();
     ASSERT_THAT(actual, SizeIs(1));
-    EXPECT_THAT(actual[0], Field(&Machine::storeUri, EndsWith("nix@scratchy.labs.cs.uu.nl")));
+    EXPECT_THAT(actual[0], Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl")));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("Arch1", "Arch2")));
     EXPECT_THAT(actual[0], Field(&Machine::supportedFeatures, ElementsAre("SupportedFeature1", "SupportedFeature2")));
     EXPECT_THAT(actual[0], Field(&Machine::mandatoryFeatures, ElementsAre("MandatoryFeature1", "MandatoryFeature2")));
@@ -146,9 +149,9 @@ TEST(machines, getMachinesWithCorrectFileReference) {
     settings.builders = std::string("@") + path;
     Machines actual = getMachines();
     ASSERT_THAT(actual, SizeIs(3));
-    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, EndsWith("nix@scratchy.labs.cs.uu.nl"))));
-    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, EndsWith("nix@itchy.labs.cs.uu.nl"))));
-    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, EndsWith("nix@poochie.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@poochie.labs.cs.uu.nl"))));
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile) {
