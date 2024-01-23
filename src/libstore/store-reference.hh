@@ -58,7 +58,7 @@ struct StoreReference
     struct Specified
     {
         std::string scheme;
-        std::string authority;
+        std::string authority = "";
 
         bool operator==(const Specified & rhs) const = default;
         auto operator<=>(const Specified & rhs) const = default;
@@ -73,6 +73,14 @@ struct StoreReference
     bool operator==(const StoreReference & rhs) const = default;
     auto operator<=>(const StoreReference & rhs) const = default;
 
+    /**
+     * Render the whole store reference as a URI, including parameters.
+     */
+    std::string render() const;
+
+    /**
+     * Parse a URI into a store reference.
+     */
     static StoreReference parse(const std::string & uri, const Params & extraParams = Params{});
 };
 

@@ -15,7 +15,7 @@ SpaceAfterCStyleCast: true
 SpaceAfterTemplateKeyword: false
 AccessModifierOffset: -4
 AlignAfterOpenBracket: AlwaysBreak
-AlignEscapedNewlines: DontAlign
+AlignEscapedNewlines: Left
 ColumnLimit: 120
 BreakStringLiterals: false
 BitFieldColonSpacing: None

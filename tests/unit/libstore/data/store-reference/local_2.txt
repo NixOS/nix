@@ -1,0 +1,1 @@
+local:///foo/bar/baz?trusted=true
