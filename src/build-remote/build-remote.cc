@@ -139,9 +139,7 @@ static int main_build_remote(int argc, char * * argv)
 
                     if (m.enabled
                         && (neededSystem == "builtin"
-                            || std::find(m.systemTypes.begin(),
-                                m.systemTypes.end(),
-                                neededSystem) != m.systemTypes.end()) &&
+                            || m.systemTypes.count(neededSystem) > 0) &&
                         m.allSupported(requiredFeatures) &&
                         m.mandatoryMet(requiredFeatures))
                     {
@@ -214,7 +212,7 @@ static int main_build_remote(int argc, char * * argv)
 
                         for (auto & m : machines)
                             error
-                                % concatStringsSep<std::vector<std::string>>(", ", m.systemTypes)
+                                % concatStringsSep<StringSet>(", ", m.systemTypes)
                                 % m.maxJobs
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
