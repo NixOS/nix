@@ -16,7 +16,12 @@ class LibStoreTest : public virtual ::testing::Test {
 
     protected:
         LibStoreTest()
-            : store(openStore("dummy://"))
+            : store(openStore({
+                .variant = StoreReference::Specified {
+                    .scheme = "dummy",
+                    .authority = "",
+                },
+            }))
         { }
 
         ref<Store> store;

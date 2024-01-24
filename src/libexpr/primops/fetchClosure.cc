@@ -182,23 +182,26 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             .pos = state.positions[pos]
         });
 
-    auto parsedURL = parseURL(*fromStoreUrl);
+    auto parsedURL = StoreReference::parse(*fromStoreUrl);
 
-    if (parsedURL.scheme != "http" &&
-        parsedURL.scheme != "https" &&
-        !(getEnv("_NIX_IN_TEST").has_value() && parsedURL.scheme == "file"))
+    auto * storeVariant = std::get_if<StoreReference::Specified>(&parsedURL.variant);
+
+    if (!storeVariant ||
+        (storeVariant->scheme != "http" &&
+         storeVariant->scheme != "https" &&
+         !(getEnv("_NIX_IN_TEST").has_value() && storeVariant->scheme == "file")))
         throw Error({
             .msg = HintFmt("'fetchClosure' only supports http:// and https:// stores"),
             .pos = state.positions[pos]
         });
 
-    if (!parsedURL.query.empty())
+    if (!parsedURL.params.empty())
         throw Error({
             .msg = HintFmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
             .pos = state.positions[pos]
         });
 
-    auto fromStore = openStore(parsedURL.to_string());
+    auto fromStore = openStore(parsedURL);
 
     if (toPath)
         runFetchClosureWithRewrite(state, pos, *fromStore, *fromPath, *toPath, v);

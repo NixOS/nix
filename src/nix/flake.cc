@@ -1006,7 +1006,7 @@ struct CmdFlakeClone : FlakeCommand
 
 struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 {
-    std::string dstUri;
+    std::optional<StoreReference> dstUri;
 
     CmdFlakeArchive()
     {
@@ -1014,7 +1014,9 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             .longName = "to",
             .description = "URI of the destination Nix store",
             .labels = {"store-uri"},
-            .handler = {&dstUri}
+            .handler = {[&](std::string s) {
+                dstUri = StoreReference::parse(s);
+            }},
         });
     }
 
@@ -1075,8 +1077,8 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             traverse(*flake.lockFile.root);
         }
 
-        if (!dryRun && !dstUri.empty()) {
-            ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
+        if (!dryRun && dstUri) {
+            ref<Store> dstStore = openStore(*dstUri);
             copyPaths(*store, *dstStore, sources);
         }
     }

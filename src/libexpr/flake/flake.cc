@@ -1,3 +1,5 @@
+#include <nlohmann/json.hpp>
+
 #include "terminal.hh"
 #include "flake.hh"
 #include "eval.hh"

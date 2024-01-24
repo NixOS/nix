@@ -18,6 +18,7 @@
 #include "terminal.hh"
 #include "users.hh"
 #include "network-proxy.hh"
+#include "json-utils.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -224,7 +225,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     evalSettings.restrictEval = false;
     evalSettings.pureEval = false;
-    EvalState state({}, openStore("dummy://"));
+    EvalState state({}, openStore({ .variant = StoreReference::Specified { .scheme = "dummy" } }));
 
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
@@ -400,7 +401,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::FetchTree,
         };
         evalSettings.pureEval = false;
-        EvalState state({}, openStore("dummy://"));
+        EvalState state({}, openStore({ .variant = StoreReference::Specified { .scheme = "dummy" } }));
         auto res = nlohmann::json::object();
         res["builtins"] = ({
             auto builtinsJson = nlohmann::json::object();

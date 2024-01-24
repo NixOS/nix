@@ -68,9 +68,9 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     Strings command = remoteProgram.get();
     command.push_back("--serve");
     command.push_back("--write");
-    if (remoteStore.get() != "") {
+    if (std::optional rs = remoteStore.get()) {
         command.push_back("--store");
-        command.push_back(remoteStore.get());
+        command.push_back(rs->render());
     }
     conn->sshConn = master.startCommand(std::move(command));
     conn->to = FdSink(conn->sshConn->in.get());

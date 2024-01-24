@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nlohmann/json_fwd.hpp"
+#include <nlohmann/json_fwd.hpp>
 
 // Following https://github.com/nlohmann/json#how-can-i-use-get-for-non-default-constructiblenon-copyable-types
 #define JSON_IMPL(TYPE)                                                \

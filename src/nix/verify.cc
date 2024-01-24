@@ -15,7 +15,7 @@ struct CmdVerify : StorePathsCommand
 {
     bool noContents = false;
     bool noTrust = false;
-    Strings substituterUris;
+    std::vector<StoreReference> substituterUris;
     size_t sigsNeeded = 0;
 
     CmdVerify()
@@ -37,7 +37,9 @@ struct CmdVerify : StorePathsCommand
             .shortName = 's',
             .description = "Use signatures from the specified store.",
             .labels = {"store-uri"},
-            .handler = {[&](std::string s) { substituterUris.push_back(s); }}
+            .handler = {[&](std::string s) {
+                substituterUris.push_back(StoreReference::parse(s));
+            }}
         });
 
         addFlag({

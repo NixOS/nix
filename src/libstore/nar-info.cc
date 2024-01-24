@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "nar-info.hh"
 #include "store-api.hh"
+#include "json-utils.hh"
 
 namespace nix {
 

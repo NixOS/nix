@@ -5,6 +5,7 @@
 #include "canon-path.hh"
 #include "common-args.hh"
 #include "search-path.hh"
+#include "store-reference.hh"
 
 #include <filesystem>
 
@@ -25,7 +26,7 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 
     LookupPath lookupPath;
 
-    std::optional<std::string> evalStoreUrl;
+    std::optional<StoreReference> evalStoreUrl;
 
 private:
     struct AutoArgExpr { std::string expr; };

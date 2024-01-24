@@ -1,3 +1,6 @@
+#include <boost/container/small_vector.hpp>
+#include <nlohmann/json.hpp>
+
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
 #include "store-api.hh"
@@ -7,8 +10,7 @@
 #include "split.hh"
 #include "common-protocol.hh"
 #include "common-protocol-impl.hh"
-#include <boost/container/small_vector.hpp>
-#include <nlohmann/json.hpp>
+#include "json-utils.hh"
 
 namespace nix {
 

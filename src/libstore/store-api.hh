@@ -863,13 +863,10 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
  */
 ref<Store> openStore(StoreReference && storeURI);
 
-
-/**
- * Opens the store at `uri`, where `uri` is in the format expected by `StoreReference::parse`
-
- */
-ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
-    const Store::Params & extraParams = Store::Params());
+static inline ref<Store> openStore(const StoreReference & storeURI = settings.storeUri.get())
+{
+    return openStore(StoreReference { storeURI });
+}
 
 
 /**

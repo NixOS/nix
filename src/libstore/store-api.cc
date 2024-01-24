@@ -1330,9 +1330,9 @@ std::list<ref<Store>> getDefaultSubstituters()
     static auto stores([]() {
         std::list<ref<Store>> stores;
 
-        StringSet done;
+        std::set<StoreReference> done;
 
-        auto addStore = [&](const std::string & uri) {
+        auto addStore = [&](const StoreReference & uri) {
             if (!done.insert(uri).second) return;
             try {
                 stores.push_back(openStore(uri));

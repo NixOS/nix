@@ -228,9 +228,9 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     auto conn = make_ref<Connection>();
     Strings command = remoteProgram.get();
     command.push_back("--stdio");
-    if (remoteStore.get() != "") {
+    if (std::optional rs = remoteStore.get()) {
         command.push_back("--store");
-        command.push_back(remoteStore.get());
+        command.push_back(rs->render());
     }
     command.insert(command.end(),
         extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());

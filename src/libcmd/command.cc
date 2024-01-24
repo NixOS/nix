@@ -75,28 +75,32 @@ CopyCommand::CopyCommand()
         .longName = "from",
         .description = "URL of the source Nix store.",
         .labels = {"store-uri"},
-        .handler = {&srcUri},
+        .handler = {[&](std::string storeUri) {
+            srcUri = StoreReference::parse(storeUri);
+        }},
     });
 
     addFlag({
         .longName = "to",
         .description = "URL of the destination Nix store.",
         .labels = {"store-uri"},
-        .handler = {&dstUri},
+        .handler = {[&](std::string storeUri) {
+            dstUri = StoreReference::parse(storeUri);
+        }},
     });
 }
 
 ref<Store> CopyCommand::createStore()
 {
-    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+    return !srcUri ? StoreCommand::createStore() : openStore(*srcUri);
 }
 
 ref<Store> CopyCommand::getDstStore()
 {
-    if (srcUri.empty() && dstUri.empty())
+    if (!srcUri && !dstUri)
         throw UsageError("you must pass '--from' and/or '--to'");
 
-    return dstUri.empty() ? openStore() : openStore(dstUri);
+    return !dstUri ? openStore() : openStore(*dstUri);
 }
 
 EvalCommand::EvalCommand()

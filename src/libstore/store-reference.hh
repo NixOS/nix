@@ -4,6 +4,8 @@
 #include <variant>
 
 #include "types.hh"
+#include "json-impls.hh"
+#include "json-avoids-null.hh"
 
 namespace nix {
 
@@ -89,4 +91,14 @@ struct StoreReference
  */
 std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::string & uri);
 
+/**
+ * It is always rendered as a string
+ */
+template<>
+struct json_avoids_null<StoreReference> : std::true_type
+{
+};
+
 }
+
+JSON_IMPL(StoreReference)

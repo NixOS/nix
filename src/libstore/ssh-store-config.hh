@@ -18,7 +18,7 @@ struct CommonSSHStoreConfig : virtual StoreConfig
     const Setting<bool> compress{this, false, "compress",
         "Whether to enable SSH compression."};
 
-    const Setting<std::string> remoteStore{this, "", "remote-store",
+    const Setting<std::optional<StoreReference>> remoteStore{this, std::nullopt, "remote-store",
         R"(
           [Store URL](@docroot@/store/types/index.md#store-url-format)
           to be used on the remote machine. The default is `auto`

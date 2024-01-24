@@ -26,7 +26,7 @@ LocalOverlayStore::LocalOverlayStore(const Params & params)
     , Store(params)
     , LocalFSStore(params)
     , LocalStore(params)
-    , lowerStore(openStore(percentDecode(lowerStoreUri.get())).dynamic_pointer_cast<LocalFSStore>())
+    , lowerStore(openStore(lowerStoreUri.get()).dynamic_pointer_cast<LocalFSStore>())
 {
     if (checkMount.get()) {
         std::smatch match;

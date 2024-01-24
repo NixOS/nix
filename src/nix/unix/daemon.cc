@@ -234,10 +234,10 @@ static PeerInfo getPeerInfo(int remote)
  */
 static ref<Store> openUncachedStore()
 {
-    Store::Params params; // FIXME: get params from somewhere
+    StoreReference ref = settings.storeUri.get();
     // Disable caching since the client already does that.
-    params["path-info-cache-size"] = "0";
-    return openStore(settings.storeUri, params);
+    ref.params["path-info-cache-size"] = "0";
+    return openStore(std::move(ref));
 }
 
 /**

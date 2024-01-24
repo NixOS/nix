@@ -35,6 +35,10 @@
 
 namespace nix {
 
+DECLARE_CONFIG_SERIALISER(StoreReference)
+DECLARE_CONFIG_SERIALISER(std::optional<StoreReference>)
+DECLARE_CONFIG_SERIALISER(std::set<StoreReference>)
+DECLARE_CONFIG_SERIALISER(std::vector<StoreReference>)
 
 /* The default location of the daemon socket, relative to nixStateDir.
    The socket is in a directory to allow you to control access to the
@@ -318,6 +322,66 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .handler = {[this]() { override(smRelaxed); }}
     });
 }
+
+template<> StoreReference BaseSetting<StoreReference>::parse(const std::string & str) const
+{
+    return StoreReference::parse(str);
+}
+
+template<> std::string BaseSetting<StoreReference>::to_string() const
+{
+    return value.render();
+}
+
+template<> std::optional<StoreReference> BaseSetting<std::optional<StoreReference>>::parse(const std::string & str) const
+{
+    if (str == "")
+        return std::nullopt;
+    else
+        return StoreReference::parse(str);
+}
+
+template<> std::string BaseSetting<std::optional<StoreReference>>::to_string() const
+{
+    return value ? value->render() : "";
+}
+
+template<> std::set<StoreReference> BaseSetting<std::set<StoreReference>>::parse(const std::string & str) const
+{
+    std::set<StoreReference> res;
+    for (const auto & s : tokenizeString<std::vector<std::string>>(str))
+        res.insert(StoreReference::parse(s));
+    return res;
+}
+
+template<> std::string BaseSetting<std::set<StoreReference>>::to_string() const
+{
+    std::set<std::string> strings;
+    for (const auto & ref : value)
+        strings.insert(ref.render());
+    return concatStringsSep(" ", strings);
+}
+
+template<> std::vector<StoreReference> BaseSetting<std::vector<StoreReference>>::parse(const std::string & str) const
+{
+    std::vector<StoreReference> res;
+    for (const auto & s : tokenizeString<std::vector<std::string>>(str))
+        res.push_back(StoreReference::parse(s));
+    return res;
+}
+
+template<> std::string BaseSetting<std::vector<StoreReference>>::to_string() const
+{
+    std::vector<std::string> strings;
+    for (const auto & ref : value)
+        strings.push_back(ref.render());
+    return concatStringsSep(" ", strings);
+}
+
+template class BaseSetting<StoreReference>;
+template class BaseSetting<std::optional<StoreReference>>;
+template class BaseSetting<std::set<StoreReference>>;
+template class BaseSetting<std::vector<StoreReference>>;
 
 unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {

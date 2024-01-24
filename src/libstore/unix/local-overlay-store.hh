@@ -13,7 +13,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         , LocalStoreConfig(params)
     { }
 
-    const Setting<std::string> lowerStoreUri{(StoreConfig*) this, "", "lower-store",
+    const Setting<StoreReference> lowerStoreUri{this, StoreReference{.variant = StoreReference::Auto{}}, "lower-store",
         R"(
           [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
           for the lower store. The default is `auto` (i.e. use the Nix daemon or `/nix/store` directly).
@@ -22,12 +22,12 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const PathSetting upperLayer{(StoreConfig*) this, "", "upper-layer",
+    const PathSetting upperLayer{this, "", "upper-layer",
         R"(
           Directory containing the OverlayFS upper layer for this store's store dir.
         )"};
 
-    Setting<bool> checkMount{(StoreConfig*) this, true, "check-mount",
+    Setting<bool> checkMount{this, true, "check-mount",
         R"(
           Check that the overlay filesystem is correctly mounted.
 
@@ -38,7 +38,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    const PathSetting remountHook{(StoreConfig*) this, "", "remount-hook",
+    const PathSetting remountHook{this, "", "remount-hook",
         R"(
           Script or other executable to run when overlay filesystem needs remounting.
 

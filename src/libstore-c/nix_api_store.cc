@@ -49,14 +49,15 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
         if (uri_str.empty())
             return new Store{nix::openStore()};
 
-        if (!params)
-            return new Store{nix::openStore(uri_str)};
+        auto base_uri = nix::StoreReference::parse(uri_str);
 
-        nix::Store::Params params_map;
-        for (size_t i = 0; params[i] != nullptr; i++) {
-            params_map[params[i][0]] = params[i][1];
+        if (params) {
+            for (size_t i = 0; params[i] != nullptr; i++) {
+                base_uri.params[params[i][0]] = params[i][1];
+            }
         }
-        return new Store{nix::openStore(uri_str, params_map)};
+
+        return new Store{nix::openStore(std::move(base_uri))};
     }
     NIXC_CATCH_ERRS_NULL
 }
