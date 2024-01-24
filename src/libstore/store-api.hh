@@ -858,8 +858,8 @@ ref<Store> openStore(StoreURI && storeURI);
 
 
 /**
- * Convenient function to `StoreURI::parse` a raw unparsed store URI and
- * `openStore` it.
+ * Opens the store at `uri`, where `uri` is in the format expected by `StoreURI::parse`
+
  */
 ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
     const Store::Params & extraParams = Store::Params());
