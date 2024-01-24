@@ -6,7 +6,8 @@
 
 namespace nix {
 
-Machine::Machine(decltype(storeUri) storeUri,
+Machine::Machine(
+    const std::string & storeUri,
     decltype(systemTypes) systemTypes,
     decltype(sshKey) sshKey,
     decltype(maxJobs) maxJobs,
@@ -14,21 +15,15 @@ Machine::Machine(decltype(storeUri) storeUri,
     decltype(supportedFeatures) supportedFeatures,
     decltype(mandatoryFeatures) mandatoryFeatures,
     decltype(sshPublicHostKey) sshPublicHostKey) :
-    storeUri(
-        // Backwards compatibility: if the URI is schemeless, is not a path,
-        // and is not one of the special store connection words, prepend
-        // ssh://.
-        storeUri.find("://") != std::string::npos
-        || storeUri.find("/") != std::string::npos
-        || storeUri == "auto"
-        || storeUri == "daemon"
-        || storeUri == "local"
-        || hasPrefix(storeUri, "auto?")
-        || hasPrefix(storeUri, "daemon?")
-        || hasPrefix(storeUri, "local?")
-        || hasPrefix(storeUri, "?")
-        ? storeUri
-        : "ssh://" + storeUri),
+    storeUri([&storeUri]{
+        try {
+            return StoreURI::parse(storeUri);
+        } catch (UsageError &) {
+            // Backwards compatibility: if the URI is invalid, it might
+            // be bare host name.
+            return StoreURI::parse("ssh://" + storeUri);
+        }
+    }()),
     systemTypes(systemTypes),
     sshKey(sshKey),
     maxJobs(maxJobs),
@@ -62,21 +57,24 @@ bool Machine::mandatoryMet(const std::set<std::string> & features) const
 
 ref<Store> Machine::openStore() const
 {
-    Store::Params storeParams;
-    if (hasPrefix(storeUri, "ssh://")) {
-        storeParams["max-connections"] = "1";
-        storeParams["log-fd"] = "4";
+    auto storeUri = this->storeUri;
+
+    auto * generic = std::get_if<StoreURI::Generic>(&storeUri.variant);
+
+    if (generic && generic->scheme == "ssh") {
+        storeUri.params["max-connections"] = "1";
+        storeUri.params["log-fd"] = "4";
     }
 
-    if (hasPrefix(storeUri, "ssh://") || hasPrefix(storeUri, "ssh-ng://")) {
+    if (generic && generic->scheme == "ssh-ng") {
         if (sshKey != "")
-            storeParams["ssh-key"] = sshKey;
+            storeUri.params["ssh-key"] = sshKey;
         if (sshPublicHostKey != "")
-            storeParams["base64-ssh-public-host-key"] = sshPublicHostKey;
+            storeUri.params["base64-ssh-public-host-key"] = sshPublicHostKey;
     }
 
     {
-        auto & fs = storeParams["system-features"];
+        auto & fs = storeUri.params["system-features"];
         auto append = [&](auto feats) {
             for (auto & f : feats) {
                 if (fs.size() > 0) fs += ' ';
@@ -87,7 +85,7 @@ ref<Store> Machine::openStore() const
         append(mandatoryFeatures);
     }
 
-    return nix::openStore(storeUri, storeParams);
+    return nix::openStore(std::move(storeUri));
 }
 
 static std::vector<std::string> expandBuilderLines(const std::string & builders)

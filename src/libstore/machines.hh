@@ -2,6 +2,7 @@
 ///@file
 
 #include "types.hh"
+#include "store-uri.hh"
 
 namespace nix {
 
@@ -9,7 +10,7 @@ class Store;
 
 struct Machine {
 
-    const std::string storeUri;
+    const StoreURI storeUri;
     const std::set<std::string> systemTypes;
     const std::string sshKey;
     const unsigned int maxJobs;
@@ -36,7 +37,8 @@ struct Machine {
      */
     bool mandatoryMet(const std::set<std::string> & features) const;
 
-    Machine(decltype(storeUri) storeUri,
+    Machine(
+        const std::string & storeUri,
         decltype(systemTypes) systemTypes,
         decltype(sshKey) sshKey,
         decltype(maxJobs) maxJobs,
