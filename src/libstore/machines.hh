@@ -13,7 +13,7 @@ struct Machine {
     const std::set<std::string> systemTypes;
     const std::string sshKey;
     const unsigned int maxJobs;
-    const unsigned int speedFactor;
+    const float speedFactor;
     const std::set<std::string> supportedFeatures;
     const std::set<std::string> mandatoryFeatures;
     const std::string sshPublicHostKey;
