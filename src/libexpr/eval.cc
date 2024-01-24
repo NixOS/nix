@@ -2259,7 +2259,9 @@ BackedStringView EvalState::coerceToString(
             return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) {
-            error("cannot coerce %1% to a string", showType(v))
+            error("cannot coerce %1% to a string: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
                 .withTrace(pos, errorCtx)
                 .debugThrow<TypeError>();
         }
@@ -2305,7 +2307,9 @@ BackedStringView EvalState::coerceToString(
         }
     }
 
-    error("cannot coerce %1% to a string", showType(v))
+    error("cannot coerce %1% to a string: %2%",
+          showType(v),
+          ValuePrinter(*this, v, errorPrintOptions))
         .withTrace(pos, errorCtx)
         .debugThrow<TypeError>();
 }
@@ -2665,7 +2669,7 @@ void EvalState::printStatistics()
 std::string ExternalValueBase::coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
     throw TypeError({
-        .msg = hintfmt("cannot coerce %1% to a string", showType())
+        .msg = hintfmt("cannot coerce %1% to a string: %2%", showType(), *this)
     });
 }
 
