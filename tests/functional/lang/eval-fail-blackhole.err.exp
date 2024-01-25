@@ -6,6 +6,17 @@ error:
              |   ^
             3|   x = y;
 
+       … entering the infinite recursion
+
+       … while evaluating variable 'y'
+
+         at /pwd/lang/eval-fail-blackhole.nix:3:7:
+
+            2|   body = x;
+            3|   x = y;
+             |       ^
+            4|   y = x;
+
        error: infinite recursion encountered
        at /pwd/lang/eval-fail-blackhole.nix:3:7:
             2|   body = x;

@@ -11,9 +11,9 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame)
+void BaseError::addTrace(Value * valuePtr, std::shared_ptr<Pos> && e, hintformat hint, bool frame)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame, .valuePtr = valuePtr });
 }
 
 void throwExceptionSelfCheck(){
@@ -374,6 +374,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     auto ellipsisIndent = "  ";
 
     bool frameOnly = false;
+    Value * recursion = einfo.recursionPtr;
     if (!einfo.traces.empty()) {
         // Stack traces seen since we last printed a chunk of `duplicate frames
         // omitted`.
@@ -389,6 +390,14 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             if (!showTrace && count > 3) {
                 oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
                 break;
+            }
+
+            if (recursion && recursion == trace.valuePtr) {
+                oss << "\n" << "… entering the infinite recursion\n";
+                // A subsequent frame may be about the same value (e.g. multiple
+                // frames for formatting reasons), but we only want to print the
+                // the start of the infinite recursion once.
+                recursion = nullptr;
             }
 
             if (tracesSeen.count(trace)) {
