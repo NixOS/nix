@@ -34,7 +34,13 @@ static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
     return data->state.positions.add(data->origin, loc.first_line, loc.first_column);
 }
 
+static inline PosIdx makeEndPos(const YYLTYPE & loc, ParseData * data)
+{
+    return data->state.positions.add(data->origin, loc.last_line, loc.last_column);
+}
+
 #define CUR_POS makeCurPos(*yylloc, data)
+#define END_POS makeEndPos(*yylloc, data)
 
 static void initLoc(YYLTYPE * loc)
 {
@@ -301,7 +307,13 @@ or          { return OR_KW; }
 
 [ \t\r\n]+    /* eat up whitespace */
 \#[^\r\n]*    /* single-line comments */
-\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
+\/\*([^*]|\*+[^*/])*\*+\/  {
+  data->comments.emplace_back(Comment {
+    .content = std::string(yytext, (size_t) yyleng),
+    .start = CUR_POS,
+    .end = END_POS
+  });
+}
 
 {ANY}       {
               /* Don't return a negative number, as this will cause
