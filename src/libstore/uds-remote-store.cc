@@ -40,12 +40,13 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 
 
 UDSRemoteStore::UDSRemoteStore(
-    const std::string scheme,
-    std::string socket_path,
+    std::string_view scheme,
+    PathView socket_path,
     const Params & params)
     : UDSRemoteStore(params)
 {
-    path.emplace(socket_path);
+    if (!socket_path.empty())
+        path.emplace(socket_path);
 }
 
 
@@ -54,6 +55,7 @@ std::string UDSRemoteStore::getUri()
     if (path) {
         return std::string("unix://") + *path;
     } else {
+        // unix:// with no path also works. Change what we return?
         return "daemon";
     }
 }

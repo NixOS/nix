@@ -32,9 +32,10 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
 
 class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
-public:
-
-    SSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    SSHStore(
+        std::string_view scheme,
+        std::string host,
+        const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
         , CommonSSHStoreConfig(params)
@@ -44,11 +45,21 @@ public:
         , host(host)
         , master(
             host,
-            sshKey,
-            sshPublicHostKey,
+            sshKey.get(),
+            sshPublicHostKey.get(),
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress)
+    {
+    }
+
+public:
+
+    SSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params)
+        : SSHStore{scheme, SSHStoreConfig::extractConnStr(scheme, host), params}
     {
     }
 
@@ -141,7 +152,10 @@ class MountedSSHStore : public virtual MountedSSHStoreConfig, public virtual SSH
 {
 public:
 
-    MountedSSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    MountedSSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
         , CommonSSHStoreConfig(params)

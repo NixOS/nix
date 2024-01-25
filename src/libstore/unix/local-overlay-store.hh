@@ -92,7 +92,7 @@ class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual
 public:
     LocalOverlayStore(const Params & params);
 
-    LocalOverlayStore(std::string scheme, std::string path, const Params & params)
+    LocalOverlayStore(std::string_view scheme, PathView path, const Params & params)
         : LocalOverlayStore(params)
     {
         if (!path.empty())

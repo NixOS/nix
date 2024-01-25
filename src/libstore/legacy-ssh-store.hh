@@ -41,7 +41,17 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
-    LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params);
+    LegacySSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params);
+
+private:
+    LegacySSHStore(
+        std::string_view scheme,
+        std::string host,
+        const Params & params);
+public:
 
     ref<Connection> openConnection();
 

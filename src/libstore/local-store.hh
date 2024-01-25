@@ -137,12 +137,15 @@ public:
      * necessary.
      */
     LocalStore(const Params & params);
-    LocalStore(std::string scheme, std::string path, const Params & params);
+    LocalStore(
+        std::string_view scheme,
+        PathView path,
+        const Params & params);
 
     ~LocalStore();
 
     static std::set<std::string> uriSchemes()
-    { return {}; }
+    { return {"local"}; }
 
     /**
      * Implementations of abstract store API methods.
