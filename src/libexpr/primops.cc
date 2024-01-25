@@ -1878,7 +1878,7 @@ static RegisterPrimOp primop_outputOf({
       For instance,
       ```nix
       builtins.outputOf
-        (builtins.outputOf myDrv "out)
+        (builtins.outputOf myDrv "out")
         "out"
       ```
       will return a placeholder for the output of the output of `myDrv`.
