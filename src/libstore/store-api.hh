@@ -104,7 +104,7 @@ struct StoreConfig : public Config
 
     StoreConfig() = delete;
 
-    StringSet getDefaultSystemFeatures();
+    static StringSet getDefaultSystemFeatures();
 
     virtual ~StoreConfig() { }
 
