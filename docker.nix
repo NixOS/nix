@@ -9,6 +9,10 @@
 , maxLayers ? 100
 , nixConf ? {}
 , flake-registry ? null
+, uid ? 0
+, gid ? 0
+, uname ? "root"
+, gname ? "root"
 }:
 let
   defaultPkgs = with pkgs; [
@@ -50,6 +54,15 @@ let
       description = "Unprivileged account (don't use!)";
     };
 
+  } // lib.optionalAttrs (uid != 0) {
+    "${uname}" = {
+      uid = uid;
+      shell = "${pkgs.bashInteractive}/bin/bash";
+      home = "/home/${uname}";
+      gid = gid;
+      groups = [ "${gname}" ];
+      description = "Nix user";
+    };
   } // lib.listToAttrs (
     map
       (
@@ -70,6 +83,8 @@ let
     root.gid = 0;
     nixbld.gid = 30000;
     nobody.gid = 65534;
+  } // lib.optionalAttrs (gid != 0) {
+    "${gname}".gid = gid;
   };
 
   userToPasswd = (
@@ -149,6 +164,8 @@ let
       vStr = if builtins.isList v then lib.concatStringsSep " " v else v;
     in
       "${n} = ${vStr}") (defaultNixConf // nixConf))) + "\n";
+
+  userHome = if uid == 0 then "/root" else "/home/${uname}";
 
   baseSystem =
     let
@@ -237,26 +254,26 @@ let
       mkdir -p $out/etc/nix
       cat $nixConfContentsPath > $out/etc/nix/nix.conf
 
-      mkdir -p $out/root
-      mkdir -p $out/nix/var/nix/profiles/per-user/root
+      mkdir -p $out${userHome}
+      mkdir -p $out/nix/var/nix/profiles/per-user/${uname}
 
       ln -s ${profile} $out/nix/var/nix/profiles/default-1-link
       ln -s $out/nix/var/nix/profiles/default-1-link $out/nix/var/nix/profiles/default
-      ln -s /nix/var/nix/profiles/default $out/root/.nix-profile
+      ln -s /nix/var/nix/profiles/default $out${userHome}/.nix-profile
 
-      ln -s ${channel} $out/nix/var/nix/profiles/per-user/root/channels-1-link
-      ln -s $out/nix/var/nix/profiles/per-user/root/channels-1-link $out/nix/var/nix/profiles/per-user/root/channels
+      ln -s ${channel} $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link
+      ln -s $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link $out/nix/var/nix/profiles/per-user/${uname}/channels
 
-      mkdir -p $out/root/.nix-defexpr
-      ln -s $out/nix/var/nix/profiles/per-user/root/channels $out/root/.nix-defexpr/channels
-      echo "${channelURL} ${channelName}" > $out/root/.nix-channels
+      mkdir -p $out${userHome}/.nix-defexpr
+      ln -s $out/nix/var/nix/profiles/per-user/${uname}/channels $out${userHome}/.nix-defexpr/channels
+      echo "${channelURL} ${channelName}" > $out${userHome}/.nix-channels
 
       mkdir -p $out/bin $out/usr/bin
       ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
       ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
 
     '' + (lib.optionalString (flake-registry-path != null) ''
-      nixCacheDir="/root/.cache/nix"
+      nixCacheDir="${userHome}/.cache/nix"
       mkdir -p $out$nixCacheDir
       globalFlakeRegistryPath="$nixCacheDir/flake-registry.json"
       ln -s ${flake-registry-path} $out$globalFlakeRegistryPath
@@ -268,7 +285,7 @@ let
 in
 pkgs.dockerTools.buildLayeredImageWithNixDb {
 
-  inherit name tag maxLayers;
+  inherit name tag maxLayers uid gid uname gname;
 
   contents = [ baseSystem ];
 
@@ -279,25 +296,28 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
   fakeRootCommands = ''
     chmod 1777 tmp
     chmod 1777 var/tmp
+    chown -R ${toString uid}:${toString gid} .${userHome}
+    chown -R ${toString uid}:${toString gid} nix
   '';
 
   config = {
-    Cmd = [ "/root/.nix-profile/bin/bash" ];
+    Cmd = [ "${userHome}/.nix-profile/bin/bash" ];
+    User = "${toString uid}:${toString gid}";
     Env = [
-      "USER=root"
+      "USER=${uname}"
       "PATH=${lib.concatStringsSep ":" [
-        "/root/.nix-profile/bin"
+        "${userHome}/.nix-profile/bin"
         "/nix/var/nix/profiles/default/bin"
         "/nix/var/nix/profiles/default/sbin"
       ]}"
       "MANPATH=${lib.concatStringsSep ":" [
-        "/root/.nix-profile/share/man"
+        "${userHome}/.nix-profile/share/man"
         "/nix/var/nix/profiles/default/share/man"
       ]}"
       "SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "GIT_SSL_CAINFO=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
-      "NIX_PATH=/nix/var/nix/profiles/per-user/root/channels:/root/.nix-defexpr/channels"
+      "NIX_PATH=/nix/var/nix/profiles/per-user/${uname}/channels:${userHome}/.nix-defexpr/channels"
     ];
   };
 
