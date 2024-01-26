@@ -13,6 +13,9 @@
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
+#include "auth.hh"
+
+#include <sys/socket.h>
 
 namespace nix::daemon {
 
@@ -261,9 +264,55 @@ struct ClientSettings
     }
 };
 
+struct CallbackAuthSource : auth::AuthSource
+{
+    /**
+     * File descriptor to send requests to the client.
+     */
+    AutoCloseFD fd;
+
+    FdSource from;
+    FdSink to;
+
+    WorkerProto::ReadConn fromConn;
+    WorkerProto::WriteConn toConn;
+
+    ref<Store> store;
+
+    CallbackAuthSource(AutoCloseFD fd, WorkerProto::Version clientVersion, ref<Store> store)
+        : fd(std::move(fd))
+        , from(this->fd.get())
+        , to(this->fd.get())
+        , fromConn {.from = from, .version = clientVersion}
+        , toConn {.to = to, .version = clientVersion}
+        , store(store)
+    { }
+
+    std::optional<auth::AuthData> get(const auth::AuthData & request) override
+    {
+        to << (int) WorkerProto::CallbackOp::FillAuth;
+        WorkerProto::Serialise<auth::AuthData>::write(*store, toConn, request);
+        to << false;
+        to.flush();
+
+        if (readInt(from))
+            return WorkerProto::Serialise<std::optional<auth::AuthData>>::read(*store, fromConn);
+        else
+            return std::nullopt;
+    }
+
+    void set(const auth::AuthData & authData) override
+    {
+    }
+
+    void erase(const auth::AuthData & authData) override
+    {
+    }
+};
+
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, WorkerProto::Version clientVersion,
-    Source & from, BufferedSink & to, WorkerProto::Op op)
+    FdSource & from, BufferedSink & to, WorkerProto::Op op)
 {
     WorkerProto::ReadConn rconn {
         .from = from,
@@ -996,6 +1045,39 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::QueryFailedPaths:
     case WorkerProto::Op::ClearFailedPaths:
         throw Error("Removed operation %1%", op);
+
+    case WorkerProto::Op::InitCallback: {
+        logger->startWork();
+
+        logger->stopWork();
+        to << 1;
+        to.flush();
+
+        // FIXME: do this before stopWork().
+        struct msghdr msg = {0};
+
+        char msgData[256];
+        struct iovec io = { .iov_base = msgData, .iov_len = sizeof(msgData) };
+        msg.msg_iov = &io;
+        msg.msg_iovlen = 1;
+
+        char controlData[256];
+        msg.msg_control = controlData;
+        msg.msg_controllen = sizeof(controlData);
+
+        if (recvmsg(from.fd, &msg, 0) < 0)
+            throw SysError("receiving callback socket");
+
+        AutoCloseFD fd(*((int *) CMSG_DATA(CMSG_FIRSTHDR(&msg))));
+        debug("received file descriptor %d from client", fd.get());
+
+        if (trusted)
+            auth::getAuthenticator()->addAuthSource(
+                make_ref<CallbackAuthSource>(
+                    std::move(fd), clientVersion, store));
+
+        break;
+    }
 
     default:
         throw Error("invalid operation %1%", op);

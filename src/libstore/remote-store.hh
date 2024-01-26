@@ -170,7 +170,7 @@ protected:
 
     virtual ref<Connection> openConnection() = 0;
 
-    void initConnection(Connection & conn);
+    virtual void initConnection(Connection & conn);
 
     ref<Pool<Connection>> connections;
 

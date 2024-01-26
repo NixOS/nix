@@ -56,10 +56,14 @@ private:
     struct Connection : RemoteStore::Connection
     {
         AutoCloseFD fd;
+        AutoCloseFD callbackFd;
+        std::thread callbackThread;
+        ~Connection();
         void closeWrite() override;
     };
 
     ref<RemoteStore::Connection> openConnection() override;
+    void initConnection(RemoteStore::Connection & conn) override;
     std::optional<std::string> path;
 };
 

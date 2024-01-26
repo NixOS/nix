@@ -6,11 +6,40 @@
 #include "worker-protocol-impl.hh"
 #include "archive.hh"
 #include "path-info.hh"
+#include "auth.hh"
 
 #include <chrono>
 #include <nlohmann/json.hpp>
 
 namespace nix {
+
+
+template<typename T>
+std::optional<T> readOptional(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto tag = readNum<uint8_t>(conn.from);
+    switch (tag) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return WorkerProto::Serialise<T>::read(store, conn);
+        default:
+            throw Error("Invalid optional tag from remote");
+    }
+}
+
+
+template<typename T>
+void writeOptional(const StoreDirConfig & store, WorkerProto::WriteConn conn, const std::optional<T> & x)
+{
+    if (!x.has_value()) {
+        conn.to << uint8_t{0};
+    } else {
+        conn.to << uint8_t{1};
+        WorkerProto::Serialise<T>::write(store, conn, *x);
+    }
+}
+
 
 /* protocol-specific definitions */
 
@@ -220,6 +249,39 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & 
             << pathInfo.sigs
             << renderContentAddress(pathInfo.ca);
     }
+}
+
+
+auth::AuthData WorkerProto::Serialise<auth::AuthData>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    auth::AuthData authData;
+    conn.from
+        >> authData.protocol
+        >> authData.host
+        >> authData.path
+        >> authData.userName
+        >> authData.password;
+    return authData;
+}
+
+void WorkerProto::Serialise<auth::AuthData>::write(const StoreDirConfig & store, WriteConn conn, const auth::AuthData & authData)
+{
+    conn.to
+        << authData.protocol
+        << authData.host
+        << authData.path
+        << authData.userName
+        << authData.password;
+}
+
+std::optional<auth::AuthData> WorkerProto::Serialise<std::optional<auth::AuthData>>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    return readOptional<auth::AuthData>(store, conn);
+}
+
+void WorkerProto::Serialise<std::optional<auth::AuthData>>::write(const StoreDirConfig & store, WriteConn conn, const std::optional<auth::AuthData> & authData)
+{
+    writeOptional<auth::AuthData>(store, conn, authData);
 }
 
 }

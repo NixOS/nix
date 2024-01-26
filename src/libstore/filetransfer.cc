@@ -7,6 +7,8 @@
 #include "finally.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "auth.hh"
+#include "url.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -344,10 +346,31 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransferSettings.stalledDownloadTimeout.get());
 
+            #if 0
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
             curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+            #endif
+
+            auto authenticator = auth::getAuthenticator();
+            auto url = parseURL(request.uri);
+            auth::AuthData authRequest = {
+                .protocol = url.scheme,
+                .host = url.authority,
+                .path = url.path,
+                // FIXME: add username
+            };
+            auto authData = authenticator->fill(authRequest, false);
+
+            if (authData) {
+                if (authData->userName)
+                    curl_easy_setopt(req, CURLOPT_USERNAME, authData->userName->c_str());
+                if (authData->password)
+                    curl_easy_setopt(req, CURLOPT_PASSWORD, authData->password->c_str());
+            }
+            else
+                debug("no auth data for '%s'", request.uri);
 
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
