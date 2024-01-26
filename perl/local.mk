@@ -41,3 +41,6 @@ Store_FORCE_INSTALL = 1
 Store_INSTALL_DIR = $(perllibdir)/auto/Nix/Store
 
 clean-files += lib/Nix/Config.pm lib/Nix/Store.cc Makefile.config
+
+check: all
+	yath test
