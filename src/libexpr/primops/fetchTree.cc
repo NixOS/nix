@@ -614,8 +614,7 @@ static RegisterPrimOp primop_fetchGit({
 
       - `shallow` (default: `false`)
 
-        A Boolean parameter that specifies whether fetching from a shallow remote repository is allowed.
-        This still performs a full clone of what is available on the remote.
+        Make a shallow clone when fetching the Git tree.
 
       - `allRefs`
 
