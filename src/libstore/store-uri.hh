@@ -43,7 +43,7 @@ struct StoreURI {
     using Params = std::map<std::string, std::string>;
 
     /**
-     * Special keyword `` or `auto`
+     * Special store reference `""` or `"auto"`
      */
     struct Auto {
         inline auto operator <=> (const Auto & rhs) const = default;
