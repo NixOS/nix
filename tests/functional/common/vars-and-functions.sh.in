@@ -163,11 +163,11 @@ startGcDaemon() {
         -s "$NIX_STORE_DIR" \
         > /dev/null 2>&1 \
             &
+    pidGcDaemon=$!
     for ((i = 0; i < 30; i++)); do
         if [[ -S $NIX_GC_SOCKET_PATH ]]; then break; fi
         sleep 1
     done
-    pidGcDaemon=$!
     trapFunctions[killGcDaemon]=killGcDaemon
 }
 
