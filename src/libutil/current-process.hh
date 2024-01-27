@@ -2,6 +2,7 @@
 ///@file
 
 #include <optional>
+#include <sys/resource.h>
 
 #include "types.hh"
 
