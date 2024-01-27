@@ -1,19 +1,25 @@
 #pragma once
+///@file
 
 #include "eval.hh"
 
 namespace nix {
 
-// using C a struct allows us to avoid having to define the special
-// members that using string_view here would implicitly delete.
-struct StringToken {
-  const char * p;
-  size_t l;
-  bool hasIndentation;
-  operator std::string_view() const { return {p, l}; }
+/**
+ * @note Storing a C-style `char *` and `size_t` allows us to avoid
+ * having to define the special members that using string_view here
+ * would implicitly delete.
+ */
+struct StringToken
+{
+    const char * p;
+    size_t l;
+    bool hasIndentation;
+    operator std::string_view() const { return {p, l}; }
 };
 
-struct ParserLocation {
+struct ParserLocation
+{
     int first_line, first_column;
     int last_line, last_column;
 
@@ -36,7 +42,8 @@ struct ParserLocation {
     }
 };
 
-struct ParserState {
+struct ParserState
+{
     SymbolTable & symbols;
     PosTable & positions;
     Expr * result;
