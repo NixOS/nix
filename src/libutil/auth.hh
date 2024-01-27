@@ -16,7 +16,9 @@ struct AuthData
 
     static AuthData parseGitAuthData(std::string_view raw);
 
-    std::optional<AuthData> match(const AuthData & request);
+    std::optional<AuthData> match(const AuthData & request) const;
+
+    std::string toGitAuthData() const;
 };
 
 std::ostream & operator << (std::ostream & str, const AuthData & authData);

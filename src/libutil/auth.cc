@@ -27,10 +27,16 @@ AuthData AuthData::parseGitAuthData(std::string_view raw)
             res.password = value;
     }
 
+    if (!res.protocol)
+        throw Error("authentication data '%s' does not contain a protocol", res);
+
+    if (!res.host)
+        throw Error("authentication data '%s' does not contain a host", res);
+
     return res;
 }
 
-std::optional<AuthData> AuthData::match(const AuthData & request)
+std::optional<AuthData> AuthData::match(const AuthData & request) const
 {
     if (protocol && request.protocol && *protocol != *request.protocol)
         return std::nullopt;
@@ -56,6 +62,17 @@ std::optional<AuthData> AuthData::match(const AuthData & request)
     return res;
 }
 
+std::string AuthData::toGitAuthData() const
+{
+    std::string res;
+    if (protocol) res += fmt("protocol=%s\n", *protocol);
+    if (host) res += fmt("host=%s\n", *host);
+    if (path) res += fmt("path=%s\n", *path);
+    if (userName) res += fmt("username=%s\n", *userName);
+    if (password) res += fmt("password=%s\n", *password);
+    return res;
+}
+
 std::ostream & operator << (std::ostream & str, const AuthData & authData)
 {
     str << fmt("{protocol = %s, host=%s, path=%s, userName=%s, password=%s}",
@@ -63,7 +80,7 @@ std::ostream & operator << (std::ostream & str, const AuthData & authData)
         authData.host.value_or(""),
         authData.path.value_or(""),
         authData.userName.value_or(""),
-        authData.password.value_or(""));
+        authData.password ? "..." : "");
     return str;
 }
 
