@@ -70,10 +70,8 @@ void ExprOpHasAttr::show(const SymbolTable & symbols, std::ostream & str) const
     str << ") ? " << showAttrPath(symbols, attrPath) << ")";
 }
 
-void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
+void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) const
 {
-    if (recursive) str << "rec ";
-    str << "{ ";
     typedef const decltype(attrs)::value_type * Attr;
     std::vector<Attr> sorted;
     for (auto & i : attrs) sorted.push_back(&i);
@@ -97,6 +95,13 @@ void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
         i.valueExpr->show(symbols, str);
         str << "; ";
     }
+}
+
+void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
+{
+    if (recursive) str << "rec ";
+    str << "{ ";
+    showBindings(symbols, str);
     str << "}";
 }
 
@@ -152,15 +157,7 @@ void ExprCall::show(const SymbolTable & symbols, std::ostream & str) const
 void ExprLet::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(let ";
-    for (auto & i : attrs->attrs)
-        if (i.second.inherited()) {
-            str << "inherit " << symbols[i.first] << "; ";
-        }
-        else {
-            str << symbols[i.first] << " = ";
-            i.second.e->show(symbols, str);
-            str << "; ";
-        }
+    attrs->showBindings(symbols, str);
     str << "in ";
     body->show(symbols, str);
     str << ")";
