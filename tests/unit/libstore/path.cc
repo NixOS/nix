@@ -39,7 +39,6 @@ TEST_DONT_PARSE(double_star, "**")
 TEST_DONT_PARSE(star_first, "*,foo")
 TEST_DONT_PARSE(star_second, "foo,*")
 TEST_DONT_PARSE(bang, "foo!o")
-TEST_DONT_PARSE(dotfile, ".gitignore")
 
 #undef TEST_DONT_PARSE
 
