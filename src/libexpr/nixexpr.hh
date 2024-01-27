@@ -135,6 +135,18 @@ struct ExprVar : Expr
     COMMON_METHODS
 };
 
+struct ExprInheritFrom : ExprVar
+{
+    ExprInheritFrom(PosIdx pos, Displacement displ): ExprVar(pos, {})
+    {
+        this->level = 0;
+        this->displ = displ;
+        this->fromWith = nullptr;
+    }
+
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+};
+
 struct ExprSelect : Expr
 {
     PosIdx pos;
@@ -195,6 +207,7 @@ struct ExprAttrs : Expr
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
+    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
     struct DynamicAttrDef {
         Expr * nameExpr, * valueExpr;
         PosIdx pos;
@@ -208,6 +221,9 @@ struct ExprAttrs : Expr
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 
+    std::shared_ptr<const StaticEnv> bindInheritSources(
+        EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+    Env * buildInheritFromEnv(EvalState & state, Env & up);
     void showBindings(const SymbolTable & symbols, std::ostream & str) const;
 };
 
