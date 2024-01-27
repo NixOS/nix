@@ -1207,11 +1207,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Displacement displ = 0;
         for (auto & i : attrs) {
             Value * vAttr;
-            if (hasOverrides && !i.second.inherited) {
+            if (hasOverrides && !i.second.inherited()) {
                 vAttr = state.allocValue();
                 mkThunk(*vAttr, env2, i.second.e);
             } else
-                vAttr = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
+                vAttr = i.second.e->maybeThunk(state, i.second.inherited() ? env : env2);
             env2.values[displ++] = vAttr;
             v.attrs->push_back(Attr(i.first, vAttr, i.second.pos));
         }
@@ -1282,7 +1282,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
        environment. */
     Displacement displ = 0;
     for (auto & i : attrs->attrs)
-        env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
+        env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited() ? env : env2);
 
     auto dts = state.debugRepl
         ? makeDebugTraceStacker(

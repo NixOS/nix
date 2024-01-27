@@ -313,7 +313,9 @@ binds
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               state->dupAttr(i.symbol, state->at(@3), $$->attrs[i.symbol].pos);
           auto pos = state->at(@3);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
+          $$->attrs.emplace(
+              i.symbol,
+              ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, ExprAttrs::AttrDef::Kind::Inherited));
       }
       delete $3;
     }
@@ -323,7 +325,12 @@ binds
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               state->dupAttr(i.symbol, state->at(@6), $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), state->at(@6)));
+          $$->attrs.emplace(
+              i.symbol,
+              ExprAttrs::AttrDef(
+                  new ExprSelect(CUR_POS, $4, i.symbol),
+                  state->at(@6),
+                  ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
       delete $6;
     }

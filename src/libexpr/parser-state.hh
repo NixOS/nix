@@ -89,7 +89,7 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
         if (i->symbol) {
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
-                if (!j->second.inherited) {
+                if (!j->second.inherited()) {
                     ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
                     if (!attrs2) dupAttr(attrPath, pos, j->second.pos);
                     attrs = attrs2;

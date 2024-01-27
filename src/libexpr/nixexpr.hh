@@ -160,13 +160,24 @@ struct ExprAttrs : Expr
     bool recursive;
     PosIdx pos;
     struct AttrDef {
-        bool inherited;
+        enum class Kind {
+            /** `attr = expr;` */
+            Plain,
+            /** `inherit attr1 attrn;` */
+            Inherited,
+            /** `inherit (expr) attr1 attrn;` */
+            InheritedFrom,
+        };
+
+        Kind kind;
         Expr * e;
         PosIdx pos;
         Displacement displ; // displacement
-        AttrDef(Expr * e, const PosIdx & pos, bool inherited=false)
-            : inherited(inherited), e(e), pos(pos) { };
+        AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
+            : kind(kind), e(e), pos(pos) { };
         AttrDef() { };
+
+        bool inherited() const { return kind == Kind::Inherited; }
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;

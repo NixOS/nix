@@ -82,7 +82,7 @@ void ExprAttrs::show(const SymbolTable & symbols, std::ostream & str) const
         return sa < sb;
     });
     for (auto & i : sorted) {
-        if (i->second.inherited)
+        if (i->second.inherited())
             str << "inherit " << symbols[i->first] << " " << "; ";
         else {
             str << symbols[i->first] << " = ";
@@ -153,7 +153,7 @@ void ExprLet::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(let ";
     for (auto & i : attrs->attrs)
-        if (i.second.inherited) {
+        if (i.second.inherited()) {
             str << "inherit " << symbols[i.first] << "; ";
         }
         else {
@@ -343,7 +343,7 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
         // No need to sort newEnv since attrs is in sorted order.
 
         for (auto & i : attrs)
-            i.second.e->bindVars(es, i.second.inherited ? env : newEnv);
+            i.second.e->bindVars(es, i.second.inherited() ? env : newEnv);
 
         for (auto & i : dynamicAttrs) {
             i.nameExpr->bindVars(es, newEnv);
@@ -418,7 +418,7 @@ void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
     for (auto & i : attrs->attrs)
-        i.second.e->bindVars(es, i.second.inherited ? env : newEnv);
+        i.second.e->bindVars(es, i.second.inherited() ? env : newEnv);
 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, newEnv));
