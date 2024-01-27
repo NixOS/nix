@@ -1209,9 +1209,9 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             Value * vAttr;
             if (hasOverrides && !i.second.inherited()) {
                 vAttr = state.allocValue();
-                mkThunk(*vAttr, env2, i.second.e);
+                mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, &env2), i.second.e);
             } else
-                vAttr = i.second.e->maybeThunk(state, i.second.inherited() ? env : env2);
+                vAttr = i.second.e->maybeThunk(state, *i.second.chooseByKind(&env2, &env, &env2));
             env2.values[displ++] = vAttr;
             v.attrs->push_back(Attr(i.first, vAttr, i.second.pos));
         }
@@ -1243,9 +1243,14 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         }
     }
 
-    else
-        for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second.e->maybeThunk(state, env), i.second.pos));
+    else {
+        for (auto & i : attrs) {
+            v.attrs->push_back(Attr(
+                    i.first,
+                    i.second.e->maybeThunk(state, *i.second.chooseByKind(&env, &env, &env)),
+                    i.second.pos));
+        }
+    }
 
     /* Dynamic attrs apply *after* rec and __overrides. */
     for (auto & i : dynamicAttrs) {
@@ -1281,8 +1286,11 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
        while the inherited attributes are evaluated in the original
        environment. */
     Displacement displ = 0;
-    for (auto & i : attrs->attrs)
-        env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited() ? env : env2);
+    for (auto & i : attrs->attrs) {
+        env2.values[displ++] = i.second.e->maybeThunk(
+            state,
+            *i.second.chooseByKind(&env2, &env, &env2));
+    }
 
     auto dts = state.debugRepl
         ? makeDebugTraceStacker(

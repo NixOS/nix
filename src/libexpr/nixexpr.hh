@@ -178,6 +178,20 @@ struct ExprAttrs : Expr
         AttrDef() { };
 
         bool inherited() const { return kind == Kind::Inherited; }
+
+        template<typename T>
+        const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
+        {
+            switch (kind) {
+            case Kind::Plain:
+                return plain;
+            case Kind::Inherited:
+                return inherited;
+            default:
+            case Kind::InheritedFrom:
+                return inheritedFrom;
+            }
+        }
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;

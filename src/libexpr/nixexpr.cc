@@ -334,16 +334,19 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
         es.exprEnvs.insert(std::make_pair(this, env));
 
     if (recursive) {
-        auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), recursive ? attrs.size() : 0);
+        auto newEnv = [&] () -> std::shared_ptr<const StaticEnv> {
+            auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs.size());
 
-        Displacement displ = 0;
-        for (auto & i : attrs)
-            newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+            Displacement displ = 0;
+            for (auto & i : attrs)
+                newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+            return newEnv;
+        }();
 
         // No need to sort newEnv since attrs is in sorted order.
 
         for (auto & i : attrs)
-            i.second.e->bindVars(es, i.second.inherited() ? env : newEnv);
+            i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, newEnv));
 
         for (auto & i : dynamicAttrs) {
             i.nameExpr->bindVars(es, newEnv);
@@ -352,7 +355,7 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
     }
     else {
         for (auto & i : attrs)
-            i.second.e->bindVars(es, env);
+            i.second.e->bindVars(es, i.second.chooseByKind(env, env, env));
 
         for (auto & i : dynamicAttrs) {
             i.nameExpr->bindVars(es, env);
@@ -409,16 +412,19 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 
 void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs->attrs.size());
+    auto newEnv = [&] () -> std::shared_ptr<const StaticEnv> {
+        auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs->attrs.size());
 
-    Displacement displ = 0;
-    for (auto & i : attrs->attrs)
-        newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+        Displacement displ = 0;
+        for (auto & i : attrs->attrs)
+            newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+        return newEnv;
+    }();
 
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
     for (auto & i : attrs->attrs)
-        i.second.e->bindVars(es, i.second.inherited() ? env : newEnv);
+        i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, newEnv));
 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, newEnv));
