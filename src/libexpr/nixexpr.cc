@@ -79,10 +79,36 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
         std::string_view sa = symbols[a->first], sb = symbols[b->first];
         return sa < sb;
     });
+    std::vector<Symbol> inherits;
+    std::map<Expr *, std::vector<Symbol>> inheritsFrom;
     for (auto & i : sorted) {
-        if (i->second.inherited())
-            str << "inherit " << symbols[i->first] << " " << "; ";
-        else {
+        switch (i->second.kind) {
+        case AttrDef::Kind::Plain:
+            break;
+        case AttrDef::Kind::Inherited:
+            inherits.push_back(i->first);
+            break;
+        case AttrDef::Kind::InheritedFrom: {
+            auto & select = dynamic_cast<ExprSelect &>(*i->second.e);
+            inheritsFrom[select.e].push_back(i->first);
+            break;
+        }
+        }
+    }
+    if (!inherits.empty()) {
+        str << "inherit";
+        for (auto sym : inherits) str << " " << symbols[sym];
+        str << "; ";
+    }
+    for (const auto & [from, syms] : inheritsFrom) {
+        str << "inherit (";
+        from->show(symbols, str);
+        str << ")";
+        for (auto sym : syms) str << " " << symbols[sym];
+        str << "; ";
+    }
+    for (auto & i : sorted) {
+        if (i->second.kind == AttrDef::Kind::Plain) {
             str << symbols[i->first] << " = ";
             i->second.e->show(symbols, str);
             str << "; ";

@@ -1,1 +1,1 @@
-(let b = 2; c = { }; in { a = 1; inherit b ; d = (c).d; e = (c).e; f = 3; })
+(let b = 2; c = { }; in { inherit b; inherit (c) d e; a = 1; f = 3; })
