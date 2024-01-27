@@ -62,6 +62,7 @@ TEST_DO_PARSE(underscore, "foo_bar")
 TEST_DO_PARSE(period, "foo.txt")
 TEST_DO_PARSE(question_mark, "foo?why")
 TEST_DO_PARSE(equals_sign, "foo=foo")
+TEST_DO_PARSE(dotfile, ".gitignore")
 
 #undef TEST_DO_PARSE
 
