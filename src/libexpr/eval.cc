@@ -1186,6 +1186,18 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+Env * ExprAttrs::buildInheritFromEnv(EvalState & state, Env & up)
+{
+    Env & inheritEnv = state.allocEnv(inheritFromExprs->size());
+    inheritEnv.up = &up;
+
+    Displacement displ = 0;
+    for (auto from : *inheritFromExprs)
+        inheritEnv.values[displ++] = from->maybeThunk(state, up);
+
+    return &inheritEnv;
+}
+
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkAttrs(state.buildBindings(attrs.size() + dynamicAttrs.size()).finish());
@@ -1197,6 +1209,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Env & env2(state.allocEnv(attrs.size()));
         env2.up = &env;
         dynamicEnv = &env2;
+        Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env2) : nullptr;
 
         AttrDefs::iterator overrides = attrs.find(state.sOverrides);
         bool hasOverrides = overrides != attrs.end();
@@ -1209,9 +1222,9 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             Value * vAttr;
             if (hasOverrides && !i.second.inherited()) {
                 vAttr = state.allocValue();
-                mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, &env2), i.second.e);
+                mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), i.second.e);
             } else
-                vAttr = i.second.e->maybeThunk(state, *i.second.chooseByKind(&env2, &env, &env2));
+                vAttr = i.second.e->maybeThunk(state, *i.second.chooseByKind(&env2, &env, inheritEnv));
             env2.values[displ++] = vAttr;
             v.attrs->push_back(Attr(i.first, vAttr, i.second.pos));
         }
@@ -1244,10 +1257,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     }
 
     else {
+        Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env) : nullptr;
         for (auto & i : attrs) {
             v.attrs->push_back(Attr(
                     i.first,
-                    i.second.e->maybeThunk(state, *i.second.chooseByKind(&env, &env, &env)),
+                    i.second.e->maybeThunk(state, *i.second.chooseByKind(&env, &env, inheritEnv)),
                     i.second.pos));
         }
     }
@@ -1282,6 +1296,8 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     Env & env2(state.allocEnv(attrs->attrs.size()));
     env2.up = &env;
 
+    Env * inheritEnv = attrs->inheritFromExprs ? attrs->buildInheritFromEnv(state, env2) : nullptr;
+
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
@@ -1289,7 +1305,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : attrs->attrs) {
         env2.values[displ++] = i.second.e->maybeThunk(
             state,
-            *i.second.chooseByKind(&env2, &env, &env2));
+            *i.second.chooseByKind(&env2, &env, inheritEnv));
     }
 
     auto dts = state.debugRepl

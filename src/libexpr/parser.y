@@ -321,14 +321,17 @@ binds
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
-      /* !!! Should ensure sharing of the expression in $4. */
+      if (!$$->inheritFromExprs)
+          $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+      $$->inheritFromExprs->push_back($4);
+      auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               state->dupAttr(i.symbol, state->at(@6), $$->attrs[i.symbol].pos);
           $$->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
-                  new ExprSelect(CUR_POS, $4, i.symbol),
+                  new ExprSelect(CUR_POS, from, i.symbol),
                   state->at(@6),
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
