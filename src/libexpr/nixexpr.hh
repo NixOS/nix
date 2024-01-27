@@ -140,6 +140,11 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 struct Expr
 {
+    struct AstSymbols {
+        Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
+    };
+
+
     static unsigned long nrExprs;
     Expr() {
         nrExprs++;
