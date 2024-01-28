@@ -285,7 +285,7 @@
 
 - [package attribute set]{#package-attribute-set}
 
-  An [attribute set] containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
+  An [attribute set](@docroot@/language/values.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
   - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
   - attributes that declare something about how the package is supposed to be installed or used,
   - other metadata or arbitrary attributes.
