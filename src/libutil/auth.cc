@@ -7,6 +7,46 @@
 
 namespace nix::auth {
 
+struct AuthSettings : Config
+{
+    Setting<Strings> authSources{
+        this,
+        {"builtin:nix",
+         "git-credential-libsecret",
+         "git-credential-netrc",
+        },
+        "auth-sources",
+        R"(
+          A list of helper programs from which to obtain
+          authentication data for HTTP requests.  These helpers use
+          [the same protocol as Git's credential
+          helpers](https://git-scm.com/docs/gitcredentials#_custom_helpers),
+          so any Git credential helper can be used as an
+          authentication source.
+
+          Nix has the following builtin helpers:
+
+          * `builtin:nix`: Get authentication data from files in
+            `~/.local/share/nix/auth`. For example, the following sets
+            a username and password for `cache.example.org`:
+
+            ```
+            # cat <<EOF > ~/.local/share/nix/auth/my-cache
+            protocol=https
+            host=cache.example.org
+            username=alice
+            password=foobar
+            EOF
+            ```
+
+          Example: `builtin:nix` `git-credential-libsecret`
+        )"};
+};
+
+AuthSettings authSettings;
+
+static GlobalConfig::Register rAuthSettings(&authSettings);
+
 AuthData AuthData::parseGitAuthData(std::string_view raw)
 {
     AuthData res;
@@ -138,9 +178,15 @@ struct ExternalAuthSource : AuthSource
 
 Authenticator::Authenticator()
 {
-    authSources.push_back(make_ref<NixAuthSource>());
-    authSources.push_back(make_ref<ExternalAuthSource>("git-credential-libsecret"));
-    authSources.push_back(make_ref<ExternalAuthSource>("git-credential-netrc"));
+    for (auto & s : authSettings.authSources.get()) {
+        if (hasPrefix(s, "builtin:")) {
+            if (s == "builtin:nix")
+                authSources.push_back(make_ref<NixAuthSource>());
+            else
+                warn("unknown authentication sources '%s'", s);
+        } else
+            authSources.push_back(make_ref<ExternalAuthSource>(s));
+    }
 }
 
 std::optional<AuthData> Authenticator::fill(const AuthData & request, bool required)
