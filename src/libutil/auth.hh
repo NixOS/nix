@@ -27,9 +27,11 @@ struct AuthSource
 {
     virtual std::optional<AuthData> get(const AuthData & request) = 0;
 
-    virtual void set(const AuthData & authData) = 0;
+    virtual bool set(const AuthData & authData)
+    { return false; }
 
-    virtual void erase(const AuthData & authData) = 0;
+    virtual void erase(const AuthData & authData)
+    { }
 };
 
 class Authenticator

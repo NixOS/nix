@@ -300,14 +300,6 @@ struct CallbackAuthSource : auth::AuthSource
         else
             return std::nullopt;
     }
-
-    void set(const auth::AuthData & authData) override
-    {
-    }
-
-    void erase(const auth::AuthData & authData) override
-    {
-    }
 };
 
 static void performOp(TunnelLogger * logger, ref<Store> store,

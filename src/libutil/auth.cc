@@ -3,6 +3,7 @@
 #include "file-system.hh"
 #include "users.hh"
 #include "util.hh"
+#include "processes.hh"
 
 namespace nix::auth {
 
@@ -26,12 +27,6 @@ AuthData AuthData::parseGitAuthData(std::string_view raw)
         else if (key == "password")
             res.password = value;
     }
-
-    if (!res.protocol)
-        throw Error("authentication data '%s' does not contain a protocol", res);
-
-    if (!res.host)
-        throw Error("authentication data '%s' does not contain a host", res);
 
     return res;
 }
@@ -112,23 +107,50 @@ struct NixAuthSource : AuthSource
 
         return std::nullopt;
     }
+};
 
-    void set(const AuthData & authData) override
-    {
-    }
+/**
+ * Authenticate using an external helper program via the
+ * `git-credential-*` protocol.
+ */
+struct ExternalAuthSource : AuthSource
+{
+    Path program;
 
-    void erase(const AuthData & authData) override
+    ExternalAuthSource(Path program)
+        : program(program)
+    { }
+
+    std::optional<AuthData> get(const AuthData & request) override
     {
+        auto response = AuthData::parseGitAuthData(
+            runProgram(program, true, {"get"}, request.toGitAuthData()));
+
+        if (!response.password)
+            return std::nullopt;
+
+        AuthData res{request};
+        if (response.userName) res.userName = response.userName;
+        res.password = response.password;
+        return res;
     }
 };
 
 Authenticator::Authenticator()
 {
     authSources.push_back(make_ref<NixAuthSource>());
+    authSources.push_back(make_ref<ExternalAuthSource>("git-credential-libsecret"));
+    authSources.push_back(make_ref<ExternalAuthSource>("git-credential-netrc"));
 }
 
 std::optional<AuthData> Authenticator::fill(const AuthData & request, bool required)
 {
+    if (!request.protocol)
+        throw Error("authentication data '%s' does not contain a protocol", request);
+
+    if (!request.host)
+        throw Error("authentication data '%s' does not contain a host", request);
+
     for (auto & authSource : authSources) {
         auto res = authSource->get(request);
         if (res)
