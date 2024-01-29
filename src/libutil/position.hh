@@ -67,6 +67,48 @@ struct Pos
     bool operator==(const Pos & rhs) const = default;
     bool operator!=(const Pos & rhs) const = default;
     bool operator<(const Pos & rhs) const;
+
+    struct LinesIterator {
+        using difference_type = size_t;
+        using value_type = std::string_view;
+        using reference = const std::string_view &;
+        using pointer = const std::string_view *;
+        using iterator_category = std::input_iterator_tag;
+
+        LinesIterator(): pastEnd(true) {}
+        explicit LinesIterator(std::string_view input): input(input), pastEnd(input.empty()) {
+            if (!pastEnd)
+                bump(true);
+        }
+
+        LinesIterator & operator++() {
+            bump(false);
+            return *this;
+        }
+        LinesIterator operator++(int) {
+            auto result = *this;
+            ++*this;
+            return result;
+        }
+
+        reference operator*() const { return curLine; }
+        pointer operator->() const { return &curLine; }
+
+        bool operator!=(const LinesIterator & other) const {
+            return !(*this == other);
+        }
+        bool operator==(const LinesIterator & other) const {
+            return (pastEnd && other.pastEnd)
+                || (std::forward_as_tuple(input.size(), input.data())
+                    == std::forward_as_tuple(other.input.size(), other.input.data()));
+        }
+
+    private:
+        std::string_view input, curLine;
+        bool pastEnd = false;
+
+        void bump(bool atFirst);
+    };
 };
 
 std::ostream & operator<<(std::ostream & str, const Pos & pos);
