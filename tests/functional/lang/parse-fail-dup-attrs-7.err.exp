@@ -3,3 +3,4 @@ error: attribute 'x' already defined at «stdin»:6:12
             6|     inherit x;
             7|     inherit x;
              |            ^
+            8|   };
