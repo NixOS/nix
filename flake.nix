@@ -190,7 +190,6 @@
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
-              changelog-d = final.changelog-d-nix;
             } // {
               # this is a proper separate downstream package, but put
               # here also for back compat reasons.
@@ -363,7 +362,7 @@
       });
 
       packages = forAllSystems (system: rec {
-        inherit (nixpkgsFor.${system}.native) nix;
+        inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
         default = nix;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;

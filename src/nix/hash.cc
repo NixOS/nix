@@ -150,15 +150,14 @@ struct CmdHashConvert : Command
 
     std::string description() override
     {
-        std::string descr( "convert between different hash formats. Choose from: ");
-        auto iter = hashFormats.begin();
-        assert(iter != hashFormats.end());
-        descr += *iter++;
-        while (iter != hashFormats.end()) {
-            descr += ", " + *iter++;
-        }
+        return "convert between hash formats";
+    }
 
-        return descr;
+    std::string doc() override
+    {
+        return
+          #include "hash-convert.md"
+          ;
     }
 
     Category category() override { return catUtility; }
