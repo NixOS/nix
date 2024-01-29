@@ -10,7 +10,6 @@
 , boost
 , brotli
 , bzip2
-, changelog-d
 , curl
 , editline
 , readline
@@ -87,11 +86,6 @@
 # - editline (default)
 # - readline
 , readlineFlavor ? if stdenv.hostPlatform.isWindows then "readline" else "editline"
-
-# Whether to compile `rl-next.md`, the release notes for the next
-# not-yet-released version of Nix in the manul, from the individual
-# change log entries in the directory.
-, buildUnreleasedNotes ? false
 
 # Whether to build the internal API docs, can be done separately from
 # everything else.
@@ -218,9 +212,6 @@ in {
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
-    # Official releases don't have rl-next, so we don't need to compile a
-    # changelog
-    ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d
     ++ lib.optional enableInternalAPIDocs doxygen
   ;
 
@@ -378,9 +369,6 @@ in {
       # Nix proper (which they depend on).
       (installUnitTests -> doBuild)
       (doCheck -> doBuild)
-      # We have to build the manual to build unreleased notes, as those
-      # are part of the manual
-      (buildUnreleasedNotes -> enableManual)
       # The build process for the manual currently requires extracting
       # data from the Nix executable we are trying to document.
       (enableManual -> doBuild)

@@ -304,7 +304,6 @@ See also the [format documentation](https://github.com/haskell/cabal/blob/master
 ### Build process
 
 Releases have a precomputed `rl-MAJOR.MINOR.md`, and no `rl-next.md`.
-Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on the fly.
 
 ## Branches
 
