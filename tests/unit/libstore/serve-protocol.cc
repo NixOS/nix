@@ -412,7 +412,7 @@ TEST_F(ServeProtoTest, handshake_log)
         toClient.create();
         toServer.create();
 
-        ServeProto::Version clientResult, serverResult;
+        ServeProto::Version clientResult;
 
         auto thread = std::thread([&]() {
             FdSink out { toServer.writeSide.get() };
@@ -425,7 +425,7 @@ TEST_F(ServeProtoTest, handshake_log)
         {
             FdSink out { toClient.writeSide.get() };
             FdSource in { toServer.readSide.get() };
-            serverResult = ServeProto::BasicServerConnection::handshake(
+            ServeProto::BasicServerConnection::handshake(
                 out, in, defaultVersion);
         };
 
