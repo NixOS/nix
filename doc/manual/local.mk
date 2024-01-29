@@ -108,7 +108,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	done
 	@touch $@
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/favicon.png $(d)/src/favicon.svg
 	$(trace-gen) \
 	  set -euo pipefail; \
 	  RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual.tmp 2>&1 \
