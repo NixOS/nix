@@ -149,7 +149,10 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
     if (hasFormals()) {
         str << "{ ";
         bool first = true;
-        for (auto & i : formals->formals) {
+        // the natural Symbol ordering is by creation time, which can lead to the
+        // same expression being printed in two different ways depending on its
+        // context. always use lexicographic ordering to avoid this.
+        for (auto & i : formals->lexicographicOrder(symbols)) {
             if (first) first = false; else str << ", ";
             str << symbols[i.name];
             if (i.def) {
