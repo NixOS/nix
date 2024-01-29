@@ -12,8 +12,6 @@ struct AuthSettings : Config
     Setting<Strings> authSources{
         this,
         {"builtin:nix",
-         "git-credential-libsecret",
-         "git-credential-netrc",
         },
         "auth-sources",
         R"(
@@ -155,6 +153,7 @@ struct NixAuthSource : AuthSource
  */
 struct ExternalAuthSource : AuthSource
 {
+    bool enabled = true;
     Path program;
 
     ExternalAuthSource(Path program)
@@ -163,16 +162,28 @@ struct ExternalAuthSource : AuthSource
 
     std::optional<AuthData> get(const AuthData & request) override
     {
-        auto response = AuthData::parseGitAuthData(
-            runProgram(program, true, {"get"}, request.toGitAuthData()));
+        try {
+            if (!enabled) return std::nullopt;
 
-        if (!response.password)
+            auto response = AuthData::parseGitAuthData(
+                runProgram(program, true, {"get"}, request.toGitAuthData()));
+
+            if (!response.password)
+                return std::nullopt;
+
+            AuthData res{request};
+            if (response.userName) res.userName = response.userName;
+            res.password = response.password;
+            return res;
+        } catch (SysError & e) {
+            ignoreException();
+            if (e.errNo == ENOENT || e.errNo == EPIPE)
+                enabled = false;
             return std::nullopt;
-
-        AuthData res{request};
-        if (response.userName) res.userName = response.userName;
-        res.password = response.password;
-        return res;
+        } catch (Error &) {
+            ignoreException();
+            return std::nullopt;
+        }
     }
 };
 
