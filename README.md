@@ -3,9 +3,27 @@
 [![Open Collective supporters](https://opencollective.com/nixos/tiers/supporter/badge.svg?label=Supporters&color=brightgreen)](https://opencollective.com/nixos)
 [![Test](https://github.com/NixOS/nix/workflows/Test/badge.svg)](https://github.com/NixOS/nix/actions)
 
-Nix is a powerful package manager for Linux and other Unix systems that makes package
-management reliable and reproducible. Please refer to the [Nix manual](https://nixos.org/nix/manual)
-for more details.
+Nix makes computation repeatable.
+
+It treats file system data like memory in a data flow program:
+- Ensures referential integrity
+- Enables caching and deduplication
+- Performs garbage collection
+
+This allows getting computer programs from one machine to another — and having them still work when they get there.
+
+![](./figures/memory-filesystem.svg)
+management reliable and reproducible.
+
+It forces operating system processes to act like pure functions:
+- Output only changes if input changes
+- Composable as independent, reusable units
+- Deterministic and safe to parallelise
+
+Think of it as running `execve()` in a clean environment on read-only data and caching the output.
+Or think of it as functional programming with files and directories.
+
+![](./figures/function-process.svg)
 
 ## Installation and first steps
 
