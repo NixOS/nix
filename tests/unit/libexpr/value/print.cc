@@ -110,8 +110,8 @@ TEST_F(ValuePrintingTests, vLambda)
         .up = nullptr,
         .values = { }
     };
-    PosTable::Origin origin((std::monostate()));
-    auto posIdx = state.positions.add(origin, 1, 1);
+    PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
+    auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
     auto formals = Formals {};
 
@@ -558,8 +558,8 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
         .up = nullptr,
         .values = { }
     };
-    PosTable::Origin origin((std::monostate()));
-    auto posIdx = state.positions.add(origin, 1, 1);
+    PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
+    auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
     auto formals = Formals {};
 

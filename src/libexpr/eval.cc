@@ -922,12 +922,11 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 
 void EvalState::mkPos(Value & v, PosIdx p)
 {
-    auto pos = positions[p];
-    if (auto path = std::get_if<SourcePath>(&pos.origin)) {
+    auto origin = positions.originOf(p);
+    if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
         attrs.alloc(sFile).mkString(path->path.abs());
-        attrs.alloc(sLine).mkInt(pos.line);
-        attrs.alloc(sColumn).mkInt(pos.column);
+        makePositionThunks(*this, p, attrs.alloc(sLine), attrs.alloc(sColumn));
         v.mkAttrs(attrs);
     } else
         v.mkNull();
