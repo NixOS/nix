@@ -64,6 +64,10 @@ using namespace nix;
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
 {
+    if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
+        loc->first_column = loc->last_column;
+        loc->first_line = loc->last_line;
+    }
     throw ParseError({
         .msg = HintFmt(error),
         .pos = state->positions[state->at(*loc)]
