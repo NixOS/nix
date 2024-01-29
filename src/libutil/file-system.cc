@@ -78,7 +78,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
        arbitrary (but high) limit to prevent infinite loops. */
     unsigned int followCount = 0, maxFollow = 1024;
 
-    return canonPathInner(
+    return canonPathInner<UnixPathTrait>(
         path,
         [&followCount, &temp, maxFollow, resolveSymlinks]
         (std::string & result, std::string_view & remaining) {

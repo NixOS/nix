@@ -11,6 +11,39 @@
 namespace nix {
 
 /**
+ * Unix-style path primives.
+ *
+ * Nix'result own "logical" paths are always Unix-style. So this is always
+ * used for that, and additionally used for native paths on Unix.
+ */
+struct UnixPathTrait
+{
+    using CharT = char;
+
+    using String = std::string;
+
+    using StringView = std::string_view;
+
+    constexpr static char preferredSep = '/';
+
+    static inline bool isPathSep(char c)
+    {
+        return c == '/';
+    }
+
+    static inline size_t findPathSep(StringView path, size_t from = 0)
+    {
+        return path.find('/', from);
+    }
+
+    static inline size_t rfindPathSep(StringView path, size_t from = StringView::npos)
+    {
+        return path.rfind('/', from);
+    }
+};
+
+
+/**
  * Core pure path canonicalization algorithm.
  *
  * @param hookComponent
@@ -24,25 +57,26 @@ namespace nix {
  *   This is a chance to modify those two paths in arbitrary way, e.g. if
  *   "result" points to a symlink.
  */
-typename std::string canonPathInner(
-    std::string_view remaining,
+template<class PathDict>
+typename PathDict::String canonPathInner(
+    typename PathDict::StringView remaining,
     auto && hookComponent)
 {
     assert(remaining != "");
 
-    std::string result;
+    typename PathDict::String result;
     result.reserve(256);
 
     while (true) {
 
         /* Skip slashes. */
-        while (!remaining.empty() && remaining[0] == '/')
+        while (!remaining.empty() && PathDict::isPathSep(remaining[0]))
             remaining.remove_prefix(1);
 
         if (remaining.empty()) break;
 
         auto nextComp = ({
-            auto nextPathSep = remaining.find('/');
+            auto nextPathSep = PathDict::findPathSep(remaining);
             nextPathSep == remaining.npos ? remaining : remaining.substr(0, nextPathSep);
         });
 
@@ -53,14 +87,14 @@ typename std::string canonPathInner(
         /* If `..', delete the last component. */
         else if (nextComp == "..")
         {
-            if (!result.empty()) result.erase(result.rfind('/'));
+            if (!result.empty()) result.erase(PathDict::rfindPathSep(result));
             remaining.remove_prefix(2);
         }
 
         /* Normal component; copy it. */
         else {
-            result += '/';
-            if (const auto slash = remaining.find('/'); slash == result.npos) {
+            result += PathDict::preferredSep;
+            if (const auto slash = PathDict::findPathSep(remaining); slash == result.npos) {
                 result += remaining;
                 remaining = {};
             } else {
@@ -73,7 +107,7 @@ typename std::string canonPathInner(
     }
 
     if (result.empty())
-        result = "/";
+        result = typename PathDict::String { PathDict::preferredSep };
 
     return result;
 }
