@@ -19,7 +19,7 @@
       inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nix/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
         fileset;
 
-      officialRelease = false;
+      officialRelease = true;
 
       # Set to true to build the release notes for the next release.
       buildUnreleasedNotes = false;
@@ -174,7 +174,7 @@
 
           nix =
             let
-              officialRelease = false;
+              officialRelease = true;
               versionSuffix =
                 if officialRelease
                 then ""
@@ -186,7 +186,7 @@
                 stdenv
                 versionSuffix
                 ;
-              officialRelease = false;
+              officialRelease = true;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
