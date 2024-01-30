@@ -29,7 +29,8 @@ unset NIX_CONFIG
 # Create a channel.
 rm -rf $TEST_ROOT/foo
 mkdir -p $TEST_ROOT/foo
-nix copy --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate dependencies.nix))
+drvPath=$(nix-instantiate dependencies.nix)
+nix copy --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r "$drvPath")
 rm -rf $TEST_ROOT/nixexprs
 mkdir -p $TEST_ROOT/nixexprs
 cp config.nix dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/
@@ -64,3 +65,5 @@ grepQuiet 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 nix-env -i dependencies-top
 [ -e $TEST_HOME/.nix-profile/foobar ]
 
+# Test evaluation through a channel symlink (#9882).
+nix-instantiate '<foo/dependencies.nix>'
