@@ -1,3 +1,4 @@
+#include <rapidcheck/gen/Arbitrary.h>
 #include <regex>
 
 #include <rapidcheck.h>
@@ -20,59 +21,60 @@ void showValue(const StorePath & p, std::ostream & os)
 namespace rc {
 using namespace nix;
 
-Gen<StorePathName> Arbitrary<StorePathName>::arbitrary()
+Gen<char> storePathChar()
 {
-    auto len = *gen::inRange<size_t>(
-        1,
-        StorePath::MaxPathLen - StorePath::HashLen);
-
-    std::string pre;
-    pre.reserve(len);
-
-    for (size_t c = 0; c < len; ++c) {
-        switch (auto i = *gen::inRange<uint8_t>(0, 10 + 2 * 26 + 6)) {
+    return rc::gen::apply([](uint8_t i) -> char {
+        switch (i) {
             case 0 ... 9:
-                pre += '0' + i;
+                return '0' + i;
             case 10 ... 35:
-                pre += 'A' + (i - 10);
-                break;
+                return 'A' + (i - 10);
             case 36 ... 61:
-                pre += 'a' + (i - 36);
-                break;
+                return 'a' + (i - 36);
             case 62:
-                pre += '+';
-                break;
+                return '+';
             case 63:
-                pre += '-';
-                break;
+                return '-';
             case 64:
-                pre += '.';
-                break;
+                return '.';
             case 65:
-                pre += '_';
-                break;
+                return '_';
             case 66:
-                pre += '?';
-                break;
+                return '?';
             case 67:
-                pre += '=';
-                break;
+                return '=';
             default:
                 assert(false);
         }
-    }
+    },
+    gen::inRange<uint8_t>(0, 10 + 2 * 26 + 6));
+}
 
-    return gen::just(StorePathName {
-        .name = std::move(pre),
-    });
+Gen<StorePathName> Arbitrary<StorePathName>::arbitrary()
+{
+    return gen::construct<StorePathName>(
+        gen::suchThat(
+            gen::container<std::string>(storePathChar()),
+            [](const std::string & s) {
+                return
+                    !( s == ""
+                    || s == "."
+                    || s == ".."
+                    || s.starts_with(".-")
+                    || s.starts_with("..-")
+                    );
+            }
+        )
+    );
 }
 
 Gen<StorePath> Arbitrary<StorePath>::arbitrary()
 {
-    return gen::just(StorePath {
-        *gen::arbitrary<Hash>(),
-        (*gen::arbitrary<StorePathName>()).name,
-    });
+    return
+        gen::construct<StorePath>(
+            gen::arbitrary<Hash>(),
+            gen::apply([](StorePathName n){ return n.name; }, gen::arbitrary<StorePathName>())
+        );
 }
 
 } // namespace rc
