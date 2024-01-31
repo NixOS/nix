@@ -25,6 +25,7 @@ typedef enum {
     tInt = 1,
     tBool,
     tString,
+    tStringSmall,
     tPath,
     tNull,
     tAttrs,
@@ -185,6 +186,10 @@ public:
         const char * c_str;
         const char * * context; // must be in sorted order
     };
+    struct SmallStringWithoutContext {
+        char * c_str;
+        char * c_str_2;
+    };
 
     struct Path {
         InputAccessor * accessor;
@@ -211,6 +216,7 @@ public:
         bool boolean;
 
         StringWithContext string;
+        SmallStringWithoutContext smallString;
 
         Path _path;
 
@@ -242,6 +248,7 @@ public:
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
+            case tStringSmall: return nString;
             case tPath: return nPath;
             case tNull: return nNull;
             case tAttrs: return nAttrs;
@@ -280,6 +287,18 @@ public:
         boolean = b;
     }
 
+    // Assumption that the string s is null-terminated
+    // assert(s[len] == '\0');
+    inline void mkString(const char * s, size_t len, const char * * context = 0, bool forceLarge = false){
+        if (!forceLarge && len < (sizeof(char *) *2) && context == 0){
+            internalType = tStringSmall;
+            char * t = (char *) &(smallString.c_str);
+            memcpy(t, s, len);
+            t[len] = '\0';
+            return;
+        }
+        mkString(s, context);
+    }
     inline void mkString(const char * s, const char * * context = 0)
     {
         internalType = tString;
@@ -291,11 +310,11 @@ public:
 
     void mkString(std::string_view s, const NixStringContext & context);
 
-    void mkStringMove(const char * s, const NixStringContext & context);
+    void mkStringMove(std::string_view s, const NixStringContext & context);
 
     inline void mkString(const Symbol & s)
     {
-        mkString(((const std::string &) s).c_str());
+        mkString((const std::string &) s);
     }
 
     void mkPath(const SourcePath & path);
@@ -432,19 +451,28 @@ public:
 
     std::string_view string_view() const
     {
-        assert(internalType == tString);
-        return std::string_view(string.c_str);
+        assert(internalType == tString || internalType == tStringSmall);
+        if (internalType == tStringSmall)
+            return std::string_view((const char * const) &(smallString.c_str));
+        else
+            return std::string_view(string.c_str);
     }
 
     const char * const c_str() const
     {
-        assert(internalType == tString);
-        return string.c_str;
+        assert(internalType == tString || internalType == tStringSmall);
+        if (internalType == tStringSmall)
+            return (const char * const) &(smallString.c_str);
+        else
+            return string.c_str;
     }
 
     const char * * context() const
     {
-        return string.context;
+        if (internalType == tString)
+            return string.context;
+        else
+            return 0;
     }
 };
 

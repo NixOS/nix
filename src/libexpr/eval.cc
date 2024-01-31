@@ -873,34 +873,51 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
         evalState.runDebugRepl(nullptr, trace.env, trace.expr);
 }
 
+unsigned long nrSmallStrings = 0;
 void Value::mkString(std::string_view s)
 {
-    mkString(makeImmutableString(s));
+    if (s.length() < (sizeof(char *) * 2)) {
+        nrSmallStrings++;
+        mkString(s.data(),s.length());
+    } else {
+        mkString(makeImmutableString(s),s.length());
+    }
 }
 
 
 static void copyContextToValue(Value & v, const NixStringContext & context)
 {
-    if (!context.empty()) {
-        size_t n = 0;
-        v.string.context = (const char * *)
-            allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context)
-            v.string.context[n++] = dupString(i.to_string().c_str());
-        v.string.context[n] = 0;
-    }
+    size_t n = 0;
+    v.string.context = (const char * *)
+        allocBytes((context.size() + 1) * sizeof(char *));
+    for (auto & i : context)
+        v.string.context[n++] = dupString(i.to_string().c_str());
+    v.string.context[n] = 0;
 }
 
 void Value::mkString(std::string_view s, const NixStringContext & context)
 {
-    mkString(s);
-    copyContextToValue(*this, context);
+    if (context.empty() && s.length() < (sizeof(char *) * 2)) {
+        nrSmallStrings++;
+        mkString(s);
+    }
+    else if (context.empty()){
+        mkString(s);
+    } else {
+        mkString(makeImmutableString(s),s.length(),0,true);
+        copyContextToValue(*this, context);
+    }
 }
 
-void Value::mkStringMove(const char * s, const NixStringContext & context)
+void Value::mkStringMove(std::string_view s, const NixStringContext & context)
 {
-    mkString(s);
-    copyContextToValue(*this, context);
+    if (context.empty()){
+        // already allocated
+        mkString(s.data(),s.length(),0,true);
+    } else {
+        mkString(s.data(),s.length(),0,true);
+        copyContextToValue(*this, context);
+    }
 }
 
 
@@ -1965,7 +1982,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             tmp += part->size();
         }
         *tmp = 0;
-        return result;
+        return std::string_view(result, sSize);
     };
 
     // List of returned strings. References to these Values must NOT be persisted.
@@ -2189,8 +2206,8 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 
 void copyContext(const Value & v, NixStringContext & context)
 {
-    if (v.string.context)
-        for (const char * * p = v.string.context; *p; ++p)
+    if (v.context() != 0)
+        for (const char * * p = v.context(); *p; ++p)
             context.insert(NixStringContextElem::parse(*p));
 }
 
@@ -2616,6 +2633,7 @@ void EvalState::printStatistics()
     topObj["nrOpUpdates"] = nrOpUpdates;
     topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
     topObj["nrThunks"] = nrThunks;
+    topObj["nrSmallStrings"] = nrSmallStrings;
     topObj["nrAvoided"] = nrAvoided;
     topObj["nrLookups"] = nrLookups;
     topObj["nrPrimOpCalls"] = nrPrimOpCalls;
