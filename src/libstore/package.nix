@@ -5,6 +5,7 @@
 
   unixtools,
   darwin,
+  freebsd,
 
   nix-util,
   boost,
@@ -65,6 +66,7 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
+  ++ lib.optional stdenv.hostPlatform.isFreeBSD freebsd.libjail
   ++ lib.optional withAWS aws-crt-cpp;
 
   propagatedBuildInputs = [
