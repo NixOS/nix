@@ -365,6 +365,11 @@ this_library = library(
 install_headers(headers, subdir : 'nix/store', preserve_path : true)
 
 libraries_private = []
+# `libraries_private` cannot contain ad-hoc dependencies (from
+# `find_library), so we need to do this manually
+if host_machine.system() == 'freebsd'
+  libraries_private += [ '-ljail' ]
+endif
 
 extra_pkg_config_variables = {
   'storedir' : get_option('store-dir'),

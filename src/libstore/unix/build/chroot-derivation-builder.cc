@@ -1,4 +1,4 @@
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 
 namespace nix {
 
@@ -59,6 +59,8 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         return buildUser->getGID();
     }
 
+    virtual void extraChrootParentDirCleanup(const Path & chrootParentDir) {}
+
     void prepareSandbox() override
     {
         /* Create a temporary directory in which we set up the chroot
@@ -66,6 +68,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
         auto chrootParentDir = store.Store::toRealPath(drvPath) + ".chroot";
+        extraChrootParentDirCleanup(chrootParentDir);
         deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
