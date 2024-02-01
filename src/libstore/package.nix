@@ -5,6 +5,7 @@
 
   unixtools,
   darwin,
+  freebsd,
 
   nix-util,
   boost,
@@ -17,12 +18,22 @@
   cmake, # for resolving aws-crt-cpp dep
 
   busybox-sandbox-shell ? null,
+  pkgsStatic,
 
   # Configuration Options
 
   version,
 
   embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
+
+  withSandboxShell ? stdenv.hostPlatform.isLinux || stdenv.hostPlatform.isFreeBSD,
+  sandboxShell ?
+    if stdenv.hostPlatform.isLinux then
+      "${busybox-sandbox-shell}/bin/busybox"
+    else if stdenv.hostPlatform.isFreeBSD then
+      "${pkgsStatic.bash}/bin/bash"
+    else
+      null,
 
   withAWS ?
     # Default is this way because there have been issues building this dependency
@@ -67,6 +78,7 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
+  ++ lib.optional stdenv.hostPlatform.isFreeBSD freebsd.libjail
   ++ lib.optional withAWS aws-crt-cpp;
 
   propagatedBuildInputs = [
@@ -79,8 +91,8 @@ mkMesonLibrary (finalAttrs: {
     (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
     (lib.mesonEnable "s3-aws-auth" withAWS)
   ]
-  ++ lib.optionals stdenv.hostPlatform.isLinux [
-    (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
+  ++ lib.optionals withSandboxShell [
+    (lib.mesonOption "sandbox-shell" sandboxShell)
   ];
 
   meta = {

@@ -353,8 +353,12 @@ void moveFile(const std::filesystem::path & src, const std::filesystem::path & d
  * `true`, then also remove `oldPath` (making this equivalent to `moveFile`, but
  * with the guaranty that the destination will be “fresh”, with no stale inode
  * or file descriptor pointing to it).
+ *
+ * If contents is set, always create a regular file, even if the source is a
+ * link.
  */
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete);
+void copyFile(
+    const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents = false);
 
 /**
  * Automatic cleanup of resources.
@@ -597,51 +601,5 @@ public:
 private:
     std::filesystem::directory_iterator it_;
 };
-
-#ifdef __FreeBSD__
-class AutoUnmount
-{
-    std::filesystem::path path;
-    bool del;
-public:
-    AutoUnmount();
-    AutoUnmount(const std::filesystem::path &);
-    AutoUnmount(const AutoUnmount &) = delete;
-
-    AutoUnmount(AutoUnmount && other) noexcept
-        : path(std::move(other.path))
-        , del(std::exchange(other.del, false))
-    {
-    }
-
-    AutoUnmount & operator=(AutoUnmount && other) noexcept
-    {
-        swap(*this, other);
-        return *this;
-    }
-
-    friend void swap(AutoUnmount & lhs, AutoUnmount & rhs) noexcept
-    {
-        using std::swap;
-        swap(lhs.path, rhs.path);
-        swap(lhs.del, rhs.del);
-    }
-
-    ~AutoUnmount();
-
-    /**
-     * Cancel the unmounting
-     */
-    void cancel() noexcept;
-
-    /**
-     * Unmount the mountpoint right away (if it exists), resetting the
-     * `AutoUnmount`
-     *
-     * The destructor calls this, but ignoring any exception.
-     */
-    void unmount();
-};
-#endif
 
 } // namespace nix

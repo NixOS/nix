@@ -1324,9 +1324,6 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         if (chdir(tmpDirInSandbox().c_str()) == -1)
             throw SysError("changing into %1%", PathFmt(tmpDir));
 
-        /* Close all other file descriptors. */
-        unix::closeExtraFDs();
-
         /* Disable core dumps by default. */
         struct rlimit limit = {0, RLIM_INFINITY};
         setrlimit(RLIMIT_CORE, &limit);
@@ -2045,6 +2042,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 // FIXME: do this properly
 #include "chroot-derivation-builder.cc"
 #include "linux-derivation-builder.cc"
+#include "freebsd-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
 #include "external-derivation-builder.cc"
 
@@ -2093,7 +2091,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
     }
 
     if (store.storeDir != store.config->realStoreDir.get()) {
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
         useSandbox = true;
 #else
         throw Error("building using a diverted store is not supported on this platform");
@@ -2123,6 +2121,12 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
             new ChrootLinuxDerivationBuilder(store, std::move(miscMethods), std::move(params)));
 
     return DerivationBuilderUnique(new LinuxDerivationBuilder(store, std::move(miscMethods), std::move(params)));
+#elif defined(__FreeBSD__)
+    if (useSandbox)
+        return DerivationBuilderUnique(
+            new ChrootFreeBSDDerivationBuilder(store, std::move(miscMethods), std::move(params)));
+
+    return DerivationBuilderUnique(new FreeBSDDerivationBuilder(store, std::move(miscMethods), std::move(params)));
 #else
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");
