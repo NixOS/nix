@@ -16,6 +16,9 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         writeFile(settings.netrcFile, netrcData, 0600);
     }
 
+    if (!drv.type().isFixed())
+        throw Error("'builtin:fetchurl' must be a fixed-output derivation");
+
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
         if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
