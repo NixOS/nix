@@ -16,7 +16,12 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         writeFile(settings.netrcFile, netrcData, 0600);
     }
 
-    if (!drv.type().isFixed())
+    auto out = get(drv.outputs, "out");
+    if (!out)
+        throw Error("'builtin:fetchurl' requires an 'out' output");
+
+    auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
+    if (!dof)
         throw Error("'builtin:fetchurl' must be a fixed-output derivation");
 
     auto getAttr = [&](const std::string & name) {
@@ -62,13 +67,11 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     };
 
     /* Try the hashed mirrors first. */
-    if (getAttr("outputHashMode") == "flat")
+    if (dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
                 if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                std::optional<HashAlgorithm> ht = parseHashAlgoOpt(getAttr("outputHashAlgo"));
-                Hash h = newHashAllowEmpty(getAttr("outputHash"), ht);
-                fetch(hashedMirror + printHashAlgo(h.algo) + "/" + h.to_string(HashFormat::Base16, false));
+                fetch(hashedMirror + printHashAlgo(dof->ca.hash.algo) + "/" + dof->ca.hash.to_string(HashFormat::Base16, false));
                 return;
             } catch (Error & e) {
                 debug(e.what());
