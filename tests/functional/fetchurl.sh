@@ -78,3 +78,6 @@ outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:
 
 test -x $outPath/fetchurl.sh
 test -L $outPath/symlink
+
+# Make sure that *not* passing a outputHash fails.
+expectStderr 100 nix-build --expr '{ url }: builtins.derivation { name = "nix-cache-info"; system = "x86_64-linux"; builder = "builtin:fetchurl"; inherit url; outputHashMode = "flat"; }' --argstr url file://$narxz 2>&1 | grep 'must be a fixed-output derivation'
