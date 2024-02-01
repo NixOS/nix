@@ -1085,9 +1085,10 @@ drvName, Bindings * attrs, Value & v)
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
     std::optional<json> jsonObject;
+    auto pos = v.determinePos(noPos);
     auto attr = attrs->find(state.sStructuredAttrs);
     if (attr != attrs->end() &&
-        state.forceBool(*attr->value, noPos,
+        state.forceBool(*attr->value, pos,
                         "while evaluating the `__structuredAttrs` "
                         "attribute passed to builtins.derivationStrict"))
         jsonObject = json::object();
@@ -1096,7 +1097,7 @@ drvName, Bindings * attrs, Value & v)
     bool ignoreNulls = false;
     attr = attrs->find(state.sIgnoreNulls);
     if (attr != attrs->end())
-        ignoreNulls = state.forceBool(*attr->value, noPos, "while evaluating the `__ignoreNulls` attribute " "passed to builtins.derivationStrict");
+        ignoreNulls = state.forceBool(*attr->value, pos, "while evaluating the `__ignoreNulls` attribute " "passed to builtins.derivationStrict");
 
     /* Build the derivation expression by processing the attributes. */
     Derivation drv;
@@ -1160,16 +1161,16 @@ drvName, Bindings * attrs, Value & v)
             const std::string_view context_below("");
 
             if (ignoreNulls) {
-                state.forceValue(*i->value, noPos);
+                state.forceValue(*i->value, pos);
                 if (i->value->type() == nNull) continue;
             }
 
-            if (i->name == state.sContentAddressed && state.forceBool(*i->value, noPos, context_below)) {
+            if (i->name == state.sContentAddressed && state.forceBool(*i->value, pos, context_below)) {
                 contentAddressed = true;
                 experimentalFeatureSettings.require(Xp::CaDerivations);
             }
 
-            else if (i->name == state.sImpure && state.forceBool(*i->value, noPos, context_below)) {
+            else if (i->name == state.sImpure && state.forceBool(*i->value, pos, context_below)) {
                 isImpure = true;
                 experimentalFeatureSettings.require(Xp::ImpureDerivations);
             }
@@ -1177,9 +1178,9 @@ drvName, Bindings * attrs, Value & v)
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
             else if (i->name == state.sArgs) {
-                state.forceList(*i->value, noPos, context_below);
+                state.forceList(*i->value, pos, context_below);
                 for (auto elem : i->value->listItems()) {
-                    auto s = state.coerceToString(noPos, *elem, context,
+                    auto s = state.coerceToString(pos, *elem, context,
                             "while evaluating an element of the argument list",
                             true).toOwned();
                     drv.args.push_back(s);
@@ -1194,29 +1195,29 @@ drvName, Bindings * attrs, Value & v)
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    (*jsonObject)[key] = printValueAsJSON(state, true, *i->value, noPos, context);
+                    (*jsonObject)[key] = printValueAsJSON(state, true, *i->value, pos, context);
 
                     if (i->name == state.sBuilder)
-                        drv.builder = state.forceString(*i->value, context, noPos, context_below);
+                        drv.builder = state.forceString(*i->value, context, pos, context_below);
                     else if (i->name == state.sSystem)
-                        drv.platform = state.forceStringNoCtx(*i->value, noPos, context_below);
+                        drv.platform = state.forceStringNoCtx(*i->value, pos, context_below);
                     else if (i->name == state.sOutputHash)
-                        outputHash = state.forceStringNoCtx(*i->value, noPos, context_below);
+                        outputHash = state.forceStringNoCtx(*i->value, pos, context_below);
                     else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = state.forceStringNoCtx(*i->value, noPos, context_below);
+                        outputHashAlgo = state.forceStringNoCtx(*i->value, pos, context_below);
                     else if (i->name == state.sOutputHashMode)
-                        handleHashMode(state.forceStringNoCtx(*i->value, noPos, context_below));
+                        handleHashMode(state.forceStringNoCtx(*i->value, pos, context_below));
                     else if (i->name == state.sOutputs) {
                         /* Require ‘outputs’ to be a list of strings. */
-                        state.forceList(*i->value, noPos, context_below);
+                        state.forceList(*i->value, pos, context_below);
                         Strings ss;
                         for (auto elem : i->value->listItems())
-                            ss.emplace_back(state.forceStringNoCtx(*elem, noPos, context_below));
+                            ss.emplace_back(state.forceStringNoCtx(*elem, pos, context_below));
                         handleOutputs(ss);
                     }
 
                 } else {
-                    auto s = state.coerceToString(noPos, *i->value, context, context_below, true).toOwned();
+                    auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
                     drv.env.emplace(key, s);
                     if (i->name == state.sBuilder) drv.builder = std::move(s);
                     else if (i->name == state.sSystem) drv.platform = std::move(s);
