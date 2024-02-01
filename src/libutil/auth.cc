@@ -7,40 +7,6 @@
 
 namespace nix::auth {
 
-struct AuthSettings : Config
-{
-    Setting<Strings> authSources{
-        this,
-        {"builtin:nix",
-        },
-        "auth-sources",
-        R"(
-          A list of helper programs from which to obtain
-          authentication data for HTTP requests.  These helpers use
-          [the same protocol as Git's credential
-          helpers](https://git-scm.com/docs/gitcredentials#_custom_helpers),
-          so any Git credential helper can be used as an
-          authentication source.
-
-          Nix has the following builtin helpers:
-
-          * `builtin:nix`: Get authentication data from files in
-            `~/.local/share/nix/auth`. For example, the following sets
-            a username and password for `cache.example.org`:
-
-            ```
-            # cat <<EOF > ~/.local/share/nix/auth/my-cache
-            protocol=https
-            host=cache.example.org
-            username=alice
-            password=foobar
-            EOF
-            ```
-
-          Example: `builtin:nix` `git-credential-libsecret`
-        )"};
-};
-
 AuthSettings authSettings;
 
 static GlobalConfig::Register rAuthSettings(&authSettings);
@@ -128,6 +94,7 @@ struct NixAuthSource : AuthSource
 
         if (pathExists(authDir.abs()))
             for (auto & file : readDirectory(authDir.abs())) {
+                if (hasSuffix(file.name, "~")) continue;
                 auto path = authDir + file.name;
                 auto authData = AuthData::parseGitAuthData(readFile(path.abs()));
                 if (!authData.password)
@@ -135,6 +102,101 @@ struct NixAuthSource : AuthSource
                 else
                     authDatas.push_back(authData);
             }
+    }
+
+    std::optional<AuthData> get(const AuthData & request) override
+    {
+        for (auto & authData : authDatas)
+            if (auto res = authData.match(request))
+                return res;
+
+        return std::nullopt;
+    }
+};
+
+struct NetrcAuthSource : AuthSource
+{
+    const Path path;
+    std::vector<AuthData> authDatas;
+
+    NetrcAuthSource(const Path & path)
+        : path(path)
+    {
+        // FIXME: read netrc lazily.
+        debug("reading netrc '%s'", path);
+
+        if (!pathExists(path)) return;
+
+        auto raw = readFile(path);
+
+        std::string_view remaining(raw);
+
+        auto whitespace = "\n\r\t ";
+
+        auto nextToken = [&]() -> std::optional<std::string_view>
+        {
+            // Skip whitespace.
+            auto n = remaining.find_first_not_of(whitespace);
+            if (n == remaining.npos) return std::nullopt;
+            remaining = remaining.substr(n);
+
+            if (remaining.substr(0, 1) == "\"")
+                throw UnimplementedError("quoted tokens in netrc are not supported yet");
+
+            n = remaining.find_first_of(whitespace);
+            auto token = remaining.substr(0, n);
+            remaining = remaining.substr(n == remaining.npos ? remaining.size() : n);
+
+            return token;
+        };
+
+        std::optional<AuthData> curMachine;
+
+        auto flushMachine = [&]()
+        {
+            if (curMachine) {
+                authDatas.push_back(std::move(*curMachine));
+                curMachine.reset();
+            }
+        };
+
+        while (auto token = nextToken()) {
+            if (token == "machine") {
+                flushMachine();
+                auto name = nextToken();
+                if (!name) throw Error("netrc 'machine' token requires a name");
+                curMachine = AuthData {
+                    .protocol = "https",
+                    .host = std::string(*name)
+                };
+            }
+            else if (token == "default") {
+                flushMachine();
+                curMachine = AuthData {
+                    .protocol = "https",
+                };
+            }
+            else if (token == "login") {
+                if (!curMachine) throw Error("netrc 'login' token must be preceded by a 'machine'");
+                auto userName = nextToken();
+                if (!userName) throw Error("netrc 'login' token requires a user name");
+                curMachine->userName = std::string(*userName);
+            }
+            else if (token == "password") {
+                if (!curMachine) throw Error("netrc 'password' token must be preceded by a 'machine'");
+                auto password = nextToken();
+                if (!password) throw Error("netrc 'password' token requires a password");
+                curMachine->password = std::string(*password);
+            }
+            else if (token == "account") {
+                // Ignore this.
+                nextToken();
+            }
+            else
+                warn("unrecognized netrc token '%s'", *token);
+        }
+
+        flushMachine();
     }
 
     std::optional<AuthData> get(const AuthData & request) override
@@ -193,6 +255,10 @@ Authenticator::Authenticator()
         if (hasPrefix(s, "builtin:")) {
             if (s == "builtin:nix")
                 authSources.push_back(make_ref<NixAuthSource>());
+            else if (s == "builtin:netrc") {
+                if (authSettings.netrcFile != "")
+                    authSources.push_back(make_ref<NetrcAuthSource>(authSettings.netrcFile));
+            }
             else
                 warn("unknown authentication sources '%s'", s);
         } else

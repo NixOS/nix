@@ -8,9 +8,10 @@ namespace nix {
 
 void builtinFetchurl(
     const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs,
-    const std::string & netrcData)
+    const std::map<std::string, Path> & outputs)
 {
+    // FIXME: tunnel auth requests
+    #if 0
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */
@@ -18,6 +19,7 @@ void builtinFetchurl(
         settings.netrcFile = "netrc";
         writeFile(settings.netrcFile, netrcData, 0600);
     }
+    #endif
 
     auto out = get(drv.outputs, "out");
     if (!out)

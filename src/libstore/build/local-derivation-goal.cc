@@ -1701,6 +1701,8 @@ void LocalDerivationGoal::runChild()
 
         bool setUser = true;
 
+        // FIXME: tunnel auth requests
+        #if 0
         /* Make the contents of netrc available to builtin:fetchurl
            (which may run under a different uid and/or in a sandbox). */
         std::string netrcData;
@@ -1708,6 +1710,7 @@ void LocalDerivationGoal::runChild()
             if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
                 netrcData = readFile(settings.netrcFile);
         } catch (SystemError &) { }
+        #endif
 
 #if __linux__
         if (useChroot) {
@@ -2136,7 +2139,7 @@ void LocalDerivationGoal::runChild()
                         worker.store.printStorePath(scratchOutputs.at(e.first)));
 
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(*drv, outputs, netrcData);
+                    builtinFetchurl(*drv, outputs);
                 else if (drv->builder == "builtin:buildenv")
                     builtinBuildenv(*drv, outputs);
                 else if (drv->builder == "builtin:unpack-channel")
