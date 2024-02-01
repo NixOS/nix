@@ -151,6 +151,12 @@ endif
 configdata_priv.set('HAVE_SECCOMP', seccomp.found().to_int())
 deps_private += seccomp
 
+if host_machine.system() == 'freebsd'
+  # libjail is not in freebsd.libc, but there's no discovery mechanism
+  libjail = declare_dependency(link_args : [ '-ljail' ])
+  deps_other += libjail
+endif
+
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
