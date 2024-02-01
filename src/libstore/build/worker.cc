@@ -19,7 +19,6 @@ Worker::Worker(Store & store, Store & evalStore)
     , store(store)
     , evalStore(evalStore)
 {
-    /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;
     nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
