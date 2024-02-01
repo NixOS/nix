@@ -88,7 +88,7 @@ Before accessing the overlay store you will need to ensure the OverlayFS mount i
 Note that OverlayFS requires `/mnt/example/workdir` to be on the same volume as the `upperdir`.
 
 By default, Nix will check that the mountpoint as been set up correctly and fail with an error if it has not.
-You can override this behaviour by passing [`check-mount=false`](???) if you need to.
+You can override this behaviour by passing [`check-mount=false`](#store-experimental-local-overlay-store-check-mount) if you need to.
 
 
 
