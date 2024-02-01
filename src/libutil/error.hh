@@ -31,15 +31,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-/* Before 4.7, gcc's std::exception uses empty throw() specifiers for
- * its (virtual) destructor and what() in c++11 mode, in violation of spec
- */
-#ifdef __GNUC__
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
-#define EXCEPTION_NEEDS_THROW_SPEC
-#endif
-#endif
-
 namespace nix {
 
 
@@ -147,13 +138,7 @@ public:
         : err(e)
     { }
 
-#ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~BaseError() throw () { };
-    const char * what() const throw () { return calcWhat().c_str(); }
-#else
     const char * what() const noexcept override { return calcWhat().c_str(); }
-#endif
-
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
 
