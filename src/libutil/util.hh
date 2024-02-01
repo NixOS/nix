@@ -180,7 +180,7 @@ bool hasSuffix(std::string_view s, std::string_view suffix);
 /**
  * Convert a string to lower case.
  */
-std::string toLower(const std::string & s);
+std::string toLower(std::string s);
 
 
 /**

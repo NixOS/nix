@@ -16,6 +16,7 @@
 #include "value-to-xml.hh"
 #include "primops.hh"
 #include "fs-input-accessor.hh"
+#include "fetch-to-store.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -84,14 +85,14 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
-    store->buildPaths(buildReqs);
+    buildStore->buildPaths(buildReqs, bmNormal, store);
+
+    StorePathSet outputsToCopyAndAllow;
 
     for (auto & drv : drvs) {
-        auto outputs = resolveDerivedPath(*store, drv);
+        auto outputs = resolveDerivedPath(*buildStore, drv, &*store);
         for (auto & [outputName, outputPath] : outputs) {
-            /* Add the output of this derivations to the allowed
-               paths. */
-            allowPath(store->toRealPath(outputPath));
+            outputsToCopyAndAllow.insert(outputPath);
 
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
@@ -101,10 +102,17 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                             .drvPath = drv.drvPath,
                             .output = outputName,
                         }).render(),
-                    store->printStorePath(outputPath)
+                    buildStore->printStorePath(outputPath)
                 );
             }
         }
+    }
+
+    if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
+    for (auto & outputPath : outputsToCopyAndAllow) {
+        /* Add the output of this derivations to the allowed
+           paths. */
+        allowPath(outputPath);
     }
 
     return res;
@@ -214,7 +222,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             Env * env = &state.allocEnv(vScope->attrs->size());
             env->up = &state.baseEnv;
 
-            auto staticEnv = std::make_shared<StaticEnv>(false, state.staticBaseEnv.get(), vScope->attrs->size());
+            auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv.get(), vScope->attrs->size());
 
             unsigned int displ = 0;
             for (auto & attr : *vScope->attrs) {
@@ -438,9 +446,7 @@ static RegisterPrimOp primop_isNull({
     .doc = R"(
       Return `true` if *e* evaluates to `null`, and `false` otherwise.
 
-      > **Warning**
-      >
-      > This function is *deprecated*; just write `e == null` instead.
+      This is equivalent to `e == null`.
     )",
     .fun = prim_isNull,
 });
@@ -586,7 +592,7 @@ struct CompareValues
                 case nFloat:
                     return v1->fpoint < v2->fpoint;
                 case nString:
-                    return v1->string_view().compare(v2->string_view()) < 0;
+                    return strcmp(v1->c_str(), v2->c_str()) < 0;
                 case nPath:
                     // Note: we don't take the accessor into account
                     // since it's not obvious how to compare them in a
@@ -991,7 +997,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
     if (args[0]->type() == nString)
         printError("trace: %1%", args[0]->string_view());
     else
-        printError("trace: %1%", printValue(state, *args[0]));
+        printError("trace: %1%", ValuePrinter(state, *args[0]));
     state.forceValue(*args[1], pos);
     v = *args[1];
 }
@@ -1872,7 +1878,7 @@ static RegisterPrimOp primop_outputOf({
       For instance,
       ```nix
       builtins.outputOf
-        (builtins.outputOf myDrv "out)
+        (builtins.outputOf myDrv "out")
         "out"
       ```
       will return a placeholder for the output of the output of `myDrv`.
@@ -2072,8 +2078,14 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     }
 
     auto storePath = settings.readOnlyMode
-        ? state.store->computeStorePathForText(name, contents, refs)
-        : state.store->addTextToStore(name, contents, refs, state.repair);
+        ? state.store->makeFixedOutputPathFromCA(name, TextInfo {
+            .hash = hashString(HashAlgorithm::SHA256, contents),
+            .references = std::move(refs),
+        })
+        : ({
+            StringSource s { contents };
+            state.store->addToStoreFromDump(s, name, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+        });
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
@@ -2229,7 +2241,7 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = path.fetchToStore(state.store, name, method, filter.get(), state.repair);
+            auto dstPath = fetchToStore(*state.store, path.resolveSymlinks(), name, method, filter.get(), state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
@@ -2401,7 +2413,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
         (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return v1->string_view().compare(v2->string_view()) < 0; });
+              [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -3700,15 +3712,28 @@ static RegisterPrimOp primop_toString({
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     int start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
-    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
-    NixStringContext context;
-    auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
     if (start < 0)
         state.debugThrowLastTrace(EvalError({
             .msg = hintfmt("negative start position in 'substring'"),
             .errPos = state.positions[pos]
         }));
+
+
+    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+
+    // Special-case on empty substring to avoid O(n) strlen
+    // This allows for the use of empty substrings to efficently capture string context
+    if (len == 0) {
+        state.forceValue(*args[2], pos);
+        if (args[2]->type() == nString) {
+            v.mkString("", args[2]->context());
+            return;
+        }
+    }
+
+    NixStringContext context;
+    auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
     v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
 }
@@ -4383,13 +4408,16 @@ void EvalState::createBaseEnv()
         .impureOnly = true,
     });
 
-    if (!evalSettings.pureEval) {
-        v.mkString(settings.thisSystem.get());
-    }
+    if (!evalSettings.pureEval)
+        v.mkString(evalSettings.getCurrentSystem());
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
-          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-system).
+          The value of the
+          [`eval-system`](@docroot@/command-ref/conf-file.md#conf-eval-system)
+          or else
+          [`system`](@docroot@/command-ref/conf-file.md#conf-system)
+          configuration option.
 
           It can be used to set the `system` attribute for [`builtins.derivation`](@docroot@/language/derivations.md) such that the resulting derivation can be built on the same system that evaluates the Nix expression:
 

@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "signals.hh"
 #include "posix-fs-canonicalise.hh"
+#include "posix-source-accessor.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -146,7 +147,12 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = hashPath(HashAlgorithm::SHA256, path).first;
+    Hash hash = ({
+        PosixSourceAccessor accessor;
+        hashPath(
+            accessor, CanonPath { path },
+            FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first;
+    });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
@@ -156,7 +162,12 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (pathExists(linkPath)) {
         auto stLink = lstat(linkPath);
         if (st.st_size != stLink.st_size
-            || (repair && hash != hashPath(HashAlgorithm::SHA256, linkPath).first))
+            || (repair && hash != ({
+                PosixSourceAccessor accessor;
+                hashPath(
+                    accessor, CanonPath { linkPath },
+                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first;
+           })))
         {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link '%s'", linkPath);
@@ -231,7 +242,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Atomically replace the old file with the new hard link. */
     try {
         renameFile(tempLink, path);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         if (unlink(tempLink.c_str()) == -1)
             printError("unable to unlink '%1%'", tempLink);
         if (errno == EMLINK) {

@@ -274,7 +274,7 @@ The [`builder`](#attr-builder) is executed as follows:
     directory (typically, `/nix/store`).
 
   - `NIX_ATTRS_JSON_FILE` & `NIX_ATTRS_SH_FILE` if `__structuredAttrs`
-    is set to `true` for the dervation. A detailed explanation of this
+    is set to `true` for the derivation. A detailed explanation of this
     behavior can be found in the
     [section about structured attrs](./advanced-attributes.md#adv-attr-structuredAttrs).
 

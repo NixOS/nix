@@ -149,11 +149,12 @@ void LocalStore::addTempRoot(const StorePath & path)
             try {
                 nix::connect(fdRootsSocket->get(), socketPath);
             } catch (SysError & e) {
-                /* The garbage collector may have exited, so we need to
-                   restart. */
-                if (e.errNo == ECONNREFUSED) {
-                    debug("GC socket connection refused");
+                /* The garbage collector may have exited or not
+                   created the socket yet, so we need to restart. */
+                if (e.errNo == ECONNREFUSED || e.errNo == ENOENT) {
+                    debug("GC socket connection refused: %s", e.msg());
                     fdRootsSocket->close();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     goto restart;
                 }
                 throw;
@@ -413,7 +414,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     auto env_end = std::sregex_iterator{};
                     for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
                         unchecked[i->str()].emplace(envFile);
-                } catch (SysError & e) {
+                } catch (SystemError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
                         continue;
                     throw;
@@ -508,6 +509,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        downgrade our exclusive lock. */
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltWrite, true, "waiting for the big garbage collector lock...");
+
+    /* Synchronisation point to test ENOENT handling in
+       addTempRoot(), see tests/gc-non-blocking.sh. */
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC_1"))
+        readFile(*p);
 
     /* Start the server for receiving new roots. */
     auto socketPath = stateDir.get() + gcSocketPath;
@@ -631,6 +637,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
         roots.insert(root.first);
     }
+
+    /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
+        readFile(*p);
 
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
@@ -778,10 +788,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             }
         }
     };
-
-    /* Synchronisation point for testing, see tests/functional/gc-concurrent.sh. */
-    if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
-        readFile(*p);
 
     /* Either delete all garbage paths, or just the specified
        paths (for gcDeleteSpecific). */

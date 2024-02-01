@@ -12,6 +12,7 @@
 #include "thread-pool.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "archive.hh"
 
 #include <chrono>
 #include <future>
@@ -27,7 +28,8 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
     , Store(params)
 {
     if (secretKeyFile != "")
-        secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
+        signer = std::make_unique<LocalSigner>(
+            SecretKey { readFile(secretKeyFile) });
 
     StringSink sink;
     sink << narVersionMagic1;
@@ -273,7 +275,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     stats.narWriteCompressionTimeMs += duration;
 
     /* Atomically write the NAR info file.*/
-    if (secretKey) narInfo->sign(*this, *secretKey);
+    if (signer) narInfo->sign(*this, *signer);
 
     writeNarInfo(narInfo);
 
@@ -300,24 +302,60 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
     }});
 }
 
-StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view name,
-                                               FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references)
+StorePath BinaryCacheStore::addToStoreFromDump(
+    Source & dump,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
-    if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
-        unsupported("addToStoreFromDump");
-    return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
+    std::optional<Hash> caHash;
+    std::string nar;
+
+    if (auto * dump2p = dynamic_cast<StringSource *>(&dump)) {
+        auto & dump2 = *dump2p;
+        // Hack, this gives us a "replayable" source so we can compute
+        // multiple hashes more easily.
+        caHash = hashString(HashAlgorithm::SHA256, dump2.s);
+        switch (method.getFileIngestionMethod()) {
+        case FileIngestionMethod::Recursive:
+            // The dump is already NAR in this case, just use it.
+            nar = dump2.s;
+            break;
+        case FileIngestionMethod::Flat:
+            // The dump is Flat, so we need to convert it to NAR with a
+            // single file.
+            StringSink s;
+            dumpString(dump2.s, s);
+            nar = std::move(s.s);
+            break;
+        }
+    } else {
+        // Otherwise, we have to do th same hashing as NAR so our single
+        // hash will suffice for both purposes.
+        if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
+            unsupported("addToStoreFromDump");
+    }
+    StringSource narDump { nar };
+
+    // Use `narDump` if we wrote to `nar`.
+    Source & narDump2 = nar.size() > 0
+        ? static_cast<Source &>(narDump)
+        : dump;
+
+    return addToStoreCommon(narDump2, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
             name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = nar.first,
-                .references = {
+            ContentAddressWithReferences::fromParts(
+                method,
+                caHash ? *caHash : nar.first,
+                {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
-                },
-            },
+                }),
             nar.first,
         };
         info.narSize = nar.second;
@@ -399,72 +437,36 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 }
 
 StorePath BinaryCacheStore::addToStore(
-        std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method,
-        HashAlgorithm hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references)
+    std::string_view name,
+    SourceAccessor & accessor,
+    const CanonPath & path,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    PathFilter & filter,
+    RepairFlag repair)
 {
     /* FIXME: Make BinaryCacheStore::addToStoreCommon support
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    HashSink sink { hashAlgo };
-    if (method == FileIngestionMethod::Recursive) {
-        dumpPath(srcPath, sink, filter);
-    } else {
-        readFile(srcPath, sink);
-    }
-    auto h = sink.finish().first;
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
 
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(srcPath, sink, filter);
+        accessor.dumpPath(path, sink, filter);
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
             name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = h,
-                .references = {
+            ContentAddressWithReferences::fromParts(
+                method,
+                h,
+                {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
-                },
-            },
-            nar.first,
-        };
-        info.narSize = nar.second;
-        return info;
-    })->path;
-}
-
-StorePath BinaryCacheStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    auto textHash = hashString(HashAlgorithm::SHA256, s);
-    auto path = makeTextPath(name, TextInfo { { textHash }, references });
-
-    if (!repair && isValidPath(path))
-        return path;
-
-    StringSink sink;
-    dumpString(s, sink);
-    StringSource source(sink.s);
-    return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
-        ValidPathInfo info {
-            *this,
-            std::string { name },
-            TextInfo {
-                .hash = textHash,
-                .references = references,
-            },
+                }),
             nar.first,
         };
         info.narSize = nar.second;

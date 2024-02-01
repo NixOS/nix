@@ -5,7 +5,6 @@
 #include "serialise.hh"
 #include "file-system.hh"
 
-
 namespace nix {
 
 
@@ -143,6 +142,11 @@ public:
     }
 
     static Hash dummy;
+
+    /**
+     * @return a random hash with hash algorithm `algo`
+     */
+    static Hash random(HashAlgorithm algo);
 };
 
 /**
@@ -168,14 +172,11 @@ Hash hashString(HashAlgorithm ha, std::string_view s);
 Hash hashFile(HashAlgorithm ha, const Path & path);
 
 /**
- * Compute the hash of the given path, serializing as a Nix Archive and
- * then hashing that.
+ * The final hash and the number of bytes digested.
  *
- * The hash is defined as (essentially) hashString(ht, dumpPath(path)).
+ * @todo Convert to proper struct
  */
 typedef std::pair<Hash, uint64_t> HashResult;
-HashResult hashPath(HashAlgorithm ha, const Path & path,
-                    PathFilter & filter = defaultPathFilter);
 
 /**
  * Compress a hash to the specified number of bytes by cyclically

@@ -93,9 +93,6 @@ let
 
       maybeProse =
         # FIXME: this is a horrible hack to keep `nix help-stores` working.
-        # the correct answer to this is to remove that command and replace it
-        # by statically generated manpages or the output of something like `nix
-        # store info <store type>`.
         let
           help-stores = ''
             ${index}
@@ -121,7 +118,7 @@ let
           };
         in
         optionalString (details ? doc) (
-          if match "@store-types@" details.doc != [ ]
+          if match ".*@store-types@.*" details.doc != null
           then help-stores
           else details.doc
         );

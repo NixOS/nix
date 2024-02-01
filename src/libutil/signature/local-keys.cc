@@ -1,13 +1,12 @@
-#include "crypto.hh"
+#include "signature/local-keys.hh"
+
 #include "file-system.hh"
 #include "util.hh"
-#include "globals.hh"
-
 #include <sodium.h>
 
 namespace nix {
 
-static std::pair<std::string_view, std::string_view> split(std::string_view s)
+BorrowedCryptoValue BorrowedCryptoValue::parse(std::string_view s)
 {
     size_t colon = s.find(':');
     if (colon == std::string::npos || colon == 0)
@@ -17,10 +16,10 @@ static std::pair<std::string_view, std::string_view> split(std::string_view s)
 
 Key::Key(std::string_view s)
 {
-    auto ss = split(s);
+    auto ss = BorrowedCryptoValue::parse(s);
 
-    name = ss.first;
-    key = ss.second;
+    name = ss.name;
+    key = ss.payload;
 
     if (name == "" || key == "")
         throw Error("secret key is corrupt");
@@ -73,45 +72,34 @@ PublicKey::PublicKey(std::string_view s)
         throw Error("public key is not valid");
 }
 
-bool verifyDetached(const std::string & data, const std::string & sig,
-    const PublicKeys & publicKeys)
+bool PublicKey::verifyDetached(std::string_view data, std::string_view sig) const
 {
-    auto ss = split(sig);
+    auto ss = BorrowedCryptoValue::parse(sig);
 
-    auto key = publicKeys.find(std::string(ss.first));
-    if (key == publicKeys.end()) return false;
+    if (ss.name != std::string_view { name }) return false;
 
-    auto sig2 = base64Decode(ss.second);
+    return verifyDetachedAnon(data, ss.payload);
+}
+
+bool PublicKey::verifyDetachedAnon(std::string_view data, std::string_view sig) const
+{
+    auto sig2 = base64Decode(sig);
     if (sig2.size() != crypto_sign_BYTES)
         throw Error("signature is not valid");
 
     return crypto_sign_verify_detached((unsigned char *) sig2.data(),
         (unsigned char *) data.data(), data.size(),
-        (unsigned char *) key->second.key.data()) == 0;
+        (unsigned char *) key.data()) == 0;
 }
 
-PublicKeys getDefaultPublicKeys()
+bool verifyDetached(std::string_view data, std::string_view sig, const PublicKeys & publicKeys)
 {
-    PublicKeys publicKeys;
+    auto ss = BorrowedCryptoValue::parse(sig);
 
-    // FIXME: filter duplicates
+    auto key = publicKeys.find(std::string(ss.name));
+    if (key == publicKeys.end()) return false;
 
-    for (auto s : settings.trustedPublicKeys.get()) {
-        PublicKey key(s);
-        publicKeys.emplace(key.name, key);
-    }
-
-    for (auto secretKeyFile : settings.secretKeyFiles.get()) {
-        try {
-            SecretKey secretKey(readFile(secretKeyFile));
-            publicKeys.emplace(secretKey.name, secretKey.toPublicKey());
-        } catch (SysError & e) {
-            /* Ignore unreadable key files. That's normal in a
-               multi-user installation. */
-        }
-    }
-
-    return publicKeys;
+    return key->second.verifyDetachedAnon(data, ss.payload);
 }
 
 }

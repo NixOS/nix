@@ -1,7 +1,5 @@
-#!/usr/bin/env nix-shell
-#!nix-shell -i bash ../shell.nix -I nixpkgs=channel:nixos-unstable-small
-#                                   ^^^^^^^
-#                Only used for bash. shell.nix goes to the flake.
+#!/usr/bin/env nix
+#!nix shell .#changelog-d-nix --command bash
 
 # --- CONFIGURATION ---
 

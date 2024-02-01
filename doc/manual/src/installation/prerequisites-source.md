@@ -32,10 +32,14 @@
     your distribution does not provide it, please install it from
     <http://www.sqlite.org/>.
 
-  - The [Boehm garbage collector](http://www.hboehm.info/gc/) to reduce
-    the evaluator’s memory consumption (optional). To enable it, install
+  - The [Boehm garbage collector (`bdw-gc`)](http://www.hboehm.info/gc/) to reduce
+    the evaluator’s memory consumption (optional).
+
+    To enable it, install
     `pkgconfig` and the Boehm garbage collector, and pass the flag
     `--enable-gc` to `configure`.
+
+    For `bdw-gc` <= 8.2.4 Nix needs a [small patch](https://github.com/NixOS/nix/blob/ac4d2e7b857acdfeac35ac8a592bdecee2d29838/boehmgc-traceable_allocator-public.diff) to be applied.
 
   - The `boost` library of version 1.66.0 or higher. It can be obtained
     from the official web site <https://www.boost.org/>.
@@ -72,7 +76,7 @@
     This is an optional dependency and can be disabled
     by providing a `--disable-cpuid` to the `configure` script.
 
-  - Unless `./configure --disable-tests` is specified, GoogleTest (GTest) and
+  - Unless `./configure --disable-unit-tests` is specified, GoogleTest (GTest) and
     RapidCheck are required, which are available at
     <https://google.github.io/googletest/> and
     <https://github.com/emil-e/rapidcheck> respectively.

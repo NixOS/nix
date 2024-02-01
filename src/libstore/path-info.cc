@@ -38,9 +38,9 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
 }
 
 
-void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
+void ValidPathInfo::sign(const Store & store, const Signer & signer)
 {
-    sigs.insert(secretKey.signDetached(fingerprint(store)));
+    sigs.insert(signer.signDetached(fingerprint(store)));
 }
 
 std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const

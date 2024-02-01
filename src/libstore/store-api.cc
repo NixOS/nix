@@ -1,4 +1,4 @@
-#include "crypto.hh"
+#include "signature/local-keys.hh"
 #include "source-accessor.hh"
 #include "globals.hh"
 #include "derived-path.hh"
@@ -194,7 +194,10 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
     if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
-        assert(info.references.size() == 0);
+        if (!info.references.empty()) {
+            throw Error("fixed output derivation '%s' is not allowed to refer to other store paths.\nYou may need to use the 'unsafeDiscardReferences' derivation attribute, see the manual for more details.",
+                name);
+        }
         return makeStorePath("output:out",
             hashString(HashAlgorithm::SHA256,
                 "fixed:out:"
@@ -205,25 +208,19 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
 }
 
 
-StorePath StoreDirConfig::makeTextPath(std::string_view name, const TextInfo & info) const
-{
-    assert(info.hash.algo == HashAlgorithm::SHA256);
-    return makeStorePath(
-        makeType(*this, "text", StoreReferences {
-            .others = info.references,
-            .self = false,
-        }),
-        info.hash,
-        name);
-}
-
-
 StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
 {
     // New template
     return std::visit(overloaded {
         [&](const TextInfo & ti) {
-            return makeTextPath(name, ti);
+            assert(ti.hash.algo == HashAlgorithm::SHA256);
+            return makeStorePath(
+                makeType(*this, "text", StoreReferences {
+                    .others = ti.references,
+                    .self = false,
+                }),
+                ti.hash,
+                name);
         },
         [&](const FixedOutputInfo & foi) {
             return makeFixedOutputPath(name, foi);
@@ -232,54 +229,45 @@ StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const
 }
 
 
-std::pair<StorePath, Hash> StoreDirConfig::computeStorePathFromDump(
-        Source & dump,
-        std::string_view name,
-        FileIngestionMethod method,
-        HashAlgorithm hashAlgo,
-        const StorePathSet & references) const
-{
-    HashSink sink(hashAlgo);
-    dump.drainInto(sink);
-    auto h = sink.finish().first;
-    FixedOutputInfo caInfo {
-        .method = method,
-        .hash = h,
-        .references = {},
-    };
-    return std::make_pair(makeFixedOutputPath(name, caInfo), h);
-}
-
-
-StorePath StoreDirConfig::computeStorePathForText(
+std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     std::string_view name,
-    std::string_view s,
-    const StorePathSet & references) const
+    SourceAccessor & accessor,
+    const CanonPath & path,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    PathFilter & filter) const
 {
-    return makeTextPath(name, TextInfo {
-        .hash = hashString(HashAlgorithm::SHA256, s),
-        .references = references,
-    });
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
+    return {
+        makeFixedOutputPathFromCA(
+            name,
+            ContentAddressWithReferences::fromParts(
+                method,
+                h,
+                {
+                    .others = references,
+                    .self = false,
+                })),
+        h,
+    };
 }
 
 
 StorePath Store::addToStore(
-        std::string_view name,
-        const Path & _srcPath,
-        FileIngestionMethod method,
-        HashAlgorithm hashAlgo,
-        PathFilter & filter,
-        RepairFlag repair,
-        const StorePathSet & references)
+    std::string_view name,
+    SourceAccessor & accessor,
+    const CanonPath & path,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    PathFilter & filter,
+    RepairFlag repair)
 {
-    Path srcPath(absPath(_srcPath));
     auto source = sinkToSource([&](Sink & sink) {
-        if (method == FileIngestionMethod::Recursive)
-            dumpPath(srcPath, sink, filter);
-        else
-            readFile(srcPath, sink);
+        dumpPath(accessor, path, sink, method.getFileIngestionMethod(), filter);
     });
-    return addToStoreFromDump(*source, name, method, hashAlgo, repair, references);
+    return addToStoreFromDump(*source, name, method, hashAlgo, references, repair);
 }
 
 void Store::addMultipleToStore(
@@ -404,9 +392,13 @@ digraph graphname {
     fileSink -> caHashSink
 }
 */
-ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
-                                    FileIngestionMethod method, HashAlgorithm hashAlgo,
-                                    std::optional<Hash> expectedCAHash)
+ValidPathInfo Store::addToStoreSlow(
+    std::string_view name,
+    SourceAccessor & accessor,
+    const CanonPath & srcPath,
+    ContentAddressMethod method, HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    std::optional<Hash> expectedCAHash)
 {
     HashSink narHashSink { HashAlgorithm::SHA256 };
     HashSink caHashSink { hashAlgo };
@@ -425,17 +417,19 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
        srcPath. The fact that we use scratchpadSink as a temporary buffer here
        is an implementation detail. */
     auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
-        dumpPath(srcPath, scratchpadSink);
+        accessor.dumpPath(srcPath, scratchpadSink);
     });
 
     /* tapped provides the same data as fileSource, but we also write all the
        information to narSink. */
     TeeSource tapped { *fileSource, narSink };
 
-    NullParseSink blank;
-    auto & parseSink = method == FileIngestionMethod::Flat
-        ? (ParseSink &) fileSink
-        : (ParseSink &) blank;
+    NullFileSystemObjectSink blank;
+    auto & parseSink = method.getFileIngestionMethod() == FileIngestionMethod::Flat
+        ? (FileSystemObjectSink &) fileSink
+        : method.getFileIngestionMethod() == FileIngestionMethod::Recursive
+        ? (FileSystemObjectSink &) blank
+        : (abort(), (FileSystemObjectSink &)*(FileSystemObjectSink *)nullptr); // handled both cases
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */
@@ -452,21 +446,24 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
 
+
     ValidPathInfo info {
         *this,
         name,
-        FixedOutputInfo {
-            .method = method,
-            .hash = hash,
-            .references = {},
-        },
+        ContentAddressWithReferences::fromParts(
+            method,
+            hash,
+            {
+                .others = references,
+                .self = false,
+            }),
         narHash,
     };
     info.narSize = narSize;
 
     if (!isValidPath(info.path)) {
         auto source = sinkToSource([&](Sink & scratchpadSink) {
-            dumpPath(srcPath, scratchpadSink);
+            accessor.dumpPath(srcPath, scratchpadSink);
         });
         addToStore(info, *source);
     }
@@ -689,38 +686,56 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
 }
 
 
+std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClientCache(const StorePath & storePath)
+{
+    auto hashPart = std::string(storePath.hashPart());
+
+    {
+        auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
+        if (res && res->isKnownNow()) {
+            stats.narInfoReadAverted++;
+            if (res->didExist())
+                return std::make_optional(res->value);
+            else
+                return std::make_optional(nullptr);
+        }
+    }
+
+    if (diskCache) {
+        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
+        if (res.first != NarInfoDiskCache::oUnknown) {
+            stats.narInfoReadAverted++;
+            {
+                auto state_(state.lock());
+                state_->pathInfoCache.upsert(std::string(storePath.to_string()),
+                    res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
+                if (res.first == NarInfoDiskCache::oInvalid ||
+                    !goodStorePath(storePath, res.second->path))
+                    return std::make_optional(nullptr);
+            }
+            assert(res.second);
+            return std::make_optional(res.second);
+        }
+    }
+
+    return std::nullopt;
+}
+
+
 void Store::queryPathInfo(const StorePath & storePath,
     Callback<ref<const ValidPathInfo>> callback) noexcept
 {
     auto hashPart = std::string(storePath.hashPart());
 
     try {
-        {
-            auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
-            if (res && res->isKnownNow()) {
-                stats.narInfoReadAverted++;
-                if (!res->didExist())
-                    throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-                return callback(ref<const ValidPathInfo>(res->value));
-            }
+        auto r = queryPathInfoFromClientCache(storePath);
+        if (r.has_value()) {
+            std::shared_ptr<const ValidPathInfo> & info = *r;
+            if (info)
+                return callback(ref(info));
+            else
+                throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
         }
-
-        if (diskCache) {
-            auto res = diskCache->lookupNarInfo(getUri(), hashPart);
-            if (res.first != NarInfoDiskCache::oUnknown) {
-                stats.narInfoReadAverted++;
-                {
-                    auto state_(state.lock());
-                    state_->pathInfoCache.upsert(std::string(storePath.to_string()),
-                        res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
-                    if (res.first == NarInfoDiskCache::oInvalid ||
-                        !goodStorePath(storePath, res.second->path))
-                        throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-                }
-                return callback(ref<const ValidPathInfo>(res.second));
-            }
-        }
-
     } catch (...) { return callback.rethrow(); }
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
@@ -984,6 +999,11 @@ void copyStorePath(
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+    /* Bail out early (before starting a download from srcStore) if
+       dstStore already has this path. */
+    if (!repair && dstStore.isValidPath(storePath))
+        return;
+
     auto srcUri = srcStore.getUri();
     auto dstUri = dstStore.getUri();
     auto storePathS = srcStore.printStorePath(storePath);

@@ -13,7 +13,7 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{this, "nix-store", "remote-program",
+    const Setting<Strings> remoteProgram{this, {"nix-store"}, "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
     const Setting<int> maxConnections{this, 1, "max-connections",
@@ -59,25 +59,24 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     { unsupported("queryPathFromHashPart"); }
 
     StorePath addToStore(
-            std::string_view name,
-            const Path & srcPath,
-            FileIngestionMethod method,
-            HashAlgorithm hashAlgo,
-            PathFilter & filter,
-            RepairFlag repair,
-            const StorePathSet & references) override
+        std::string_view name,
+        SourceAccessor & accessor,
+        const CanonPath & srcPath,
+        ContentAddressMethod method,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        PathFilter & filter,
+        RepairFlag repair) override
     { unsupported("addToStore"); }
 
-    StorePath addTextToStore(
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
         std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override
-    { unsupported("addTextToStore"); }
-
-private:
-
-    void putBuildSettings(Connection & conn);
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override
+    { unsupported("addToStore"); }
 
 public:
 

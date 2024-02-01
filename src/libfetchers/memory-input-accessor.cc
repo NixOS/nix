@@ -1,5 +1,6 @@
 #include "memory-input-accessor.hh"
 #include "memory-source-accessor.hh"
+#include "source-path.hh"
 
 namespace nix {
 

@@ -118,3 +118,55 @@ cloneRepo=$TEST_ROOT/a/b/gitSubmodulesClone # NB /a/b to make the relative path 
 git clone $rootRepo $cloneRepo
 pathIndirect=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$cloneRepo; rev = \"$rev2\"; submodules = true; }).outPath")
 [[ $pathIndirect = $pathWithRelative ]]
+
+# Test submodule export-ignore interaction
+git -C $rootRepo/sub config user.email "foobar@example.com"
+git -C $rootRepo/sub config user.name "Foobar"
+
+echo "/exclude-from-root export-ignore" >> $rootRepo/.gitattributes
+# TBD possible semantics for submodules + exportIgnore
+# echo "/sub/exclude-deep export-ignore" >> $rootRepo/.gitattributes
+echo nope > $rootRepo/exclude-from-root
+git -C $rootRepo add .gitattributes exclude-from-root
+git -C $rootRepo commit -m "Add export-ignore"
+
+echo "/exclude-from-sub export-ignore" >> $rootRepo/sub/.gitattributes
+echo nope > $rootRepo/sub/exclude-from-sub
+# TBD possible semantics for submodules + exportIgnore
+# echo aye > $rootRepo/sub/exclude-from-root
+git -C $rootRepo/sub add .gitattributes exclude-from-sub
+git -C $rootRepo/sub commit -m "Add export-ignore (sub)"
+
+git -C $rootRepo add sub
+git -C $rootRepo commit -m "Update submodule"
+
+git -C $rootRepo status
+
+# # TBD: not supported yet, because semantics are undecided and current implementation leaks rules from the root to submodules
+# # exportIgnore can be used with submodules
+# pathWithExportIgnore=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$rootRepo; submodules = true; exportIgnore = true; }).outPath")
+# # find $pathWithExportIgnore
+# # git -C $rootRepo archive --format=tar HEAD | tar -t
+# # cp -a $rootRepo /tmp/rootRepo
+
+# [[ -e $pathWithExportIgnore/sub/content ]]
+# [[ ! -e $pathWithExportIgnore/exclude-from-root ]]
+# [[ ! -e $pathWithExportIgnore/sub/exclude-from-sub ]]
+# TBD possible semantics for submodules + exportIgnore
+# # root .gitattribute has no power across submodule boundary
+# [[ -e $pathWithExportIgnore/sub/exclude-from-root ]]
+# [[ -e $pathWithExportIgnore/sub/exclude-deep ]]
+
+
+# exportIgnore can be explicitly disabled with submodules
+pathWithoutExportIgnore=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$rootRepo; submodules = true; exportIgnore = false; }).outPath")
+# find $pathWithoutExportIgnore
+
+[[ -e $pathWithoutExportIgnore/exclude-from-root ]]
+[[ -e $pathWithoutExportIgnore/sub/exclude-from-sub ]]
+
+# exportIgnore defaults to false when submodules = true
+pathWithSubmodules=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$rootRepo; submodules = true; }).outPath")
+
+[[ -e $pathWithoutExportIgnore/exclude-from-root ]]
+[[ -e $pathWithoutExportIgnore/sub/exclude-from-sub ]]

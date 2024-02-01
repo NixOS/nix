@@ -1,5 +1,3 @@
-ifeq ($(doc_generate),yes)
-
 # The version of Nix used to generate the doc. Can also be
 # `$(nix_INSTALL_PATH)` or just `nix` (to grap ambient from the `PATH`),
 # if one prefers.
@@ -180,6 +178,8 @@ manual-html: $(docdir)/manual/index.html
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.
+.PHONY: manpages
+manpages: $(mandir)/man1/nix3-manpages
 install: $(mandir)/man1/nix3-manpages
 man: doc/manual/generated/man1/nix3-manpages
 all: doc/manual/generated/man1/nix3-manpages
@@ -225,5 +225,3 @@ $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/
 	@rm -rf $(DESTDIR)$(docdir)/manual
 	@mv $(DESTDIR)$(docdir)/manual.tmp/html $(DESTDIR)$(docdir)/manual
 	@rm -rf $(DESTDIR)$(docdir)/manual.tmp
-
-endif

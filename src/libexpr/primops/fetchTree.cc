@@ -1,3 +1,4 @@
+#include "libfetchers/attrs.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
@@ -25,7 +26,7 @@ void emitTreeAttrs(
 {
     assert(input.isLocked());
 
-    auto attrs = state.buildBindings(10);
+    auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
@@ -135,6 +136,10 @@ static void fetchTree(
                     state.symbols[attr.name], showType(*attr.value)));
         }
 
+        if (params.isFetchGit && !attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+            attrs.emplace("exportIgnore", Explicit<bool>{true});
+        }
+
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.debugThrowLastTrace(EvalError({
@@ -152,6 +157,9 @@ static void fetchTree(
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
             attrs.emplace("url", fixGitURL(url));
+            if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+                attrs.emplace("exportIgnore", Explicit<bool>{true});
+            }
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
@@ -166,8 +174,12 @@ static void fetchTree(
     if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isLocked())
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+    if (evalSettings.pureEval && !input.isLocked()) {
+        if (params.isFetchGit)
+            state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchGit' requires a locked input, at %s", state.positions[pos]));
+        else
+            state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+    }
 
     state.checkURI(input.toURLString());
 
@@ -593,10 +605,16 @@ static RegisterPrimOp primop_fetchGit({
 
         A Boolean parameter that specifies whether submodules should be checked out.
 
+      - `exportIgnore` (default: `true`)
+
+        A Boolean parameter that specifies whether `export-ignore` from `.gitattributes` should be applied.
+        This approximates part of the `git archive` behavior.
+
+        Enabling this option is not recommended because it is unknown whether the Git developers commit to the reproducibility of `export-ignore` in newer Git versions.
+
       - `shallow` (default: `false`)
 
-        A Boolean parameter that specifies whether fetching from a shallow remote repository is allowed.
-        This still performs a full clone of what is available on the remote.
+        Make a shallow clone when fetching the Git tree.
 
       - `allRefs`
 

@@ -53,7 +53,7 @@ void FdSink::writeUnbuffered(std::string_view data)
     written += data.size();
     try {
         writeFull(fd, data);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         _good = false;
         throw;
     }
@@ -82,7 +82,7 @@ void Source::operator () (std::string_view data)
 void Source::drainInto(Sink & sink)
 {
     std::string s;
-    std::vector<char> buf(8192);
+    std::array<char, 8192> buf;
     while (true) {
         size_t n;
         try {
@@ -132,7 +132,7 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
         n = ::read(fd, data, len);
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
-    if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
+    if (n == 0) { _good = false; throw EndOfFile(std::string(*endOfFileError)); }
     read += n;
     return n;
 }

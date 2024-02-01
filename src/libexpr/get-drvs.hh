@@ -10,8 +10,10 @@
 
 namespace nix {
 
-
-struct DrvInfo
+/**
+ * A "parsed" package attribute set.
+ */
+struct PackageInfo
 {
 public:
     typedef std::map<std::string, std::optional<StorePath>> Outputs;
@@ -43,9 +45,9 @@ public:
      */
     std::string attrPath;
 
-    DrvInfo(EvalState & state) : state(&state) { };
-    DrvInfo(EvalState & state, std::string attrPath, Bindings * attrs);
-    DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
+    PackageInfo(EvalState & state) : state(&state) { };
+    PackageInfo(EvalState & state, std::string attrPath, Bindings * attrs);
+    PackageInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
     std::string queryName() const;
     std::string querySystem() const;
@@ -82,21 +84,21 @@ public:
 
 
 #if HAVE_BOEHMGC
-typedef std::list<DrvInfo, traceable_allocator<DrvInfo>> DrvInfos;
+typedef std::list<PackageInfo, traceable_allocator<PackageInfo>> PackageInfos;
 #else
-typedef std::list<DrvInfo> DrvInfos;
+typedef std::list<PackageInfo> PackageInfos;
 #endif
 
 
 /**
- * If value `v` denotes a derivation, return a DrvInfo object
+ * If value `v` denotes a derivation, return a PackageInfo object
  * describing it. Otherwise return nothing.
  */
-std::optional<DrvInfo> getDerivation(EvalState & state,
+std::optional<PackageInfo> getDerivation(EvalState & state,
     Value & v, bool ignoreAssertionFailures);
 
 void getDerivations(EvalState & state, Value & v, const std::string & pathPrefix,
-    Bindings & autoArgs, DrvInfos & drvs,
+    Bindings & autoArgs, PackageInfos & drvs,
     bool ignoreAssertionFailures);
 
 

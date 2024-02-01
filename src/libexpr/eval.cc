@@ -2,6 +2,7 @@
 #include "eval-settings.hh"
 #include "hash.hh"
 #include "primops.hh"
+#include "print-options.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -18,6 +19,11 @@
 #include "memory-input-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
+#include "url.hh"
+#include "fetch-to-store.hh"
+#include "tarball.hh"
+#include "flake/flakeref.hh"
+#include "parser-tab.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -27,9 +33,9 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <iostream>
 #include <fstream>
 #include <functional>
+#include <iostream>
 
 #include <sys/resource.h>
 #include <nlohmann/json.hpp>
@@ -103,116 +109,23 @@ RootValue allocRootValue(Value * v)
 #endif
 }
 
-void Value::print(const SymbolTable &symbols, std::ostream &str,
-                  std::set<const void *> *seen, int depth) const
-
-{
-    checkInterrupt();
-
-    if (depth <= 0) {
-        str << "«too deep»";
-        return;
-    }
-    switch (internalType) {
-    case tInt:
-        str << integer;
-        break;
-    case tBool:
-        printLiteralBool(str, boolean);
-        break;
-    case tString:
-        printLiteralString(str, string_view());
-        break;
-    case tPath:
-        str << path().to_string(); // !!! escaping?
-        break;
-    case tNull:
-        str << "null";
-        break;
-    case tAttrs: {
-        if (seen && !attrs->empty() && !seen->insert(attrs).second)
-            str << "«repeated»";
-        else {
-            str << "{ ";
-            for (auto & i : attrs->lexicographicOrder(symbols)) {
-                str << symbols[i->name] << " = ";
-                i->value->print(symbols, str, seen, depth - 1);
-                str << "; ";
-            }
-            str << "}";
-        }
-        break;
-    }
-    case tList1:
-    case tList2:
-    case tListN:
-        if (seen && listSize() && !seen->insert(listElems()).second)
-            str << "«repeated»";
-        else {
-            str << "[ ";
-            for (auto v2 : listItems()) {
-                if (v2)
-                    v2->print(symbols, str, seen, depth - 1);
-                else
-                    str << "(nullptr)";
-                str << " ";
-            }
-            str << "]";
-        }
-        break;
-    case tThunk:
-    case tApp:
-        str << "<CODE>";
-        break;
-    case tLambda:
-        str << "<LAMBDA>";
-        break;
-    case tPrimOp:
-        str << "<PRIMOP>";
-        break;
-    case tPrimOpApp:
-        str << "<PRIMOP-APP>";
-        break;
-    case tExternal:
-        str << *external;
-        break;
-    case tFloat:
-        str << fpoint;
-        break;
-    case tBlackhole:
-        // Although we know for sure that it's going to be an infinite recursion
-        // when this value is accessed _in the current context_, it's likely
-        // that the user will misinterpret a simpler «infinite recursion» output
-        // as a definitive statement about the value, while in fact it may be
-        // a valid value after `builtins.trace` and perhaps some other steps
-        // have completed.
-        str << "«potential infinite recursion»";
-        break;
-    default:
-        printError("Nix evaluator internal error: Value::print(): invalid value type %1%", internalType);
-        abort();
-    }
-}
-
-void Value::print(const SymbolTable &symbols, std::ostream &str,
-                  bool showRepeated, int depth) const {
-    std::set<const void *> seen;
-    print(symbols, str, showRepeated ? nullptr : &seen, depth);
-}
-
 // Pretty print types for assertion errors
 std::ostream & operator << (std::ostream & os, const ValueType t) {
     os << showType(t);
     return os;
 }
 
-std::string printValue(const EvalState & state, const Value & v)
+std::string printValue(EvalState & state, Value & v)
 {
     std::ostringstream out;
-    v.print(state.symbols, out);
+    v.print(state, out);
     return out.str();
 }
 
+void Value::print(EvalState & state, std::ostream & str, PrintOptions options)
+{
+    printValue(state, str, *this, options);
+}
 
 const Value * getPrimOp(const Value &v) {
     const Value * primOp = &v;
@@ -255,9 +168,8 @@ std::string showType(const Value & v)
         case tPrimOpApp:
             return fmt("the partially applied built-in function '%s'", std::string(getPrimOp(v)->primOp->name));
         case tExternal: return v.external->showType();
-        case tThunk: return "a thunk";
+        case tThunk: return v.isBlackhole() ? "a black hole" : "a thunk";
         case tApp: return "a function application";
-        case tBlackhole: return "a black hole";
     default:
         return std::string(showType(v.type()));
     }
@@ -508,6 +420,16 @@ EvalState::EvalState(
     , sPath(symbols.create("path"))
     , sPrefix(symbols.create("prefix"))
     , sOutputSpecified(symbols.create("outputSpecified"))
+    , exprSymbols{
+        .sub = symbols.create("__sub"),
+        .lessThan = symbols.create("__lessThan"),
+        .mul = symbols.create("__mul"),
+        .div = symbols.create("__div"),
+        .or_ = symbols.create("or"),
+        .findFile = symbols.create("__findFile"),
+        .nixPath = symbols.create("__nixPath"),
+        .body = symbols.create("body"),
+    }
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
@@ -542,7 +464,7 @@ EvalState::EvalState(
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #endif
     , baseEnv(allocEnv(128))
-    , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
+    , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
@@ -552,6 +474,8 @@ EvalState::EvalState(
     assert(gcInitialised);
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+
+    vEmptyList.mkList(0);
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -599,21 +523,45 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     mkStorePathString(storePath, v);
 }
 
+inline static bool isJustSchemePrefix(std::string_view prefix)
+{
+    return
+        !prefix.empty()
+        && prefix[prefix.size() - 1] == ':'
+        && isValidSchemeName(prefix.substr(0, prefix.size() - 1));
+}
+
+bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
+{
+    /* 'uri' should be equal to a prefix, or in a subdirectory of a
+       prefix. Thus, the prefix https://github.co does not permit
+       access to https://github.com. */
+    for (auto & prefix : allowedUris) {
+        if (uri == prefix
+            // Allow access to subdirectories of the prefix.
+            || (uri.size() > prefix.size()
+                && prefix.size() > 0
+                && hasPrefix(uri, prefix)
+                && (
+                    // Allow access to subdirectories of the prefix.
+                    prefix[prefix.size() - 1] == '/'
+                    || uri[prefix.size()] == '/'
+
+                    // Allow access to whole schemes
+                    || isJustSchemePrefix(prefix)
+                    )
+                ))
+            return true;
+    }
+
+    return false;
+}
+
 void EvalState::checkURI(const std::string & uri)
 {
     if (!evalSettings.restrictEval) return;
 
-    /* 'uri' should be equal to a prefix, or in a subdirectory of a
-       prefix. Thus, the prefix https://github.co does not permit
-       access to https://github.com. Note: this allows 'http://' and
-       'https://' as prefixes for any http/https URI. */
-    for (auto & prefix : evalSettings.allowedUris.get())
-        if (uri == prefix ||
-            (uri.size() > prefix.size()
-            && prefix.size() > 0
-            && hasPrefix(uri, prefix)
-            && (prefix[prefix.size() - 1] == '/' || uri[prefix.size()] == '/')))
-            return;
+    if (isAllowedURI(uri, evalSettings.allowedUris.get())) return;
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
@@ -679,6 +627,26 @@ void PrimOp::check()
     if (arity > maxPrimOpArity) {
         throw Error("primop arity must not exceed %1%", maxPrimOpArity);
     }
+}
+
+
+std::ostream & operator<<(std::ostream & output, PrimOp & primOp)
+{
+    output << "primop " << primOp.name;
+    return output;
+}
+
+
+PrimOp * Value::primOpAppPrimOp() const
+{
+    Value * left = primOpApp.left;
+    while (left && !left->isPrimOp()) {
+        left = left->primOpApp.left;
+    }
+
+    if (!left)
+        return nullptr;
+    return left->primOp;
 }
 
 
@@ -756,7 +724,7 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    if (env.type == Env::HasWithAttrs) {
+    if (!env.values[0]->isThunk()) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         Bindings::iterator j = env.values[0]->attrs->begin();
@@ -810,7 +778,7 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     if (env.up && se.up) {
         mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
-        if (env.type == Env::HasWithAttrs) {
+        if (!env.values[0]->isThunk()) {
             // add 'with' bindings.
             Bindings::iterator j = env.values[0]->attrs->begin();
             while (j != env.values[0]->attrs->end()) {
@@ -843,7 +811,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         ? std::make_unique<DebugTraceStacker>(
             *this,
             DebugTrace {
-                .pos = error->info().errPos ? error->info().errPos : static_cast<std::shared_ptr<AbstractPos>>(positions[expr.getPos()]),
+                .pos = error->info().errPos ? error->info().errPos : positions[expr.getPos()],
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
@@ -882,7 +850,7 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
-    std::shared_ptr<AbstractPos> && pos,
+    std::shared_ptr<Pos> && pos,
     const char * s,
     const std::string & s2)
 {
@@ -948,22 +916,23 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 
     if (!var.fromWith) return env->values[var.displ];
 
+    // This early exit defeats the `maybeThunk` optimization for variables from `with`,
+    // The added complexity of handling this appears to be similarly in cost, or
+    // the cases where applicable were insignificant in the first place.
+    if (noEval) return nullptr;
+
+    auto * fromWith = var.fromWith;
     while (1) {
-        if (env->type == Env::HasWithExpr) {
-            if (noEval) return 0;
-            Value * v = allocValue();
-            evalAttrs(*env->up, (Expr *) env->values[0], *v, noPos, "<borked>");
-            env->values[0] = v;
-            env->type = Env::HasWithAttrs;
-        }
+        forceAttrs(*env->values[0], fromWith->pos, "while evaluating the first subexpression of a with expression");
         Bindings::iterator j = env->values[0]->attrs->find(var.name);
         if (j != env->values[0]->attrs->end()) {
             if (countCalls) attrSelects[j->pos]++;
             return j->value;
         }
-        if (!env->prevWith)
+        if (!fromWith->parentWith)
             error("undefined variable '%1%'", symbols[var.name]).atPos(var.pos).withFrame(*env, var).debugThrow<UndefinedVarError>();
-        for (size_t l = env->prevWith; l; --l, env = env->up) ;
+        for (size_t l = fromWith->prevWith; l; --l, env = env->up) ;
+        fromWith = fromWith->parentWith;
     }
 }
 
@@ -1159,7 +1128,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? static_cast<std::shared_ptr<AbstractPos>>(positions[e->getPos()]) : nullptr,
+                e->getPos() ? std::make_shared<Pos>(positions[e->getPos()]) : nullptr,
                 "while evaluating the file '%1%':", resolvedPath.to_string())
             : nullptr;
 
@@ -1198,7 +1167,10 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
         Value v;
         e->eval(*this, env, v);
         if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+            error("expected a Boolean but found %1%: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
+                .withFrame(env, *e).debugThrow<TypeError>();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -1212,7 +1184,10 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
-            error("value is %1% while a set was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+            error("expected a set but found %1%: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
+                .withFrame(env, *e).debugThrow<TypeError>();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -1359,6 +1334,15 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+Value * ExprList::maybeThunk(EvalState & state, Env & env)
+{
+    if (elems.empty()) {
+        return &state.vEmptyList;
+    }
+    return Expr::maybeThunk(state, env);
+}
+
+
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
     Value * v2 = state.lookupVar(&env, *this, false);
@@ -1480,9 +1464,27 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
+namespace {
+/** Increments a count on construction and decrements on destruction.
+ */
+class CallDepth {
+  size_t & count;
+public:
+  CallDepth(size_t & count) : count(count) {
+    ++count;
+  }
+  ~CallDepth() {
+    --count;
+  }
+};
+};
 
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
+    if (callDepth > evalSettings.maxCallDepth)
+        error("stack overflow; max-call-depth exceeded").atPos(pos).template debugThrow<EvalError>();
+    CallDepth _level(callDepth);
+
     auto trace = evalSettings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
         : nullptr;
@@ -1621,15 +1623,15 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 return;
             } else {
                 /* We have all the arguments, so call the primop. */
-                auto name = vCur.primOp->name;
+                auto * fn = vCur.primOp;
 
                 nrPrimOpCalls++;
-                if (countCalls) primOpCalls[name]++;
+                if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    vCur.primOp->fun(*this, vCur.determinePos(noPos), args, vCur);
+                    fn->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1666,18 +1668,18 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 for (size_t i = 0; i < argsLeft; ++i)
                     vArgs[argsDone + i] = args[i];
 
-                auto name = primOp->primOp->name;
+                auto fn = primOp->primOp;
                 nrPrimOpCalls++;
-                if (countCalls) primOpCalls[name]++;
+                if (countCalls) primOpCalls[fn->name]++;
 
                 try {
                     // TODO:
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    primOp->primOp->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
+                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1703,7 +1705,11 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
 
         else
-            error("attempt to call something which is not a function but %1%", showType(vCur)).atPos(pos).debugThrow<TypeError>();
+            error("attempt to call something which is not a function but %1%: %2%",
+                    showType(vCur),
+                    ValuePrinter(*this, vCur, errorPrintOptions))
+                .atPos(pos)
+                .debugThrow<TypeError>();
     }
 
     vRes = vCur;
@@ -1791,9 +1797,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
     Env & env2(state.allocEnv(1));
     env2.up = &env;
-    env2.prevWith = prevWith;
-    env2.type = Env::HasWithExpr;
-    env2.values[0] = (Value *) attrs;
+    env2.values[0] = attrs->maybeThunk(state, env);
 
     body->eval(state, env2, v);
 }
@@ -2031,6 +2035,29 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 }
 
 
+void ExprBlackHole::eval(EvalState & state, Env & env, Value & v)
+{
+    state.error("infinite recursion encountered")
+        .debugThrow<InfiniteRecursionError>();
+}
+
+// always force this to be separate, otherwise forceValue may inline it and take
+// a massive perf hit
+[[gnu::noinline]]
+void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
+{
+    if (!v.isBlackhole())
+        return;
+    auto e = std::current_exception();
+    try {
+        std::rethrow_exception(e);
+    } catch (InfiniteRecursionError & e) {
+        e.err.errPos = positions[pos];
+    } catch (...) {
+    }
+}
+
+
 void EvalState::forceValueDeep(Value & v)
 {
     std::set<const Value *> seen;
@@ -2040,7 +2067,7 @@ void EvalState::forceValueDeep(Value & v)
     recurse = [&](Value & v) {
         if (!seen.insert(&v).second) return;
 
-        forceValue(v, [&]() { return v.determinePos(noPos); });
+        forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
@@ -2073,7 +2100,10 @@ NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCt
     try {
         forceValue(v, pos);
         if (v.type() != nInt)
-            error("value is %1% while an integer was expected", showType(v)).debugThrow<TypeError>();
+            error("expected an integer but found %1%: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
+                .debugThrow<TypeError>();
         return v.integer;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2089,7 +2119,10 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
         if (v.type() == nInt)
             return v.integer;
         else if (v.type() != nFloat)
-            error("value is %1% while a float was expected", showType(v)).debugThrow<TypeError>();
+            error("expected a float but found %1%: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
+                .debugThrow<TypeError>();
         return v.fpoint;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2103,7 +2136,10 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
     try {
         forceValue(v, pos);
         if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).debugThrow<TypeError>();
+            error("expected a Boolean but found %1%: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
+                .debugThrow<TypeError>();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2123,7 +2159,10 @@ void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view erro
     try {
         forceValue(v, pos);
         if (v.type() != nFunction && !isFunctor(v))
-            error("value is %1% while a function was expected", showType(v)).debugThrow<TypeError>();
+            error("expected a function but found %1%: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
+                .debugThrow<TypeError>();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -2136,7 +2175,10 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
     try {
         forceValue(v, pos);
         if (v.type() != nString)
-            error("value is %1% while a string was expected", showType(v)).debugThrow<TypeError>();
+            error("expected a string but found %1%: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
+                .debugThrow<TypeError>();
         return v.string_view();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2230,7 +2272,9 @@ BackedStringView EvalState::coerceToString(
             return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) {
-            error("cannot coerce %1% to a string", showType(v))
+            error("cannot coerce %1% to a string: %2%",
+                  showType(v),
+                  ValuePrinter(*this, v, errorPrintOptions))
                 .withTrace(pos, errorCtx)
                 .debugThrow<TypeError>();
         }
@@ -2276,7 +2320,9 @@ BackedStringView EvalState::coerceToString(
         }
     }
 
-    error("cannot coerce %1% to a string", showType(v))
+    error("cannot coerce %1% to a string: %2%",
+          showType(v),
+          ValuePrinter(*this, v, errorPrintOptions))
         .withTrace(pos, errorCtx)
         .debugThrow<TypeError>();
 }
@@ -2292,7 +2338,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            auto dstPath = path.fetchToStore(store, path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
+            auto dstPath = fetchToStore(*store, path.resolveSymlinks(), path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
@@ -2432,7 +2478,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return v1.boolean == v2.boolean;
 
         case nString:
-            return v1.string_view().compare(v2.string_view()) == 0;
+            return strcmp(v1.c_str(), v2.c_str()) == 0;
 
         case nPath:
             return
@@ -2633,10 +2679,187 @@ void EvalState::printStatistics()
 }
 
 
+SourcePath resolveExprPath(SourcePath path)
+{
+    unsigned int followCount = 0, maxFollow = 1024;
+
+    /* If `path' is a symlink, follow it.  This is so that relative
+       path references work. */
+    while (!path.path.isRoot()) {
+        // Basic cycle/depth limit to avoid infinite loops.
+        if (++followCount >= maxFollow)
+            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+        auto p = path.parent().resolveSymlinks() + path.baseName();
+        if (p.lstat().type != InputAccessor::tSymlink) break;
+        path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
+    }
+
+    /* If `path' refers to a directory, append `/default.nix'. */
+    if (path.resolveSymlinks().lstat().type == InputAccessor::tDirectory)
+        return path + "default.nix";
+
+    return path;
+}
+
+
+Expr * EvalState::parseExprFromFile(const SourcePath & path)
+{
+    return parseExprFromFile(path, staticBaseEnv);
+}
+
+
+Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
+{
+    auto buffer = path.resolveSymlinks().readFile();
+    // readFile hopefully have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
+}
+
+
+Expr * EvalState::parseExprFromString(std::string s_, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+{
+    auto s = make_ref<std::string>(std::move(s_));
+    s->append("\0\0", 2);
+    return parse(s->data(), s->size(), Pos::String{.source = s}, basePath, staticEnv);
+}
+
+
+Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath)
+{
+    return parseExprFromString(std::move(s), basePath, staticBaseEnv);
+}
+
+
+Expr * EvalState::parseStdin()
+{
+    //Activity act(*logger, lvlTalkative, "parsing standard input");
+    auto buffer = drainFD(0);
+    // drainFD should have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    auto s = make_ref<std::string>(std::move(buffer));
+    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath(CanonPath::fromCwd()), staticBaseEnv);
+}
+
+
+SourcePath EvalState::findFile(const std::string_view path)
+{
+    return findFile(searchPath, path);
+}
+
+
+SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos)
+{
+    for (auto & i : searchPath.elements) {
+        auto suffixOpt = i.prefix.suffixIfPotentialMatch(path);
+
+        if (!suffixOpt) continue;
+        auto suffix = *suffixOpt;
+
+        auto rOpt = resolveSearchPathPath(i.path);
+        if (!rOpt) continue;
+        auto r = *rOpt;
+
+        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
+        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
+    }
+
+    if (hasPrefix(path, "nix/"))
+        return {corepkgsFS, CanonPath(path.substr(3))};
+
+    debugThrow(ThrownError({
+        .msg = hintfmt(evalSettings.pureEval
+            ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
+            : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
+            path),
+        .errPos = positions[pos]
+    }), 0, 0);
+}
+
+
+std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
+{
+    auto & value = value0.s;
+    auto i = searchPathResolved.find(value);
+    if (i != searchPathResolved.end()) return i->second;
+
+    std::optional<std::string> res;
+
+    if (EvalSettings::isPseudoUrl(value)) {
+        try {
+            auto storePath = fetchers::downloadTarball(
+                store, EvalSettings::resolvePseudoUrl(value), "source", false).storePath;
+            res = { store->toRealPath(storePath) };
+        } catch (FileTransferError & e) {
+            logWarning({
+                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
+            });
+        }
+    }
+
+    else if (hasPrefix(value, "flake:")) {
+        experimentalFeatureSettings.require(Xp::Flakes);
+        auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", value);
+        auto storePath = flakeRef.resolve(store).fetchTree(store).first;
+        res = { store->toRealPath(storePath) };
+    }
+
+    else {
+        auto path = absPath(value);
+
+        /* Allow access to paths in the search path. */
+        if (initAccessControl) {
+            allowPath(path);
+            if (store->isInStore(path)) {
+                try {
+                    StorePathSet closure;
+                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    for (auto & p : closure)
+                        allowPath(p);
+                } catch (InvalidPath &) { }
+            }
+        }
+
+        if (pathExists(path))
+            res = { path };
+        else {
+            logWarning({
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", value)
+            });
+            res = std::nullopt;
+        }
+    }
+
+    if (res)
+        debug("resolved search path element '%s' to '%s'", value, *res);
+    else
+        debug("failed to resolve search path element '%s'", value);
+
+    searchPathResolved.emplace(value, res);
+    return res;
+}
+
+
+Expr * EvalState::parse(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    std::shared_ptr<StaticEnv> & staticEnv)
+{
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, positions, rootFS, exprSymbols);
+
+    result->bindVars(*this, staticEnv);
+
+    return result;
+}
+
+
 std::string ExternalValueBase::coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
     throw TypeError({
-        .msg = hintfmt("cannot coerce %1% to a string", showType())
+        .msg = hintfmt("cannot coerce %1% to a string: %2%", showType(), *this)
     });
 }
 

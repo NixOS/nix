@@ -106,7 +106,7 @@ struct CacheImpl : Cache
     }
 
     void add(
-        ref<Store> store,
+        Store & store,
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
         const StorePath & storePath,
@@ -115,13 +115,13 @@ struct CacheImpl : Cache
         _state.lock()->add.use()
             (attrsToJSON(inAttrs).dump())
             (attrsToJSON(infoAttrs).dump())
-            (store->printStorePath(storePath))
+            (store.printStorePath(storePath))
             (locked)
             (time(0)).exec();
     }
 
     std::optional<std::pair<Attrs, StorePath>> lookup(
-        ref<Store> store,
+        Store & store,
         const Attrs & inAttrs) override
     {
         if (auto res = lookupExpired(store, inAttrs)) {
@@ -134,7 +134,7 @@ struct CacheImpl : Cache
     }
 
     std::optional<Result> lookupExpired(
-        ref<Store> store,
+        Store & store,
         const Attrs & inAttrs) override
     {
         auto state(_state.lock());
@@ -148,19 +148,19 @@ struct CacheImpl : Cache
         }
 
         auto infoJSON = stmt.getStr(0);
-        auto storePath = store->parseStorePath(stmt.getStr(1));
+        auto storePath = store.parseStorePath(stmt.getStr(1));
         auto locked = stmt.getInt(2) != 0;
         auto timestamp = stmt.getInt(3);
 
-        store->addTempRoot(storePath);
-        if (!store->isValidPath(storePath)) {
+        store.addTempRoot(storePath);
+        if (!store.isValidPath(storePath)) {
             // FIXME: we could try to substitute 'storePath'.
             debug("ignoring disappeared cache entry '%s'", inAttrsJSON);
             return {};
         }
 
         debug("using cache entry '%s' -> '%s', '%s'",
-            inAttrsJSON, infoJSON, store->printStorePath(storePath));
+            inAttrsJSON, infoJSON, store.printStorePath(storePath));
 
         return Result {
             .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),

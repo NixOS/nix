@@ -144,20 +144,25 @@ public:
      */
     bool verboseBuild = true;
 
-    Setting<size_t> logLines{this, 10, "log-lines",
+    Setting<size_t> logLines{this, 25, "log-lines",
         "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
         this, 1, "max-jobs",
         R"(
-          This option defines the maximum number of jobs that Nix will try to
-          build in parallel. The default is `1`. The special value `auto`
-          causes Nix to use the number of CPUs in your system. `0` is useful
-          when using remote builders to prevent any local builds (except for
-          `preferLocalBuild` derivation attribute which executes locally
-          regardless). It can be overridden using the `--max-jobs` (`-j`)
-          command line switch.
+          Maximum number of jobs that Nix will try to build locally in parallel.
+
+          The special value `auto` causes Nix to use the number of CPUs in your system.
+          Use `0` to disable local builds and directly use the remote machines specified in [`builders`](#conf-builders).
+          This will not affect derivations that have [`preferLocalBuild = true`](@docroot@/language/advanced-attributes.md#adv-attr-preferLocalBuild), which are always built locally.
+
+          > **Note**
+          >
+          > The number of CPU cores to use for each build job is independently determined by the [`cores`](#conf-cores) setting.
+
+          <!-- TODO(@fricklerhandwerk): would be good to have those shorthands for common options as part of the specification -->
+          The setting can be overridden using the `--max-jobs` (`-j`) command line switch.
         )",
         {"build-max-jobs"}};
 
@@ -214,7 +219,11 @@ public:
           In general, you do not have to modify this setting.
           While you can force Nix to run a Darwin-specific `builder` executable on a Linux machine, the result would obviously be wrong.
 
-          This value is available in the Nix language as [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem).
+          This value is available in the Nix language as
+          [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+          if the
+          [`eval-system`](#conf-eval-system)
+          configuration option is set as the empty string.
         )"};
 
     Setting<time_t> maxSilentTime{
@@ -268,21 +277,16 @@ public:
     Setting<bool> alwaysAllowSubstitutes{
         this, false, "always-allow-substitutes",
         R"(
-          If set to `true`, Nix will ignore the `allowSubstitutes` attribute in
-          derivations and always attempt to use available substituters.
-          For more information on `allowSubstitutes`, see [the manual chapter on advanced attributes](../language/advanced-attributes.md).
+          If set to `true`, Nix will ignore the [`allowSubstitutes`](@docroot@/language/advanced-attributes.md) attribute in derivations and always attempt to use [available substituters](#conf-substituters).
         )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
         R"(
-          If set to `true`, Nix will instruct remote build machines to use
-          their own binary substitutes if available. In practical terms, this
-          means that remote hosts will fetch as many build dependencies as
-          possible from their own substitutes (e.g, from `cache.nixos.org`),
-          instead of waiting for this host to upload them all. This can
-          drastically reduce build times if the network connection between
-          this computer and the remote build host is slow.
+          If set to `true`, Nix will instruct [remote build machines](#conf-builders) to use their own [`substituters`](#conf-substituters) if available.
+
+          It means that remote build hosts will fetch as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
+          This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
@@ -632,11 +636,11 @@ public:
 
           At least one of the following condition must be met
           for Nix to accept copying a store object from another
-          Nix store (such as a substituter):
+          Nix store (such as a [substituter](#conf-substituters)):
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
+          - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
 
@@ -947,7 +951,9 @@ public:
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
         )"};
+#endif
 
+#if HAVE_ACL_SUPPORT
     Setting<StringSet> ignoredAcls{
         this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(

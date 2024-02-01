@@ -251,7 +251,7 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
-    debug("wait for build slot");
+    goal->trace("wait for build slot");
     bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
     if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs) ||
         (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
@@ -449,7 +449,7 @@ void Worker::waitForInput()
                 } else {
                     printMsg(lvlVomit, "%1%: read %2% bytes",
                         goal->getName(), rd);
-                    std::string data((char *) buffer.data(), rd);
+                    std::string_view data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
                 }
@@ -519,7 +519,9 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash.algo, store.printStorePath(path));
+        HashResult current = hashPath(
+            *store.getFSAccessor(), CanonPath { store.printStorePath(path) },
+            FileIngestionMethod::Recursive, info->narHash.algo);
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }

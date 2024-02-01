@@ -77,7 +77,7 @@ there is no risk of any build-system wildcards for the library accidentally pick
 ### Running tests
 
 You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`.
-Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable.
+Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable, e.g. `GTEST_FILTER='ErrorTraceTest.*' make check`.
 
 ### Characterisation testing { #characaterisation-testing-unit }
 

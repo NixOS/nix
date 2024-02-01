@@ -13,6 +13,7 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 #include "store-dir-config.hh"
+#include "source-path.hh"
 
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
@@ -107,7 +108,7 @@ struct StoreConfig : public StoreDirConfig
 
     StoreConfig() = delete;
 
-    StringSet getDefaultSystemFeatures();
+    static StringSet getDefaultSystemFeatures();
 
     virtual ~StoreConfig() { }
 
@@ -282,6 +283,16 @@ public:
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
     /**
+     * Version of queryPathInfo() that only queries the local narinfo cache and not
+     * the actual store.
+     *
+     * @return `std::nullopt` if nothing is known about the path in the local narinfo cache.
+     * @return `std::make_optional(nullptr)` if the path is known to not exist.
+     * @return `std::make_optional(validPathInfo)` if the path is known to exist.
+     */
+    std::optional<std::shared_ptr<const ValidPathInfo>> queryPathInfoFromClientCache(const StorePath & path);
+
+    /**
      * Query the information about a realisation.
      */
     std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
@@ -427,22 +438,28 @@ public:
      * libutil/archive.hh).
      */
     virtual StorePath addToStore(
-            std::string_view name,
-            const Path & srcPath,
-            FileIngestionMethod method = FileIngestionMethod::Recursive,
-            HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
-            PathFilter & filter = defaultPathFilter,
-            RepairFlag repair = NoRepair,
-            const StorePathSet & references = StorePathSet());
+        std::string_view name,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        PathFilter & filter = defaultPathFilter,
+        RepairFlag repair = NoRepair);
 
     /**
      * Copy the contents of a path to the store and register the
      * validity the resulting path, using a constant amount of
      * memory.
      */
-    ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
-                                 FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
-                                 std::optional<Hash> expectedCAHash = {});
+    ValidPathInfo addToStoreSlow(
+        std::string_view name,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        std::optional<Hash> expectedCAHash = {});
 
     /**
      * Like addToStore(), but the contents of the path are contained
@@ -453,19 +470,12 @@ public:
      *
      * \todo remove?
      */
-    virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
-                                         FileIngestionMethod method = FileIngestionMethod::Recursive, HashAlgorithm hashAlgo = HashAlgorithm::SHA256, RepairFlag repair = NoRepair,
-                                         const StorePathSet & references = StorePathSet())
-    { unsupported("addToStoreFromDump"); }
-
-    /**
-     * Like addToStore, but the contents written to the output path is a
-     * regular file containing the given string.
-     */
-    virtual StorePath addTextToStore(
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
         std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) = 0;
 
     /**
@@ -943,6 +953,7 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,
     const Derivation & drv,
-    const StorePath & outputPath);
+    const StorePath & outputPath,
+    Store * evalStore = nullptr);
 
 }
