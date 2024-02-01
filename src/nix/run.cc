@@ -259,14 +259,13 @@ void chrootHelper(int argc, char * * argv)
                 createSymlink(readLink(src), dst);
         }
 
-        char * cwd = getcwd(0, 0);
+        auto cwd = getCwd();
         if (!cwd) throw SysError("getting current directory");
-        Finally freeCwd([&]() { free(cwd); });
 
         if (chroot(tmpDir.c_str()) == -1)
             throw SysError("chrooting into '%s'", tmpDir);
 
-        if (chdir(cwd) == -1)
+        if (chdir(&*cwd) == -1)
             throw SysError("chdir to '%s' in chroot", cwd);
     } else
         if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)

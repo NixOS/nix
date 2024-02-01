@@ -21,36 +21,43 @@ namespace fs = std::filesystem;
 
 namespace nix {
 
+#ifdef __GNUC__
+std::unique_ptr<char, FreeDeleter> getCwd()
+{
+    return std::unique_ptr<char, FreeDeleter> { getcwd(NULL, 0) };
+}
+#endif
+
+
 Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
 {
-    std::string scratch;
+    /* In some branches case we create strings that, as r-values, would
+       not live long enough. We instead assign them to these variables
+       so they are only deallocated at the end of this function, after
+       the call to `canonPath` where they are used. */
+    std::string scratch0;
+    std::unique_ptr<char, FreeDeleter> scratch1;
+    [[maybe_unused]] char buf[PATH_MAX];
 
-    if (path[0] != '/') {
-        // In this case we need to call `canonPath` on a newly-created
-        // string. We set `scratch` to that string first, and then set
-        // `path` to `scratch`. This ensures the newly-created string
-        // lives long enough for the call to `canonPath`, and allows us
-        // to just accept a `std::string_view`.
-        if (!dir) {
+    return canonPath(
+        path[0] == '/'
+            ? path
+            : (scratch0 = concatStrings(
+                dir
+                    ? *dir
+                    :
 #ifdef __GNU__
-            /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
-               lengths and doesn't define `PATH_MAX'.  */
-            char *buf = getcwd(NULL, 0);
-            if (buf == NULL)
+                    /* GNU (aka. GNU/Hurd) doesn't have any limitation
+                       on path lengths and doesn't define `PATH_MAX'. */
+                    *(scratch1 = getCwd());
 #else
-            char buf[PATH_MAX];
-            if (!getcwd(buf, sizeof(buf)))
+                    getcwd(buf, sizeof(buf))
+                        ? buf
+                        : throw SysError("cannot get cwd"),
 #endif
-                throw SysError("cannot get cwd");
-            scratch = concatStrings(buf, "/", path);
-#ifdef __GNU__
-            free(buf);
-#endif
-        } else
-            scratch = concatStrings(*dir, "/", path);
-        path = scratch;
-    }
-    return canonPath(path, resolveSymlinks);
+                "/",
+                path)),
+        resolveSymlinks);
 }
 
 
