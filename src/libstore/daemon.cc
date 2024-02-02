@@ -1091,6 +1091,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
               }
               localStore->setAccessStatus(object, status, ensureAccessCheck);
             }
+          } else {
+            localStore->ensureAccess(status, object);
           }
         }
         logger->stopWork();
