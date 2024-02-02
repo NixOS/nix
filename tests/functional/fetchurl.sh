@@ -80,6 +80,7 @@ test -x $outPath/fetchurl.sh
 test -L $outPath/symlink
 
 # Make sure that *not* passing a outputHash fails.
+requireDaemonNewerThan "2.20"
 expected=100
 if [[ -v NIX_DAEMON_PACKAGE ]]; then expected=1; fi # work around the daemon not returning a 100 status correctly
 expectStderr $expected nix-build --expr '{ url }: builtins.derivation { name = "nix-cache-info"; system = "x86_64-linux"; builder = "builtin:fetchurl"; inherit url; outputHashMode = "flat"; }' --argstr url file://$narxz 2>&1 | grep 'must be a fixed-output derivation'
