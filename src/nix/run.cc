@@ -14,6 +14,8 @@
 
 #if __linux__
 #include <sys/mount.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #endif
 
 #include <queue>
@@ -228,6 +230,13 @@ void chrootHelper(int argc, char * * argv)
         if (unshare(CLONE_NEWNS) == -1)
             throw SysError("setting up a private mount namespace");
 
+    /* Need to map user and group IDs before potentially mounting a tmpfs for the store.
+       Otherwise we can't create any files as our uid/gid aren't mapped:
+       https://bugzilla.kernel.org/show_bug.cgi?id=183461 */
+    writeFile("/proc/self/setgroups", "deny");
+    writeFile("/proc/self/uid_map", fmt("%d %d %d", uid, uid, 1));
+    writeFile("/proc/self/gid_map", fmt("%d %d %d", gid, gid, 1));
+
     /* Bind-mount realStoreDir on /nix/store. If the latter mount
        point doesn't already exists, we have to create a chroot
        environment containing the mount point and bind mounts for the
@@ -239,6 +248,9 @@ void chrootHelper(int argc, char * * argv)
         // FIXME: Use overlayfs?
 
         Path tmpDir = createTempDir();
+
+        if (mount ("tmpfs", tmpDir.c_str(), "tmpfs", MS_NODEV | MS_NOSUID, NULL) == -1)
+            throw SysError("mounting tmpfs on '%s'", tmpDir);
 
         createDirs(tmpDir + storeDir);
 
@@ -263,18 +275,18 @@ void chrootHelper(int argc, char * * argv)
         if (!cwd) throw SysError("getting current directory");
         Finally freeCwd([&]() { free(cwd); });
 
-        if (chroot(tmpDir.c_str()) == -1)
-            throw SysError("chrooting into '%s'", tmpDir);
+        if (chdir(tmpDir.c_str()) == -1)
+            throw SysError("chdir to new root '%s'", tmpDir);
+        if (syscall(SYS_pivot_root, ".", ".") == -1)
+            throw SysError("pivot_root'ing into '%s'", tmpDir);
+        if (umount2(".", MNT_DETACH) == -1)
+            throw SysError("umounting host root underneath store namespace");
 
         if (chdir(cwd) == -1)
             throw SysError("chdir to '%s' in chroot", cwd);
     } else
         if (mount(realStoreDir.c_str(), storeDir.c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
-
-    writeFile("/proc/self/setgroups", "deny");
-    writeFile("/proc/self/uid_map", fmt("%d %d %d", uid, uid, 1));
-    writeFile("/proc/self/gid_map", fmt("%d %d %d", gid, gid, 1));
 
     if (system != "")
         setPersonality(system);
