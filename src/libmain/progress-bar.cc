@@ -437,15 +437,15 @@ public:
             if (running || done || expected || failed) {
                 if (running)
                     if (expected != 0)
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            running / unit, done / unit, expected / unit);
+                        s = fmt(numberFmt + "→" ANSI_BLUE + numberFmt + ANSI_NORMAL "→" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                            expected / unit, running / unit, done / unit);
                     else
-                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                        s = fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "→" ANSI_GREEN + numberFmt + ANSI_NORMAL,
                             running / unit, done / unit);
                 else if (expected != done)
                     if (expected != 0)
-                        s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt,
-                            done / unit, expected / unit);
+                        s = fmt(numberFmt + "→" ANSI_GREEN + numberFmt + ANSI_NORMAL,
+                            expected / unit, done / unit);
                     else
                         s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
                 else
