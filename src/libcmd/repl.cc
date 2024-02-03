@@ -336,13 +336,7 @@ ReplExitStatus NixRepl::mainLoop()
               printMsg(lvlError, e.msg());
             }
         } catch (EvalError & e) {
-            // in debugger mode, an EvalError should trigger another repl session.
-            // when that session returns the exception will land here.  No need to show it again;
-            // show the error for this repl session instead.
-            if (state->debugRepl && !state->debugTraces.empty())
-                showDebugTrace(std::cout, state->positions, state->debugTraces.front());
-            else
-                printMsg(lvlError, e.msg());
+            printMsg(lvlError, e.msg());
         } catch (Error & e) {
             printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
