@@ -14,6 +14,7 @@
 #include "derivations.hh"
 #include "args.hh"
 #include "auth.hh"
+#include "auth-tunnel.hh"
 
 #include <sys/socket.h>
 
@@ -261,44 +262,6 @@ struct ClientSettings
                 warn(e.what());
             }
         }
-    }
-};
-
-struct CallbackAuthSource : auth::AuthSource
-{
-    /**
-     * File descriptor to send requests to the client.
-     */
-    AutoCloseFD fd;
-
-    FdSource from;
-    FdSink to;
-
-    WorkerProto::ReadConn fromConn;
-    WorkerProto::WriteConn toConn;
-
-    ref<Store> store;
-
-    CallbackAuthSource(AutoCloseFD fd, WorkerProto::Version clientVersion, ref<Store> store)
-        : fd(std::move(fd))
-        , from(this->fd.get())
-        , to(this->fd.get())
-        , fromConn {.from = from, .version = clientVersion}
-        , toConn {.to = to, .version = clientVersion}
-        , store(store)
-    { }
-
-    std::optional<auth::AuthData> get(const auth::AuthData & request) override
-    {
-        to << (int) WorkerProto::CallbackOp::FillAuth;
-        WorkerProto::Serialise<auth::AuthData>::write(*store, toConn, request);
-        to << false;
-        to.flush();
-
-        if (readInt(from))
-            return WorkerProto::Serialise<std::optional<auth::AuthData>>::read(*store, fromConn);
-        else
-            return std::nullopt;
     }
 };
 
@@ -1065,8 +1028,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         if (trusted)
             auth::getAuthenticator()->addAuthSource(
-                make_ref<CallbackAuthSource>(
-                    std::move(fd), clientVersion, store));
+                makeTunneledAuthSource(store, clientVersion, std::move(fd)));
 
         break;
     }

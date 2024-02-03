@@ -21,6 +21,8 @@
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
+#include "auth.hh"
+#include "auth-tunnel.hh"
 
 #include <regex>
 #include <queue>
@@ -1158,6 +1160,12 @@ void LocalDerivationGoal::initEnv()
 
     /* Trigger colored output in various tools. */
     env["TERM"] = "xterm-256color";
+
+    /* Set up authentication tunneling for builtin:fetchurl. FIXME:
+       maybe we want to support this for arbitrary fixed-output
+       derivations. */
+    if (drv->builder == "builtin:fetchurl")
+        authTunnel = std::make_shared<AuthTunnel>(worker.store, 0);
 }
 
 
@@ -1701,17 +1709,6 @@ void LocalDerivationGoal::runChild()
 
         bool setUser = true;
 
-        // FIXME: tunnel auth requests
-        #if 0
-        /* Make the contents of netrc available to builtin:fetchurl
-           (which may run under a different uid and/or in a sandbox). */
-        std::string netrcData;
-        try {
-            if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
-                netrcData = readFile(settings.netrcFile);
-        } catch (SystemError &) { }
-        #endif
-
 #if __linux__
         if (useChroot) {
 
@@ -1937,7 +1934,10 @@ void LocalDerivationGoal::runChild()
             throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */
-        closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
+        std::set<int> fdsToKeep{STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
+        if (authTunnel)
+            fdsToKeep.insert(authTunnel->clientFd.get());
+        closeMostFDs(fdsToKeep);
 
         setPersonality(drv->platform);
 
@@ -2138,8 +2138,16 @@ void LocalDerivationGoal::runChild()
                     outputs.insert_or_assign(e.first,
                         worker.store.printStorePath(scratchOutputs.at(e.first)));
 
-                if (drv->builder == "builtin:fetchurl")
+                if (drv->builder == "builtin:fetchurl") {
+                    if (authTunnel)
+                        auth::getAuthenticator()->setAuthSource(
+                            makeTunneledAuthSource(
+                                ref(worker.store.shared_from_this()),
+                                authTunnel->clientVersion,
+                                std::move(authTunnel->clientFd)));
+
                     builtinFetchurl(*drv, outputs);
+                }
                 else if (drv->builder == "builtin:buildenv")
                     builtinBuildenv(*drv, outputs);
                 else if (drv->builder == "builtin:unpack-channel")
@@ -2909,7 +2917,7 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
 {
     if (tmpDir != "") {
         /* Don't keep temporary directories for builtins because they
-           might have privileged stuff (like a copy of netrc). */
+           might have privileged stuff. */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError("note: keeping build directory '%s'", tmpDir);
             chmod(tmpDir.c_str(), 0755);

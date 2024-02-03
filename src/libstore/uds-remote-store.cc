@@ -3,6 +3,7 @@
 #include "worker-protocol.hh"
 #include "worker-protocol-impl.hh"
 #include "auth.hh"
+#include "auth-tunnel.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -57,16 +58,6 @@ std::string UDSRemoteStore::getUri()
 }
 
 
-UDSRemoteStore::Connection::~Connection()
-{
-    if (callbackFd)
-        shutdown(callbackFd.get(), SHUT_RDWR);
-
-    if (callbackThread.joinable())
-        callbackThread.join();
-}
-
-
 void UDSRemoteStore::Connection::closeWrite()
 {
     shutdown(fd.get(), SHUT_WR);
@@ -98,55 +89,9 @@ void UDSRemoteStore::initConnection(RemoteStore::Connection & _conn)
     RemoteStore::initConnection(conn);
 
     if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 38 && conn.remoteTrustsUs) {
-        int sockets[2];
-        if (socketpair(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets))
-            throw SysError("creating a socket pair");
 
-        conn.callbackFd = sockets[0];
-        AutoCloseFD otherSide = sockets[1];
-
-        conn.callbackThread = std::thread([this, &conn, clientVersion{((WorkerProto::ReadConn) _conn).version}]()
-        {
-            try {
-                FdSource fromSource(conn.callbackFd.get());
-                WorkerProto::ReadConn from {
-                    .from = fromSource,
-                    .version = clientVersion,
-                };
-                FdSink toSource(conn.callbackFd.get());
-                WorkerProto::WriteConn to {
-                    .to = toSource,
-                    .version = clientVersion,
-                };
-
-                while (true) {
-                    auto op = (WorkerProto::CallbackOp) readInt(from.from);
-
-                    switch (op) {
-                    case WorkerProto::CallbackOp::FillAuth: {
-                        auto authRequest = WorkerProto::Serialise<auth::AuthData>::read(*this, from);
-                        bool required;
-                        from.from >> required;
-                        printError("got auth request from daemon: %s", authRequest);
-                        // FIXME: handle exceptions
-                        auto authData = auth::getAuthenticator()->fill(authRequest, required);
-                        if (authData)
-                            printError("returning auth to daemon: %s", *authData);
-                        to.to << 1;
-                        WorkerProto::Serialise<std::optional<auth::AuthData>>::write(*this, to, authData);
-                        toSource.flush();
-                        break;
-                    }
-
-                    default:
-                        throw Error("invalid callback operation %1%", (int) op);
-                    }
-                }
-            } catch (EndOfFile &) {
-            } catch (...) {
-                ignoreException();
-            }
-        });
+        conn.authTunnel = std::make_unique<AuthTunnel>(
+            *this, ((WorkerProto::ReadConn) _conn).version);
 
         conn.to << WorkerProto::Op::InitCallback;
         conn.to.flush();
@@ -170,7 +115,9 @@ void UDSRemoteStore::initConnection(RemoteStore::Connection & _conn)
         cmsg->cmsg_type = SCM_RIGHTS;
         cmsg->cmsg_len = CMSG_LEN(sizeof(int));
 
-        *((int *) CMSG_DATA(cmsg)) = otherSide.get();
+        auto clientFd = std::move(conn.authTunnel->clientFd);
+
+        *((int *) CMSG_DATA(cmsg)) = clientFd.get();
 
         msg.msg_controllen = CMSG_SPACE(sizeof(int));
 

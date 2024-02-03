@@ -7,6 +7,8 @@
 
 namespace nix {
 
+struct AuthTunnel;
+
 struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
 {
     UDSRemoteStoreConfig(const Params & params)
@@ -56,9 +58,7 @@ private:
     struct Connection : RemoteStore::Connection
     {
         AutoCloseFD fd;
-        AutoCloseFD callbackFd;
-        std::thread callbackThread;
-        ~Connection();
+        std::unique_ptr<AuthTunnel> authTunnel;
         void closeWrite() override;
     };
 

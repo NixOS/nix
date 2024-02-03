@@ -288,6 +288,11 @@ void Authenticator::addAuthSource(ref<AuthSource> authSource)
     authSources.push_back(authSource);
 }
 
+void Authenticator::setAuthSource(ref<AuthSource> authSource)
+{
+    authSources = {authSource};
+}
+
 ref<Authenticator> getAuthenticator()
 {
     static auto authenticator = make_ref<Authenticator>();

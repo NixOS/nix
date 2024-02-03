@@ -106,6 +106,8 @@ public:
     std::optional<AuthData> fill(const AuthData & request, bool required);
 
     void addAuthSource(ref<AuthSource> authSource);
+
+    void setAuthSource(ref<AuthSource> authSource);
 };
 
 ref<Authenticator> getAuthenticator();
