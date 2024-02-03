@@ -243,10 +243,21 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     return out;
 }
 
+static bool isFirstRepl = true;
+
 void NixRepl::mainLoop()
 {
-    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
+    if (isFirstRepl) {
+        std::string_view debuggerNotice = "";
+        if (state->debugRepl) {
+            debuggerNotice = " debugger";
+        }
+        notice("Nix %1%%2%\nType :? for help.", nixVersion, debuggerNotice);
+    }
+
+    if (isFirstRepl) {
+        isFirstRepl = false;
+    }
 
     loadFiles();
 
