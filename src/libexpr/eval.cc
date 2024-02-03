@@ -1322,6 +1322,19 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
+    auto dts = state.debugRepl
+        ? makeDebugTraceStacker(
+            state,
+            *this,
+            env2,
+            getPos()
+                ? std::make_shared<Pos>(state.positions[getPos()])
+                : nullptr,
+            "while evaluating a '%1%' expression",
+            "let"
+        )
+        : nullptr;
+
     body->eval(state, env2, v);
 }
 
