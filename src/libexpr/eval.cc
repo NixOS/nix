@@ -3,6 +3,7 @@
 #include "hash.hh"
 #include "primops.hh"
 #include "print-options.hh"
+#include "shared.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -416,7 +417,6 @@ EvalState::EvalState(
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(nullptr)
     , debugStop(false)
-    , debugQuit(false)
     , trylevel(0)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
@@ -792,7 +792,17 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     auto se = getStaticEnv(expr);
     if (se) {
         auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
-        (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
+        auto exitStatus = (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
+        switch (exitStatus) {
+            case ReplExitStatus::QuitAll:
+                if (error)
+                    throw *error;
+                throw Exit(0);
+            case ReplExitStatus::Continue:
+                break;
+            default:
+                abort();
+        }
     }
 }
 
