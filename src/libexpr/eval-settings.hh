@@ -127,6 +127,9 @@ struct EvalSettings : Config
 
     Setting<unsigned int> maxCallDepth{this, 10000, "max-call-depth",
         "The maximum function call depth to allow before erroring."};
+
+    Setting<bool> builtinsTraceDebugger{this, false, "builtins-trace-debugger",
+        "Whether to enter the debugger on `builtins.trace` calls."};
 };
 
 extern EvalSettings evalSettings;
