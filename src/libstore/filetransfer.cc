@@ -36,6 +36,12 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
+FileTransferRequest::FileTransferRequest(std::string_view uri)
+    : uri(uri)
+    , parentAct(getCurActivity())
+    , authenticator(auth::getAuthenticator())
+{ }
+
 struct curlFileTransfer : public FileTransfer
 {
     CURLM * curlm = 0;
@@ -346,7 +352,6 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransferSettings.stalledDownloadTimeout.get());
 
-            auto authenticator = auth::getAuthenticator();
             auto url = parseURL(request.uri);
             auth::AuthData authRequest = {
                 .protocol = url.scheme,
@@ -354,7 +359,7 @@ struct curlFileTransfer : public FileTransfer
                 .path = url.path,
                 // FIXME: add username
             };
-            auto authData = authenticator->fill(authRequest, false);
+            auto authData = request.authenticator->fill(authRequest, false);
 
             if (authData) {
                 if (authData->userName)

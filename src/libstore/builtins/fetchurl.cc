@@ -8,7 +8,8 @@ namespace nix {
 
 void builtinFetchurl(
     const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs)
+    const std::map<std::string, Path> & outputs,
+    ref<auth::Authenticator> authenticator)
 {
     auto out = get(drv.outputs, "out");
     if (!out)
@@ -32,6 +33,7 @@ void builtinFetchurl(
             /* No need to do TLS verification, because we check the hash of
                the result anyway. */
             FileTransferRequest request(url);
+            request.authenticator = authenticator;
             request.verifyTLS = false;
             request.decompress = false;
 

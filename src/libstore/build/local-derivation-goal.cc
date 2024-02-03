@@ -2139,14 +2139,13 @@ void LocalDerivationGoal::runChild()
                         worker.store.printStorePath(scratchOutputs.at(e.first)));
 
                 if (drv->builder == "builtin:fetchurl") {
-                    if (authTunnel)
-                        auth::getAuthenticator()->setAuthSource(
-                            makeTunneledAuthSource(
-                                ref(worker.store.shared_from_this()),
-                                authTunnel->clientVersion,
-                                std::move(authTunnel->clientFd)));
-
-                    builtinFetchurl(*drv, outputs);
+                    auto authSource =
+                        makeTunneledAuthSource(
+                            ref(worker.store.shared_from_this()),
+                            authTunnel->clientVersion,
+                            std::move(authTunnel->clientFd));
+                    std::vector<ref<auth::AuthSource>> authSources{authSource};
+                    builtinFetchurl(*drv, outputs, make_ref<auth::Authenticator>(authSources));
                 }
                 else if (drv->builder == "builtin:buildenv")
                     builtinBuildenv(*drv, outputs);

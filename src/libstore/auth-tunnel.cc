@@ -41,11 +41,11 @@ AuthTunnel::AuthTunnel(
                     auto authRequest = WorkerProto::Serialise<auth::AuthData>::read(storeConfig, from);
                     bool required;
                     from.from >> required;
-                    printError("got auth request from daemon: %s", authRequest);
+                    debug("tunneling auth request: %s", authRequest);
                     // FIXME: handle exceptions
                     auto authData = auth::getAuthenticator()->fill(authRequest, required);
                     if (authData)
-                        printError("returning auth to daemon: %s", *authData);
+                        debug("tunneling auth response: %s", *authData);
                     to.to << 1;
                     WorkerProto::Serialise<std::optional<auth::AuthData>>::write(storeConfig, to, authData);
                     toSource.flush();

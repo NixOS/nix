@@ -101,7 +101,9 @@ class Authenticator
 
 public:
 
-    Authenticator();
+    Authenticator(std::vector<ref<AuthSource>> authSources = {})
+        : authSources(std::move(authSources))
+    { }
 
     std::optional<AuthData> fill(const AuthData & request, bool required);
 

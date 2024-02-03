@@ -10,6 +10,8 @@
 
 namespace nix {
 
+namespace auth { class Authenticator; }
+
 struct FileTransferSettings : Config
 {
     Setting<bool> enableHttp2{this, true, "http2",
@@ -63,9 +65,9 @@ struct FileTransferRequest
     std::optional<std::string> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
+    ref<auth::Authenticator> authenticator;
 
-    FileTransferRequest(std::string_view uri)
-        : uri(uri), parentAct(getCurActivity()) { }
+    FileTransferRequest(std::string_view uri);
 
     std::string verb()
     {

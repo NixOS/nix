@@ -249,23 +249,6 @@ struct ExternalAuthSource : AuthSource
     }
 };
 
-Authenticator::Authenticator()
-{
-    for (auto & s : authSettings.authSources.get()) {
-        if (hasPrefix(s, "builtin:")) {
-            if (s == "builtin:nix")
-                authSources.push_back(make_ref<NixAuthSource>());
-            else if (s == "builtin:netrc") {
-                if (authSettings.netrcFile != "")
-                    authSources.push_back(make_ref<NetrcAuthSource>(authSettings.netrcFile));
-            }
-            else
-                warn("unknown authentication sources '%s'", s);
-        } else
-            authSources.push_back(make_ref<ExternalAuthSource>(s));
-    }
-}
-
 std::optional<AuthData> Authenticator::fill(const AuthData & request, bool required)
 {
     if (!request.protocol)
@@ -295,7 +278,25 @@ void Authenticator::setAuthSource(ref<AuthSource> authSource)
 
 ref<Authenticator> getAuthenticator()
 {
-    static auto authenticator = make_ref<Authenticator>();
+    static auto authenticator = ({
+        std::vector<ref<AuthSource>> authSources;
+
+        for (auto & s : authSettings.authSources.get()) {
+            if (hasPrefix(s, "builtin:")) {
+                if (s == "builtin:nix")
+                    authSources.push_back(make_ref<NixAuthSource>());
+                else if (s == "builtin:netrc") {
+                    if (authSettings.netrcFile != "")
+                        authSources.push_back(make_ref<NetrcAuthSource>(authSettings.netrcFile));
+                }
+                else
+                    warn("unknown authentication sources '%s'", s);
+            } else
+                authSources.push_back(make_ref<ExternalAuthSource>(s));
+        }
+
+        make_ref<Authenticator>(authSources);
+    });
     return authenticator;
 }
 
