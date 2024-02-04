@@ -387,6 +387,8 @@ template class Setting<Strings>;
 template class Setting<StringSet>;
 template class Setting<StringMap>;
 template class Setting<std::set<ExperimentalFeature>>;
+template class Setting<LogFormat>;
+template class Setting<std::optional<LogFormat>>;
 
 static Path parsePath(const AbstractSetting & s, const std::string & str)
 {

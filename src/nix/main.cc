@@ -322,6 +322,22 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
+    programPath = argv[0];
+    auto programName = std::string(baseNameOf(programPath));
+    auto legacy = (*RegisterLegacyCommand::commands)[programName];
+
+    if (!legacy) {
+        // New-style commands default to `bar` logs.
+        // `initNix()` reads configuration files and will override this setting
+        // if it's set.
+        loggerSettings.logFormat.assign(LogFormat::bar);
+    }
+
+    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
+        programName = "build-remote";
+        argv++; argc--;
+    }
+
     initNix();
     initGC();
 
@@ -337,22 +353,19 @@ void mainWrapped(int argc, char * * argv)
 
     Finally f([] { logger->stop(); });
 
-    programPath = argv[0];
-    auto programName = std::string(baseNameOf(programPath));
-
-    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
-        programName = "build-remote";
-        argv++; argc--;
-    }
-
-    {
-        auto legacy = (*RegisterLegacyCommand::commands)[programName];
-        if (legacy) return legacy(argc, argv);
+    if (legacy) {
+        // If we're in a legacy command and `logFormatLegacy` has a value, use
+        // that for the log format setting.
+        if (loggerSettings.logFormatLegacy.get().has_value()) {
+            loggerSettings.logFormat.assign(
+                loggerSettings.logFormatLegacy.get().value()
+            );
+        }
+        return legacy(argc, argv);
     }
 
     evalSettings.pureEval = true;
 
-    setLogFormat("bar");
     settings.verboseBuild = false;
     if (isatty(STDERR_FILENO)) {
         verbosity = lvlNotice;

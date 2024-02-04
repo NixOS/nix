@@ -132,4 +132,60 @@ std::string Setting<T>::to_string() const
     return std::to_string(value);
 }
 
+template<>
+LogFormat Setting<LogFormat>::parse(const std::string & str) const
+{
+    auto format = parseLogFormat(str);
+    if (format.has_value()) {
+        return format.value();
+    } else {
+        throw UsageError("setting '%s' has invalid value '%s'", name, str);
+    }
+}
+
+template<>
+std::string Setting<LogFormat>::to_string() const
+{
+    return logFormatToString(value);
+}
+
+template<>
+void Setting<LogFormat>::convertToArg(Args &args, const std::string &category)
+{
+    args.addFlag({
+        .longName = name,
+        .description = fmt("Set the `%s` setting.", name),
+        .category = category,
+        .labels = {"format"},
+        .handler = {[this](std::string format) { override(parse(format)); }},
+        .experimentalFeature = experimentalFeature,
+    });
+}
+
+template<>
+std::optional<LogFormat> Setting<std::optional<LogFormat>>::parse(const std::string & str) const
+{
+    if (str.empty()) {
+        return std::nullopt;
+    }
+
+    auto format = parseLogFormat(str);
+    if (format.has_value()) {
+        return format.value();
+    } else {
+        throw UsageError("setting '%s' has invalid value '%s'", name, str);
+    }
+}
+
+template<>
+std::string Setting<std::optional<LogFormat>>::to_string() const
+{
+    if (value.has_value()) {
+        return logFormatToString(value.value());
+    } else {
+        // TODO: Will returning the empty string here cause problems?
+        return "";
+    }
+}
+
 }

@@ -56,14 +56,6 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
     });
 
     addFlag({
-        .longName = "log-format",
-        .description = "Set the format of log output; one of `raw`, `internal-json`, `bar` or `bar-with-logs`.",
-        .category = loggingCategory,
-        .labels = {"format"},
-        .handler = {[](std::string format) { setLogFormat(format); }},
-    });
-
-    addFlag({
         .longName = "max-jobs",
         .shortName = 'j',
         .description = "The maximum number of parallel builds.",

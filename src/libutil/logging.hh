@@ -83,6 +83,26 @@ struct LoggerSettings : Config
           Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
+
+    Setting<LogFormat> logFormat{
+        this, LogFormat::raw, "log-format",
+        R"(
+            The log format to use.
+            One of `raw`, `raw-with-logs`, `internal-json`, `bar`, or `bar-with-logs`.
+        )",
+        {},
+        false,
+        std::nullopt,
+        {[](const LogFormat & value) {
+            setLogFormat(value);
+        }}};
+
+    Setting<std::optional<LogFormat>> logFormatLegacy{
+        this, std::nullopt, "log-format-legacy",
+        R"(
+            The log format to use for legacy commands like `nix-build` and `nix-shell`.
+            One of `raw`, `raw-with-logs`, `internal-json`, `bar`, or `bar-with-logs`.
+        )"};
 };
 
 extern LoggerSettings loggerSettings;
