@@ -53,7 +53,6 @@ namespace nix {
                 state.error<EvalError>("beans").debugThrow();
             } catch (Error & e2) {
                 e.addTrace(state.positions[noPos], "beans2", "");
-                //e2.addTrace(state.positions[noPos], "Something", "");
                 ASSERT_TRUE(e.info().traces.size() == 2);
                 ASSERT_TRUE(e2.info().traces.size() == 0);
                 ASSERT_FALSE(&e.info() == &e2.info());

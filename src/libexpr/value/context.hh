@@ -20,7 +20,7 @@ public:
     {
         raw = raw_;
         auto hf = hintfmt(args...);
-        err.msg = hintfmt("Bad String Context element: %1%: %2%", normaltxt(hf.str()), raw);
+        err.msg = hintfmt("Bad String Context element: %1%: %2%", Uncolored(hf.str()), raw);
     }
 };
 

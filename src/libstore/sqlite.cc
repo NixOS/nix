@@ -10,19 +10,19 @@
 
 namespace nix {
 
-SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, hintformat && hf)
+SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, hintfmt && hf)
   : Error(""), path(path), errMsg(errMsg), errNo(errNo), extendedErrNo(extendedErrNo), offset(offset)
 {
     auto offsetStr = (offset == -1) ? "" : "at offset " + std::to_string(offset) + ": ";
     err.msg = hintfmt("%s: %s%s, %s (in '%s')",
-        normaltxt(hf.str()),
+        Uncolored(hf.str()),
         offsetStr,
         sqlite3_errstr(extendedErrNo),
         errMsg,
         path ? path : "(in-memory)");
 }
 
-[[noreturn]] void SQLiteError::throw_(sqlite3 * db, hintformat && hf)
+[[noreturn]] void SQLiteError::throw_(sqlite3 * db, hintfmt && hf)
 {
     int err = sqlite3_errcode(db);
     int exterr = sqlite3_extended_errcode(db);

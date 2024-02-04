@@ -232,7 +232,7 @@ void LocalDerivationGoal::tryLocalBuild()
         if (!buildUser) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                    fmt("waiting for a free build user ID for '%s'", magentatxt(worker.store.printStorePath(drvPath))));
+                    fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }

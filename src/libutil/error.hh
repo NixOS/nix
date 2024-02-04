@@ -63,7 +63,7 @@ void printCodeLines(std::ostream & out,
 
 struct Trace {
     std::shared_ptr<Pos> pos;
-    hintformat hint;
+    hintfmt hint;
     bool frame;
 };
 
@@ -74,7 +74,7 @@ inline bool operator>=(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;
-    hintformat msg;
+    hintfmt msg;
     std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
 
@@ -126,7 +126,7 @@ public:
         : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
     { }
 
-    BaseError(hintformat hint)
+    BaseError(hintfmt hint)
         : err { .level = lvlError, .msg = hint }
     { }
 
@@ -162,7 +162,7 @@ public:
         addTrace(std::move(e), hintfmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame = false);
+    void addTrace(std::shared_ptr<Pos> && e, hintfmt hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
 
@@ -215,7 +215,7 @@ public:
         : SystemError(""), errNo(errNo)
     {
         auto hf = hintfmt(args...);
-        err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
+        err.msg = hintfmt("%1%: %2%", Uncolored(hf.str()), strerror(errNo));
     }
 
     /**

@@ -62,7 +62,7 @@ namespace nix {
             throw TestError(e.info());
         } catch (Error &e) {
             ErrorInfo ei = e.info();
-            ei.msg = hintfmt("%s; subsequent error message.", normaltxt(e.info().msg.str()));
+            ei.msg = hintfmt("%s; subsequent error message.", Uncolored(e.info().msg.str()));
 
             testing::internal::CaptureStderr();
             logger->logEI(ei);
