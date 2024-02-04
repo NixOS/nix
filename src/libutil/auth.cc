@@ -257,10 +257,19 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
     if (!request.host)
         throw Error("authentication data '%s' does not contain a host", request);
 
+    for (auto & entry : cache) {
+        if (auto res = entry.match(request)) {
+            debug("authentication cache hit %s -> %s", entry, *res);
+            return res;
+        }
+    }
+
     for (auto & authSource : authSources) {
         auto res = authSource->get(request);
-        if (res)
+        if (res) {
+            cache.push_back(*res);
             return res;
+        }
     }
 
     return std::nullopt;

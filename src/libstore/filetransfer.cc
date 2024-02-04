@@ -356,7 +356,7 @@ struct curlFileTransfer : public FileTransfer
             auth::AuthData authRequest = {
                 .protocol = url.scheme,
                 .host = url.authority,
-                .path = url.path,
+                .path = request.authPath.value_or(url.path),
                 // FIXME: add username
             };
             auto authData = request.authenticator->fill(authRequest, false);

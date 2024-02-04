@@ -99,6 +99,8 @@ class Authenticator
 {
     std::vector<ref<AuthSource>> authSources;
 
+    std::vector<AuthData> cache;
+
 public:
 
     Authenticator(std::vector<ref<AuthSource>> authSources = {})

@@ -67,6 +67,16 @@ struct FileTransferRequest
     std::function<void(std::string_view data)> dataCallback;
     ref<auth::Authenticator> authenticator;
 
+    /**
+     * The path to be used for authentication (replacing the path part
+     * of `uri`). This is needed for efficient authentication
+     * caching. E.g. for a binary cache, the `authPart` will typically
+     * be `/`, ensuring that all paths underneath `/`
+     * (e.g. `/nix-cache-info` or `/foo.narinfo`) can hit the same
+     * authentication cache entry.
+     */
+    std::optional<std::string> authPath;
+
     FileTransferRequest(std::string_view uri);
 
     std::string verb()

@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 #include "callback.hh"
+#include "url.hh"
 
 namespace nix {
 
@@ -28,6 +29,8 @@ private:
 
     Path cacheUri;
 
+    std::string authRoot;
+
     struct State
     {
         bool enabled = true;
@@ -51,6 +54,8 @@ public:
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
+
+        authRoot = parseURL(cacheUri).path;
 
         diskCache = getNarInfoDiskCache();
     }
@@ -144,11 +149,13 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        return FileTransferRequest(
-            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
-            ? path
-            : cacheUri + "/" + path);
-
+        if (hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://"))
+            return FileTransferRequest(path);
+        else {
+            auto request = FileTransferRequest(cacheUri + "/" + path);
+            request.authPath = parseURL(cacheUri).path;
+            return request;
+        }
     }
 
     void getFile(const std::string & path, Sink & sink) override
