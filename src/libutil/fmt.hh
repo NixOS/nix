@@ -63,19 +63,17 @@ inline std::string fmt(const std::string & fs, const Args & ... args)
     return f.str();
 }
 
-// -----------------------------------------------------------------------------
 // format function for hints in errors.  same as fmt, except templated values
-// are always in yellow.
-
+// are always in magenta.
 template <class T>
-struct yellowtxt
+struct magentatxt
 {
-    yellowtxt(const T &s) : value(s) {}
+    magentatxt(const T &s) : value(s) {}
     const T & value;
 };
 
 template <class T>
-std::ostream & operator<<(std::ostream & out, const yellowtxt<T> & y)
+std::ostream & operator<<(std::ostream & out, const magentatxt<T> & y)
 {
     return out << ANSI_WARNING << y.value << ANSI_NORMAL;
 }
@@ -114,7 +112,7 @@ public:
     template<class T>
     hintformat & operator%(const T & value)
     {
-        fmt % yellowtxt(value);
+        fmt % magentatxt(value);
         return *this;
     }
 
