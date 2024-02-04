@@ -460,19 +460,7 @@ TEST_F(ValuePrintingTests, ansiColorsError)
 
     test(vError,
          ANSI_RED
-         "«"
-         ANSI_RED
-         "error:"
-         ANSI_NORMAL
-         "\n       … while calling the '"
-         ANSI_MAGENTA
-         "throw"
-         ANSI_NORMAL
-         "' builtin\n\n       "
-         ANSI_RED
-         "error:"
-         ANSI_NORMAL
-         " uh oh!»"
+         "«error: uh oh!»"
          ANSI_NORMAL,
          PrintOptions {
              .ansiColors = true,
@@ -501,19 +489,7 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
     test(vAttrs,
          "{ drvPath = "
          ANSI_RED
-         "«"
-         ANSI_RED
-         "error:"
-         ANSI_NORMAL
-         "\n       … while calling the '"
-         ANSI_MAGENTA
-         "throw"
-         ANSI_NORMAL
-         "' builtin\n\n       "
-         ANSI_RED
-         "error:"
-         ANSI_NORMAL
-         " uh oh!»"
+         "«error: uh oh!»"
          ANSI_NORMAL
          "; type = "
          ANSI_MAGENTA
@@ -527,19 +503,7 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
 
     test(vAttrs,
          ANSI_RED
-         "«"
-         ANSI_RED
-         "error:"
-         ANSI_NORMAL
-         "\n       … while calling the '"
-         ANSI_MAGENTA
-         "throw"
-         ANSI_NORMAL
-         "' builtin\n\n       "
-         ANSI_RED
-         "error:"
-         ANSI_NORMAL
-         " uh oh!»"
+         "«error: uh oh!»"
          ANSI_NORMAL,
          PrintOptions {
              .ansiColors = true,
@@ -560,7 +524,7 @@ TEST_F(ValuePrintingTests, ansiColorsAssert)
     state.mkThunk_(v, &expr);
 
     test(v,
-         ANSI_RED "«" ANSI_RED "error:" ANSI_NORMAL " assertion '" ANSI_MAGENTA "false" ANSI_NORMAL "' failed»" ANSI_NORMAL,
+         ANSI_RED "«error: assertion 'false' failed»" ANSI_NORMAL,
          PrintOptions {
              .ansiColors = true,
              .force = true
