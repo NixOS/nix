@@ -60,7 +60,7 @@ void Setting<T>::appendOrSet(T newValue, bool append)
         "using default `appendOrSet` implementation with an appendable type");
     assert(!append);
 
-    value = std::move(newValue);
+    assign(std::move(newValue));
 }
 
 template<typename T>

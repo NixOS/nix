@@ -215,6 +215,37 @@ protected:
 };
 
 /**
+ * Settings, like command-line arguments, have a "handler" which is
+ * executed when the value is set, including the default value.
+ * The handler may cause arbitrary side-effects.
+ */
+template<typename T>
+struct SettingHandler
+{
+    /**
+     * The `bool` argument is `true` if the value is being set to the default
+     * value.
+     *
+     * The `T &` argument is the value itself.
+     */
+    std::function<void(bool, T &)> fun;
+
+    SettingHandler() = default;
+
+    SettingHandler(std::function<void(bool, T &)> && fun)
+        : fun(std::move(fun))
+    { }
+
+    operator bool() const {
+        if (fun) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+};
+
+/**
  * A setting of type T.
  */
 template<typename T>
@@ -225,6 +256,7 @@ protected:
     T value;
     const T defaultValue;
     const bool documentDefault;
+    const SettingHandler<T> handler;
 
     /**
      * Parse the string into a `T`.
@@ -252,13 +284,19 @@ public:
         const std::string & description,
         const std::set<std::string> & aliases = {},
         const bool documentDefault = true,
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        SettingHandler<T> handler = {}
+    )
         : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
+        , handler(handler)
     {
         options->addSetting(this);
+        if (handler) {
+            handler.fun(true, value);
+        }
     }
 
     operator const T &() const { return value; }
@@ -274,12 +312,17 @@ public:
     template<typename U>
     void operator =(const U & v) { assign(v); }
 
-    virtual void assign(const T & v) { value = v; }
+    virtual void assign(const T & v) {
+        value = v;
+        if (handler) {
+            handler.fun(false, value);
+        }
+    }
 
-    void operator =(const T & v) { this->assign(v); }
+    void operator =(const T & v) { assign(v); }
 
     template<typename U>
-    void setDefault(const U & v) { if (!overridden) value = v; }
+    void setDefault(const U & v) { if (!overridden) assign(v); }
 
     /**
      * Require any experimental feature the setting depends on
@@ -304,7 +347,7 @@ public:
     virtual void override(const T & v)
     {
         overridden = true;
-        value = v;
+        assign(v);
     }
 
     std::string to_string() const override;
