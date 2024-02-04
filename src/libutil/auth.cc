@@ -4,6 +4,7 @@
 #include "users.hh"
 #include "util.hh"
 #include "processes.hh"
+#include "environment-variables.hh"
 
 namespace nix::auth {
 
@@ -104,7 +105,7 @@ struct NixAuthSource : AuthSource
             }
     }
 
-    std::optional<AuthData> get(const AuthData & request) override
+    std::optional<AuthData> get(const AuthData & request, bool required) override
     {
         for (auto & authData : authDatas)
             if (auto res = authData.match(request))
@@ -199,7 +200,7 @@ struct NetrcAuthSource : AuthSource
         flushMachine();
     }
 
-    std::optional<AuthData> get(const AuthData & request) override
+    std::optional<AuthData> get(const AuthData & request, bool required) override
     {
         for (auto & authData : authDatas)
             if (auto res = authData.match(request))
@@ -222,7 +223,7 @@ struct ExternalAuthSource : AuthSource
         : program(program)
     { }
 
-    std::optional<AuthData> get(const AuthData & request) override
+    std::optional<AuthData> get(const AuthData & request, bool required) override
     {
         try {
             if (!enabled) return std::nullopt;
@@ -265,9 +266,40 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
     }
 
     for (auto & authSource : authSources) {
-        auto res = authSource->get(request);
+        auto res = authSource->get(request, required);
         if (res) {
             cache.push_back(*res);
+            return res;
+        }
+    }
+
+    if (required) {
+        auto askPassHelper = getEnvNonEmpty("SSH_ASKPASS");
+        if (askPassHelper) {
+            /* Ask the user. */
+            auto res = request;
+
+            // Note: see
+            // https://github.com/KDE/ksshaskpass/blob/master/src/main.cpp
+            // for the expected format of the phrases.
+
+            if (!request.userName) {
+                res.userName = chomp(
+                    runProgram(*askPassHelper, true,
+                        {fmt("Username for '%s': ", request.host.value_or(""))},
+                        std::nullopt, true));
+            }
+
+            if (!request.password) {
+                res.password = chomp(
+                    runProgram(*askPassHelper, true,
+                        {fmt("Password for '%s': ", request.host.value_or(""))},
+                        std::nullopt, true));
+            }
+
+            if (res.userName && res.password)
+                cache.push_back(res);
+
             return res;
         }
     }

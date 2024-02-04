@@ -99,12 +99,12 @@ struct TunneledAuthSource : auth::AuthSource
         , storeConfig(storeConfig)
     { }
 
-    std::optional<auth::AuthData> get(const auth::AuthData & request) override
+    std::optional<auth::AuthData> get(const auth::AuthData & request, bool required) override
     {
         // FIXME: lock the connection
         to << (int) WorkerProto::CallbackOp::FillAuth;
         WorkerProto::Serialise<auth::AuthData>::write(*storeConfig, toConn, request);
-        to << false;
+        to << required;
         to.flush();
 
         if (readInt(from))

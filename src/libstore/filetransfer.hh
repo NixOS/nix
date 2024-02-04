@@ -77,6 +77,11 @@ struct FileTransferRequest
      */
     std::optional<std::string> authPath;
 
+    /**
+     * Whether the authenticator *must* return authentication data.
+     */
+    bool requireAuth = false;
+
     FileTransferRequest(std::string_view uri);
 
     std::string verb()

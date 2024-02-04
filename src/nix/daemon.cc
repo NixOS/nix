@@ -449,6 +449,9 @@ static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
  */
 static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)
 {
+    /* Don't ask for authentication in auth.cc. */
+    unsetenv("SSH_ASKPASS");
+
     if (stdio) {
         auto store = openUncachedStore();
 
