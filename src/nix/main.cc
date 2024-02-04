@@ -13,7 +13,6 @@
 #include "store-api.hh"
 #include "filetransfer.hh"
 #include "finally.hh"
-#include "loggers.hh"
 #include "markdown.hh"
 #include "memory-input-accessor.hh"
 

@@ -3,7 +3,6 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
-#include "loggers.hh"
 #include "progress-bar.hh"
 #include "signals.hh"
 

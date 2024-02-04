@@ -2,7 +2,6 @@
 #include "args/root.hh"
 #include "globals.hh"
 #include "logging.hh"
-#include "loggers.hh"
 #include "util.hh"
 
 namespace nix {
