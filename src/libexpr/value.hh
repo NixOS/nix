@@ -38,7 +38,9 @@ typedef enum {
     tPrimOp,
     tPrimOpApp,
     tExternal,
-    tFloat
+    tFloat,
+    tPending,
+    tActive,
 } InternalType;
 
 /**
@@ -166,11 +168,32 @@ public:
 struct Value
 {
 private:
-    InternalType internalType = tUninitialized;
+    std::atomic<InternalType> internalType{tUninitialized};
 
     friend std::string showType(const Value & v);
 
+    friend class EvalState;
+
 public:
+
+    Value()
+        : internalType(tInt)
+    { }
+
+    Value(const Value & v)
+    { *this = v; }
+
+    /**
+     * Copy a value. This is not allowed to be a thunk.
+     */
+    Value & operator =(const Value & v)
+    {
+        auto type = v.internalType.load();
+        assert(type != tThunk && type != tApp && type != tPending && type != tActive);
+        internalType = type;
+        payload = v.payload;
+        return *this;
+    }
 
     void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
@@ -281,7 +304,7 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: return nThunk;
+            case tThunk: case tApp: case tPending: case tActive: return nThunk;
         }
         if (invalidIsThunk)
             return nThunk;
@@ -449,7 +472,7 @@ public:
         return std::string_view(payload.string.c_str);
     }
 
-    const char * const c_str() const
+    const char * c_str() const
     {
         assert(internalType == tString);
         return payload.string.c_str;

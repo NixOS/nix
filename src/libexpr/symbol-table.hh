@@ -7,6 +7,7 @@
 
 #include "types.hh"
 #include "chunked-vector.hh"
+#include "sync.hh"
 
 namespace nix {
 
@@ -74,8 +75,13 @@ public:
 class SymbolTable
 {
 private:
-    std::unordered_map<std::string_view, std::pair<const std::string *, uint32_t>> symbols;
-    ChunkedVector<std::string, 8192> store{16};
+    struct State
+    {
+        std::unordered_map<std::string_view, std::pair<const std::string *, uint32_t>> symbols;
+        ChunkedVector<std::string, 8192> store{16};
+    };
+
+    SharedSync<State> state_;
 
 public:
 
@@ -88,12 +94,12 @@ public:
         // for lookup performance.
         // TODO: could probably be done more efficiently with transparent Hash and Equals
         // on the original implementation using unordered_set
-        // FIXME: make this thread-safe.
-        auto it = symbols.find(s);
-        if (it != symbols.end()) return Symbol(it->second.second + 1);
+        auto state(state_.lock());
+        auto it = state->symbols.find(s);
+        if (it != state->symbols.end()) return Symbol(it->second.second + 1);
 
-        const auto & [rawSym, idx] = store.add(std::string(s));
-        symbols.emplace(rawSym, std::make_pair(&rawSym, idx));
+        const auto & [rawSym, idx] = state->store.add(std::string(s));
+        state->symbols.emplace(rawSym, std::make_pair(&rawSym, idx));
         return Symbol(idx + 1);
     }
 
@@ -101,21 +107,22 @@ public:
     {
         std::vector<SymbolStr> result;
         result.reserve(symbols.size());
-        for (auto sym : symbols)
+        for (auto & sym : symbols)
             result.push_back((*this)[sym]);
         return result;
     }
 
     SymbolStr operator[](Symbol s) const
     {
-        if (s.id == 0 || s.id > store.size())
+        auto state(state_.read());
+        if (s.id == 0 || s.id > state->store.size())
             abort();
-        return SymbolStr(store[s.id - 1]);
+        return SymbolStr(state->store[s.id - 1]);
     }
 
     size_t size() const
     {
-        return store.size();
+        return state_.read()->store.size();
     }
 
     size_t totalSize() const;
@@ -123,7 +130,7 @@ public:
     template<typename T>
     void dump(T callback) const
     {
-        store.forEach(callback);
+        state_.read()->store.forEach(callback);
     }
 };
 

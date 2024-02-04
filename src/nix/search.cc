@@ -1,3 +1,5 @@
+#include "parallel-eval.hh"
+
 #include "command-installable-value.hh"
 #include "globals.hh"
 #include "eval.hh"
@@ -87,25 +89,49 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         std::optional<nlohmann::json> jsonOut;
         if (json) jsonOut = json::object();
 
-        uint64_t results = 0;
+        std::atomic<uint64_t> results = 0;
+
+        Executor executor;
+
+        struct State
+        {
+            std::vector<std::future<void>> futures;
+        };
+
+        Sync<State> state_;
+
+        auto spawn = [&](std::vector<Executor::work_t> && work)
+        {
+            auto futures = executor.spawn(std::move(work));
+            auto state(state_.lock());
+            for (auto & future : futures)
+                state->futures.push_back(std::move(future));
+        };
 
         std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 
         visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
         {
             auto attrPathS = state->symbols.resolve(attrPath);
+            //printError("AT %d", concatStringsSep(".", attrPathS));
 
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
                 auto recurse = [&]()
                 {
+                    std::vector<Executor::work_t> work;
                     for (const auto & attr : cursor.getAttrs()) {
                         auto cursor2 = cursor.getAttr(state->symbols[attr]);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        visit(*cursor2, attrPath2, false);
+                        work.push_back([cursor2, attrPath2, visit]()
+                        {
+                            visit(*cursor2, attrPath2, false);
+                        });
                     }
+                    printError("ADD %d", work.size());
+                    spawn(std::move(work));
                 };
 
                 if (cursor.isDerivation()) {
@@ -151,6 +177,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     if (found)
                     {
                         results++;
+                        // FIXME: locking
                         if (json) {
                             (*jsonOut)[attrPath2] = {
                                 {"pname", name.name},
@@ -189,17 +216,44 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             } catch (EvalError & e) {
                 if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
                     throw;
+                //printError("ERROR: %d", e.what());
             }
         };
 
-        for (auto & cursor : installable->getCursors(*state))
-            visit(*cursor, cursor->getAttrPath(), true);
+        std::vector<Executor::work_t> work;
+        for (auto & cursor : installable->getCursors(*state)) {
+            work.push_back([cursor, visit]()
+            {
+                visit(*cursor, cursor->getAttrPath(), true);
+            });
+        }
+
+        spawn(std::move(work));
+
+        while (true) {
+            std::vector<std::future<void>> futures;
+            {
+                auto state(state_.lock());
+                std::swap(futures, state->futures);
+            }
+            printError("GOT %d FUTURES", futures.size());
+            if (futures.empty())
+                break;
+            for (auto & future : futures)
+                try {
+                    future.get();
+                } catch (...) {
+                    ignoreException();
+                }
+        }
 
         if (json)
             logger->cout("%s", *jsonOut);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");
+
+        printError("Found %d matching packages.", results);
     }
 };
 

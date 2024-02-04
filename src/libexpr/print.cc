@@ -473,7 +473,8 @@ private:
             if (options.ansiColors)
                     output << ANSI_NORMAL;
         } else {
-            abort();
+            // FIXME
+            output << "«pending»";
         }
     }
 

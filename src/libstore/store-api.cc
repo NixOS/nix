@@ -913,7 +913,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
 const Store::Stats & Store::getStats()
 {
     {
-        auto state_(state.lock());
+        auto state_(state.read());
         stats.pathInfoCacheSize = state_->pathInfoCache.size();
     }
     return stats;

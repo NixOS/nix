@@ -301,6 +301,8 @@ void initGC()
 
     GC_INIT();
 
+    GC_allow_register_threads();
+
     GC_set_oom_fn(oomHandler);
 
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
@@ -1526,9 +1528,11 @@ public:
 
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
+    #if 0
     if (callDepth > evalSettings.maxCallDepth)
         error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
     CallDepth _level(callDepth);
+    #endif
 
     auto trace = evalSettings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
@@ -1536,7 +1540,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
     forceValue(fun, pos);
 
-    Value vCur(fun);
+    Value vCur = fun;
 
     auto makeAppChain = [&]()
     {

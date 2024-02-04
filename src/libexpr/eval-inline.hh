@@ -27,7 +27,7 @@ inline void * allocBytes(size_t n)
 [[gnu::always_inline]]
 Value * EvalState::allocValue()
 {
-#if HAVE_BOEHMGC
+#if 0 /* HAVE_BOEHMGC */
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
@@ -59,7 +59,7 @@ Env & EvalState::allocEnv(size_t size)
 
     Env * env;
 
-#if HAVE_BOEHMGC
+#if 0 /* HAVE_BOEHMGC */
     if (size == 1) {
         /* see allocValue for explanations. */
         if (!*env1AllocCache) {
@@ -84,9 +84,17 @@ Env & EvalState::allocEnv(size_t size)
 [[gnu::always_inline]]
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
-    if (v.isThunk()) {
+    auto type = v.internalType.load();
+
+    if (type == tThunk) {
+        if (!v.internalType.compare_exchange_strong(type, tPending))
+            throw Error("RACE");
         Env * env = v.payload.thunk.env;
         Expr * expr = v.payload.thunk.expr;
+        expr->eval(*this, *env, v);
+    }
+    #if 0
+    if (v.isThunk()) {
         try {
             v.mkBlackhole();
             //checkInterrupt();
@@ -97,8 +105,12 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             throw;
         }
     }
-    else if (v.isApp())
+    #endif
+    else if (type == tApp)
+        // FIXME: mark as pending
         callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
+    else if (type == tPending)
+        throw Error("HIT PENDING");
 }
 
 
