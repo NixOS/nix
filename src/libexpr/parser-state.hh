@@ -64,7 +64,7 @@ struct ParserState
 inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
-         .msg = hintfmt("attribute '%1%' already defined at %2%",
+         .msg = HintFmt("attribute '%1%' already defined at %2%",
              showAttrPath(symbols, attrPath), positions[prevPos]),
          .pos = positions[pos]
     });
@@ -73,7 +73,7 @@ inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, co
 inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
-        .msg = hintfmt("attribute '%1%' already defined at %2%", symbols[attr], positions[prevPos]),
+        .msg = HintFmt("attribute '%1%' already defined at %2%", symbols[attr], positions[prevPos]),
         .pos = positions[pos]
     });
 }
@@ -154,13 +154,13 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
     }
     if (duplicate)
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
+            .msg = HintFmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
             .pos = positions[duplicate->second]
         });
 
     if (arg && formals->has(arg))
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", symbols[arg]),
+            .msg = HintFmt("duplicate formal function argument '%1%'", symbols[arg]),
             .pos = positions[pos]
         });
 

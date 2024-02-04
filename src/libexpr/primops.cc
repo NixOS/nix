@@ -754,7 +754,7 @@ static RegisterPrimOp primop_break({
         if (state.debugRepl && !state.debugTraces.empty()) {
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
-                .msg = hintfmt("breakpoint reached"),
+                .msg = HintFmt("breakpoint reached"),
                 .pos = state.positions[pos],
             });
 
@@ -765,7 +765,7 @@ static RegisterPrimOp primop_break({
                 // If the user elects to quit the repl, throw an exception.
                 throw Error(ErrorInfo{
                     .level = lvlInfo,
-                    .msg = hintfmt("quit the debugger"),
+                    .msg = HintFmt("quit the debugger"),
                     .pos = nullptr,
                 });
             }
@@ -820,7 +820,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         auto message = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.addErrorContext",
                 false, false).toOwned();
-        e.addTrace(nullptr, hintfmt(message), true);
+        e.addTrace(nullptr, HintFmt(message), true);
         throw;
     }
 }
@@ -1071,7 +1071,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
          * often results from the composition of several functions
          * (derivationStrict, derivation, mkDerivation, mkPythonModule, etc.)
          */
-        e.addTrace(nullptr, hintfmt(
+        e.addTrace(nullptr, HintFmt(
                 "while evaluating derivation '%s'\n"
                 "  whose name attribute is located at %s",
                 drvName, pos), true);
@@ -1232,7 +1232,7 @@ drvName, Bindings * attrs, Value & v)
 
         } catch (Error & e) {
             e.addTrace(state.positions[i->pos],
-                hintfmt("while evaluating attribute '%1%' of derivation '%2%'", key, drvName),
+                HintFmt("while evaluating attribute '%1%' of derivation '%2%'", key, drvName),
                 true);
             throw;
         }

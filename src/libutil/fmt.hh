@@ -31,6 +31,17 @@ inline void formatHelper(F & f, const T & x, const Args & ... args)
     // Interpolate one argument and then recurse.
     formatHelper(f % x, args...);
 }
+
+/**
+ * Set the correct exceptions for `fmt`.
+ */
+void setExceptions(boost::format & fmt)
+{
+    fmt.exceptions(
+        boost::io::all_error_bits ^
+        boost::io::too_many_args_bit ^
+        boost::io::too_few_args_bit);
+}
 }
 
 /**
@@ -74,7 +85,7 @@ template<typename... Args>
 inline std::string fmt(const std::string & fs, const Args & ... args)
 {
     boost::format f(fs);
-    f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
+    setExceptions(f);
     formatHelper(f, args...);
     return f.str();
 }
@@ -82,9 +93,9 @@ inline std::string fmt(const std::string & fs, const Args & ... args)
 /**
  * Values wrapped in this struct are printed in magenta.
  *
- * By default, arguments to `hintfmt` are printed in magenta. To avoid this,
+ * By default, arguments to `HintFmt` are printed in magenta. To avoid this,
  * either wrap the argument in `Uncolored` or add a specialization of
- * `hintfmt::operator%`.
+ * `HintFmt::operator%`.
  */
 template <class T>
 struct Magenta
@@ -102,7 +113,7 @@ std::ostream & operator<<(std::ostream & out, const Magenta<T> & y)
 /**
  * Values wrapped in this class are printed without coloring.
  *
- * By default, arguments to `hintfmt` are printed in magenta (see `Magenta`).
+ * By default, arguments to `HintFmt` are printed in magenta (see `Magenta`).
  */
 template <class T>
 struct Uncolored
@@ -121,65 +132,49 @@ std::ostream & operator<<(std::ostream & out, const Uncolored<T> & y)
  * A wrapper around `boost::format` which colors interpolated arguments in
  * magenta by default.
  */
-class hintfmt
+class HintFmt
 {
 private:
     boost::format fmt;
 
 public:
     /**
-     * Construct a `hintfmt` from a format string, with values to be
-     * interpolated later with `%`.
-     *
-     * This isn't exposed as a single-argument constructor to avoid
-     * accidentally constructing `hintfmt`s with user-controlled strings. See
-     * the note on `fmt` for more information.
-     */
-    static hintfmt interpolate(const std::string & formatString)
-    {
-        hintfmt result((boost::format(formatString)));
-        result.fmt.exceptions(
-            boost::io::all_error_bits ^
-            boost::io::too_many_args_bit ^
-            boost::io::too_few_args_bit);
-        return result;
-    }
-
-    /**
      * Format the given string literally, without interpolating format
      * placeholders.
      */
-    hintfmt(const std::string & literal)
-        : hintfmt("%s", Uncolored(literal))
+    HintFmt(const std::string & literal)
+        : HintFmt("%s", Uncolored(literal))
     { }
 
     /**
      * Interpolate the given arguments into the format string.
      */
     template<typename... Args>
-    hintfmt(const std::string & format, const Args & ... args)
-        : fmt(format)
-    {
-        formatHelper(*this, args...);
-    }
+    HintFmt(const std::string & format, const Args & ... args)
+        : HintFmt(boost::format(format), args...)
+    { }
 
-    hintfmt(const hintfmt & hf)
+    HintFmt(const HintFmt & hf)
         : fmt(hf.fmt)
     { }
 
-    hintfmt(boost::format && fmt)
+    template<typename... Args>
+    HintFmt(boost::format && fmt, const Args & ... args)
         : fmt(std::move(fmt))
-    { }
+    {
+        setExceptions(fmt);
+        formatHelper(*this, args...);
+    }
 
     template<class T>
-    hintfmt & operator%(const T & value)
+    HintFmt & operator%(const T & value)
     {
         fmt % Magenta(value);
         return *this;
     }
 
     template<class T>
-    hintfmt & operator%(const Uncolored<T> & value)
+    HintFmt & operator%(const Uncolored<T> & value)
     {
         fmt % value.value;
         return *this;
@@ -191,6 +186,6 @@ public:
     }
 };
 
-std::ostream & operator<<(std::ostream & os, const hintfmt & hf);
+std::ostream & operator<<(std::ostream & os, const HintFmt & hf);
 
 }

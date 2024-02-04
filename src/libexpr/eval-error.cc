@@ -28,7 +28,7 @@ template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withTrace(PosIdx pos, const std::string_view text)
 {
     error.err.traces.push_front(
-        Trace{.pos = error.state.positions[pos], .hint = hintfmt(std::string(text)), .frame = false});
+        Trace{.pos = error.state.positions[pos], .hint = HintFmt(std::string(text)), .frame = false});
     return *this;
 }
 
@@ -36,7 +36,7 @@ template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrameTrace(PosIdx pos, const std::string_view text)
 {
     error.err.traces.push_front(
-        Trace{.pos = error.state.positions[pos], .hint = hintformat(std::string(text)), .frame = true});
+        Trace{.pos = error.state.positions[pos], .hint = HintFmt(std::string(text)), .frame = true});
     return *this;
 }
 
@@ -57,13 +57,13 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
         .pos = error.state.positions[expr.getPos()],
         .expr = expr,
         .env = env,
-        .hint = hintformat("Fake frame for debugging purposes"),
+        .hint = HintFmt("Fake frame for debugging purposes"),
         .isError = true});
     return *this;
 }
 
 template<class T>
-EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, hintformat hint, bool frame)
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, HintFmt hint, bool frame)
 {
     error.addTrace(error.state.positions[pos], hint, frame);
     return *this;
@@ -75,7 +75,7 @@ EvalErrorBuilder<T> &
 EvalErrorBuilder<T>::addTrace(PosIdx pos, std::string_view formatString, const Args &... formatArgs)
 {
 
-    addTrace(error.state.positions[pos], hintfmt(std::string(formatString), formatArgs...));
+    addTrace(error.state.positions[pos], HintFmt(std::string(formatString), formatArgs...));
     return *this;
 }
 

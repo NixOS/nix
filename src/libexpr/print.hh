@@ -86,6 +86,6 @@ std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer);
  * magenta.
  */
 template<>
-hintformat & hintformat::operator%(const ValuePrinter & value);
+HintFmt & HintFmt::operator%(const ValuePrinter & value);
 
 }

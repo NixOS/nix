@@ -92,7 +92,7 @@ void handleDiffHook(
         } catch (Error & error) {
             ErrorInfo ei = error.info();
             // FIXME: wrap errors.
-            ei.msg = hintfmt("diff hook execution failed: %s", ei.msg.str());
+            ei.msg = HintFmt("diff hook execution failed: %s", ei.msg.str());
             logError(ei);
         }
     }
