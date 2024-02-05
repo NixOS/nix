@@ -156,7 +156,7 @@ testReplResponseNoRegex '
 # Same for let expressions
 testReplResponseNoRegex '
 let x = { y = { a = 1; }; inherit x; }; in x
-' '{ x = { ... }; y = { ... }; }'
+' '{ x = «repeated»; y = { ... }; }'
 
 # The :p command should recursively print sets, but prevent infinite recursion
 testReplResponseNoRegex '
@@ -171,4 +171,4 @@ testReplResponseNoRegex '
 # Same for let expressions
 testReplResponseNoRegex '
 :p let x = { y = { a = 1; }; inherit x; }; in x
-' '{ x = { x = «repeated»; y = { a = 1; }; }; y = «repeated»; }'
+' '{ x = «repeated»; y = { a = 1; }; }'

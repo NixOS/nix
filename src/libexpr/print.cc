@@ -152,7 +152,7 @@ struct ImportantFirstAttrNameCmp
     }
 };
 
-typedef std::set<Value *> ValuesSeen;
+typedef std::set<const void *> ValuesSeen;
 
 class Printer
 {
@@ -262,7 +262,7 @@ private:
 
     void printAttrs(Value & v, size_t depth)
     {
-        if (seen && !seen->insert(&v).second) {
+        if (seen && !seen->insert(v.attrs).second) {
             printRepeated();
             return;
         }
