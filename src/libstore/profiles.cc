@@ -31,6 +31,14 @@ static std::optional<GenerationNumber> parseName(const std::string & profileName
 }
 
 
+std::optional<GenerationNumber> currentGeneration(Path profile) {
+    auto profileName = std::string(baseNameOf(profile));
+    return pathExists(profile)
+        ? parseName(profileName, readLink(profile))
+        : std::nullopt;
+}
+
+
 std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile)
 {
     Generations gens;
@@ -57,9 +65,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 
     return {
         gens,
-        pathExists(profile)
-        ? parseName(profileName, readLink(profile))
-        : std::nullopt
+        currentGeneration(profile)
     };
 }
 
@@ -120,6 +126,10 @@ static void removeFile(const Path & path)
 
 void deleteGeneration(const Path & profile, GenerationNumber gen, bool dryRun)
 {
+    auto curGen = currentGeneration(profile);
+    if (curGen && *curGen == gen)
+        throw Error("cannot delete current version of profile %1%'", profile);
+
     if (dryRun)
         notice("would remove profile version %1%", gen);
     else {
