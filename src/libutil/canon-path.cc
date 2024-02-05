@@ -63,7 +63,7 @@ void CanonPath::extend(const CanonPath & x)
         path += x.abs();
 }
 
-CanonPath CanonPath::operator + (const CanonPath & x) const
+CanonPath CanonPath::operator / (const CanonPath & x) const
 {
     auto res = *this;
     res.extend(x);
@@ -78,7 +78,7 @@ void CanonPath::push(std::string_view c)
     path += c;
 }
 
-CanonPath CanonPath::operator + (std::string_view c) const
+CanonPath CanonPath::operator / (std::string_view c) const
 {
     auto res = *this;
     res.push(c);

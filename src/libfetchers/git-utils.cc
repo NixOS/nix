@@ -295,7 +295,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             throw Error("getting working directory status: %s", git_error_last()->message);
 
         /* Get submodule info. */
-        auto modulesFile = path + ".gitmodules";
+        auto modulesFile = path / ".gitmodules";
         if (pathExists(modulesFile.abs()))
             info.submodules = parseSubmodules(modulesFile);
 

@@ -141,7 +141,7 @@ struct MercurialInputScheme : InputScheme
         if (!isLocal)
             throw Error("cannot commit '%s' to Mercurial repository '%s' because it's not a working tree", path, input.to_string());
 
-        auto absPath = CanonPath(repoPath) + path;
+        auto absPath = CanonPath(repoPath) / path;
 
         writeFile(absPath.abs(), contents);
 

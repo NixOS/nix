@@ -77,20 +77,20 @@ void SourceAccessor::dumpPath(
                     std::string name(i.first);
                     size_t pos = i.first.find(caseHackSuffix);
                     if (pos != std::string::npos) {
-                        debug("removing case hack suffix from '%s'", path + i.first);
+                        debug("removing case hack suffix from '%s'", path / i.first);
                         name.erase(pos);
                     }
                     if (!unhacked.emplace(name, i.first).second)
                         throw Error("file name collision in between '%s' and '%s'",
-                            (path + unhacked[name]),
-                            (path + i.first));
+                            (path / unhacked[name]),
+                            (path / i.first));
                 } else
                     unhacked.emplace(i.first, i.first);
 
             for (auto & i : unhacked)
-                if (filter((path + i.first).abs())) {
+                if (filter((path / i.first).abs())) {
                     sink << "entry" << "(" << "name" << i.first << "node";
-                    dump(path + i.second);
+                    dump(path / i.second);
                     sink << ")";
                 }
         }

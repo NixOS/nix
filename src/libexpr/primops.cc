@@ -1816,7 +1816,7 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
             // detailed node info quickly in this case we produce a thunk to
             // query the file type lazily.
             auto epath = state.allocValue();
-            epath->mkPath(path + name);
+            epath->mkPath(path / name);
             if (!readFileType)
                 readFileType = &state.getBuiltin("readFileType");
             attr.mkApp(readFileType, epath);

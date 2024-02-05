@@ -2689,14 +2689,14 @@ SourcePath resolveExprPath(SourcePath path)
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
             throw Error("too many symbolic links encountered while traversing the path '%s'", path);
-        auto p = path.parent().resolveSymlinks() + path.baseName();
+        auto p = path.parent().resolveSymlinks() / path.baseName();
         if (p.lstat().type != InputAccessor::tSymlink) break;
         path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
     if (path.resolveSymlinks().lstat().type == InputAccessor::tDirectory)
-        return path + "default.nix";
+        return path / "default.nix";
 
     return path;
 }

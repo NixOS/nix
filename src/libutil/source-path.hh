@@ -89,14 +89,15 @@ struct SourcePath
     /**
      * Append a `CanonPath` to this path.
      */
-    SourcePath operator + (const CanonPath & x) const;
+    SourcePath operator / (const CanonPath & x) const;
 
     /**
      * Append a single component `c` to this path. `c` must not
      * contain a slash. A slash is implicitly added between this path
      * and `c`.
      */
-    SourcePath operator+(std::string_view c) const;
+    SourcePath operator / (std::string_view c) const;
+
     bool operator==(const SourcePath & x) const;
     bool operator!=(const SourcePath & x) const;
     bool operator<(const SourcePath & x) const;

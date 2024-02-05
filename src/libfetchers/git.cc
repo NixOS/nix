@@ -319,7 +319,7 @@ struct GitInputScheme : InputScheme
         if (!repoInfo.isLocal)
             throw Error("cannot commit '%s' to Git repository '%s' because it's not a working tree", path, input.to_string());
 
-        writeFile((CanonPath(repoInfo.url) + path).abs(), contents);
+        writeFile((CanonPath(repoInfo.url) / path).abs(), contents);
 
         auto result = runProgram(RunOptions {
             .program = "git",
@@ -680,7 +680,7 @@ struct GitInputScheme : InputScheme
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {
-                auto submodulePath = CanonPath(repoInfo.url) + submodule.path;
+                auto submodulePath = CanonPath(repoInfo.url) / submodule.path;
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", submodulePath.abs());

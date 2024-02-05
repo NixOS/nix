@@ -28,7 +28,7 @@ struct LocalStoreAccessor : PosixSourceAccessor
         auto [storePath, rest] = store->toStorePath(path.abs());
         if (requireValidPath && !store->isValidPath(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-        return CanonPath(store->getRealStoreDir()) + storePath.to_string() + CanonPath(rest);
+        return CanonPath(store->getRealStoreDir()) / storePath.to_string() / CanonPath(rest);
     }
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override

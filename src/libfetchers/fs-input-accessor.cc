@@ -48,7 +48,7 @@ struct FSInputAccessor : InputAccessor, PosixSourceAccessor
 
     CanonPath makeAbsPath(const CanonPath & path)
     {
-        return root + path;
+        return root / path;
     }
 
     std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override
