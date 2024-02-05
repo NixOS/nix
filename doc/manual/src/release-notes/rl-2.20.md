@@ -190,3 +190,13 @@
   repository where the `flake.lock` file is `.gitignore`d
   [#8854](https://github.com/NixOS/nix/issues/8854)
   [#9324](https://github.com/NixOS/nix/pull/9324)
+
+- Nix commands will now respect Ctrl-C
+  [#7145](https://github.com/NixOS/nix/issues/7145)
+  [#6995](https://github.com/NixOS/nix/pull/6995)
+  [#9687](https://github.com/NixOS/nix/pull/9687)
+
+  Previously, many Nix commands would hang indefinitely if Ctrl-C was pressed
+  while performing various operations (including `nix develop`, `nix flake
+  update`, and so on). With several fixes to Nix's signal handlers, Nix
+  commands will now exit quickly after Ctrl-C is pressed.
