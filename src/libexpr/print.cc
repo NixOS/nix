@@ -255,7 +255,7 @@ private:
             output << "»";
             if (options.ansiColors)
                 output << ANSI_NORMAL;
-        } catch (BaseError & e) {
+        } catch (Error & e) {
             printError_(e);
         }
     }
@@ -405,7 +405,7 @@ private:
             output << ANSI_NORMAL;
     }
 
-    void printError_(BaseError & e)
+    void printError_(Error & e)
     {
         if (options.ansiColors)
             output << ANSI_RED;
@@ -422,7 +422,7 @@ private:
         if (options.force) {
             try {
                 state.forceValue(v, v.determinePos(noPos));
-            } catch (BaseError & e) {
+            } catch (Error & e) {
                 printError_(e);
                 return;
             }
