@@ -939,8 +939,8 @@ struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRu
             .longName = "older-than",
             .description =
                 "Delete versions older than the specified age. *age* "
-                "must be in the format *N*`d`, where *N* denotes a number "
-                "of days.",
+                "must be in the format *N*`d` or `+`*N* where *N* denotes a number. "
+                "Use `d` for days and `+` for absolute number to keep.",
             .labels = {"age"},
             .handler = {&minAge},
         });
