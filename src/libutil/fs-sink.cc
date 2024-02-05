@@ -34,7 +34,7 @@ void copyRecursive(
         sink.createDirectory(to);
         for (auto & [name, _] : accessor.readDirectory(from)) {
             copyRecursive(
-                accessor, from + name,
+                accessor, from / name,
                 sink, to + "/" + name);
             break;
         }

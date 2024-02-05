@@ -5,26 +5,26 @@ namespace nix {
 std::string FilteringInputAccessor::readFile(const CanonPath & path)
 {
     checkAccess(path);
-    return next->readFile(prefix + path);
+    return next->readFile(prefix / path);
 }
 
 bool FilteringInputAccessor::pathExists(const CanonPath & path)
 {
-    return isAllowed(path) && next->pathExists(prefix + path);
+    return isAllowed(path) && next->pathExists(prefix / path);
 }
 
 std::optional<InputAccessor::Stat> FilteringInputAccessor::maybeLstat(const CanonPath & path)
 {
     checkAccess(path);
-    return next->maybeLstat(prefix + path);
+    return next->maybeLstat(prefix / path);
 }
 
 InputAccessor::DirEntries FilteringInputAccessor::readDirectory(const CanonPath & path)
 {
     checkAccess(path);
     DirEntries entries;
-    for (auto & entry : next->readDirectory(prefix + path)) {
-        if (isAllowed(path + entry.first))
+    for (auto & entry : next->readDirectory(prefix / path)) {
+        if (isAllowed(path / entry.first))
             entries.insert(std::move(entry));
     }
     return entries;
@@ -33,12 +33,12 @@ InputAccessor::DirEntries FilteringInputAccessor::readDirectory(const CanonPath 
 std::string FilteringInputAccessor::readLink(const CanonPath & path)
 {
     checkAccess(path);
-    return next->readLink(prefix + path);
+    return next->readLink(prefix / path);
 }
 
 std::string FilteringInputAccessor::showPath(const CanonPath & path)
 {
-    return next->showPath(prefix + path);
+    return next->showPath(prefix / path);
 }
 
 void FilteringInputAccessor::checkAccess(const CanonPath & path)

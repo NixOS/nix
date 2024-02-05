@@ -277,7 +277,7 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
             json &res2 = obj["entries"];
             for (const auto & [name, type] : accessor->readDirectory(path)) {
                 if (recurse) {
-                    res2[name] = listNar(accessor, path + name, true);
+                    res2[name] = listNar(accessor, path / name, true);
                 } else
                     res2[name] = json::object();
             }
