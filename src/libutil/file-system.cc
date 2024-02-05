@@ -25,7 +25,7 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
 {
     std::string scratch;
 
-    if (path[0] != '/') {
+    if (path.empty() || path[0] != '/') {
         // In this case we need to call `canonPath` on a newly-created
         // string. We set `scratch` to that string first, and then set
         // `path` to `scratch`. This ensures the newly-created string
