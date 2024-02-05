@@ -200,3 +200,22 @@
   while performing various operations (including `nix develop`, `nix flake
   update`, and so on). With several fixes to Nix's signal handlers, Nix
   commands will now exit quickly after Ctrl-C is pressed.
+
+- Blank lines have been removed from stack traces, rendering them more compact [#9619](https://github.com/NixOS/nix/pull/9619)
+
+  ```
+  error:
+         … while evaluating the attribute 'body'
+           at /Users/wiggles/nix/tests/functional/lang/eval-fail-assert.nix:4:3:
+              3|
+              4|   body = x "x";
+               |   ^
+              5| }
+
+         error: assertion '(arg == "y")' failed
+         at /Users/wiggles/nix/tests/functional/lang/eval-fail-assert.nix:2:12:
+              1| let {
+              2|   x = arg: assert arg == "y"; 123;
+               |            ^
+              3|
+  ```
