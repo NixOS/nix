@@ -167,3 +167,7 @@
 
          error: expected a set but found an integer
   ```
+- Flake operations like `nix develop` will no longer fail when run in a Git
+  repository where the `flake.lock` file is `.gitignore`d
+  [#8854](https://github.com/NixOS/nix/issues/8854)
+  [#9324](https://github.com/NixOS/nix/pull/9324)
