@@ -118,28 +118,14 @@ static void removeFile(const Path & path)
 }
 
 
-void deleteGeneration(const Path & profile, GenerationNumber gen)
-{
-    Path generation = makeName(profile, gen);
-    removeFile(generation);
-}
-
-/**
- * Delete a generation with dry-run mode.
- *
- * Like `deleteGeneration()` but:
- *
- *  - We log what we are going to do.
- *
- *  - We only actually delete if `dryRun` is false.
- */
-static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
+void deleteGeneration(const Path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
         notice("would remove profile version %1%", gen);
     else {
         notice("removing profile version %1%", gen);
-        deleteGeneration(profile, gen);
+        Path generation = makeName(profile, gen);
+        removeFile(generation);
     }
 }
 
@@ -156,7 +142,7 @@ void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & 
 
     for (auto & i : gens) {
         if (!gensToDelete.count(i.number)) continue;
-        deleteGeneration2(profile, i.number, dryRun);
+        deleteGeneration(profile, i.number, dryRun);
     }
 }
 
@@ -189,7 +175,7 @@ void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bo
 
     // Delete the rest
     for (; i != gens.rend(); ++i)
-        deleteGeneration2(profile, i->number, dryRun);
+        deleteGeneration(profile, i->number, dryRun);
 }
 
 void deleteOldGenerations(const Path & profile, bool dryRun)
@@ -201,7 +187,7 @@ void deleteOldGenerations(const Path & profile, bool dryRun)
 
     for (auto & i : gens)
         if (i.number != curGen)
-            deleteGeneration2(profile, i.number, dryRun);
+            deleteGeneration(profile, i.number, dryRun);
 }
 
 
@@ -233,7 +219,7 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
            numbered derivations should also be older. */
         assert(older(*i));
         if (i->number != curGen)
-            deleteGeneration2(profile, i->number, dryRun);
+            deleteGeneration(profile, i->number, dryRun);
     }
 }
 

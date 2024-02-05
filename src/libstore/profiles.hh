@@ -107,12 +107,15 @@ Path createGeneration(LocalFSStore & store, Path profile, StorePath outPath);
  * @param gen The generation number specifying exactly which generation
  * to delete.
  *
+ * @param dryRun Log what would be deleted instead of actually doing
+ * so.
+ *
  * Because there is no check of whether the generation to delete is
  * active, this is somewhat unsafe.
  *
  * @todo Should we expose this at all?
  */
-void deleteGeneration(const Path & profile, GenerationNumber gen);
+void deleteGeneration(const Path & profile, GenerationNumber gen, bool dryRun);
 
 /**
  * Delete the given set of generations.
