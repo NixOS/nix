@@ -13,7 +13,7 @@ libexpr_SOURCES := \
   $(d)/parser-tab.cc \
   $(d)/tracy/public/TracyClient.cpp
 
-libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr -I src/libexpr/tracy/public
+libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr -I src/libexpr/tracy/public -DTRACY_ENABLE=1
 
 libexpr_LIBS = libutil libstore libfetchers
 
@@ -49,3 +49,4 @@ $(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh
 $(d)/eval.cc: $(d)/primops/derivation.nix.gen.hh $(d)/fetchurl.nix.gen.hh $(d)/flake/call-flake.nix.gen.hh
 
 $(buildprefix)src/libexpr/primops/fromTOML.o:	ERROR_SWITCH_ENUM =
+$(buildprefix)src/libexpr/tracy/public/TracyClient.o: ERROR_SWITCH_ENUM =
