@@ -1,0 +1,3 @@
+[submodule "src/libexpr/tracy"]
+	path = src/libexpr/tracy
+	url = git@github.com:wolfpld/tracy.git

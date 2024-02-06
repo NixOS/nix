@@ -25,6 +25,7 @@
 #include "flake/flakeref.hh"
 #include "parser-tab.hh"
 
+#include <tracy/Tracy.hpp>
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -1372,6 +1373,7 @@ static std::string showAttrPath(EvalState & state, Env & env, const AttrPath & a
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
+    ZoneScopedN("select");
     Value vTmp;
     PosIdx pos2;
     Value * vAttrs = &vTmp;

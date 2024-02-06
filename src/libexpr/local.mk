@@ -10,9 +10,10 @@ libexpr_SOURCES := \
   $(wildcard $(d)/primops/*.cc) \
   $(wildcard $(d)/flake/*.cc) \
   $(d)/lexer-tab.cc \
-  $(d)/parser-tab.cc
+  $(d)/parser-tab.cc \
+  $(d)/tracy/public/TracyClient.cpp
 
-libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
+libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr -I src/libexpr/tracy/public
 
 libexpr_LIBS = libutil libstore libfetchers
 
