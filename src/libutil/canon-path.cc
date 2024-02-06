@@ -20,11 +20,6 @@ CanonPath::CanonPath(const std::vector<std::string> & elems)
         push(s);
 }
 
-CanonPath CanonPath::fromCwd(std::string_view path)
-{
-    return CanonPath(unchecked_t(), absPath(path));
-}
-
 std::optional<CanonPath> CanonPath::parent() const
 {
     if (isRoot()) return std::nullopt;

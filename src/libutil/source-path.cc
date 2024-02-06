@@ -35,7 +35,7 @@ void SourcePath::dumpPath(
     PathFilter & filter) const
 { return accessor->dumpPath(path, sink, filter); }
 
-std::optional<CanonPath> SourcePath::getPhysicalPath() const
+std::optional<std::filesystem::path> SourcePath::getPhysicalPath() const
 { return accessor->getPhysicalPath(path); }
 
 std::string SourcePath::to_string() const

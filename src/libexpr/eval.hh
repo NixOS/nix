@@ -373,6 +373,11 @@ public:
     SourcePath rootPath(CanonPath path);
 
     /**
+     * Variant which accepts relative paths too.
+     */
+    SourcePath rootPath(PathView path);
+
+    /**
      * Allow access to a path.
      */
     void allowPath(const Path & path);

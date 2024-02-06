@@ -487,10 +487,11 @@ Installables SourceExprCommand::parseInstallables(
             state->eval(e, *vFile);
         }
         else if (file) {
-            state->evalFile(lookupFileArg(*state, *file, CanonPath::fromCwd(getCommandBaseDir())), *vFile);
+            auto dir = absPath(getCommandBaseDir());
+            state->evalFile(lookupFileArg(*state, *file, &dir), *vFile);
         }
         else {
-            CanonPath dir(CanonPath::fromCwd(getCommandBaseDir()));
+            Path dir = absPath(getCommandBaseDir());
             auto e = state->parseExprFromString(*expr, state->rootPath(dir));
             state->eval(e, *vFile);
         }
