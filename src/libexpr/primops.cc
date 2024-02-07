@@ -32,6 +32,13 @@
 
 #include <cmath>
 
+#include <tracy/Tracy.hpp>
+
+#define TRACY_TRACE_PRIMOP(es, posidx, typestr)                             \
+    std::ostringstream tracyss;                                         \
+    tracyss << es.positions[posidx] << " " << typestr;                  \
+    ZoneTransientN(nix, tracyss.str().c_str(), true);
+
 namespace nix {
 
 
@@ -120,6 +127,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
 
 static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bool resolveSymlinks = true)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "realizePath");
     NixStringContext context;
 
     auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
@@ -170,6 +178,7 @@ static void mkOutputString(
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.import");
     auto path = realisePath(state, pos, vPath, false);
     auto path2 = path.path.abs();
 
@@ -334,6 +343,7 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.importNative");
     auto path = realisePath(state, pos, *args[0]);
 
     std::string sym(state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
@@ -361,6 +371,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
 /* Execute a program and parse its output */
 void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.exec");
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.exec");
     auto elems = args[0]->listElems();
     auto count = args[0]->listSize();
@@ -402,6 +413,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 /* Return a string representing the type of the expression. */
 static void prim_typeOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.typeOf");
     state.forceValue(*args[0], pos);
     std::string t;
     switch (args[0]->type()) {
@@ -436,6 +448,7 @@ static RegisterPrimOp primop_typeOf({
 /* Determine whether the argument is the null value. */
 static void prim_isNull(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isNull");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nNull);
 }
@@ -454,6 +467,7 @@ static RegisterPrimOp primop_isNull({
 /* Determine whether the argument is a function. */
 static void prim_isFunction(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isFunction");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nFunction);
 }
@@ -470,6 +484,7 @@ static RegisterPrimOp primop_isFunction({
 /* Determine whether the argument is an integer. */
 static void prim_isInt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isInt");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nInt);
 }
@@ -486,6 +501,7 @@ static RegisterPrimOp primop_isInt({
 /* Determine whether the argument is a float. */
 static void prim_isFloat(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isFloat");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nFloat);
 }
@@ -502,6 +518,7 @@ static RegisterPrimOp primop_isFloat({
 /* Determine whether the argument is a string. */
 static void prim_isString(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isString");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nString);
 }
@@ -518,6 +535,7 @@ static RegisterPrimOp primop_isString({
 /* Determine whether the argument is a Boolean. */
 static void prim_isBool(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isBool");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nBool);
 }
@@ -534,6 +552,7 @@ static RegisterPrimOp primop_isBool({
 /* Determine whether the argument is a path. */
 static void prim_isPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isPath");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nPath);
 }
@@ -644,6 +663,7 @@ static Bindings::iterator getAttr(
 
 static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.genericClosure");
     state.forceAttrs(*args[0], noPos, "while evaluating the first argument passed to builtins.genericClosure");
 
     /* Get the start set. */
@@ -754,6 +774,7 @@ static RegisterPrimOp primop_break({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
+        TRACY_TRACE_PRIMOP(state, pos, "primop.break");
         if (state.debugRepl && !state.debugTraces.empty()) {
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
@@ -787,6 +808,7 @@ static RegisterPrimOp primop_abort({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
+        TRACY_TRACE_PRIMOP(state, pos, "primop.abort");
         NixStringContext context;
         auto s = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.abort").toOwned();
@@ -806,6 +828,7 @@ static RegisterPrimOp primop_throw({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
+      TRACY_TRACE_PRIMOP(state, pos, "primop.throw");
       NixStringContext context;
       auto s = state.coerceToString(pos, *args[0], context,
               "while evaluating the error message passed to builtin.throw").toOwned();
@@ -815,6 +838,7 @@ static RegisterPrimOp primop_throw({
 
 static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.addErrorContext");
     try {
         state.forceValue(*args[1], pos);
         v = *args[1];
@@ -836,6 +860,7 @@ static RegisterPrimOp primop_addErrorContext(PrimOp {
 
 static void prim_ceil(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.ceil");
     auto value = state.forceFloat(*args[0], args[0]->determinePos(pos),
             "while evaluating the first argument passed to builtins.ceil");
     v.mkInt(ceil(value));
@@ -856,6 +881,7 @@ static RegisterPrimOp primop_ceil({
 
 static void prim_floor(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.floor");
     auto value = state.forceFloat(*args[0], args[0]->determinePos(pos), "while evaluating the first argument passed to builtins.floor");
     v.mkInt(floor(value));
 }
@@ -877,6 +903,7 @@ static RegisterPrimOp primop_floor({
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.tryEval");
     auto attrs = state.buildBindings(2);
 
     /* increment state.trylevel, and decrement it when this function returns. */
@@ -930,6 +957,7 @@ static RegisterPrimOp primop_tryEval({
 /* Return an environment variable.  Use with care. */
 static void prim_getEnv(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.getEnv");
     std::string name(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.getEnv"));
     v.mkString(evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
 }
@@ -954,6 +982,7 @@ static RegisterPrimOp primop_getEnv({
 /* Evaluate the first argument, then return the second argument. */
 static void prim_seq(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.seq");
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     v = *args[1];
@@ -973,6 +1002,7 @@ static RegisterPrimOp primop_seq({
    attrsets), then return the second argument. */
 static void prim_deepSeq(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.deepSeq");
     state.forceValueDeep(*args[0]);
     state.forceValue(*args[1], pos);
     v = *args[1];
@@ -993,6 +1023,7 @@ static RegisterPrimOp primop_deepSeq({
    return the second expression.  Useful for debugging. */
 static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.trace");
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
         printError("trace: %1%", args[0]->string_view());
@@ -1019,6 +1050,7 @@ static RegisterPrimOp primop_trace({
  */
 static void prim_second(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.second");
     state.forceValue(*args[1], pos);
     v = *args[1];
 }
@@ -1038,6 +1070,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & name
    derivation. */
 static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.derivationStrict");
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.derivationStrict");
 
     Bindings * attrs = args[0]->attrs;
@@ -1436,6 +1469,7 @@ static RegisterPrimOp primop_derivationStrict(PrimOp {
    ‘out’. */
 static void prim_placeholder(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.placeholder");
     v.mkString(hashPlaceholder(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.placeholder")));
 }
 
@@ -1459,6 +1493,7 @@ static RegisterPrimOp primop_placeholder({
 /* Convert the argument to a path.  !!! obsolete? */
 static void prim_toPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.toPath");
     NixStringContext context;
     auto path = state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to builtins.toPath");
     v.mkString(path.path.abs(), context);
@@ -1484,6 +1519,7 @@ static RegisterPrimOp primop_toPath({
    corner cases. */
 static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.storePath");
     if (evalSettings.pureEval)
         state.debugThrowLastTrace(EvalError({
             .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
@@ -1531,6 +1567,7 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.pathExists");
     try {
         auto & arg = *args[0];
 
@@ -1563,6 +1600,7 @@ static RegisterPrimOp primop_pathExists({
    following the last slash. */
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.baseNameOf");
     NixStringContext context;
     v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
@@ -1585,6 +1623,7 @@ static RegisterPrimOp primop_baseNameOf({
    of the argument. */
 static void prim_dirOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.dirOf");
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nPath) {
         auto path = args[0]->path();
@@ -1613,6 +1652,7 @@ static RegisterPrimOp primop_dirOf({
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.readFile");
     auto path = realisePath(state, pos, *args[0]);
     auto s = path.readFile();
     if (s.find((char) 0) != std::string::npos)
@@ -1650,6 +1690,7 @@ static RegisterPrimOp primop_readFile({
    which are desugared to 'findFile __nixPath "x"'. */
 static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.findFile");
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.findFile");
 
     SearchPath searchPath;
@@ -1742,6 +1783,7 @@ static RegisterPrimOp primop_findFile(PrimOp {
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.hashFile");
     auto algo = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashFile");
     std::optional<HashAlgorithm> ha = parseHashAlgo(algo);
     if (!ha)
@@ -1777,6 +1819,7 @@ static std::string_view fileTypeToString(InputAccessor::Type type)
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.readFileType");
     auto path = realisePath(state, pos, *args[0], false);
     /* Retrieve the directory entry type and stringize it. */
     v.mkString(fileTypeToString(path.lstat().type));
@@ -1795,6 +1838,7 @@ static RegisterPrimOp primop_readFileType({
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.readDir");
     auto path = realisePath(state, pos, *args[0]);
 
     // Retrieve directory entries for all nodes in a directory.
@@ -1852,6 +1896,7 @@ static RegisterPrimOp primop_readDir({
 /* Extend single element string context with another output. */
 static void prim_outputOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.outputOf");
     SingleDerivedPath drvPath = state.coerceToSingleDerivedPath(pos, *args[0], "while evaluating the first argument to builtins.outputOf");
 
     OutputNameView outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
@@ -1899,6 +1944,7 @@ static RegisterPrimOp primop_outputOf({
    be sensibly or completely represented (e.g., functions). */
 static void prim_toXML(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.toXML");
     std::ostringstream out;
     NixStringContext context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
@@ -2007,6 +2053,7 @@ static RegisterPrimOp primop_toXML({
    represented (e.g., functions). */
 static void prim_toJSON(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.toJSON");
     std::ostringstream out;
     NixStringContext context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
@@ -2030,6 +2077,7 @@ static RegisterPrimOp primop_toJSON({
 /* Parse a JSON string to a value. */
 static void prim_fromJSON(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.fromJSON");
     auto s = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.fromJSON");
     try {
         parseJSON(state, s, v);
@@ -2058,6 +2106,7 @@ static RegisterPrimOp primop_fromJSON({
    as an input by derivations. */
 static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.toFile");
     NixStringContext context;
     std::string name(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.toFile"));
     std::string contents(state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.toFile"));
@@ -2207,6 +2256,7 @@ static void addPath(
     Value & v,
     const NixStringContext & context)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.addPath");
     try {
         StorePathSet refs;
 
@@ -2256,6 +2306,7 @@ static void addPath(
 
 static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.filterSource");
     NixStringContext context;
     auto path = state.coerceToPath(pos, *args[1], context,
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
@@ -2321,6 +2372,7 @@ static RegisterPrimOp primop_filterSource({
 
 static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.path");
     std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
@@ -2404,6 +2456,7 @@ static RegisterPrimOp primop_path({
    strings. */
 static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.attrNames");
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrNames");
 
     state.mkList(v, args[0]->attrs->size());
@@ -2431,6 +2484,7 @@ static RegisterPrimOp primop_attrNames({
    order as attrNames. */
 static void prim_attrValues(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.attrValues");
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrValues");
 
     state.mkList(v, args[0]->attrs->size());
@@ -2463,6 +2517,7 @@ static RegisterPrimOp primop_attrValues({
 /* Dynamic version of the `.' operator. */
 void prim_getAttr(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.getAttr");
     auto attr = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.getAttr");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.getAttr");
     Bindings::iterator i = getAttr(
@@ -2492,6 +2547,7 @@ static RegisterPrimOp primop_getAttr({
 /* Return position information of the specified attribute. */
 static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.unsafeGetAttrPos");
     auto attr = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.unsafeGetAttrPos");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.unsafeGetAttrPos");
     Bindings::iterator i = args[1]->attrs->find(state.symbols.create(attr));
@@ -2510,6 +2566,7 @@ static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.hasAttr");
     auto attr = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hasAttr");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.hasAttr");
     v.mkBool(args[1]->attrs->find(state.symbols.create(attr)) != args[1]->attrs->end());
@@ -2544,6 +2601,7 @@ static RegisterPrimOp primop_isAttrs({
 
 static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.removeAttrs");
     state.forceAttrs(*args[0], pos, "while evaluating the first argument passed to builtins.removeAttrs");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.removeAttrs");
 
@@ -2593,6 +2651,7 @@ static RegisterPrimOp primop_removeAttrs({
    name, the first takes precedence. */
 static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.listToAttrs");
     state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToAttrs");
 
     auto attrs = state.buildBindings(args[0]->listSize());
@@ -2649,6 +2708,7 @@ static RegisterPrimOp primop_listToAttrs({
 
 static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.intersectAttrs");
     state.forceAttrs(*args[0], pos, "while evaluating the first argument passed to builtins.intersectAttrs");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.intersectAttrs");
 
@@ -2727,6 +2787,7 @@ static RegisterPrimOp primop_intersectAttrs({
 
 static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.catAttrs");
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.catAttrs"));
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
@@ -2764,6 +2825,7 @@ static RegisterPrimOp primop_catAttrs({
 
 static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.functionArgs");
     state.forceValue(*args[0], pos);
     if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
         v.mkAttrs(&state.emptyBindings);
@@ -2807,6 +2869,7 @@ static RegisterPrimOp primop_functionArgs({
 /*  */
 static void prim_mapAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.mapAttrs");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.mapAttrs");
 
     auto attrs = state.buildBindings(args[1]->attrs->size());
@@ -2839,6 +2902,7 @@ static RegisterPrimOp primop_mapAttrs({
 
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.zipAttrsWith");
     // we will first count how many values are present for each given key.
     // we then allocate a single attrset and pre-populate it with lists of
     // appropriate sizes, stash the pointers to the list elements of each,
@@ -2926,6 +2990,7 @@ static RegisterPrimOp primop_zipAttrsWith({
 /* Determine whether the argument is a list. */
 static void prim_isList(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.isList");
     state.forceValue(*args[0], pos);
     v.mkBool(args[0]->type() == nList);
 }
@@ -2954,6 +3019,7 @@ static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Val
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.elemAt");
     elemAt(state, pos, *args[0], state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt"), v);
 }
 
@@ -2970,6 +3036,7 @@ static RegisterPrimOp primop_elemAt({
 /* Return the first element of a list. */
 static void prim_head(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.head");
     elemAt(state, pos, *args[0], 0, v);
 }
 
@@ -2989,6 +3056,7 @@ static RegisterPrimOp primop_head({
    don't want to use it!  */
 static void prim_tail(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.tail");
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.tail");
     if (args[0]->listSize() == 0)
         state.debugThrowLastTrace(Error({
@@ -3020,6 +3088,7 @@ static RegisterPrimOp primop_tail({
 /* Apply a function to every element of a list. */
 static void prim_map(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.map");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.map");
 
     if (args[1]->listSize() == 0) {
@@ -3056,6 +3125,7 @@ static RegisterPrimOp primop_map({
    returns true. */
 static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.filter");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.filter");
 
     if (args[1]->listSize() == 0) {
@@ -3099,6 +3169,7 @@ static RegisterPrimOp primop_filter({
 /* Return true if a list contains a given element. */
 static void prim_elem(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.elem");
     bool res = false;
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.elem");
     for (auto elem : args[1]->listItems())
@@ -3122,6 +3193,7 @@ static RegisterPrimOp primop_elem({
 /* Concatenate a list of lists. */
 static void prim_concatLists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.concatLists");
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.concatLists");
     state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos, "while evaluating a value of the list passed to builtins.concatLists");
 }
@@ -3138,6 +3210,7 @@ static RegisterPrimOp primop_concatLists({
 /* Return the length of a list.  This is an O(1) time operation. */
 static void prim_length(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.length");
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.length");
     v.mkInt(args[0]->listSize());
 }
@@ -3155,6 +3228,7 @@ static RegisterPrimOp primop_length({
    right. The operator is applied strictly. */
 static void prim_foldlStrict(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.foldStrict");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.foldlStrict");
     state.forceList(*args[2], pos, "while evaluating the third argument passed to builtins.foldlStrict");
 
@@ -3218,6 +3292,7 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
 
 static void prim_any(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.any");
     anyOrAll(true, state, pos, args, v);
 }
 
@@ -3233,6 +3308,7 @@ static RegisterPrimOp primop_any({
 
 static void prim_all(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.all");
     anyOrAll(false, state, pos, args, v);
 }
 
@@ -3248,6 +3324,7 @@ static RegisterPrimOp primop_all({
 
 static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.genList");
     auto len = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.genList");
 
     if (len < 0)
@@ -3286,6 +3363,7 @@ static void prim_lessThan(EvalState & state, const PosIdx pos, Value * * args, V
 
 static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.sort");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.sort");
 
     auto len = args[1]->listSize();
@@ -3345,6 +3423,7 @@ static RegisterPrimOp primop_sort({
 
 static void prim_partition(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.partition");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.partition");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.partition");
 
@@ -3405,6 +3484,7 @@ static RegisterPrimOp primop_partition({
 
 static void prim_groupBy(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.groupBy");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.groupBy");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.groupBy");
 
@@ -3457,6 +3537,7 @@ static RegisterPrimOp primop_groupBy({
 
 static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.concatMap");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.concatMap");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
     auto nrLists = args[1]->listSize();
@@ -3500,6 +3581,7 @@ static RegisterPrimOp primop_concatMap({
 
 static void prim_add(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.add");
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
@@ -3521,6 +3603,7 @@ static RegisterPrimOp primop_add({
 
 static void prim_sub(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.sub");
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
@@ -3542,6 +3625,7 @@ static RegisterPrimOp primop_sub({
 
 static void prim_mul(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.mul");
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
@@ -3563,6 +3647,7 @@ static RegisterPrimOp primop_mul({
 
 static void prim_div(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.div");
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
 
@@ -3600,6 +3685,7 @@ static RegisterPrimOp primop_div({
 
 static void prim_bitAnd(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.bitAnd");
     v.mkInt(state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitAnd")
             & state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitAnd"));
 }
@@ -3645,6 +3731,7 @@ static RegisterPrimOp primop_bitXor({
 
 static void prim_lessThan(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.lessThan");
     state.forceValue(*args[0], pos);
     state.forceValue(*args[1], pos);
     // pos is exact here, no need for a message.
@@ -3674,6 +3761,7 @@ static RegisterPrimOp primop_lessThan({
    `"/nix/store/whatever..."'. */
 static void prim_toString(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.toString");
     NixStringContext context;
     auto s = state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.toString",
@@ -3711,6 +3799,7 @@ static RegisterPrimOp primop_toString({
    non-negative. */
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.substring");
     int start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
 
     if (start < 0)
@@ -3761,6 +3850,7 @@ static RegisterPrimOp primop_substring({
 
 static void prim_stringLength(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.stringLength");
     NixStringContext context;
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.stringLength");
     v.mkInt(s->size());
@@ -3779,6 +3869,7 @@ static RegisterPrimOp primop_stringLength({
 /* Return the cryptographic hash of a string in base-16. */
 static void prim_hashString(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.hashString");
     auto algo = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hashString");
     std::optional<HashAlgorithm> ha = parseHashAlgo(algo);
     if (!ha)
@@ -3806,6 +3897,7 @@ static RegisterPrimOp primop_hashString({
 
 static void prim_convertHash(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.convertHash");
     state.forceAttrs(*args[0], pos, "while evaluating the first argument passed to builtins.convertHash");
     auto &inputAttrs = args[0]->attrs;
 
@@ -3923,6 +4015,7 @@ std::shared_ptr<RegexCache> makeRegexCache()
 
 void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.match");
     auto re = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.match");
 
     try {
@@ -4003,6 +4096,7 @@ static RegisterPrimOp primop_match({
    non-matching parts interleaved by the lists of the matching groups. */
 void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.split");
     auto re = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.split");
 
     try {
@@ -4106,6 +4200,7 @@ static RegisterPrimOp primop_split({
 
 static void prim_concatStringsSep(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.concatStringsSep");
     NixStringContext context;
 
     auto sep = state.forceString(*args[0], context, pos, "while evaluating the first argument (the separator string) passed to builtins.concatStringsSep");
@@ -4136,6 +4231,7 @@ static RegisterPrimOp primop_concatStringsSep({
 
 static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.replaceStrings");
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.replaceStrings");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.replaceStrings");
     if (args[0]->listSize() != args[1]->listSize())
@@ -4218,6 +4314,7 @@ static RegisterPrimOp primop_replaceStrings({
 
 static void prim_parseDrvName(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.parseDrvName");
     auto name = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.parseDrvName");
     DrvName parsed(name);
     auto attrs = state.buildBindings(2);
@@ -4242,6 +4339,7 @@ static RegisterPrimOp primop_parseDrvName({
 
 static void prim_compareVersions(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.compareVersions");
     auto version1 = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.compareVersions");
     auto version2 = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.compareVersions");
     v.mkInt(compareVersions(version1, version2));
@@ -4262,6 +4360,7 @@ static RegisterPrimOp primop_compareVersions({
 
 static void prim_splitVersion(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    TRACY_TRACE_PRIMOP(state, pos, "primop.splitVersion");
     auto version = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.splitVersion");
     auto iter = version.cbegin();
     Strings components;

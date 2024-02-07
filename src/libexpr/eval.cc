@@ -57,12 +57,12 @@
 
 #define TRACY_TRACE(evalstate, expr) \
     std::ostringstream tracyss; \
-    tracyss << evalstate.positions[(expr)->getPos()] << " " << (expr)->showExprType(); \
+    tracyss << (evalstate).positions[(expr)->getPos()] << " " << (expr)->showExprType();      \
     ZoneTransientN(nix, tracyss.str().c_str(), true);
 
 #define TRACY_TRACE_TYPE_STR(evalstate, expr, typestr)   \
     std::ostringstream tracyss; \
-    tracyss << (evalstate).positions[(expr)->getPos()] << " " << typestr; \
+    tracyss << (evalstate).positions[(expr)->getPos()] << " " << typestr;      \
     ZoneTransientN(nix, tracyss.str().c_str(), true);
 
 using json = nlohmann::json;
@@ -80,7 +80,6 @@ static char * allocString(size_t size)
     if (!t) throw std::bad_alloc();
     return t;
 }
-
 
 static char * dupString(const char * s)
 {
