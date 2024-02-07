@@ -28,4 +28,9 @@ void bind(int fd, const std::string & path);
  */
 void connect(int fd, const std::string & path);
 
+/**
+ * Create an unnamed pair of connected sockets.
+ */
+std::pair<AutoCloseFD, AutoCloseFD> socketPair();
+
 }

@@ -2,6 +2,7 @@
 #include "serialise.hh"
 #include "auth.hh"
 #include "store-api.hh"
+#include "unix-domain-socket.hh"
 
 #include <sys/socket.h>
 
@@ -12,12 +13,9 @@ AuthTunnel::AuthTunnel(
     WorkerProto::Version clientVersion)
     : clientVersion(clientVersion)
 {
-    int sockets[2];
-    if (socketpair(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets))
-        throw SysError("creating a socket pair");
-
-    serverFd = sockets[0];
-    clientFd = sockets[1];
+    auto sockets = socketPair();
+    serverFd = std::move(sockets.first);
+    clientFd = std::move(sockets.second);
 
     serverThread = std::thread([this, clientVersion, &storeConfig]()
     {
