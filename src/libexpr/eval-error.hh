@@ -56,6 +56,11 @@ public:
     }
 };
 
+/**
+ * `EvalErrorBuilder`s may only be constructed by `EvalState`. The `debugThrow`
+ * method must be the final method in any such `EvalErrorBuilder` usage, and it
+ * handles deleting the object.
+ */
 template<class T>
 class EvalErrorBuilder final
 {
@@ -90,29 +95,10 @@ public:
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> &
     addTrace(PosIdx pos, std::string_view formatString, const Args &... formatArgs);
 
+    /**
+     * Delete the `EvalErrorBuilder` and throw the underlying exception.
+     */
     [[gnu::noinline, gnu::noreturn]] void debugThrow();
 };
-
-/**
- * The size needed to allocate any `EvalErrorBuilder<T>`.
- *
- * The list of classes here needs to be kept in sync with the list of `template
- * class` declarations in `eval-error.cc`.
- *
- * This is used by `EvalState` to preallocate a buffer of sufficient size for
- * any `EvalErrorBuilder<T>` to avoid allocating while evaluating Nix code.
- */
-constexpr size_t EVAL_ERROR_BUILDER_SIZE = std::max({
-    sizeof(EvalErrorBuilder<EvalError>),
-    sizeof(EvalErrorBuilder<AssertionError>),
-    sizeof(EvalErrorBuilder<ThrownError>),
-    sizeof(EvalErrorBuilder<Abort>),
-    sizeof(EvalErrorBuilder<TypeError>),
-    sizeof(EvalErrorBuilder<UndefinedVarError>),
-    sizeof(EvalErrorBuilder<MissingArgumentError>),
-    sizeof(EvalErrorBuilder<InfiniteRecursionError>),
-    sizeof(EvalErrorBuilder<CachedEvalError>),
-    sizeof(EvalErrorBuilder<InvalidPathError>),
-});
 
 }

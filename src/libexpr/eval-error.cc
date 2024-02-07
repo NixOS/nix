@@ -91,7 +91,7 @@ void EvalErrorBuilder<T>::debugThrow()
 
     // `EvalState` is the only class that can construct an `EvalErrorBuilder`,
     // and it does so in dynamic storage. This is the final method called on
-    // any such instancve and must delete itself before throwing the underlying
+    // any such instance and must delete itself before throwing the underlying
     // error.
     auto error = std::move(this->error);
     delete this;
