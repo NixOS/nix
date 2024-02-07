@@ -91,12 +91,12 @@ struct NixAuthSource : AuthSource
     NixAuthSource()
     {
         // FIXME: read the auth directory lazily.
-        auto authDir = CanonPath(getDataDir()) + "nix" + "auth";
+        auto authDir = CanonPath(getDataDir()) / "nix" / "auth";
 
         if (pathExists(authDir.abs()))
             for (auto & file : readDirectory(authDir.abs())) {
                 if (hasSuffix(file.name, "~")) continue;
-                auto path = authDir + file.name;
+                auto path = authDir / file.name;
                 auto authData = AuthData::parseGitAuthData(readFile(path.abs()));
                 if (!authData.password)
                     warn("authentication file '%s' does not contain a password, skipping", path);
@@ -249,7 +249,7 @@ struct ExternalAuthSource : AuthSource
         }
     }
 
-    bool set(const AuthData & authData)
+    bool set(const AuthData & authData) override
     {
         try {
             if (!enabled) return false;
@@ -268,7 +268,7 @@ struct ExternalAuthSource : AuthSource
         }
     }
 
-    void erase(const AuthData & authData)
+    void erase(const AuthData & authData) override
     {
         try {
             if (!enabled) return;

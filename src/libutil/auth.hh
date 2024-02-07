@@ -86,6 +86,9 @@ std::ostream & operator << (std::ostream & str, const AuthData & authData);
 
 struct AuthSource
 {
+    virtual ~AuthSource()
+    { }
+
     virtual std::optional<AuthData> get(const AuthData & request, bool required) = 0;
 
     virtual bool set(const AuthData & authData)
