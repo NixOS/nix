@@ -13,15 +13,22 @@ namespace nix {
 std::string getUserName(uid_t uid)
 {
     auto pw = getpwuid(uid);
-    std::string name = pw ? pw->pw_name : getEnv("USER").value_or("");
-    if (name.empty())
+    if (!pw)
         throw Error("cannot figure out user name");
-    return name;
+    return pw->pw_name;
 }
 
 std::string getUserName()
 {
-    return getUserName(getuid());
+    uid_t uid = getuid();
+    if (getpwuid(uid))
+        return getUserName(uid);
+    else {
+        if (auto name = getEnv("USER"))
+            return *name;
+        else
+            throw Error("cannot figure our user name");
+    }
 }
 
 std::string getGroupName(gid_t gid)
