@@ -60,6 +60,11 @@
     tracyss << evalstate.positions[(expr)->getPos()] << " " << (expr)->showExprType(); \
     ZoneTransientN(nix, tracyss.str().c_str(), true);
 
+#define TRACY_TRACE_TYPE_STR(evalstate, expr, typestr)   \
+    std::ostringstream tracyss; \
+    tracyss << (evalstate).positions[(expr)->getPos()] << " " << typestr; \
+    ZoneTransientN(nix, tracyss.str().c_str(), true);
+
 using json = nlohmann::json;
 
 namespace nix {
@@ -1169,6 +1174,7 @@ void EvalState::eval(Expr * e, Value & v)
 
 inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx)
 {
+    TRACY_TRACE_TYPE_STR(*this, e, "bool")
     try {
         Value v;
         e->eval(*this, env, v);
@@ -1187,6 +1193,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
 
 inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx)
 {
+    TRACY_TRACE_TYPE_STR(*this, e, "attrs")
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
