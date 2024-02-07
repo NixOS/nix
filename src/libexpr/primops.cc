@@ -1563,6 +1563,9 @@ static RegisterPrimOp primop_pathExists({
     .doc = R"(
       Return `true` if the path *path* exists at evaluation time, and
       `false` otherwise.
+
+      If the path refers to a symlink, `pathExists` returns `true` without
+      checking the target of the symlink.
     )",
     .fun = prim_pathExists,
 });
