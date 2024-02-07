@@ -3017,7 +3017,17 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
             printError("note: keeping build directory '%s'", tmpDir);
-            chmod(tmpDir.c_str(), 0755);
+            bool chowned = false;
+            struct stat info;
+            stat(tmpDir.c_str(), &info);
+            if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
+                if (auto store = dynamic_cast<LocalGranularAccessStore*>(&worker.store))
+                    if (store->effectiveUser) {
+                        chown(tmpDir.c_str(), store->effectiveUser->uid, info.st_gid);
+                        chowned = true;
+                    }
+            if (!chowned)
+                chmod(tmpDir.c_str(), 0755);
         }
         else
             deletePath(tmpDir);
