@@ -197,6 +197,7 @@ inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
 enum struct WorkerProto::CallbackOp : uint64_t
 {
     FillAuth = 1,
+    RejectAuth = 2,
 };
 
 /**

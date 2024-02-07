@@ -37,6 +37,7 @@ AuthTunnel::AuthTunnel(
                 auto op = (WorkerProto::CallbackOp) readInt(from.from);
 
                 switch (op) {
+
                 case WorkerProto::CallbackOp::FillAuth: {
                     auto authRequest = WorkerProto::Serialise<auth::AuthData>::read(storeConfig, from);
                     bool required;
@@ -48,6 +49,15 @@ AuthTunnel::AuthTunnel(
                         debug("tunneling auth response: %s", *authData);
                     to.to << 1;
                     WorkerProto::Serialise<std::optional<auth::AuthData>>::write(storeConfig, to, authData);
+                    toSource.flush();
+                    break;
+                }
+
+                case WorkerProto::CallbackOp::RejectAuth: {
+                    auto authData = WorkerProto::Serialise<auth::AuthData>::read(storeConfig, from);
+                    debug("tunneling auth data erase: %s", authData);
+                    auth::getAuthenticator()->reject(authData);
+                    to.to << 1;
                     toSource.flush();
                     break;
                 }
@@ -111,6 +121,16 @@ struct TunneledAuthSource : auth::AuthSource
             return WorkerProto::Serialise<std::optional<auth::AuthData>>::read(*storeConfig, fromConn);
         else
             return std::nullopt;
+    }
+
+    void erase(const auth::AuthData & authData) override
+    {
+        // FIXME: lock the connection
+        to << (int) WorkerProto::CallbackOp::RejectAuth;
+        WorkerProto::Serialise<auth::AuthData>::write(*storeConfig, toConn, authData);
+        to.flush();
+
+        readInt(from);
     }
 };
 

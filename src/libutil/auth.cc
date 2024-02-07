@@ -248,6 +248,40 @@ struct ExternalAuthSource : AuthSource
             return std::nullopt;
         }
     }
+
+    bool set(const AuthData & authData)
+    {
+        try {
+            if (!enabled) return false;
+
+            runProgram(program, true, {"store"}, authData.toGitAuthData());
+
+            return true;
+        } catch (SysError & e) {
+            ignoreException();
+            if (e.errNo == ENOENT || e.errNo == EPIPE)
+                enabled = false;
+            return false;
+        } catch (Error &) {
+            ignoreException();
+            return false;
+        }
+    }
+
+    void erase(const AuthData & authData)
+    {
+        try {
+            if (!enabled) return;
+
+            runProgram(program, true, {"erase"}, authData.toGitAuthData());
+        } catch (SysError & e) {
+            ignoreException();
+            if (e.errNo == ENOENT || e.errNo == EPIPE)
+                enabled = false;
+        } catch (Error &) {
+            ignoreException();
+        }
+    }
 };
 
 std::optional<AuthData> Authenticator::fill(const AuthData & request, bool required)
@@ -297,14 +331,27 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
                         std::nullopt, true));
             }
 
-            if (res.userName && res.password)
+            if (res.userName && res.password) {
                 cache.push_back(res);
+
+                for (auto & authSource : authSources) {
+                    if (authSource->set(res))
+                        break;
+                }
+            }
 
             return res;
         }
     }
 
     return std::nullopt;
+}
+
+void Authenticator::reject(const AuthData & authData)
+{
+    debug("erasing auth data %s", authData);
+    for (auto & authSource : authSources)
+        authSource->erase(authData);
 }
 
 void Authenticator::addAuthSource(ref<AuthSource> authSource)

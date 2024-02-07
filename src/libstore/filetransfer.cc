@@ -430,6 +430,10 @@ struct curlFileTransfer : public FileTransfer
                     // The file is definitely not there
                     err = NotFound;
                 } else if (httpStatus == 401) {
+                    if (authData)
+                        /* This authentication data didn't work, so
+                           erase it. */
+                        request.authenticator->reject(*authData);
                     if (authData || request.requireAuth)
                         // FIXME: call erase() on the auth and retry.
                         err = Forbidden;

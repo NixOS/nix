@@ -109,6 +109,8 @@ public:
 
     std::optional<AuthData> fill(const AuthData & request, bool required);
 
+    void reject(const AuthData & authData);
+
     void addAuthSource(ref<AuthSource> authSource);
 
     void setAuthSource(ref<AuthSource> authSource);
