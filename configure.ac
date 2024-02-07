@@ -348,6 +348,15 @@ if test "$gc" = yes; then
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
 fi
 
+AC_ARG_ENABLE(tracy-profiler, AS_HELP_STRING([--enable-tracy-profiler],[Profile the Nix evaluation using the Tracy profiler (default no)]),
+  TRACY_PROFILER=$enableval, TRACY_PROFILER=no)
+if test "$TRACY_PROFILER" != no; then
+  # We don't have any pkg-config file for tracy, we have to inject the
+  # headers manually…
+  CXXFLAGS="-I $TRACY_PROFILER/include/Tracy $CXXFLAGS"
+fi
+AC_SUBST(TRACY_PROFILER)
+
 AS_IF([test "$ENABLE_UNIT_TESTS" == "yes"],[
 
 # Look for gtest.

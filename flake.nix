@@ -2,11 +2,14 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
+  # Tracy is in a half-broken situation on 23.05. We need the changes
+  # introduced by https://github.com/NixOS/nixpkgs/pull/261589.
+  inputs.nixpkgs-tracy.url = "github:NixOS/nixpkgs/nixos-23.11-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, nixpkgs-tracy, ... }:
 
     let
       inherit (nixpkgs) lib;
@@ -186,6 +189,19 @@
                 stdenv
                 versionSuffix
                 ;
+              # We have to use the nixos-23.11 tracy version. However,
+              # we can't link the 23.11 lib on our 23.05 nix without
+              # hitting some Glibc ABI incompatibilities.
+              #
+              # To go around that issue, we build the 23.11 tracy
+              # derivation with the 23.05 toolchain/libs.
+              tracy = final.callPackage (nixpkgs-tracy.legacyPackages.${final.hostPlatform.system}.path + "/pkgs/development/tools/tracy") {};
+              # Temporarily enabling the tracy profiler and disabling
+              # install check for convenience.
+              # TODO: remove this before undrafting the PR.
+              enableTracy = true;
+              doCheck = false;
+              doInstallCheck = false;
               officialRelease = false;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
@@ -221,6 +237,10 @@
 
         buildNoGc = forAllSystems (system:
           self.packages.${system}.nix.override { enableGC = false; }
+        );
+
+        buildWithTracy = forAllSystems (system:
+          self.packages.${system}.nix.override { enableTracy = true; }
         );
 
         buildNoTests = forAllSystems (system:
@@ -394,7 +414,7 @@
           stdenvs)));
 
       devShells = let
-        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs: {
+        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; enableTracy = true; }).overrideAttrs (attrs: {
           installFlags = "sysconfdir=$(out)/etc";
           shellHook = ''
             PATH=$prefix/bin:$PATH

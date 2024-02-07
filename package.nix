@@ -34,6 +34,7 @@
 , rapidcheck
 , sqlite
 , util-linux
+, tracy
 , xz
 
 , busybox-sandbox-shell ? null
@@ -75,6 +76,9 @@
 # processes. (When the process exits, the memory is reclaimed; it is
 # only leaked *within* the process.)
 , enableGC ? true
+
+# TODO
+, enableTracy ? false
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
@@ -234,6 +238,7 @@ in {
     rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
+    ++ lib.optional enableTracy tracy
     # There have been issues building these dependencies
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
       (aws-sdk-cpp.override {
@@ -287,6 +292,8 @@ in {
     (lib.enableFeature enableMarkdown "markdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
     (lib.withFeatureAs true "readline-flavor" readlineFlavor)
+  ] ++ lib.optionals (enableTracy) [
+    "--enable-tracy-profiler=${tracy}"
   ] ++ lib.optionals (!forDevShell) [
     "--sysconfdir=/etc"
   ] ++ lib.optionals installUnitTests [
