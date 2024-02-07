@@ -239,6 +239,7 @@ public:
     template<class T, typename... Args>
     [[nodiscard, gnu::noinline]]
     EvalErrorBuilder<T> & error(const Args & ... args) {
+        // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
         return *new EvalErrorBuilder<T>(*this, args...);
     }
 
