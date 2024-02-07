@@ -6,7 +6,7 @@ clearStoreIfPossible
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
 (! nix-instantiate --eval --restrict-eval ./restricted.nix)
-(! nix-instantiate --eval --restrict-eval <(echo '1 + 2'))
+TMPFILE=$(mktemp) && echo '1 + 2' >$TMPFILE && (! nix-instantiate --eval --restrict-eval $TMPFILE)
 
 mkdir -p "$TEST_ROOT/nix"
 cp ./simple.nix "$TEST_ROOT/nix"
