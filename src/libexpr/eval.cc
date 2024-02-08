@@ -844,20 +844,20 @@ void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const
     e.addTrace(positions[pos], hintfmt(s, s2), frame);
 }
 
+template<typename... Args>
 static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
     std::shared_ptr<Pos> && pos,
-    const char * s,
-    const std::string & s2)
+    const Args & ... formatArgs)
 {
     return std::make_unique<DebugTraceStacker>(state,
         DebugTrace {
             .pos = std::move(pos),
             .expr = expr,
             .env = env,
-            .hint = hintfmt(s, s2),
+            .hint = hintfmt(formatArgs...),
             .isError = false
         });
 }
@@ -1320,6 +1320,19 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
+    auto dts = state.debugRepl
+        ? makeDebugTraceStacker(
+            state,
+            *this,
+            env2,
+            getPos()
+                ? std::make_shared<Pos>(state.positions[getPos()])
+                : nullptr,
+            "while evaluating a '%1%' expression",
+            "let"
+        )
+        : nullptr;
+
     body->eval(state, env2, v);
 }
 
@@ -1716,6 +1729,18 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
 void ExprCall::eval(EvalState & state, Env & env, Value & v)
 {
+    auto dts = state.debugRepl
+        ? makeDebugTraceStacker(
+            state,
+            *this,
+            env,
+            getPos()
+                ? std::make_shared<Pos>(state.positions[getPos()])
+                : nullptr,
+            "while calling a function"
+        )
+        : nullptr;
+
     Value vFun;
     fun->eval(state, env, vFun);
 
