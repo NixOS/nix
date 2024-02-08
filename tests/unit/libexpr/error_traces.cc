@@ -26,7 +26,7 @@ namespace nix {
                 try {
                     state.error<EvalError>("puppy").withTrace(noPos, "doggy").debugThrow();
                 } catch (Error & e) {
-                    e.addTrace(state.positions[noPos], "beans", "");
+                    e.addTrace(state.positions[noPos], "beans");
                     throw;
                 }
             } catch (BaseError & e) {
@@ -52,7 +52,7 @@ namespace nix {
             try {
                 state.error<EvalError>("beans").debugThrow();
             } catch (Error & e2) {
-                e.addTrace(state.positions[noPos], "beans2", "");
+                e.addTrace(state.positions[noPos], "beans2");
                 //e2.addTrace(state.positions[noPos], "Something", "");
                 ASSERT_TRUE(e.info().traces.size() == 2);
                 ASSERT_TRUE(e2.info().traces.size() == 0);
@@ -807,7 +807,7 @@ namespace nix {
         ASSERT_TRACE2("genList 1 2",
                       TypeError,
                       HintFmt("expected a function but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
-                      HintFmt("while evaluating the first argument passed to builtins.genList", "an integer"));
+                      HintFmt("while evaluating the first argument passed to builtins.genList"));
 
         // XXX: defered
         // ASSERT_TRACE2("genList (x: x + \"foo\") 2 #TODO",
