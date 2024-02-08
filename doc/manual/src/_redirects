@@ -36,5 +36,6 @@
 /package-management/s3-substituter /store/types/s3-binary-cache-store 301!
 
 /protocols/protocols /protocols 301!
+/json/* /protocols/json/:splat 301!
 
 /release-notes/release-notes /release-notes 301!
