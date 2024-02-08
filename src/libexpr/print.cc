@@ -176,6 +176,7 @@ private:
     void decreaseIndent()
     {
         if (options.prettyPrint()) {
+            assert(indent.size() >= options.prettyIndent);
             indent.resize(indent.size() - options.prettyIndent);
         }
     }
