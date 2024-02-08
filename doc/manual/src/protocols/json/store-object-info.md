@@ -14,11 +14,11 @@ Info about a [store object].
 
 * `narHash`:
 
-  Hash of the [file system object] part of the store object when serialized as a [Nix Archive](#gloss-nar).
+  Hash of the [file system object] part of the store object when serialized as a [Nix Archive].
 
 * `narSize`:
 
-  Size of the [file system object] part of the store object when serialized as a [Nix Archive](#gloss-nar).
+  Size of the [file system object] part of the store object when serialized as a [Nix Archive].
 
 * `references`:
 
@@ -30,6 +30,7 @@ Info about a [store object].
 
 [store path]: @docroot@/glossary.md#gloss-store-path
 [file system object]: @docroot@/store/file-system-object.md
+[Nix Archive]: @docroot@/glossary.md#gloss-nar
 
 ## Impure fields
 

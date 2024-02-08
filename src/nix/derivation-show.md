@@ -52,6 +52,6 @@ By default, this command only shows top-level derivations, but with
 
 [store path]: @docroot@/glossary.md#gloss-store-path
 
-{{#include ../../json/derivation.md}}
+{{#include ../../protocols/json/derivation.md}}
 
 )""
