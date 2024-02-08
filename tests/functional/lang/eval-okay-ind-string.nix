@@ -125,4 +125,22 @@ let
   # Accept dollars at end of strings 
   s17 = ''ending dollar $'' + ''$'' + "\n";
 
-in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17
+  s18 = ''
+    This text uses
+    	tabs
+    for indentation
+  '';
+
+	s19 = ''
+		And this text uses
+		  spaces
+		but is indented with tabs
+	'';
+
+  s20 = ''
+  	This text uses
+	  both spaces and tabs
+		so nothing is stripped
+	'';
+
+in s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19 + s20

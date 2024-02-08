@@ -2,6 +2,7 @@
 ///@file
 
 #include "eval.hh"
+#include <limits>
 
 namespace nix {
 
@@ -173,6 +174,15 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
     return formals;
 }
 
+enum IndentChar {
+    Tab = '\t',
+    Space = ' ',
+};
+
+constexpr bool isIndent(char c) {
+    return c == ' ' || c == '\t';
+}
+
 inline Expr * ParserState::stripIndentation(const PosIdx pos,
     std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
 {
@@ -180,36 +190,34 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
-       the " " in "\n ''" is ignored, but the " " in "\n foo''" is.) */
+       the " " in "\n ''" is ignored, but the " " in "\n foo''" is not.) */
+    std::optional<IndentChar> indentChar = std::nullopt;
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
-    size_t minIndent = 1000000;
+    size_t minIndent = std::numeric_limits<size_t>::max();
     size_t curIndent = 0;
     for (auto & [i_pos, i] : es) {
         auto * str = std::get_if<StringToken>(&i);
         if (!str || !str->hasIndentation) {
             /* Anti-quotations and escaped characters end the current start-of-line whitespace. */
-            if (atStartOfLine) {
-                atStartOfLine = false;
-                if (curIndent < minIndent) minIndent = curIndent;
-            }
+            if (atStartOfLine) minIndent = std::min(minIndent, curIndent);
+            atStartOfLine = false;
             continue;
         }
         for (size_t j = 0; j < str->l; ++j) {
-            if (atStartOfLine) {
-                if (str->p[j] == ' ')
-                    curIndent++;
-                else if (str->p[j] == '\n') {
-                    /* Empty line, doesn't influence minimum
-                       indentation. */
-                    curIndent = 0;
-                } else {
-                    atStartOfLine = false;
-                    if (curIndent < minIndent) minIndent = curIndent;
-                }
-            } else if (str->p[j] == '\n') {
-                atStartOfLine = true;
+            auto cur = str->p[j];
+            if (cur == '\n') {
                 curIndent = 0;
+                atStartOfLine = true;
+                continue;
             }
+            if (!atStartOfLine) continue;
+            if (!isIndent(cur)) {
+                atStartOfLine = false;
+                minIndent = std::min(minIndent, curIndent);
+                continue;
+            }
+            if (!indentChar) indentChar = IndentChar(cur);
+            if (cur == indentChar) ++curIndent;
         }
     }
 
@@ -228,7 +236,7 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
         std::string s2;
         for (size_t j = 0; j < t.l; ++j) {
             if (atStartOfLine) {
-                if (t.p[j] == ' ') {
+                if (t.p[j] == indentChar) {
                     if (curDropped++ >= minIndent)
                         s2 += t.p[j];
                 }
