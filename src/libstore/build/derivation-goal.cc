@@ -708,7 +708,7 @@ void DerivationGoal::tryToBuild()
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                fmt("waiting for lock on %s", yellowtxt(showPaths(lockFiles))));
+                fmt("waiting for lock on %s", magentatxt(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
         return;
     }
@@ -762,7 +762,7 @@ void DerivationGoal::tryToBuild()
                    the wake-up timeout expires. */
                 if (!actLock)
                     actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                        fmt("waiting for a machine to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
+                        fmt("waiting for a machine to build '%s'", magentatxt(worker.store.printStorePath(drvPath))));
                 worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
                 return;
@@ -987,7 +987,7 @@ void DerivationGoal::buildDone()
             diskFull |= cleanupDecideWhetherDiskFull();
 
             auto msg = fmt("builder for '%s' %s",
-                yellowtxt(worker.store.printStorePath(drvPath)),
+                magentatxt(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
             if (!logger->isVerbose() && !logTail.empty()) {
