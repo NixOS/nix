@@ -25,6 +25,7 @@
 #include "flake/flakeref.hh"
 #include "parser-tab.hh"
 
+#include <tracy/Tracy.hpp>
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -54,6 +55,16 @@
 
 #endif
 
+#define TRACY_TRACE(evalstate, expr) \
+    std::ostringstream tracyss; \
+    tracyss << (evalstate).positions[(expr)->getPos()] << " " << (expr)->showExprType();      \
+    ZoneTransientN(nix, tracyss.str().c_str(), true);
+
+#define TRACY_TRACE_TYPE_STR(evalstate, expr, typestr)   \
+    std::ostringstream tracyss; \
+    tracyss << (evalstate).positions[(expr)->getPos()] << " " << typestr;      \
+    ZoneTransientN(nix, tracyss.str().c_str(), true);
+
 using json = nlohmann::json;
 
 namespace nix {
@@ -69,7 +80,6 @@ static char * allocString(size_t size)
     if (!t) throw std::bad_alloc();
     return t;
 }
-
 
 static char * dupString(const char * s)
 {
@@ -1161,6 +1171,7 @@ void EvalState::eval(Expr * e, Value & v)
 
 inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx)
 {
+    TRACY_TRACE_TYPE_STR(*this, e, "bool")
     try {
         Value v;
         e->eval(*this, env, v);
@@ -1179,6 +1190,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
 
 inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx)
 {
+    TRACY_TRACE_TYPE_STR(*this, e, "attrs")
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
@@ -1201,29 +1213,34 @@ void Expr::eval(EvalState & state, Env & env, Value & v)
 
 void ExprInt::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v = this->v;
 }
 
 
 void ExprFloat::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v = this->v;
 }
 
 void ExprString::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v = this->v;
 }
 
 
 void ExprPath::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v = this->v;
 }
 
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v.mkAttrs(state.buildBindings(attrs.size() + dynamicAttrs.size()).finish());
     auto dynamicEnv = &env;
 
@@ -1308,6 +1325,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 
 void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     /* Create a new environment that contains the attributes in this
        `let'. */
     Env & env2(state.allocEnv(attrs->attrs.size()));
@@ -1326,6 +1344,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     state.mkList(v, elems.size());
     for (auto [n, v2] : enumerate(v.listItems()))
         const_cast<Value * &>(v2) = elems[n]->maybeThunk(state, env);
@@ -1334,6 +1353,7 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 
 Value * ExprList::maybeThunk(EvalState & state, Env & env)
 {
+    TRACY_TRACE(state, this);
     if (elems.empty()) {
         return &state.vEmptyList;
     }
@@ -1343,6 +1363,7 @@ Value * ExprList::maybeThunk(EvalState & state, Env & env)
 
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     Value * v2 = state.lookupVar(&env, *this, false);
     state.forceValue(*v2, pos);
     v = *v2;
@@ -1370,6 +1391,7 @@ static std::string showAttrPath(EvalState & state, Env & env, const AttrPath & a
 
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this)
     Value vTmp;
     PosIdx pos2;
     Value * vAttrs = &vTmp;
@@ -1434,6 +1456,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this)
     Value vTmp;
     Value * vAttrs = &vTmp;
 
@@ -1459,6 +1482,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 
 void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this)
     v.mkLambda(&env, this);
 }
 
@@ -1716,6 +1740,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
 void ExprCall::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     Value vFun;
     fun->eval(state, env, vFun);
 
@@ -1793,6 +1818,7 @@ https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbo
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.values[0] = attrs->maybeThunk(state, env);
@@ -1803,6 +1829,7 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     // We cheat in the parser, and pass the position of the condition as the position of the if itself.
     (state.evalBool(env, cond, pos, "while evaluating a branch condition") ? then : else_)->eval(state, env, v);
 }
@@ -1810,6 +1837,7 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
@@ -1821,12 +1849,14 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
 }
 
 
 void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     v.mkBool(state.eqValues(v1, v2, pos, "while testing two values for equality"));
@@ -1835,6 +1865,7 @@ void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     v.mkBool(!state.eqValues(v1, v2, pos, "while testing two values for inequality"));
@@ -1843,6 +1874,7 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v.mkBool(state.evalBool(env, e1, pos, "in the left operand of the AND (&&) operator") && state.evalBool(env, e2, pos, "in the right operand of the AND (&&) operator"));
 }
 
@@ -1855,12 +1887,14 @@ void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     v.mkBool(!state.evalBool(env, e1, pos, "in the left operand of the IMPL (->) operator") || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
 }
 
 
 void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     Value v1, v2;
     state.evalAttrs(env, e1, v1, pos, "in the left operand of the update (//) operator");
     state.evalAttrs(env, e2, v2, pos, "in the right operand of the update (//) operator");
@@ -1899,6 +1933,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     Value v1; e1->eval(state, env, v1);
     Value v2; e2->eval(state, env, v2);
     Value * lists[2] = { &v1, &v2 };
@@ -1937,6 +1972,7 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
 
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     NixStringContext context;
     std::vector<BackedStringView> s;
     size_t sSize = 0;
@@ -2029,12 +2065,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     state.mkPos(v, pos);
 }
 
 
 void ExprBlackHole::eval(EvalState & state, Env & env, Value & v)
 {
+    TRACY_TRACE(state, this);
     state.error("infinite recursion encountered")
         .debugThrow<InfiniteRecursionError>();
 }

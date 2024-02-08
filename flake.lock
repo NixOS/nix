@@ -64,12 +64,29 @@
         "type": "github"
       }
     },
+    "nixpkgs-tracy": {
+      "locked": {
+        "lastModified": 1707205788,
+        "narHash": "sha256-dFPctGYh7cNPAuJQY9i4+1/M+LdrRDpk0RRwpClEQ4w=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "e311f423a6e56505afae9d4b621759826e7270c0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-23.11-small",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-compat": "flake-compat",
         "libgit2": "libgit2",
         "nixpkgs": "nixpkgs",
-        "nixpkgs-regression": "nixpkgs-regression"
+        "nixpkgs-regression": "nixpkgs-regression",
+        "nixpkgs-tracy": "nixpkgs-tracy"
       }
     }
   },

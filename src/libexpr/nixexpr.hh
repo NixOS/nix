@@ -156,6 +156,7 @@ struct Expr
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol name);
     virtual PosIdx getPos() const { return noPos; }
+    virtual const char* showExprType() const { return "undefined"; }
 };
 
 #define COMMON_METHODS \
@@ -168,6 +169,7 @@ struct ExprInt : Expr
     Value v;
     ExprInt(NixInt n) { v.mkInt(n); };
     Value * maybeThunk(EvalState & state, Env & env) override;
+    const char* showExprType() const { return "int"; }
     COMMON_METHODS
 };
 
@@ -176,6 +178,7 @@ struct ExprFloat : Expr
     Value v;
     ExprFloat(NixFloat nf) { v.mkFloat(nf); };
     Value * maybeThunk(EvalState & state, Env & env) override;
+    const char* showExprType() const { return "float"; }
     COMMON_METHODS
 };
 
@@ -185,6 +188,7 @@ struct ExprString : Expr
     Value v;
     ExprString(std::string &&s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env) override;
+    const char* showExprType() const { return "string"; }
     COMMON_METHODS
 };
 
@@ -198,6 +202,7 @@ struct ExprPath : Expr
         v.mkPath(&*accessor, this->s.c_str());
     }
     Value * maybeThunk(EvalState & state, Env & env) override;
+    const char* showExprType() const { return "path"; }
     COMMON_METHODS
 };
 
@@ -229,6 +234,7 @@ struct ExprVar : Expr
     ExprVar(const PosIdx & pos, Symbol name) : pos(pos), name(name) { };
     Value * maybeThunk(EvalState & state, Env & env) override;
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "var"; }
     COMMON_METHODS
 };
 
@@ -240,6 +246,7 @@ struct ExprSelect : Expr
     ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "select"; }
     COMMON_METHODS
 };
 
@@ -249,6 +256,7 @@ struct ExprOpHasAttr : Expr
     AttrPath attrPath;
     ExprOpHasAttr(Expr * e, AttrPath attrPath) : e(e), attrPath(std::move(attrPath)) { };
     PosIdx getPos() const override { return e->getPos(); }
+    const char* showExprType() const { return "op_has_attr"; }
     COMMON_METHODS
 };
 
@@ -278,6 +286,7 @@ struct ExprAttrs : Expr
     ExprAttrs(const PosIdx &pos) : recursive(false), pos(pos) { };
     ExprAttrs() : recursive(false) { };
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "attrs"; }
     COMMON_METHODS
 };
 
@@ -285,6 +294,7 @@ struct ExprList : Expr
 {
     std::vector<Expr *> elems;
     ExprList() { };
+    const char* showExprType() const { return "list"; }
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env) override;
 
@@ -345,6 +355,7 @@ struct ExprLambda : Expr
     std::string showNamePos(const EvalState & state) const;
     inline bool hasFormals() const { return formals != nullptr; }
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "lambda"; }
     COMMON_METHODS
 };
 
@@ -357,6 +368,7 @@ struct ExprCall : Expr
         : fun(fun), args(args), pos(pos)
     { }
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "call"; }
     COMMON_METHODS
 };
 
@@ -365,6 +377,7 @@ struct ExprLet : Expr
     ExprAttrs * attrs;
     Expr * body;
     ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
+    const char* showExprType() const { return "let"; }
     COMMON_METHODS
 };
 
@@ -376,6 +389,7 @@ struct ExprWith : Expr
     ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "with"; }
     COMMON_METHODS
 };
 
@@ -385,6 +399,7 @@ struct ExprIf : Expr
     Expr * cond, * then, * else_;
     ExprIf(const PosIdx & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "if"; }
     COMMON_METHODS
 };
 
@@ -394,6 +409,7 @@ struct ExprAssert : Expr
     Expr * cond, * body;
     ExprAssert(const PosIdx & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "assert"; }
     COMMON_METHODS
 };
 
@@ -422,6 +438,7 @@ struct ExprOpNot : Expr
         } \
         void eval(EvalState & state, Env & env, Value & v) override; \
         PosIdx getPos() const override { return pos; } \
+        const char* showExprType() const { return #name; } \
     };
 
 MakeBinOp(ExprOpEq, "==")
@@ -440,6 +457,7 @@ struct ExprConcatStrings : Expr
     ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> * es)
         : pos(pos), forceString(forceString), es(es) { };
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "concat_strings"; }
     COMMON_METHODS
 };
 
@@ -448,6 +466,7 @@ struct ExprPos : Expr
     PosIdx pos;
     ExprPos(const PosIdx & pos) : pos(pos) { };
     PosIdx getPos() const override { return pos; }
+    const char* showExprType() const { return "pos"; }
     COMMON_METHODS
 };
 
@@ -457,6 +476,7 @@ struct ExprBlackHole : Expr
     void show(const SymbolTable & symbols, std::ostream & str) const override {}
     void eval(EvalState & state, Env & env, Value & v) override;
     void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+    const char* showExprType() const { return "blackhole"; }
 };
 
 extern ExprBlackHole eBlackHole;
