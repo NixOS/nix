@@ -71,7 +71,7 @@ struct PrintOptions
     /**
      * True if pretty-printing is enabled.
      */
-    inline bool prettyPrint()
+    inline bool shouldPrettyPrint()
     {
         return prettyIndent > 0;
     }

@@ -168,14 +168,14 @@ private:
 
     void increaseIndent()
     {
-        if (options.prettyPrint()) {
+        if (options.shouldPrettyPrint()) {
             indent.append(options.prettyIndent, ' ');
         }
     }
 
     void decreaseIndent()
     {
-        if (options.prettyPrint()) {
+        if (options.shouldPrettyPrint()) {
             assert(indent.size() >= options.prettyIndent);
             indent.resize(indent.size() - options.prettyIndent);
         }
@@ -279,7 +279,7 @@ private:
 
     bool shouldPrettyPrintAttrs(AttrVec & v)
     {
-        if (!options.prettyPrint() || v.empty()) {
+        if (!options.shouldPrettyPrint() || v.empty()) {
             return false;
         }
 
@@ -356,7 +356,7 @@ private:
 
     bool shouldPrettyPrintList(std::span<Value * const> list)
     {
-        if (!options.prettyPrint() || list.empty()) {
+        if (!options.shouldPrettyPrint() || list.empty()) {
             return false;
         }
 
