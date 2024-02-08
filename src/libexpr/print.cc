@@ -511,4 +511,11 @@ std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer)
     return output;
 }
 
+template<>
+hintformat & hintformat::operator%(const ValuePrinter & value)
+{
+        fmt % value;
+        return *this;
+}
+
 }
