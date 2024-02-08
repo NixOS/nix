@@ -255,9 +255,7 @@ void NixRepl::mainLoop()
         notice("Nix %1%%2%\nType :? for help.", nixVersion, debuggerNotice);
     }
 
-    if (isFirstRepl) {
-        isFirstRepl = false;
-    }
+    isFirstRepl = false;
 
     loadFiles();
 
