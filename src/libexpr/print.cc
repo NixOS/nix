@@ -181,6 +181,21 @@ private:
         }
     }
 
+    /**
+     * Print a space (for separating items or attributes).
+     *
+     * If pretty-printing is enabled, a newline and the current `indent` is
+     * printed instead.
+     */
+    void printSpace(bool prettyPrint)
+    {
+        if (prettyPrint) {
+            output << "\n" << indent;
+        } else {
+            output << " ";
+        }
+    }
+
     void printRepeated()
     {
         if (options.ansiColors)
@@ -324,11 +339,7 @@ private:
             auto prettyPrint = shouldPrettyPrintAttrs(sorted);
 
             for (auto & i : sorted) {
-                if (prettyPrint) {
-                    output << "\n" << indent;
-                } else {
-                    output << " ";
-                }
+                printSpace(prettyPrint);
 
                 if (attrsPrinted >= options.maxAttrs) {
                     printElided(sorted.size() - attrsPrinted, "attribute", "attributes");
@@ -343,11 +354,7 @@ private:
             }
 
             decreaseIndent();
-            if (prettyPrint) {
-                output << "\n" << indent;
-            } else {
-                output << " ";
-            }
+            printSpace(prettyPrint);
             output << "}";
         } else {
             output << "{ ... }";
@@ -389,11 +396,7 @@ private:
             auto listItems = v.listItems();
             auto prettyPrint = shouldPrettyPrintList(listItems);
             for (auto elem : listItems) {
-                if (prettyPrint) {
-                    output << "\n" << indent;
-                } else {
-                    output << " ";
-                }
+                printSpace(prettyPrint);
 
                 if (listItemsPrinted >= options.maxListItems) {
                     printElided(listItems.size() - listItemsPrinted, "item", "items");
@@ -409,11 +412,7 @@ private:
             }
 
             decreaseIndent();
-            if (prettyPrint) {
-                output << "\n" << indent;
-            } else {
-                output << " ";
-            }
+            printSpace(prettyPrint);
             output << "]";
         } else {
             output << "[ ... ]";
