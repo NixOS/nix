@@ -431,8 +431,6 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             // Quietly ignore parse errors.
         } catch (EvalError & e) {
             // Quietly ignore evaluation errors.
-        } catch (UndefinedVarError & e) {
-            // Quietly ignore undefined variable errors.
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
         }

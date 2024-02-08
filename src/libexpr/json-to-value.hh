@@ -1,13 +1,16 @@
 #pragma once
 ///@file
 
-#include "eval.hh"
+#include "error.hh"
 
 #include <string>
 
 namespace nix {
 
-MakeError(JSONParseError, EvalError);
+class EvalState;
+struct Value;
+
+MakeError(JSONParseError, Error);
 
 void parseJSON(EvalState & state, const std::string_view & s, Value & v);
 

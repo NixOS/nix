@@ -848,10 +848,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto templateDir = templateDirAttr->getString();
 
         if (!store->isInStore(templateDir))
-            throw TypeError(
+            evalState->error<TypeError>(
                 "'%s' was not found in the Nix store\n"
                 "If you've set '%s' to a string, try using a path instead.",
-                templateDir, templateDirAttr->getAttrPathStr());
+                templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
 
         std::vector<Path> changedFiles;
         std::vector<Path> conflictedFiles;
@@ -1321,7 +1321,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 {
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
-                        throw EvalError("not an app definition");
+                        state->error<EvalError>("not an app definition").debugThrow();
                     if (json) {
                         j.emplace("type", "app");
                     } else {

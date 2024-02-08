@@ -66,7 +66,7 @@ inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, co
     throw ParseError({
          .msg = hintfmt("attribute '%1%' already defined at %2%",
              showAttrPath(symbols, attrPath), positions[prevPos]),
-         .errPos = positions[pos]
+         .pos = positions[pos]
     });
 }
 
@@ -74,7 +74,7 @@ inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx pre
 {
     throw ParseError({
         .msg = hintfmt("attribute '%1%' already defined at %2%", symbols[attr], positions[prevPos]),
-        .errPos = positions[pos]
+        .pos = positions[pos]
     });
 }
 
@@ -155,13 +155,13 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
     if (duplicate)
         throw ParseError({
             .msg = hintfmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
-            .errPos = positions[duplicate->second]
+            .pos = positions[duplicate->second]
         });
 
     if (arg && formals->has(arg))
         throw ParseError({
             .msg = hintfmt("duplicate formal function argument '%1%'", symbols[arg]),
-            .errPos = positions[pos]
+            .pos = positions[pos]
         });
 
     return formals;
