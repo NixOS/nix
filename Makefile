@@ -47,6 +47,17 @@ makefiles += \
   tests/functional/plugins/local.mk
 endif
 
+# Some makefiles require access to built programs and must be included late.
+makefiles-late =
+
+ifeq ($(ENABLE_DOC_GEN), yes)
+makefiles-late += doc/manual/local.mk
+endif
+
+ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
+makefiles-late += doc/internal-api/local.mk
+endif
+
 # Miscellaneous global Flags
 
 OPTIMIZE = 1
@@ -95,24 +106,16 @@ installcheck:
 	@exit 1
 endif
 
-# Documentation or else fallback stub rules.
-#
-# The documentation makefiles be included after `mk/lib.mk` so rules
-# refer to variables defined by `mk/lib.mk`. Rules are not "lazy" like
-# variables, unfortunately.
+# Documentation fallback stub rules.
 
-ifeq ($(ENABLE_DOC_GEN), yes)
-$(eval $(call include-sub-makefile, doc/manual/local.mk))
-else
+ifneq ($(ENABLE_DOC_GEN), yes)
 .PHONY: manual-html manpages
 manual-html manpages:
 	@echo "Generated docs are disabled. Configure without '--disable-doc-gen', or avoid calling 'make manpages' and 'make manual-html'."
 	@exit 1
 endif
 
-ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
-$(eval $(call include-sub-makefile, doc/internal-api/local.mk))
-else
+ifneq ($(ENABLE_INTERNAL_API_DOCS), yes)
 .PHONY: internal-api-html
 internal-api-html:
 	@echo "Internal API docs are disabled. Configure with '--enable-internal-api-docs', or avoid calling 'make internal-api-html'."
