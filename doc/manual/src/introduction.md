@@ -111,7 +111,7 @@ It offers mechanisms to **compose or customise software** according to your need
 
 ## NixOS Linux distribution
 
-[NixOS](https://github.com/NixOS/nixpkgs/tree/master/nixos) is a Linux distribution based on Nix and Nixpkgs, and allows you to **manage the entire system configuration declaratively** through the Nix language.
+[NixOS](https://github.com/NixOS/nixpkgs/tree/master/nixos) is a Linux distribution based on Nix and Nixpkgs, and allows you to **manage the entire system configuration** through the Nix language in a central configuration file.
 
 This means, among other things, that it is easy to configure settings for all programs and services uniformly, and recreate them any time from a text file, by rolling back to an earlier state, deploying it directly to remote machines, or building containers and virtual machines efficienly.
 
