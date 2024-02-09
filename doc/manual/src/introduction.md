@@ -39,7 +39,7 @@ This makes possible unique features without compromising on efficiency.
 
 You can have multiple versions or variants of a package installed at the same time.
 Different files always end up on different paths in the Nix store, so they don’t interfere with each other.
-This circumvents the “DLL hell”.
+This circumvents the “dependency hell”.
 
 An important consequence is that upgrading or uninstalling an application cannot break other applications, since these operations never “destructively” update or delete files that are used otherwise.
 
