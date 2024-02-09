@@ -222,17 +222,11 @@ protected:
 template<typename T>
 struct SettingHandler
 {
-    /**
-     * The `bool` argument is `true` if the value is being set to the default
-     * value.
-     *
-     * The `T &` argument is the value itself.
-     */
-    std::function<void(bool, T &)> fun;
+    std::function<void(T &)> fun = [](T & val) {};
 
     SettingHandler() = default;
 
-    SettingHandler(std::function<void(bool, T &)> && fun)
+    SettingHandler(std::function<void(T &)> && fun)
         : fun(std::move(fun))
     { }
 
@@ -294,9 +288,7 @@ public:
         , handler(handler)
     {
         options->addSetting(this);
-        if (handler) {
-            handler.fun(true, value);
-        }
+        handler.fun(value);
     }
 
     operator const T &() const { return value; }
@@ -314,9 +306,7 @@ public:
 
     virtual void assign(const T & v) {
         value = v;
-        if (handler) {
-            handler.fun(false, value);
-        }
+        handler.fun(value);
     }
 
     void operator =(const T & v) { assign(v); }
