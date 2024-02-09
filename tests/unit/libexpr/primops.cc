@@ -147,7 +147,7 @@ namespace nix {
     TEST_F(PrimOpTest, getAttrNotFound) {
         // FIXME: TypeError is really bad here, also the error wording is worse
         // than on Nix <=2.3
-        ASSERT_THROW(eval("builtins.getAttr \"y\" { }"), TypeError);
+        ASSERT_THROW(eval("builtins.getAttr \"y\" { }"), EvalError);
     }
 
     TEST_F(PrimOpTest, unsafeGetAttrPos) {

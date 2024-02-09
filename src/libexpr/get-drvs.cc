@@ -49,7 +49,11 @@ std::string PackageInfo::queryName() const
 {
     if (name == "" && attrs) {
         auto i = attrs->find(state->sName);
-        if (i == attrs->end()) state->error<TypeError>("derivation name missing").debugThrow();
+        if (i == attrs->end()) {
+            Value v;
+            v.mkAttrs(attrs);
+            state->error<MissingAttrError>(state->sName, v).debugThrow();
+        }
         name = state->forceStringNoCtx(*i->value, noPos, "while evaluating the 'name' attribute of a derivation");
     }
     return name;
@@ -397,7 +401,7 @@ static void getDerivations(EvalState & state, Value & vIn,
     }
 
     else
-        state.error<TypeError>("expression does not evaluate to a derivation (or a set or list of those)").debugThrow();
+        state.error<EvalError>("expression does not evaluate to a derivation (or a set or list of those)").debugThrow();
 }
 
 

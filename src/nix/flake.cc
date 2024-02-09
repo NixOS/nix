@@ -858,7 +858,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto templateDir = templateDirAttr->getString();
 
         if (!store->isInStore(templateDir))
-            evalState->error<TypeError>(
+            evalState->error<EvalError>(
                 "'%s' was not found in the Nix store\n"
                 "If you've set '%s' to a string, try using a path instead.",
                 templateDir, templateDirAttr->getAttrPathStr()).debugThrow();

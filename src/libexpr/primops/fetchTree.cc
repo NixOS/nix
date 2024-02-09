@@ -129,7 +129,8 @@ static void fetchTree(
                 attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
             }
             else
-                state.error<TypeError>("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                // TODO: This should be a TypeError.
+                state.error<EvalError>("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     state.symbols[attr.name], showType(*attr.value)).debugThrow();
         }
 

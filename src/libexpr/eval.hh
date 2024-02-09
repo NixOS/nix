@@ -240,7 +240,7 @@ public:
 
     template<class T, typename... Args>
     [[nodiscard, gnu::noinline]]
-    EvalErrorBuilder<T> & error(const Args & ... args) {
+    EvalErrorBuilder<T> & error(Args && ... args) {
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
         return *new EvalErrorBuilder<T>(*this, args...);
     }
@@ -767,15 +767,6 @@ struct DebugTraceStacker {
     EvalState & evalState;
     DebugTrace trace;
 };
-
-/**
- * @return A string representing the type of the value `v`.
- *
- * @param withArticle Whether to begin with an english article, e.g. "an
- * integer" vs "integer".
- */
-std::string_view showType(ValueType type, bool withArticle = true);
-std::string showType(const Value & v);
 
 /**
  * If `path` refers to a directory, then append "/default.nix".

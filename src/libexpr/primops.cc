@@ -634,7 +634,9 @@ static Bindings::iterator getAttr(
 {
     Bindings::iterator value = attrSet->find(attrSym);
     if (value == attrSet->end()) {
-        state.error<TypeError>("attribute '%s' missing", state.symbols[attrSym]).withTrace(noPos, errorCtx).debugThrow();
+        Value v;
+        v.mkAttrs(attrSet);
+        state.error<MissingAttrError>(attrSym, v).withTrace(noPos, errorCtx).debugThrow();
     }
     return value;
 }
@@ -2835,7 +2837,7 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * arg
         return;
     }
     if (!args[0]->isLambda())
-        state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
+        state.error<TypeError>(nFunction, *args[0]).atPos(pos).debugThrow();
 
     if (!args[0]->lambda.fun->hasFormals()) {
         v.mkAttrs(&state.emptyBindings);

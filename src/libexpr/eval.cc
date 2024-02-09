@@ -128,55 +128,6 @@ void Value::print(EvalState & state, std::ostream & str, PrintOptions options)
     printValue(state, str, *this, options);
 }
 
-const Value * getPrimOp(const Value &v) {
-    const Value * primOp = &v;
-    while (primOp->isPrimOpApp()) {
-        primOp = primOp->primOpApp.left;
-    }
-    assert(primOp->isPrimOp());
-    return primOp;
-}
-
-std::string_view showType(ValueType type, bool withArticle)
-{
-    #define WA(a, w) withArticle ? a " " w : w
-    switch (type) {
-        case nInt: return WA("an", "integer");
-        case nBool: return WA("a", "Boolean");
-        case nString: return WA("a", "string");
-        case nPath: return WA("a", "path");
-        case nNull: return "null";
-        case nAttrs: return WA("a", "set");
-        case nList: return WA("a", "list");
-        case nFunction: return WA("a", "function");
-        case nExternal: return WA("an", "external value");
-        case nFloat: return WA("a", "float");
-        case nThunk: return WA("a", "thunk");
-    }
-    abort();
-}
-
-
-std::string showType(const Value & v)
-{
-    // Allow selecting a subset of enum values
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wswitch-enum"
-    switch (v.internalType) {
-        case tString: return v.string.context ? "a string with context" : "a string";
-        case tPrimOp:
-            return fmt("the built-in function '%s'", std::string(v.primOp->name));
-        case tPrimOpApp:
-            return fmt("the partially applied built-in function '%s'", std::string(getPrimOp(v)->primOp->name));
-        case tExternal: return v.external->showType();
-        case tThunk: return v.isBlackhole() ? "a black hole" : "a thunk";
-        case tApp: return "a function application";
-    default:
-        return std::string(showType(v.type()));
-    }
-    #pragma GCC diagnostic pop
-}
-
 PosIdx Value::determinePos(const PosIdx pos) const
 {
     // Allow selecting a subset of enum values
@@ -1153,11 +1104,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
         Value v;
         e->eval(*this, env, v);
         if (v.type() != nBool)
-            error<TypeError>(
-                 "expected a Boolean but found %1%: %2%",
-                 showType(v),
-                 ValuePrinter(*this, v, errorPrintOptions)
-             ).atPos(pos).withFrame(env, *e).debugThrow();
+            error<TypeError>(nBool, v).atPos(pos).withFrame(env, *e).debugThrow();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -1171,11 +1118,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
-            error<TypeError>(
-                "expected a set but found %1%: %2%",
-                showType(v),
-                ValuePrinter(*this, v, errorPrintOptions)
-            ).withFrame(env, *e).debugThrow();
+            error<TypeError>(nAttrs, v).withFrame(env, *e).debugThrow();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -1565,7 +1508,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     auto j = args[0]->attrs->get(i.name);
                     if (!j) {
                         if (!i.def) {
-                            error<TypeError>("function '%1%' called without required argument '%2%'",
+                            error<EvalError>("function '%1%' called without required argument '%2%'",
                                              (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
                                              symbols[i.name])
                                     .atPos(lambda.pos)
@@ -1591,7 +1534,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                             for (auto & formal : lambda.formals->formals)
                                 formalNames.insert(symbols[formal.name]);
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
-                            error<TypeError>("function '%1%' called with unexpected argument '%2%'",
+                            error<EvalError>("function '%1%' called with unexpected argument '%2%'",
                                              (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
                                              symbols[i.name])
                                 .atPos(lambda.pos)
@@ -1729,10 +1672,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
 
         else
-            error<TypeError>(
-                    "attempt to call something which is not a function but %1%: %2%",
-                    showType(vCur),
-                    ValuePrinter(*this, vCur, errorPrintOptions))
+            error<TypeError>(nFunction, vCur)
                 .atPos(pos)
                 .debugThrow();
     }
@@ -2138,11 +2078,7 @@ NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCt
     try {
         forceValue(v, pos);
         if (v.type() != nInt)
-            error<TypeError>(
-                "expected an integer but found %1%: %2%",
-                showType(v),
-                ValuePrinter(*this, v, errorPrintOptions)
-            ).atPos(pos).debugThrow();
+            error<TypeError>(nInt, v).atPos(pos).debugThrow();
         return v.integer;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2160,11 +2096,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
         if (v.type() == nInt)
             return v.integer;
         else if (v.type() != nFloat)
-            error<TypeError>(
-                "expected a float but found %1%: %2%",
-                showType(v),
-                ValuePrinter(*this, v, errorPrintOptions)
-            ).atPos(pos).debugThrow();
+            error<TypeError>(nFloat, v).atPos(pos).debugThrow();
         return v.fpoint;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2178,11 +2110,7 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
     try {
         forceValue(v, pos);
         if (v.type() != nBool)
-            error<TypeError>(
-                "expected a Boolean but found %1%: %2%",
-                showType(v),
-                ValuePrinter(*this, v, errorPrintOptions)
-            ).atPos(pos).debugThrow();
+            error<TypeError>(nBool, v).atPos(pos).debugThrow();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2204,11 +2132,7 @@ void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view erro
     try {
         forceValue(v, pos);
         if (v.type() != nFunction && !isFunctor(v))
-            error<TypeError>(
-                "expected a function but found %1%: %2%",
-                showType(v),
-                ValuePrinter(*this, v, errorPrintOptions)
-            ).atPos(pos).debugThrow();
+            error<TypeError>(nFunction, v).atPos(pos).debugThrow();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -2221,11 +2145,7 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
     try {
         forceValue(v, pos);
         if (v.type() != nString)
-            error<TypeError>(
-                "expected a string but found %1%: %2%",
-                showType(v),
-                ValuePrinter(*this, v, errorPrintOptions)
-            ).atPos(pos).debugThrow();
+            error<TypeError>(nString, v).atPos(pos).debugThrow();
         return v.string_view();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -2319,7 +2239,7 @@ BackedStringView EvalState::coerceToString(
             return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
         if (i == v.attrs->end()) {
-            error<TypeError>(
+            error<EvalError>(
                 "cannot coerce %1% to a string: %2%",
                 showType(v),
                 ValuePrinter(*this, v, errorPrintOptions)
@@ -2369,7 +2289,7 @@ BackedStringView EvalState::coerceToString(
         }
     }
 
-    error<TypeError>("cannot coerce %1% to a string: %2%",
+    error<EvalError>("cannot coerce %1% to a string: %2%",
         showType(v),
         ValuePrinter(*this, v, errorPrintOptions)
     )
@@ -2921,7 +2841,7 @@ Expr * EvalState::parse(
 
 std::string ExternalValueBase::coerceToString(EvalState & state, const PosIdx & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
-    state.error<TypeError>(
+    state.error<EvalError>(
         "cannot coerce %1% to a string: %2%", showType(), *this
     ).atPos(pos).debugThrow();
 }

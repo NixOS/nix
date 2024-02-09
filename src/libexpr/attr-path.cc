@@ -57,18 +57,18 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
         Value * vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
-        state.forceValue(*v, noPos);
+        state.forceValue(*v, pos);
 
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
 
         if (!attrIndex) {
 
-            if (v->type() != nAttrs)
-                state.error<TypeError>(
-                    "the expression selected by the selection path '%1%' should be a set but is %2%",
-                    attrPath,
-                    showType(*v)).debugThrow();
+            if (v->type() != nAttrs) {
+                state.error<TypeError>(nAttrs, *v)
+                    .addTrace(pos, HintFmt("while evaluating the selection path %1%", attrPath))
+                    .debugThrow();
+            }
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
@@ -88,10 +88,9 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
         else {
 
             if (!v->isList())
-                state.error<TypeError>(
-                    "the expression selected by the selection path '%1%' should be a list but is %2%",
-                    attrPath,
-                    showType(*v)).debugThrow();
+                state.error<TypeError>(nList, *v)
+                    .addTrace(pos, HintFmt("while evaluating the selection path %1%", attrPath))
+                    .debugThrow();
             if (*attrIndex >= v->listSize())
                 throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", *attrIndex, attrPath);
 

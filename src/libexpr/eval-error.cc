@@ -101,5 +101,18 @@ template class EvalErrorBuilder<MissingArgumentError>;
 template class EvalErrorBuilder<InfiniteRecursionError>;
 template class EvalErrorBuilder<CachedEvalError>;
 template class EvalErrorBuilder<InvalidPathError>;
+template class EvalErrorBuilder<MissingAttrError>;
+
+
+MissingAttrError::MissingAttrError(EvalState & state, Symbol attr, Value & actual)
+    : EvalError(
+        state,
+        "attribute '%1%' missing: %2%",
+        state.symbols[attr],
+        ValuePrinter(state, actual, errorPrintOptions))
+    , attr(attr)
+    , actual(actual)
+{
+}
 
 }
