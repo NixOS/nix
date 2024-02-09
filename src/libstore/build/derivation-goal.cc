@@ -891,7 +891,7 @@ void runPostBuildHook(
     if (hook == "")
         return;
 
-    Activity act(logger, lvlInfo, actPostBuildHook,
+    Activity act(logger, lvlTalkative, actPostBuildHook,
             fmt("running post-build-hook '%s'", settings.postBuildHook),
             Logger::Fields{store.printStorePath(drvPath)});
     PushActivity pact(act.id);
