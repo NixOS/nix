@@ -512,7 +512,7 @@ std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer)
 }
 
 template<>
-hintformat & hintformat::operator%(const ValuePrinter & value)
+HintFmt & HintFmt::operator%(const ValuePrinter & value)
 {
         fmt % value;
         return *this;

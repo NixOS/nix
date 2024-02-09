@@ -63,7 +63,7 @@ void printCodeLines(std::ostream & out,
 
 struct Trace {
     std::shared_ptr<Pos> pos;
-    hintformat hint;
+    HintFmt hint;
     bool frame;
 };
 
@@ -74,7 +74,7 @@ inline bool operator>=(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;
-    hintformat msg;
+    HintFmt msg;
     std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
 
@@ -113,20 +113,20 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...), .status = status }
+        : err { .level = lvlError, .msg = HintFmt(args...), .status = status }
     { }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(fs, args...) }
+        : err { .level = lvlError, .msg = HintFmt(fs, args...) }
     { }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
+        : err { .level = lvlError, .msg = HintFmt(args...), .suggestions = sug }
     { }
 
-    BaseError(hintformat hint)
+    BaseError(HintFmt hint)
         : err { .level = lvlError, .msg = hint }
     { }
 
@@ -159,10 +159,10 @@ public:
     template<typename... Args>
     void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
     {
-        addTrace(std::move(e), hintfmt(std::string(fs), args...));
+        addTrace(std::move(e), HintFmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame = false);
+    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
 
@@ -214,8 +214,8 @@ public:
     SysError(int errNo, const Args & ... args)
         : SystemError(""), errNo(errNo)
     {
-        auto hf = hintfmt(args...);
-        err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
+        auto hf = HintFmt(args...);
+        err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), strerror(errNo));
     }
 
     /**
