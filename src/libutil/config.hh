@@ -223,20 +223,6 @@ template<typename T>
 struct SettingHandler
 {
     std::function<void(T &)> fun = [](T & val) {};
-
-    SettingHandler() = default;
-
-    SettingHandler(std::function<void(T &)> && fun)
-        : fun(std::move(fun))
-    { }
-
-    operator bool() const {
-        if (fun) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 };
 
 /**
