@@ -3023,7 +3023,8 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
             if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
                 if (auto store = dynamic_cast<LocalGranularAccessStore*>(&worker.store))
                     if (store->effectiveUser) {
-                        chown(tmpDir.c_str(), store->effectiveUser->uid, info.st_gid);
+                        if (chown(tmpDir.c_str(), store->effectiveUser->uid, info.st_gid) == -1)
+                            throw SysError("cannot change ownership %s", tmpDir.c_str());
                         chowned = true;
                     }
             if (!chowned)

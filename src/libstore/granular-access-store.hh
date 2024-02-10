@@ -57,6 +57,17 @@ struct GranularAccessStore : public virtual Store
     virtual void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status, const bool & ensureAccessCheck) = 0;
     virtual AccessStatus getAccessStatus(const StoreObject & storeObject) = 0;
 
+    virtual void setAccessStatus(const std::map<StorePath, AccessStatus> pathMap)
+    {
+        StorePathSet pathSet;
+        for (auto [path, _] : pathMap)
+            pathSet.insert(path);
+        auto paths = topoSortPaths(pathSet);
+        for (auto path : paths) {
+            setAccessStatus(path, pathMap.at(path), true);
+        }
+    }
+
     virtual std::set<AccessControlGroup> getSubjectGroupsUncached(AccessControlSubject subject) = 0;
 
     std::set<AccessControlGroup> getSubjectGroups(AccessControlSubject subject)

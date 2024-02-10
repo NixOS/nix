@@ -371,7 +371,7 @@ private:
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
-    void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
+    void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers, bool accessCheck = true);
 
     /**
      * Add signatures to a ValidPathInfo or Realisation using the secret keys

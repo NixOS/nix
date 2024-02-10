@@ -858,11 +858,11 @@ StorePathSet LocalStore::queryAllValidPaths()
 }
 
 
-void LocalStore::queryReferrers(State & state, const StorePath & path, StorePathSet & referrers)
+void LocalStore::queryReferrers(State & state, const StorePath & path, StorePathSet & referrers, bool accessCheck)
 {
     auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));
 
-    if (!canAccess(path)) throw AccessDenied("Access Denied");
+    if (accessCheck && !canAccess(path)) throw AccessDenied("Access Denied");
 
     while (useQueryReferrers.next())
         referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
@@ -1086,7 +1086,7 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
 
             auto info = promise.get_future().get();
 
-            if (info){
+            if (info) {
                 for (auto reference : info->references) {
                     if (reference == storePath) continue;
                     auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
@@ -1101,6 +1101,28 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
                         for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
                         throw AccessDenied("can not allow %s access to %s because it references path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(reference));
                     }
+                }
+            }
+
+            StorePathSet referrers;
+            retrySQLite<void>([&]() {
+                auto state(_state.lock());
+                queryReferrers(*state, storePath, referrers, false);
+            });
+
+            for (auto referrer : referrers) {
+                if (referrer == storePath) continue;
+                auto otherStatus = getAccessStatus(referrer);
+                if (!status.isProtected) continue;
+                if (!otherStatus.isProtected)
+                    throw AccessDenied("can not make %s protected because it is referenced by a non-protected path %s", path, printStorePath(referrer));
+                std::vector<AccessControlEntity> difference;
+                std::set_difference(otherStatus.entities.begin(), otherStatus.entities.end(), status.entities.begin(), status.entities.end(),std::inserter(difference, difference.begin()));
+
+                if (! difference.empty()) {
+                    std::string entities;
+                    for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
+                    throw AccessDenied("can not deny %s access to %s because it is referenced by a path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(referrer));
                 }
             }
         }

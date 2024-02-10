@@ -1460,6 +1460,8 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                 state.forceAttrs(*outputs->value, noPos,
                                 "while evaluating the `__permissions.outputs` "
                                 "attribute passed to builtins.derivationStrict");
+                auto outputMap = state.store->queryPartialDerivationOutputMap(drvPath);
+                std::map<StorePath, LocalGranularAccessStore::AccessStatus> accessMap;
                 for (auto & output : *outputs->value->attrs) {
                     if (!drv.outputs.contains(state.symbols[output.name]))
                         state.debugThrowLastTrace(EvalError({
@@ -1468,8 +1470,13 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                         }));
                     LocalGranularAccessStore::AccessStatus status;
                     readAccessStatus(state, output, &status, fmt("__permissions.outputs.%s", state.symbols[output.name]), "builtins.derivationStrict");
-                    require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, std::string(state.symbols[{output.name}])}, status, true);
+                    auto outputName = std::string(state.symbols[{output.name}]);
+                    if (auto path = outputMap.at(outputName))
+                        accessMap[*path] = status;
+                    else
+                        require<LocalGranularAccessStore>(*state.store).setAccessStatus(StoreObjectDerivationOutput {drvPath, outputName}, status, true);
                 }
+                require<LocalGranularAccessStore>(*state.store).setAccessStatus(accessMap);
             }
             auto log = attr->value->attrs->find(state.sLog);
             if (log != attr->value->attrs->end()) {

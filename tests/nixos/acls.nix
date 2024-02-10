@@ -13,6 +13,7 @@ let
         permissions = {
           protected = true;
           users = ["root"];
+          groups = ["root"];
         };
       };
       buildCommand = "echo Example > $out; cat $exampleSource >> $out";
@@ -34,6 +35,7 @@ let
         permissions = {
           protected = true;
           users = ["root"];
+          groups = ["root"];
         };
       };
       buildCommand = "echo Example > $out; cat $exampleSource >> $out";
