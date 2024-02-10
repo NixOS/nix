@@ -62,7 +62,7 @@ bool SourcePath::operator<(const SourcePath & x) const
     return std::tie(*accessor, path) < std::tie(*x.accessor, x.path);
 }
 
-SourcePath SourcePath::resolveSymlinks() const
+SourcePath SourcePath::resolveSymlinks(SymlinkResolution mode) const
 {
     auto res = SourcePath(accessor);
 
@@ -71,6 +71,8 @@ SourcePath SourcePath::resolveSymlinks() const
     std::list<std::string> todo;
     for (auto & c : path)
         todo.push_back(std::string(c));
+
+    bool resolve_last = mode == SymlinkResolution::Full;
 
     while (!todo.empty()) {
         auto c = *todo.begin();
@@ -81,14 +83,16 @@ SourcePath SourcePath::resolveSymlinks() const
             res.path.pop();
         else {
             res.path.push(c);
-            if (auto st = res.maybeLstat(); st && st->type == InputAccessor::tSymlink) {
-                if (!linksAllowed--)
-                    throw Error("infinite symlink recursion in path '%s'", path);
-                auto target = res.readLink();
-                res.path.pop();
-                if (hasPrefix(target, "/"))
-                    res.path = CanonPath::root;
-                todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
+            if (resolve_last || !todo.empty()) {
+                if (auto st = res.maybeLstat(); st && st->type == InputAccessor::tSymlink) {
+                    if (!linksAllowed--)
+                        throw Error("infinite symlink recursion in path '%s'", path);
+                    auto target = res.readLink();
+                    res.path.pop();
+                    if (hasPrefix(target, "/"))
+                        res.path = CanonPath::root;
+                    todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
+                }
             }
         }
     }
