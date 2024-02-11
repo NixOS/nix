@@ -907,14 +907,14 @@ void EvalState::mkList(Value & v, size_t size)
 
 unsigned long nrThunks = 0;
 
-static inline void mkThunk(Value & v, Env & env, Expr * expr)
+static inline void mkThunk(Value & v, Env & env, Expr & expr)
 {
     v.mkThunk(&env, expr);
     nrThunks++;
 }
 
 
-void EvalState::mkThunk_(Value & v, Expr * expr)
+void EvalState::mkThunk_(Value & v, Expr & expr)
 {
     mkThunk(v, baseEnv, expr);
 }
@@ -1015,7 +1015,7 @@ void EvalState::mkSingleDerivedPathString(
 Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.allocValue();
-    mkThunk(*v, env, this);
+    mkThunk(*v, env, *this);
     return v;
 }
 
@@ -1077,7 +1077,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         e = j->second;
 
     if (!e)
-        e = parseExprFromFile(resolvedPath);
+        e = &parseExprFromFile(resolvedPath);
 
     fileParseCache[resolvedPath] = e;
 
@@ -1096,7 +1096,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         if (mustBeTrivial &&
             !(dynamic_cast<ExprAttrs *>(e)))
             error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
-        eval(e, v);
+        eval(*e, v);
     } catch (Error & e) {
         addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath.to_string());
         throw;
@@ -1114,23 +1114,23 @@ void EvalState::resetFileCache()
 }
 
 
-void EvalState::eval(Expr * e, Value & v)
+void EvalState::eval(Expr & e, Value & v)
 {
-    e->eval(*this, baseEnv, v);
+    e.eval(*this, baseEnv, v);
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx)
+inline bool EvalState::evalBool(Env & env, Expr & e, const PosIdx pos, std::string_view errorCtx)
 {
     try {
         Value v;
-        e->eval(*this, env, v);
+        e.eval(*this, env, v);
         if (v.type() != nBool)
             error<TypeError>(
                  "expected a Boolean but found %1%: %2%",
                  showType(v),
                  ValuePrinter(*this, v, errorPrintOptions)
-             ).atPos(pos).withFrame(env, *e).debugThrow();
+             ).atPos(pos).withFrame(env, e).debugThrow();
         return v.boolean;
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
@@ -1139,16 +1139,16 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
 }
 
 
-inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx)
+inline void EvalState::evalAttrs(Env & env, Expr & e, Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     try {
-        e->eval(*this, env, v);
+        e.eval(*this, env, v);
         if (v.type() != nAttrs)
             error<TypeError>(
                 "expected a set but found %1%: %2%",
                 showType(v),
                 ValuePrinter(*this, v, errorPrintOptions)
-            ).withFrame(env, *e).debugThrow();
+            ).withFrame(env, e).debugThrow();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -1221,7 +1221,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             Value * vAttr;
             if (hasOverrides && i.second.kind != AttrDef::Kind::Inherited) {
                 vAttr = state.allocValue();
-                mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), i.second.e);
+                mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), *i.second.e);
             } else
                 vAttr = i.second.e->maybeThunk(state, *i.second.chooseByKind(&env2, &env, inheritEnv));
             env2.values[displ++] = vAttr;
@@ -1817,13 +1817,13 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
     // We cheat in the parser, and pass the position of the condition as the position of the if itself.
-    (state.evalBool(env, cond, pos, "while evaluating a branch condition") ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, *cond, pos, "while evaluating a branch condition") ? *then : *else_).eval(state, env, v);
 }
 
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
+    if (!state.evalBool(env, *cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
         state.error<AssertionError>("assertion '%1%' failed", out.str()).atPos(pos).withFrame(env, *this).debugThrow();
@@ -1834,7 +1834,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
+    v.mkBool(!state.evalBool(env, *e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
 }
 
 
@@ -1856,27 +1856,27 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(state.evalBool(env, e1, pos, "in the left operand of the AND (&&) operator") && state.evalBool(env, e2, pos, "in the right operand of the AND (&&) operator"));
+    v.mkBool(state.evalBool(env, *e1, pos, "in the left operand of the AND (&&) operator") && state.evalBool(env, *e2, pos, "in the right operand of the AND (&&) operator"));
 }
 
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(state.evalBool(env, e1, pos, "in the left operand of the OR (||) operator") || state.evalBool(env, e2, pos, "in the right operand of the OR (||) operator"));
+    v.mkBool(state.evalBool(env, *e1, pos, "in the left operand of the OR (||) operator") || state.evalBool(env, *e2, pos, "in the right operand of the OR (||) operator"));
 }
 
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e1, pos, "in the left operand of the IMPL (->) operator") || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
+    v.mkBool(!state.evalBool(env, *e1, pos, "in the left operand of the IMPL (->) operator") || state.evalBool(env, *e2, pos, "in the right operand of the IMPL (->) operator"));
 }
 
 
 void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1, v2;
-    state.evalAttrs(env, e1, v1, pos, "in the left operand of the update (//) operator");
-    state.evalAttrs(env, e2, v2, pos, "in the right operand of the update (//) operator");
+    state.evalAttrs(env, *e1, v1, pos, "in the left operand of the update (//) operator");
+    state.evalAttrs(env, *e2, v2, pos, "in the right operand of the update (//) operator");
 
     state.nrOpUpdates++;
 
@@ -2726,39 +2726,39 @@ SourcePath resolveExprPath(SourcePath path)
 }
 
 
-Expr * EvalState::parseExprFromFile(const SourcePath & path)
+Expr & EvalState::parseExprFromFile(const SourcePath & path)
 {
     return parseExprFromFile(path, staticBaseEnv);
 }
 
 
-Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
+Expr & EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
 {
     auto buffer = path.resolveSymlinks().readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
+    return *parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s_, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr & EvalState::parseExprFromString(std::string s_, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
     // NOTE this method (and parseStdin) must take care to *fully copy* their input
     // into their respective Pos::Origin until the parser stops overwriting its input
     // data.
     auto s = make_ref<std::string>(s_);
     s_.append("\0\0", 2);
-    return parse(s_.data(), s_.size(), Pos::String{.source = s}, basePath, staticEnv);
+    return *parse(s_.data(), s_.size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath)
+Expr & EvalState::parseExprFromString(std::string s, const SourcePath & basePath)
 {
     return parseExprFromString(std::move(s), basePath, staticBaseEnv);
 }
 
 
-Expr * EvalState::parseStdin()
+Expr & EvalState::parseStdin()
 {
     // NOTE this method (and parseExprFromString) must take care to *fully copy* their
     // input into their respective Pos::Origin until the parser stops overwriting its
@@ -2768,7 +2768,7 @@ Expr * EvalState::parseStdin()
     auto s = make_ref<std::string>(buffer);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), Pos::Stdin{.source = s}, rootPath(CanonPath::fromCwd()), staticBaseEnv);
+    return *parse(buffer.data(), buffer.size(), Pos::Stdin{.source = s}, rootPath(CanonPath::fromCwd()), staticBaseEnv);
 }
 
 

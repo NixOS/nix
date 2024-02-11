@@ -260,7 +260,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
 
             evalSettings.pureEval = false;
             auto state = getEvalState();
-            auto e =
+            auto & e =
                 state->parseExprFromFile(
                     resolveExprPath(
                         lookupFileArg(*state, *file)));
@@ -483,7 +483,7 @@ Installables SourceExprCommand::parseInstallables(
         auto vFile = state->allocValue();
 
         if (file == "-") {
-            auto e = state->parseStdin();
+            auto & e = state->parseStdin();
             state->eval(e, *vFile);
         }
         else if (file) {
@@ -491,7 +491,7 @@ Installables SourceExprCommand::parseInstallables(
         }
         else {
             CanonPath dir(CanonPath::fromCwd(getCommandBaseDir()));
-            auto e = state->parseExprFromString(*expr, state->rootPath(dir));
+            auto & e = state->parseExprFromString(*expr, state->rootPath(dir));
             state->eval(e, *vFile);
         }
 

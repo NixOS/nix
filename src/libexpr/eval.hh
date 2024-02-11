@@ -338,16 +338,16 @@ public:
     /**
      * Parse a Nix expression from the specified file.
      */
-    Expr * parseExprFromFile(const SourcePath & path);
-    Expr * parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr & parseExprFromFile(const SourcePath & path);
+    Expr & parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv);
 
     /**
      * Parse a Nix expression from the specified string.
      */
-    Expr * parseExprFromString(std::string s, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv);
-    Expr * parseExprFromString(std::string s, const SourcePath & basePath);
+    Expr & parseExprFromString(std::string s, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr & parseExprFromString(std::string s, const SourcePath & basePath);
 
-    Expr * parseStdin();
+    Expr & parseStdin();
 
     /**
      * Evaluate an expression read from the given file to normal
@@ -380,15 +380,15 @@ public:
      *
      * @param [out] v The resulting is stored here.
      */
-    void eval(Expr * e, Value & v);
+    void eval(Expr & e, Value & v);
 
     /**
      * Evaluation the expression, then verify that it has the expected
      * type.
      */
-    inline bool evalBool(Env & env, Expr * e);
-    inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx);
-    inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
+    inline bool evalBool(Env & env, Expr & e);
+    inline bool evalBool(Env & env, Expr & e, const PosIdx pos, std::string_view errorCtx);
+    inline void evalAttrs(Env & env, Expr & e, Value & v, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * If `v` is a thunk, enter it and overwrite `v` with the result
@@ -607,7 +607,7 @@ public:
     }
 
     void mkList(Value & v, size_t length);
-    void mkThunk_(Value & v, Expr * expr);
+    void mkThunk_(Value & v, Expr & expr);
     void mkPos(Value & v, PosIdx pos);
 
     /**

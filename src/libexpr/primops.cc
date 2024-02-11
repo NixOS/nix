@@ -231,9 +231,9 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             // args[0]->attrs is already sorted.
 
             printTalkative("evaluating file '%1%'", path);
-            Expr * e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
+            Expr & e = state.parseExprFromFile(resolveExprPath(path), staticEnv);
 
-            e->eval(state, *env, v);
+            e.eval(state, *env, v);
         }
     }
 }
@@ -383,13 +383,13 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
     auto output = runProgram(program, true, commandArgs);
     Expr * parsed;
     try {
-        parsed = state.parseExprFromString(std::move(output), state.rootPath(CanonPath::root));
+        parsed = &state.parseExprFromString(std::move(output), state.rootPath(CanonPath::root));
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while parsing the output from '%1%'", program);
         throw;
     }
     try {
-        state.eval(parsed, v);
+        state.eval(*parsed, v);
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while evaluating the output from '%1%'", program);
         throw;

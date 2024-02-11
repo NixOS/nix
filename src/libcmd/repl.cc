@@ -89,7 +89,7 @@ struct NixRepl
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol name, Value & v);
-    Expr * parseString(std::string s);
+    Expr & parseString(std::string s);
     void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace & dt);
 
@@ -416,9 +416,9 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             auto expr = cur.substr(0, dot);
             auto cur2 = cur.substr(dot + 1);
 
-            Expr * e = parseString(expr);
+            Expr & e = parseString(expr);
             Value v;
-            e->eval(*state, *env, v);
+            e.eval(*state, *env, v);
             state->forceAttrs(v, noPos, "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
             for (auto & i : *v.attrs) {
@@ -779,7 +779,7 @@ bool NixRepl::processLine(std::string line)
             line[p + 1] != '=' &&
             isVarName(name = removeWhitespace(line.substr(0, p))))
         {
-            Expr * e = parseString(line.substr(p + 1));
+            Expr & e = parseString(line.substr(p + 1));
             Value & v(*state->allocValue());
             v.mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);
@@ -895,7 +895,7 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 }
 
 
-Expr * NixRepl::parseString(std::string s)
+Expr & NixRepl::parseString(std::string s)
 {
     return state->parseExprFromString(std::move(s), state->rootPath(CanonPath::fromCwd()), staticEnv);
 }
@@ -903,8 +903,8 @@ Expr * NixRepl::parseString(std::string s)
 
 void NixRepl::evalString(std::string s, Value & v)
 {
-    Expr * e = parseString(s);
-    e->eval(*state, *env, v);
+    Expr & e = parseString(s);
+    e.eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
 }
 

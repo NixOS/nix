@@ -336,11 +336,11 @@ public:
         }
     }
 
-    inline void mkThunk(Env * e, Expr * ex)
+    inline void mkThunk(Env * e, Expr & ex)
     {
         internalType = tThunk;
         thunk.env = e;
-        thunk.expr = ex;
+        thunk.expr = &ex;
     }
 
     inline void mkApp(Value * l, Value * r)

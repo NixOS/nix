@@ -42,6 +42,11 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 struct Expr
 {
+protected:
+    Expr(Expr &&) = default;
+    Expr & operator=(Expr &&) = default;
+
+public:
     struct AstSymbols {
         Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
     };
@@ -51,7 +56,10 @@ struct Expr
     Expr() {
         nrExprs++;
     }
+    Expr(const Expr &) = delete;
+    Expr & operator=(const Expr &) = delete;
     virtual ~Expr() { };
+
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
     virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
     virtual void eval(EvalState & state, Env & env, Value & v);

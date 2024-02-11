@@ -86,11 +86,11 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     if (v.isThunk()) {
         Env * env = v.thunk.env;
-        Expr * expr = v.thunk.expr;
+        Expr & expr = *v.thunk.expr;
         try {
             v.mkBlackhole();
             //checkInterrupt();
-            expr->eval(*this, *env, v);
+            expr.eval(*this, *env, v);
         } catch (...) {
             v.mkThunk(env, expr);
             tryFixupBlackHolePos(v, pos);
