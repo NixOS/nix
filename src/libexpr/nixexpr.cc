@@ -80,7 +80,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
         return sa < sb;
     });
     std::vector<Symbol> inherits;
-    std::map<ExprInheritFrom *, std::vector<Symbol>> inheritsFrom;
+    std::map<Displacement, std::vector<Symbol>> inheritsFrom;
     for (auto & i : sorted) {
         switch (i->second.kind) {
         case AttrDef::Kind::Plain:
@@ -91,7 +91,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
         case AttrDef::Kind::InheritedFrom: {
             auto & select = dynamic_cast<ExprSelect &>(*i->second.e);
             auto & from = dynamic_cast<ExprInheritFrom &>(*select.e);
-            inheritsFrom[&from].push_back(i->first);
+            inheritsFrom[from.displ].push_back(i->first);
             break;
         }
         }
@@ -103,7 +103,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
     }
     for (const auto & [from, syms] : inheritsFrom) {
         str << "inherit (";
-        (*inheritFromExprs)[from->displ]->show(symbols, str);
+        (*inheritFromExprs)[from]->show(symbols, str);
         str << ")";
         for (auto sym : syms) str << " " << symbols[sym];
         str << "; ";
@@ -152,7 +152,7 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
         // the natural Symbol ordering is by creation time, which can lead to the
         // same expression being printed in two different ways depending on its
         // context. always use lexicographic ordering to avoid this.
-        for (auto & i : formals->lexicographicOrder(symbols)) {
+        for (const Formal & i : formals->lexicographicOrder(symbols)) {
             if (first) first = false; else str << ", ";
             str << symbols[i.name];
             if (i.def) {
@@ -177,7 +177,7 @@ void ExprCall::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << '(';
     fun->show(symbols, str);
-    for (auto e : args) {
+    for (auto & e : args) {
         str <<  ' ';
         e->show(symbols, str);
     }
@@ -376,7 +376,7 @@ std::shared_ptr<const StaticEnv> ExprAttrs::bindInheritSources(
     // not even *have* an expr that grabs anything from this env since it's fully
     // invisible, but the evaluator does not allow for this yet.
     auto inner = std::make_shared<StaticEnv>(nullptr, env.get(), 0);
-    for (auto from : *inheritFromExprs)
+    for (auto & from : *inheritFromExprs)
         from->bindVars(es, env);
 
     return inner;
@@ -463,7 +463,7 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
         es.exprEnvs.insert(std::make_pair(this, env));
 
     fun->bindVars(es, env);
-    for (auto e : args)
+    for (auto & e : args)
         e->bindVars(es, env);
 }
 

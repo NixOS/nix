@@ -2817,7 +2817,7 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * arg
     auto attrs = state.buildBindings(args[0]->lambda.fun->formals->formals.size());
     for (auto & i : args[0]->lambda.fun->formals->formals)
         // !!! should optimise booleans (allocate only once)
-        attrs.alloc(i.name, i.pos).mkBool(i.def);
+        attrs.alloc(i.name, i.pos).mkBool(i.def.get());
     v.mkAttrs(attrs);
 }
 

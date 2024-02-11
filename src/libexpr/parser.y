@@ -83,6 +83,21 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
     });
 }
 
+template<typename T>
+static std::unique_ptr<T> unp(T * e)
+{
+  return std::unique_ptr<T>(e);
+}
+
+template<typename T = std::unique_ptr<nix::Expr>, typename... Args>
+static std::vector<T> vec(Args && ... args)
+{
+  std::vector<T> result;
+  result.reserve(sizeof...(Args));
+  (result.emplace_back(std::forward<Args>(args)), ...);
+  return result;
+}
+
 
 %}
 
@@ -101,8 +116,8 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
   nix::StringToken str;
   std::vector<nix::AttrName> * attrNames;
   std::vector<std::pair<nix::AttrName, nix::PosIdx>> * inheritAttrs;
-  std::vector<std::pair<nix::PosIdx, nix::Expr *>> * string_parts;
-  std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, nix::StringToken>>> * ind_string_parts;
+  std::vector<std::pair<nix::PosIdx, std::unique_ptr<nix::Expr>>> * string_parts;
+  std::vector<std::pair<nix::PosIdx, std::variant<std::unique_ptr<nix::Expr>, nix::StringToken>>> * ind_string_parts;
 }
 
 %destructor { delete $$; } <e>
@@ -160,85 +175,86 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3); }
+    { $$ = new ExprLambda(CUR_POS, state->symbols.create($1), nullptr, unp($3)); }
   | '{' formals '}' ':' expr_function
     { if (auto e = state->validateFormals($2)) THROW(*e);
-      $$ = new ExprLambda(CUR_POS, $2, $5); }
+      $$ = new ExprLambda(CUR_POS, unp($2), unp($5));
+    }
   | '{' formals '}' '@' ID ':' expr_function
     {
       auto arg = state->symbols.create($5);
       if (auto e = state->validateFormals($2, CUR_POS, arg)) THROW(*e, $2, $7);
-      $$ = new ExprLambda(CUR_POS, arg, $2, $7);
+      $$ = new ExprLambda(CUR_POS, arg, unp($2), unp($7));
     }
   | ID '@' '{' formals '}' ':' expr_function
     {
       auto arg = state->symbols.create($1);
       if (auto e = state->validateFormals($4, CUR_POS, arg)) THROW(*e, $4, $7);
-      $$ = new ExprLambda(CUR_POS, arg, $4, $7);
+      $$ = new ExprLambda(CUR_POS, arg, unp($4), unp($7));
     }
   | ASSERT expr ';' expr_function
-    { $$ = new ExprAssert(CUR_POS, $2, $4); }
+    { $$ = new ExprAssert(CUR_POS, unp($2), unp($4)); }
   | WITH expr ';' expr_function
-    { $$ = new ExprWith(CUR_POS, $2, $4); }
+    { $$ = new ExprWith(CUR_POS, unp($2), unp($4)); }
   | LET binds IN_KW expr_function
     { if (!$2->dynamicAttrs.empty())
         THROW(ParseError({
             .msg = HintFmt("dynamic attributes not allowed in let"),
             .pos = state->positions[CUR_POS]
         }), $2, $4);
-      $$ = new ExprLet($2, $4);
+      $$ = new ExprLet(unp($2), unp($4));
     }
   | expr_if
   ;
 
 expr_if
-  : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
+  : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, unp($2), unp($4), unp($6)); }
   | expr_op
   ;
 
 expr_op
-  : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-  | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(state->s.sub), {new ExprInt(0), $2}); }
-  | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
-  | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.lessThan), {$1, $3}); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(state->at(@2), new ExprVar(state->s.lessThan), {$3, $1})); }
-  | expr_op '>' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.lessThan), {$3, $1}); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(state->at(@2), new ExprVar(state->s.lessThan), {$1, $3})); }
-  | expr_op AND expr_op { $$ = new ExprOpAnd(state->at(@2), $1, $3); }
-  | expr_op OR expr_op { $$ = new ExprOpOr(state->at(@2), $1, $3); }
-  | expr_op IMPL expr_op { $$ = new ExprOpImpl(state->at(@2), $1, $3); }
-  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->at(@2), $1, $3); }
-  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
+  : '!' expr_op %prec NOT { $$ = new ExprOpNot(unp($2)); }
+  | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, std::make_unique<ExprVar>(state->s.sub), vec(std::make_unique<ExprInt>(0), unp($2))); }
+  | expr_op EQ expr_op { $$ = new ExprOpEq(unp($1), unp($3)); }
+  | expr_op NEQ expr_op { $$ = new ExprOpNEq(unp($1), unp($3)); }
+  | expr_op '<' expr_op { $$ = new ExprCall(state->at(@2), std::make_unique<ExprVar>(state->s.lessThan), vec($1, $3)); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(std::make_unique<ExprCall>(state->at(@2), std::make_unique<ExprVar>(state->s.lessThan), vec($3, $1))); }
+  | expr_op '>' expr_op { $$ = new ExprCall(state->at(@2), std::make_unique<ExprVar>(state->s.lessThan), vec($3, $1)); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(std::make_unique<ExprCall>(state->at(@2), std::make_unique<ExprVar>(state->s.lessThan), vec($1, $3))); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd(state->at(@2), unp($1), unp($3)); }
+  | expr_op OR expr_op { $$ = new ExprOpOr(state->at(@2), unp($1), unp($3)); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl(state->at(@2), unp($1), unp($3)); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->at(@2), unp($1), unp($3)); }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr(unp($1), std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(state->at(@2), false, {{state->at(@1), $1}, {state->at(@3), $3}}); }
-  | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.sub), {$1, $3}); }
-  | expr_op '*' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.mul), {$1, $3}); }
-  | expr_op '/' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.div), {$1, $3}); }
-  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(state->at(@2), $1, $3); }
+    { $$ = new ExprConcatStrings(state->at(@2), false, vec<std::pair<PosIdx, std::unique_ptr<Expr>>>(std::pair(state->at(@1), unp($1)), std::pair(state->at(@3), unp($3)))); }
+  | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), std::make_unique<ExprVar>(state->s.sub), vec($1, $3)); }
+  | expr_op '*' expr_op { $$ = new ExprCall(state->at(@2), std::make_unique<ExprVar>(state->s.mul), vec($1, $3)); }
+  | expr_op '/' expr_op { $$ = new ExprCall(state->at(@2), std::make_unique<ExprVar>(state->s.div), vec($1, $3)); }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(state->at(@2), unp($1), unp($3)); }
   | expr_app
   ;
 
 expr_app
   : expr_app expr_select {
       if (auto e2 = dynamic_cast<ExprCall *>($1)) {
-          e2->args.push_back($2);
+          e2->args.emplace_back($2);
           $$ = $1;
       } else
-          $$ = new ExprCall(CUR_POS, $1, {$2});
+          $$ = new ExprCall(CUR_POS, unp($1), vec(unp($2)));
   }
   | expr_select
   ;
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
+    { $$ = new ExprSelect(CUR_POS, unp($1), std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; }
+    { $$ = new ExprSelect(CUR_POS, unp($1), std::move(*$3), unp($5)); delete $3; }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
-    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}); }
+    { $$ = new ExprCall(CUR_POS, unp($1), vec(std::make_unique<ExprVar>(CUR_POS, state->s.or_))); }
   | expr_simple
   ;
 
@@ -254,21 +270,21 @@ expr_simple
   | FLOAT_LIT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = state->stripIndentation(CUR_POS, std::move(*$2));
+      $$ = state->stripIndentation(CUR_POS, std::move(*$2)).release();
       delete $2;
   }
   | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
-      $2->insert($2->begin(), {state->at(@1), $1});
+      $2->emplace($2->begin(), state->at(@1), $1);
       $$ = new ExprConcatStrings(CUR_POS, false, std::move(*$2));
       delete $2;
   }
   | SPATH {
       std::string path($1.p + 1, $1.l - 2);
       $$ = new ExprCall(CUR_POS,
-          new ExprVar(state->s.findFile),
-          {new ExprVar(state->s.nixPath),
-           new ExprString(std::move(path))});
+          std::make_unique<ExprVar>(state->s.findFile),
+          vec(std::make_unique<ExprVar>(state->s.nixPath),
+              std::make_unique<ExprString>(std::move(path))));
   }
   | URI {
       static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
@@ -283,7 +299,7 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect(noPos, $3, state->s.body); }
+    { $3->recursive = true; $$ = new ExprSelect(noPos, unp($3), state->s.body); }
   | REC '{' binds '}'
     { $3->recursive = true; $$ = $3; }
   | '{' binds '}'
@@ -304,9 +320,9 @@ string_parts_interpolated
   : string_parts_interpolated STR
   { $$ = $1; $1->emplace_back(state->at(@2), new ExprString(std::string($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), $3); }
-  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(state->at(@1), $2); }
+  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, std::unique_ptr<Expr>>>; $$->emplace_back(state->at(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
-      $$ = new std::vector<std::pair<PosIdx, Expr *>>;
+      $$ = new std::vector<std::pair<PosIdx, std::unique_ptr<Expr>>>;
       $$->emplace_back(state->at(@1), new ExprString(std::string($1)));
       $$->emplace_back(state->at(@2), $3);
     }
@@ -334,14 +350,14 @@ path_start
 
 ind_string_parts
   : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(state->at(@2), $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), $3); }
-  | { $$ = new std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>; }
+  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), unp($3)); }
+  | { $$ = new std::vector<std::pair<PosIdx, std::variant<std::unique_ptr<Expr>, StringToken>>>; }
   ;
 
 binds
   : binds attrpath '=' expr ';'
     { $$ = $1;
-      if (auto e = state->addAttr($$, std::move(*$2), $4, state->at(@2))) THROW(*e, $1, $2);
+      if (auto e = state->addAttr($$, std::move(*$2), unp($4), state->at(@2))) THROW(*e, $1, $2);
       delete $2;
     }
   | binds INHERIT attrs ';'
@@ -351,23 +367,23 @@ binds
               THROW(state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos), $1);
           $$->attrs.emplace(
               i.symbol,
-              ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
+              ExprAttrs::AttrDef(std::make_unique<ExprVar>(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
       delete $3;
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
       if (!$$->inheritFromExprs)
-          $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
-      $$->inheritFromExprs->push_back($4);
-      auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
+          $$->inheritFromExprs = std::make_unique<std::vector<std::unique_ptr<Expr>>>();
+      $$->inheritFromExprs->push_back(unp($4));
       for (auto & [i, iPos] : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               THROW(state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos), $1);
+          auto from = std::make_unique<nix::ExprInheritFrom>(state->at(@4), $$->inheritFromExprs->size() - 1);
           $$->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
-                  new ExprSelect(iPos, from, i.symbol),
+                  std::make_unique<ExprSelect>(iPos, std::move(from), i.symbol),
                   iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
@@ -402,7 +418,7 @@ attrpath
           $$->push_back(AttrName(state->symbols.create(str->s)));
           delete str;
       } else
-          $$->push_back(AttrName($3));
+          $$->emplace_back(unp($3));
     }
   | attr { $$ = new std::vector<AttrName>; $$->push_back(AttrName(state->symbols.create($1))); }
   | string_attr
@@ -412,7 +428,7 @@ attrpath
           $$->push_back(AttrName(state->symbols.create(str->s)));
           delete str;
       } else
-          $$->push_back(AttrName($1));
+          $$->emplace_back(unp($1));
     }
   ;
 
@@ -427,15 +443,15 @@ string_attr
   ;
 
 expr_list
-  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */ }
+  : expr_list expr_select { $$ = $1; $1->elems.emplace_back($2); /* !!! dangerous */ }
   | { $$ = new ExprList; }
   ;
 
 formals
   : formal ',' formals
-    { $$ = $3; $$->formals.emplace_back(*$1); delete $1; }
+    { $$ = $3; $$->formals.emplace_back(std::move(*$1)); delete $1; }
   | formal
-    { $$ = new Formals; $$->formals.emplace_back(*$1); $$->ellipsis = false; delete $1; }
+    { $$ = new Formals; $$->formals.emplace_back(std::move(*$1)); $$->ellipsis = false; delete $1; }
   |
     { $$ = new Formals; $$->ellipsis = false; }
   | ELLIPSIS
@@ -443,8 +459,8 @@ formals
   ;
 
 formal
-  : ID { $$ = new Formal{CUR_POS, state->symbols.create($1), 0}; }
-  | ID '?' expr { $$ = new Formal{CUR_POS, state->symbols.create($1), $3}; }
+  : ID { $$ = new Formal{CUR_POS, state->symbols.create($1), nullptr}; }
+  | ID '?' expr { $$ = new Formal{CUR_POS, state->symbols.create($1), unp($3)}; }
   ;
 
 %%

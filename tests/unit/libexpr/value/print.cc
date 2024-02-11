@@ -113,10 +113,8 @@ TEST_F(ValuePrintingTests, vLambda)
     };
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
-    auto body = ExprInt(0);
-    auto formals = Formals {};
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
+    ExprLambda eLambda(posIdx, createSymbol("a"), std::make_unique<Formals>(), std::make_unique<ExprInt>(0));
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
@@ -515,11 +513,10 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
 
 TEST_F(ValuePrintingTests, ansiColorsAssert)
 {
-    ExprVar eFalse(state.symbols.create("false"));
-    eFalse.bindVars(state, state.staticBaseEnv);
-    ExprInt eInt(1);
-
-    ExprAssert expr(noPos, &eFalse, &eInt);
+    ExprAssert expr(noPos,
+        std::make_unique<ExprVar>(state.symbols.create("false")),
+        std::make_unique<ExprInt>(1));
+    expr.bindVars(state, state.staticBaseEnv);
 
     Value v;
     state.mkThunk_(v, expr);
@@ -561,10 +558,8 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
     };
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
-    auto body = ExprInt(0);
-    auto formals = Formals {};
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
+    ExprLambda eLambda(posIdx, createSymbol("a"), std::make_unique<Formals>(), std::make_unique<ExprInt>(0));
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);

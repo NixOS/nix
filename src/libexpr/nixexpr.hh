@@ -28,9 +28,9 @@ struct StaticEnv;
 struct AttrName
 {
     Symbol symbol;
-    Expr * expr;
+    std::unique_ptr<Expr> expr;
     AttrName(Symbol s) : symbol(s) {};
-    AttrName(Expr * e) : expr(e) {};
+    AttrName(std::unique_ptr<Expr> e) : expr(std::move(e)) {};
 };
 
 typedef std::vector<AttrName> AttrPath;
@@ -157,19 +157,19 @@ struct ExprInheritFrom : ExprVar
 struct ExprSelect : Expr
 {
     PosIdx pos;
-    Expr * e, * def;
+    std::unique_ptr<Expr> e, def;
     AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
-    ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
+    ExprSelect(const PosIdx & pos, std::unique_ptr<Expr> e, AttrPath attrPath, std::unique_ptr<Expr> def) : pos(pos), e(std::move(e)), def(std::move(def)), attrPath(std::move(attrPath)) { };
+    ExprSelect(const PosIdx & pos, std::unique_ptr<Expr> e, Symbol name) : pos(pos), e(std::move(e)) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
 struct ExprOpHasAttr : Expr
 {
-    Expr * e;
+    std::unique_ptr<Expr> e;
     AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, AttrPath attrPath) : e(e), attrPath(std::move(attrPath)) { };
+    ExprOpHasAttr(std::unique_ptr<Expr> e, AttrPath attrPath) : e(std::move(e)), attrPath(std::move(attrPath)) { };
     PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };
@@ -189,11 +189,11 @@ struct ExprAttrs : Expr
         };
 
         Kind kind;
-        Expr * e;
+        std::unique_ptr<Expr> e;
         PosIdx pos;
         Displacement displ; // displacement
-        AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
-            : kind(kind), e(e), pos(pos) { };
+        AttrDef(std::unique_ptr<Expr> e, const PosIdx & pos, Kind kind = Kind::Plain)
+            : kind(kind), e(std::move(e)), pos(pos) { };
         AttrDef() { };
 
         template<typename T>
@@ -212,12 +212,12 @@ struct ExprAttrs : Expr
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
-    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
+    std::unique_ptr<std::vector<std::unique_ptr<Expr>>> inheritFromExprs;
     struct DynamicAttrDef {
-        Expr * nameExpr, * valueExpr;
+        std::unique_ptr<Expr> nameExpr, valueExpr;
         PosIdx pos;
-        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const PosIdx & pos)
-            : nameExpr(nameExpr), valueExpr(valueExpr), pos(pos) { };
+        DynamicAttrDef(std::unique_ptr<Expr> nameExpr, std::unique_ptr<Expr> valueExpr, const PosIdx & pos)
+            : nameExpr(std::move(nameExpr)), valueExpr(std::move(valueExpr)), pos(pos) { };
     };
     typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
     DynamicAttrDefs dynamicAttrs;
@@ -234,7 +234,7 @@ struct ExprAttrs : Expr
 
 struct ExprList : Expr
 {
-    std::vector<Expr *> elems;
+    std::vector<std::unique_ptr<Expr>> elems;
     ExprList() { };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -249,7 +249,7 @@ struct Formal
 {
     PosIdx pos;
     Symbol name;
-    Expr * def;
+    std::unique_ptr<Expr> def;
 };
 
 struct Formals
@@ -265,9 +265,9 @@ struct Formals
         return it != formals.end() && it->name == arg;
     }
 
-    std::vector<Formal> lexicographicOrder(const SymbolTable & symbols) const
+    std::vector<std::reference_wrapper<const Formal>> lexicographicOrder(const SymbolTable & symbols) const
     {
-        std::vector<Formal> result(formals.begin(), formals.end());
+        std::vector<std::reference_wrapper<const Formal>> result(formals.begin(), formals.end());
         std::sort(result.begin(), result.end(),
             [&] (const Formal & a, const Formal & b) {
                 std::string_view sa = symbols[a.name], sb = symbols[b.name];
@@ -282,14 +282,14 @@ struct ExprLambda : Expr
     PosIdx pos;
     Symbol name;
     Symbol arg;
-    Formals * formals;
-    Expr * body;
-    ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
-        : pos(pos), arg(arg), formals(formals), body(body)
+    std::unique_ptr<Formals> formals;
+    std::unique_ptr<Expr> body;
+    ExprLambda(PosIdx pos, Symbol arg, std::unique_ptr<Formals> formals, std::unique_ptr<Expr> body)
+        : pos(pos), arg(arg), formals(std::move(formals)), body(std::move(body))
     {
     };
-    ExprLambda(PosIdx pos, Formals * formals, Expr * body)
-        : pos(pos), formals(formals), body(body)
+    ExprLambda(PosIdx pos, std::unique_ptr<Formals> formals, std::unique_ptr<Expr> body)
+        : pos(pos), formals(std::move(formals)), body(std::move(body))
     {
     }
     void setName(Symbol name) override;
@@ -301,11 +301,11 @@ struct ExprLambda : Expr
 
 struct ExprCall : Expr
 {
-    Expr * fun;
-    std::vector<Expr *> args;
+    std::unique_ptr<Expr> fun;
+    std::vector<std::unique_ptr<Expr>> args;
     PosIdx pos;
-    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
-        : fun(fun), args(std::move(args)), pos(pos)
+    ExprCall(const PosIdx & pos, std::unique_ptr<Expr> fun, std::vector<std::unique_ptr<Expr>> && args)
+        : fun(std::move(fun)), args(std::move(args)), pos(pos)
     { }
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -313,19 +313,19 @@ struct ExprCall : Expr
 
 struct ExprLet : Expr
 {
-    ExprAttrs * attrs;
-    Expr * body;
-    ExprLet(ExprAttrs * attrs, Expr * body) : attrs(attrs), body(body) { };
+    std::unique_ptr<ExprAttrs> attrs;
+    std::unique_ptr<Expr> body;
+    ExprLet(std::unique_ptr<ExprAttrs> attrs, std::unique_ptr<Expr> body) : attrs(std::move(attrs)), body(std::move(body)) { };
     COMMON_METHODS
 };
 
 struct ExprWith : Expr
 {
     PosIdx pos;
-    Expr * attrs, * body;
+    std::unique_ptr<Expr> attrs, body;
     size_t prevWith;
     ExprWith * parentWith;
-    ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
+    ExprWith(const PosIdx & pos, std::unique_ptr<Expr> attrs, std::unique_ptr<Expr> body) : pos(pos), attrs(std::move(attrs)), body(std::move(body)) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
@@ -333,8 +333,8 @@ struct ExprWith : Expr
 struct ExprIf : Expr
 {
     PosIdx pos;
-    Expr * cond, * then, * else_;
-    ExprIf(const PosIdx & pos, Expr * cond, Expr * then, Expr * else_) : pos(pos), cond(cond), then(then), else_(else_) { };
+    std::unique_ptr<Expr> cond, then, else_;
+    ExprIf(const PosIdx & pos, std::unique_ptr<Expr> cond, std::unique_ptr<Expr> then, std::unique_ptr<Expr> else_) : pos(pos), cond(std::move(cond)), then(std::move(then)), else_(std::move(else_)) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
@@ -342,16 +342,16 @@ struct ExprIf : Expr
 struct ExprAssert : Expr
 {
     PosIdx pos;
-    Expr * cond, * body;
-    ExprAssert(const PosIdx & pos, Expr * cond, Expr * body) : pos(pos), cond(cond), body(body) { };
+    std::unique_ptr<Expr> cond, body;
+    ExprAssert(const PosIdx & pos, std::unique_ptr<Expr> cond, std::unique_ptr<Expr> body) : pos(pos), cond(std::move(cond)), body(std::move(body)) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };
 
 struct ExprOpNot : Expr
 {
-    Expr * e;
-    ExprOpNot(Expr * e) : e(e) { };
+    std::unique_ptr<Expr> e;
+    ExprOpNot(std::unique_ptr<Expr> e) : e(std::move(e)) { };
     PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };
@@ -360,9 +360,9 @@ struct ExprOpNot : Expr
     struct name : Expr \
     { \
         PosIdx pos; \
-        Expr * e1, * e2; \
-        name(Expr * e1, Expr * e2) : e1(e1), e2(e2) { }; \
-        name(const PosIdx & pos, Expr * e1, Expr * e2) : pos(pos), e1(e1), e2(e2) { }; \
+        std::unique_ptr<Expr> e1, e2; \
+        name(std::unique_ptr<Expr> e1, std::unique_ptr<Expr> e2) : e1(std::move(e1)), e2(std::move(e2)) { }; \
+        name(const PosIdx & pos, std::unique_ptr<Expr> e1, std::unique_ptr<Expr> e2) : pos(pos), e1(std::move(e1)), e2(std::move(e2)) { }; \
         void show(const SymbolTable & symbols, std::ostream & str) const override \
         { \
             str << "("; e1->show(symbols, str); str << " " s " "; e2->show(symbols, str); str << ")"; \
@@ -387,8 +387,8 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *>> es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> es)
+    std::vector<std::pair<PosIdx, std::unique_ptr<Expr>>> es;
+    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, std::unique_ptr<Expr>>> es)
         : pos(pos), forceString(forceString), es(std::move(es)) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS

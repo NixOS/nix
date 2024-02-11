@@ -1191,7 +1191,7 @@ Env * ExprAttrs::buildInheritFromEnv(EvalState & state, Env & up)
     inheritEnv.up = &up;
 
     Displacement displ = 0;
-    for (auto from : *inheritFromExprs)
+    for (auto & from : *inheritFromExprs)
         inheritEnv.values[displ++] = from->maybeThunk(state, up);
 
     return &inheritEnv;

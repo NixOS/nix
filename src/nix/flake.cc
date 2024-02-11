@@ -446,7 +446,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (v.lambda.fun->hasFormals()
                     || !argHasName(v.lambda.fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
-                auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);
+                auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body.get());
                 if (!body
                     || body->hasFormals()
                     || !argHasName(body->arg, "prev"))
