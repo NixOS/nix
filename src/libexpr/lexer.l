@@ -27,6 +27,12 @@
 
 using namespace nix;
 
+#define THROW(...)                             \
+  do {                                         \
+    state->error.reset(new auto(__VA_ARGS__)); \
+    return YYerror;                            \
+  } while (0)
+
 namespace nix {
 
 #define CUR_POS state->at(*yylloc)
@@ -129,20 +135,20 @@ or          { return OR_KW; }
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
               } catch (const boost::bad_lexical_cast &) {
-                  throw ParseError(ErrorInfo{
+                  THROW(ParseError({
                       .msg = HintFmt("invalid integer '%1%'", yytext),
                       .pos = state->positions[CUR_POS],
-                  });
+                  }));
               }
               return INT_LIT;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
-                  throw ParseError(ErrorInfo{
+                  THROW(ParseError({
                       .msg = HintFmt("invalid float '%1%'", yytext),
                       .pos = state->positions[CUR_POS],
-                  });
+                  }));
               return FLOAT_LIT;
             }
 
@@ -268,10 +274,10 @@ or          { return OR_KW; }
 
 <INPATH_SLASH>{ANY} |
 <INPATH_SLASH><<EOF>> {
-  throw ParseError(ErrorInfo{
+  THROW(ParseError({
       .msg = HintFmt("path has a trailing slash"),
       .pos = state->positions[CUR_POS],
-  });
+  }));
 }
 
 {SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }

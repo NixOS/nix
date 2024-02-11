@@ -46,34 +46,35 @@ struct ParserState
     PosTable::Origin origin;
     const ref<InputAccessor> rootFS;
     const Expr::AstSymbols & s;
+    std::unique_ptr<Error> error;
 
-    void dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
-    void dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos);
-    void addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos);
-    Formals * validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
+    [[nodiscard]] ParseError dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
+    [[nodiscard]] ParseError dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos);
+    [[nodiscard]] std::optional<ParseError> addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos);
+    [[nodiscard]] std::optional<ParseError> validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos,
         std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
     PosIdx at(const ParserLocation & loc);
 };
 
-inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
+inline ParseError ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
 {
-    throw ParseError({
+    return ParseError({
          .msg = HintFmt("attribute '%1%' already defined at %2%",
              showAttrPath(symbols, attrPath), positions[prevPos]),
          .pos = positions[pos]
     });
 }
 
-inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos)
+inline ParseError ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos)
 {
-    throw ParseError({
+    return ParseError({
         .msg = HintFmt("attribute '%1%' already defined at %2%", symbols[attr], positions[prevPos]),
         .pos = positions[pos]
     });
 }
 
-inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos)
+inline std::optional<ParseError> ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos)
 {
     AttrPath::iterator i;
     // All attrpaths have at least one attr
@@ -86,10 +87,10 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
             if (j != attrs->attrs.end()) {
                 if (j->second.kind != ExprAttrs::AttrDef::Kind::Inherited) {
                     ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
-                    if (!attrs2) dupAttr(attrPath, pos, j->second.pos);
+                    if (!attrs2) return dupAttr(attrPath, pos, j->second.pos);
                     attrs = attrs2;
                 } else
-                    dupAttr(attrPath, pos, j->second.pos);
+                    return dupAttr(attrPath, pos, j->second.pos);
             } else {
                 ExprAttrs * nested = new ExprAttrs;
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
@@ -118,7 +119,7 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
                 for (auto & ad : ae->attrs) {
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
-                        dupAttr(ad.first, j2->second.pos, ad.second.pos);
+                        return dupAttr(ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs.emplace(ad.first, ad.second);
                     if (ad.second.kind == ExprAttrs::AttrDef::Kind::InheritedFrom) {
                         auto & sel = dynamic_cast<ExprSelect &>(*ad.second.e);
@@ -132,7 +133,7 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
                         ae->inheritFromExprs->begin(), ae->inheritFromExprs->end());
                 }
             } else {
-                dupAttr(attrPath, pos, j->second.pos);
+                return dupAttr(attrPath, pos, j->second.pos);
             }
         } else {
             // This attr path is not defined. Let's create it.
@@ -142,9 +143,11 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
     } else {
         attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, e, pos));
     }
+
+    return {};
 }
 
-inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Symbol arg)
+inline std::optional<ParseError> ParserState::validateFormals(Formals * formals, PosIdx pos, Symbol arg)
 {
     std::sort(formals->formals.begin(), formals->formals.end(),
         [] (const auto & a, const auto & b) {
@@ -159,18 +162,18 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
         duplicate = std::min(thisDup, duplicate.value_or(thisDup));
     }
     if (duplicate)
-        throw ParseError({
+        return ParseError({
             .msg = HintFmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
             .pos = positions[duplicate->second]
         });
 
     if (arg && formals->has(arg))
-        throw ParseError({
+        return ParseError({
             .msg = HintFmt("duplicate formal function argument '%1%'", symbols[arg]),
             .pos = positions[pos]
         });
 
-    return formals;
+    return {};
 }
 
 inline Expr * ParserState::stripIndentation(const PosIdx pos,
