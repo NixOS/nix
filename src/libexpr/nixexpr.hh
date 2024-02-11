@@ -297,7 +297,7 @@ struct ExprCall : Expr
     std::vector<Expr *> args;
     PosIdx pos;
     ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
-        : fun(fun), args(args), pos(pos)
+        : fun(fun), args(std::move(args)), pos(pos)
     { }
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -379,9 +379,9 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *>> * es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> * es)
-        : pos(pos), forceString(forceString), es(es) { };
+    std::vector<std::pair<PosIdx, Expr *>> es;
+    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> es)
+        : pos(pos), forceString(forceString), es(std::move(es)) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
 };

@@ -211,7 +211,7 @@ expr_op
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->at(@2), $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(state->at(@2), false, new std::vector<std::pair<PosIdx, Expr *> >({{state->at(@1), $1}, {state->at(@3), $3}})); }
+    { $$ = new ExprConcatStrings(state->at(@2), false, {{state->at(@1), $1}, {state->at(@3), $3}}); }
   | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.sub), {$1, $3}); }
   | expr_op '*' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.mul), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.div), {$1, $3}); }
@@ -260,7 +260,8 @@ expr_simple
   | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
       $2->insert($2->begin(), {state->at(@1), $1});
-      $$ = new ExprConcatStrings(CUR_POS, false, $2);
+      $$ = new ExprConcatStrings(CUR_POS, false, std::move(*$2));
+      delete $2;
   }
   | SPATH {
       std::string path($1.p + 1, $1.l - 2);
@@ -292,7 +293,10 @@ expr_simple
 
 string_parts
   : STR { $$ = new ExprString(std::string($1)); }
-  | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
+  | string_parts_interpolated
+    { $$ = new ExprConcatStrings(CUR_POS, true, std::move(*$1));
+      delete $1;
+    }
   | { $$ = new ExprString(""); }
   ;
 

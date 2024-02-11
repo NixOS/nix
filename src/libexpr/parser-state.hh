@@ -217,7 +217,7 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
     }
 
     /* Strip spaces from each line. */
-    auto * es2 = new std::vector<std::pair<PosIdx, Expr *>>;
+    std::vector<std::pair<PosIdx, Expr *>> es2;
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
@@ -225,7 +225,7 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
     const auto trimExpr = [&] (Expr * e) {
         atStartOfLine = false;
         curDropped = 0;
-        es2->emplace_back(i->first, e);
+        es2.emplace_back(i->first, e);
     };
     const auto trimString = [&] (const StringToken & t) {
         std::string s2;
@@ -257,19 +257,17 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
                 s2 = std::string(s2, 0, p + 1);
         }
 
-        es2->emplace_back(i->first, new ExprString(std::move(s2)));
+        es2.emplace_back(i->first, new ExprString(std::move(s2)));
     };
     for (; i != es.end(); ++i, --n) {
         std::visit(overloaded { trimExpr, trimString }, i->second);
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    if (es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second)) {
-        auto *const result = (*es2)[0].second;
-        delete es2;
-        return result;
+    if (es2.size() == 1 && dynamic_cast<ExprString *>(es2[0].second)) {
+        return es2[0].second;
     }
-    return new ExprConcatStrings(pos, true, es2);
+    return new ExprConcatStrings(pos, true, std::move(es2));
 }
 
 inline PosIdx ParserState::at(const ParserLocation & loc)

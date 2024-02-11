@@ -232,7 +232,7 @@ void ExprConcatStrings::show(const SymbolTable & symbols, std::ostream & str) co
 {
     bool first = true;
     str << "(";
-    for (auto & i : *es) {
+    for (auto & i : es) {
         if (first) first = false; else str << " + ";
         i.second->show(symbols, str);
     }
@@ -548,7 +548,7 @@ void ExprConcatStrings::bindVars(EvalState & es, const std::shared_ptr<const Sta
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
-    for (auto & i : *this->es)
+    for (auto & i : this->es)
         i.second->bindVars(es, env);
 }
 
