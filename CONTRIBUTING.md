@@ -63,7 +63,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
      - Functional tests – [`tests/functional/**.sh`](./tests/functional)
      - Unit tests – [`src/*/tests`](./src/)
      - Integration tests – [`tests/nixos/*`](./tests/nixos)
-   - [ ] User documentation in the [manual](..doc/manual/src)
+   - [ ] User documentation in the [manual](./doc/manual/src)
    - [ ] API documentation in header files
    - [ ] Code and comments are self-explanatory
    - [ ] Commit message explains **why** the change was made
