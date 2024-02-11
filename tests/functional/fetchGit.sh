@@ -107,6 +107,25 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [ ! -e $path2/.git ]
 [[ $(cat $path2/dir1/foo) = foo ]]
 
+# Using an unclean tree with --include-git-untracked-files option should yield the tracked and uncommitted changes
+path21=$(nix eval --include-untracked-files --impure --raw --expr "(builtins.fetchGit $repo).outPath")
+[ ! -e $path21/hello ]
+[ -e $path21/bar ]
+[ -e $path21/dir2/bar ]
+[ ! -e $path21/.git ]
+[[ $(cat $path21/dir1/foo) = foo ]]
+
+# Using an unclean tree with --include-git-untracked-files option should take into account .gitignore files
+echo "/bar" >> $repo/.gitignore
+echo "bar" >> $repo/dir2/.gitignore
+path22=$(nix eval --include-untracked-files --impure --raw --expr "(builtins.fetchGit $repo).outPath")
+[ ! -e $path22/hello ]
+[ ! -e $path22/bar ]
+[ ! -e $path22/dir2/bar ]
+[ ! -e $path22/.git ]
+git -C $repo checkout -- $repo/.gitignore
+git -C $repo clean -fd
+
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).dirtyRev") = "${rev2}-dirty" ]]
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).dirtyShortRev") = "${rev2:0:7}-dirty" ]]

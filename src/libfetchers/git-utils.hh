@@ -49,7 +49,7 @@ struct GitRepo
         std::vector<Submodule> submodules;
     };
 
-    virtual WorkdirInfo getWorkdirInfo() = 0;
+    virtual WorkdirInfo getWorkdirInfo(bool includeUntrackedFiles) = 0;
 
     /* Get the ref that HEAD points to. */
     virtual std::optional<std::string> getWorkdirRef() = 0;
