@@ -6,7 +6,6 @@
 , aws-sdk-cpp
 , boehmgc
 , nlohmann_json
-, bison
 , boost
 , brotli
 , bzip2
@@ -14,7 +13,6 @@
 , editline
 , readline
 , fileset
-, flex
 , git
 , gtest
 , jq
@@ -30,6 +28,7 @@
 , mercurial
 , openssh
 , openssl
+, pegtl
 , pkg-config
 , rapidcheck
 , sqlite
@@ -202,9 +201,6 @@ in {
     autoconf-archive
     autoreconfHook
     pkg-config
-  ] ++ lib.optionals doBuild [
-    bison
-    flex
   ] ++ lib.optionals enableManual [
     (lib.getBin lowdown)
     mdbook
@@ -299,7 +295,8 @@ in {
   ] ++ lib.optional (doBuild && stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
        "LDFLAGS=-fuse-ld=gold"
     ++ lib.optional (doBuild && stdenv.hostPlatform.isStatic) "--enable-embedded-sandbox-shell"
-    ;
+    ++ lib.optional buildUnitTests "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+    ++ lib.optional doBuild "PEGTL_HEADERS=${lib.getDev pegtl}/include";
 
   enableParallelBuilding = true;
 

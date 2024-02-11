@@ -1,4 +1,4 @@
-error: syntax error, unexpected ':', expecting '}'
+error: syntax error, expecting '}'
        at «stdin»:3:13:
             2|
             3|   f = {x, y : ["baz" "bar" z "bat"]}: x + y;

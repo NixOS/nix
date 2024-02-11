@@ -7,12 +7,12 @@ libexpr_DIR := $(d)
 libexpr_SOURCES := \
   $(wildcard $(d)/*.cc) \
   $(wildcard $(d)/value/*.cc) \
+  $(wildcard $(d)/parser/*.cc) \
   $(wildcard $(d)/primops/*.cc) \
-  $(wildcard $(d)/flake/*.cc) \
-  $(d)/lexer-tab.cc \
-  $(d)/parser-tab.cc
+  $(wildcard $(d)/flake/*.cc)
 
-libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
+libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr \
+  -I pegtl/include
 
 libexpr_LIBS = libutil libstore libfetchers
 
@@ -25,16 +25,6 @@ endif
 # programs/libraries that use libexpr must explicitly pass -lgc),
 # because inline functions in libexpr's header files call libgc.
 libexpr_LDFLAGS_PROPAGATED = $(BDW_GC_LIBS)
-
-libexpr_ORDER_AFTER := $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
-
-$(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
-	$(trace-gen) bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d
-
-$(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
-	$(trace-gen) flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
-
-clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
 
 $(eval $(call install-file-in, $(buildprefix)$(d)/nix-expr.pc, $(libdir)/pkgconfig, 0644))
 

@@ -387,6 +387,16 @@ AS_CASE(["$enable_markdown"],
 PKG_CHECK_MODULES([LIBGIT2], [libgit2])
 
 
+# Look for pegtl.
+# pegtl has only cmake support, no pkg-config.
+AC_ARG_VAR([PEGTL_HEADERS], [include path of pegtl headers])
+AC_LANG_PUSH(C++)
+AC_SUBST(PEGTL_HEADERS)
+[CXXFLAGS="-I $PEGTL_HEADERS $CXXFLAGS"]
+AC_CHECK_HEADER(tao/pegtl.hpp, [], [AC_MSG_ERROR([PEGTL not found.])])
+AC_LANG_POP(C++)
+
+
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
 
