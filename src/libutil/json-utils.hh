@@ -29,7 +29,7 @@ std::optional<nlohmann::json> optionalValueAt(const nlohmann::json::object_t & v
  * Downcast the json object, failing with a nice error if the conversion fails.
  * See https://json.nlohmann.me/features/types/
  */
-std::optional<nlohmann::json> getNullable(const nlohmann::json & value);
+const nlohmann::json * getNullable(const nlohmann::json & value);
 const nlohmann::json::object_t & getObject(const nlohmann::json & value);
 const nlohmann::json::array_t & getArray(const nlohmann::json & value);
 const nlohmann::json::string_t & getString(const nlohmann::json & value);
