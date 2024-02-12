@@ -111,7 +111,7 @@ where
 [Nix Archive (NAR)]: @docroot@/glossary.md#gloss-NAR
 [sha-256]: https://en.m.wikipedia.org/wiki/SHA-256
 
-## Historical Note
+### Historical Note
 
 The `type` = `"source:" ...` and `type` = `"output:out"` grammars technically overlap in purpose,
 in that both can represent data hashed by its SHA-256 NAR serialization.

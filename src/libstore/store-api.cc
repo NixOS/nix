@@ -69,7 +69,7 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 The exact specification of store paths is in `protocols/store-path.md`
 in the Nix manual. These few functions implement that specification.
 
-If changes do these functions go behind mere implementation changes but
+If changes to these functions go beyond mere implementation changes i.e.
 also update the user-visible behavior, please update the specification
 to match.
 */
