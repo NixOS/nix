@@ -95,11 +95,11 @@ where
           hashes of the for [Nix Archive (NAR)] (arbitrary file system object) serialization
 
         - ```ebnf
-          |
+          | ""
           ```
           (empty string) for hashes of the flat (single file) serialization
 
-      - ```ebf
+      - ```ebnf
         algo = "md5" | "sha1" | "sha256"
         ```
 
