@@ -36,17 +36,35 @@ struct PrintOptions
      */
     size_t maxDepth = std::numeric_limits<size_t>::max();
     /**
-     * Maximum number of attributes in an attribute set to print.
+     * Maximum number of attributes in attribute sets to print.
+     *
+     * Note that this is a limit for the entire print invocation, not for each
+     * attribute set encountered.
      */
     size_t maxAttrs = std::numeric_limits<size_t>::max();
     /**
      * Maximum number of list items to print.
+     *
+     * Note that this is a limit for the entire print invocation, not for each
+     * list encountered.
      */
     size_t maxListItems = std::numeric_limits<size_t>::max();
     /**
      * Maximum string length to print.
      */
     size_t maxStringLength = std::numeric_limits<size_t>::max();
+};
+
+/**
+ * `PrintOptions` for unknown and therefore potentially large values in error messages,
+ * to avoid printing "too much" output.
+ */
+static PrintOptions errorPrintOptions = PrintOptions {
+    .ansiColors = true,
+    .maxDepth = 10,
+    .maxAttrs = 10,
+    .maxListItems = 10,
+    .maxStringLength = 1024
 };
 
 }

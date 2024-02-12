@@ -20,6 +20,11 @@ error:
             3|     true
 
        … while evaluating list element at index 3
+         at /pwd/lang/eval-fail-toJSON.nix:2:3:
+            1| builtins.toJSON {
+            2|   a.b = [
+             |   ^
+            3|     true
 
        … while evaluating attribute 'c'
          at /pwd/lang/eval-fail-toJSON.nix:7:7:

@@ -2,48 +2,39 @@
 
 > **Note**
 >
-> These upgrade instructions apply for regular Linux distributions where Nix was installed following the [installation instructions in this manual](./index.md).
+> These upgrade instructions apply where Nix was installed following the [installation instructions in this manual](./index.md).
 
-First, find the name of the current [channel](@docroot@/command-ref/nix-channel.md) through which Nix is distributed:
-
-```console
-$ nix-channel --list
-```
-
-By default this should return an entry for Nixpkgs:
+Check which Nix version will be installed, for example from one of the [release channels](http://channels.nixos.org/) such as `nixpkgs-unstable`:
 
 ```console
-nixpkgs https://nixos.org/channels/nixpkgs-23.05
-```
-
-Check which Nix version will be installed:
-
-```console
-$ nix-shell -p nix -I nixpkgs=channel:nixpkgs-23.11 --run "nix --version"
+$ nix-shell -p nix -I nixpkgs=channel:nixpkgs-unstable --run "nix --version"
 nix (Nix) 2.18.1
 ```
 
 > **Warning**
 >
-> Writing to the [local store](@docroot@/store/types/local-store.md) with a newer version of Nix, for example by building derivations with `nix-build` or `nix-store --realise`, may change the database schema!
+> Writing to the [local store](@docroot@/store/types/local-store.md) with a newer version of Nix, for example by building derivations with [`nix-build`](@docroot@/command-ref/nix-build.md) or [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md), may change the database schema!
 > Reverting to an older version of Nix may therefore require purging the store database before it can be used.
 
-Update the channel entry:
+## Linux multi-user
 
 ```console
-$ nix-channel --remove nixpkgs
-$ nix-channel --add https://nixos.org/channels/nixpkgs-23.11 nixpkgs
+$ sudo su
+# nix-env --install --file '<nixpkgs>' --attr nix cacert -I nixpkgs=channel:nixpkgs-unstable
+# systemctl daemon-reload
+# systemctl restart nix-daemon
 ```
 
-Multi-user Nix users on macOS can upgrade Nix by running: `sudo -i sh -c
-'nix-channel --update &&
-nix-env --install --attr nixpkgs.nix &&
-launchctl remove org.nixos.nix-daemon &&
-launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist'`
+## macOS multi-user
 
-Single-user installations of Nix should run this: `nix-channel --update;
-nix-env --install --attr nixpkgs.nix nixpkgs.cacert`
+```console
+$ sudo nix-env --install --file '<nixpkgs>' --attr nix -I nixpkgs=channel:nixpkgs-unstable
+$ sudo launchctl remove org.nixos.nix-daemon
+$ sudo launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+```
 
-Multi-user Nix users on Linux should run this with sudo: `nix-channel
---update; nix-env --install --attr nixpkgs.nix nixpkgs.cacert; systemctl
-daemon-reload; systemctl restart nix-daemon`
+## Single-user all platforms
+
+```console
+$ nix-env --install --file '<nixpkgs>' --attr nix cacert -I nixpkgs=channel:nixpkgs-unstable
+```

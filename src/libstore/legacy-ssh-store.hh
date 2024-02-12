@@ -13,7 +13,7 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{this, "nix-store", "remote-program",
+    const Setting<Strings> remoteProgram{this, {"nix-store"}, "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
     const Setting<int> maxConnections{this, 1, "max-connections",
@@ -77,10 +77,6 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override
     { unsupported("addToStore"); }
-
-private:
-
-    void putBuildSettings(Connection & conn);
 
 public:
 

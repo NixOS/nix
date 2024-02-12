@@ -395,13 +395,23 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking derivation %s", attrPath));
                 auto packageInfo = getDerivation(*state, v, false);
                 if (!packageInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
-                // FIXME: check meta attributes
-                return packageInfo->queryDrvPath();
+                else {
+                    // FIXME: check meta attributes
+                    auto storePath = packageInfo->queryDrvPath();
+                    if (storePath) {
+                        logger->log(lvlInfo,
+                            fmt("derivation evaluated to %s",
+                                store->printStorePath(storePath.value())));
+                    }
+                    return storePath;
+                }
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the derivation '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the derivation '%s'", attrPath));
                 reportError(e);
             }
             return std::nullopt;
@@ -420,13 +430,15 @@ struct CmdFlakeCheck : FlakeCommand
                 }
                 #endif
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the app definition '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the app definition '%s'", attrPath));
                 reportError(e);
             }
         };
 
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking overlay '%s'", attrPath));
                 state->forceValue(v, pos);
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
@@ -442,16 +454,18 @@ struct CmdFlakeCheck : FlakeCommand
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the overlay '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the overlay '%s'", attrPath));
                 reportError(e);
             }
         };
 
         auto checkModule = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking NixOS module '%s'", attrPath));
                 state->forceValue(v, pos);
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the NixOS module '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the NixOS module '%s'", attrPath));
                 reportError(e);
             }
         };
@@ -469,7 +483,7 @@ struct CmdFlakeCheck : FlakeCommand
                     state->forceAttrs(*attr.value, attr.pos, "");
                     auto attrPath2 = concatStrings(attrPath, ".", state->symbols[attr.name]);
                     if (state->isDerivation(*attr.value)) {
-                        Activity act(*logger, lvlChatty, actUnknown,
+                        Activity act(*logger, lvlInfo, actUnknown,
                             fmt("checking Hydra job '%s'", attrPath2));
                         checkDerivation(attrPath2, *attr.value, attr.pos);
                     } else
@@ -477,14 +491,14 @@ struct CmdFlakeCheck : FlakeCommand
                 }
 
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the Hydra jobset '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the Hydra jobset '%s'", attrPath));
                 reportError(e);
             }
         };
 
         auto checkNixOSConfiguration = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlChatty, actUnknown,
+                Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking NixOS configuration '%s'", attrPath));
                 Bindings & bindings(*state->allocBindings(0));
                 auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v).first;
@@ -492,14 +506,14 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!state->isDerivation(*vToplevel))
                     throw Error("attribute 'config.system.build.toplevel' is not a derivation");
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the NixOS configuration '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the NixOS configuration '%s'", attrPath));
                 reportError(e);
             }
         };
 
         auto checkTemplate = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlChatty, actUnknown,
+                Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking template '%s'", attrPath));
 
                 state->forceAttrs(v, pos, "");
@@ -526,19 +540,21 @@ struct CmdFlakeCheck : FlakeCommand
                         throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
                 }
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the template '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the template '%s'", attrPath));
                 reportError(e);
             }
         };
 
         auto checkBundler = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking bundler '%s'", attrPath));
                 state->forceValue(v, pos);
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
                 // TODO: check types of inputs/outputs?
             } catch (Error & e) {
-                e.addTrace(resolve(pos), hintfmt("while checking the template '%s'", attrPath));
+                e.addTrace(resolve(pos), HintFmt("while checking the template '%s'", attrPath));
                 reportError(e);
             }
         };
@@ -552,7 +568,7 @@ struct CmdFlakeCheck : FlakeCommand
             enumerateOutputs(*state,
                 *vFlake,
                 [&](const std::string & name, Value & vOutput, const PosIdx pos) {
-                    Activity act(*logger, lvlChatty, actUnknown,
+                    Activity act(*logger, lvlInfo, actUnknown,
                         fmt("checking flake output '%s'", name));
 
                     try {
@@ -758,14 +774,15 @@ struct CmdFlakeCheck : FlakeCommand
                             warn("unknown flake output '%s'", name);
 
                     } catch (Error & e) {
-                        e.addTrace(resolve(pos), hintfmt("while checking flake output '%s'", name));
+                        e.addTrace(resolve(pos), HintFmt("while checking flake output '%s'", name));
                         reportError(e);
                     }
                 });
         }
 
         if (build && !drvPaths.empty()) {
-            Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
+            Activity act(*logger, lvlInfo, actUnknown,
+                fmt("running %d flake checks", drvPaths.size()));
             store->buildPaths(drvPaths);
         }
         if (hasErrors)
@@ -831,10 +848,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto templateDir = templateDirAttr->getString();
 
         if (!store->isInStore(templateDir))
-            throw TypeError(
+            evalState->error<TypeError>(
                 "'%s' was not found in the Nix store\n"
                 "If you've set '%s' to a string, try using a path instead.",
-                templateDir, templateDirAttr->getAttrPathStr());
+                templateDir, templateDirAttr->getAttrPathStr()).debugThrow();
 
         std::vector<Path> changedFiles;
         std::vector<Path> conflictedFiles;
@@ -1304,7 +1321,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 {
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
-                        throw EvalError("not an app definition");
+                        state->error<EvalError>("not an app definition").debugThrow();
                     if (json) {
                         j.emplace("type", "app");
                     } else {

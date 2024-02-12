@@ -11,7 +11,7 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, bool frame)
 {
     err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
 }
@@ -37,7 +37,7 @@ const std::string & BaseError::calcWhat() const
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
-std::ostream & operator <<(std::ostream & os, const hintformat & hf)
+std::ostream & operator <<(std::ostream & os, const HintFmt & hf)
 {
     return os << hf.str();
 }
@@ -335,7 +335,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
      *      try {
      *          e->eval(*this, env, v);
      *          if (v.type() != nAttrs)
-     *              throwTypeError("value is %1% while a set was expected", v);
+     *              error<TypeError>("expected a set but found %1%", v);
      *      } catch (Error & e) {
      *          e.addTrace(pos, errorCtx);
      *          throw;
@@ -349,7 +349,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
      *      e->eval(*this, env, v);
      *      try {
      *          if (v.type() != nAttrs)
-     *              throwTypeError("value is %1% while a set was expected", v);
+     *              error<TypeError>("expected a set but found %1%", v);
      *      } catch (Error & e) {
      *          e.addTrace(pos, errorCtx);
      *          throw;
@@ -411,7 +411,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     oss << einfo.msg << "\n";
 
-    printPosMaybe(oss, "", einfo.errPos);
+    printPosMaybe(oss, "", einfo.pos);
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {

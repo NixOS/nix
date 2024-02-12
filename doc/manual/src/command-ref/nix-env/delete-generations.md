@@ -12,13 +12,13 @@ This operation deletes the specified generations of the current profile.
 
 *generations* can be a one of the following:
 
-- <span id="generations-list">`<number>...`</span>:\
+- <span id="generations-list">[`<number>...`](#generations-list)</span>:\
   A list of generation numbers, each one a separate command-line argument.
 
   Delete exactly the profile generations given by their generation number.
   Deleting the current generation is not allowed.
 
-- The special value <span id="generations-old">`old`</span>
+- <span id="generations-old">[The special value `old`](#generations-old)</span>
 
   Delete all generations except the current one.
 
@@ -30,7 +30,7 @@ This operation deletes the specified generations of the current profile.
   > Because one can roll back to a previous generation, it is possible to have generations newer than the current one.
   > They will also be deleted.
 
-- <span id="generations-time">`<number>d`</span>:\
+- <span id="generations-time">[`<number>d`](#generations-time)</span>:\
   The last *number* days
 
   *Example*: `30d`
@@ -38,7 +38,7 @@ This operation deletes the specified generations of the current profile.
   Delete all generations created more than *number* days ago, except the most recent one of them.
   This allows rolling back to generations that were available within the specified period.
 
-- <span id="generations-count">`+<number>`</span>:\
+- <span id="generations-count">[`+<number>`](#generations-count)</span>:\
   The last *number* generations up to the present
 
   *Example*: `+5`

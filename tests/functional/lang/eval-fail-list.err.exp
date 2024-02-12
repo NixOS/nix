@@ -5,4 +5,4 @@ error:
              |  ^
             2|
 
-       error: value is an integer while a list was expected
+       error: expected a list but found an integer: 8

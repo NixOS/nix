@@ -92,7 +92,7 @@ void handleDiffHook(
         } catch (Error & error) {
             ErrorInfo ei = error.info();
             // FIXME: wrap errors.
-            ei.msg = hintfmt("diff hook execution failed: %s", ei.msg.str());
+            ei.msg = HintFmt("diff hook execution failed: %s", ei.msg.str());
             logError(ei);
         }
     }
@@ -232,7 +232,7 @@ void LocalDerivationGoal::tryLocalBuild()
         if (!buildUser) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                    fmt("waiting for a free build user ID for '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
+                    fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }
@@ -2724,7 +2724,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             .outPath = newInfo.path
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
-            && drv->type().isPure())
+            && !drv->type().isImpure())
         {
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);

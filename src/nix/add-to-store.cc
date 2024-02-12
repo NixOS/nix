@@ -22,6 +22,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     Path path;
     std::optional<std::string> namePart;
     ContentAddressMethod caMethod = FileIngestionMethod::Recursive;
+    HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
 
     CmdAddToStore()
     {
@@ -38,7 +39,6 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         addFlag({
             .longName  = "mode",
-            .shortName = 'n',
             .description = R"(
     How to compute the hash of the input.
     One of:
@@ -52,21 +52,21 @@ struct CmdAddToStore : MixDryRun, StoreCommand
                 this->caMethod = parseIngestionMethod(s);
             }},
         });
+
+        addFlag(Flag::mkHashAlgoFlag(&hashAlgo));
     }
 
     void run(ref<Store> store) override
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        PosixSourceAccessor accessor;
-
-        auto path2 = CanonPath::fromCwd(path);
+        auto [accessor, path2] = PosixSourceAccessor::createAtRoot(path);
 
         auto storePath = dryRun
             ? store->computeStorePath(
-                *namePart, accessor, path2, caMethod, HashAlgorithm::SHA256, {}).first
+                *namePart, accessor, path2, caMethod, hashAlgo, {}).first
             : store->addToStoreSlow(
-                *namePart, accessor, path2, caMethod, HashAlgorithm::SHA256, {}).path;
+                *namePart, accessor, path2, caMethod, hashAlgo, {}).path;
 
         logger->cout("%s", store->printStorePath(storePath));
     }

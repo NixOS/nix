@@ -9,6 +9,8 @@
 
 namespace nix {
 
+unsigned long Expr::nrExprs = 0;
+
 ExprBlackHole eBlackHole;
 
 // FIXME: remove, because *symbols* are abstract and do not have a single
@@ -294,10 +296,10 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
     if (withLevel == -1)
-        throw UndefinedVarError({
-            .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
-            .errPos = es.positions[pos]
-        });
+        es.error<UndefinedVarError>(
+            "undefined variable '%1%'",
+            es.symbols[name]
+        ).atPos(pos).debugThrow();
     for (auto * e = env.get(); e && !fromWith; e = e->up)
         fromWith = e->isWith;
     this->level = withLevel;
@@ -407,9 +409,6 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 
 void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    if (es.debugRepl)
-        es.exprEnvs.insert(std::make_pair(this, env));
-
     auto newEnv = std::make_shared<StaticEnv>(nullptr, env.get(), attrs->attrs.size());
 
     Displacement displ = 0;
@@ -420,6 +419,9 @@ void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
 
     for (auto & i : attrs->attrs)
         i.second.e->bindVars(es, i.second.inherited ? env : newEnv);
+
+    if (es.debugRepl)
+        es.exprEnvs.insert(std::make_pair(this, newEnv));
 
     body->bindVars(es, newEnv);
 }
@@ -444,9 +446,6 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
             prevWith = level;
             break;
         }
-
-    if (es.debugRepl)
-        es.exprEnvs.insert(std::make_pair(this, env));
 
     attrs->bindVars(es, env);
     auto newEnv = std::make_shared<StaticEnv>(this, env.get());

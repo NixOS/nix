@@ -151,13 +151,18 @@ public:
     MaxBuildJobsSetting maxBuildJobs{
         this, 1, "max-jobs",
         R"(
-          This option defines the maximum number of jobs that Nix will try to
-          build in parallel. The default is `1`. The special value `auto`
-          causes Nix to use the number of CPUs in your system. `0` is useful
-          when using remote builders to prevent any local builds (except for
-          `preferLocalBuild` derivation attribute which executes locally
-          regardless). It can be overridden using the `--max-jobs` (`-j`)
-          command line switch.
+          Maximum number of jobs that Nix will try to build locally in parallel.
+
+          The special value `auto` causes Nix to use the number of CPUs in your system.
+          Use `0` to disable local builds and directly use the remote machines specified in [`builders`](#conf-builders).
+          This will not affect derivations that have [`preferLocalBuild = true`](@docroot@/language/advanced-attributes.md#adv-attr-preferLocalBuild), which are always built locally.
+
+          > **Note**
+          >
+          > The number of CPU cores to use for each build job is independently determined by the [`cores`](#conf-cores) setting.
+
+          <!-- TODO(@fricklerhandwerk): would be good to have those shorthands for common options as part of the specification -->
+          The setting can be overridden using the `--max-jobs` (`-j`) command line switch.
         )",
         {"build-max-jobs"}};
 
@@ -635,7 +640,7 @@ public:
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
+          - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
 

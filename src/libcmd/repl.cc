@@ -232,7 +232,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
         : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
-        out << pos;
+        out << *pos;
         if (auto loc = pos->getCodeLines()) {
             out << "\n";
             printCodeLines(out, "", *pos, *loc);
@@ -243,10 +243,19 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     return out;
 }
 
+static bool isFirstRepl = true;
+
 void NixRepl::mainLoop()
 {
-    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
+    if (isFirstRepl) {
+        std::string_view debuggerNotice = "";
+        if (state->debugRepl) {
+            debuggerNotice = " debugger";
+        }
+        notice("Nix %1%%2%\nType :? for help.", nixVersion, debuggerNotice);
+    }
+
+    isFirstRepl = false;
 
     loadFiles();
 
@@ -422,8 +431,6 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             // Quietly ignore parse errors.
         } catch (EvalError & e) {
             // Quietly ignore evaluation errors.
-        } catch (UndefinedVarError & e) {
-            // Quietly ignore undefined variable errors.
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
         }
@@ -890,7 +897,7 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    return state->parseExprFromString(std::move(s), state->rootPath(CanonPath::fromCwd()), staticEnv);
+    return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
 }
 
 

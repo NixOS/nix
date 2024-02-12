@@ -29,12 +29,7 @@ using namespace nix;
 
 namespace nix {
 
-static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
-{
-    return data->state.positions.add(data->origin, loc.first_line, loc.first_column);
-}
-
-#define CUR_POS makeCurPos(*yylloc, data)
+#define CUR_POS state->at(*yylloc)
 
 static void initLoc(YYLTYPE * loc)
 {
@@ -151,9 +146,9 @@ or          { return OR_KW; }
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
               } catch (const boost::bad_lexical_cast &) {
-                  throw ParseError({
-                      .msg = hintfmt("invalid integer '%1%'", yytext),
-                      .errPos = data->state.positions[CUR_POS],
+                  throw ParseError(ErrorInfo{
+                      .msg = HintFmt("invalid integer '%1%'", yytext),
+                      .pos = state->positions[CUR_POS],
                   });
               }
               return INT_LIT;
@@ -161,9 +156,9 @@ or          { return OR_KW; }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
-                  throw ParseError({
-                      .msg = hintfmt("invalid float '%1%'", yytext),
-                      .errPos = data->state.positions[CUR_POS],
+                  throw ParseError(ErrorInfo{
+                      .msg = HintFmt("invalid float '%1%'", yytext),
+                      .pos = state->positions[CUR_POS],
                   });
               return FLOAT_LIT;
             }
@@ -186,7 +181,7 @@ or          { return OR_KW; }
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->str = unescapeStr(data->symbols, yytext, yyleng);
+                yylval->str = unescapeStr(state->symbols, yytext, yyleng);
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -214,7 +209,7 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\{ANY} {
-                   yylval->str = unescapeStr(data->symbols, yytext + 2, yyleng - 2);
+                   yylval->str = unescapeStr(state->symbols, yytext + 2, yyleng - 2);
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -290,9 +285,9 @@ or          { return OR_KW; }
 
 <INPATH_SLASH>{ANY} |
 <INPATH_SLASH><<EOF>> {
-  throw ParseError({
-      .msg = hintfmt("path has a trailing slash"),
-      .errPos = data->state.positions[CUR_POS],
+  throw ParseError(ErrorInfo{
+      .msg = HintFmt("path has a trailing slash"),
+      .pos = state->positions[CUR_POS],
   });
 }
 

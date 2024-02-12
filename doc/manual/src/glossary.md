@@ -127,7 +127,7 @@
   non-[fixed-output](#gloss-fixed-output-derivation)
   derivation.
 
-- [output-addressed store object]{#gloss-output-addressed-store-object}
+- [content-addressed store object]{#gloss-content-addressed-store-object}
 
   A [store object] whose [store path] is determined by its contents.
   This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
@@ -156,6 +156,11 @@
   builder can rely on external inputs such as the network or the
   system time) but the Nix model assumes it.
 
+- [impure derivation]{#gloss-impure-derivation}
+
+  [An experimental feature](#@docroot@/contributing/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
+  so that they are always rebuilt, and their outputs not reused by subsequent calls to realise them.
+
 - [Nix database]{#gloss-nix-database}
 
   An SQlite database to track [reference]s between [store object]s.
@@ -167,12 +172,13 @@
 
 - [Nix expression]{#gloss-nix-expression}
 
-  A high-level description of software packages and compositions
-  thereof. Deploying software using Nix entails writing Nix
-  expressions for your packages. Nix expressions specify [derivations][derivation],
-  which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
-  These derivations can then be [realised][realise] to produce
-  [outputs][output].
+  1. Commonly, a high-level description of software packages and compositions
+    thereof. Deploying software using Nix entails writing Nix
+    expressions for your packages. Nix expressions specify [derivations][derivation],
+    which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
+    These derivations can then be [realised][realise] to produce [outputs][output].
+
+  2. A syntactically valid use of the [Nix language]. For example, the contents of a `.nix` file form an expression.
 
 - [reference]{#gloss-reference}
 
@@ -279,7 +285,7 @@
 
 - [package attribute set]{#package-attribute-set}
 
-  An [attribute set] containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
+  An [attribute set](@docroot@/language/values.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
   - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
   - attributes that declare something about how the package is supposed to be installed or used,
   - other metadata or arbitrary attributes.
@@ -302,3 +308,6 @@
   These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
 
   See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/contributing/experimental-features.md).
+
+
+[Nix language]: ./language/index.md

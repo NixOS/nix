@@ -110,17 +110,17 @@ bool DerivationType::isSandboxed() const
 }
 
 
-bool DerivationType::isPure() const
+bool DerivationType::isImpure() const
 {
     return std::visit(overloaded {
         [](const InputAddressed & ia) {
-            return true;
+            return false;
         },
         [](const ContentAddressed & ca) {
-            return true;
+            return false;
         },
         [](const Impure &) {
-            return false;
+            return true;
         },
     }, raw);
 }
@@ -840,7 +840,7 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
         };
     }
 
-    if (!type.isPure()) {
+    if (type.isImpure()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & [outputName, _] : drv.outputs)
             outputHashes.insert_or_assign(outputName, impureOutputHash);

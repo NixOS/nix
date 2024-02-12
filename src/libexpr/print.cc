@@ -7,6 +7,7 @@
 #include "store-api.hh"
 #include "terminal.hh"
 #include "english.hh"
+#include "eval.hh"
 
 namespace nix {
 
@@ -19,7 +20,7 @@ void printElided(
 {
     if (ansiColors)
         output << ANSI_FAINT;
-    output << " «";
+    output << "«";
     pluralize(output, value, single, plural);
     output << " elided»";
     if (ansiColors)
@@ -36,7 +37,7 @@ printLiteralString(std::ostream & str, const std::string_view string, size_t max
     str << "\"";
     for (auto i = string.begin(); i != string.end(); ++i) {
         if (charsPrinted >= maxLength) {
-            str << "\"";
+            str << "\" ";
             printElided(str, string.length() - charsPrinted, "byte", "bytes", ansiColors);
             return str;
         }
@@ -151,7 +152,7 @@ struct ImportantFirstAttrNameCmp
     }
 };
 
-typedef std::set<Value *> ValuesSeen;
+typedef std::set<const void *> ValuesSeen;
 
 class Printer
 {
@@ -160,6 +161,8 @@ private:
     EvalState & state;
     PrintOptions options;
     std::optional<ValuesSeen> seen;
+    size_t attrsPrinted = 0;
+    size_t listItemsPrinted = 0;
 
     void printRepeated()
     {
@@ -252,14 +255,14 @@ private:
             output << "»";
             if (options.ansiColors)
                 output << ANSI_NORMAL;
-        } catch (BaseError & e) {
+        } catch (Error & e) {
             printError_(e);
         }
     }
 
     void printAttrs(Value & v, size_t depth)
     {
-        if (seen && !seen->insert(&v).second) {
+        if (seen && !seen->insert(v.attrs).second) {
             printRepeated();
             return;
         }
@@ -278,7 +281,6 @@ private:
             else
                 std::sort(sorted.begin(), sorted.end(), ImportantFirstAttrNameCmp());
 
-            size_t attrsPrinted = 0;
             for (auto & i : sorted) {
                 if (attrsPrinted >= options.maxAttrs) {
                     printElided(sorted.size() - attrsPrinted, "attribute", "attributes");
@@ -306,7 +308,6 @@ private:
 
         output << "[ ";
         if (depth < options.maxDepth) {
-            size_t listItemsPrinted = 0;
             for (auto elem : v.listItems()) {
                 if (listItemsPrinted >= options.maxListItems) {
                     printElided(v.listSize() - listItemsPrinted, "item", "items");
@@ -404,11 +405,11 @@ private:
             output << ANSI_NORMAL;
     }
 
-    void printError_(BaseError & e)
+    void printError_(Error & e)
     {
         if (options.ansiColors)
             output << ANSI_RED;
-        output << "«" << e.msg() << "»";
+        output << "«error: " << filterANSIEscapes(e.info().msg.str(), true) << "»";
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -421,7 +422,7 @@ private:
         if (options.force) {
             try {
                 state.forceValue(v, v.determinePos(noPos));
-            } catch (BaseError & e) {
+            } catch (Error & e) {
                 printError_(e);
                 return;
             }
@@ -485,6 +486,9 @@ public:
 
     void print(Value & v)
     {
+        attrsPrinted = 0;
+        listItemsPrinted = 0;
+
         if (options.trackRepeated) {
             seen.emplace();
         } else {
@@ -499,6 +503,19 @@ public:
 void printValue(EvalState & state, std::ostream & output, Value & v, PrintOptions options)
 {
     Printer(output, state, options).print(v);
+}
+
+std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer)
+{
+    printValue(printer.state, output, printer.value, printer.options);
+    return output;
+}
+
+template<>
+HintFmt & HintFmt::operator%(const ValuePrinter & value)
+{
+        fmt % value;
+        return *this;
 }
 
 }

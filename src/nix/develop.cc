@@ -354,7 +354,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
 
-        out << "eval \"$shellHook\"\n";
+        out << "eval \"${shellHook:-}\"\n";
 
         auto script = out.str();
 

@@ -253,12 +253,17 @@ struct DerivationType {
     bool isSandboxed() const;
 
     /**
-     * Whether the derivation is expected to produce the same result
-     * every time, and therefore it only needs to be built once. This is
-     * only false for derivations that have the attribute '__impure =
+     * Whether the derivation is expected to produce a different result
+     * every time, and therefore it needs to be rebuilt every time. This is
+     * only true for derivations that have the attribute '__impure =
      * true'.
+     *
+     * Non-impure derivations can still behave impurely, to the degree permitted
+     * by the sandbox. Hence why this method isn't `isPure`: impure derivations
+     * are not the negation of pure derivations. Purity can not be ascertained
+     * except by rather heavy tools.
      */
-    bool isPure() const;
+    bool isImpure() const;
 
     /**
      * Does the derivation knows its own output paths?

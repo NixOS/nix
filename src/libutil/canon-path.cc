@@ -20,11 +20,6 @@ CanonPath::CanonPath(const std::vector<std::string> & elems)
         push(s);
 }
 
-CanonPath CanonPath::fromCwd(std::string_view path)
-{
-    return CanonPath(unchecked_t(), absPath(path));
-}
-
 std::optional<CanonPath> CanonPath::parent() const
 {
     if (isRoot()) return std::nullopt;
@@ -63,7 +58,7 @@ void CanonPath::extend(const CanonPath & x)
         path += x.abs();
 }
 
-CanonPath CanonPath::operator + (const CanonPath & x) const
+CanonPath CanonPath::operator / (const CanonPath & x) const
 {
     auto res = *this;
     res.extend(x);
@@ -78,7 +73,7 @@ void CanonPath::push(std::string_view c)
     path += c;
 }
 
-CanonPath CanonPath::operator + (std::string_view c) const
+CanonPath CanonPath::operator / (std::string_view c) const
 {
     auto res = *this;
     res.push(c);

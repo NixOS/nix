@@ -47,6 +47,10 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 # State should be stored in /nix/var, unless the user overrides it explicitly.
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
+# Assign a default value to C{,XX}FLAGS as the default configure script sets them
+# to -O2 otherwise, which we don't want to have hardcoded
+CFLAGS=${CFLAGS-""}
+CXXFLAGS=${CXXFLAGS-""}
 
 AC_PROG_CC
 AC_PROG_CXX
@@ -351,7 +355,7 @@ fi
 AS_IF([test "$ENABLE_UNIT_TESTS" == "yes"],[
 
 # Look for gtest.
-PKG_CHECK_MODULES([GTEST], [gtest_main])
+PKG_CHECK_MODULES([GTEST], [gtest_main gmock_main])
 
 # Look for rapidcheck.
 PKG_CHECK_MODULES([RAPIDCHECK], [rapidcheck rapidcheck_gtest])

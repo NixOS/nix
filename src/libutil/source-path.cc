@@ -35,17 +35,17 @@ void SourcePath::dumpPath(
     PathFilter & filter) const
 { return accessor->dumpPath(path, sink, filter); }
 
-std::optional<CanonPath> SourcePath::getPhysicalPath() const
+std::optional<std::filesystem::path> SourcePath::getPhysicalPath() const
 { return accessor->getPhysicalPath(path); }
 
 std::string SourcePath::to_string() const
 { return accessor->showPath(path); }
 
-SourcePath SourcePath::operator+(const CanonPath & x) const
-{ return {accessor, path + x}; }
+SourcePath SourcePath::operator / (const CanonPath & x) const
+{ return {accessor, path / x}; }
 
-SourcePath SourcePath::operator+(std::string_view c) const
-{  return {accessor, path + c}; }
+SourcePath SourcePath::operator / (std::string_view c) const
+{ return {accessor, path / c}; }
 
 bool SourcePath::operator==(const SourcePath & x) const
 {

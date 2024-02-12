@@ -9,10 +9,13 @@
 
 #include <iostream>
 
-#include "eval.hh"
+#include "fmt.hh"
 #include "print-options.hh"
 
 namespace nix {
+
+class EvalState;
+struct Value;
 
 /**
  * Print a string as a Nix string literal.
@@ -58,5 +61,31 @@ bool isReservedKeyword(const std::string_view str);
 std::ostream & printIdentifier(std::ostream & o, std::string_view s);
 
 void printValue(EvalState & state, std::ostream & str, Value & v, PrintOptions options = PrintOptions {});
+
+/**
+ * A partially-applied form of `printValue` which can be formatted using `<<`
+ * without allocating an intermediate string.
+ */
+class ValuePrinter {
+    friend std::ostream & operator << (std::ostream & output, const ValuePrinter & printer);
+private:
+    EvalState & state;
+    Value & value;
+    PrintOptions options;
+
+public:
+    ValuePrinter(EvalState & state, Value & value, PrintOptions options = PrintOptions {})
+        : state(state), value(value), options(options) { }
+};
+
+std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer);
+
+
+/**
+ * `ValuePrinter` does its own ANSI formatting, so we don't color it
+ * magenta.
+ */
+template<>
+HintFmt & HintFmt::operator%(const ValuePrinter & value);
 
 }

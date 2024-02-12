@@ -352,12 +352,12 @@ ValidPathInfo Store::addToStoreSlow(
        information to narSink. */
     TeeSource tapped { *fileSource, narSink };
 
-    NullParseSink blank;
+    NullFileSystemObjectSink blank;
     auto & parseSink = method.getFileIngestionMethod() == FileIngestionMethod::Flat
-        ? (ParseSink &) fileSink
+        ? (FileSystemObjectSink &) fileSink
         : method.getFileIngestionMethod() == FileIngestionMethod::Recursive
-        ? (ParseSink &) blank
-        : (abort(), (ParseSink &)*(ParseSink *)nullptr); // handled both cases
+        ? (FileSystemObjectSink &) blank
+        : (abort(), (FileSystemObjectSink &)*(FileSystemObjectSink *)nullptr); // handled both cases
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */
@@ -614,38 +614,56 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
 }
 
 
+std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClientCache(const StorePath & storePath)
+{
+    auto hashPart = std::string(storePath.hashPart());
+
+    {
+        auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
+        if (res && res->isKnownNow()) {
+            stats.narInfoReadAverted++;
+            if (res->didExist())
+                return std::make_optional(res->value);
+            else
+                return std::make_optional(nullptr);
+        }
+    }
+
+    if (diskCache) {
+        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
+        if (res.first != NarInfoDiskCache::oUnknown) {
+            stats.narInfoReadAverted++;
+            {
+                auto state_(state.lock());
+                state_->pathInfoCache.upsert(std::string(storePath.to_string()),
+                    res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
+                if (res.first == NarInfoDiskCache::oInvalid ||
+                    !goodStorePath(storePath, res.second->path))
+                    return std::make_optional(nullptr);
+            }
+            assert(res.second);
+            return std::make_optional(res.second);
+        }
+    }
+
+    return std::nullopt;
+}
+
+
 void Store::queryPathInfo(const StorePath & storePath,
     Callback<ref<const ValidPathInfo>> callback) noexcept
 {
     auto hashPart = std::string(storePath.hashPart());
 
     try {
-        {
-            auto res = state.lock()->pathInfoCache.get(std::string(storePath.to_string()));
-            if (res && res->isKnownNow()) {
-                stats.narInfoReadAverted++;
-                if (!res->didExist())
-                    throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-                return callback(ref<const ValidPathInfo>(res->value));
-            }
+        auto r = queryPathInfoFromClientCache(storePath);
+        if (r.has_value()) {
+            std::shared_ptr<const ValidPathInfo> & info = *r;
+            if (info)
+                return callback(ref(info));
+            else
+                throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
         }
-
-        if (diskCache) {
-            auto res = diskCache->lookupNarInfo(getUri(), hashPart);
-            if (res.first != NarInfoDiskCache::oUnknown) {
-                stats.narInfoReadAverted++;
-                {
-                    auto state_(state.lock());
-                    state_->pathInfoCache.upsert(std::string(storePath.to_string()),
-                        res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{} : PathInfoCacheValue{ .value = res.second });
-                    if (res.first == NarInfoDiskCache::oInvalid ||
-                        !goodStorePath(storePath, res.second->path))
-                        throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-                }
-                return callback(ref<const ValidPathInfo>(res.second));
-            }
-        }
-
     } catch (...) { return callback.rethrow(); }
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
@@ -757,7 +775,7 @@ void Store::substitutePaths(const StorePathSet & paths)
     if (!willSubstitute.empty())
         try {
             std::vector<DerivedPath> subs;
-            for (auto & p : willSubstitute) subs.push_back(DerivedPath::Opaque{p});
+            for (auto & p : willSubstitute) subs.emplace_back(DerivedPath::Opaque{p});
             buildPaths(subs);
         } catch (Error & e) {
             logWarning(e.info());
@@ -909,6 +927,11 @@ void copyStorePath(
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+    /* Bail out early (before starting a download from srcStore) if
+       dstStore already has this path. */
+    if (!repair && dstStore.isValidPath(storePath))
+        return;
+
     auto srcUri = srcStore.getUri();
     auto dstUri = dstStore.getUri();
     auto storePathS = srcStore.printStorePath(storePath);

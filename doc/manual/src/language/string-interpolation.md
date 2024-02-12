@@ -20,6 +20,8 @@ Rather than writing
 
 (where `freetype` is a [derivation]), you can instead write
 
+[derivation]: ../glossary.md#gloss-derivation
+
 ```nix
 "--with-freetype2-library=${freetype}/lib"
 ```
@@ -189,7 +191,7 @@ If neither is present, an error is thrown.
 > "${a}"
 > ```
 >
->     error: cannot coerce a set to a string
+>     error: cannot coerce a set to a string: { }
 >
 >            at «string»:4:2:
 >

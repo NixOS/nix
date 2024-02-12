@@ -176,12 +176,11 @@ static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    PosixSourceAccessor accessor;
-    for (auto & i : opArgs)
+    for (auto & i : opArgs) {
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         cout << fmt("%s\n", store->printStorePath(store->addToStore(
-            std::string(baseNameOf(i)),
-            accessor,
-            CanonPath::fromCwd(i))));
+            std::string(baseNameOf(i)), accessor, canonPath)));
+    }
 }
 
 
@@ -201,14 +200,15 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     HashAlgorithm hashAlgo = parseHashAlgo(opArgs.front());
     opArgs.pop_front();
 
-    PosixSourceAccessor accessor;
-    for (auto & i : opArgs)
+    for (auto & i : opArgs) {
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(
             baseNameOf(i),
             accessor,
-            CanonPath::fromCwd(i),
+            canonPath,
             method,
             hashAlgo).path));
+    }
 }
 
 
@@ -828,11 +828,9 @@ static void opServe(Strings opFlags, Strings opArgs)
     FdSink out(STDOUT_FILENO);
 
     /* Exchange the greeting. */
-    unsigned int magic = readInt(in);
-    if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
-    out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
-    out.flush();
-    ServeProto::Version clientVersion = readInt(in);
+    ServeProto::Version clientVersion =
+        ServeProto::BasicServerConnection::handshake(
+            out, in, SERVE_PROTOCOL_VERSION);
 
     ServeProto::ReadConn rconn {
         .from = in,
@@ -952,8 +950,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->buildPaths(toDerivedPaths(paths));
                     out << 0;
                 } catch (Error & e) {
-                    assert(e.status);
-                    out << e.status << e.msg();
+                    assert(e.info().status);
+                    out << e.info().status << e.msg();
                 }
                 break;
             }
