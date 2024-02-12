@@ -6,7 +6,10 @@
 
 namespace nix {
 
-void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
+void builtinFetchurl(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs,
+    const std::string & netrcData)
 {
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
@@ -24,14 +27,8 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     if (!dof)
         throw Error("'builtin:fetchurl' must be a fixed-output derivation");
 
-    auto getAttr = [&](const std::string & name) {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
-        return i->second;
-    };
-
-    Path storePath = getAttr("out");
-    auto mainUrl = getAttr("url");
+    auto storePath = outputs.at("out");
+    auto mainUrl = drv.env.at("url");
     bool unpack = getOr(drv.env, "unpack", "") == "1";
 
     /* Note: have to use a fresh fileTransfer here because we're in

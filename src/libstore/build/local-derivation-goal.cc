@@ -2130,16 +2130,17 @@ void LocalDerivationGoal::runChild()
             try {
                 logger = makeJSONLogger(*logger);
 
-                BasicDerivation & drv2(*drv);
-                for (auto & e : drv2.env)
-                    e.second = rewriteStrings(e.second, inputRewrites);
+                std::map<std::string, Path> outputs;
+                for (auto & e : drv->outputs)
+                    outputs.insert_or_assign(e.first,
+                        worker.store.printStorePath(scratchOutputs.at(e.first)));
 
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(drv2, netrcData);
+                    builtinFetchurl(*drv, outputs, netrcData);
                 else if (drv->builder == "builtin:buildenv")
-                    builtinBuildenv(drv2);
+                    builtinBuildenv(*drv, outputs);
                 else if (drv->builder == "builtin:unpack-channel")
-                    builtinUnpackChannel(drv2);
+                    builtinUnpackChannel(*drv, outputs);
                 else
                     throw Error("unsupported builtin builder '%1%'", drv->builder.substr(8));
                 _exit(0);

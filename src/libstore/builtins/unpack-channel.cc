@@ -3,7 +3,9 @@
 
 namespace nix {
 
-void builtinUnpackChannel(const BasicDerivation & drv)
+void builtinUnpackChannel(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
@@ -11,7 +13,7 @@ void builtinUnpackChannel(const BasicDerivation & drv)
         return i->second;
     };
 
-    Path out = getAttr("out");
+    auto out = outputs.at("out");
     auto channelName = getAttr("channelName");
     auto src = getAttr("src");
 
