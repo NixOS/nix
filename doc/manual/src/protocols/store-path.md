@@ -12,9 +12,13 @@ store-path = store-dir "/" digest "-" name
 ```
 where
 
+- `name` = the name of the store object.
+
+- `store-dir` = the [store directory](@docroot@/store/store-path.md#store-directory)
+
 - `digest` = base-32 representation of the first 160 bits of a [SHA-256] hash of `fingerprint`
 
-  Th is :the hash part of the store name
+  This the hash part of the store name
 
 - `fingerprint` = the string
 
@@ -24,10 +28,6 @@ where
 
   Note that it includes the location of the store as well as the name to make sure that changes to either of those are reflected in the hash
   (e.g. you won't get `/nix/store/<digest>-name1` and `/nix/store/<digest>-name2`, or `/gnu/store/<digest>-name1`, with equal hash parts).
-
-- `name` = the name of the store object.
-
-- `store` = the [store directory](@docroot@/store/store-path.md#store-directory)
 
 - `type` = one of:
 
