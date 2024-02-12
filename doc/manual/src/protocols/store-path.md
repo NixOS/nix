@@ -121,6 +121,6 @@ For instance, the thinking was that it shouldn't be feasible to come up with a d
 The former would have an `inner-fingerprint` starting with `output:out:`, while the latter would have an `inner-fingerprint` starting with `source:`.
 
 Since `64519cfd657d024ae6e2bb74cb21ad21b886fd2a` (2008), however, it was decided that separating derivation-produced vs manually-hashed content-addressed data like this was not useful.
-Now, data this is to be SHA-256 + NAR-serialization content-addressed always uses the `source:...` construction, regardless of how it was produced (manually or by derivation).
+Now, data that is content-addressed with SHA-256 + NAR-serialization always uses the `source:...` construction, regardless of how it was produced (manually or by derivation).
 This allows freely switching between using [fixed-output derivations](@docroot@/glossary.md#gloss-fixed-output-derivation) for fetching, and fetching out-of-band and then manually adding.
 It also removes the ambiguity from the grammar.
