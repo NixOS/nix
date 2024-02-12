@@ -156,7 +156,7 @@ function and the fifth being a set.
 
 Note that lists are only lazy in values, and they are strict in length.
 
-Elements in a list can be accessed using `builtins.elemAt`. 
+Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#builtins-elemAt). 
 
 ## Attribute Set
 
