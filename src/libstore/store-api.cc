@@ -847,7 +847,7 @@ void Store::substitutePaths(const StorePathSet & paths)
     if (!willSubstitute.empty())
         try {
             std::vector<DerivedPath> subs;
-            for (auto & p : willSubstitute) subs.push_back(DerivedPath::Opaque{p});
+            for (auto & p : willSubstitute) subs.emplace_back(DerivedPath::Opaque{p});
             buildPaths(subs);
         } catch (Error & e) {
             logWarning(e.info());
