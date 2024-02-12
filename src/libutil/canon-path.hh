@@ -52,8 +52,6 @@ public:
      */
     CanonPath(const std::vector<std::string> & elems);
 
-    static CanonPath fromCwd(std::string_view path = ".");
-
     static CanonPath root;
 
     /**

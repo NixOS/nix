@@ -176,12 +176,11 @@ static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    PosixSourceAccessor accessor;
-    for (auto & i : opArgs)
+    for (auto & i : opArgs) {
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         cout << fmt("%s\n", store->printStorePath(store->addToStore(
-            std::string(baseNameOf(i)),
-            accessor,
-            CanonPath::fromCwd(i))));
+            std::string(baseNameOf(i)), accessor, canonPath)));
+    }
 }
 
 
@@ -201,14 +200,15 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     HashAlgorithm hashAlgo = parseHashAlgo(opArgs.front());
     opArgs.pop_front();
 
-    PosixSourceAccessor accessor;
-    for (auto & i : opArgs)
+    for (auto & i : opArgs) {
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(
             baseNameOf(i),
             accessor,
-            CanonPath::fromCwd(i),
+            canonPath,
             method,
             hashAlgo).path));
+    }
 }
 
 

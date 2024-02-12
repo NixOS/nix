@@ -415,7 +415,7 @@ struct GitInputScheme : InputScheme
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
         if (!input.getRef() && !input.getRev() && repoInfo.isLocal)
-            repoInfo.workdirInfo = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirInfo();
+            repoInfo.workdirInfo = GitRepo::openRepo(repoInfo.url)->getWorkdirInfo();
 
         return repoInfo;
     }
@@ -429,7 +429,7 @@ struct GitInputScheme : InputScheme
         if (auto res = cache->lookup(key))
             return getIntAttr(*res, "lastModified");
 
-        auto lastModified = GitRepo::openRepo(CanonPath(repoDir))->getLastModified(rev);
+        auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
 
         cache->upsert(key, Attrs{{"lastModified", lastModified}});
 
@@ -447,7 +447,7 @@ struct GitInputScheme : InputScheme
 
         Activity act(*logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.url));
 
-        auto revCount = GitRepo::openRepo(CanonPath(repoDir))->getRevCount(rev);
+        auto revCount = GitRepo::openRepo(repoDir)->getRevCount(rev);
 
         cache->upsert(key, Attrs{{"revCount", revCount}});
 
@@ -457,7 +457,7 @@ struct GitInputScheme : InputScheme
     std::string getDefaultRef(const RepoInfo & repoInfo) const
     {
         auto head = repoInfo.isLocal
-            ? GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirRef()
+            ? GitRepo::openRepo(repoInfo.url)->getWorkdirRef()
             : readHeadCached(repoInfo.url);
         if (!head) {
             warn("could not read HEAD ref from repo at '%s', using 'master'", repoInfo.url);
@@ -510,7 +510,7 @@ struct GitInputScheme : InputScheme
         if (repoInfo.isLocal) {
             repoDir = repoInfo.url;
             if (!input.getRev())
-                input.attrs.insert_or_assign("rev", GitRepo::openRepo(CanonPath(repoDir))->resolveRef(ref).gitRev());
+                input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
         } else {
             Path cacheDir = getCachePath(repoInfo.url, getShallowAttr(input));
             repoDir = cacheDir;
@@ -519,7 +519,7 @@ struct GitInputScheme : InputScheme
             createDirs(dirOf(cacheDir));
             PathLocks cacheDirLock({cacheDir});
 
-            auto repo = GitRepo::openRepo(CanonPath(cacheDir), true, true);
+            auto repo = GitRepo::openRepo(cacheDir, true, true);
 
             Path localRefFile =
                 ref.compare(0, 5, "refs/") == 0
@@ -588,7 +588,7 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        auto repo = GitRepo::openRepo(CanonPath(repoDir));
+        auto repo = GitRepo::openRepo(repoDir);
 
         auto isShallow = repo->isShallow();
 
@@ -664,7 +664,7 @@ struct GitInputScheme : InputScheme
             for (auto & submodule : repoInfo.workdirInfo.submodules)
                 repoInfo.workdirInfo.files.insert(submodule.path);
 
-        auto repo = GitRepo::openRepo(CanonPath(repoInfo.url), false, false);
+        auto repo = GitRepo::openRepo(repoInfo.url, false, false);
 
         auto exportIgnore = getExportIgnoreAttr(input);
 
@@ -703,7 +703,7 @@ struct GitInputScheme : InputScheme
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
-            auto repo = GitRepo::openRepo(CanonPath(repoInfo.url));
+            auto repo = GitRepo::openRepo(repoInfo.url);
 
             if (auto ref = repo->getWorkdirRef())
                 input.attrs.insert_or_assign("ref", *ref);

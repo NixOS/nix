@@ -60,9 +60,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        PosixSourceAccessor accessor;
-
-        auto path2 = CanonPath::fromCwd(path);
+        auto [accessor, path2] = PosixSourceAccessor::createAtRoot(path);
 
         auto storePath = dryRun
             ? store->computeStorePath(

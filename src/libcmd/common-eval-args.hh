@@ -29,6 +29,6 @@ private:
     std::map<std::string, std::string> autoArgs;
 };
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir = CanonPath::fromCwd());
+SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir = nullptr);
 
 }

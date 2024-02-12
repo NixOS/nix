@@ -110,8 +110,8 @@ void SourceAccessor::dumpPath(
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
-    PosixSourceAccessor accessor;
-    accessor.dumpPath(CanonPath::fromCwd(path), sink, filter);
+    auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
+    accessor.dumpPath(canonPath, sink, filter);
     return accessor.mtime;
 }
 

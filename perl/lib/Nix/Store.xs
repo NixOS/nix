@@ -256,9 +256,9 @@ SV *
 hashPath(char * algo, int base32, char * path)
     PPCODE:
         try {
-            PosixSourceAccessor accessor;
+            auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
             Hash h = hashPath(
-                accessor, CanonPath::fromCwd(path),
+                accessor, canonPath,
                 FileIngestionMethod::Recursive, parseHashAlgo(algo)).first;
             auto s = h.to_string(base32 ? HashFormat::Nix32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
@@ -336,10 +336,10 @@ StoreWrapper::addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            PosixSourceAccessor accessor;
+            auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(srcPath);
             auto path = THIS->store->addToStore(
                 std::string(baseNameOf(srcPath)),
-                accessor, CanonPath::fromCwd(srcPath),
+                accessor, canonPath,
                 method, parseHashAlgo(algo));
             XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {

@@ -140,15 +140,15 @@ T peelObject(git_repository * repo, git_object * obj, git_object_t type)
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
-    CanonPath path;
+    std::filesystem::path path;
     Repository repo;
 
-    GitRepoImpl(CanonPath _path, bool create, bool bare)
+    GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
         : path(std::move(_path))
     {
         initLibGit2();
 
-        if (pathExists(path.abs())) {
+        if (pathExists(path.native())) {
             if (git_repository_open(Setter(repo), path.c_str()))
                 throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
         } else {
@@ -221,10 +221,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return toHash(*oid);
     }
 
-    std::vector<Submodule> parseSubmodules(const CanonPath & configFile)
+    std::vector<Submodule> parseSubmodules(const std::filesystem::path & configFile)
     {
         GitConfig config;
-        if (git_config_open_ondisk(Setter(config), configFile.abs().c_str()))
+        if (git_config_open_ondisk(Setter(config), configFile.c_str()))
             throw Error("parsing .gitmodules file: %s", git_error_last()->message);
 
         ConfigIterator it;
@@ -296,7 +296,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         /* Get submodule info. */
         auto modulesFile = path / ".gitmodules";
-        if (pathExists(modulesFile.abs()))
+        if (pathExists(modulesFile))
             info.submodules = parseSubmodules(modulesFile);
 
         return info;
@@ -389,10 +389,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto dir = this->path;
         Strings gitArgs;
         if (shallow) {
-            gitArgs = { "-C", dir.abs(), "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
+            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
         }
         else {
-            gitArgs = { "-C", dir.abs(), "fetch", "--quiet", "--force", "--", url, refspec };
+            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--", url, refspec };
         }
 
         runProgram(RunOptions {
@@ -438,7 +438,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 .args = {
                     "-c",
                     "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
-                    "-C", path.abs(),
+                    "-C", path,
                     "verify-commit",
                     rev.gitRev()
                 },
@@ -465,7 +465,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 };
 
-ref<GitRepo> GitRepo::openRepo(const CanonPath & path, bool create, bool bare)
+ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare)
 {
     return make_ref<GitRepoImpl>(path, create, bare);
 }
@@ -781,7 +781,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
     auto rawAccessor = getRawAccessor(rev);
 
-    for (auto & submodule : parseSubmodules(CanonPath(pathTemp))) {
+    for (auto & submodule : parseSubmodules(pathTemp)) {
         auto rev = rawAccessor->getSubmoduleRev(submodule.path);
         result.push_back({std::move(submodule), rev});
     }

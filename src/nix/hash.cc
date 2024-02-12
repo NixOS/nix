@@ -89,8 +89,8 @@ struct CmdHashBase : Command
             else
                 hashSink = std::make_unique<HashSink>(ha);
 
-            PosixSourceAccessor accessor;
-            dumpPath(accessor, CanonPath::fromCwd(path), *hashSink, mode);
+            auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
+            dumpPath(accessor, canonPath, *hashSink, mode);
 
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);

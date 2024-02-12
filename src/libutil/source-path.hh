@@ -82,7 +82,7 @@ struct SourcePath
      * Return the location of this path in the "real" filesystem, if
      * it has a physical location.
      */
-    std::optional<CanonPath> getPhysicalPath() const;
+    std::optional<std::filesystem::path> getPhysicalPath() const;
 
     std::string to_string() const;
 

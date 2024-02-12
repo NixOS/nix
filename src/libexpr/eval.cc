@@ -394,14 +394,14 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         evalSettings.restrictEval || evalSettings.pureEval
-        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(CanonPath::root), {},
+        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
-        : makeFSInputAccessor(CanonPath::root))
+        : makeFSInputAccessor())
     , corepkgsFS(makeMemoryInputAccessor())
     , internalFS(makeMemoryInputAccessor())
     , derivationInternal{corepkgsFS->addFile(
@@ -2739,7 +2739,7 @@ Expr * EvalState::parseStdin()
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
     auto s = make_ref<std::string>(std::move(buffer));
-    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath(CanonPath::fromCwd()), staticBaseEnv);
+    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath("."), staticBaseEnv);
 }
 
 

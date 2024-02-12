@@ -10,6 +10,16 @@ namespace nix {
 struct PosixSourceAccessor : virtual SourceAccessor
 {
     /**
+     * Optional root path to prefix all operations into the native file
+     * system. This allows prepending funny things like `C:\` that
+     * `CanonPath` intentionally doesn't support.
+     */
+    const std::filesystem::path root;
+
+    PosixSourceAccessor();
+    PosixSourceAccessor(std::filesystem::path && root);
+
+    /**
      * The most recent mtime seen by lstat(). This is a hack to
      * support dumpPathAndGetMtime(). Should remove this eventually.
      */
@@ -28,7 +38,22 @@ struct PosixSourceAccessor : virtual SourceAccessor
 
     std::string readLink(const CanonPath & path) override;
 
-    std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override;
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
+
+    /**
+     * Create a `PosixSourceAccessor` and `CanonPath` corresponding to
+     * some native path.
+     *
+     * The `PosixSourceAccessor` is rooted as far up the tree as
+     * possible, (e.g. on Windows it could scoped to a drive like
+     * `C:\`). This allows more `..` parent accessing to work.
+     *
+     * See
+     * [`std::filesystem::path::root_path`](https://en.cppreference.com/w/cpp/filesystem/path/root_path)
+     * and
+     * [`std::filesystem::path::relative_path`](https://en.cppreference.com/w/cpp/filesystem/path/relative_path).
+     */
+    static std::pair<PosixSourceAccessor, CanonPath> createAtRoot(const std::filesystem::path & path);
 
 private:
 
@@ -38,6 +63,8 @@ private:
     void assertNoSymlinks(CanonPath path);
 
     std::optional<struct stat> cachedLstat(const CanonPath & path);
+
+    std::filesystem::path makeAbsPath(const CanonPath & path);
 };
 
 }

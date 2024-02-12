@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+
 #include "canon-path.hh"
 #include "hash.hh"
 
@@ -119,7 +121,7 @@ struct SourceAccessor
      * possible. This is only possible for filesystems that are
      * materialized in the root filesystem.
      */
-    virtual std::optional<CanonPath> getPhysicalPath(const CanonPath & path)
+    virtual std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path)
     { return std::nullopt; }
 
     bool operator == (const SourceAccessor & x) const
