@@ -2,6 +2,8 @@
 
 This is the complete specification for how store paths are calculated.
 
+The format of this specification is close to [Extended Backus–Naur form](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form), but must deviate for a few things such as hash functions which we treat as bidirectional for specification purposes.
+
 Regular users do *not* need to know this information --- store paths can be treated as black boxes computed from the properties of the store objects they refer to.
 But for those interested in exactly how Nix works, e.g. if they are reimplementing it, this information can be useful.
 
