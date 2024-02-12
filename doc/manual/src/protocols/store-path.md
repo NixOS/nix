@@ -7,6 +7,8 @@ The format of this specification is close to [Extended Backus–Naur form](https
 Regular users do *not* need to know this information --- store paths can be treated as black boxes computed from the properties of the store objects they refer to.
 But for those interested in exactly how Nix works, e.g. if they are reimplementing it, this information can be useful.
 
+## Store path proper
+
 ```ebnf
 store-path = store-dir "/" digest "-" name
 ```
@@ -20,10 +22,10 @@ where
 
   This the hash part of the store name
 
-- `fingerprint` = the string
+## Fingerprint
 
-  ```ebnf
-  type ":" sha256 ":" inner-digest ":" store ":" name
+- ```ebnf
+  fingerprint = type ":" sha256 ":" inner-digest ":" store ":" name
   ```
 
   Note that it includes the location of the store as well as the name to make sure that changes to either of those are reflected in the hash
@@ -32,14 +34,14 @@ where
 - `type` = one of:
 
   - ```ebnf
-    "text" ( ":" store-path )*
+    | "text" ( ":" store-path )*
     ```
 
     for encoded derivations written to the store.
     The optional trailing store paths are the references of the store object.
 
   - ```ebnf
-    "source" ( ":" store-path )*
+    | "source" ( ":" store-path )*
     ```
 
     For paths copied to the store and hashed via a [Nix Archive (NAR)] and [SHA-256][sha-256].
@@ -47,7 +49,7 @@ where
     Additionally, we can have an optional `:self` label to denote self reference.
 
   - ```ebnf
-    "output:" id
+    | "output:" id
     ```
 
     For either the outputs built from derivations,
@@ -58,6 +60,8 @@ where
     For content-addressed store objects, `id`, is always "out".
 
 - `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`
+
+## Inner fingerprint
 
 - `inner-fingerprint` = one of the following based on `type`:
 
@@ -77,8 +81,6 @@ where
 
     - For content-addressed store paths:
 
-      the string
-
       ```ebnf
       "fixed:out:" rec algo ":" hash ":"
       ```
@@ -87,15 +89,23 @@ where
 
       - `rec` = one of:
 
-        - `r:` hashes of the for [Nix Archive (NAR)] (arbitrary file system object) serialization
+        - ```ebnf
+          | "r:"
+          ```
+          hashes of the for [Nix Archive (NAR)] (arbitrary file system object) serialization
 
-        - `` (empty string) for hashes of the flat (single file) serialization
+        - ```ebnf
+          |
+          ```
+          (empty string) for hashes of the flat (single file) serialization
 
-      - `algo` = `md5`, `sha1` or `sha256`
+      - ```ebf
+        algo = "md5" | "sha1" | "sha256"
+        ```
 
       - `hash` = base-16 representation of the path or flat hash of the contents of the path (or expected contents of the path for fixed-output derivations).
 
-      Note that `id` = `out`, regardless of the name part of the store path.
+      Note that `id` = `"out"`, regardless of the name part of the store path.
       Also note that NAR + SHA-256 must not use this case, and instead must use the `type` = `"source:" ...` case.
 
 [Nix Archive (NAR)]: @docroot@/glossary.md#gloss-NAR
