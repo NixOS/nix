@@ -40,4 +40,6 @@ in
   setuid = lib.genAttrs
     ["i686-linux" "x86_64-linux"]
     (system: runNixOSTestFor system ./setuid.nix);
+
+  ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
 }
