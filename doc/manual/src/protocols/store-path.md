@@ -12,11 +12,11 @@ store-path = store-dir "/" digest "-" name
 ```
 where
 
-- `digest` = base-32 representation of the first 160 bits of a [SHA-256] hash of `pre`
+- `digest` = base-32 representation of the first 160 bits of a [SHA-256] hash of `fingerprint`
 
   Th is :the hash part of the store name
 
-- `pre` = the string
+- `fingerprint` = the string
 
   ```ebnf
   type ":" sha256 ":" inner-digest ":" store ":" name
@@ -57,9 +57,9 @@ where
     `id` is the name of the output (usually, "out").
     For content-addressed store objects, `id`, is always "out".
 
-- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-pre`
+- `inner-digest` = base-16 representation of a SHA-256 hash of `inner-fingerprint`
 
-- `inner-pre` = one of the following based on `type`:
+- `inner-fingerprint` = one of the following based on `type`:
 
   - if `type` = `"text:" ...`:
 
@@ -108,7 +108,7 @@ in that both can represent data hashed by its SHA-256 NAR serialization.
 
 The original reason for this way of computing names was to prevent name collisions (for security).
 For instance, the thinking was that it shouldn't be feasible to come up with a derivation whose output path collides with the path for a copied source.
-The former would have an `inner-pre` starting with `output:out:`, while the latter would have an `inner-pre` starting with `source:`.
+The former would have an `inner-fingerprint` starting with `output:out:`, while the latter would have an `inner-fingerprint` starting with `source:`.
 
 Since `64519cfd657d024ae6e2bb74cb21ad21b886fd2a` (2008), however, it was decided that separting derivation-produced vs manually-hashed content-addressed data like this was not useful.
 Now, data this is to be SHA-256 + NAR-serialization content-addressed always uses the `source:...` construction, regardless of how it was produced (manually or by derivation).
