@@ -21,7 +21,7 @@ struct EvalSettings : Config
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
         R"(
-          List of search paths to use for [lookup paths](@docroot@/language/constructs/lookup-path.md).
+          List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
           [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath).
 
