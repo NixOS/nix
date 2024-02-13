@@ -628,6 +628,11 @@ void copy(const fs::directory_entry & from, const fs::path & to, bool andDelete)
     }
 }
 
+void copyFile(const Path & oldPath, const Path & newPath, bool andDelete)
+{
+    return copy(fs::directory_entry(fs::path(oldPath)), fs::path(newPath), andDelete);
+}
+
 void renameFile(const Path & oldName, const Path & newName)
 {
     fs::rename(oldName, newName);
