@@ -6,17 +6,6 @@
 
 using namespace nix;
 
-static FileIngestionMethod parseIngestionMethod(std::string_view input)
-{
-    if (input == "flat") {
-        return FileIngestionMethod::Flat;
-    } else if (input == "nar") {
-        return FileIngestionMethod::Recursive;
-    } else {
-        throw UsageError("Unknown hash mode '%s', expect `flat` or `nar`");
-    }
-}
-
 struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
@@ -49,7 +38,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             )",
             .labels = {"hash-mode"},
             .handler = {[this](std::string s) {
-                this->caMethod = parseIngestionMethod(s);
+                this->caMethod = parseFileIngestionMethod(s);
             }},
         });
 

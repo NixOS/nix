@@ -24,6 +24,23 @@ enum struct FileIngestionMethod : uint8_t {
 };
 
 /**
+ * Parse a `FileIngestionMethod` by name. Choice of:
+ *
+ *  - `flat`: `FileIngestionMethod::Flat`
+ *  - `nar`: `FileIngestionMethod::Recursive`
+ *
+ * Oppostite of `renderFileIngestionMethod`.
+ */
+FileIngestionMethod parseFileIngestionMethod(std::string_view input);
+
+/**
+ * Render a `FileIngestionMethod` by name.
+ *
+ * Oppostite of `parseFileIngestionMethod`.
+ */
+std::string_view renderFileIngestionMethod(FileIngestionMethod method);
+
+/**
  * Dump a serialization of the given file system object.
  */
 void dumpPath(

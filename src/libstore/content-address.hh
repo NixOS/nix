@@ -36,7 +36,7 @@ struct TextIngestionMethod : std::monostate { };
  * Compute the prefix to the hash algorithm which indicates how the
  * files were ingested.
  */
-std::string makeFileIngestionPrefix(FileIngestionMethod m);
+std::string_view makeFileIngestionPrefix(FileIngestionMethod m);
 
 /**
  * An enumeration of all the ways we can content-address store objects.
@@ -60,6 +60,20 @@ struct ContentAddressMethod
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
 
     /**
+     * Parse a content addressing method (name).
+     *
+     * The inverse of `render`.
+     */
+    static ContentAddressMethod parse(std::string_view rawCaMethod);
+
+    /**
+     * Render a content addressing method (name).
+     *
+     * The inverse of `parse`.
+     */
+    std::string_view render() const;
+
+    /**
      * Parse the prefix tag which indicates how the files
      * were ingested, with the fixed output case not prefixed for back
      * compat.
@@ -74,12 +88,12 @@ struct ContentAddressMethod
      *
      * The rough inverse of `parsePrefix()`.
      */
-    std::string renderPrefix() const;
+    std::string_view renderPrefix() const;
 
     /**
      * Parse a content addressing method and hash type.
      */
-    static std::pair<ContentAddressMethod, HashAlgorithm> parse(std::string_view rawCaMethod);
+    static std::pair<ContentAddressMethod, HashAlgorithm> parseWithAlgo(std::string_view rawCaMethod);
 
     /**
      * Render a content addressing method and hash type in a
@@ -87,7 +101,7 @@ struct ContentAddressMethod
      *
      * The rough inverse of `parse()`.
      */
-    std::string render(HashAlgorithm ht) const;
+    std::string renderWithAlgo(HashAlgorithm ht) const;
 
     /**
      * Get the underlying way to content-address file system objects.

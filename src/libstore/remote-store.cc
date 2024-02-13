@@ -435,7 +435,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << WorkerProto::Op::AddToStore
             << name
-            << caMethod.render(hashAlgo);
+            << caMethod.renderWithAlgo(hashAlgo);
         WorkerProto::write(*this, *conn, references);
         conn->to << repair;
 

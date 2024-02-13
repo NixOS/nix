@@ -400,7 +400,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parse(camStr);
+                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parseWithAlgo(camStr);
                 auto hashAlgo = hashAlgo_; // work around clang bug
                 FramedSource source(from);
                 // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
