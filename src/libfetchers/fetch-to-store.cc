@@ -21,23 +21,9 @@ StorePath fetchToStore(
         cacheKey = fetchers::Attrs{
             {"_what", "fetchToStore"},
             {"store", store.storeDir},
-            {"name", std::string(name)},
+            {"name", std::string{name}},
             {"fingerprint", *path.accessor->fingerprint},
-            {
-                "method",
-                std::visit(overloaded {
-                    [](const TextIngestionMethod &) {
-                        return "text";
-                    },
-                    [](const FileIngestionMethod & fim) {
-                        switch (fim) {
-                        case FileIngestionMethod::Flat: return "flat";
-                        case FileIngestionMethod::Recursive: return "nar";
-                        default: assert(false);
-                        }
-                    },
-                }, method.raw),
-            },
+            {"method", std::string{method.render()}},
             {"path", path.path.abs()}
         };
         if (auto res = fetchers::getCache()->lookup(store, *cacheKey)) {
