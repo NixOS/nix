@@ -59,18 +59,21 @@
 
 - [store]{#gloss-store}
 
-  A collection of store objects, with operations to manipulate that collection.
-  See [Nix store](./store/index.md) for details.
+  A collection of [store objects][store object], with operations to manipulate that collection.
+  See [Nix Store](./store/index.md) for details.
 
-  There are many types of stores.
-  See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md) for a complete list.
-
-  From the perspective of the location where Nix is invoked, the Nix store can be  referred to _local_ or _remote_.
-  Only a [local store]{#gloss-local-store} exposes a location in the file system of the machine where Nix is invoked that allows access to store objects, typically `/nix/store`.
-  Local stores can be used for building [derivations](#gloss-derivation).
-  See [Local Store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) for details.
+  There are many types of stores, see [Store Types](./store/types/index.md) for details.
 
   [store]: #gloss-store
+
+- [local store]{#gloss-local-store}
+
+  From the perspective of the location where Nix is invoked, the Nix [store] can be referred to _local_ or _remote_.
+  Only a local store exposes a file system directory, typically `/nix/store`, to allow operating system processes to directly access store objects.
+  Local stores can be used for building [derivations][derivation].
+
+  See [Local Store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) for details.
+
   [local store]: #gloss-local-store
 
 - [chroot store]{#gloss-chroot-store}
@@ -87,7 +90,7 @@
 
 - [store path]{#gloss-store-path}
 
-  The location of a [store object](@docroot@/store/index.md#store-object) in the file system, i.e., an immediate child of the Nix store directory.
+  The location of a [store object] in the file system, i.e., an immediate child of the Nix store directory.
 
   > **Example**
   >
