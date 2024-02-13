@@ -176,7 +176,7 @@ public:
         "cores",
         R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
-          The executable can use this variable to control the maximum amount of parallelism.
+          The `builder` executable can use this variable to control its own maximum amount of parallelism.
 
           <!--
           FIXME(@fricklerhandwerk): I don't think this should even be mentioned here.
@@ -189,7 +189,7 @@ public:
 
           > **Note**
           >
-          > The number of parallel local build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
+          > The number of parallel local Nix build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
         )",
         {"build-cores"},
         // Don't document the machine-specific default value
