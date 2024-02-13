@@ -209,7 +209,7 @@ public:
 
             {
                 auto r(state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority));
-                assert(r.next());
+                if (!r.next()) { abort(); }
                 ret.id = (int) r.getInt(0);
             }
 
