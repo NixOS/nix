@@ -20,9 +20,8 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     if (!out)
         throw Error("'builtin:fetchurl' requires an 'out' output");
 
-    auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
-    if (!dof)
-        throw Error("'builtin:fetchurl' must be a fixed-output derivation");
+    if (!(drv.type().isFixed() || drv.type().isImpure()))
+        throw Error("'builtin:fetchurl' must be a fixed-output or impure derivation");
 
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
@@ -67,7 +66,8 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     };
 
     /* Try the hashed mirrors first. */
-    if (dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
+    auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
+    if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
                 if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
