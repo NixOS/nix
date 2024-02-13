@@ -358,7 +358,11 @@ const redirects = {
     "one-time-setup": "testing.html#one-time-setup",
     "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
     "characterization-testing": "#characterisation-testing-unit",
-  }
+  },
+  "glossary.html": {
+    "gloss-local-store": "store/types/local-store.html",
+    "gloss-chroot-store": "store/types/local-store.html",
+  },
 };
 
 // the following code matches the current page's URL against the set of redirects.
