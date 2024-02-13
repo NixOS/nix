@@ -37,9 +37,7 @@ struct EvalSettings : Config
 
           > **Note**
           >
-          > If [restricted evaluation](#conf-restrict-eval) is enabled, the default value is ignored.
-          >
-          > If [pure evaluation](#conf-pure-eval) is enabled, lookup paths are not resolved at all.
+          > If [pure evaluation](#conf-pure-eval) is enabled, `nixPath` evaluates to the empty list `[ ]`.
         )", {}, false};
 
     Setting<std::string> currentSystem{
@@ -70,8 +68,6 @@ struct EvalSettings : Config
           [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath),
           or to URIs outside of
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
-
-          Also the default value for [`nix-path`](#conf-nix-path) is ignored, such that only explicitly set search path entries are taken into account.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
