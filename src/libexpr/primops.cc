@@ -705,32 +705,52 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .args = {"attrset"},
     .arity = 1,
     .doc = R"(
-      Take an *attrset* with values named `startSet` and `operator` in order to
-      return a *list of attrsets* by starting with the `startSet` and recursively
-      applying the `operator` function to each `item`. The *attrsets* in the
-      `startSet` and the *attrsets* produced by `operator` must contain a value
-      named `key` which is comparable. The result is produced by calling `operator`
-      for each `item` with a value for `key` that has not been called yet including
-      newly produced `item`s. The function terminates when no new `item`s are
-      produced. The resulting *list of attrsets* contains only *attrsets* with a
-      unique key. For example,
+      `builtins.genericClosure` computes the transitive closure over an arbitrary relation defined by an `operator` function.
+      It is designed to handle potentially cyclic data structures or any complex language constructs that require iterative processing.
 
-      ```
-      builtins.genericClosure {
-        startSet = [ {key = 5;} ];
-        operator = item: [{
-          key = if (item.key / 2 ) * 2 == item.key
-               then item.key / 2
-               else 3 * item.key + 1;
-        }];
-      }
-      ```
-      evaluates to
-      ```
-      [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
-      ```
+      Common usages are:
+
+      - Generating dependency trees or unique collections of items.
+      - Traversing through structures that may contain cycles or loops.
+      - Processing data structures with complex relationships.
+
+      ## Concept
+
+      - **startSet**: The initial collection of attribute sets from which the closure begins its computation.
+      - **operator**: A function that takes an attrset and returns a list of attribute sets. It defines how each item in the current set is processed and expanded into more items.
+
+      The result is produced by calling the `operator` recursively over again, until no new items (compared by key) are returned.
+
+      The `genericClosure` function terminates when no new `items` are produced.
+
+      > **Example**
+      >
+      > ```nix
+      > builtins.genericClosure {
+      >   startSet = [ {key = 5;} ];
+      >   operator = item: [{
+      >     key = if (item.key / 2 ) * 2 == item.key
+      >          then item.key / 2
+      >          else 3 * item.key + 1;
+      >   }];
+      > }
+      > ```
+      >
+      > evaluates to
+      >
+      > ```nix
+      > [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
+      > ```
+
+      > **Prerequisites**
+      >
+      > - Ensure key in startSet and in operator's output is of the type listed below.
+      > - Repeated application of the operator function to the working set must eventually stop producing new keys.
+
+      ## Reference
 
       `key` can be one of the following types:
+
       - [Number](@docroot@/language/values.md#type-number)
       - [Boolean](@docroot@/language/values.md#type-boolean)
       - [String](@docroot@/language/values.md#type-string)
