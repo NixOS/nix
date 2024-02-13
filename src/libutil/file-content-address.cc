@@ -23,7 +23,7 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method)
     case FileIngestionMethod::Recursive:
         return "nar";
     default:
-        assert(false);
+        abort();
     }
 }
 
