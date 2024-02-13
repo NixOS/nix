@@ -66,16 +66,6 @@
 
   [store]: #gloss-store
 
-- [local store]{#gloss-local-store}
-
-  See [Local Store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) for details.
-
-  [local store]: #gloss-local-store
-
-- [chroot store]{#gloss-chroot-store}
-
-  A [local store] whose canonical path is anything other than `/nix/store`.
-
 - [binary cache]{#gloss-binary-cache}
 
   A *binary cache* is a Nix store which uses a different format: its
@@ -242,6 +232,7 @@
   - All paths in the store path's [closure] are valid.
 
   [validity]: #gloss-validity
+  [local store]: @docroot@/store/types/local-store.md
 
 - [user environment]{#gloss-user-env}
 
