@@ -68,10 +68,6 @@
 
 - [local store]{#gloss-local-store}
 
-  From the perspective of the location where Nix is invoked, the Nix [store] can be referred to _local_ or _remote_.
-  Only a local store exposes a file system directory, typically `/nix/store`, to allow operating system processes to directly access store objects.
-  Local stores can be used for building [derivations][derivation].
-
   See [Local Store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) for details.
 
   [local store]: #gloss-local-store
