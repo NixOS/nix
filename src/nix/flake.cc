@@ -771,7 +771,7 @@ struct CmdFlakeCheck : FlakeCommand
                             ;
 
                         else
-                            warn("unknown flake output '%s'", name);
+                            debug("unknown flake output '%s'", name);
 
                     } catch (Error & e) {
                         e.addTrace(resolve(pos), HintFmt("while checking flake output '%s'", name));
