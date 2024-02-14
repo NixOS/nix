@@ -94,6 +94,7 @@ perl/Makefile.config
 /tests/functional/ca/config.nix
 /tests/functional/dyn-drv/config.nix
 /tests/functional/repl-result-out
+/tests/functional/debugger-test-out
 /tests/functional/test-libstoreconsumer/test-libstoreconsumer
 
 # /tests/functional/lang/
@@ -141,6 +142,7 @@ compile_commands.json
 nix-rust/target
 
 result
+result-*
 
 # IDE
 .vscode/

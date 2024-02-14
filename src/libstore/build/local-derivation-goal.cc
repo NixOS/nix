@@ -92,7 +92,7 @@ void handleDiffHook(
         } catch (Error & error) {
             ErrorInfo ei = error.info();
             // FIXME: wrap errors.
-            ei.msg = hintfmt("diff hook execution failed: %s", ei.msg.str());
+            ei.msg = HintFmt("diff hook execution failed: %s", ei.msg.str());
             logError(ei);
         }
     }
@@ -232,7 +232,7 @@ void LocalDerivationGoal::tryLocalBuild()
         if (!buildUser) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                    fmt("waiting for a free build user ID for '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
+                    fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }
@@ -1495,7 +1495,7 @@ void LocalDerivationGoal::startDaemon()
                     daemon::processConnection(store, from, to,
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
-                } catch (SysError &) {
+                } catch (SystemError &) {
                     ignoreException();
                 }
             });
@@ -1707,7 +1707,7 @@ void LocalDerivationGoal::runChild()
         try {
             if (drv->isBuiltin() && drv->builder == "builtin:fetchurl")
                 netrcData = readFile(settings.netrcFile);
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
 
 #if __linux__
         if (useChroot) {
@@ -2130,16 +2130,17 @@ void LocalDerivationGoal::runChild()
             try {
                 logger = makeJSONLogger(*logger);
 
-                BasicDerivation & drv2(*drv);
-                for (auto & e : drv2.env)
-                    e.second = rewriteStrings(e.second, inputRewrites);
+                std::map<std::string, Path> outputs;
+                for (auto & e : drv->outputs)
+                    outputs.insert_or_assign(e.first,
+                        worker.store.printStorePath(scratchOutputs.at(e.first)));
 
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(drv2, netrcData);
+                    builtinFetchurl(*drv, outputs, netrcData);
                 else if (drv->builder == "builtin:buildenv")
-                    builtinBuildenv(drv2);
+                    builtinBuildenv(*drv, outputs);
                 else if (drv->builder == "builtin:unpack-channel")
-                    builtinUnpackChannel(drv2);
+                    builtinUnpackChannel(*drv, outputs);
                 else
                     throw Error("unsupported builtin builder '%1%'", drv->builder.substr(8));
                 _exit(0);
@@ -2724,7 +2725,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             .outPath = newInfo.path
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
-            && drv->type().isPure())
+            && !drv->type().isImpure())
         {
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);

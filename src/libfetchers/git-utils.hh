@@ -1,5 +1,6 @@
 #pragma once
 
+#include "filtering-input-accessor.hh"
 #include "input-accessor.hh"
 
 namespace nix {
@@ -11,7 +12,7 @@ struct GitRepo
     virtual ~GitRepo()
     { }
 
-    static ref<GitRepo> openRepo(const CanonPath & path, bool create = false, bool bare = false);
+    static ref<GitRepo> openRepo(const std::filesystem::path & path, bool create = false, bool bare = false);
 
     virtual uint64_t getRevCount(const Hash & rev) = 0;
 
@@ -57,7 +58,7 @@ struct GitRepo
      * Return the submodules of this repo at the indicated revision,
      * along with the revision of each submodule.
      */
-    virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) = 0;
+    virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) = 0;
 
     virtual std::string resolveSubmoduleUrl(
         const std::string & url,
@@ -73,7 +74,9 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const Hash & rev) = 0;
+    virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+
+    virtual ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual void fetch(
         const std::string & url,
@@ -87,12 +90,6 @@ struct GitRepo
     virtual void verifyCommit(
         const Hash & rev,
         const std::vector<fetchers::PublicKey> & publicKeys) = 0;
-
-    /**
-     * Given a Git tree hash, compute the hash of its NAR
-     * serialisation. This is memoised on-disk.
-     */
-    virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
 };
 
 ref<GitRepo> getTarballCache();

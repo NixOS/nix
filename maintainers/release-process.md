@@ -27,8 +27,9 @@ release:
 * Compile the release notes by running
 
   ```console
+  $ export VERSION=X.YY
   $ git checkout -b release-notes
-  $ VERSION=X.YY ./maintainers/release-notes
+  $ ./maintainers/release-notes
   ```
 
   where `X.YY` is *without* the patch level, e.g. `2.12` rather than ~~`2.12.0`~~.

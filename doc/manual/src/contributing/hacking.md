@@ -31,7 +31,7 @@ This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` im
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop .#native-clang11StdenvPackages
+$ nix develop .#native-clangStdenvPackages
 ```
 
 > **Note**
@@ -51,10 +51,13 @@ To install it in `$(pwd)/outputs` and test it:
 
 ```console
 [nix-shell]$ make install
-[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
+[nix-shell]$ make installcheck check -j $NIX_BUILD_CORES
 [nix-shell]$ nix --version
 nix (Nix) 2.12
 ```
+
+For more information on running and filtering tests, see
+[`testing.md`](./testing.md).
 
 To build a release version of Nix for the current operating system and CPU architecture:
 
@@ -63,27 +66,6 @@ $ nix build
 ```
 
 You can also build Nix for one of the [supported platforms](#platforms).
-
-## Makefile variables
-
-You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run
-`make install`.
-
-You may want to set `MAKEFLAGS="-e -j $NIX_BUILD_CORES"` to allow environment
-variables to override `Makefile` variables.
-
-- `ENABLE_BUILD=yes` to enable building the C++ code.
-- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
-
-  The docs can take a while to build, so you may want to disable this for local development.
-- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
-- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
-- `OPTIMIZE=1` to enable optimizations.
-- `libraries=libutil programs=` to only build a specific library (this will
-  fail in the linking phase if you don't have the other libraries built, but is
-  useful for checking types).
-- `libraries= programs=nix` to only build a specific program (this will not, in
-  general, work, because the programs need the libraries).
 
 ## Building Nix
 
@@ -96,7 +78,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 ```
 
 > **Note**
@@ -129,6 +111,26 @@ $ nix-build
 
 You can also build Nix for one of the [supported platforms](#platforms).
 
+## Makefile variables
+
+You may need `profiledir=$out/etc/profile.d` and `sysconfdir=$out/etc` to run `make install`.
+
+Run `make` with [`-e` / `--environment-overrides`](https://www.gnu.org/software/make/manual/make.html#index-_002de) to allow environment variables to override `Makefile` variables:
+
+- `ENABLE_BUILD=yes` to enable building the C++ code.
+- `ENABLE_DOC_GEN=yes` to enable building the documentation (manual, man pages, etc.).
+
+  The docs can take a while to build, so you may want to disable this for local development.
+- `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
+- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
+- `OPTIMIZE=1` to enable optimizations.
+- `libraries=libutil programs=` to only build a specific library.
+
+  This will fail in the linking phase if the other libraries haven't been built, but is useful for checking types.
+- `libraries= programs=nix` to only build a specific program.
+
+  This will not work in general, because the programs need the libraries.
+
 ## Platforms
 
 Nix can be built for various platforms, as specified in [`flake.nix`]:
@@ -145,10 +147,10 @@ Nix can be built for various platforms, as specified in [`flake.nix`]:
 
 In order to build Nix for a different platform than the one you're currently
 on, you need a way for your current Nix installation to build code for that
-platform. Common solutions include [remote builders] and [binary format emulation]
+platform. Common solutions include [remote build machines] and [binary format emulation]
 (only supported on NixOS).
 
-[remote builders]: ../advanced-topics/distributed-builds.md
+[remote builders]: @docroot@/language/derivations.md#attr-builder
 [binary format emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
 Given such a setup, executing the build only requires selecting the respective attribute.
@@ -302,7 +304,6 @@ See also the [format documentation](https://github.com/haskell/cabal/blob/master
 ### Build process
 
 Releases have a precomputed `rl-MAJOR.MINOR.md`, and no `rl-next.md`.
-Set `buildUnreleasedNotes = true;` in `flake.nix` to build the release notes on the fly.
 
 ## Branches
 

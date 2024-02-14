@@ -14,11 +14,14 @@
 #include "signals.hh"
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
+#include "keys.hh"
 
 #include <iostream>
 #include <algorithm>
 #include <cstring>
 
+#include <memory>
+#include <new>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/select.h>
@@ -273,7 +276,7 @@ LocalStore::LocalStore(const Params & params)
                 [[gnu::unused]] auto res2 = ftruncate(fd.get(), settings.reservedSize);
             }
         }
-    } catch (SysError & e) { /* don't care about errors */
+    } catch (SystemError & e) { /* don't care about errors */
     }
 
     /* Acquire the big fat lock in shared mode to make sure that no
@@ -1045,8 +1048,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     bool narRead = false;
     Finally cleanup = [&]() {
         if (!narRead) {
-            NullParseSink sink;
-            parseDump(sink, source);
+            NullFileSystemObjectSink sink;
+            try {
+                parseDump(sink, source);
+            } catch (...) {
+                ignoreException();
+            }
         }
     };
 
@@ -1147,7 +1154,11 @@ StorePath LocalStore::addToStoreFromDump(
        path. */
     bool inMemory = false;
 
-    std::string dump;
+    struct Free {
+        void operator()(void* v) { free(v); }
+    };
+    std::unique_ptr<char, Free> dumpBuffer(nullptr);
+    std::string_view dump;
 
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
@@ -1156,13 +1167,18 @@ StorePath LocalStore::addToStoreFromDump(
         auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
-        dump.resize(oldSize + want);
+        if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
+            dumpBuffer.release();
+            dumpBuffer.reset((char*) tmp);
+        } else {
+            throw std::bad_alloc();
+        }
         auto got = 0;
         Finally cleanup([&]() {
-            dump.resize(oldSize + got);
+            dump = {dumpBuffer.get(), dump.size() + got};
         });
         try {
-            got = source.read(dump.data() + oldSize, want);
+            got = source.read(dumpBuffer.get() + oldSize, want);
         } catch (EndOfFile &) {
             inMemory = true;
             break;
@@ -1185,7 +1201,8 @@ StorePath LocalStore::addToStoreFromDump(
 
         restorePath(tempPath, bothSource, method.getFileIngestionMethod());
 
-        dump.clear();
+        dumpBuffer.reset();
+        dump = {};
     }
 
     auto [hash, size] = hashSink->finish();
@@ -1566,7 +1583,8 @@ void LocalStore::signRealisation(Realisation & realisation)
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
-        realisation.sign(secretKey);
+        LocalSigner signer(std::move(secretKey));
+        realisation.sign(signer);
     }
 }
 
@@ -1578,7 +1596,8 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
-        info.sign(*this, secretKey);
+        LocalSigner signer(std::move(secretKey));
+        info.sign(*this, signer);
     }
 }
 

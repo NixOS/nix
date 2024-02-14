@@ -1,3 +1,4 @@
+#include "libfetchers/attrs.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
@@ -25,7 +26,7 @@ void emitTreeAttrs(
 {
     assert(input.isLocked());
 
-    auto attrs = state.buildBindings(10);
+    auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
@@ -99,16 +100,14 @@ static void fetchTree(
 
         if (auto aType = args[0]->attrs->get(state.sType)) {
             if (type)
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unexpected attribute 'type'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "unexpected attribute 'type'"
+                ).atPos(pos).debugThrow();
             type = state.forceStringNoCtx(*aType->value, aType->pos, "while evaluating the `type` attribute passed to builtins.fetchTree");
         } else if (!type)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = state.positions[pos]
-            }));
+            state.error<EvalError>(
+                "attribute 'type' is missing in call to 'fetchTree'"
+            ).atPos(pos).debugThrow();
 
         attrs.emplace("type", type.value());
 
@@ -131,16 +130,19 @@ static void fetchTree(
                 attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
             }
             else
-                state.debugThrowLastTrace(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    state.symbols[attr.name], showType(*attr.value)));
+                state.error<TypeError>("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                    state.symbols[attr.name], showType(*attr.value)).debugThrow();
+        }
+
+        if (params.isFetchGit && !attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+            attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "attribute 'name' isn’t supported in call to 'fetchTree'"
+                ).atPos(pos).debugThrow();
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
@@ -152,13 +154,15 @@ static void fetchTree(
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
             attrs.emplace("url", fixGitURL(url));
+            if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+                attrs.emplace("exportIgnore", Explicit<bool>{true});
+            }
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
+                ).atPos(pos).debugThrow();
             input = fetchers::Input::fromURL(url);
         }
     }
@@ -166,8 +170,16 @@ static void fetchTree(
     if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isLocked())
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+    if (evalSettings.pureEval && !input.isLocked()) {
+        auto fetcher = "fetchTree";
+        if (params.isFetchGit)
+            fetcher = "fetchGit";
+
+        state.error<EvalError>(
+            "in pure evaluation mode, %s requires a locked input",
+            fetcher
+        ).atPos(pos).debugThrow();
+    }
 
     state.checkURI(input.toURLString());
 
@@ -420,17 +432,13 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             else
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
-                    .errPos = state.positions[attr.pos]
-                }));
+                state.error<EvalError>("unsupported argument '%s' to '%s'", n, who)
+                .atPos(pos).debugThrow();
         }
 
         if (!url)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            }));
+            state.error<EvalError>(
+                "'url' argument required").atPos(pos).debugThrow();
     } else
         url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
@@ -443,7 +451,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         name = baseNameOf(*url);
 
     if (evalSettings.pureEval && !expectedHash)
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
+        state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who).atPos(pos).debugThrow();
 
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
@@ -472,9 +480,15 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
-        if (hash != *expectedHash)
-            state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                                                *url, expectedHash->to_string(HashFormat::Nix32, true), hash.to_string(HashFormat::Nix32, true)));
+        if (hash != *expectedHash) {
+            state.error<EvalError>(
+                "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                *url,
+                expectedHash->to_string(HashFormat::Nix32, true),
+                hash.to_string(HashFormat::Nix32, true)
+            ).withExitStatus(102)
+            .debugThrow();
+        }
     }
 
     state.allowAndSetStorePathString(storePath, v);
@@ -593,10 +607,16 @@ static RegisterPrimOp primop_fetchGit({
 
         A Boolean parameter that specifies whether submodules should be checked out.
 
+      - `exportIgnore` (default: `true`)
+
+        A Boolean parameter that specifies whether `export-ignore` from `.gitattributes` should be applied.
+        This approximates part of the `git archive` behavior.
+
+        Enabling this option is not recommended because it is unknown whether the Git developers commit to the reproducibility of `export-ignore` in newer Git versions.
+
       - `shallow` (default: `false`)
 
-        A Boolean parameter that specifies whether fetching from a shallow remote repository is allowed.
-        This still performs a full clone of what is available on the remote.
+        Make a shallow clone when fetching the Git tree.
 
       - `allRefs`
 

@@ -10,9 +10,9 @@
 , boost
 , brotli
 , bzip2
-, changelog-d
 , curl
 , editline
+, readline
 , fileset
 , flex
 , git
@@ -68,10 +68,24 @@
 # Whether to build the regular manual
 , enableManual ? __forDefaults.canRunInstalled
 
-# Whether to compile `rl-next.md`, the release notes for the next
-# not-yet-released version of Nix in the manul, from the individual
-# change log entries in the directory.
-, buildUnreleasedNotes ? false
+# Whether to use garbage collection for the Nix language evaluator.
+#
+# If it is disabled, we just leak memory, but this is not as bad as it
+# sounds so long as evaluation just takes places within short-lived
+# processes. (When the process exits, the memory is reclaimed; it is
+# only leaked *within* the process.)
+, enableGC ? true
+
+# Whether to enable Markdown rendering in the Nix binary.
+, enableMarkdown ? !stdenv.hostPlatform.isWindows
+
+# Which interactive line editor library to use for Nix's repl.
+#
+# Currently supported choices are:
+#
+# - editline (default)
+# - readline
+, readlineFlavor ? if stdenv.hostPlatform.isWindows then "readline" else "editline"
 
 # Whether to build the internal API docs, can be done separately from
 # everything else.
@@ -80,7 +94,7 @@
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
 # later.
-, installUnitTests ? __forDefaults.canRunInstalled
+, installUnitTests ? doBuild && !__forDefaults.canExecuteHost
 
 # For running the functional tests against a pre-built Nix. Probably
 # want to use in conjunction with `doBuild = false;`.
@@ -93,7 +107,8 @@
 # Not a real argument, just the only way to approximate let-binding some
 # stuff for argument defaults.
 , __forDefaults ? {
-    canRunInstalled = doBuild && stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    canExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+    canRunInstalled = doBuild && __forDefaults.canExecuteHost;
   }
 }:
 
@@ -153,7 +168,6 @@ in {
           ./mk
           (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
         ] ++ lib.optionals doBuild [
-          ./boehmgc-coroutine-sp-fallback.diff
           ./doc
           ./misc
           ./precompiled-headers.h
@@ -164,6 +178,10 @@ in {
           ./doc/manual
         ] ++ lib.optionals enableInternalAPIDocs [
           ./doc/internal-api
+          # Source might not be compiled, but still must be available
+          # for Doxygen to gather comments.
+          ./src
+          ./tests/unit
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
         ] ++ lib.optionals doInstallCheck [
@@ -194,9 +212,6 @@ in {
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
-    # Official releases don't have rl-next, so we don't need to compile a
-    # changelog
-    ++ lib.optional (!officialRelease && buildUnreleasedNotes) changelog-d
     ++ lib.optional enableInternalAPIDocs doxygen
   ;
 
@@ -211,9 +226,12 @@ in {
     openssl
     sqlite
     xz
-  ] ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-    editline
+    ({ inherit readline editline; }.${readlineFlavor})
+  ] ++ lib.optionals enableMarkdown [
     lowdown
+  ] ++ lib.optionals buildUnitTests [
+    gtest
+    rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
@@ -225,17 +243,11 @@ in {
   ;
 
   propagatedBuildInputs = [
-    boehmgc
     nlohmann_json
-  ];
+  ] ++ lib.optional enableGC boehmgc;
 
   dontBuild = !attrs.doBuild;
   doCheck = attrs.doCheck;
-
-  checkInputs = [
-    gtest
-    rapidcheck
-  ];
 
   nativeCheckInputs = [
     git
@@ -250,7 +262,7 @@ in {
       # Copy libboost_context so we don't get all of Boost in our closure.
       # https://github.com/NixOS/nixpkgs/issues/45462
       mkdir -p $out/lib
-      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*,libboost_regex*} $out/lib
+      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
       rm -f $out/lib/*.a
     '' + lib.optionalString stdenv.hostPlatform.isLinux ''
       chmod u+w $out/lib/*.so.*
@@ -271,7 +283,10 @@ in {
     (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
+    (lib.enableFeature enableGC "gc")
+    (lib.enableFeature enableMarkdown "markdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
+    (lib.withFeatureAs true "readline-flavor" readlineFlavor)
   ] ++ lib.optionals (!forDevShell) [
     "--sysconfdir=/etc"
   ] ++ lib.optionals installUnitTests [
@@ -284,7 +299,7 @@ in {
   ] ++ lib.optional (doBuild && stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux"))
        "LDFLAGS=-fuse-ld=gold"
     ++ lib.optional (doBuild && stdenv.hostPlatform.isStatic) "--enable-embedded-sandbox-shell"
-    ++ lib.optional buildUnitTests "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include";
+    ;
 
   enableParallelBuilding = true;
 
@@ -354,9 +369,6 @@ in {
       # Nix proper (which they depend on).
       (installUnitTests -> doBuild)
       (doCheck -> doBuild)
-      # We have to build the manual to build unreleased notes, as those
-      # are part of the manual
-      (buildUnreleasedNotes -> enableManual)
       # The build process for the manual currently requires extracting
       # data from the Nix executable we are trying to document.
       (enableManual -> doBuild)

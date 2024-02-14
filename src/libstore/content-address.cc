@@ -4,7 +4,7 @@
 
 namespace nix {
 
-std::string makeFileIngestionPrefix(FileIngestionMethod m)
+std::string_view makeFileIngestionPrefix(FileIngestionMethod m)
 {
     switch (m) {
     case FileIngestionMethod::Flat:
@@ -16,10 +16,29 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
     }
 }
 
-std::string ContentAddressMethod::renderPrefix() const
+std::string_view ContentAddressMethod::render() const
 {
     return std::visit(overloaded {
-        [](TextIngestionMethod) -> std::string { return "text:"; },
+        [](TextIngestionMethod) -> std::string_view { return "text"; },
+        [](FileIngestionMethod m2) {
+             /* Not prefixed for back compat with things that couldn't produce text before. */
+            return renderFileIngestionMethod(m2);
+        },
+    }, raw);
+}
+
+ContentAddressMethod ContentAddressMethod::parse(std::string_view m)
+{
+    if (m == "text")
+        return TextIngestionMethod {};
+    else
+        return parseFileIngestionMethod(m);
+}
+
+std::string_view ContentAddressMethod::renderPrefix() const
+{
+    return std::visit(overloaded {
+        [](TextIngestionMethod) -> std::string_view { return "text:"; },
         [](FileIngestionMethod m2) {
              /* Not prefixed for back compat with things that couldn't produce text before. */
             return makeFileIngestionPrefix(m2);
@@ -38,7 +57,7 @@ ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
     return FileIngestionMethod::Flat;
 }
 
-std::string ContentAddressMethod::render(HashAlgorithm ha) const
+std::string ContentAddressMethod::renderWithAlgo(HashAlgorithm ha) const
 {
     return std::visit(overloaded {
         [&](const TextIngestionMethod & th) {
@@ -133,7 +152,7 @@ ContentAddress ContentAddress::parse(std::string_view rawCa)
     };
 }
 
-std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parse(std::string_view caMethod)
+std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parseWithAlgo(std::string_view caMethod)
 {
     std::string asPrefix = std::string{caMethod} + ":";
     // parseContentAddressMethodPrefix takes its argument by reference
@@ -155,7 +174,7 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 
 std::string ContentAddress::printMethodAlgo() const
 {
-    return method.renderPrefix()
+    return std::string { method.renderPrefix() }
         + printHashAlgo(hash.algo);
 }
 

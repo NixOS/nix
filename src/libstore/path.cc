@@ -1,7 +1,5 @@
 #include "store-dir-config.hh"
 
-#include <sodium.h>
-
 namespace nix {
 
 static void checkName(std::string_view path, std::string_view name)
@@ -11,9 +9,20 @@ static void checkName(std::string_view path, std::string_view name)
     if (name.size() > StorePath::MaxPathLen)
         throw BadStorePath("store path '%s' has a name longer than %d characters",
             path, StorePath::MaxPathLen);
-    if (name[0] == '.')
-        throw BadStorePath("store path '%s' starts with illegal character '.'", path);
     // See nameRegexStr for the definition
+    if (name[0] == '.') {
+        // check against "." and "..", followed by end or dash
+        if (name.size() == 1)
+            throw BadStorePath("store path '%s' has invalid name '%s'", path, name);
+        if (name[1] == '-')
+            throw BadStorePath("store path '%s' has invalid name '%s': first dash-separated component must not be '%s'", path, name, ".");
+        if (name[1] == '.') {
+            if (name.size() == 2)
+                throw BadStorePath("store path '%s' has invalid name '%s'", path, name);
+            if (name[2] == '-')
+                throw BadStorePath("store path '%s' has invalid name '%s': first dash-separated component must not be '%s'", path, name, "..");
+        }
+    }
     for (auto c : name)
         if (!((c >= '0' && c <= '9')
                 || (c >= 'a' && c <= 'z')
@@ -49,9 +58,7 @@ StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
 
 StorePath StorePath::random(std::string_view name)
 {
-    Hash hash(HashAlgorithm::SHA1);
-    randombytes_buf(hash.hash, hash.hashSize);
-    return StorePath(hash, name);
+    return StorePath(Hash::random(HashAlgorithm::SHA1), name);
 }
 
 StorePath StoreDirConfig::parseStorePath(std::string_view path) const

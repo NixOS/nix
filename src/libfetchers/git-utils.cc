@@ -1,11 +1,14 @@
 #include "git-utils.hh"
+#include "fs-input-accessor.hh"
 #include "input-accessor.hh"
+#include "filtering-input-accessor.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
 #include "signals.hh"
 #include "users.hh"
 
+#include <git2/attr.h>
 #include <git2/blob.h>
 #include <git2/commit.h>
 #include <git2/config.h>
@@ -23,6 +26,7 @@
 #include "tarfile.hh"
 #include <archive_entry.h>
 
+#include <iostream>
 #include <unordered_set>
 #include <queue>
 #include <regex>
@@ -52,6 +56,8 @@ bool operator == (const git_oid & oid1, const git_oid & oid2)
 }
 
 namespace nix {
+
+struct GitInputAccessor;
 
 // Some wrapper types that ensure that the git_*_free functions get called.
 template<auto del>
@@ -136,15 +142,16 @@ T peelObject(git_repository * repo, git_object * obj, git_object_t type)
 
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
-    CanonPath path;
+    /** Location of the repository on disk. */
+    std::filesystem::path path;
     Repository repo;
 
-    GitRepoImpl(CanonPath _path, bool create, bool bare)
+    GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
         : path(std::move(_path))
     {
         initLibGit2();
 
-        if (pathExists(path.abs())) {
+        if (pathExists(path.native())) {
             if (git_repository_open(Setter(repo), path.c_str()))
                 throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
         } else {
@@ -217,10 +224,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return toHash(*oid);
     }
 
-    std::vector<Submodule> parseSubmodules(const CanonPath & configFile)
+    std::vector<Submodule> parseSubmodules(const std::filesystem::path & configFile)
     {
         GitConfig config;
-        if (git_config_open_ondisk(Setter(config), configFile.abs().c_str()))
+        if (git_config_open_ondisk(Setter(config), configFile.c_str()))
             throw Error("parsing .gitmodules file: %s", git_error_last()->message);
 
         ConfigIterator it;
@@ -291,8 +298,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             throw Error("getting working directory status: %s", git_error_last()->message);
 
         /* Get submodule info. */
-        auto modulesFile = path + ".gitmodules";
-        if (pathExists(modulesFile.abs()))
+        auto modulesFile = path / ".gitmodules";
+        if (pathExists(modulesFile))
             info.submodules = parseSubmodules(modulesFile);
 
         return info;
@@ -462,7 +469,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         };
     }
 
-    std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) override;
+    std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
     std::string resolveSubmoduleUrl(
         const std::string & url,
@@ -495,7 +502,14 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return true;
     }
 
-    ref<InputAccessor> getAccessor(const Hash & rev) override;
+    /**
+     * A 'GitInputAccessor' with no regard for export-ignore or any other transformations.
+     */
+    ref<GitInputAccessor> getRawAccessor(const Hash & rev);
+
+    ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
+
+    ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
     static int sidebandProgressCallback(const char * str, int len, void * payload)
     {
@@ -524,27 +538,27 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         Activity act(*logger, lvlTalkative, actFetchTree, fmt("fetching Git repository '%s'", url));
 
-        Remote remote;
+        // TODO: implement git-credential helper support (preferably via libgit2, which as of 2024-01 does not support that)
+        //       then use code that was removed in this commit (see blame)
 
-        if (git_remote_create_anonymous(Setter(remote), *this, url.c_str()))
-            throw Error("cannot create Git remote '%s': %s", url, git_error_last()->message);
+        auto dir = this->path;
+        Strings gitArgs;
+        if (shallow) {
+            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
+        }
+        else {
+            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--", url, refspec };
+        }
 
-        char * refspecs[] = {(char *) refspec.c_str()};
-        git_strarray refspecs2 {
-            .strings = refspecs,
-            .count = 1
-        };
-
-        git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
-        // FIXME: for some reason, shallow fetching over ssh barfs
-        // with "could not read from remote repository".
-        opts.depth = shallow && parseURL(url).scheme != "ssh" ? 1 : GIT_FETCH_DEPTH_FULL;
-        opts.callbacks.payload = &act;
-        opts.callbacks.sideband_progress = sidebandProgressCallback;
-        opts.callbacks.transfer_progress = transferProgressCallback;
-
-        if (git_remote_fetch(remote.get(), &refspecs2, &opts, nullptr))
-            throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
+        runProgram(RunOptions {
+            .program = "git",
+            .searchPath = true,
+            // FIXME: git stderr messes up our progress indicator, so
+            // we're using --quiet for now. Should process its stderr.
+            .args = gitArgs,
+            .input = {},
+            .isInteractive = true
+        });
     }
 
     void verifyCommit(
@@ -579,7 +593,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 .args = {
                     "-c",
                     "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
-                    "-C", path.abs(),
+                    "-C", path,
                     "verify-commit",
                     rev.gitRev()
                 },
@@ -604,29 +618,16 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         else
             throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
     }
-
-    Hash treeHashToNarHash(const Hash & treeHash) override
-    {
-        auto accessor = getAccessor(treeHash);
-
-        fetchers::Attrs cacheKey({{"_what", "treeHashToNarHash"}, {"treeHash", treeHash.gitRev()}});
-
-        if (auto res = fetchers::getCache()->lookup(cacheKey))
-            return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), HashAlgorithm::SHA256);
-
-        auto narHash = accessor->hashPath(CanonPath::root);
-
-        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
-
-        return narHash;
-    }
 };
 
-ref<GitRepo> GitRepo::openRepo(const CanonPath & path, bool create, bool bare)
+ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare)
 {
     return make_ref<GitRepoImpl>(path, create, bare);
 }
 
+/**
+ * Raw git tree input accessor.
+ */
 struct GitInputAccessor : InputAccessor
 {
     ref<GitRepoImpl> repo;
@@ -815,17 +816,114 @@ struct GitInputAccessor : InputAccessor
     }
 };
 
-ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev)
+struct GitExportIgnoreInputAccessor : CachingFilteringInputAccessor {
+    ref<GitRepoImpl> repo;
+    std::optional<Hash> rev;
+
+    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<InputAccessor> next, std::optional<Hash> rev)
+        : CachingFilteringInputAccessor(next, [&](const CanonPath & path) {
+            return RestrictedPathError(fmt("'%s' does not exist because it was fetched with exportIgnore enabled", path));
+        })
+        , repo(repo)
+        , rev(rev)
+    { }
+
+    bool gitAttrGet(const CanonPath & path, const char * attrName, const char * & valueOut)
+    {
+        const char * pathCStr = path.rel_c_str();
+
+        if (rev) {
+            git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
+            opts.attr_commit_id = hashToOID(*rev);
+            // TODO: test that gitattributes from global and system are not used
+            //       (ie more or less: home and etc - both of them!)
+            opts.flags = GIT_ATTR_CHECK_INCLUDE_COMMIT | GIT_ATTR_CHECK_NO_SYSTEM;
+            return git_attr_get_ext(
+                &valueOut,
+                *repo,
+                &opts,
+                pathCStr,
+                attrName
+                );
+        }
+        else {
+            return git_attr_get(
+                &valueOut,
+                *repo,
+                GIT_ATTR_CHECK_INDEX_ONLY | GIT_ATTR_CHECK_NO_SYSTEM,
+                pathCStr,
+                attrName);
+        }
+    }
+
+    bool isExportIgnored(const CanonPath & path)
+    {
+        const char *exportIgnoreEntry = nullptr;
+
+        // GIT_ATTR_CHECK_INDEX_ONLY:
+        // > It will use index only for creating archives or for a bare repo
+        // > (if an index has been specified for the bare repo).
+        // -- https://github.com/libgit2/libgit2/blob/HEAD/include/git2/attr.h#L113C62-L115C48
+        if (gitAttrGet(path, "export-ignore", exportIgnoreEntry)) {
+            if (git_error_last()->klass == GIT_ENOTFOUND)
+                return false;
+            else
+                throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
+        }
+        else {
+            // Official git will silently reject export-ignore lines that have
+            // values. We do the same.
+            return GIT_ATTR_IS_TRUE(exportIgnoreEntry);
+        }
+    }
+
+    bool isAllowedUncached(const CanonPath & path) override
+    {
+        return !isExportIgnored(path);
+    }
+
+};
+
+ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
 {
-    return make_ref<GitInputAccessor>(ref<GitRepoImpl>(shared_from_this()), rev);
+    auto self = ref<GitRepoImpl>(shared_from_this());
+    return make_ref<GitInputAccessor>(self, rev);
 }
 
-std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev)
+ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
+{
+    auto self = ref<GitRepoImpl>(shared_from_this());
+    ref<GitInputAccessor> rawGitAccessor = getRawAccessor(rev);
+    if (exportIgnore) {
+        return make_ref<GitExportIgnoreInputAccessor>(self, rawGitAccessor, rev);
+    }
+    else {
+        return rawGitAccessor;
+    }
+}
+
+ref<InputAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
+{
+    auto self = ref<GitRepoImpl>(shared_from_this());
+    ref<InputAccessor> fileAccessor =
+        AllowListInputAccessor::create(
+                makeFSInputAccessor(path),
+                std::set<CanonPath> { wd.files },
+                std::move(makeNotAllowedError));
+    if (exportIgnore) {
+        return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor, std::nullopt);
+    }
+    else {
+        return fileAccessor;
+    }
+}
+
+std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev, bool exportIgnore)
 {
     /* Read the .gitmodules files from this revision. */
     CanonPath modulesFile(".gitmodules");
 
-    auto accessor = getAccessor(rev);
+    auto accessor = getAccessor(rev, exportIgnore);
     if (!accessor->pathExists(modulesFile)) return {};
 
     /* Parse it and get the revision of each submodule. */
@@ -836,8 +934,10 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
     std::vector<std::tuple<Submodule, Hash>> result;
 
-    for (auto & submodule : parseSubmodules(CanonPath(pathTemp))) {
-        auto rev = accessor.dynamic_pointer_cast<GitInputAccessor>()->getSubmoduleRev(submodule.path);
+    auto rawAccessor = getRawAccessor(rev);
+
+    for (auto & submodule : parseSubmodules(pathTemp)) {
+        auto rev = rawAccessor->getSubmoduleRev(submodule.path);
         result.push_back({std::move(submodule), rev});
     }
 
@@ -846,7 +946,7 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
 
 ref<GitRepo> getTarballCache()
 {
-    static CanonPath repoDir(getCacheDir() + "/nix/tarball-cache");
+    static auto repoDir = std::filesystem::path(getCacheDir()) / "nix" / "tarball-cache";
 
     return make_ref<GitRepoImpl>(repoDir, true, true);
 }

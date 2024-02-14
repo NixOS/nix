@@ -19,3 +19,5 @@ substring 1 2 s
 + substring 3 1 s
 + "c"
 + substring 5 10 "perl"
++ "_"
++ substring 3 (-1) "tebbad"

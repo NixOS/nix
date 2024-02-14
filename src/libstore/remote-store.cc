@@ -16,6 +16,8 @@
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"
+#include "signals.hh"
+
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -65,6 +67,7 @@ void RemoteStore::initConnection(Connection & conn)
 {
     /* Send the magic greeting, check for the reply. */
     try {
+        conn.from.endOfFileError = "Nix daemon disconnected unexpectedly (maybe it crashed?)";
         conn.to << WORKER_MAGIC_1;
         conn.to.flush();
         StringSink saved;
@@ -186,7 +189,7 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
                 if (m.find("parsing derivation") != std::string::npos &&
                     m.find("expected string") != std::string::npos &&
                     m.find("Derive([") != std::string::npos)
-                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw dervation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
+                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw derivation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
             }
             throw;
         }
@@ -432,7 +435,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << WorkerProto::Op::AddToStore
             << name
-            << caMethod.render(hashAlgo);
+            << caMethod.renderWithAlgo(hashAlgo);
         WorkerProto::write(*this, *conn, references);
         conn->to << repair;
 
@@ -1066,6 +1069,7 @@ void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sin
     std::thread stderrThread([&]()
     {
         try {
+            ReceiveInterrupts receiveInterrupts;
             processStderr(nullptr, nullptr, false);
         } catch (...) {
             ex = std::current_exception();

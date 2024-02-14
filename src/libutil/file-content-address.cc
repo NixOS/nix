@@ -3,6 +3,31 @@
 
 namespace nix {
 
+FileIngestionMethod parseFileIngestionMethod(std::string_view input)
+{
+    if (input == "flat") {
+        return FileIngestionMethod::Flat;
+    } else if (input == "nar") {
+        return FileIngestionMethod::Recursive;
+    } else {
+        throw UsageError("Unknown file ingestion method '%s', expect `flat` or `nar`");
+    }
+}
+
+
+std::string_view renderFileIngestionMethod(FileIngestionMethod method)
+{
+    switch (method) {
+    case FileIngestionMethod::Flat:
+        return "flat";
+    case FileIngestionMethod::Recursive:
+        return "nar";
+    default:
+        abort();
+    }
+}
+
+
 void dumpPath(
     SourceAccessor & accessor, const CanonPath & path,
     Sink & sink,

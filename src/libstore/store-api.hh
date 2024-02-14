@@ -13,6 +13,7 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 #include "store-dir-config.hh"
+#include "source-path.hh"
 
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
@@ -107,7 +108,7 @@ struct StoreConfig : public StoreDirConfig
 
     StoreConfig() = delete;
 
-    StringSet getDefaultSystemFeatures();
+    static StringSet getDefaultSystemFeatures();
 
     virtual ~StoreConfig() { }
 
@@ -280,6 +281,16 @@ public:
      */
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
+
+    /**
+     * Version of queryPathInfo() that only queries the local narinfo cache and not
+     * the actual store.
+     *
+     * @return `std::nullopt` if nothing is known about the path in the local narinfo cache.
+     * @return `std::make_optional(nullptr)` if the path is known to not exist.
+     * @return `std::make_optional(validPathInfo)` if the path is known to exist.
+     */
+    std::optional<std::shared_ptr<const ValidPathInfo>> queryPathInfoFromClientCache(const StorePath & path);
 
     /**
      * Query the information about a realisation.
@@ -465,8 +476,7 @@ public:
         ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
-        RepairFlag repair = NoRepair)
-    { unsupported("addToStoreFromDump"); }
+        RepairFlag repair = NoRepair) = 0;
 
     /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path

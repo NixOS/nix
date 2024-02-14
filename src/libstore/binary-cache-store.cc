@@ -28,7 +28,8 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
     , Store(params)
 {
     if (secretKeyFile != "")
-        secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
+        signer = std::make_unique<LocalSigner>(
+            SecretKey { readFile(secretKeyFile) });
 
     StringSink sink;
     sink << narVersionMagic1;
@@ -234,14 +235,14 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
             std::regex regex2("^[0-9a-f]{38}\\.debug$");
 
             for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
-                auto dir = buildIdDir + s1;
+                auto dir = buildIdDir / s1;
 
                 if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory
                     || !std::regex_match(s1, regex1))
                     continue;
 
                 for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
-                    auto debugPath = dir + s2;
+                    auto debugPath = dir / s2;
 
                     if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular
                         || !std::regex_match(s2, regex2))
@@ -274,7 +275,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     stats.narWriteCompressionTimeMs += duration;
 
     /* Atomically write the NAR info file.*/
-    if (secretKey) narInfo->sign(*this, *secretKey);
+    if (signer) narInfo->sign(*this, *signer);
 
     writeNarInfo(narInfo);
 

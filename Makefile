@@ -1,7 +1,11 @@
+# External build directory support
+
 include mk/build-dir.mk
 
 -include $(buildprefix)Makefile.config
 clean-files += $(buildprefix)Makefile.config
+
+# List makefiles
 
 ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
@@ -43,6 +47,19 @@ makefiles += \
   tests/functional/plugins/local.mk
 endif
 
+# Some makefiles require access to built programs and must be included late.
+makefiles-late =
+
+ifeq ($(ENABLE_DOC_GEN), yes)
+makefiles-late += doc/manual/local.mk
+endif
+
+ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
+makefiles-late += doc/internal-api/local.mk
+endif
+
+# Miscellaneous global Flags
+
 OPTIMIZE = 1
 
 ifeq ($(OPTIMIZE), 1)
@@ -52,9 +69,29 @@ else
   GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
 endif
 
+include mk/platform.mk
+
+ifdef HOST_WINDOWS
+  # Windows DLLs are stricter about symbol visibility than Unix shared
+  # objects --- see https://gcc.gnu.org/wiki/Visibility for details.
+  # This is a temporary sledgehammer to export everything like on Unix,
+  # and not detail with this yet.
+  #
+  # TODO do not do this, and instead do fine-grained export annotations.
+  GLOBAL_LDFLAGS += -Wl,--export-all-symbols
+endif
+
+GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src
+
+# Include the main lib, causing rules to be defined
+
 include mk/lib.mk
 
-# Must be included after `mk/lib.mk` so isn't the default target.
+# Fallback stub rules for better UX when things are disabled
+#
+# These must be defined after `mk/lib.mk`. Otherwise the first rule
+# incorrectly becomes the default target.
+
 ifneq ($(ENABLE_UNIT_TESTS), yes)
 .PHONY: check
 check:
@@ -69,25 +106,18 @@ installcheck:
 	@exit 1
 endif
 
-# Must be included after `mk/lib.mk` so rules refer to variables defined
-# by the library. Rules are not "lazy" like variables, unfortunately.
+# Documentation fallback stub rules.
 
-ifeq ($(ENABLE_DOC_GEN), yes)
-$(eval $(call include-sub-makefile, doc/manual/local.mk))
-else
+ifneq ($(ENABLE_DOC_GEN), yes)
 .PHONY: manual-html manpages
 manual-html manpages:
 	@echo "Generated docs are disabled. Configure without '--disable-doc-gen', or avoid calling 'make manpages' and 'make manual-html'."
 	@exit 1
 endif
 
-ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
-$(eval $(call include-sub-makefile, doc/internal-api/local.mk))
-else
+ifneq ($(ENABLE_INTERNAL_API_DOCS), yes)
 .PHONY: internal-api-html
 internal-api-html:
 	@echo "Internal API docs are disabled. Configure with '--enable-internal-api-docs', or avoid calling 'make internal-api-html'."
 	@exit 1
 endif
-
-GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src

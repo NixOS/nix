@@ -161,7 +161,9 @@ void buildProfile(const Path & out, Packages && pkgs)
     debug("created %d symlinks in user environment", state.symlinks);
 }
 
-void builtinBuildenv(const BasicDerivation & drv)
+void builtinBuildenv(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
@@ -169,7 +171,7 @@ void builtinBuildenv(const BasicDerivation & drv)
         return i->second;
     };
 
-    Path out = getAttr("out");
+    auto out = outputs.at("out");
     createDirs(out);
 
     /* Convert the stuff we get from the environment back into a

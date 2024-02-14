@@ -47,6 +47,10 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 # State should be stored in /nix/var, unless the user overrides it explicitly.
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
+# Assign a default value to C{,XX}FLAGS as the default configure script sets them
+# to -O2 otherwise, which we don't want to have hardcoded
+CFLAGS=${CFLAGS-""}
+CXXFLAGS=${CXXFLAGS-""}
 
 AC_PROG_CC
 AC_PROG_CXX
@@ -160,7 +164,7 @@ AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation
 AC_SUBST(ENABLE_DOC_GEN)
 
 AS_IF(
-  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_GENERATED_DOCS" == "yes"],
+  [test "$ENABLE_BUILD" == "no" && test "$ENABLE_DOC_GEN" == "yes"],
   [AC_MSG_ERROR([Cannot enable generated docs when building overall is disabled. Please do not pass '--enable-doc-gen' or do not pass '--disable-build'.])])
 
 # Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
@@ -251,17 +255,25 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 # Look for libcurl, a required dependency.
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
 
-# Look for editline, a required dependency.
+# Look for editline or readline, a required dependency.
 # The the libeditline.pc file was added only in libeditline >= 1.15.2,
 # see https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
-# but e.g. Ubuntu 16.04 has an older version, so we fall back to searching for
-# editline.h when the pkg-config approach fails.
-PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"], [
-  AC_CHECK_HEADERS([editline.h], [true],
-    [AC_MSG_ERROR([Nix requires libeditline; it was found neither via pkg-config nor its normal header.])])
-  AC_SEARCH_LIBS([readline read_history], [editline], [],
-    [AC_MSG_ERROR([Nix requires libeditline; it was not found via pkg-config, but via its header, but required functions do not work. Maybe it is too old? >= 1.14 is required.])])
-])
+# Older versions are no longer supported.
+AC_ARG_WITH(
+  [readline-flavor],
+  AS_HELP_STRING([--with-readline-flavor],[Which library to use for nice line editting with the Nix language REPL" [default=editline]]),
+  [readline_flavor=$withval],
+  [readline_flavor=editline])
+AS_CASE(["$readline_flavor"],
+  [editline], [
+    readline_flavor_pc=libeditline
+  ],
+  [readline], [
+    readline_flavor_pc=readline
+    AC_DEFINE([USE_READLINE], [1], [Use readline instead of editline])
+  ],
+  [AC_MSG_ERROR([bad value "$readline_flavor" for --with-readline-flavor, must be one of: editline, readline])])
+PKG_CHECK_MODULES([EDITLINE], [$readline_flavor_pc], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLAGS"])
 
 # Look for libsodium.
 PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
@@ -308,7 +320,12 @@ AC_SUBST(HAVE_SECCOMP, [$have_seccomp])
 
 # Optional dependencies for better normalizing file system data
 AC_CHECK_HEADERS([sys/xattr.h])
-AC_CHECK_FUNCS([llistxattr lremovexattr])
+AS_IF([test "$ac_cv_header_sys_xattr_h" = "yes"],[
+  AC_CHECK_FUNCS([llistxattr lremovexattr])
+  AS_IF([test "$ac_cv_func_llistxattr" = "yes" && test "$ac_cv_func_lremovexattr" = "yes"],[
+    AC_DEFINE([HAVE_ACL_SUPPORT], [1], [Define if we can manipulate file system Access Control Lists])
+  ])
+])
 
 # Look for aws-cpp-sdk-s3.
 AC_LANG_PUSH(C++)
@@ -338,29 +355,10 @@ fi
 AS_IF([test "$ENABLE_UNIT_TESTS" == "yes"],[
 
 # Look for gtest.
-PKG_CHECK_MODULES([GTEST], [gtest_main])
-
+PKG_CHECK_MODULES([GTEST], [gtest_main gmock_main])
 
 # Look for rapidcheck.
-AC_ARG_VAR([RAPIDCHECK_HEADERS], [include path of gtest headers shipped by RAPIDCHECK])
-# No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
-AC_LANG_PUSH(C++)
-AC_SUBST(RAPIDCHECK_HEADERS)
-[CXXFLAGS="-I $RAPIDCHECK_HEADERS $CXXFLAGS"]
-[LIBS="-lrapidcheck -lgtest $LIBS"]
-AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
-dnl AC_CHECK_LIB doesn't work for C++ libs with mangled symbols
-AC_LINK_IFELSE([
-    AC_LANG_PROGRAM([[
-      #include <gtest/gtest.h>
-      #include <rapidcheck/gtest.h>
-    ]], [[
-      return RUN_ALL_TESTS();
-    ]])
-  ],
-  [],
-  [AC_MSG_ERROR([librapidcheck is not found.])])
-AC_LANG_POP(C++)
+PKG_CHECK_MODULES([RAPIDCHECK], [rapidcheck rapidcheck_gtest])
 
 ])
 
@@ -369,7 +367,20 @@ PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
 
 
 # Look for lowdown library.
-PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"])
+AC_ARG_ENABLE([markdown], AS_HELP_STRING([--enable-markdown], [Enable Markdown rendering in the Nix binary (requires lowdown) [default=auto]]),
+  enable_markdown=$enableval, enable_markdown=auto)
+AS_CASE(["$enable_markdown"],
+  [yes | auto], [
+    PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [
+      CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"
+      have_lowdown=1
+      AC_DEFINE(HAVE_LOWDOWN, 1, [Whether lowdown is available and should be used for Markdown rendering.])
+    ], [
+      AS_IF([test "x$enable_markdown" == "xyes"], [AC_MSG_ERROR([--enable-markdown was specified, but lowdown was not found.])])
+    ])
+  ],
+  [no], [have_lowdown=],
+  [AC_MSG_ERROR([bad value "$enable_markdown" for --enable-markdown, must be one of: yes, no, auto])])
 
 
 # Look for libgit2.

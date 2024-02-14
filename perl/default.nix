@@ -5,12 +5,12 @@
 , nix, curl, bzip2, xz, boost, libsodium, darwin
 }:
 
-perl.pkgs.toPerlModule (stdenv.mkDerivation {
+perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
   name = "nix-perl-${nix.version}";
 
   src = fileset.toSource {
     root = ../.;
-    fileset = fileset.unions [
+    fileset = fileset.unions ([
       ../.version
       ../m4
       ../mk
@@ -20,7 +20,10 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation {
       ./configure.ac
       ./lib
       ./local.mk
-    ];
+    ] ++ lib.optionals finalAttrs.doCheck [
+      ./.yath.rc
+      ./t
+    ]);
   };
 
   nativeBuildInputs =
@@ -40,6 +43,13 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation {
     ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
     ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
+  # `perlPackages.Test2Harness` is marked broken for Darwin
+  doCheck = !stdenv.isDarwin;
+
+  nativeCheckInputs = [
+    perlPackages.Test2Harness
+  ];
+
   configureFlags = [
     "--with-dbi=${perlPackages.DBI}/${perl.libPrefix}"
     "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${perl.libPrefix}"
@@ -48,4 +58,4 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation {
   enableParallelBuilding = true;
 
   postUnpack = "sourceRoot=$sourceRoot/perl";
-})
+}))

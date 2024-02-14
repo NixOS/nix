@@ -119,7 +119,7 @@ struct TunnelLogger : public Logger
             if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
                 to << STDERR_ERROR << *ex;
             } else {
-                to << STDERR_ERROR << ex->what() << ex->status;
+                to << STDERR_ERROR << ex->what() << ex->info().status;
             }
         }
     }
@@ -400,7 +400,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parse(camStr);
+                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parseWithAlgo(camStr);
                 auto hashAlgo = hashAlgo_; // work around clang bug
                 FramedSource source(from);
                 // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
@@ -441,7 +441,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                        eagerly consume the entire stream it's given, past the
                        length of the Nar. */
                     TeeSource savedNARSource(from, saved);
-                    NullParseSink sink; /* just parse the NAR */
+                    NullFileSystemObjectSink sink; /* just parse the NAR */
                     parseDump(sink, savedNARSource);
                 } else {
                     /* Incrementally parse the NAR file, stripping the
@@ -913,7 +913,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 source = std::make_unique<TunnelSource>(from, to);
             else {
                 TeeSource tee { from, saved };
-                NullParseSink ether;
+                NullFileSystemObjectSink ether;
                 parseDump(ether, tee);
                 source = std::make_unique<StringSource>(saved.s);
             }

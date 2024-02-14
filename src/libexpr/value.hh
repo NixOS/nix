@@ -8,6 +8,8 @@
 #include "symbol-table.hh"
 #include "value/context.hh"
 #include "input-accessor.hh"
+#include "source-path.hh"
+#include "print-options.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -32,7 +34,6 @@ typedef enum {
     tThunk,
     tApp,
     tLambda,
-    tBlackhole,
     tPrimOp,
     tPrimOpApp,
     tExternal,
@@ -62,6 +63,7 @@ class Bindings;
 struct Env;
 struct Expr;
 struct ExprLambda;
+struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
 class PosIdx;
@@ -69,7 +71,7 @@ struct Pos;
 class StorePath;
 class EvalState;
 class XMLWriter;
-
+class Printer;
 
 typedef int64_t NixInt;
 typedef double NixFloat;
@@ -81,6 +83,7 @@ typedef double NixFloat;
 class ExternalValueBase
 {
     friend std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
+    friend class Printer;
     protected:
     /**
      * Print out the value
@@ -102,7 +105,7 @@ class ExternalValueBase
      * Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error.
      */
-    virtual std::string coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const;
+    virtual std::string coerceToString(EvalState & state, const PosIdx & pos, NixStringContext & context, bool copyMore, bool copyToStore) const;
 
     /**
      * Compare to another value of the same type. Defaults to uncomparable,
@@ -138,11 +141,9 @@ private:
 
     friend std::string showType(const Value & v);
 
-    void print(const SymbolTable &symbols, std::ostream &str, std::set<const void *> *seen, int depth) const;
-
 public:
 
-    void print(const SymbolTable &symbols, std::ostream &str, bool showRepeated = false, int depth = INT_MAX) const;
+    void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
@@ -151,7 +152,7 @@ public:
     // type() == nThunk
     inline bool isThunk() const { return internalType == tThunk; };
     inline bool isApp() const { return internalType == tApp; };
-    inline bool isBlackhole() const { return internalType == tBlackhole; };
+    inline bool isBlackhole() const;
 
     // type() == nFunction
     inline bool isLambda() const { return internalType == tLambda; };
@@ -248,7 +249,7 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: case tBlackhole: return nThunk;
+            case tThunk: case tApp: return nThunk;
         }
         if (invalidIsThunk)
             return nThunk;
@@ -356,20 +357,21 @@ public:
         lambda.fun = f;
     }
 
-    inline void mkBlackhole()
-    {
-        internalType = tBlackhole;
-        // Value will be overridden anyways
-    }
+    inline void mkBlackhole();
 
     void mkPrimOp(PrimOp * p);
 
     inline void mkPrimOpApp(Value * l, Value * r)
     {
         internalType = tPrimOpApp;
-        app.left = l;
-        app.right = r;
+        primOpApp.left = l;
+        primOpApp.right = r;
     }
+
+    /**
+     * For a `tPrimOpApp` value, get the original `PrimOp` value.
+     */
+    PrimOp * primOpAppPrimOp() const;
 
     inline void mkExternal(ExternalValueBase * e)
     {
@@ -445,6 +447,20 @@ public:
         return string.context;
     }
 };
+
+
+extern ExprBlackHole eBlackHole;
+
+bool Value::isBlackhole() const
+{
+    return internalType == tThunk && thunk.expr == (Expr*) &eBlackHole;
+}
+
+void Value::mkBlackhole()
+{
+    internalType = tThunk;
+    thunk.expr = (Expr*) &eBlackHole;
+}
 
 
 #if HAVE_BOEHMGC

@@ -12,17 +12,20 @@ our %EXPORT_TAGS = ( 'all' => [ qw( ) ] );
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
-    setVerbosity
-    isValidPath queryReferences queryPathInfo queryDeriver queryPathHash
-    queryPathFromHashPart
-    topoSortPaths computeFSClosure followLinksToStorePath exportPaths importPaths
+    StoreWrapper
+    StoreWrapper::new
+    StoreWrapper::isValidPath StoreWrapper::queryReferences StoreWrapper::queryPathInfo StoreWrapper::queryDeriver StoreWrapper::queryPathHash
+    StoreWrapper::queryPathFromHashPart
+    StoreWrapper::topoSortPaths StoreWrapper::computeFSClosure followLinksToStorePath StoreWrapper::exportPaths StoreWrapper::importPaths
+    StoreWrapper::addToStore StoreWrapper::makeFixedOutputPath
+    StoreWrapper::derivationFromPath
+    StoreWrapper::addTempRoot
+    StoreWrapper::queryRawRealisation
+
     hashPath hashFile hashString convertHash
     signString checkSignature
-    addToStore makeFixedOutputPath
-    derivationFromPath
-    addTempRoot
     getBinDir getStoreDir
-    queryRawRealisation
+    setVerbosity
 );
 
 our $VERSION = '0.15';

@@ -89,8 +89,8 @@ struct CmdHashBase : Command
             else
                 hashSink = std::make_unique<HashSink>(ha);
 
-            PosixSourceAccessor accessor;
-            dumpPath(accessor, CanonPath::fromCwd(path), *hashSink, mode);
+            auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
+            dumpPath(accessor, canonPath, *hashSink, mode);
 
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
@@ -141,7 +141,7 @@ struct CmdHashConvert : Command
     CmdHashConvert(): to(HashFormat::SRI) {
         addFlag(Args::Flag::mkHashFormatOptFlag("from", &from));
         addFlag(Args::Flag::mkHashFormatFlagWithDefault("to", &to));
-        addFlag(Args::Flag::mkHashAlgoOptFlag("algo", &algo));
+        addFlag(Args::Flag::mkHashAlgoOptFlag(&algo));
         expectArgs({
            .label = "hashes",
            .handler = {&hashStrings},
@@ -150,15 +150,14 @@ struct CmdHashConvert : Command
 
     std::string description() override
     {
-        std::string descr( "convert between different hash formats. Choose from: ");
-        auto iter = hashFormats.begin();
-        assert(iter != hashFormats.end());
-        descr += *iter++;
-        while (iter != hashFormats.end()) {
-            descr += ", " + *iter++;
-        }
+        return "convert between hash formats";
+    }
 
-        return descr;
+    std::string doc() override
+    {
+        return
+          #include "hash-convert.md"
+          ;
     }
 
     Category category() override { return catUtility; }

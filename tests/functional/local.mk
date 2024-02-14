@@ -2,6 +2,7 @@ nix_tests = \
   test-infra.sh \
   init.sh \
   flakes/flakes.sh \
+  flakes/develop.sh \
   flakes/run.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
@@ -46,7 +47,8 @@ nix_tests = \
   optimise-store.sh \
   substitute-with-invalid-ca.sh \
   signing.sh \
-  hash.sh \
+  hash-convert.sh \
+  hash-path.sh \
   gc-non-blocking.sh \
   check.sh \
   nix-shell.sh \
@@ -126,18 +128,19 @@ nix_tests = \
   toString-path.sh \
   read-only-store.sh \
   nested-sandboxing.sh \
-  impure-env.sh
+  impure-env.sh \
+  debugger.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
-	nix_tests += compute-levels.sh
+  nix_tests += compute-levels.sh
 endif
 
 ifeq ($(ENABLE_BUILD), yes)
-	nix_tests += test-libstoreconsumer.sh
+  nix_tests += test-libstoreconsumer.sh
 
-	ifeq ($(BUILD_SHARED_LIBS), 1)
-		nix_tests += plugins.sh
-	endif
+  ifeq ($(BUILD_SHARED_LIBS), 1)
+    nix_tests += plugins.sh
+  endif
 endif
 
 $(d)/test-libstoreconsumer.sh.test $(d)/test-libstoreconsumer.sh.test-debug: \

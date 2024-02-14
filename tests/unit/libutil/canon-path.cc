@@ -80,29 +80,29 @@ namespace nix {
         {
             CanonPath p1("a//foo/bar//");
             CanonPath p2("xyzzy/bla");
-            ASSERT_EQ((p1 + p2).abs(), "/a/foo/bar/xyzzy/bla");
+            ASSERT_EQ((p1 / p2).abs(), "/a/foo/bar/xyzzy/bla");
         }
 
         {
             CanonPath p1("/");
             CanonPath p2("/a/b");
-            ASSERT_EQ((p1 + p2).abs(), "/a/b");
+            ASSERT_EQ((p1 / p2).abs(), "/a/b");
         }
 
         {
             CanonPath p1("/a/b");
             CanonPath p2("/");
-            ASSERT_EQ((p1 + p2).abs(), "/a/b");
+            ASSERT_EQ((p1 / p2).abs(), "/a/b");
         }
 
         {
             CanonPath p("/foo/bar");
-            ASSERT_EQ((p + "x").abs(), "/foo/bar/x");
+            ASSERT_EQ((p / "x").abs(), "/foo/bar/x");
         }
 
         {
             CanonPath p("/");
-            ASSERT_EQ((p + "foo" + "bar").abs(), "/foo/bar");
+            ASSERT_EQ((p / "foo" / "bar").abs(), "/foo/bar");
         }
     }
 

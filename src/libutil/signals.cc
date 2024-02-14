@@ -179,7 +179,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     auto token = interruptCallbacks->nextToken++;
     interruptCallbacks->callbacks.emplace(token, callback);
 
-    auto res = std::make_unique<InterruptCallbackImpl>();
+    std::unique_ptr<InterruptCallbackImpl> res {new InterruptCallbackImpl{}};
     res->token = token;
 
     return std::unique_ptr<InterruptCallback>(res.release());

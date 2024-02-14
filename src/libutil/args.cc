@@ -304,7 +304,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 for (auto pos = savedArgs.begin(); pos != savedArgs.end();pos++)
                     cmdline.push_back(*pos);
             }
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
@@ -557,7 +557,7 @@ Args::Flag Args::Flag::mkHashFormatFlagWithDefault(std::string &&longName, HashF
     assert(*hf == nix::HashFormat::SRI);
     return Flag{
             .longName = std::move(longName),
-            .description = "hash format ('base16', 'nix32', 'base64', 'sri'). Default: 'sri'",
+            .description = "Hash format (`base16`, `nix32`, `base64`, `sri`). Default: `sri`.",
             .labels = {"hash-format"},
             .handler = {[hf](std::string s) {
                 *hf = parseHashFormat(s);
@@ -569,7 +569,7 @@ Args::Flag Args::Flag::mkHashFormatFlagWithDefault(std::string &&longName, HashF
 Args::Flag Args::Flag::mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf) {
     return Flag{
             .longName = std::move(longName),
-            .description = "hash format ('base16', 'nix32', 'base64', 'sri').",
+            .description = "Hash format (`base16`, `nix32`, `base64`, `sri`).",
             .labels = {"hash-format"},
             .handler = {[ohf](std::string s) {
                 *ohf = std::optional<HashFormat>{parseHashFormat(s)};
@@ -589,7 +589,7 @@ Args::Flag Args::Flag::mkHashAlgoFlag(std::string && longName, HashAlgorithm * h
 {
     return Flag{
             .longName = std::move(longName),
-            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
+            .description = "Hash algorithm (`md5`, `sha1`, `sha256`, or `sha512`).",
             .labels = {"hash-algo"},
             .handler = {[ha](std::string s) {
                 *ha = parseHashAlgo(s);
@@ -602,7 +602,7 @@ Args::Flag Args::Flag::mkHashAlgoOptFlag(std::string && longName, std::optional<
 {
     return Flag{
             .longName = std::move(longName),
-            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
+            .description = "Hash algorithm (`md5`, `sha1`, `sha256`, or `sha512`). Can be omitted for SRI hashes.",
             .labels = {"hash-algo"},
             .handler = {[oha](std::string s) {
                 *oha = std::optional<HashAlgorithm>{parseHashAlgo(s)};

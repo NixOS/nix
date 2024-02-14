@@ -257,7 +257,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
-        auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash);
+        auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash, false);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 

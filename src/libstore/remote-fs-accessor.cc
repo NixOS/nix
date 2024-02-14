@@ -87,13 +87,13 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
             nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
 
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
 
         try {
             auto narAccessor = makeNarAccessor(nix::readFile(cacheFile));
             nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
 
     StringSink sink;
