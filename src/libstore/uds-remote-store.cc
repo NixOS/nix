@@ -96,10 +96,11 @@ void UDSRemoteStore::initConnection(RemoteStore::Connection & _conn)
         conn.to << WorkerProto::Op::InitCallback;
         conn.to.flush();
 
-        conn.processStderr();
+        // Wait until the daemon is ready to receive the file
+        // descriptor. This is so that the fd doesn't get lost in the
+        // daemon's regular read() calls.
         readInt(conn.from);
 
-        // FIXME: do this before processStderr().
         struct msghdr msg = { 0 };
         char buf[CMSG_SPACE(sizeof(int))];
         memset(buf, '\0', sizeof(buf));
@@ -123,6 +124,9 @@ void UDSRemoteStore::initConnection(RemoteStore::Connection & _conn)
 
         if (sendmsg(conn.fd.get(), &msg, 0) < 0)
             throw SysError("sending callback socket to the daemon");
+
+        conn.processStderr();
+        readInt(conn.from);
     }
 }
 

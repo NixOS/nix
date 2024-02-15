@@ -1002,13 +1002,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         throw Error("Removed operation %1%", op);
 
     case WorkerProto::Op::InitCallback: {
-        logger->startWork();
-
-        logger->stopWork();
-        to << 1;
+        // Indicate that we're ready to receive the file descriptor.
+        to << 0;
         to.flush();
 
-        // FIXME: do this before stopWork().
         struct msghdr msg = {0};
 
         char msgData[256];
@@ -1026,9 +1023,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         AutoCloseFD fd(*((int *) CMSG_DATA(CMSG_FIRSTHDR(&msg))));
         debug("received file descriptor %d from client", fd.get());
 
+        logger->startWork();
+
         if (trusted)
             auth::getAuthenticator()->addAuthSource(
                 makeTunneledAuthSource(store, clientVersion, std::move(fd)));
+
+        logger->stopWork();
+        to << 1;
+        to.flush();
 
         break;
     }
