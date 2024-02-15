@@ -33,13 +33,6 @@ std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
         : root / path.rel();
 }
 
-std::string PosixSourceAccessor::readFile(const CanonPath & path)
-{
-    // Can't be implemented as a wrapper of the `Sink` based overload
-    // since this needs to support non-regular files (like `/dev/stdin`).
-    return nix::readFile(path.abs());
-}
-
 void PosixSourceAccessor::readFile(
     const CanonPath & path,
     Sink & sink,
@@ -57,8 +50,12 @@ void PosixSourceAccessor::readFile(
     if (fstat(fd.get(), &st) == -1)
         throw SysError("statting file");
 
-    // logger->cout("%s %d", path.c_str(), st.st_size);
-    assert(S_ISREG(st.st_mode) && "sinks are only compatible with regular files since they need to know the size in advance");
+    if (!S_ISREG(st.st_mode)) {
+        std::string fileContent = nix::readFile(path.abs());
+        sizeCallback(fileContent.size());
+        sink(fileContent);
+        return;
+    }
 
     sizeCallback(st.st_size);
 

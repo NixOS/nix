@@ -25,8 +25,6 @@ struct PosixSourceAccessor : virtual SourceAccessor
      */
     time_t mtime = 0;
 
-    std::string readFile(const CanonPath & path) override;
-
     void readFile(
         const CanonPath & path,
         Sink & sink,
