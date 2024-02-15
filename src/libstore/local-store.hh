@@ -304,7 +304,7 @@ public:
     void ensureAccess(const AccessStatus & accessStatus, const StoreObject & object);
     void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status, const bool & ensureAccessCheck) override;
     void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
-    void setCurrentAccessStatus(const Path & path, const AccessStatus & status);
+    void setCurrentAccessStatus(const Path & path, const AccessStatus & status, bool doChecks = true);
     AccessStatus getAccessStatus(const StoreObject & storeObject) override;
     std::optional<AccessStatus> getFutureAccessStatusOpt(const StoreObject & storeObject);
     AccessStatus getCurrentAccessStatus(const Path & path);

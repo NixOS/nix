@@ -1051,18 +1051,32 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos, bool syncPermi
 
     std::reverse(sortedPaths.begin(), sortedPaths.end());
 
+    std::optional<AccessDenied> ex;
+    
     if (syncPermissions)
-        for (auto path : sortedPaths)
-            syncPathPermissions(infos.at(path));
+        for (auto path : sortedPaths) {
+            auto info = infos.at(path);
+            try {
+                syncPathPermissions(info);
+            } catch (AccessDenied e) {
+                if ((info.accessStatus && info.accessStatus->isProtected) || (futurePermissions.contains(path) && futurePermissions[path].isProtected)) {
+                    // Upon failure, just mark path as protected to prevent data leakage
+                    setCurrentAccessStatus(Store::toRealPath(path), AccessStatus(true, {}), false);
+                }
+                ex = e;
+            }
+        }
+
+    if (ex) throw *ex;
 }
 
-void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::AccessStatus & status)
+void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::AccessStatus & status, bool doChecks)
 {
     experimentalFeatureSettings.require(Xp::ACLs);
 
 
     // We check that everyone who has access to the path has access to runtimes dependencies
-    if (isInStore(path)) {
+    if (doChecks && isInStore(path)) {
         StorePath storePath(baseNameOf(path));
 
         // FIXME(acls): cache is broken when called from registerValidPaths
@@ -1122,7 +1136,7 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
                 if (! difference.empty()) {
                     std::string entities;
                     for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
-                    throw AccessDenied("can not deny %s access to %s because it is referenced by a path %s to which they do not have access", entities.substr(0, entities.size()-2), path, printStorePath(referrer));
+                    throw AccessDenied("can not deny %s access to %s because it is referenced by a path %s to which they do have access", entities.substr(0, entities.size()-2), path, printStorePath(referrer));
                 }
             }
         }
