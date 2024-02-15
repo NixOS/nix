@@ -693,7 +693,7 @@ SourcePath resolveExprPath(SourcePath path)
         if (++followCount >= maxFollow)
             throw Error("too many symbolic links encountered while traversing the path '%s'", path);
         if (path.lstat().type != InputAccessor::tSymlink) break;
-        path = {path.accessor, CanonPath(path.readLink(), path.path.parent().value_or(CanonPath::root))};
+        path = {CanonPath(path.readLink(), path.path.parent().value_or(CanonPath::root))};
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
