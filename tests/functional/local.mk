@@ -60,6 +60,7 @@ nix_tests = \
   fetchGitVerification.sh \
   flakes/search-root.sh \
   readfile-context.sh \
+  readfile-stdin.sh \
   nix-channel.sh \
   recursive.sh \
   dependencies.sh \
