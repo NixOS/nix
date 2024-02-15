@@ -95,4 +95,6 @@ struct GitRepo
         const std::vector<fetchers::PublicKey> & publicKeys) = 0;
 };
 
+ref<GitRepo> getTarballCache();
+
 }

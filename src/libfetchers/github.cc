@@ -10,7 +10,6 @@
 #include "tarball.hh"
 #include "tarfile.hh"
 #include "git-utils.hh"
-#include "tarball-cache.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -192,6 +191,12 @@ struct GitArchiveInputScheme : InputScheme
     virtual RefInfo getRevFromRef(nix::ref<Store> store, const Input & input) const = 0;
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
+
+    struct TarballInfo
+    {
+        Hash treeHash;
+        time_t lastModified;
+    };
 
     std::pair<Input, TarballInfo> downloadArchive(ref<Store> store, Input input) const
     {
