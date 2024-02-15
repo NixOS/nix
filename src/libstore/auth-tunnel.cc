@@ -82,16 +82,31 @@ AuthTunnel::~AuthTunnel()
 
 struct TunneledAuthSource : auth::AuthSource
 {
-    /**
-     * File descriptor to send requests to the client.
-     */
-    AutoCloseFD fd;
+    struct State
+    {
+        /**
+         * File descriptor to send requests to the client.
+         */
+        AutoCloseFD fd;
 
-    FdSource from;
-    FdSink to;
+        FdSource from;
+        FdSink to;
 
-    WorkerProto::ReadConn fromConn;
-    WorkerProto::WriteConn toConn;
+        WorkerProto::ReadConn fromConn;
+        WorkerProto::WriteConn toConn;
+
+        State(
+            WorkerProto::Version clientVersion,
+            AutoCloseFD && fd)
+            : fd(std::move(fd))
+            , from(this->fd.get())
+            , to(this->fd.get())
+            , fromConn {.from = from, .version = clientVersion}
+            , toConn {.to = to, .version = clientVersion}
+        { }
+    };
+
+    Sync<State> state_;
 
     ref<StoreDirConfig> storeConfig;
 
@@ -99,36 +114,34 @@ struct TunneledAuthSource : auth::AuthSource
         ref<StoreDirConfig> storeConfig,
         WorkerProto::Version clientVersion,
         AutoCloseFD && fd)
-        : fd(std::move(fd))
-        , from(this->fd.get())
-        , to(this->fd.get())
-        , fromConn {.from = from, .version = clientVersion}
-        , toConn {.to = to, .version = clientVersion}
+        : state_(clientVersion, std::move(fd))
         , storeConfig(storeConfig)
     { }
 
     std::optional<auth::AuthData> get(const auth::AuthData & request, bool required) override
     {
-        // FIXME: lock the connection
-        to << (int) WorkerProto::CallbackOp::FillAuth;
-        WorkerProto::Serialise<auth::AuthData>::write(*storeConfig, toConn, request);
-        to << required;
-        to.flush();
+        auto state(state_.lock());
 
-        if (readInt(from))
-            return WorkerProto::Serialise<std::optional<auth::AuthData>>::read(*storeConfig, fromConn);
+        state->to << (int) WorkerProto::CallbackOp::FillAuth;
+        WorkerProto::Serialise<auth::AuthData>::write(*storeConfig, state->toConn, request);
+        state->to << required;
+        state->to.flush();
+
+        if (readInt(state->from))
+            return WorkerProto::Serialise<std::optional<auth::AuthData>>::read(*storeConfig, state->fromConn);
         else
             return std::nullopt;
     }
 
     void erase(const auth::AuthData & authData) override
     {
-        // FIXME: lock the connection
-        to << (int) WorkerProto::CallbackOp::RejectAuth;
-        WorkerProto::Serialise<auth::AuthData>::write(*storeConfig, toConn, authData);
-        to.flush();
+        auto state(state_.lock());
 
-        readInt(from);
+        state->to << (int) WorkerProto::CallbackOp::RejectAuth;
+        WorkerProto::Serialise<auth::AuthData>::write(*storeConfig, state->toConn, authData);
+        state->to.flush();
+
+        readInt(state->from);
     }
 };
 
