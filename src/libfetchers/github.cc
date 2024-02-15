@@ -8,7 +8,9 @@
 #include "fetchers.hh"
 #include "fetch-settings.hh"
 #include "tarball.hh"
+#include "tarfile.hh"
 #include "git-utils.hh"
+#include "tarball-cache.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -191,7 +193,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<Input, GitRepo::TarballInfo> downloadArchive(ref<Store> store, Input input) const
+    std::pair<Input, TarballInfo> downloadArchive(ref<Store> store, Input input) const
     {
         if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
@@ -218,7 +220,7 @@ struct GitArchiveInputScheme : InputScheme
                 auto treeHash = getRevAttr(*treeHashAttrs, "treeHash");
                 auto lastModified = getIntAttr(*lastModifiedAttrs, "lastModified");
                 if (getTarballCache()->hasObject(treeHash))
-                    return {std::move(input), GitRepo::TarballInfo { .treeHash = treeHash, .lastModified = (time_t) lastModified }};
+                    return {std::move(input), TarballInfo { .treeHash = treeHash, .lastModified = (time_t) lastModified }};
                 else
                     debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
             }
@@ -233,7 +235,14 @@ struct GitArchiveInputScheme : InputScheme
             getFileTransfer()->download(std::move(req), sink);
         });
 
-        auto tarballInfo = getTarballCache()->importTarball(*source);
+        TarArchive archive { *source };
+        auto parseSink = getTarballCache()->getFileSystemObjectSink();
+        auto lastModified = unpackTarfileToSink(archive, *parseSink);
+
+        TarballInfo tarballInfo {
+            .treeHash = parseSink->sync(),
+            .lastModified = lastModified
+        };
 
         cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
         cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});

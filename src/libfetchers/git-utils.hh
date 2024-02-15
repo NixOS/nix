@@ -2,10 +2,19 @@
 
 #include "filtering-input-accessor.hh"
 #include "input-accessor.hh"
+#include "fs-sink.hh"
 
 namespace nix {
 
 namespace fetchers { struct PublicKey; }
+
+struct GitFileSystemObjectSink : FileSystemObjectSink
+{
+    /**
+     * Flush builder and return a final Git hash.
+     */
+    virtual Hash sync() = 0;
+};
 
 struct GitRepo
 {
@@ -64,19 +73,13 @@ struct GitRepo
         const std::string & url,
         const std::string & base) = 0;
 
-    struct TarballInfo
-    {
-        Hash treeHash;
-        time_t lastModified;
-    };
-
-    virtual TarballInfo importTarball(Source & source) = 0;
-
     virtual bool hasObject(const Hash & oid) = 0;
 
     virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
 
     virtual ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
+
+    virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
     virtual void fetch(
         const std::string & url,
@@ -91,7 +94,5 @@ struct GitRepo
         const Hash & rev,
         const std::vector<fetchers::PublicKey> & publicKeys) = 0;
 };
-
-ref<GitRepo> getTarballCache();
 
 }

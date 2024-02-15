@@ -7,6 +7,7 @@
 #include "processes.hh"
 #include "signals.hh"
 #include "users.hh"
+#include "fs-sink.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -22,9 +23,6 @@
 #include <git2/status.h>
 #include <git2/submodule.h>
 #include <git2/tree.h>
-
-#include "tarfile.hh"
-#include <archive_entry.h>
 
 #include <iostream>
 #include <unordered_set>
@@ -317,158 +315,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return std::nullopt;
     }
 
-    TarballInfo importTarball(Source & source) override
-    {
-        TarArchive archive(source);
-
-        struct PendingDir
-        {
-            std::string name;
-            TreeBuilder builder;
-        };
-
-        std::vector<PendingDir> pendingDirs;
-
-        auto pushBuilder = [&](std::string name)
-        {
-            git_treebuilder * b;
-            if (git_treebuilder_new(&b, *this, nullptr))
-                throw Error("creating a tree builder: %s", git_error_last()->message);
-            pendingDirs.push_back({ .name = std::move(name), .builder = TreeBuilder(b) });
-        };
-
-        auto popBuilder = [&]() -> std::pair<git_oid, std::string>
-        {
-            assert(!pendingDirs.empty());
-            auto pending = std::move(pendingDirs.back());
-            git_oid oid;
-            if (git_treebuilder_write(&oid, pending.builder.get()))
-                throw Error("creating a tree object: %s", git_error_last()->message);
-            pendingDirs.pop_back();
-            return {oid, pending.name};
-        };
-
-        auto addToTree = [&](const std::string & name, const git_oid & oid, git_filemode_t mode)
-        {
-            assert(!pendingDirs.empty());
-            auto & pending = pendingDirs.back();
-            if (git_treebuilder_insert(nullptr, pending.builder.get(), name.c_str(), &oid, mode))
-                throw Error("adding a file to a tree builder: %s", git_error_last()->message);
-        };
-
-        auto updateBuilders = [&](std::span<const std::string> names)
-        {
-            // Find the common prefix of pendingDirs and names.
-            size_t prefixLen = 0;
-            for (; prefixLen < names.size() && prefixLen + 1 < pendingDirs.size(); ++prefixLen)
-                if (names[prefixLen] != pendingDirs[prefixLen + 1].name)
-                    break;
-
-            // Finish the builders that are not part of the common prefix.
-            for (auto n = pendingDirs.size(); n > prefixLen + 1; --n) {
-                auto [oid, name] = popBuilder();
-                addToTree(name, oid, GIT_FILEMODE_TREE);
-            }
-
-            // Create builders for the new directories.
-            for (auto n = prefixLen; n < names.size(); ++n)
-                pushBuilder(names[n]);
-        };
-
-        pushBuilder("");
-
-        size_t componentsToStrip = 1;
-
-        time_t lastModified = 0;
-
-        for (;;) {
-            // FIXME: merge with extract_archive
-            struct archive_entry * entry;
-            int r = archive_read_next_header(archive.archive, &entry);
-            if (r == ARCHIVE_EOF) break;
-            auto path = archive_entry_pathname(entry);
-            if (!path)
-                throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
-            if (r == ARCHIVE_WARN)
-                warn(archive_error_string(archive.archive));
-            else
-                archive.check(r);
-
-            lastModified = std::max(lastModified, archive_entry_mtime(entry));
-
-            auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
-
-            std::span<const std::string> pathComponents2{pathComponents};
-
-            if (pathComponents2.size() <= componentsToStrip) continue;
-            pathComponents2 = pathComponents2.subspan(componentsToStrip);
-
-            updateBuilders(
-                archive_entry_filetype(entry) == AE_IFDIR
-                ? pathComponents2
-                : pathComponents2.first(pathComponents2.size() - 1));
-
-            switch (archive_entry_filetype(entry)) {
-
-            case AE_IFDIR:
-                // Nothing to do right now.
-                break;
-
-            case AE_IFREG: {
-
-                git_writestream * stream = nullptr;
-                if (git_blob_create_from_stream(&stream, *this, nullptr))
-                    throw Error("creating a blob stream object: %s", git_error_last()->message);
-
-                while (true) {
-                    std::vector<unsigned char> buf(128 * 1024);
-                    auto n = archive_read_data(archive.archive, buf.data(), buf.size());
-                    if (n < 0)
-                        throw Error("cannot read file '%s' from tarball", path);
-                    if (n == 0) break;
-                    if (stream->write(stream, (const char *) buf.data(), n))
-                        throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
-                }
-
-                git_oid oid;
-                if (git_blob_create_from_stream_commit(&oid, stream))
-                    throw Error("creating a blob object for tarball member '%s': %s", path, git_error_last()->message);
-
-                addToTree(*pathComponents.rbegin(), oid,
-                    archive_entry_mode(entry) & S_IXUSR
-                    ? GIT_FILEMODE_BLOB_EXECUTABLE
-                    : GIT_FILEMODE_BLOB);
-
-                break;
-            }
-
-            case AE_IFLNK: {
-                auto target = archive_entry_symlink(entry);
-
-                git_oid oid;
-                if (git_blob_create_from_buffer(&oid, *this, target, strlen(target)))
-                    throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
-
-                addToTree(*pathComponents.rbegin(), oid, GIT_FILEMODE_LINK);
-
-                break;
-            }
-
-            default:
-                throw Error("file '%s' in tarball has unsupported file type", path);
-            }
-        }
-
-        updateBuilders({});
-
-        auto [oid, _name] = popBuilder();
-
-        return TarballInfo {
-            .treeHash = toHash(oid),
-            .lastModified = lastModified
-        };
-    }
-
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
     std::string resolveSubmoduleUrl(
@@ -510,6 +356,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
 
     ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
+
+    ref<GitFileSystemObjectSink> getFileSystemObjectSink() override;
 
     static int sidebandProgressCallback(const char * str, int len, void * payload)
     {
@@ -925,6 +773,154 @@ struct GitExportIgnoreInputAccessor : CachingFilteringInputAccessor {
 
 };
 
+struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
+{
+    ref<GitRepoImpl> repo;
+
+    struct PendingDir
+    {
+        std::string name;
+        TreeBuilder builder;
+    };
+
+    std::vector<PendingDir> pendingDirs;
+
+    size_t componentsToStrip = 1;
+
+    void pushBuilder(std::string name)
+    {
+        git_treebuilder * b;
+        if (git_treebuilder_new(&b, *repo, nullptr))
+            throw Error("creating a tree builder: %s", git_error_last()->message);
+        pendingDirs.push_back({ .name = std::move(name), .builder = TreeBuilder(b) });
+    };
+
+    GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo) : repo(repo)
+    {
+        pushBuilder("");
+    }
+
+    std::pair<git_oid, std::string> popBuilder()
+    {
+        assert(!pendingDirs.empty());
+        auto pending = std::move(pendingDirs.back());
+        git_oid oid;
+        if (git_treebuilder_write(&oid, pending.builder.get()))
+            throw Error("creating a tree object: %s", git_error_last()->message);
+        pendingDirs.pop_back();
+        return {oid, pending.name};
+    };
+
+    void addToTree(const std::string & name, const git_oid & oid, git_filemode_t mode)
+    {
+        assert(!pendingDirs.empty());
+        auto & pending = pendingDirs.back();
+        if (git_treebuilder_insert(nullptr, pending.builder.get(), name.c_str(), &oid, mode))
+            throw Error("adding a file to a tree builder: %s", git_error_last()->message);
+    };
+
+    void updateBuilders(std::span<const std::string> names)
+    {
+        // Find the common prefix of pendingDirs and names.
+        size_t prefixLen = 0;
+        for (; prefixLen < names.size() && prefixLen + 1 < pendingDirs.size(); ++prefixLen)
+            if (names[prefixLen] != pendingDirs[prefixLen + 1].name)
+                break;
+
+        // Finish the builders that are not part of the common prefix.
+        for (auto n = pendingDirs.size(); n > prefixLen + 1; --n) {
+            auto [oid, name] = popBuilder();
+            addToTree(name, oid, GIT_FILEMODE_TREE);
+        }
+
+        // Create builders for the new directories.
+        for (auto n = prefixLen; n < names.size(); ++n)
+            pushBuilder(names[n]);
+    };
+
+    bool prepareDirs(const std::vector<std::string> & pathComponents, bool isDir)
+    {
+        std::span<const std::string> pathComponents2{pathComponents};
+
+        if (pathComponents2.size() <= componentsToStrip) return false;
+        pathComponents2 = pathComponents2.subspan(componentsToStrip);
+
+        updateBuilders(
+            isDir
+            ? pathComponents2
+            : pathComponents2.first(pathComponents2.size() - 1));
+
+        return true;
+    }
+
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)> func) override
+    {
+        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+        if (!prepareDirs(pathComponents, false)) return;
+
+        git_writestream * stream = nullptr;
+        if (git_blob_create_from_stream(&stream, *repo, nullptr))
+            throw Error("creating a blob stream object: %s", git_error_last()->message);
+
+        struct CRF : CreateRegularFileSink {
+            const Path & path;
+            GitFileSystemObjectSinkImpl & back;
+            git_writestream * stream;
+            bool executable = false;
+            CRF(const Path & path, GitFileSystemObjectSinkImpl & back, git_writestream * stream)
+                : path(path), back(back), stream(stream)
+            {}
+            void operator () (std::string_view data) override
+            {
+                if (stream->write(stream, data.data(), data.size()))
+                    throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
+            }
+            void isExecutable() override
+            {
+                executable = true;
+            }
+        } crf { path, *this, stream };
+        func(crf);
+
+        git_oid oid;
+        if (git_blob_create_from_stream_commit(&oid, stream))
+            throw Error("creating a blob object for tarball member '%s': %s", path, git_error_last()->message);
+
+        addToTree(*pathComponents.rbegin(), oid,
+            crf.executable
+            ? GIT_FILEMODE_BLOB_EXECUTABLE
+            : GIT_FILEMODE_BLOB);
+    }
+
+    void createDirectory(const Path & path) override
+    {
+        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+        (void) prepareDirs(pathComponents, true);
+    }
+
+    void createSymlink(const Path & path, const std::string & target) override
+    {
+        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+        if (!prepareDirs(pathComponents, false)) return;
+
+        git_oid oid;
+        if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
+            throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
+
+        addToTree(*pathComponents.rbegin(), oid, GIT_FILEMODE_LINK);
+    }
+
+    Hash sync() override {
+        updateBuilders({});
+
+        auto [oid, _name] = popBuilder();
+
+        return toHash(oid);
+    }
+};
+
 ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
@@ -959,6 +955,11 @@ ref<InputAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportI
     }
 }
 
+ref<GitFileSystemObjectSink> GitRepoImpl::getFileSystemObjectSink()
+{
+    return make_ref<GitFileSystemObjectSinkImpl>(ref<GitRepoImpl>(shared_from_this()));
+}
+
 std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev, bool exportIgnore)
 {
     /* Read the .gitmodules files from this revision. */
@@ -983,13 +984,6 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     }
 
     return result;
-}
-
-ref<GitRepo> getTarballCache()
-{
-    static auto repoDir = std::filesystem::path(getCacheDir()) / "nix" / "tarball-cache";
-
-    return make_ref<GitRepoImpl>(repoDir, true, true);
 }
 
 }
