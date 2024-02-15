@@ -1,4 +1,5 @@
 #include "primops.hh"
+#include "patching-input-accessor.hh"
 
 namespace nix {
 
@@ -16,10 +17,9 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
         auto check = [&]()
         {
             if (!patches.empty())
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("'builtins.patch' does not support both 'patches' and 'patchFiles'"),
-                    .errPos = state.positions[attr.pos]
-                }));
+                state.error<EvalError>(
+                    "'builtins.patch' does not support both 'patches' and 'patchFiles'")
+                    .atPos(attr.pos).debugThrow();
         };
 
         if (n == "src") {
@@ -50,17 +50,15 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
         }
 
         else
-            throw Error({
-                .msg = hintfmt("attribute '%s' isn't supported in call to 'builtins.patch'", n),
-                .errPos = state.positions[pos]
-            });
+            state.error<EvalError>(
+                "attribute '%s' isn't supported in call to 'builtins.patch'", n)
+                .atPos(pos).debugThrow();
     }
 
     if (!src)
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("attribute 'src' is missing in call to 'builtins.patch'"),
-            .errPos = state.positions[pos]
-        }));
+        state.error<EvalError>(
+            "attribute 'src' is missing in call to 'builtins.patch'")
+            .atPos(pos).debugThrow();
 
     if (!src->path.isRoot())
         throw UnimplementedError("applying patches to a non-root path ('%s') is not yet supported", src->path);

@@ -51,7 +51,7 @@ These options are for deleting old [profiles] prior to deleting unreachable [sto
 - <span id="opt-delete-old">[`--delete-old`](#opt-delete-old)</span> / `-d`\
   Delete all old generations of profiles.
 
-  This is the equivalent of invoking `nix-env --delete-generations old` on each found profile.
+  This is the equivalent of invoking [`nix-env --delete-generations old`](@docroot@/command-ref/nix-env/delete-generations.md#generations-old) on each found profile.
 
 - <span id="opt-delete-older-than">[`--delete-older-than`](#opt-delete-older-than)</span> *period*\
   Delete all generations of profiles older than the specified amount (except for the generations that were active at that point in time).

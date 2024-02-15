@@ -1,12 +1,16 @@
 #include "eval.hh"
 #include "util.hh"
-#include "fs-input-accessor.hh"
 
 namespace nix {
 
 SourcePath EvalState::rootPath(CanonPath path)
 {
     return {rootFS, std::move(path)};
+}
+
+SourcePath EvalState::rootPath(PathView path)
+{
+    return {rootFS, CanonPath(absPath(path))};
 }
 
 void EvalState::registerAccessor(ref<InputAccessor> accessor)
@@ -29,11 +33,11 @@ std::string EvalState::encodePath(const SourcePath & path)
 SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
 {
     if (!hasPrefix(s, "/"))
-        error("string '%s' doesn't represent an absolute path", s).atPos(pos).debugThrow<EvalError>();
+        error<EvalError>("string '%s' doesn't represent an absolute path", s).atPos(pos).debugThrow();
 
     if (hasPrefix(s, virtualPathMarker)) {
         auto fail = [s, pos, this]() {
-            error("cannot decode virtual path '%s'", s).atPos(pos).debugThrow<Error>();
+            error<Abort>("cannot decode virtual path '%s'", s).atPos(pos).debugThrow();
         };
 
         s = s.substr(virtualPathMarker.size());

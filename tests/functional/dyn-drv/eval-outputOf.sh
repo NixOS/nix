@@ -14,7 +14,7 @@ nix --experimental-features 'nix-command' eval --impure  --expr \
 # resolve first. Adding a test so we don't liberalise it by accident.
 expectStderr 1 nix --experimental-features 'nix-command dynamic-derivations' eval --impure --expr \
     'builtins.outputOf (import ../dependencies.nix {}) "out"' \
-    | grepQuiet "value is a set while a string was expected"
+    | grepQuiet "expected a string but found a set"
 
 # Test that "DrvDeep" string contexts are not supported at this time
 #

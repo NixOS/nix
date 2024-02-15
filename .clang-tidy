@@ -1,0 +1,3 @@
+# We use pointers to aggregates in a couple of places, intentionally.
+# void * would look weird.
+Checks: '-bugprone-sizeof-expression'

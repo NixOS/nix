@@ -1,4 +1,4 @@
-#if HAVE_SYS_XATTR_H
+#if HAVE_ACL_SUPPORT
 # include <sys/xattr.h>
 #endif
 
@@ -78,7 +78,7 @@ static void canonicalisePathMetaData_(
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
         throw Error("file '%1%' has an unsupported type", path);
 
-#ifdef HAVE_SYS_XATTR_H
+#if HAVE_ACL_SUPPORT
     /* Remove extended attributes / ACLs. */
     ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
 

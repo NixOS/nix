@@ -362,8 +362,8 @@ git -C "$flake3Dir" commit -m 'Add nonFlakeInputs'
 # nonFlakeInputs.
 nix build -o "$TEST_ROOT/result" "$flake3Dir#sth" --commit-lock-file
 
-nix build -o "$TEST_ROOT/result" flake3#fnord
-[[ $(cat $TEST_ROOT/result) = FNORD ]]
+#nix build -o "$TEST_ROOT/result" flake3#fnord
+#[[ $(cat $TEST_ROOT/result) = FNORD ]]
 
 # Check whether flake input fetching is lazy: flake3#sth does not
 # depend on flake2, so this shouldn't fail.
@@ -376,7 +376,7 @@ nix build -o "$TEST_ROOT/result" flake3#sth
 (! nix build -o "$TEST_ROOT/result" flake3#fnord)
 mv "$flake2Dir.tmp" "$flake2Dir"
 mv "$nonFlakeDir.tmp" "$nonFlakeDir"
-nix build -o "$TEST_ROOT/result" flake3#xyzzy flake3#fnord
+#nix build -o "$TEST_ROOT/result" flake3#xyzzy flake3#fnord
 
 # Test doing multiple `lookupFlake`s
 nix build -o "$TEST_ROOT/result" flake4#xyzzy

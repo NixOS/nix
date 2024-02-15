@@ -13,11 +13,15 @@
 #include "compression.hh"
 #include "signals.hh"
 #include "posix-fs-canonicalise.hh"
+#include "posix-source-accessor.hh"
+#include "keys.hh"
 
 #include <iostream>
 #include <algorithm>
 #include <cstring>
 
+#include <memory>
+#include <new>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/select.h>
@@ -272,7 +276,7 @@ LocalStore::LocalStore(const Params & params)
                 [[gnu::unused]] auto res2 = ftruncate(fd.get(), settings.reservedSize);
             }
         }
-    } catch (SysError & e) { /* don't care about errors */
+    } catch (SystemError & e) { /* don't care about errors */
     }
 
     /* Acquire the big fat lock in shared mode to make sure that no
@@ -1044,8 +1048,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     bool narRead = false;
     Finally cleanup = [&]() {
         if (!narRead) {
-            NullParseSink sink;
-            parseDump(sink, source);
+            NullFileSystemObjectSink sink;
+            try {
+                parseDump(sink, source);
+            } catch (...) {
+                ignoreException();
+            }
         }
     };
 
@@ -1088,11 +1096,22 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             if (info.ca) {
                 auto & specified = *info.ca;
-                auto actualHash = hashCAPath(
-                    specified.method,
-                    specified.hash.algo,
-                    info.path
-                );
+                auto actualHash = ({
+                    HashModuloSink caSink {
+                        specified.hash.algo,
+                        std::string { info.path.hashPart() },
+                    };
+                    PosixSourceAccessor accessor;
+                    dumpPath(
+                        *getFSAccessor(false),
+                        CanonPath { printStorePath(info.path) },
+                        caSink,
+                        specified.method.getFileIngestionMethod());
+                    ContentAddress {
+                        .method = specified.method,
+                        .hash = caSink.finish().first,
+                    };
+                });
                 if (specified.hash != actualHash.hash) {
                     throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                         printStorePath(info.path),
@@ -1115,8 +1134,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 }
 
 
-StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name,
-                                         FileIngestionMethod method, HashAlgorithm hashAlgo, RepairFlag repair, const StorePathSet & references)
+StorePath LocalStore::addToStoreFromDump(
+    Source & source0,
+    std::string_view name,
+    ContentAddressMethod method,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
@@ -1130,7 +1154,11 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
        path. */
     bool inMemory = false;
 
-    std::string dump;
+    struct Free {
+        void operator()(void* v) { free(v); }
+    };
+    std::unique_ptr<char, Free> dumpBuffer(nullptr);
+    std::string_view dump;
 
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
@@ -1139,13 +1167,18 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
-        dump.resize(oldSize + want);
+        if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
+            dumpBuffer.release();
+            dumpBuffer.reset((char*) tmp);
+        } else {
+            throw std::bad_alloc();
+        }
         auto got = 0;
         Finally cleanup([&]() {
-            dump.resize(oldSize + got);
+            dump = {dumpBuffer.get(), dump.size() + got};
         });
         try {
-            got = source.read(dump.data() + oldSize, want);
+            got = source.read(dumpBuffer.get() + oldSize, want);
         } catch (EndOfFile &) {
             inMemory = true;
             break;
@@ -1166,25 +1199,22 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
-        if (method == FileIngestionMethod::Recursive)
-            restorePath(tempPath, bothSource);
-        else
-            writeFile(tempPath, bothSource);
+        restorePath(tempPath, bothSource, method.getFileIngestionMethod());
 
-        dump.clear();
+        dumpBuffer.reset();
+        dump = {};
     }
 
     auto [hash, size] = hashSink->finish();
 
-    ContentAddressWithReferences desc = FixedOutputInfo {
-        .method = method,
-        .hash = hash,
-        .references = {
+    auto desc = ContentAddressWithReferences::fromParts(
+        method,
+        hash,
+        {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
             .self = false,
-        },
-    };
+        });
 
     auto dstPath = makeFixedOutputPathFromCA(name, desc);
 
@@ -1207,11 +1237,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
             if (inMemory) {
                 StringSource dumpSource { dump };
-                /* Restore from the NAR in memory. */
-                if (method == FileIngestionMethod::Recursive)
-                    restorePath(realPath, dumpSource);
-                else
-                    writeFile(realPath, dumpSource);
+                /* Restore from the buffer in memory. */
+                restorePath(realPath, dumpSource, method.getFileIngestionMethod());
             } else {
                 /* Move the temporary path we restored above. */
                 moveFile(tempPath, realPath);
@@ -1237,58 +1264,6 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 narHash.first
             };
             info.narSize = narHash.second;
-            registerValidPath(info);
-        }
-
-        outputLock.setDeletion(true);
-    }
-
-    return dstPath;
-}
-
-
-StorePath LocalStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references, RepairFlag repair)
-{
-    auto hash = hashString(HashAlgorithm::SHA256, s);
-    auto dstPath = makeTextPath(name, TextInfo {
-        .hash = hash,
-        .references = references,
-    });
-
-    addTempRoot(dstPath);
-
-    if (repair || !isValidPath(dstPath)) {
-
-        auto realPath = Store::toRealPath(dstPath);
-
-        PathLocks outputLock({realPath});
-
-        if (repair || !isValidPath(dstPath)) {
-
-            deletePath(realPath);
-
-            autoGC();
-
-            writeFile(realPath, s);
-
-            canonicalisePathMetaData(realPath, {});
-
-            StringSink sink;
-            dumpString(s, sink);
-            auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
-
-            optimisePath(realPath, repair);
-
-            ValidPathInfo info { dstPath, narHash };
-            info.narSize = sink.s.size();
-            info.references = references;
-            info.ca = {
-                .method = TextIngestionMethod {},
-                .hash = hash,
-            };
             registerValidPath(info);
         }
 
@@ -1389,7 +1364,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             printMsg(lvlTalkative, "checking contents of '%s'", link.name);
             Path linkPath = linksDir + "/" + link.name;
-            std::string hash = hashPath(HashAlgorithm::SHA256, linkPath).first.to_string(HashFormat::Nix32, false);
+            PosixSourceAccessor accessor;
+            std::string hash = hashPath(
+                accessor, CanonPath { linkPath },
+                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);
@@ -1605,7 +1583,8 @@ void LocalStore::signRealisation(Realisation & realisation)
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
-        realisation.sign(secretKey);
+        LocalSigner signer(std::move(secretKey));
+        realisation.sign(signer);
     }
 }
 
@@ -1617,7 +1596,8 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
-        info.sign(*this, secretKey);
+        LocalSigner signer(std::move(secretKey));
+        info.sign(*this, signer);
     }
 }
 
@@ -1694,42 +1674,6 @@ void LocalStore::queryRealisationUncached(const DrvOutput & id,
     } catch (...) {
         callback.rethrow();
     }
-}
-
-ContentAddress LocalStore::hashCAPath(
-    const ContentAddressMethod & method, const HashAlgorithm & hashAlgo,
-    const StorePath & path)
-{
-    return hashCAPath(method, hashAlgo, Store::toRealPath(path), path.hashPart());
-}
-
-ContentAddress LocalStore::hashCAPath(
-    const ContentAddressMethod & method,
-    const HashAlgorithm & hashAlgo,
-    const Path & path,
-    const std::string_view pathHash
-)
-{
-    HashModuloSink caSink ( hashAlgo, std::string(pathHash) );
-    std::visit(overloaded {
-        [&](const TextIngestionMethod &) {
-            readFile(path, caSink);
-        },
-        [&](const FileIngestionMethod & m2) {
-            switch (m2) {
-            case FileIngestionMethod::Recursive:
-                dumpPath(path, caSink);
-                break;
-            case FileIngestionMethod::Flat:
-                readFile(path, caSink);
-                break;
-            }
-        },
-    }, method.raw);
-    return ContentAddress {
-        .method = method,
-        .hash = caSink.finish().first,
-    };
 }
 
 void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)

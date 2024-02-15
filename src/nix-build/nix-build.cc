@@ -148,7 +148,7 @@ static void main_nix_build(int argc, char * * argv)
                             args.push_back(word);
                 }
             }
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
 
     struct MyArgs : LegacyArgs, MixEvalArgs
@@ -289,7 +289,7 @@ static void main_nix_build(int argc, char * * argv)
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
 
-    DrvInfos drvs;
+    PackageInfos drvs;
 
     /* Parse the expressions. */
     std::vector<Expr *> exprs;
@@ -299,7 +299,7 @@ static void main_nix_build(int argc, char * * argv)
     else
         for (auto i : left) {
             if (fromArgs)
-                exprs.push_back(state->parseExprFromString(std::move(i), state->rootPath(CanonPath::fromCwd())));
+                exprs.push_back(state->parseExprFromString(std::move(i), state->rootPath(".")));
             else {
                 auto absolute = i;
                 try {
@@ -307,7 +307,7 @@ static void main_nix_build(int argc, char * * argv)
                 } catch (Error & e) {};
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
                 if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
-                    drvs.push_back(DrvInfo(*state, evalStore, absolute));
+                    drvs.push_back(PackageInfo(*state, evalStore, absolute));
                 else
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
@@ -350,7 +350,7 @@ static void main_nix_build(int argc, char * * argv)
                 takesNixShellAttr(vRoot) ? *autoArgsWithInNixShell : *autoArgs,
                 vRoot
             ).first);
-            state->forceValue(v, [&]() { return v.determinePos(noPos); });
+            state->forceValue(v, v.determinePos(noPos));
             getDerivations(
                 *state,
                 v,
@@ -383,8 +383,8 @@ static void main_nix_build(int argc, char * * argv)
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
 
-        auto & drvInfo = drvs.front();
-        auto drv = evalStore->derivationFromPath(drvInfo.requireDrvPath());
+        auto & packageInfo = drvs.front();
+        auto drv = evalStore->derivationFromPath(packageInfo.requireDrvPath());
 
         std::vector<DerivedPath> pathsToBuild;
         RealisedPath::Set pathsToCopy;
@@ -400,7 +400,7 @@ static void main_nix_build(int argc, char * * argv)
             try {
                 auto expr = state->parseExprFromString(
                     "(import <nixpkgs> {}).bashInteractive",
-                    state->rootPath(CanonPath::fromCwd()));
+                    state->rootPath("."));
 
                 Value v;
                 state->eval(expr, v);
@@ -527,7 +527,7 @@ static void main_nix_build(int argc, char * * argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            ParsedDerivation parsedDrv(drvInfo.requireDrvPath(), drv);
+            ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
 
             if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
                 auto json = structAttrs.value();
@@ -620,10 +620,10 @@ static void main_nix_build(int argc, char * * argv)
 
         std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
-        for (auto & drvInfo : drvs) {
-            auto drvPath = drvInfo.requireDrvPath();
+        for (auto & packageInfo : drvs) {
+            auto drvPath = packageInfo.requireDrvPath();
 
-            auto outputName = drvInfo.queryOutputName();
+            auto outputName = packageInfo.queryOutputName();
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 

@@ -6,6 +6,8 @@ additional-css = ["custom.css"]
 additional-js = ["redirects.js"]
 edit-url-template = "https://github.com/NixOS/nix/tree/master/doc/manual/{path}"
 git-repository-url = "https://github.com/NixOS/nix"
+fold.enable = true
+fold.level = 1
 
 [preprocessor.anchors]
 renderers = ["html"]

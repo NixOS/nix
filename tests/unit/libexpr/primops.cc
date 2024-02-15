@@ -1,6 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "eval-settings.hh"
 #include "memory-input-accessor.hh"
 
 #include "tests/libexpr.hh"
@@ -603,7 +604,7 @@ namespace nix {
         ASSERT_THAT(v, IsStringEq("401b09eab3c013d4ca54922bb802bec8fd5318192b0a75f201d8b3727429080fb337591abd3e44453b954555b7a0812e1081c39b740293f765eae731f5a65ed1"));
     }
 
-    TEST_F(PrimOpTest, hashStringInvalidHashType) {
+    TEST_F(PrimOpTest, hashStringInvalidHashAlgorithm) {
         ASSERT_THROW(eval("builtins.hashString \"foobar\" \"asdf\""), Error);
     }
 
@@ -631,7 +632,7 @@ namespace nix {
 
     TEST_F(PrimOpTest, currentSystem) {
         auto v = eval("builtins.currentSystem");
-        ASSERT_THAT(v, IsStringEq(settings.thisSystem.get()));
+        ASSERT_THAT(v, IsStringEq(evalSettings.getCurrentSystem()));
     }
 
     TEST_F(PrimOpTest, derivation) {

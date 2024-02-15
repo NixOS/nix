@@ -4,7 +4,7 @@
 
 namespace nix {
 
-std::string makeFileIngestionPrefix(FileIngestionMethod m)
+std::string_view makeFileIngestionPrefix(FileIngestionMethod m)
 {
     switch (m) {
     case FileIngestionMethod::Flat:
@@ -16,10 +16,29 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
     }
 }
 
-std::string ContentAddressMethod::renderPrefix() const
+std::string_view ContentAddressMethod::render() const
 {
     return std::visit(overloaded {
-        [](TextIngestionMethod) -> std::string { return "text:"; },
+        [](TextIngestionMethod) -> std::string_view { return "text"; },
+        [](FileIngestionMethod m2) {
+             /* Not prefixed for back compat with things that couldn't produce text before. */
+            return renderFileIngestionMethod(m2);
+        },
+    }, raw);
+}
+
+ContentAddressMethod ContentAddressMethod::parse(std::string_view m)
+{
+    if (m == "text")
+        return TextIngestionMethod {};
+    else
+        return parseFileIngestionMethod(m);
+}
+
+std::string_view ContentAddressMethod::renderPrefix() const
+{
+    return std::visit(overloaded {
+        [](TextIngestionMethod) -> std::string_view { return "text:"; },
         [](FileIngestionMethod m2) {
              /* Not prefixed for back compat with things that couldn't produce text before. */
             return makeFileIngestionPrefix(m2);
@@ -38,7 +57,7 @@ ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
     return FileIngestionMethod::Flat;
 }
 
-std::string ContentAddressMethod::render(HashAlgorithm ha) const
+std::string ContentAddressMethod::renderWithAlgo(HashAlgorithm ha) const
 {
     return std::visit(overloaded {
         [&](const TextIngestionMethod & th) {
@@ -46,6 +65,18 @@ std::string ContentAddressMethod::render(HashAlgorithm ha) const
         },
         [&](const FileIngestionMethod & fim) {
             return "fixed:" + makeFileIngestionPrefix(fim) + printHashAlgo(ha);
+        }
+    }, raw);
+}
+
+FileIngestionMethod ContentAddressMethod::getFileIngestionMethod() const
+{
+    return std::visit(overloaded {
+        [&](const TextIngestionMethod & th) {
+            return FileIngestionMethod::Flat;
+        },
+        [&](const FileIngestionMethod & fim) {
+            return fim;
         }
     }, raw);
 }
@@ -79,7 +110,7 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
         prefix = *optPrefix;
     }
 
-    auto parseHashType_ = [&](){
+    auto parseHashAlgorithm_ = [&](){
         auto hashTypeRaw = splitPrefixTo(rest, ':');
         if (!hashTypeRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
@@ -90,7 +121,7 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
     // Switch on prefix
     if (prefix == "text") {
         // No parsing of the ingestion method, "text" only support flat.
-        HashAlgorithm hashAlgo = parseHashType_();
+        HashAlgorithm hashAlgo = parseHashAlgorithm_();
         return {
             TextIngestionMethod {},
             std::move(hashAlgo),
@@ -100,7 +131,7 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
         auto method = FileIngestionMethod::Flat;
         if (splitPrefix(rest, "r:"))
             method = FileIngestionMethod::Recursive;
-        HashAlgorithm hashAlgo = parseHashType_();
+        HashAlgorithm hashAlgo = parseHashAlgorithm_();
         return {
             std::move(method),
             std::move(hashAlgo),
@@ -121,7 +152,7 @@ ContentAddress ContentAddress::parse(std::string_view rawCa)
     };
 }
 
-std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parse(std::string_view caMethod)
+std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parseWithAlgo(std::string_view caMethod)
 {
     std::string asPrefix = std::string{caMethod} + ":";
     // parseContentAddressMethodPrefix takes its argument by reference
@@ -143,7 +174,7 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 
 std::string ContentAddress::printMethodAlgo() const
 {
-    return method.renderPrefix()
+    return std::string { method.renderPrefix() }
         + printHashAlgo(hash.algo);
 }
 
@@ -176,13 +207,13 @@ ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const Con
     }, ca.method.raw);
 }
 
-std::optional<ContentAddressWithReferences> ContentAddressWithReferences::fromPartsOpt(
-    ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept
+ContentAddressWithReferences ContentAddressWithReferences::fromParts(
+    ContentAddressMethod method, Hash hash, StoreReferences refs)
 {
     return std::visit(overloaded {
-        [&](TextIngestionMethod _) -> std::optional<ContentAddressWithReferences> {
+        [&](TextIngestionMethod _) -> ContentAddressWithReferences {
             if (refs.self)
-                return std::nullopt;
+                throw Error("self-reference not allowed with text hashing");
             return ContentAddressWithReferences {
                 TextInfo {
                     .hash = std::move(hash),
@@ -190,7 +221,7 @@ std::optional<ContentAddressWithReferences> ContentAddressWithReferences::fromPa
                 }
             };
         },
-        [&](FileIngestionMethod m2) -> std::optional<ContentAddressWithReferences> {
+        [&](FileIngestionMethod m2) -> ContentAddressWithReferences {
             return ContentAddressWithReferences {
                 FixedOutputInfo {
                     .method = m2,

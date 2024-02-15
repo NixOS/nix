@@ -58,22 +58,22 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 
     Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
-    DrvInfos drvInfos;
-    getDerivations(*state, *v, "", autoArgs, drvInfos, false);
+    PackageInfos packageInfos;
+    getDerivations(*state, *v, "", autoArgs, packageInfos, false);
 
     // Backward compatibility hack: group results by drvPath. This
     // helps keep .all output together.
     std::map<StorePath, OutputsSpec> byDrvPath;
 
-    for (auto & drvInfo : drvInfos) {
-        auto drvPath = drvInfo.queryDrvPath();
+    for (auto & packageInfo : packageInfos) {
+        auto drvPath = packageInfo.queryDrvPath();
         if (!drvPath)
             throw Error("'%s' is not a derivation", what());
 
         auto newOutputs = std::visit(overloaded {
             [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
                 std::set<std::string> outputsToInstall;
-                for (auto & output : drvInfo.queryOutputs(false, true))
+                for (auto & output : packageInfo.queryOutputs(false, true))
                     outputsToInstall.insert(output.first);
                 return OutputsSpec::Names { std::move(outputsToInstall) };
             },

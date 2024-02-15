@@ -118,10 +118,10 @@ diff $TEST_ROOT/dev-env{,2}.json
 # Ensure `nix print-dev-env --json` contains variable assignments.
 [[ $(jq -r .variables.arr1.value[2] $TEST_ROOT/dev-env.json) = '3 4' ]]
 
-# Run tests involving `source <(nix print-dev-inv)` in subshells to avoid modifying the current
+# Run tests involving `source <(nix print-dev-env)` in subshells to avoid modifying the current
 # environment.
 
-set +u # FIXME: Make print-dev-env `set -u` compliant (issue #7951)
+set -u
 
 # Ensure `source <(nix print-dev-env)` modifies the environment.
 (

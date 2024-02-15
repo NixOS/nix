@@ -1,0 +1,2 @@
+[test]
+-I=rel(lib/Nix)

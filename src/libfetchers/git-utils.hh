@@ -1,17 +1,27 @@
 #pragma once
 
+#include "filtering-input-accessor.hh"
 #include "input-accessor.hh"
+#include "fs-sink.hh"
 
 namespace nix {
 
 namespace fetchers { struct PublicKey; }
+
+struct GitFileSystemObjectSink : FileSystemObjectSink
+{
+    /**
+     * Flush builder and return a final Git hash.
+     */
+    virtual Hash sync() = 0;
+};
 
 struct GitRepo
 {
     virtual ~GitRepo()
     { }
 
-    static ref<GitRepo> openRepo(const CanonPath & path, bool create = false, bool bare = false);
+    static ref<GitRepo> openRepo(const std::filesystem::path & path, bool create = false, bool bare = false);
 
     virtual uint64_t getRevCount(const Hash & rev) = 0;
 
@@ -57,23 +67,19 @@ struct GitRepo
      * Return the submodules of this repo at the indicated revision,
      * along with the revision of each submodule.
      */
-    virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev) = 0;
+    virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) = 0;
 
     virtual std::string resolveSubmoduleUrl(
         const std::string & url,
         const std::string & base) = 0;
 
-    struct TarballInfo
-    {
-        Hash treeHash;
-        time_t lastModified;
-    };
-
-    virtual TarballInfo importTarball(Source & source) = 0;
-
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const Hash & rev) = 0;
+    virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+
+    virtual ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
+
+    virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
     virtual void fetch(
         const std::string & url,

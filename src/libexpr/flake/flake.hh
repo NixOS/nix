@@ -97,7 +97,7 @@ struct Flake
 
     SourcePath lockFilePath()
     {
-        return path.parent() + "flake.lock";
+        return path.parent() / "flake.lock";
     }
 };
 
@@ -178,7 +178,7 @@ struct LockFlags
     /**
      * The path to a lock file to write to instead of the `flake.lock` file in the top-level flake
      */
-    std::optional<CanonPath> outputLockFilePath;
+    std::optional<Path> outputLockFilePath;
 
     /**
      * Flake inputs to be overridden.

@@ -183,6 +183,13 @@ struct InputScheme
     virtual bool isDirect(const Input & input) const
     { return true; }
 
+    /**
+     * A sufficiently unique string that can be used as a cache key to identify the `input`.
+     *
+     * Only known-equivalent inputs should return the same fingerprint.
+     *
+     * This is not a stable identifier between Nix versions, but not guaranteed to change either.
+     */
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }
 

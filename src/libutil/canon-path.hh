@@ -52,8 +52,6 @@ public:
      */
     CanonPath(const std::vector<std::string> & elems);
 
-    static CanonPath fromCwd(std::string_view path = ".");
-
     static CanonPath root;
 
     /**
@@ -87,6 +85,13 @@ public:
 
     std::string_view rel() const
     { return ((std::string_view) path).substr(1); }
+
+    const char * rel_c_str() const
+    {
+        auto cs = path.c_str();
+        assert(cs[0]); // for safety if invariant is broken
+        return &cs[1];
+    }
 
     struct Iterator
     {
@@ -183,14 +188,14 @@ public:
     /**
      * Concatenate two paths.
      */
-    CanonPath operator + (const CanonPath & x) const;
+    CanonPath operator / (const CanonPath & x) const;
 
     /**
      * Add a path component to this one. It must not contain any slashes.
      */
     void push(std::string_view c);
 
-    CanonPath operator + (std::string_view c) const;
+    CanonPath operator / (std::string_view c) const;
 
     /**
      * Check whether access to this path is allowed, which is the case

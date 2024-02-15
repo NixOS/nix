@@ -2,25 +2,16 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "posix-source-accessor.hh"
 
 using namespace nix;
-
-static FileIngestionMethod parseIngestionMethod(std::string_view input)
-{
-    if (input == "flat") {
-        return FileIngestionMethod::Flat;
-    } else if (input == "nar") {
-        return FileIngestionMethod::Recursive;
-    } else {
-        throw UsageError("Unknown hash mode '%s', expect `flat` or `nar`");
-    }
-}
 
 struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    FileIngestionMethod ingestionMethod = FileIngestionMethod::Recursive;
+    ContentAddressMethod caMethod = FileIngestionMethod::Recursive;
+    HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
 
     CmdAddToStore()
     {
@@ -37,7 +28,6 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         addFlag({
             .longName  = "mode",
-            .shortName = 'n',
             .description = R"(
     How to compute the hash of the input.
     One of:
@@ -48,45 +38,26 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             )",
             .labels = {"hash-mode"},
             .handler = {[this](std::string s) {
-                this->ingestionMethod = parseIngestionMethod(s);
+                this->caMethod = parseFileIngestionMethod(s);
             }},
         });
+
+        addFlag(Flag::mkHashAlgoFlag(&hashAlgo));
     }
 
     void run(ref<Store> store) override
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        StringSink sink;
-        dumpPath(path, sink);
+        auto [accessor, path2] = PosixSourceAccessor::createAtRoot(path);
 
-        auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
+        auto storePath = dryRun
+            ? store->computeStorePath(
+                *namePart, accessor, path2, caMethod, hashAlgo, {}).first
+            : store->addToStoreSlow(
+                *namePart, accessor, path2, caMethod, hashAlgo, {}).path;
 
-        Hash hash = narHash;
-        if (ingestionMethod == FileIngestionMethod::Flat) {
-            HashSink hsink(HashAlgorithm::SHA256);
-            readFile(path, hsink);
-            hash = hsink.finish().first;
-        }
-
-        ValidPathInfo info {
-            *store,
-            std::move(*namePart),
-            FixedOutputInfo {
-                .method = std::move(ingestionMethod),
-                .hash = std::move(hash),
-                .references = {},
-            },
-            narHash,
-        };
-        info.narSize = sink.s.size();
-
-        if (!dryRun) {
-            auto source = StringSource(sink.s);
-            store->addToStore(info, source);
-        }
-
-        logger->cout("%s", store->printStorePath(info.path));
+        logger->cout("%s", store->printStorePath(storePath));
     }
 };
 
@@ -110,7 +81,7 @@ struct CmdAddFile : CmdAddToStore
 {
     CmdAddFile()
     {
-        ingestionMethod = FileIngestionMethod::Flat;
+        caMethod = FileIngestionMethod::Flat;
     }
 
     std::string description() override

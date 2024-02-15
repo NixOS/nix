@@ -131,7 +131,7 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
-    Pid pid = startProcess([&]() {
+    Pid pid = startProcess([&] {
 
         if (setuid(uid) == -1)
             throw SysError("setting uid");
@@ -168,11 +168,12 @@ void killUser(uid_t uid)
 
 //////////////////////////////////////////////////////////////////////
 
+using ChildWrapperFunction = std::function<void()>;
 
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
-static pid_t doFork(bool allowVfork, std::function<void()> fun) __attribute__((noinline));
-static pid_t doFork(bool allowVfork, std::function<void()> fun)
+static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun) __attribute__((noinline));
+static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 {
 #ifdef __linux__
     pid_t pid = allowVfork ? vfork() : fork();
@@ -188,8 +189,8 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 #if __linux__
 static int childEntry(void * arg)
 {
-    auto main = (std::function<void()> *) arg;
-    (*main)();
+    auto & fun = *reinterpret_cast<ChildWrapperFunction*>(arg);
+    fun();
     return 1;
 }
 #endif
@@ -197,7 +198,7 @@ static int childEntry(void * arg)
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
-    std::function<void()> wrapper = [&]() {
+    ChildWrapperFunction wrapper = [&] {
         if (!options.allowVfork)
             logger = makeSimpleLogger();
         try {
@@ -225,11 +226,11 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
         assert(!(options.cloneFlags & CLONE_VM));
 
         size_t stackSize = 1 * 1024 * 1024;
-        auto stack = (char *) mmap(0, stackSize,
-            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+        auto stack = static_cast<char *>(mmap(0, stackSize,
+            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
         if (stack == MAP_FAILED) throw SysError("allocating stack");
 
-        Finally freeStack([&]() { munmap(stack, stackSize); });
+        Finally freeStack([&] { munmap(stack, stackSize); });
 
         pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
         #else
@@ -308,7 +309,7 @@ void runProgram2(const RunOptions & options)
     }
 
     /* Fork. */
-    Pid pid = startProcess([&]() {
+    Pid pid = startProcess([&] {
         if (options.environment)
             replaceEnv(*options.environment);
         if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
@@ -350,7 +351,7 @@ void runProgram2(const RunOptions & options)
 
     std::promise<void> promise;
 
-    Finally doJoin([&]() {
+    Finally doJoin([&] {
         if (writerThread.joinable())
             writerThread.join();
     });
@@ -358,7 +359,7 @@ void runProgram2(const RunOptions & options)
 
     if (source) {
         in.readSide.close();
-        writerThread = std::thread([&]() {
+        writerThread = std::thread([&] {
             try {
                 std::vector<char> buf(8 * 1024);
                 while (true) {

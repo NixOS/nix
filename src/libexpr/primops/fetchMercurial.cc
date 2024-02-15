@@ -38,17 +38,11 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.fetchMercurial");
             else
-                throw EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]),
-                    .errPos = state.positions[attr.pos]
-                });
+                state.error<EvalError>("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]).atPos(attr.pos).debugThrow();
         }
 
         if (url.empty())
-            throw EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            });
+            state.error<EvalError>("'url' argument required").atPos(pos).debugThrow();
 
     } else
         url = state.coerceToString(pos, *args[0], context,

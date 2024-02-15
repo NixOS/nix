@@ -251,7 +251,7 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
-    debug("wait for build slot");
+    goal->trace("wait for build slot");
     bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
     if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs) ||
         (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
@@ -331,13 +331,23 @@ void Worker::run(const Goals & _topGoals)
             if (awake.empty() && 0U == settings.maxBuildJobs)
             {
                 if (getMachines().empty())
-                   throw Error("unable to start any build; either increase '--max-jobs' "
-                            "or enable remote builds."
-                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+                   throw Error(
+                        R"(
+                        Unable to start any build;
+                        either increase '--max-jobs' or enable remote builds.
+
+                        For more information run 'man nix.conf' and search for '/machines'.
+                        )"
+                    );
                 else
-                   throw Error("unable to start any build; remote machines may not have "
-                            "all required system features."
-                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+                   throw Error(
+                        R"(
+                        Unable to start any build;
+                        remote machines may not have all required system features.
+
+                        For more information run 'man nix.conf' and search for '/machines'.
+                        )"
+                    );
 
             }
             assert(!awake.empty());
@@ -449,7 +459,7 @@ void Worker::waitForInput()
                 } else {
                     printMsg(lvlVomit, "%1%: read %2% bytes",
                         goal->getName(), rd);
-                    std::string data((char *) buffer.data(), rd);
+                    std::string_view data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
                 }
@@ -519,7 +529,9 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(info->narHash.algo, store.printStorePath(path));
+        HashResult current = hashPath(
+            *store.getFSAccessor(), CanonPath { store.printStorePath(path) },
+            FileIngestionMethod::Recursive, info->narHash.algo);
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current.first;
     }

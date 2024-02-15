@@ -177,7 +177,13 @@ protected:
         std::optional<ExperimentalFeature> experimentalFeature;
 
         static Flag mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha);
+        static Flag mkHashAlgoFlag(HashAlgorithm * ha) {
+            return mkHashAlgoFlag("hash-algo", ha);
+        }
         static Flag mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
+        static Flag mkHashAlgoOptFlag(std::optional<HashAlgorithm> * oha) {
+            return mkHashAlgoOptFlag("hash-algo", oha);
+        }
         static Flag mkHashFormatFlagWithDefault(std::string && longName, HashFormat * hf);
         static Flag mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf);
     };

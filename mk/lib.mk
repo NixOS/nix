@@ -12,24 +12,7 @@ man-pages :=
 install-tests :=
 install-tests-groups :=
 
-ifdef HOST_OS
-  HOST_KERNEL = $(firstword $(subst -, ,$(HOST_OS)))
-  ifeq ($(HOST_KERNEL), cygwin)
-    HOST_CYGWIN = 1
-  endif
-  ifeq ($(patsubst darwin%,,$(HOST_KERNEL)),)
-    HOST_DARWIN = 1
-  endif
-  ifeq ($(patsubst freebsd%,,$(HOST_KERNEL)),)
-    HOST_FREEBSD = 1
-  endif
-  ifeq ($(HOST_KERNEL), linux)
-    HOST_LINUX = 1
-  endif
-  ifeq ($(patsubst solaris%,,$(HOST_KERNEL)),)
-    HOST_SOLARIS = 1
-  endif
-endif
+include mk/platform.mk
 
 # Hack to define a literal space.
 space :=
@@ -113,6 +96,10 @@ $(foreach test-group, $(install-tests-groups), \
   $(foreach test, $($(test-group)-tests), \
     $(eval $(call run-test,$(test),$(install_test_init))) \
     $(eval $(test-group).test-group: $(test).test)))
+
+# Include makefiles requiring built programs.
+$(foreach mf, $(makefiles-late), $(eval $(call include-sub-makefile,$(mf))))
+
 
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 

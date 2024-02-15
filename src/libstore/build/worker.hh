@@ -116,7 +116,7 @@ private:
     WeakGoals waitingForAWhile;
 
     /**
-     * Last time the goals in `waitingForAWhile` where woken up.
+     * Last time the goals in `waitingForAWhile` were woken up.
      */
     steady_time_point lastWokenUp;
 

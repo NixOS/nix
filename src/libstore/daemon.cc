@@ -119,7 +119,7 @@ struct TunnelLogger : public Logger
             if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
                 to << STDERR_ERROR << *ex;
             } else {
-                to << STDERR_ERROR << ex->what() << ex->status;
+                to << STDERR_ERROR << ex->what() << ex->info().status;
             }
         }
     }
@@ -400,25 +400,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parse(camStr);
+                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parseWithAlgo(camStr);
                 auto hashAlgo = hashAlgo_; // work around clang bug
                 FramedSource source(from);
-                // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
-                return std::visit(overloaded {
-                    [&](const TextIngestionMethod &) {
-                        if (hashAlgo != HashAlgorithm::SHA256)
-                            throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
-                                name, printHashAlgo(hashAlgo));
-                        // We could stream this by changing Store
-                        std::string contents = source.drain();
-                        auto path = store->addTextToStore(name, contents, refs, repair);
-                        return store->queryPathInfo(path);
-                    },
-                    [&](const FileIngestionMethod & fim) {
-                        auto path = store->addToStoreFromDump(source, name, fim, hashAlgo, repair, refs);
-                        return store->queryPathInfo(path);
-                    },
-                }, contentAddressMethod.raw);
+                // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
+                auto path = store->addToStoreFromDump(source, name, contentAddressMethod, hashAlgo, refs, repair);
+                return store->queryPathInfo(path);
             }();
             logger->stopWork();
 
@@ -454,7 +441,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                        eagerly consume the entire stream it's given, past the
                        length of the Nar. */
                     TeeSource savedNARSource(from, saved);
-                    NullParseSink sink; /* just parse the NAR */
+                    NullFileSystemObjectSink sink; /* just parse the NAR */
                     parseDump(sink, savedNARSource);
                 } else {
                     /* Incrementally parse the NAR file, stripping the
@@ -496,7 +483,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         std::string s = readString(from);
         auto refs = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         logger->startWork();
-        auto path = store->addTextToStore(suffix, s, refs, NoRepair);
+        auto path = ({
+            StringSource source { s };
+            store->addToStoreFromDump(source, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, NoRepair);
+        });
         logger->stopWork();
         to << store->printStorePath(path);
         break;
@@ -923,7 +913,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 source = std::make_unique<TunnelSource>(from, to);
             else {
                 TeeSource tee { from, saved };
-                NullParseSink ether;
+                NullFileSystemObjectSink ether;
                 parseDump(ether, tee);
                 source = std::make_unique<StringSource>(saved.s);
             }

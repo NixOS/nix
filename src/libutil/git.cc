@@ -52,24 +52,22 @@ static std::string getString(Source & source, int n)
     return v;
 }
 
-
-void parse(
-    ParseSink & sink,
+void parseBlob(
+    FileSystemObjectSink & sink,
     const Path & sinkPath,
     Source & source,
-    std::function<SinkHook> hook,
+    bool executable,
     const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);
 
-    auto type = getString(source, 5);
-
-    if (type == "blob ") {
-        sink.createRegularFile(sinkPath);
+    sink.createRegularFile(sinkPath, [&](auto & crf) {
+        if (executable)
+            crf.isExecutable();
 
         unsigned long long size = std::stoi(getStringUntil(source, 0));
 
-        sink.preallocateContents(size);
+        crf.preallocateContents(size);
 
         unsigned long long left = size;
         std::string buf;
@@ -79,45 +77,89 @@ void parse(
             checkInterrupt();
             buf.resize(std::min((unsigned long long)buf.capacity(), left));
             source(buf);
-            sink.receiveContents(buf);
+            crf(buf);
             left -= buf.size();
         }
+    });
+}
+
+void parseTree(
+    FileSystemObjectSink & sink,
+    const Path & sinkPath,
+    Source & source,
+    std::function<SinkHook> hook,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    unsigned long long size = std::stoi(getStringUntil(source, 0));
+    unsigned long long left = size;
+
+    sink.createDirectory(sinkPath);
+
+    while (left) {
+        std::string perms = getStringUntil(source, ' ');
+        left -= perms.size();
+        left -= 1;
+
+        RawMode rawMode = std::stoi(perms, 0, 8);
+        auto modeOpt = decodeMode(rawMode);
+        if (!modeOpt)
+            throw Error("Unknown Git permission: %o", perms);
+        auto mode = std::move(*modeOpt);
+
+        std::string name = getStringUntil(source, '\0');
+        left -= name.size();
+        left -= 1;
+
+        std::string hashs = getString(source, 20);
+        left -= 20;
+
+        Hash hash(HashAlgorithm::SHA1);
+        std::copy(hashs.begin(), hashs.end(), hash.hash);
+
+        hook(name, TreeEntry {
+            .mode = mode,
+            .hash = hash,
+        });
+    }
+}
+
+ObjectType parseObjectType(
+    Source & source,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    xpSettings.require(Xp::GitHashing);
+
+    auto type = getString(source, 5);
+
+    if (type == "blob ") {
+        return ObjectType::Blob;
     } else if (type == "tree ") {
-        unsigned long long size = std::stoi(getStringUntil(source, 0));
-        unsigned long long left = size;
-
-        sink.createDirectory(sinkPath);
-
-        while (left) {
-            std::string perms = getStringUntil(source, ' ');
-            left -= perms.size();
-            left -= 1;
-
-            RawMode rawMode = std::stoi(perms, 0, 8);
-            auto modeOpt = decodeMode(rawMode);
-            if (!modeOpt)
-                throw Error("Unknown Git permission: %o", perms);
-            auto mode = std::move(*modeOpt);
-
-            std::string name = getStringUntil(source, '\0');
-            left -= name.size();
-            left -= 1;
-
-            std::string hashs = getString(source, 20);
-            left -= 20;
-
-            Hash hash(HashAlgorithm::SHA1);
-            std::copy(hashs.begin(), hashs.end(), hash.hash);
-
-            hook(name, TreeEntry {
-                .mode = mode,
-                .hash = hash,
-            });
-
-            if (mode == Mode::Executable)
-                sink.isExecutable();
-        }
+        return ObjectType::Tree;
     } else throw Error("input doesn't look like a Git object");
+}
+
+void parse(
+    FileSystemObjectSink & sink,
+    const Path & sinkPath,
+    Source & source,
+    bool executable,
+    std::function<SinkHook> hook,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    xpSettings.require(Xp::GitHashing);
+
+    auto type = parseObjectType(source, xpSettings);
+
+    switch (type) {
+    case ObjectType::Blob:
+        parseBlob(sink, sinkPath, source, executable, xpSettings);
+        break;
+    case ObjectType::Tree:
+        parseTree(sink, sinkPath, source, hook, xpSettings);
+        break;
+    default:
+        assert(false);
+    };
 }
 
 
@@ -133,9 +175,9 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
 }
 
 
-void restore(ParseSink & sink, Source & source, std::function<RestoreHook> hook)
+void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook)
 {
-    parse(sink, "", source, [&](Path name, TreeEntry entry) {
+    parse(sink, "", source, false, [&](Path name, TreeEntry entry) {
         auto [accessor, from] = hook(entry.hash);
         auto stat = accessor->lstat(from);
         auto gotOpt = convertMode(stat.type);
@@ -217,7 +259,7 @@ Mode dump(
     {
         Tree entries;
         for (auto & [name, _] : accessor.readDirectory(path)) {
-            auto child = path + name;
+            auto child = path / name;
             if (!filter(child.abs())) continue;
 
             auto entry = hook(child);

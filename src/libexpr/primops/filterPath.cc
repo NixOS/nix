@@ -22,7 +22,7 @@ struct FilterPathInputAccessor : CachingFilteringInputAccessor
         if (!path.isRoot() && !isAllowed(*path.parent())) return false;
         // Note that unlike 'builtins.{path,filterSource}', we don't
         // pass the prefix to the filter function.
-        return state.callPathFilter(filterFun, {next, prefix + path}, path.abs(), pos);
+        return state.callPathFilter(filterFun, {next, prefix / path}, path.abs(), pos);
     }
 
 };
@@ -46,29 +46,21 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value
             filterFun = attr.value;
         }
         else
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("unsupported argument '%1%' to 'filterPath'", state.symbols[attr.name]),
-                .errPos = state.positions[attr.pos]
-            }));
+            state.error<EvalError>(
+                "unsupported argument '%1%' to 'filterPath'", state.symbols[attr.name])
+                .atPos(attr.pos).debugThrow();
     }
 
     if (!path)
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("'path' required"),
-            .errPos = state.positions[pos]
-        }));
+        state.error<EvalError>("'path' required").atPos(pos).debugThrow();
 
     if (!filterFun)
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("'filter' required"),
-            .errPos = state.positions[pos]
-        }));
+        state.error<EvalError>("'filter' required").atPos(pos).debugThrow();
 
     if (!context.empty())
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("'path' argument to 'filterPath' cannot have a context"),
-            .errPos = state.positions[pos]
-        }));
+        state.error<EvalError>(
+            "'path' argument to 'filterPath' cannot have a context")
+            .atPos(pos).debugThrow();
 
     auto accessor = make_ref<FilterPathInputAccessor>(state, pos, *path, filterFun);
 

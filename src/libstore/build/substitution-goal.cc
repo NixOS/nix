@@ -2,6 +2,7 @@
 #include "substitution-goal.hh"
 #include "nar-info.hh"
 #include "finally.hh"
+#include "signals.hh"
 
 namespace nix {
 
@@ -217,6 +218,8 @@ void PathSubstitutionGoal::tryToRun()
 
     thr = std::thread([this]() {
         try {
+            ReceiveInterrupts receiveInterrupts;
+
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide.close(); });
 

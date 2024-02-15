@@ -8,6 +8,7 @@
 #include "tarfile.hh"
 #include "types.hh"
 #include "split.hh"
+#include "posix-source-accessor.hh"
 #include "fs-input-accessor.hh"
 #include "store-api.hh"
 #include "git-utils.hh"
@@ -29,7 +30,7 @@ DownloadFileResult downloadFile(
         {"name", name},
     });
 
-    auto cached = getCache()->lookupExpired(store, inAttrs);
+    auto cached = getCache()->lookupExpired(*store, inAttrs);
 
     auto useCached = [&]() -> DownloadFileResult
     {
@@ -96,7 +97,7 @@ DownloadFileResult downloadFile(
         inAttrs.insert_or_assign("url", url);
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
         getCache()->add(
-            store,
+            *store,
             inAttrs,
             infoAttrs,
             *storePath,
@@ -131,7 +132,7 @@ DownloadTarballResult downloadTarball(
             .treeHash = treeHash,
             .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
-            .accessor = getTarballCache()->getAccessor(treeHash),
+            .accessor = getTarballCache()->getAccessor(treeHash, false),
         };
     };
 
@@ -157,7 +158,9 @@ DownloadTarballResult downloadTarball(
 
     /* Note: if the download is cached, `importTarball()` will receive
        no data, which causes it to import an empty tarball. */
-    auto tarballInfo = getTarballCache()->importTarball(*source);
+    TarArchive archive { *source };
+    auto parseSink = getTarballCache()->getFileSystemObjectSink();
+    auto lastModified = unpackTarfileToSink(archive, *parseSink);
 
     auto res(_res->lock());
 
@@ -167,8 +170,8 @@ DownloadTarballResult downloadTarball(
         infoAttrs = cached->infoAttrs;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
-        infoAttrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
-        infoAttrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
+        infoAttrs.insert_or_assign("treeHash", parseSink->sync().gitRev());
+        infoAttrs.insert_or_assign("lastModified", uint64_t(lastModified));
         if (res->immutableUrl)
             infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
     }

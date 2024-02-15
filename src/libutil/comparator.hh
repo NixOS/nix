@@ -13,9 +13,9 @@
 #define GENERATE_ONE_CMP(PRE, QUAL, COMPARATOR, MY_TYPE, ...) \
     PRE bool QUAL operator COMPARATOR(const MY_TYPE & other) const { \
       __VA_OPT__(const MY_TYPE * me = this;) \
-      auto fields1 = std::make_tuple( __VA_ARGS__ ); \
+      auto fields1 = std::tie( __VA_ARGS__ ); \
       __VA_OPT__(me = &other;) \
-      auto fields2 = std::make_tuple( __VA_ARGS__ ); \
+      auto fields2 = std::tie( __VA_ARGS__ ); \
       return fields1 COMPARATOR fields2; \
     }
 #define GENERATE_EQUAL(prefix, qualification, my_type, args...) \

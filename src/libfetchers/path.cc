@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "archive.hh"
 #include "fs-input-accessor.hh"
+#include "posix-source-accessor.hh"
 
 namespace nix::fetchers {
 
@@ -105,7 +106,7 @@ struct PathInputScheme : InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const override
     {
-        writeFile((CanonPath(getAbsPath(input)) + path).abs(), contents);
+        writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
     }
 
     CanonPath getAbsPath(const Input & input) const
@@ -130,7 +131,8 @@ struct PathInputScheme : InputScheme
 
             if (!storePath || storePath->name() != input.getName() || !store->isValidPath(*storePath)) {
                 Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
-                storePath = store->addToStore(input.getName(), absPath.abs());
+                PosixSourceAccessor accessor;
+                storePath = store->addToStore(input.getName(), accessor, absPath);
                 auto narHash = store->queryPathInfo(*storePath)->narHash;
                 input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
             } else
@@ -150,7 +152,7 @@ struct PathInputScheme : InputScheme
             return {makeStorePathAccessor(store, *storePath), std::move(input2)};
 
         } else {
-            return {makeFSInputAccessor(absPath), std::move(input2)};
+            return {makeFSInputAccessor(std::filesystem::path(absPath.abs())), std::move(input2)};
         }
     }
 

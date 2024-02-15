@@ -16,4 +16,4 @@ libutil-test-support_CXXFLAGS += $(libutil-tests_EXTRA_INCLUDES)
 
 libutil-test-support_LIBS = libutil
 
-libutil-test-support_LDFLAGS := -pthread -lrapidcheck
+libutil-test-support_LDFLAGS := $(THREAD_LDFLAGS) -lrapidcheck

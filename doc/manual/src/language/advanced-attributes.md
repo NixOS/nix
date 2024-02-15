@@ -257,7 +257,7 @@ Derivations can declare some infrequently used optional attributes.
     of the environment (typically, a few hundred kilobyte).
 
   - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
-    If this attribute is set to `true` and [distributed building is enabled](../advanced-topics/distributed-builds.md), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
+    If this attribute is set to `true` and [distributed building is enabled](@docroot@/command-ref/conf-file.md#conf-builders), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
     This is useful for derivations that are cheapest to build locally.
 
   - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\

@@ -107,7 +107,7 @@ struct CmdConfigCheck : StoreCommand
                     if (profileDir.find("/profiles/") == std::string::npos)
                         dirs.insert(dir);
                 }
-            } catch (SysError &) {}
+            } catch (SystemError &) {}
         }
 
         if (!dirs.empty()) {

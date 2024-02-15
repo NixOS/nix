@@ -21,9 +21,16 @@ namespace fs = std::filesystem;
 
 namespace nix {
 
-Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
+Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
 {
-    if (path[0] != '/') {
+    std::string scratch;
+
+    if (path.empty() || path[0] != '/') {
+        // In this case we need to call `canonPath` on a newly-created
+        // string. We set `scratch` to that string first, and then set
+        // `path` to `scratch`. This ensures the newly-created string
+        // lives long enough for the call to `canonPath`, and allows us
+        // to just accept a `std::string_view`.
         if (!dir) {
 #ifdef __GNU__
             /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
@@ -35,12 +42,13 @@ Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
             if (!getcwd(buf, sizeof(buf)))
 #endif
                 throw SysError("cannot get cwd");
-            path = concatStrings(buf, "/", path);
+            scratch = concatStrings(buf, "/", path);
 #ifdef __GNU__
             free(buf);
 #endif
         } else
-            path = concatStrings(*dir, "/", path);
+            scratch = concatStrings(*dir, "/", path);
+        path = scratch;
     }
     return canonPath(path, resolveSymlinks);
 }
@@ -82,7 +90,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
         /* Normal component; copy it. */
         else {
             s += '/';
-            if (const auto slash = path.find('/'); slash == std::string::npos) {
+            if (const auto slash = path.find('/'); slash == path.npos) {
                 s += path;
                 path = {};
             } else {
@@ -108,14 +116,18 @@ Path canonPath(PathView path, bool resolveSymlinks)
         }
     }
 
-    return s.empty() ? "/" : std::move(s);
+    if (s.empty()) {
+        s = "/";
+    }
+
+    return s;
 }
 
 
 Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
-    if (pos == std::string::npos)
+    if (pos == path.npos)
         return ".";
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
@@ -131,7 +143,7 @@ std::string_view baseNameOf(std::string_view path)
         last -= 1;
 
     auto pos = path.rfind('/', last);
-    if (pos == std::string::npos)
+    if (pos == path.npos)
         pos = 0;
     else
         pos += 1;
@@ -307,7 +319,7 @@ void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    std::vector<char> buf(64 * 1024);
+    std::array<char, 64 * 1024> buf;
 
     try {
         while (true) {

@@ -10,6 +10,7 @@
 #include "finally.hh"
 #include "fetch-settings.hh"
 #include "value-to-json.hh"
+#include "patching-input-accessor.hh"
 
 namespace nix {
 
@@ -87,8 +88,8 @@ static FlakeInput parseFlakeInput(
                         input.patchFiles.emplace_back(flakePath.parent().path.makeRelative(elem->path().path));
                     }
                     else
-                        throw TypeError("flake input attribute '%s' is %s while a string or path is expected",
-                            state.symbols[attr.name], showType(*elem));
+                        state.error<TypeError>("flake input attribute '%s' is %s while a string or path is expected",
+                            state.symbols[attr.name], showType(*elem)).debugThrow();
                 }
             } else {
                 // Allow selecting a subset of enum values
@@ -110,15 +111,15 @@ static FlakeInput parseFlakeInput(
                             NixStringContext emptyContext = {};
                             attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, emptyContext).dump());
                         } else
-                            throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
-                                state.symbols[attr.name], showType(*attr.value));
+                            state.error<TypeError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
+                                state.symbols[attr.name], showType(*attr.value)).debugThrow();
                 }
                 #pragma GCC diagnostic pop
             }
         } catch (Error & e) {
             e.addTrace(
                 state.positions[attr.pos],
-                hintfmt("while evaluating flake attribute '%s'", state.symbols[attr.name]));
+                HintFmt("while evaluating flake attribute '%s'", state.symbols[attr.name]));
             throw;
         }
     }
@@ -127,7 +128,7 @@ static FlakeInput parseFlakeInput(
         try {
             input.ref = FlakeRef::fromAttrs(attrs);
         } catch (Error & e) {
-            e.addTrace(state.positions[pos], hintfmt("while evaluating flake input"));
+            e.addTrace(state.positions[pos], HintFmt("while evaluating flake input"));
             throw;
         }
     else {
@@ -177,7 +178,7 @@ static Flake readFlake(
     const InputPath & lockRootPath)
 {
     CanonPath flakeDir(resolvedRef.subdir);
-    auto flakePath = rootDir + flakeDir + "flake.nix";
+    auto flakePath = rootDir / flakeDir / "flake.nix";
 
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
@@ -247,15 +248,15 @@ static Flake readFlake(
                 std::vector<std::string> ss;
                 for (auto elem : setting.value->listItems()) {
                     if (elem->type() != nString)
-                        throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
-                            state.symbols[setting.name], showType(*setting.value));
+                        state.error<TypeError>("list element in flake configuration setting '%s' is %s while a string is expected",
+                            state.symbols[setting.name], showType(*setting.value)).debugThrow();
                     ss.emplace_back(state.forceStringNoCtx(*elem, setting.pos, ""));
                 }
                 flake.config.settings.emplace(state.symbols[setting.name], ss);
             }
             else
-                throw TypeError("flake configuration setting '%s' is %s",
-                    state.symbols[setting.name], showType(*setting.value));
+                state.error<TypeError>("flake configuration setting '%s' is %s",
+                    state.symbols[setting.name], showType(*setting.value)).debugThrow();
         }
     }
 
@@ -712,7 +713,7 @@ LockedFlake lockFlake(
                     if (lockFlags.outputLockFilePath) {
                         if (lockFlags.commitLockFile)
                             throw Error("'--commit-lock-file' and '--output-lock-file' are incompatible");
-                        writeFile(lockFlags.outputLockFilePath->abs(), newLockFileS);
+                        writeFile(*lockFlags.outputLockFilePath, newLockFileS);
                     } else {
                         bool lockFileExists = flake->lockFilePath().pathExists();
 
@@ -925,11 +926,11 @@ static void prim_flakeRefToString(
             attrs.emplace(state.symbols[attr.name],
                           std::string(attr.value->string_view()));
         } else {
-            state.error(
+            state.error<EvalError>(
                 "flake reference attribute sets may only contain integers, Booleans, "
                 "and strings, but attribute '%s' is %s",
                 state.symbols[attr.name],
-                showType(*attr.value)).debugThrow<EvalError>();
+                showType(*attr.value)).debugThrow();
         }
     }
     auto flakeRef = FlakeRef::fromAttrs(attrs);

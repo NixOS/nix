@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <compare>
 #include <memory>
 #include <exception>
 #include <stdexcept>

@@ -2,16 +2,10 @@ R""(
 
 # Examples
 
-* Remove a package by position:
+* Remove a package by name:
 
   ```console
-  # nix profile remove 3
-  ```
-
-* Remove a package by attribute path:
-
-  ```console
-  # nix profile remove packages.x86_64-linux.hello
+  # nix profile remove hello
   ```
 
 * Remove all packages:

@@ -2,6 +2,7 @@
 #include "downstream-placeholder.hh"
 #include "store-api.hh"
 #include "globals.hh"
+#include "types.hh"
 #include "util.hh"
 #include "split.hh"
 #include "common-protocol.hh"
@@ -109,17 +110,17 @@ bool DerivationType::isSandboxed() const
 }
 
 
-bool DerivationType::isPure() const
+bool DerivationType::isImpure() const
 {
     return std::visit(overloaded {
         [](const InputAddressed & ia) {
-            return true;
+            return false;
         },
         [](const ContentAddressed & ca) {
-            return true;
+            return false;
         },
         [](const Impure &) {
-            return false;
+            return true;
         },
     }, raw);
 }
@@ -143,36 +144,89 @@ StorePath writeDerivation(Store & store,
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
     return readOnly || settings.readOnlyMode
-        ? store.computeStorePathForText(suffix, contents, references)
-        : store.addTextToStore(suffix, contents, references, repair);
+        ? store.makeFixedOutputPathFromCA(suffix, TextInfo {
+            .hash = hashString(HashAlgorithm::SHA256, contents),
+            .references = std::move(references),
+        })
+        : ({
+            StringSource s { contents };
+            store.addToStoreFromDump(s, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair);
+        });
+}
+
+
+namespace {
+/**
+ * This mimics std::istream to some extent. We use this much smaller implementation
+ * instead of plain istreams because the sentry object overhead is too high.
+ */
+struct StringViewStream {
+    std::string_view remaining;
+
+    int peek() const {
+        return remaining.empty() ? EOF : remaining[0];
+    }
+
+    int get() {
+        if (remaining.empty()) return EOF;
+        char c = remaining[0];
+        remaining.remove_prefix(1);
+        return c;
+    }
+};
+
+constexpr struct Escapes {
+    char map[256];
+    constexpr Escapes() {
+        for (int i = 0; i < 256; i++) map[i] = (char) (unsigned char) i;
+        map[(int) (unsigned char) 'n'] = '\n';
+        map[(int) (unsigned char) 'r'] = '\r';
+        map[(int) (unsigned char) 't'] = '\t';
+    }
+    char operator[](char c) const { return map[(unsigned char) c]; }
+} escapes;
 }
 
 
 /* Read string `s' from stream `str'. */
-static void expect(std::istream & str, std::string_view s)
+static void expect(StringViewStream & str, std::string_view s)
 {
-    for (auto & c : s) {
-        if (str.get() != c)
-            throw FormatError("expected string '%1%'", s);
-    }
+    if (!str.remaining.starts_with(s))
+        throw FormatError("expected string '%1%'", s);
+    str.remaining.remove_prefix(s.size());
 }
 
 
 /* Read a C-style string from stream `str'. */
-static std::string parseString(std::istream & str)
+static BackedStringView parseString(StringViewStream & str)
 {
-    std::string res;
     expect(str, "\"");
-    int c;
-    while ((c = str.get()) != '"')
-        if (c == '\\') {
-            c = str.get();
-            if (c == 'n') res += '\n';
-            else if (c == 'r') res += '\r';
-            else if (c == 't') res += '\t';
-            else res += c;
+    auto c = str.remaining.begin(), end = str.remaining.end();
+    bool escaped = false;
+    for (; c != end && *c != '"'; c++) {
+        if (*c == '\\') {
+            c++;
+            if (c == end)
+                throw FormatError("unterminated string in derivation");
+            escaped = true;
         }
-        else res += c;
+    }
+
+    const auto contentLen = c - str.remaining.begin();
+    const auto content = str.remaining.substr(0, contentLen);
+    str.remaining.remove_prefix(contentLen + 1);
+
+    if (!escaped)
+        return content;
+
+    std::string res;
+    res.reserve(content.size());
+    for (c = content.begin(), end = content.end(); c != end; c++)
+        if (*c == '\\') {
+            c++;
+            res += escapes[*c];
+        }
+        else res += *c;
     return res;
 }
 
@@ -181,15 +235,15 @@ static void validatePath(std::string_view s) {
         throw FormatError("bad path '%1%' in derivation", s);
 }
 
-static Path parsePath(std::istream & str)
+static BackedStringView parsePath(StringViewStream & str)
 {
     auto s = parseString(str);
-    validatePath(s);
+    validatePath(*s);
     return s;
 }
 
 
-static bool endOfList(std::istream & str)
+static bool endOfList(StringViewStream & str)
 {
     if (str.peek() == ',') {
         str.get();
@@ -203,12 +257,12 @@ static bool endOfList(std::istream & str)
 }
 
 
-static StringSet parseStrings(std::istream & str, bool arePaths)
+static StringSet parseStrings(StringViewStream & str, bool arePaths)
 {
     StringSet res;
     expect(str, "[");
     while (!endOfList(str))
-        res.insert(arePaths ? parsePath(str) : parseString(str));
+        res.insert((arePaths ? parsePath(str) : parseString(str)).toOwned());
     return res;
 }
 
@@ -261,7 +315,7 @@ static DerivationOutput parseDerivationOutput(
 }
 
 static DerivationOutput parseDerivationOutput(
-    const StoreDirConfig & store, std::istringstream & str,
+    const StoreDirConfig & store, StringViewStream & str,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings)
 {
     expect(str, ","); const auto pathS = parseString(str);
@@ -269,7 +323,7 @@ static DerivationOutput parseDerivationOutput(
     expect(str, ","); const auto hash = parseString(str);
     expect(str, ")");
 
-    return parseDerivationOutput(store, pathS, hashAlgo, hash, xpSettings);
+    return parseDerivationOutput(store, *pathS, *hashAlgo, *hash, xpSettings);
 }
 
 /**
@@ -291,7 +345,7 @@ enum struct DerivationATermVersion {
 
 static DerivedPathMap<StringSet>::ChildNode parseDerivedPathMapNode(
     const StoreDirConfig & store,
-    std::istringstream & str,
+    StringViewStream & str,
     DerivationATermVersion version)
 {
     DerivedPathMap<StringSet>::ChildNode node;
@@ -317,7 +371,7 @@ static DerivedPathMap<StringSet>::ChildNode parseDerivedPathMapNode(
             expect(str, ",[");
             while (!endOfList(str)) {
                 expect(str, "(");
-                auto outputName = parseString(str);
+                auto outputName = parseString(str).toOwned();
                 expect(str, ",");
                 node.childMap.insert_or_assign(outputName, parseDerivedPathMapNode(store, str, version));
                 expect(str, ")");
@@ -343,7 +397,7 @@ Derivation parseDerivation(
     Derivation drv;
     drv.name = name;
 
-    std::istringstream str(std::move(s));
+    StringViewStream str{s};
     expect(str, "D");
     DerivationATermVersion version;
     switch (str.peek()) {
@@ -354,12 +408,12 @@ Derivation parseDerivation(
     case 'r': {
         expect(str, "rvWithVersion(");
         auto versionS = parseString(str);
-        if (versionS == "xp-dyn-drv") {
+        if (*versionS == "xp-dyn-drv") {
             // Only verison we have so far
             version = DerivationATermVersion::DynamicDerivations;
             xpSettings.require(Xp::DynamicDerivations);
         } else {
-            throw FormatError("Unknown derivation ATerm format version '%s'", versionS);
+            throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
         }
         expect(str, ",");
         break;
@@ -371,7 +425,7 @@ Derivation parseDerivation(
     /* Parse the list of outputs. */
     expect(str, "[");
     while (!endOfList(str)) {
-        expect(str, "("); std::string id = parseString(str);
+        expect(str, "("); std::string id = parseString(str).toOwned();
         auto output = parseDerivationOutput(store, str, xpSettings);
         drv.outputs.emplace(std::move(id), std::move(output));
     }
@@ -380,28 +434,28 @@ Derivation parseDerivation(
     expect(str, ",[");
     while (!endOfList(str)) {
         expect(str, "(");
-        Path drvPath = parsePath(str);
+        auto drvPath = parsePath(str);
         expect(str, ",");
-        drv.inputDrvs.map.insert_or_assign(store.parseStorePath(drvPath), parseDerivedPathMapNode(store, str, version));
+        drv.inputDrvs.map.insert_or_assign(store.parseStorePath(*drvPath), parseDerivedPathMapNode(store, str, version));
         expect(str, ")");
     }
 
     expect(str, ","); drv.inputSrcs = store.parseStorePathSet(parseStrings(str, true));
-    expect(str, ","); drv.platform = parseString(str);
-    expect(str, ","); drv.builder = parseString(str);
+    expect(str, ","); drv.platform = parseString(str).toOwned();
+    expect(str, ","); drv.builder = parseString(str).toOwned();
 
     /* Parse the builder arguments. */
     expect(str, ",[");
     while (!endOfList(str))
-        drv.args.push_back(parseString(str));
+        drv.args.push_back(parseString(str).toOwned());
 
     /* Parse the environment variables. */
     expect(str, ",[");
     while (!endOfList(str)) {
-        expect(str, "("); auto name = parseString(str);
-        expect(str, ","); auto value = parseString(str);
+        expect(str, "("); auto name = parseString(str).toOwned();
+        expect(str, ","); auto value = parseString(str).toOwned();
         expect(str, ")");
-        drv.env[name] = value;
+        drv.env.insert_or_assign(std::move(name), std::move(value));
     }
 
     expect(str, ")");
@@ -547,7 +601,7 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo));
+                s += ','; printUnquotedString(s, std::string { dof.method.renderPrefix() } + printHashAlgo(dof.hashAlgo));
                 s += ','; printUnquotedString(s, "");
             },
             [&](const DerivationOutput::Deferred &) {
@@ -558,7 +612,7 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
             [&](const DerivationOutput::Impure & doi) {
                 // FIXME
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo));
+                s += ','; printUnquotedString(s, std::string { doi.method.renderPrefix() } + printHashAlgo(doi.hashAlgo));
                 s += ','; printUnquotedString(s, "impure");
             }
         }, i.second.raw);
@@ -786,7 +840,7 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
         };
     }
 
-    if (!type.isPure()) {
+    if (type.isImpure()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & [outputName, _] : drv.outputs)
             outputHashes.insert_or_assign(outputName, impureOutputHash);
@@ -930,7 +984,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 out << ""
-                    << (dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo))
+                    << (std::string { dof.method.renderPrefix() } + printHashAlgo(dof.hashAlgo))
                     << "";
             },
             [&](const DerivationOutput::Deferred &) {
@@ -940,7 +994,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
             },
             [&](const DerivationOutput::Impure & doi) {
                 out << ""
-                    << (doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo))
+                    << (std::string { doi.method.renderPrefix() } + printHashAlgo(doi.hashAlgo))
                     << "impure";
             },
         }, i.second.raw);
@@ -1167,11 +1221,11 @@ nlohmann::json DerivationOutput::toJSON(
             // FIXME print refs?
         },
         [&](const DerivationOutput::CAFloating & dof) {
-            res["hashAlgo"] = dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo);
+            res["hashAlgo"] = std::string { dof.method.renderPrefix() } + printHashAlgo(dof.hashAlgo);
         },
         [&](const DerivationOutput::Deferred &) {},
         [&](const DerivationOutput::Impure & doi) {
-            res["hashAlgo"] = doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo);
+            res["hashAlgo"] = std::string { doi.method.renderPrefix() } + printHashAlgo(doi.hashAlgo);
             res["impure"] = true;
         },
     }, raw);

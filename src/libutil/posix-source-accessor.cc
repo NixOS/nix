@@ -6,6 +6,33 @@
 
 namespace nix {
 
+PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && root)
+    : root(std::move(root))
+{
+    assert(root.empty() || root.is_absolute());
+    displayPrefix = root;
+}
+
+PosixSourceAccessor::PosixSourceAccessor()
+    : PosixSourceAccessor(std::filesystem::path {})
+{ }
+
+std::pair<PosixSourceAccessor, CanonPath> PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
+{
+    std::filesystem::path path2 = absPath(path.native());
+    return {
+        PosixSourceAccessor { path2.root_path() },
+        CanonPath { static_cast<std::string>(path2.relative_path()) },
+    };
+}
+
+std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
+{
+    return root.empty()
+        ? (std::filesystem::path { path.abs() })
+        : root / path.rel();
+}
+
 void PosixSourceAccessor::readFile(
     const CanonPath & path,
     Sink & sink,
@@ -13,9 +40,11 @@ void PosixSourceAccessor::readFile(
 {
     assertNoSymlinks(path);
 
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    auto ap = makeAbsPath(path);
+
+    AutoCloseFD fd = open(ap.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (!fd)
-        throw SysError("opening file '%1%'", path);
+        throw SysError("opening file '%1%'", ap.native());
 
     struct stat st;
     if (fstat(fd.get(), &st) == -1)
@@ -25,7 +54,7 @@ void PosixSourceAccessor::readFile(
 
     off_t left = st.st_size;
 
-    std::vector<unsigned char> buf(64 * 1024);
+    std::array<unsigned char, 64 * 1024> buf;
     while (left) {
         checkInterrupt();
         ssize_t rd = read(fd.get(), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
@@ -46,7 +75,7 @@ void PosixSourceAccessor::readFile(
 bool PosixSourceAccessor::pathExists(const CanonPath & path)
 {
     if (auto parent = path.parent()) assertNoSymlinks(*parent);
-    return nix::pathExists(path.abs());
+    return nix::pathExists(makeAbsPath(path));
 }
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
@@ -60,7 +89,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
     }
 
     std::optional<struct stat> st{std::in_place};
-    if (::lstat(path.c_str(), &*st)) {
+    if (::lstat(makeAbsPath(path).c_str(), &*st)) {
         if (errno == ENOENT || errno == ENOTDIR)
             st.reset();
         else
@@ -95,7 +124,7 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 {
     assertNoSymlinks(path);
     DirEntries res;
-    for (auto & entry : nix::readDirectory(path.abs())) {
+    for (auto & entry : nix::readDirectory(makeAbsPath(path))) {
         std::optional<Type> type;
         switch (entry.type) {
         case DT_REG: type = Type::tRegular; break;
@@ -110,12 +139,12 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 std::string PosixSourceAccessor::readLink(const CanonPath & path)
 {
     if (auto parent = path.parent()) assertNoSymlinks(*parent);
-    return nix::readLink(path.abs());
+    return nix::readLink(makeAbsPath(path));
 }
 
-std::optional<CanonPath> PosixSourceAccessor::getPhysicalPath(const CanonPath & path)
+std::optional<std::filesystem::path> PosixSourceAccessor::getPhysicalPath(const CanonPath & path)
 {
-    return path;
+    return makeAbsPath(path);
 }
 
 void PosixSourceAccessor::assertNoSymlinks(CanonPath path)

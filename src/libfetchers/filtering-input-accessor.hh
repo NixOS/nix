@@ -1,11 +1,12 @@
 #pragma once
 
 #include "input-accessor.hh"
+#include "source-path.hh"
 
 namespace nix {
 
 /**
- * A function that should throw an exception of type
+ * A function that returns an exception of type
  * `RestrictedPathError` explaining that access to `path` is
  * forbidden.
  */
@@ -70,6 +71,9 @@ struct AllowListInputAccessor : public FilteringInputAccessor
     using FilteringInputAccessor::FilteringInputAccessor;
 };
 
+/**
+ * A wrapping `InputAccessor` mix-in where `isAllowed()` caches the result of virtual `isAllowedUncached()`.
+ */
 struct CachingFilteringInputAccessor : FilteringInputAccessor
 {
     std::map<CanonPath, bool> cache;

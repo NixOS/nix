@@ -75,7 +75,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
 /**
  * Write to a `MemorySourceAccessor` at the given path
  */
-struct MemorySink : ParseSink
+struct MemorySink : FileSystemObjectSink
 {
     MemorySourceAccessor & dst;
 
@@ -83,17 +83,11 @@ struct MemorySink : ParseSink
 
     void createDirectory(const Path & path) override;
 
-    void createRegularFile(const Path & path) override;
-    void receiveContents(std::string_view data) override;
-    void isExecutable() override;
-    void closeRegularFile() override;
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) override;
 
     void createSymlink(const Path & path, const std::string & target) override;
-
-    void preallocateContents(uint64_t size) override;
-
-private:
-    MemorySourceAccessor::File::Regular * r;
 };
 
 }
