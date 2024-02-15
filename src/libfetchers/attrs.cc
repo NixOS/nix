@@ -104,4 +104,9 @@ std::map<std::string, std::string> attrsToQuery(const Attrs & attrs)
     return query;
 }
 
+Hash getRevAttr(const Attrs & attrs, const std::string & name)
+{
+    return Hash::parseAny(getStrAttr(attrs, name), HashAlgorithm::SHA1);
+}
+
 }
