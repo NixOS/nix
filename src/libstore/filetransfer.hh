@@ -75,28 +75,30 @@ struct FileTransferRequest
 
 struct FileTransferResult
 {
-    /*
+    /**
      * Whether this is a cache hit (i.e. the ETag supplied in the
      * request is still valid). If so, `data` is empty.
      */
     bool cached = false;
 
-    /*
+    /**
      * The ETag of the object.
      */
     std::string etag;
 
-    /*
+    /**
      * All URLs visited in the redirect chain.
      */
     std::vector<std::string> urls;
 
-    /* The response body. */
+    /**
+     * The response body.
+     */
     std::string data;
 
     uint64_t bodySize = 0;
 
-    /*
+    /**
      * An "immutable" URL for this resource (i.e. one whose contents
      * will never change), as returned by the `Link: <url>;
      * rel="immutable"` header.
