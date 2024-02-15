@@ -731,20 +731,61 @@ struct GitInputAccessor : InputAccessor
     /* Recursively look up 'path' relative to the root. */
     git_tree_entry * lookup(const CanonPath & path)
     {
-        if (path.isRoot()) return nullptr;
-
         auto i = lookupCache.find(path);
-        if (i == lookupCache.end()) {
-            TreeEntry entry;
-            if (auto err = git_tree_entry_bypath(Setter(entry), root.get(), std::string(path.rel()).c_str())) {
-                if (err != GIT_ENOTFOUND)
-                    throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
-            }
+        if (i != lookupCache.end()) return i->second.get();
 
-            i = lookupCache.emplace(path, std::move(entry)).first;
+        auto parent = path.parent();
+        if (!parent) return nullptr;
+
+        auto name = path.baseName().value();
+
+        auto parentTree = lookupTree(*parent);
+        if (!parentTree) return nullptr;
+
+        auto count = git_tree_entrycount(parentTree->get());
+
+        git_tree_entry * res = nullptr;
+
+        /* Add all the tree entries to the cache to speed up
+           subsequent lookups. */
+        for (size_t n = 0; n < count; ++n) {
+            auto entry = git_tree_entry_byindex(parentTree->get(), n);
+
+            TreeEntry copy;
+            if (git_tree_entry_dup(Setter(copy), entry))
+                throw Error("dupping tree entry: %s", git_error_last()->message);
+
+            auto entryName = std::string_view(git_tree_entry_name(entry));
+
+            if (entryName == name)
+                res = copy.get();
+
+            auto path2 = *parent;
+            path2.push(entryName);
+            lookupCache.emplace(path2, std::move(copy)).first->second.get();
         }
 
-        return &*i->second;
+        return res;
+    }
+
+    std::optional<Tree> lookupTree(const CanonPath & path)
+    {
+        if (path.isRoot()) {
+            Tree tree;
+            if (git_tree_dup(Setter(tree), root.get()))
+                throw Error("duplicating directory '%s': %s", showPath(path), git_error_last()->message);
+            return tree;
+        }
+
+        auto entry = lookup(path);
+        if (!entry || git_tree_entry_type(entry) != GIT_OBJECT_TREE)
+            return std::nullopt;
+
+        Tree tree;
+        if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(tree), *repo, entry))
+            throw Error("looking up directory '%s': %s", showPath(path), git_error_last()->message);
+
+        return tree;
     }
 
     git_tree_entry * need(const CanonPath & path)
