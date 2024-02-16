@@ -87,6 +87,11 @@ struct PathInputScheme : InputScheme
         writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
     }
 
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getNarHash();
+    }
+
     CanonPath getAbsPath(const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");

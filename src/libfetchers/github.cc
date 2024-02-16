@@ -280,6 +280,11 @@ struct GitArchiveInputScheme : InputScheme
         return {accessor, input};
     }
 
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
+    }
+
     std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;

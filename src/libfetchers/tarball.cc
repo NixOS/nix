@@ -260,6 +260,11 @@ struct CurlInputScheme : InputScheme
             url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
         return url;
     }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getNarHash();
+    }
 };
 
 struct FileInputScheme : CurlInputScheme

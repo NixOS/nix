@@ -365,6 +365,7 @@ LockedFlake lockFlake(
         std::map<InputPath, FlakeInput> overrides;
         std::set<InputPath> explicitCliOverrides;
         std::set<InputPath> overridesUsed, updatesUsed;
+        std::map<ref<Node>, StorePath> nodePaths;
 
         for (auto & i : lockFlags.inputOverrides) {
             overrides.insert_or_assign(i.first, FlakeInput { .ref = i.second });
@@ -535,11 +536,13 @@ LockedFlake lockFlake(
                             }
                         }
 
-                        computeLocks(
-                            mustRefetch
-                            ? getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath).inputs
-                            : fakeInputs,
-                            childNode, inputPath, oldLock, lockRootPath, parentPath, !mustRefetch);
+                        if (mustRefetch) {
+                            auto inputFlake = getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath);
+                            nodePaths.emplace(childNode, inputFlake.storePath);
+                            computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, lockRootPath, parentPath, false);
+                        } else {
+                            computeLocks(fakeInputs, childNode, inputPath, oldLock, lockRootPath, parentPath, true);
+                        }
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
@@ -584,6 +587,7 @@ LockedFlake lockFlake(
                                flake. Also, unless we already have this flake
                                in the top-level lock file, use this flake's
                                own lock file. */
+                            nodePaths.emplace(childNode, inputFlake.storePath);
                             computeLocks(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
@@ -596,10 +600,12 @@ LockedFlake lockFlake(
                         }
 
                         else {
-                            auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+                            auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                 state, *input.ref, useRegistries, flakeCache);
 
                             auto childNode = make_ref<LockedNode>(lockedRef, ref, false);
+
+                            nodePaths.emplace(childNode, storePath);
 
                             node->inputs.insert_or_assign(id, childNode);
                         }
@@ -614,6 +620,8 @@ LockedFlake lockFlake(
 
         // Bring in the current ref for relative path resolution if we have it
         auto parentPath = canonPath(state.store->toRealPath(flake.storePath) + "/" + flake.lockedRef.subdir, true);
+
+        nodePaths.emplace(newLockFile.root, flake.storePath);
 
         computeLocks(
             flake.inputs,
@@ -707,14 +715,6 @@ LockedFlake lockFlake(
                             flake.lockedRef.input.getRev() &&
                             prevLockedRef.input.getRev() != flake.lockedRef.input.getRev())
                             warn("committed new revision '%s'", flake.lockedRef.input.getRev()->gitRev());
-
-                        /* Make sure that we picked up the change,
-                           i.e. the tree should usually be dirty
-                           now. Corner case: we could have reverted from a
-                           dirty to a clean tree! */
-                        if (flake.lockedRef.input == prevLockedRef.input
-                            && !flake.lockedRef.input.isLocked())
-                            throw Error("'%s' did not change after I updated its 'flake.lock' file; is 'flake.lock' under version control?", flake.originalRef);
                     }
                 } else
                     throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
@@ -724,7 +724,11 @@ LockedFlake lockFlake(
             }
         }
 
-        return LockedFlake { .flake = std::move(flake), .lockFile = std::move(newLockFile) };
+        return LockedFlake {
+            .flake = std::move(flake),
+            .lockFile = std::move(newLockFile),
+            .nodePaths = std::move(nodePaths)
+        };
 
     } catch (Error & e) {
         e.addTrace({}, "while updating the lock file of flake '%s'", flake.lockedRef.to_string());
@@ -736,30 +740,48 @@ void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
 {
-    auto vLocks = state.allocValue();
-    auto vRootSrc = state.allocValue();
-    auto vRootSubdir = state.allocValue();
-    auto vTmp1 = state.allocValue();
-    auto vTmp2 = state.allocValue();
+    experimentalFeatureSettings.require(Xp::Flakes);
 
-    vLocks->mkString(lockedFlake.lockFile.to_string());
+    auto [lockFileStr, keyMap] = lockedFlake.lockFile.to_string();
 
-    emitTreeAttrs(
-        state,
-        lockedFlake.flake.storePath,
-        lockedFlake.flake.lockedRef.input,
-        *vRootSrc,
-        false,
-        lockedFlake.flake.forceDirty);
+    auto overrides = state.buildBindings(lockedFlake.nodePaths.size());
 
-    vRootSubdir->mkString(lockedFlake.flake.lockedRef.subdir);
+    for (auto & [node, storePath] : lockedFlake.nodePaths) {
+        auto override = state.buildBindings(2);
+
+        auto & vSourceInfo = override.alloc(state.symbols.create("sourceInfo"));
+
+        auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
+
+        emitTreeAttrs(
+            state,
+            storePath,
+            lockedNode ? lockedNode->lockedRef.input : lockedFlake.flake.lockedRef.input,
+            vSourceInfo,
+            false,
+            !lockedNode && lockedFlake.flake.forceDirty);
+
+        auto key = keyMap.find(node);
+        assert(key != keyMap.end());
+
+        override
+            .alloc(state.symbols.create("dir"))
+            .mkString(lockedNode ? lockedNode->lockedRef.subdir : lockedFlake.flake.lockedRef.subdir);
+
+        overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
+    }
+
+    auto & vOverrides = state.allocValue()->mkAttrs(overrides);
 
     auto vCallFlake = state.allocValue();
     state.evalFile(state.callFlakeInternal, *vCallFlake);
 
+    auto vTmp1 = state.allocValue();
+    auto vLocks = state.allocValue();
+    vLocks->mkString(lockFileStr);
     state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
-    state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
-    state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
+
+    state.callFunction(*vTmp1, vOverrides, vRes, noPos);
 }
 
 static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, Value & v)

@@ -103,6 +103,13 @@ struct LockedFlake
     Flake flake;
     LockFile lockFile;
 
+    /**
+     * Store paths of nodes that have been fetched in
+     * lockFlake(); in particular, the root node and the overriden
+     * inputs.
+     */
+    std::map<ref<Node>, StorePath> nodePaths;
+
     Fingerprint getFingerprint() const;
 };
 

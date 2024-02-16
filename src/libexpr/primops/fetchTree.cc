@@ -24,8 +24,6 @@ void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isLocked());
-
     auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
@@ -176,8 +174,8 @@ static void fetchTree(
             fetcher = "fetchGit";
 
         state.error<EvalError>(
-            "in pure evaluation mode, %s requires a locked input",
-            fetcher
+            "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
+            fetcher, input.to_string()
         ).atPos(pos).debugThrow();
     }
 

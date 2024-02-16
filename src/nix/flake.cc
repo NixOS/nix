@@ -224,7 +224,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
             j["path"] = store->printStorePath(flake.storePath);
-            j["locks"] = lockedFlake.lockFile.toJSON();
+            j["locks"] = lockedFlake.lockFile.toJSON().first;
             logger->cout("%s", j.dump());
         } else {
             logger->cout(
