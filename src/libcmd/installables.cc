@@ -655,7 +655,12 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         if (settings.printMissing)
             printMissing(store, pathsToBuild, lvlInfo);
 
-        for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
+        auto results = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
+
+        std::sort(results.begin(), results.end(),
+            [] (auto a, auto b) { return a.severity() > b.severity() && !a.errorMsg.empty(); });
+
+        for (auto & buildResult : results) {
             if (!buildResult.success())
                 buildResult.rethrow();
 
