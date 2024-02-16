@@ -739,6 +739,7 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
                 printClosureDiff(store,
                     store->followLinksToStorePath(prevGen->path),
                     store->followLinksToStorePath(gen.path),
+                    false,
                     "  ");
             }
 
