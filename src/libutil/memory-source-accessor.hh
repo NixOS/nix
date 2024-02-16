@@ -70,6 +70,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
     File * open(const CanonPath & path, std::optional<File> create);
 
     CanonPath addFile(CanonPath path, std::string && contents);
+    CanonPath addSymlink(CanonPath path, std::string && contents);
 };
 
 /**

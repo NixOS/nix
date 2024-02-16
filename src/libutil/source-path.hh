@@ -104,10 +104,19 @@ struct SourcePath
 
     /**
      * Resolve any symlinks in this `SourcePath` (including its
-     * parents). The result is a `SourcePath` in which no element is a
-     * symlink.
+     * parents).
+     *
+     * @return A `SourcePath` in which no element is a symlink.
      */
     SourcePath resolveSymlinks() const;
+
+    /**
+     * If this `SourcePath` is a symlink, resolve it, but do not resolve
+     * symlinks in its parent paths.
+     *
+     * @return A `SourcePath` in which the final element is not a symlink.
+     */
+    SourcePath followSymlinks() const;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);
