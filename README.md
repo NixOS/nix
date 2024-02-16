@@ -31,4 +31,4 @@ Check the [contributing guide](./CONTRIBUTING.md) if you want to get involved wi
 
 ## License
 
-Nix is released under the [LGPL v2.1](./COPYING).
+Nix is licensed under the [GNU Lesser General Public License v2.1 or later](./COPYING).
