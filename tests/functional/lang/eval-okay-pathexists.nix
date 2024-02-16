@@ -29,3 +29,6 @@ builtins.pathExists (./lib.nix)
 && builtins.pathExists (builtins.toPath { outPath = builtins.toString ./lib.nix; })
 && builtins.pathExists ./lib.nix
 && !builtins.pathExists ./bla.nix
+&& builtins.pathExists ./symlink-resolution/foo/overlays/overlay.nix
+&& builtins.pathExists ./symlink-resolution/broken
+&& builtins.pathExists (builtins.toString ./symlink-resolution/foo/overlays + "/.")
