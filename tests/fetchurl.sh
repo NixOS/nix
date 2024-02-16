@@ -60,7 +60,7 @@ hash=$(nix-hash --flat --type sha256 $nar)
 outPath=$(nix-build '<nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
-echo $outPath | grep -q 'xyzzy'
+echo $outPath | grepQuiet 'xyzzy'
 
 test -x $outPath/fetchurl.sh
 test -L $outPath/symlink

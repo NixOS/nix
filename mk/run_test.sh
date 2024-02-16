@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -u
+set -eu -o pipefail
 
 red=""
 green=""
@@ -15,8 +15,9 @@ if [ -t 1 ]; then
     normal="[m"
 fi
 (cd $(dirname $1) && env ${TESTS_ENVIRONMENT} init.sh 2>/dev/null > /dev/null)
-log="$(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) 2>&1)"
-status=$?
+
+log="$(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) 2>&1)" && status=0 || status=$?
+
 if [ $status -eq 0 ]; then
   echo "$post_run_msg [${green}PASS$normal]"
 elif [ $status -eq 99 ]; then

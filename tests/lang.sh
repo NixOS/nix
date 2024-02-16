@@ -2,9 +2,9 @@ source common.sh
 
 export TEST_VAR=foo # for eval-okay-getenv.nix
 
-nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>&1 | grep -q Hello
-(! nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grep -q Hello)
-nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' 2>&1 | grep -q Hello
+nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>&1 | grepQuiet Hello
+nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grepQuietInverse Hello
+expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' 2>&1 | grepQuiet Hello
 
 set +x
 

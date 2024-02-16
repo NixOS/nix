@@ -20,7 +20,7 @@ nix build -f dependencies.nix --dry-run 2>&1 | grep "will be built"
 
 # TODO: XXX: FIXME: #1793
 # Disable this part of the test until the problem is resolved:
-if [ -n "$ISSUE_1795_IS_FIXED" ]; then
+if [ -n "${ISSUE_1795_IS_FIXED-}" ]; then
 clearStore
 clearCache
 

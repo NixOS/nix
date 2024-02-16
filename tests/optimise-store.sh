@@ -26,7 +26,8 @@ if [ "$inode1" = "$inode3" ]; then
     exit 1
 fi
 
-nix-store --optimise
+# XXX: This should work through the daemon too
+NIX_REMOTE="" nix-store --optimise
 
 inode1="$(stat --format=%i $outPath1/foo)"
 inode3="$(stat --format=%i $outPath3/foo)"

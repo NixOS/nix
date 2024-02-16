@@ -31,7 +31,8 @@ nix_tests = \
   search.sh \
   nix-copy-ssh.sh \
   post-hook.sh \
-  function-trace.sh
+  function-trace.sh \
+  test-infra.sh \
   # parallel.sh
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
