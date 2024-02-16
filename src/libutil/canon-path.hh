@@ -21,9 +21,21 @@ namespace nix {
  *
  * - There are no components equal to '.' or '..'.
  *
- * Note that the path does not need to correspond to an actually
- * existing path, and there is no guarantee that symlinks are
- * resolved.
+ * `CanonPath` are "virtual" Nix paths for abstract file system objects;
+ * they are always Unix-style paths, regardless of what OS Nix is
+ * running on. The `/` root doesn't denote the ambient host file system
+ * root, but some virtual FS root.
+ *
+ * @note It might be useful to compare `openat(some_fd, "foo/bar")` on
+ * Unix. `"foo/bar"` is a relative path because an absolute path would
+ * "override" the `some_fd` directory file descriptor and escape to the
+ * "system root". Conversely, Nix's abstract file operations *never* escape the
+ * designated virtual file system (i.e. `SourceAccessor` or
+ * `ParseSink`), so `CanonPath` does not need an absolute/relative
+ * distinction.
+ *
+ * @note The path does not need to correspond to an actually existing
+ * path, and the path may or may not have unresolved symlinks.
  */
 class CanonPath
 {
