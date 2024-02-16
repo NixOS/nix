@@ -6,10 +6,25 @@ mkdir -p "$flakeDir"
 writeSimpleFlake "$flakeDir"
 cd "$flakeDir"
 
+# Check the flake reference that was produced.
+nix flake show --json > output.json
+nix eval --impure --expr '
+with builtins;
+let
+  flakeRef = parseFlakeRef (head (attrNames (fromJSON (readFile ./output.json))));
+  narHash = if match ".*darwin" currentSystem != null
+    then "sha256-MhmXWT9U41eDFezA02mAj3PxBO21icT5VvvPSC1epDU="
+    else "sha256-op9gWTEmDXergxx2PojSTrxVREG7NLcrhySSun3DQd0="
+  ;
+in
+assert flakeRef.narHash == narHash;
+assert flakeRef.type == "path";
+true
+'
 
 # By default: Only show the packages content for the current system and no
 # legacyPackages at all
-nix flake show --json > show-output.json
+nix flake show --json | jq 'to_entries[0].value' > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
@@ -20,7 +35,7 @@ true
 '
 
 # With `--all-systems`, show the packages for all systems
-nix flake show --json --all-systems > show-output.json
+nix flake show --json --all-systems | jq 'to_entries[0].value' > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
@@ -30,7 +45,7 @@ true
 '
 
 # With `--legacy`, show the legacy packages
-nix flake show --json --legacy > show-output.json
+nix flake show --json --legacy | jq 'to_entries[0].value' > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
@@ -57,7 +72,7 @@ cat >flake.nix <<EOF
   };
 }
 EOF
-nix flake show --json --all-systems > show-output.json
+nix flake show --json --all-systems | jq 'to_entries[0].value' > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
@@ -77,7 +92,7 @@ cat >flake.nix <<EOF
   };
 }
 EOF
-nix flake show --json --legacy --all-systems > show-output.json
+nix flake show --json --legacy --all-systems | jq 'to_entries[0].value' > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
