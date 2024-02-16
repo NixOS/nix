@@ -1,7 +1,7 @@
 # Garbage Collector Roots
 
 The roots of the garbage collector are all store paths to which there
-are symlinks in the directory `prefix/nix/var/nix/gcroots`. For
+are symlinks in the directory prefix `/nix/var/nix/gcroots`. For
 instance, the following command makes the path
 `/nix/store/d718ef...-foo` a root of the collector:
 
