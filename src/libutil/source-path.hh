@@ -11,6 +11,10 @@
 
 namespace nix {
 
+/**
+ * Note there is a decent chance this type soon goes away because the problem is solved another way.
+ * See the discussion in https://github.com/NixOS/nix/pull/9985.
+ */
 enum class SymlinkResolution {
     /**
      * Resolve symlinks in the ancestors only.
@@ -120,6 +124,9 @@ struct SourcePath
     /**
      * Resolve any symlinks in this `SourcePath` according to the
      * given resolution mode.
+     *
+     * @param mode might only be a temporary solution for this. 
+     * See the discussion in https://github.com/NixOS/nix/pull/9985.
      */
     SourcePath resolveSymlinks(
         SymlinkResolution mode = SymlinkResolution::Full) const;
