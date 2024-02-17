@@ -106,7 +106,7 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 ANY         .|\n
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
-FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
+FLOAT       (([0-9]+\.[0-9]*)|(\.[0-9]+))([Ee][+-]?[0-9]+)?
 PATH_CHAR   [a-zA-Z0-9\.\_\-\+]
 PATH        {PATH_CHAR}*(\/{PATH_CHAR}+)+\/?
 PATH_SEG    {PATH_CHAR}*\/
