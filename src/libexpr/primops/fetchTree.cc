@@ -138,6 +138,11 @@ static void fetchTree(
             attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
+        // fetchTree should fetch git repos with shallow = true by default
+        if (type == "git" && !params.isFetchGit && !attrs.contains("shallow")) {
+            attrs.emplace("shallow", Explicit<bool>{true});
+        }
+
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>(
@@ -321,6 +326,8 @@ static RegisterPrimOp primop_fetchTree({
 
         - `ref` (String, optional)
 
+          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
           A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
 
           Default: `"HEAD"`
@@ -334,8 +341,9 @@ static RegisterPrimOp primop_fetchTree({
         - `shallow` (Bool, optional)
 
           Make a shallow clone when fetching the Git tree.
+          When this is enabled, the options `ref` and `allRefs` have no effect anymore.
 
-          Default: `false`
+          Default: `true`
 
         - `submodules` (Bool, optional)
 
@@ -345,8 +353,11 @@ static RegisterPrimOp primop_fetchTree({
 
         - `allRefs` (Bool, optional)
 
-          If set to `true`, always fetch the entire repository, even if the latest commit is still in the cache.
-          Otherwise, only the latest commit is fetched if it is not already cached.
+          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
+          Whether to fetch all references (eg. branches and tags) of the repository.
+          With this argument being true, it's possible to load a `rev` from *any* `ref`.
+          (Without setting this option, only `rev`s from the specified `ref` are supported).
 
           Default: `false`
 
@@ -600,6 +611,8 @@ static RegisterPrimOp primop_fetchGit({
 
         [Git reference]: https://git-scm.com/book/en/v2/Git-Internals-Git-References
 
+        This option has no effect once `shallow` cloning is enabled.
+
         By default, the `ref` value is prefixed with `refs/heads/`.
         As of 2.3.0, Nix will not prefix `refs/heads/` if `ref` starts with `refs/`.
 
@@ -617,12 +630,14 @@ static RegisterPrimOp primop_fetchGit({
       - `shallow` (default: `false`)
 
         Make a shallow clone when fetching the Git tree.
-
+        When this is enabled, the options `ref` and `allRefs` have no effect anymore.
       - `allRefs`
 
-        Whether to fetch all references of the repository.
-        With this argument being true, it's possible to load a `rev` from *any* `ref`
+        Whether to fetch all references (eg. branches and tags) of the repository.
+        With this argument being true, it's possible to load a `rev` from *any* `ref`.
         (by default only `rev`s from the specified `ref` are supported).
+
+        This option has no effect once `shallow` cloning is enabled.
 
       - `verifyCommit` (default: `true` if `publicKey` or `publicKeys` are provided, otherwise `false`)
 
