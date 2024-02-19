@@ -301,7 +301,11 @@ struct FileInputScheme : CurlInputScheme
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
-        return {makeStorePathAccessor(store, file.storePath), input};
+        auto accessor = makeStorePathAccessor(store, file.storePath);
+
+        accessor->setPathDisplay("«" + input.to_string() + "»");
+
+        return {accessor, input};
     }
 };
 
