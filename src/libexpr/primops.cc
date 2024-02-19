@@ -115,7 +115,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     return res;
 }
 
-static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bool resolveSymlinks = true)
+static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full)
 {
     NixStringContext context;
 
@@ -127,7 +127,7 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bo
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
             path = {path.accessor, CanonPath(realPath)};
         }
-        return resolveSymlinks ? path.resolveSymlinks() : path;
+        return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -167,7 +167,7 @@ static void mkOutputString(
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath, false);
+    auto path = realisePath(state, pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
 #if 0
@@ -1529,12 +1529,15 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
     try {
         auto & arg = *args[0];
 
-        auto path = realisePath(state, pos, arg);
-
         /* SourcePath doesn't know about trailing slash. */
+        state.forceValue(arg, pos);
         auto mustBeDir = arg.type() == nString
             && (arg.string_view().ends_with("/")
                 || arg.string_view().ends_with("/."));
+
+        auto symlinkResolution =
+            mustBeDir ? SymlinkResolution::Full : SymlinkResolution::Ancestors;
+        auto path = realisePath(state, pos, arg, symlinkResolution);
 
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
@@ -1774,7 +1777,7 @@ static std::string_view fileTypeToString(InputAccessor::Type type)
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0], false);
+    auto path = realisePath(state, pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
     v.mkString(fileTypeToString(path.lstat().type));
 }

@@ -1,16 +1,25 @@
 #include "canon-path.hh"
-#include "file-system.hh"
+#include "util.hh"
+#include "file-path-impl.hh"
 
 namespace nix {
 
 CanonPath CanonPath::root = CanonPath("/");
 
+static std::string absPathPure(std::string_view path)
+{
+    return canonPathInner(path, [](auto &, auto &){});
+}
+
 CanonPath::CanonPath(std::string_view raw)
-    : path(absPath(raw, "/"))
+    : path(absPathPure(concatStrings("/", raw)))
 { }
 
 CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
-    : path(absPath(raw, root.abs()))
+    : path(absPathPure(
+        raw.size() > 0 && raw[0] == '/'
+            ? raw
+            : concatStrings(root.abs(), "/", raw)))
 { }
 
 CanonPath::CanonPath(const std::vector<std::string> & elems)
