@@ -14,6 +14,7 @@ test_fetch_file () {
         tree = builtins.fetchTree { type = "file"; url = "file://$PWD/test_input"; };
     in
     assert (tree.narHash == "$input_hash");
+    assert builtins.readFile tree == "foo\n";
     tree
 EOF
 }
