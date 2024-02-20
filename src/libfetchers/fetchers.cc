@@ -376,7 +376,7 @@ void InputScheme::clone(const Input & input, const Path & destDir) const
 std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
 {
     auto [accessor, input2] = getAccessor(store, input);
-    auto storePath = fetchToStore(*store, SourcePath(accessor), input2.getName());
+    auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, input2.getName());
     return {storePath, input2};
 }
 
