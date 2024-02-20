@@ -54,18 +54,19 @@ struct FilteringInputAccessor : InputAccessor
 };
 
 /**
- * A wrapping `InputAccessor` that checks paths against an allow-list.
+ * A wrapping `InputAccessor` that checks paths against a set of
+ * allowed prefixes.
  */
 struct AllowListInputAccessor : public FilteringInputAccessor
 {
     /**
-     * Grant access to the specified path.
+     * Grant access to the specified prefix.
      */
-    virtual void allowPath(CanonPath path) = 0;
+    virtual void allowPrefix(CanonPath prefix) = 0;
 
     static ref<AllowListInputAccessor> create(
         ref<InputAccessor> next,
-        std::set<CanonPath> && allowedPaths,
+        std::set<CanonPath> && allowedPrefixes,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringInputAccessor::FilteringInputAccessor;
