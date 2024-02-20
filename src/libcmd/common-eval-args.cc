@@ -9,6 +9,7 @@
 #include "store-api.hh"
 #include "command.hh"
 #include "tarball.hh"
+#include "fetch-to-store.hh"
 
 namespace nix {
 
@@ -167,8 +168,9 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
-        auto storePath = fetchers::downloadTarball(
-            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).storePath;
+        auto accessor = fetchers::downloadTarball(
+            EvalSettings::resolvePseudoUrl(s)).accessor;
+        auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
         return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }
 
