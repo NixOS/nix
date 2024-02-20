@@ -61,16 +61,16 @@ enum class ProcessLineResult {
      * program or evaluation (e.g., if the REPL was acting as the debugger)
      * should also exit.
      */
-    QuitAll,
+    Quit,
     /**
      * The user exited with `:continue`. The REPL should exit, but the program
      * should continue running.
      */
-    QuitOnce,
+    Continue,
     /**
      * The user did not exit. The REPL should request another line of input.
      */
-    Continue,
+    PromptAgain,
 };
 
 struct NixRepl
@@ -318,11 +318,11 @@ ReplExitStatus NixRepl::mainLoop()
         logger->resume();
         try {
             switch (processLine(input)) {
-                case ProcessLineResult::QuitAll:
+                case ProcessLineResult::Quit:
                     return ReplExitStatus::QuitAll;
-                case ProcessLineResult::QuitOnce:
-                    return ReplExitStatus::Continue;
                 case ProcessLineResult::Continue:
+                    return ReplExitStatus::Continue;
+                case ProcessLineResult::PromptAgain:
                     break;
                 default:
                     abort();
@@ -518,7 +518,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 {
     line = trim(line);
     if (line.empty())
-        return ProcessLineResult::Continue;
+        return ProcessLineResult::PromptAgain;
 
     _isInterrupted = false;
 
@@ -613,13 +613,13 @@ ProcessLineResult NixRepl::processLine(std::string line)
     else if (state->debugRepl && (command == ":s" || command == ":step")) {
         // set flag to stop at next DebugTrace; exit repl.
         state->debugStop = true;
-        return ProcessLineResult::QuitOnce;
+        return ProcessLineResult::Continue;
     }
 
     else if (state->debugRepl && (command == ":c" || command == ":continue")) {
         // set flag to run to next breakpoint or end of program; exit repl.
         state->debugStop = false;
-        return ProcessLineResult::QuitOnce;
+        return ProcessLineResult::Continue;
     }
 
     else if (command == ":a" || command == ":add") {
@@ -762,7 +762,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":q" || command == ":quit") {
         state->debugStop = false;
-        return ProcessLineResult::QuitAll;
+        return ProcessLineResult::Quit;
     }
 
     else if (command == ":doc") {
@@ -823,7 +823,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         }
     }
 
-    return ProcessLineResult::Continue;
+    return ProcessLineResult::PromptAgain;
 }
 
 void NixRepl::loadFile(const Path & path)
