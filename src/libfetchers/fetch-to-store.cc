@@ -33,12 +33,15 @@ StorePath fetchToStore(
     } else
         debug("source path '%s' is uncacheable", path);
 
-    Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", path));
+    auto readOnly = settings.readOnlyMode;
+
+    Activity act(*logger, lvlChatty, actUnknown,
+        fmt(readOnly ? "hashing '%s'" : "copying '%s' to the store", path));
 
     auto filter2 = filter ? *filter : defaultPathFilter;
 
     auto storePath =
-        settings.readOnlyMode
+        readOnly
         ? store.computeStorePath(
             name, *path.accessor, path.path, method, HashAlgorithm::SHA256, {}, filter2).first
         : store.addToStore(
