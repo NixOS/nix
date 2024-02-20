@@ -2,6 +2,7 @@
 #include "fs-input-accessor.hh"
 #include "input-accessor.hh"
 #include "filtering-input-accessor.hh"
+#include "memory-input-accessor.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -942,17 +943,21 @@ ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 ref<InputAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
+    /* In case of an empty workdir, return an empty in-memory tree. We
+       cannot use AllowListInputAccessor because it would return an
+       error for the root (and we can't add the root to the allow-list
+       since that would allow access to all its children). */
     ref<InputAccessor> fileAccessor =
-        AllowListInputAccessor::create(
-                makeFSInputAccessor(path),
-                std::set<CanonPath> { wd.files },
-                std::move(makeNotAllowedError));
-    if (exportIgnore) {
+        wd.files.empty()
+        ? makeEmptyInputAccessor()
+        : AllowListInputAccessor::create(
+            makeFSInputAccessor(path),
+            std::set<CanonPath> { wd.files },
+            std::move(makeNotAllowedError)).cast<InputAccessor>();
+    if (exportIgnore)
         return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor, std::nullopt);
-    }
-    else {
+    else
         return fileAccessor;
-    }
 }
 
 ref<GitFileSystemObjectSink> GitRepoImpl::getFileSystemObjectSink()

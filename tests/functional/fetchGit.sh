@@ -268,3 +268,28 @@ git -C "$repo" add hello .gitignore
 git -C "$repo" commit -m 'Bla1'
 cd "$repo"
 path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")
+
+# Test a workdir with no commits.
+empty="$TEST_ROOT/empty"
+git init "$empty"
+
+emptyAttrs='{ lastModified = 0; lastModifiedDate = "19700101000000"; narHash = "sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo="; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }'
+
+[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = $emptyAttrs ]]
+
+echo foo > "$empty/x"
+
+[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = $emptyAttrs ]]
+
+git -C "$empty" add x
+
+[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = '{ lastModified = 0; lastModifiedDate = "19700101000000"; narHash = "sha256-wzlAGjxKxpaWdqVhlq55q5Gxo4Bf860+kLeEa/v02As="; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }' ]]
+
+# Test a repo with an empty commit.
+git -C "$empty" rm -f x
+
+git -C "$empty" config user.email "foobar@example.com"
+git -C "$empty" config user.name "Foobar"
+git -C "$empty" commit --allow-empty --allow-empty-message --message ""
+
+nix eval --impure --expr "let attrs = builtins.fetchGit $empty; in assert attrs.lastModified != 0; assert attrs.rev != \"0000000000000000000000000000000000000000\"; assert attrs.revCount == 1; true"
