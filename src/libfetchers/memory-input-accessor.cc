@@ -20,4 +20,10 @@ ref<MemoryInputAccessor> makeMemoryInputAccessor()
     return make_ref<MemoryInputAccessorImpl>();
 }
 
+ref<InputAccessor> makeEmptyInputAccessor()
+{
+    static auto empty = makeMemoryInputAccessor().cast<InputAccessor>();
+    return empty;
+}
+
 }
