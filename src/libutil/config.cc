@@ -84,7 +84,9 @@ void AbstractConfig::reapplyUnknownSettings()
 void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (const auto & opt : _settings)
-        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden))
+        if (!opt.second.isAlias
+            && (!overriddenOnly || opt.second.setting->overridden)
+            && experimentalFeatureSettings.isEnabled(opt.second.setting->experimentalFeature))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
