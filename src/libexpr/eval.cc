@@ -507,13 +507,13 @@ EvalState::~EvalState()
 void EvalState::allowPath(const Path & path)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
-        rootFS2->allowPath(CanonPath(path));
+        rootFS2->allowPrefix(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
-        rootFS2->allowPath(CanonPath(store->toRealPath(storePath)));
+        rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)

@@ -51,33 +51,33 @@ void FilteringInputAccessor::checkAccess(const CanonPath & path)
 
 struct AllowListInputAccessorImpl : AllowListInputAccessor
 {
-    std::set<CanonPath> allowedPaths;
+    std::set<CanonPath> allowedPrefixes;
 
     AllowListInputAccessorImpl(
         ref<InputAccessor> next,
-        std::set<CanonPath> && allowedPaths,
+        std::set<CanonPath> && allowedPrefixes,
         MakeNotAllowedError && makeNotAllowedError)
         : AllowListInputAccessor(SourcePath(next), std::move(makeNotAllowedError))
-        , allowedPaths(std::move(allowedPaths))
+        , allowedPrefixes(std::move(allowedPrefixes))
     { }
 
     bool isAllowed(const CanonPath & path) override
     {
-        return path.isAllowed(allowedPaths);
+        return path.isAllowed(allowedPrefixes);
     }
 
-    void allowPath(CanonPath path) override
+    void allowPrefix(CanonPath prefix) override
     {
-        allowedPaths.insert(std::move(path));
+        allowedPrefixes.insert(std::move(prefix));
     }
 };
 
 ref<AllowListInputAccessor> AllowListInputAccessor::create(
     ref<InputAccessor> next,
-    std::set<CanonPath> && allowedPaths,
+    std::set<CanonPath> && allowedPrefixes,
     MakeNotAllowedError && makeNotAllowedError)
 {
-    return make_ref<AllowListInputAccessorImpl>(next, std::move(allowedPaths), std::move(makeNotAllowedError));
+    return make_ref<AllowListInputAccessorImpl>(next, std::move(allowedPrefixes), std::move(makeNotAllowedError));
 }
 
 bool CachingFilteringInputAccessor::isAllowed(const CanonPath & path)
