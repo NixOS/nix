@@ -138,6 +138,8 @@ DownloadTarballResult downloadTarball(
         cached.reset();
 
     if (cached && !cached->expired)
+        /* We previously downloaded this tarball and it's younger than
+           `tarballTtl`, so no need to check the server. */
         return attrsToResult(cached->infoAttrs);
 
     auto _res = std::make_shared<Sync<FileTransferResult>>();
@@ -165,6 +167,8 @@ DownloadTarballResult downloadTarball(
     Attrs infoAttrs;
 
     if (res->cached) {
+        /* The server says that the previously downloaded version is
+           still current. */
         infoAttrs = cached->infoAttrs;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
@@ -229,6 +233,11 @@ struct CurlInputScheme : InputScheme
             if (auto n = string2Int<uint64_t>(*i))
                 input.attrs.insert_or_assign("lastModified", *n);
 
+        /* The URL query parameters serve two roles: specifying fetch
+           settings for Nix itself, and arbitrary data as part of the
+           HTTP request. Now that we've processed the Nix-specific
+           attributes above, remove them so we don't also send them as
+           part of the HTTP request. */
         for (auto & param : allowedAttrs())
             url.query.erase(param);
 
@@ -288,6 +297,10 @@ struct FileInputScheme : CurlInputScheme
     {
         auto input(_input);
 
+        /* Unlike TarballInputScheme, this stores downloaded files in
+           the Nix store directly, since there is little deduplication
+           benefit in using the Git cache for single big files like
+           tarballs. */
         auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
 
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
