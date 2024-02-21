@@ -1,5 +1,6 @@
 #include "tarball.hh"
 #include "fetchers.hh"
+#include "fetch-settings.hh"
 #include "cache.hh"
 #include "filetransfer.hh"
 #include "globals.hh"
@@ -286,6 +287,33 @@ struct TarballInputScheme : CurlInputScheme
 {
     std::string_view schemeName() const override { return "tarball"; }
 
+    std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const
+    {
+        return std::make_pair("Authorization", fmt("Bearer %s", token));
+    }
+
+    std::optional<std::string> getAccessToken(const std::string & host) const
+    {
+        auto tokens = fetchSettings.accessTokens.get();
+        if (auto token = get(tokens, host))
+            return *token;
+        return {};
+    }
+
+    Headers makeHeadersWithAuthTokens(const std::string & host) const
+    {
+        Headers headers;
+        auto accessToken = getAccessToken(host);
+        if (accessToken) {
+            auto hdr = accessHeaderFromToken(*accessToken);
+            if (hdr)
+                headers.push_back(*hdr);
+            else
+                warn("Unrecognized access token for host '%s'", host);
+        }
+        return headers;
+    }
+
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
@@ -299,8 +327,9 @@ struct TarballInputScheme : CurlInputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
-        auto url = getStrAttr(input.attrs, "url");
-        auto result = downloadTarball(store, url, input.getName(), false);
+        auto url = parseURL(getStrAttr(input.attrs, "url"));
+        auto headers = makeHeadersWithAuthTokens(*url.authority);
+        auto result = downloadTarball(store, url.url, input.getName(), false, headers);
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);
