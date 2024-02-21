@@ -59,14 +59,15 @@ struct LockFile
 
     typedef std::map<ref<const Node>, std::string> KeyMap;
 
-    nlohmann::json toJSON() const;
+    std::pair<nlohmann::json, KeyMap> toJSON() const;
 
-    std::string to_string() const;
+    std::pair<std::string, KeyMap> to_string() const;
 
     static LockFile read(const Path & path);
 
     /**
-     * Check whether this lock file has any unlocked inputs.
+     * Check whether this lock file has any unlocked inputs. If so,
+     * return one.
      */
     std::optional<FlakeRef> isUnlocked() const;
 

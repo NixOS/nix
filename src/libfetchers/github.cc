@@ -280,6 +280,15 @@ struct GitArchiveInputScheme : InputScheme
         return {accessor, input};
     }
 
+    bool isLocked(const Input & input) const override
+    {
+        /* Since we can't verify the integrity of the tarball from the
+           Git revision alone, we also require a NAR hash for
+           locking. FIXME: in the future, we may want to require a Git
+           tree hash instead of a NAR hash. */
+        return input.getRev().has_value() && input.getNarHash().has_value();
+    }
+
     std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;

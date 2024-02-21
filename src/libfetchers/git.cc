@@ -737,8 +737,6 @@ struct GitInputScheme : InputScheme
             ? getLastModified(repoInfo, repoInfo.url, *repoInfo.workdirInfo.headRev)
             : 0);
 
-        input.locked = true; // FIXME
-
         return {accessor, std::move(input)};
     }
 
@@ -774,6 +772,11 @@ struct GitInputScheme : InputScheme
             return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
         else
             return std::nullopt;
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
     }
 };
 

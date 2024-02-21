@@ -1,8 +1,37 @@
-lockFileStr: rootSrc: rootSubdir:
+# This is a helper to callFlake() to lazily fetch flake inputs.
+
+# The contents of the lock file, in JSON format.
+lockFileStr:
+
+# A mapping of lock file node IDs to { sourceInfo, subdir } attrsets,
+# with sourceInfo.outPath providing an InputAccessor to a previously
+# fetched tree. This is necessary for possibly unlocked inputs, in
+# particular the root input, but also --override-inputs pointing to
+# unlocked trees.
+overrides:
 
 let
 
   lockFile = builtins.fromJSON lockFileStr;
+
+  # Resolve a input spec into a node name. An input spec is
+  # either a node name, or a 'follows' path from the root
+  # node.
+  resolveInput = inputSpec:
+    if builtins.isList inputSpec
+    then getInputByPath lockFile.root inputSpec
+    else inputSpec;
+
+  # Follow an input path (e.g. ["dwarffs" "nixpkgs"]) from the
+  # root node, returning the final node.
+  getInputByPath = nodeName: path:
+    if path == []
+    then nodeName
+    else
+      getInputByPath
+        # Since this could be a 'follows' input, call resolveInput.
+        (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
+        (builtins.tail path);
 
   allNodes =
     builtins.mapAttrs
@@ -10,11 +39,14 @@ let
         let
 
           sourceInfo =
-            if key == lockFile.root
-            then rootSrc
-            else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+            if overrides ? ${key}
+            then
+              overrides.${key}.sourceInfo
+            else
+              # FIXME: remove obsolete node.info.
+              fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
-          subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
+          subdir = overrides.${key}.dir or node.locked.dir or "";
 
           outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
 
@@ -23,25 +55,6 @@ let
           inputs = builtins.mapAttrs
             (inputName: inputSpec: allNodes.${resolveInput inputSpec})
             (node.inputs or {});
-
-          # Resolve a input spec into a node name. An input spec is
-          # either a node name, or a 'follows' path from the root
-          # node.
-          resolveInput = inputSpec:
-              if builtins.isList inputSpec
-              then getInputByPath lockFile.root inputSpec
-              else inputSpec;
-
-          # Follow an input path (e.g. ["dwarffs" "nixpkgs"]) from the
-          # root node, returning the final node.
-          getInputByPath = nodeName: path:
-            if path == []
-            then nodeName
-            else
-              getInputByPath
-                # Since this could be a 'follows' input, call resolveInput.
-                (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
-                (builtins.tail path);
 
           outputs = flake.outputs (inputs // { self = result; });
 

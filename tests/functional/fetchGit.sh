@@ -70,7 +70,7 @@ path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"
 [[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
 
 # But without a hash, it fails
-expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "fetchGit requires a locked input"
+expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' will not fetch unlocked input"
 
 # Fetch again. This should be cached.
 mv $repo ${repo}-tmp
@@ -211,7 +211,7 @@ path6=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; ur
 [[ $path3 = $path6 ]]
 [[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]
 
-expectStderr 1 nix eval --expr 'builtins.fetchTree { type = "git"; url = "file:///foo"; }' | grepQuiet "fetchTree requires a locked input"
+expectStderr 1 nix eval --expr 'builtins.fetchTree { type = "git"; url = "file:///foo"; }' | grepQuiet "'fetchTree' will not fetch unlocked input"
 
 # Explicit ref = "HEAD" should work, and produce the same outPath as without ref
 path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
