@@ -166,7 +166,7 @@ error: An existing package already provides the following file:
 
        To remove the existing package:
 
-         nix profile remove path:${flake1Dir}#packages.${system}.default
+         nix profile remove flake1
 
        The new package can also be installed next to the existing one by assigning a different priority.
        The conflicting packages have a priority of 5.
