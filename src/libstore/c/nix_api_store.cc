@@ -72,11 +72,9 @@ nix_err nix_store_get_version(nix_c_context * context, Store * store, char * des
         context->last_err_code = NIX_OK;
     try {
         auto res = store->ptr->getVersion();
-        if (res) {
-            return nix_export_std_string(context, *res, dest, n);
-        } else {
-            return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "store does not have a version");
-        }
+        if (!res)
+            res = "";
+        return nix_export_std_string(context, *res, dest, n);
     }
     NIXC_CATCH_ERRS
 }
