@@ -83,7 +83,7 @@ makeTest {
     # Tell the smuggler server that we're done
     machine.execute("echo done | ${pkgs.socat}/bin/socat - ABSTRACT-CONNECT:${socketName}")
 
-    # Check that the file was modified
+    # Check that the file was not modified
     machine.succeed(r"""
       cat ./result
       test "$(cat ./result)" = "hello, world"
