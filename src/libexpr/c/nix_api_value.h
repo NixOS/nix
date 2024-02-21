@@ -46,6 +46,8 @@ typedef struct EvalState EvalState;
  */
 typedef struct BindingsBuilder BindingsBuilder;
 
+typedef class ListBuilder ListBuilder;
+
 /** @brief PrimOp function
  * @ingroup primops
  *
@@ -73,7 +75,7 @@ typedef struct ExternalValue ExternalValue;
  * @param[in] args list of arguments. Note that these can be thunks and should be forced using nix_value_force before
  * use.
  * @param[out] ret return value
- * @see nix_alloc_primop, nix_set_primop
+ * @see nix_alloc_primop, nix_init_primop
  */
 typedef void (*PrimOpFun)(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret);
 
@@ -90,7 +92,7 @@ typedef void (*PrimOpFun)(void * user_data, nix_c_context * context, EvalState *
  * @param[in] doc optional, documentation for this primop
  * @param[in] user_data optional, arbitrary data, passed to the callback when it's called
  * @return primop, or null in case of errors
- * @see nix_set_primop
+ * @see nix_init_primop
  */
 PrimOp * nix_alloc_primop(
     nix_c_context * context,
@@ -162,6 +164,7 @@ bool nix_get_bool(nix_c_context * context, const Value * value);
  * @return NULL in case of error.
  */
 const char * nix_get_string(nix_c_context * context, const Value * value);
+
 /** @brief Get path as string
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
@@ -169,30 +172,35 @@ const char * nix_get_string(nix_c_context * context, const Value * value);
  * @return NULL in case of error.
  */
 const char * nix_get_path_string(nix_c_context * context, const Value * value);
+
 /** @brief Get the length of a list
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return length of list, error info via context
  */
 unsigned int nix_get_list_size(nix_c_context * context, const Value * value);
+
 /** @brief Get the element count of an attrset
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return attrset element count, error info via context
  */
 unsigned int nix_get_attrs_size(nix_c_context * context, const Value * value);
+
 /** @brief Get float value in 64 bits
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return float contents, error info via context
  */
 double nix_get_float(nix_c_context * context, const Value * value);
+
 /** @brief Get int value
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return int contents, error info via context
  */
 int64_t nix_get_int(nix_c_context * context, const Value * value);
+
 /** @brief Get external reference
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
@@ -210,6 +218,7 @@ ExternalValue * nix_get_external(nix_c_context * context, Value *);
  * @return value, NULL in case of errors
  */
 Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int ix);
+
 /** @brief Get an attr by name
  *
  * Owned by the GC. Use nix_gc_decref when you're done with the pointer
@@ -257,8 +266,9 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * sta
  * @return name, NULL in case of errors
  */
 const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i);
+
 /**@}*/
-/** @name Setters
+/** @name Initializers
  */
 /**@{*/
 /** @brief Set boolean value
@@ -267,66 +277,82 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
  * @param[in] b the boolean value
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_bool(nix_c_context * context, Value * value, bool b);
+nix_err nix_init_bool(nix_c_context * context, Value * value, bool b);
 /** @brief Set a string
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] str the string, copied
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_string(nix_c_context * context, Value * value, const char * str);
+nix_err nix_init_string(nix_c_context * context, Value * value, const char * str);
 /** @brief Set a path
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] str the path string, copied
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_path_string(nix_c_context * context, Value * value, const char * str);
+nix_err nix_init_path_string(nix_c_context * context, Value * value, const char * str);
 /** @brief Set a float
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] d the float, 64-bits
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_float(nix_c_context * context, Value * value, double d);
+nix_err nix_init_float(nix_c_context * context, Value * value, double d);
 /** @brief Set an int
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] i the int
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_int(nix_c_context * context, Value * value, int64_t i);
+
+nix_err nix_init_int(nix_c_context * context, Value * value, int64_t i);
 /** @brief Set null
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_null(nix_c_context * context, Value * value);
+
+nix_err nix_init_null(nix_c_context * context, Value * value);
 /** @brief Set an external value
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] val the external value to set. Will be GC-referenced by the value.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_external(nix_c_context * context, Value * value, ExternalValue * val);
-/** @brief Allocate a list
+nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue * val);
+
+/** @brief Create a list from a list builder
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
- * @param[in] size size of list
+ * @param[in] b list builder to use. Make sure to unref this afterwards.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, unsigned int size);
-/** @brief Manipulate a list by index
+nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, ListBuilder * b);
+
+/** @brief Create a list builder
+ * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
+ * @param[in] capacity how many bindings you'll add. Don't exceed.
+ * @return owned reference to a list builder. Make sure to unref when you're done.
+ */
+ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t capacity);
+
+/** @brief Insert bindings into a builder
+ * @param[out] context Optional, stores error information
+ * @param[in] builder ListBuilder to insert into
+ * @param[in] value value to insert
+ * @return error code, NIX_OK on success.
+ */
+nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * builder, Value * value);
+
+/** @brief Free a list builder
  *
- * Don't do this mid-computation.
- * @pre your list should be at least 'ix+1' items long
- * @param[out] context Optional, stores error information
- * @param[out] value Nix value to modify
- * @param[in] ix index to manipulate
- * @param[in] elem the value to set, will be gc-referenced by the value
- * @return error code, NIX_OK on success.
+ * Does not fail.
+ * @param[in] builder the builder to free
  */
-nix_err nix_set_list_byidx(nix_c_context * context, Value * value, unsigned int ix, Value * elem);
+void nix_list_builder_free(ListBuilder * builder);
+
 /** @brief Create an attribute set from a bindings builder
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
@@ -334,6 +360,7 @@ nix_err nix_set_list_byidx(nix_c_context * context, Value * value, unsigned int 
  * @return error code, NIX_OK on success.
  */
 nix_err nix_make_attrs(nix_c_context * context, Value * value, BindingsBuilder * b);
+
 /** @brief Set primop
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
@@ -341,7 +368,7 @@ nix_err nix_make_attrs(nix_c_context * context, Value * value, BindingsBuilder *
  * @see nix_alloc_primop
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_primop(nix_c_context * context, Value * value, PrimOp * op);
+nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * op);
 /** @brief Copy from another value
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
@@ -352,7 +379,6 @@ nix_err nix_copy_value(nix_c_context * context, Value * value, Value * source);
 /**@}*/
 
 /** @brief Create a bindings builder
-
 * @param[out] context Optional, stores error information
 * @param[in] state nix evaluator state
 * @param[in] capacity how many bindings you'll add. Don't exceed.
@@ -360,6 +386,7 @@ nix_err nix_copy_value(nix_c_context * context, Value * value, Value * source);
 done.
 */
 BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState * state, size_t capacity);
+
 /** @brief Insert bindings into a builder
  * @param[out] context Optional, stores error information
  * @param[in] builder BindingsBuilder to insert into
@@ -369,6 +396,7 @@ BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState *
  */
 nix_err
 nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * builder, const char * name, Value * value);
+
 /** @brief Free a bindings builder
  *
  * Does not fail.
