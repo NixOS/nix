@@ -7,6 +7,7 @@
 
 #include "tests/nix_api_store.hh"
 
+#include <cstdlib>
 #include <gtest/gtest.h>
 
 namespace nixC {
@@ -32,30 +33,75 @@ public:
 TEST_F(nix_api_value_test, nix_value_set_get_int)
 {
     int myInt = 1;
-    nix_set_int(nullptr, value, myInt);
+    nix_init_int(nullptr, value, myInt);
 
     ASSERT_EQ(myInt, nix_get_int(nullptr, value));
 }
 
-TEST_F(nix_api_value_test, nix_value_make_list)
+TEST_F(nix_api_value_test, nix_make_and_set_list)
 {
     int size = 10;
-    nix_make_list(nullptr, state, value, size);
-    ASSERT_EQ(size, nix_get_list_size(nullptr, value));
-}
-
-TEST_F(nix_api_value_test, nix_value_set_get_list)
-{
-    int size = 10;
-    nix_make_list(nullptr, state, value, size);
+    ListBuilder * builder = nix_make_list_builder(nullptr, state, size);
 
     Value * intValue = nix_alloc_value(nullptr, state);
-    nix_set_int(nullptr, intValue, 42);
-    nix_set_list_byidx(nullptr, value, 0, intValue);
+    nix_init_int(nullptr, intValue, 42);
+    nix_list_builder_insert(nullptr, builder, intValue);
+    nix_make_list(nullptr, state, value, builder);
+    nix_list_builder_free(builder);
 
     ASSERT_EQ(42, nix_get_int(nullptr, nix_get_list_byidx(nullptr, value, state, 0)));
+    ASSERT_EQ(1, nix_get_list_size(nullptr, value));
 
     // Clean up
     nix_gc_decref(nullptr, intValue);
 }
+
+TEST_F(nix_api_value_test, nix_make_attrs_t)
+{
+    int size = 10;
+    const char ** out_name = (const char **) malloc(sizeof(char *));
+
+    BindingsBuilder * builder = nix_make_bindings_builder(nullptr, state, size);
+
+    Value * intValue = nix_alloc_value(nullptr, state);
+    nix_init_int(nullptr, intValue, 42);
+
+    Value * stringValue = nix_alloc_value(nullptr, state);
+    nix_init_string(nullptr, stringValue, "foo");
+
+    nix_bindings_builder_insert(nullptr, builder, "a", intValue);
+    nix_bindings_builder_insert(nullptr, builder, "b", stringValue);
+    nix_make_attrs(nullptr, value, builder);
+    nix_bindings_builder_free(builder);
+
+    ASSERT_EQ(2, nix_get_attrs_size(nullptr, value));
+
+    Value * out_value = nix_get_attr_byname(nullptr, value, state, "a");
+    ASSERT_EQ(42, nix_get_int(nullptr, out_value));
+    nix_gc_decref(nullptr, out_value);
+
+    out_value = nix_get_attr_byidx(nullptr, value, state, 0, out_name);
+    ASSERT_EQ(42, nix_get_int(nullptr, out_value));
+    ASSERT_STREQ("a", *out_name);
+    nix_gc_decref(nullptr, out_value);
+
+    ASSERT_STREQ("a", nix_get_attr_name_byidx(nullptr, value, state, 0));
+
+    out_value = nix_get_attr_byname(nullptr, value, state, "b");
+    ASSERT_STREQ("foo", nix_get_string(nullptr, out_value));
+    nix_gc_decref(nullptr, out_value);
+
+    out_value = nix_get_attr_byidx(nullptr, value, state, 1, out_name);
+    ASSERT_STREQ("foo", nix_get_string(nullptr, out_value));
+    ASSERT_STREQ("b", *out_name);
+    nix_gc_decref(nullptr, out_value);
+
+    ASSERT_STREQ("b", nix_get_attr_name_byidx(nullptr, value, state, 1));
+
+    // Clean up
+    nix_gc_decref(nullptr, intValue);
+    nix_gc_decref(nullptr, stringValue);
+    free(out_name);
+}
+
 }

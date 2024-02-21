@@ -17,6 +17,32 @@
 #include "gc_cpp.h"
 #endif
 
+class ListBuilder
+{
+private:
+    std::vector<nix::Value *> values;
+
+public:
+    ListBuilder(size_t capacity)
+    {
+        values.reserve(capacity);
+    }
+
+    void push_back(nix::Value * value)
+    {
+        values.push_back(value);
+    }
+
+    Value * finish(nix::EvalState * state, nix::Value * list)
+    {
+        state->mkList(*list, values.size());
+        for (size_t n = 0; n < list->listSize(); ++n) {
+            list->listElems()[n] = values[n];
+        }
+        return list;
+    }
+};
+
 // Helper function to throw an exception if value is null
 static const nix::Value & check_value_not_null(const Value * value)
 {
@@ -334,7 +360,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_set_bool(nix_c_context * context, Value * value, bool b)
+nix_err nix_init_bool(nix_c_context * context, Value * value, bool b)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -346,7 +372,7 @@ nix_err nix_set_bool(nix_c_context * context, Value * value, bool b)
 }
 
 // todo string context
-nix_err nix_set_string(nix_c_context * context, Value * value, const char * str)
+nix_err nix_init_string(nix_c_context * context, Value * value, const char * str)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -357,7 +383,7 @@ nix_err nix_set_string(nix_c_context * context, Value * value, const char * str)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_path_string(nix_c_context * context, Value * value, const char * str)
+nix_err nix_init_path_string(nix_c_context * context, Value * value, const char * str)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -368,7 +394,7 @@ nix_err nix_set_path_string(nix_c_context * context, Value * value, const char *
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_float(nix_c_context * context, Value * value, double d)
+nix_err nix_init_float(nix_c_context * context, Value * value, double d)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -379,7 +405,7 @@ nix_err nix_set_float(nix_c_context * context, Value * value, double d)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_int(nix_c_context * context, Value * value, int64_t i)
+nix_err nix_init_int(nix_c_context * context, Value * value, int64_t i)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -390,7 +416,7 @@ nix_err nix_set_int(nix_c_context * context, Value * value, int64_t i)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_null(nix_c_context * context, Value * value)
+nix_err nix_init_null(nix_c_context * context, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -401,7 +427,7 @@ nix_err nix_set_null(nix_c_context * context, Value * value)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_external(nix_c_context * context, Value * value, ExternalValue * val)
+nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue * val)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -413,31 +439,52 @@ nix_err nix_set_external(nix_c_context * context, Value * value, ExternalValue *
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, unsigned int size)
+ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t capacity)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto builder = ListBuilder(capacity);
+        return new
+#if HAVE_BOEHMGC
+            (NoGC)
+#endif
+                ListBuilder{std::move(builder)};
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * builder, Value * value)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        builder->push_back((nix::Value *) value);
+    }
+    NIXC_CATCH_ERRS
+}
+
+void nix_list_builder_free(ListBuilder * bb)
+{
+#if HAVE_BOEHMGC
+    GC_FREE(bb);
+#else
+    delete bb;
+#endif
+}
+
+nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, ListBuilder * b)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        s->state.mkList(v, size);
+        b->finish(&(s->state), &v);
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_list_byidx(nix_c_context * context, Value * value, unsigned int ix, Value * elem)
-{
-    if (context)
-        context->last_err_code = NIX_OK;
-    try {
-        // todo: assert that this is a list
-        auto & v = check_value_not_null(value);
-        auto & e = check_value_not_null(elem);
-        v.listElems()[ix] = &e;
-    }
-    NIXC_CATCH_ERRS
-}
-
-nix_err nix_set_primop(nix_c_context * context, Value * value, PrimOp * p)
+nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * p)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -486,14 +533,14 @@ BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState *
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * b, const char * name, Value * value)
+nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * bb, const char * name, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        nix::Symbol s = b->builder.state.symbols.create(name);
-        b->builder.insert(s, &v);
+        nix::Symbol s = bb->builder.state.symbols.create(name);
+        bb->builder.insert(s, &v);
     }
     NIXC_CATCH_ERRS
 }
