@@ -93,6 +93,12 @@ struct GitRepo
     virtual void verifyCommit(
         const Hash & rev,
         const std::vector<fetchers::PublicKey> & publicKeys) = 0;
+
+    /**
+     * Given a Git tree hash, compute the hash of its NAR
+     * serialisation. This is memoised on-disk.
+     */
+    virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
 };
 
 ref<GitRepo> getTarballCache();

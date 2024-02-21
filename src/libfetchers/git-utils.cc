@@ -467,6 +467,22 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         else
             throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
     }
+
+    Hash treeHashToNarHash(const Hash & treeHash) override
+    {
+        auto accessor = getAccessor(treeHash, false);
+
+        fetchers::Attrs cacheKey({{"_what", "treeHashToNarHash"}, {"treeHash", treeHash.gitRev()}});
+
+        if (auto res = fetchers::getCache()->lookup(cacheKey))
+            return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), HashAlgorithm::SHA256);
+
+        auto narHash = accessor->hashPath(CanonPath::root);
+
+        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
+
+        return narHash;
+    }
 };
 
 ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare)

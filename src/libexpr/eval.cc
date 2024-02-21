@@ -2804,10 +2804,11 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
-            auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(value), "source", false).storePath;
+            auto accessor = fetchers::downloadTarball(
+                EvalSettings::resolvePseudoUrl(value)).accessor;
+            auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
             res = { store->toRealPath(storePath) };
-        } catch (FileTransferError & e) {
+        } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
             });
