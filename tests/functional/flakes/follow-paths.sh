@@ -2,7 +2,6 @@ source ./common.sh
 
 requireGit
 
-flake1Dir=$TEST_ROOT/flake1
 flakeFollowsA=$TEST_ROOT/follows/flakeA
 flakeFollowsB=$TEST_ROOT/follows/flakeA/flakeB
 flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
@@ -10,8 +9,6 @@ flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
 flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
 # Test following path flakerefs.
-createGitRepo $flake1Dir
-createSimpleGitFlake $flake1Dir
 createGitRepo $flakeFollowsA
 mkdir -p $flakeFollowsB
 mkdir -p $flakeFollowsC
