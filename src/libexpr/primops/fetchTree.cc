@@ -193,8 +193,8 @@ static void fetchTree(
             fetcher = "fetchGit";
 
         state.error<EvalError>(
-            "in pure evaluation mode, %s requires a locked input",
-            fetcher
+            "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
+            fetcher, input.to_string()
         ).atPos(pos).debugThrow();
     }
 
@@ -510,7 +510,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, name)
+        ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, FetchMode::Copy, name)
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     if (expectedHash) {

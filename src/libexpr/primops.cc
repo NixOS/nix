@@ -767,15 +767,6 @@ static RegisterPrimOp primop_break({
 
             auto & dt = state.debugTraces.front();
             state.runDebugRepl(&error, dt.env, dt.expr);
-
-            if (state.debugQuit) {
-                // If the user elects to quit the repl, throw an exception.
-                throw Error(ErrorInfo{
-                    .level = lvlInfo,
-                    .msg = HintFmt("quit the debugger"),
-                    .pos = nullptr,
-                });
-            }
         }
 
         // Return the value we were passed.
@@ -886,7 +877,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     /* increment state.trylevel, and decrement it when this function returns. */
     MaintainCount trylevel(state.trylevel);
 
-    void (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
+    ReplExitStatus (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
     if (state.debugRepl && evalSettings.ignoreExceptionsDuringTry)
     {
         /* to prevent starting the repl from exceptions withing a tryEval, null it. */
@@ -2244,7 +2235,14 @@ static void addPath(
         // store on-demand.
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = fetchToStore(*state.store, path.resolveSymlinks(), name, method, filter.get(), state.repair);
+            auto dstPath = fetchToStore(
+                *state.store,
+                path.resolveSymlinks(),
+                settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+                name,
+                method,
+                filter.get(),
+                state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.error<EvalError>(
                     "store path mismatch in (possibly filtered) path added from '%s'",

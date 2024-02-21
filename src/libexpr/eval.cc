@@ -3,6 +3,7 @@
 #include "hash.hh"
 #include "primops.hh"
 #include "print-options.hh"
+#include "shared.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -416,7 +417,6 @@ EvalState::EvalState(
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(nullptr)
     , debugStop(false)
-    , debugQuit(false)
     , trylevel(0)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
@@ -468,13 +468,13 @@ EvalState::~EvalState()
 void EvalState::allowPath(const Path & path)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
-        rootFS2->allowPath(CanonPath(path));
+        rootFS2->allowPrefix(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
-        rootFS2->allowPath(CanonPath(store->toRealPath(storePath)));
+        rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
@@ -793,7 +793,17 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     auto se = getStaticEnv(expr);
     if (se) {
         auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
-        (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
+        auto exitStatus = (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
+        switch (exitStatus) {
+            case ReplExitStatus::QuitAll:
+                if (error)
+                    throw *error;
+                throw Exit(0);
+            case ReplExitStatus::Continue:
+                break;
+            default:
+                abort();
+        }
     }
 }
 
@@ -2356,7 +2366,14 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            auto dstPath = fetchToStore(*store, path.resolveSymlinks(), path.baseName(), FileIngestionMethod::Recursive, nullptr, repair);
+            auto dstPath = fetchToStore(
+                *store,
+                path.resolveSymlinks(),
+                settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+                path.baseName(),
+                FileIngestionMethod::Recursive,
+                nullptr,
+                repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));

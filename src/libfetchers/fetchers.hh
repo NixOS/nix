@@ -193,6 +193,11 @@ struct InputScheme
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }
 
+    /**
+     * Return `true` if this input is considered "locked", i.e. it has
+     * attributes like a Git revision or NAR hash that uniquely
+     * identify its contents.
+     */
     virtual bool isLocked(const Input & input) const
     { return false; }
 

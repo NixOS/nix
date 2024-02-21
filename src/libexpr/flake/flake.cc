@@ -581,13 +581,13 @@ LockedFlake lockFlake(
                             auto inputFlake = getInputFlake();
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(inputFlake.inputs, childNode, inputPath, oldLock, followsPrefix,
-                                inputFlake.path, !mustRefetch);
+                                inputFlake.path, false);
                         } else {
                              // FIXME: sourcePath is wrong here, we
                              // should pass a lambda that lazily
                              // fetches the parent flake if needed
                              // (i.e. getInputFlake()).
-                            computeLocks(fakeInputs, childNode, inputPath, oldLock, followsPrefix, sourcePath, !mustRefetch);
+                            computeLocks(fakeInputs, childNode, inputPath, oldLock, followsPrefix, sourcePath, true);
                         }
 
                     } else {

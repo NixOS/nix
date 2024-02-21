@@ -172,7 +172,7 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
             auto [accessor, input2] = getAccessor(store);
-            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), input2.getName());
+            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, input2.getName());
             return {storePath, input2};
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());

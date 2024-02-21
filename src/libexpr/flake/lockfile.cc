@@ -109,7 +109,7 @@ LockFile::LockFile(std::string_view contents, std::string_view path)
                 std::string inputKey = i.value();
                 auto k = nodeMap.find(inputKey);
                 if (k == nodeMap.end()) {
-                    auto nodes = json["nodes"];
+                    auto & nodes = json["nodes"];
                     auto jsonNode2 = nodes.find(inputKey);
                     if (jsonNode2 == nodes.end())
                         throw Error("lock file references missing node '%s'", inputKey);

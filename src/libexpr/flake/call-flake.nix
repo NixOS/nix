@@ -42,7 +42,8 @@ let
 
           sourceInfo =
             if overrides ? ${key}
-            then overrides.${key}.sourceInfo
+            then
+              overrides.${key}.sourceInfo
             else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/"
             then
               parentNode.sourceInfo // {

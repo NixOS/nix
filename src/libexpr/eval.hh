@@ -11,6 +11,7 @@
 #include "experimental-features.hh"
 #include "input-accessor.hh"
 #include "search-path.hh"
+#include "repl-exit-status.hh"
 
 #include <map>
 #include <optional>
@@ -225,9 +226,8 @@ public:
     /**
      * Debugger
      */
-    void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
+    ReplExitStatus (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
-    bool debugQuit;
     int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
@@ -779,7 +779,6 @@ struct DebugTraceStacker {
     DebugTraceStacker(EvalState & evalState, DebugTrace t);
     ~DebugTraceStacker()
     {
-        // assert(evalState.debugTraces.front() == trace);
         evalState.debugTraces.pop_front();
     }
     EvalState & evalState;
