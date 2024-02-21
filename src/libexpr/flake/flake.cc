@@ -327,10 +327,10 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
 
-    auto flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, {}, {}));
+    auto flake = getFlake(state, topRef, useRegistries, {}, {});
 
     if (lockFlags.applyNixConfig) {
-        flake->config.apply();
+        flake.config.apply();
         state.store->setOptions();
     }
 
@@ -341,7 +341,7 @@ LockedFlake lockFlake(
 
         auto oldLockFile = readLockFile(
             lockFlags.referenceLockFilePath.value_or(
-                flake->lockFilePath()));
+                flake.lockFilePath()));
 
         debug("old lock file: %s", oldLockFile);
 
@@ -359,7 +359,7 @@ LockedFlake lockFlake(
                     // (e.g. `--override-input B/C "path:./foo/bar"`)
                     // are interpreted relative to the top-level
                     // flake.
-                    flake->path,
+                    flake.path,
                     std::nullopt));
             explicitCliOverrides.insert(i.first);
         }
@@ -670,15 +670,15 @@ LockedFlake lockFlake(
             }
         };
 
-        nodePaths.emplace(newLockFile.root, flake->path.parent());
+        nodePaths.emplace(newLockFile.root, flake.path.parent());
 
         computeLocks(
-            flake->inputs,
+            flake.inputs,
             newLockFile.root,
             {},
             lockFlags.recreateLockFile ? nullptr : oldLockFile.root.get_ptr(),
             {},
-            flake->path,
+            flake.path,
             false);
 
         for (auto & i : lockFlags.inputOverrides)
@@ -715,16 +715,16 @@ LockedFlake lockFlake(
                             throw Error("'--commit-lock-file' and '--output-lock-file' are incompatible");
                         writeFile(*lockFlags.outputLockFilePath, newLockFileS);
                     } else {
-                        bool lockFileExists = flake->lockFilePath().pathExists();
+                        bool lockFileExists = flake.lockFilePath().pathExists();
 
                         if (lockFileExists) {
                             auto s = chomp(diff);
                             if (s.empty())
-                                warn("updating lock file '%s'", flake->lockFilePath());
+                                warn("updating lock file '%s'", flake.lockFilePath());
                             else
-                                warn("updating lock file '%s':\n%s", flake->lockFilePath(), s);
+                                warn("updating lock file '%s':\n%s", flake.lockFilePath(), s);
                         } else
-                            warn("creating lock file '%s'", flake->lockFilePath());
+                            warn("creating lock file '%s'", flake.lockFilePath());
 
                         std::optional<std::string> commitMessage = std::nullopt;
 
@@ -734,7 +734,7 @@ LockedFlake lockFlake(
                             cm = fetchSettings.commitLockFileSummary.get();
 
                             if (cm == "") {
-                                cm = fmt("%s: %s", flake->lockFilePath().path.rel(), lockFileExists ? "Update" : "Add");
+                                cm = fmt("%s: %s", flake.lockFilePath().path.rel(), lockFileExists ? "Update" : "Add");
                             }
 
                             cm += "\n\nFlake lock file updates:\n\n";
@@ -742,35 +742,34 @@ LockedFlake lockFlake(
                             commitMessage = cm;
                         }
 
-                        topRef.input.putFile(flake->lockFilePath().path, newLockFileS, commitMessage);
+                        topRef.input.putFile(flake.lockFilePath().path, newLockFileS, commitMessage);
 
                         /* Rewriting the lockfile changed the top-level
                            repo, so we should re-read it. FIXME: we could
                            also just clear the 'rev' field... */
-                        auto prevLockedRef = flake->lockedRef;
-                        flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries));
+                        auto prevLockedRef = flake.lockedRef;
+                        flake = getFlake(state, topRef, useRegistries);
 
                         if (lockFlags.commitLockFile &&
-                            flake->lockedRef.input.getRev() &&
-                            prevLockedRef.input.getRev() != flake->lockedRef.input.getRev())
-                            warn("committed new revision '%s'", flake->lockedRef.input.getRev()->gitRev());
+                            flake.lockedRef.input.getRev() &&
+                            prevLockedRef.input.getRev() != flake.lockedRef.input.getRev())
+                            warn("committed new revision '%s'", flake.lockedRef.input.getRev()->gitRev());
                     }
                 }
             } else {
                 warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
-                flake->forceDirty = true;
+                flake.forceDirty = true;
             }
         }
 
         return LockedFlake {
-            .flake = std::move(*flake),
+            .flake = std::move(flake),
             .lockFile = std::move(newLockFile),
             .nodePaths = std::move(nodePaths)
         };
 
     } catch (Error & e) {
-        if (flake)
-            e.addTrace({}, "while updating the lock file of flake '%s'", flake->lockedRef.to_string());
+        e.addTrace({}, "while updating the lock file of flake '%s'", flake.lockedRef.to_string());
         throw;
     }
 }
