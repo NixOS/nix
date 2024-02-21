@@ -125,7 +125,8 @@ nix_err nix_store_build(
     void (*callback)(void * userdata, const char * outname, const char * out));
 
 /**
- * @brief get the version of a nix store
+ * @brief get the version of a nix store.
+ * If the store doesn't have a version (like the dummy store), returns an empty string.
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
  * @param[out] dest The allocated area to write the string to.

@@ -64,6 +64,11 @@ TEST_F(nix_api_util_context, nix_store_open_dummy)
     Store * store = nix_store_open(ctx, "dummy://", nullptr);
     ASSERT_EQ(NIX_OK, ctx->last_err_code);
     ASSERT_STREQ("dummy", store->ptr->getUri().c_str());
+
+    char value[256];
+    nix_store_get_version(ctx, store, value, 256);
+    ASSERT_STREQ("", value);
+
     nix_store_unref(store);
 }
 
