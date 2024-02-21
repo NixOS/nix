@@ -128,8 +128,15 @@ struct EvalSettings : Config
     Setting<unsigned int> maxCallDepth{this, 10000, "max-call-depth",
         "The maximum function call depth to allow before erroring."};
 
-    Setting<bool> builtinsTraceDebugger{this, false, "builtins-trace-debugger",
-        "Whether to enter the debugger on `builtins.trace` calls."};
+    Setting<bool> builtinsTraceDebugger{this, false, "debugger-on-trace",
+        R"(
+          If set to true and the `--debugger` flag is given,
+          [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace) will
+          enter the debugger like
+          [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+
+          This is useful for debugging warnings in third-party Nix code.
+        )"};
 };
 
 extern EvalSettings evalSettings;
