@@ -196,19 +196,25 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
 
 print STDERR "creating multi-platform docker manifest...\n";
 system("docker manifest rm nixos/nix:$version");
+system("docker manifest rm ghcr.io/nixos/nix:$version");
 system("docker manifest create nixos/nix:$version $dockerManifest") == 0 or die;
+system("docker tag nixos/nix:$version ghcr.io/nixos/nix:$version") == 0 or die;
 if ($isLatest) {
     print STDERR "creating latest multi-platform docker manifest...\n";
     system("docker manifest rm nixos/nix:latest");
+    system("docker manifest rm ghcr.io/nixos/nix:latest");
     system("docker manifest create nixos/nix:latest $dockerManifestLatest") == 0 or die;
+    system("docker tag nixos/nix:latest ghcr.io/nixos/nix:latest") == 0 or die;
 }
 
 print STDERR "pushing multi-platform docker manifest...\n";
 system("docker manifest push nixos/nix:$version") == 0 or die;
+system("docker manifest push ghcr.io/nixos/nix:$version") == 0 or die;
 
 if ($isLatest) {
     print STDERR "pushing latest multi-platform docker manifest...\n";
     system("docker manifest push nixos/nix:latest") == 0 or die;
+    system("docker manifest push ghcr.io/nixos/nix:latest") == 0 or die;
 }
 
 # Upload nix-fallback-paths.nix.
