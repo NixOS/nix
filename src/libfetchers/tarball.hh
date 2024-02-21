@@ -36,6 +36,10 @@ struct DownloadTarballResult
     ref<InputAccessor> accessor;
 };
 
+/**
+ * Download and import a tarball into the Git cache. The result is the
+ * Git tree hash of the root directory.
+ */
 DownloadTarballResult downloadTarball(
     const std::string & url,
     const Headers & headers = {});

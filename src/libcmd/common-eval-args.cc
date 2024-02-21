@@ -10,6 +10,7 @@
 #include "command.hh"
 #include "fs-input-accessor.hh"
 #include "tarball.hh"
+#include "fetch-to-store.hh"
 
 namespace nix {
 
