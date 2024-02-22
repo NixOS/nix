@@ -200,6 +200,13 @@ struct ProfileManifest
         addElement(name, std::move(element));
     }
 
+    bool insertElement(ProfileElement element)
+    {
+        auto name = getNameFromElement(element);
+        auto [iterator, inserted] = elements.insert({name, std::move(element)});
+        return inserted;
+    }
+
     nlohmann::json toJSON(Store & store) const
     {
         auto es = nlohmann::json::object();
@@ -393,7 +400,15 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
             element.updateStorePaths(getEvalStore(), store, res);
 
-            manifest.addElement(std::move(element));
+            if (!manifest.insertElement(element)) {
+                std::string name = getNameFromElement(element);
+                throw Error(
+                    "Package '%s' is already in the profile.\n"
+                    "Remove the package first using 'nix profile remove %s'.",
+                    name,
+                    name
+                );
+            }
         }
 
         try {

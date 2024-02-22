@@ -95,10 +95,9 @@ nix profile install $(nix-build --no-out-link ./simple.nix)
 # Test packages with same name from different sources
 mkdir $TEST_ROOT/simple-too
 cp ./simple.nix ./config.nix simple.builder.sh $TEST_ROOT/simple-too
-nix profile install --file $TEST_ROOT/simple-too/simple.nix ''
-nix profile list | grep -A4 'Name:.*simple' | grep 'Name:.*simple-1'
+expect 1 nix profile install --file $TEST_ROOT/simple-too/simple.nix ''
+[[ $(nix profile list | grep 'Name:.*simple' | wc -l) -eq 1 ]]
 nix profile remove simple 2>&1 | grep 'removed 1 packages'
-nix profile remove simple-1 2>&1 | grep 'removed 1 packages'
 
 # Test wipe-history.
 nix profile wipe-history
@@ -149,6 +148,20 @@ printf World2 > $flake2Dir/who
 
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
+
+# Installing the same package twice should fail.
+expect 1 nix profile install $flake1Dir
+diff -u <(
+    nix profile install $flake1Dir 2>&1 \
+        | grep -vE "^warning: " \
+        || true
+) <(cat << EOF
+error: Package 'flake1' is already in the profile.
+       Remove the package first using 'nix profile remove flake1'.
+EOF
+)
+
+# Installing a different package with conflicting files should fail.
 expect 1 nix profile install $flake2Dir
 diff -u <(
     nix --offline profile install $flake2Dir 2>&1 1> /dev/null \
@@ -182,6 +195,7 @@ EOF
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
 nix profile install $flake2Dir --priority 100
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
+nix profile remove flake2
 nix profile install $flake2Dir --priority 0
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World2" ]]
 # nix profile install $flake1Dir --priority 100
@@ -191,7 +205,7 @@ nix profile install $flake2Dir --priority 0
 # flake references.
 # Regression test for https://github.com/NixOS/nix/issues/8284
 clearProfiles
-nix profile install $(nix build $flake1Dir --no-link --print-out-paths)
+nix profile install $(nix build $flake1Dir^out --no-link --print-out-paths)
 expect 1 nix profile install --impure --expr "(builtins.getFlake ''$flake2Dir'').packages.$system.default"
 
 # Test upgrading from profile version 2.
