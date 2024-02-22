@@ -78,13 +78,23 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .tag = Xp::FetchTree,
         .name = "fetch-tree",
         .description = R"(
-            Enable the use of the [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) built-in function in the Nix language.
-
-            `fetchTree` exposes a generic interface for fetching remote file system trees from different types of remote sources.
-            The [`flakes`](#xp-feature-flakes) feature flag always enables `fetch-tree`.
-            This built-in was previously guarded by the `flakes` experimental feature because of that overlap.
-
-            Enabling just this feature serves as a "release candidate", allowing users to try it out in isolation.
+            Backwards-compatibility alias for
+            [fetch-tree-git](#xp-feature-fetch-tree-git) and
+            [fetch-tree-urls](#xp-feature-fetch-tree-urls).
+        )",
+    },
+    {
+        .tag = Xp::FetchTreeGit,
+        .name = "fetch-tree-git",
+        .description = R"(
+            Enable the use of the `git` [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) fetcher.
+        )",
+    },
+    {
+        .tag = Xp::FetchTreeUrls,
+        .name = "fetch-tree-urls",
+        .description = R"(
+            Enable the use of the [URL-like syntax](@docroot@/command-ref/new-cli/nix3-flake.html#url-like-syntax) in [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree).
         )",
     },
     {
