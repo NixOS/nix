@@ -44,13 +44,13 @@ To build Nix itself in this shell:
 ```console
 [nix-shell]$ autoreconfPhase
 [nix-shell]$ configurePhase
-[nix-shell]$ make -j $NIX_BUILD_CORES
+[nix-shell]$ make -j $NIX_BUILD_CORES OPTIMIZE=0
 ```
 
 To install it in `$(pwd)/outputs` and test it:
 
 ```console
-[nix-shell]$ make install
+[nix-shell]$ make install OPTIMIZE=0
 [nix-shell]$ make installcheck check -j $NIX_BUILD_CORES
 [nix-shell]$ nix --version
 nix (Nix) 2.12

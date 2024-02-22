@@ -9,6 +9,7 @@
 #include "tarball.hh"
 #include "url.hh"
 #include "value-to-json.hh"
+#include "fetch-to-store.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -24,8 +25,6 @@ void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isLocked());
-
     auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
@@ -176,8 +175,8 @@ static void fetchTree(
             fetcher = "fetchGit";
 
         state.error<EvalError>(
-            "in pure evaluation mode, %s requires a locked input",
-            fetcher
+            "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
+            fetcher, input.to_string()
         ).atPos(pos).debugThrow();
     }
 
@@ -473,7 +472,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
+        ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, FetchMode::Copy, name)
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     if (expectedHash) {

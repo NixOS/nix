@@ -45,12 +45,8 @@ static void fixupInput(Input & input)
     // Check common attributes.
     input.getType();
     input.getRef();
-    if (input.getRev())
-        input.locked = true;
     input.getRevCount();
     input.getLastModified();
-    if (input.getNarHash())
-        input.locked = true;
 }
 
 Input Input::fromURL(const ParsedURL & url, bool requireTree)
@@ -140,6 +136,11 @@ bool Input::isDirect() const
     return !scheme || scheme->isDirect(*this);
 }
 
+bool Input::isLocked() const
+{
+    return scheme && scheme->isLocked(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;
@@ -221,8 +222,6 @@ std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
                 input.to_string(), *prevRevCount);
     }
-
-    input.locked = true;
 
     return {std::move(storePath), input};
 }
@@ -376,7 +375,7 @@ void InputScheme::clone(const Input & input, const Path & destDir) const
 std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
 {
     auto [accessor, input2] = getAccessor(store, input);
-    auto storePath = fetchToStore(*store, SourcePath(accessor), input2.getName());
+    auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, input2.getName());
     return {storePath, input2};
 }
 

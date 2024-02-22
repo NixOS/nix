@@ -41,6 +41,24 @@ namespace nix {
         }
     }
 
+    TEST(CanonPath, from_existing) {
+        CanonPath p0("foo//bar/");
+        {
+            CanonPath p("/baz//quux/", p0);
+            ASSERT_EQ(p.abs(), "/baz/quux");
+            ASSERT_EQ(p.rel(), "baz/quux");
+            ASSERT_EQ(*p.baseName(), "quux");
+            ASSERT_EQ(*p.dirOf(), "/baz");
+        }
+        {
+            CanonPath p("baz//quux/", p0);
+            ASSERT_EQ(p.abs(), "/foo/bar/baz/quux");
+            ASSERT_EQ(p.rel(), "foo/bar/baz/quux");
+            ASSERT_EQ(*p.baseName(), "quux");
+            ASSERT_EQ(*p.dirOf(), "/foo/bar/baz");
+        }
+    }
+
     TEST(CanonPath, pop) {
         CanonPath p("foo/bar/x");
         ASSERT_EQ(p.abs(), "/foo/bar/x");

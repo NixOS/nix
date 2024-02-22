@@ -408,6 +408,4 @@ PrintFreed::~PrintFreed()
             showBytes(results.bytesFreed));
 }
 
-Exit::~Exit() { }
-
 }

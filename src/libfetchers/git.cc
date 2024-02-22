@@ -158,6 +158,8 @@ std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 
 }  // end namespace
 
+static const Hash nullRev{HashAlgorithm::SHA1};
+
 struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
@@ -708,10 +710,12 @@ struct GitInputScheme : InputScheme
             if (auto ref = repo->getWorkdirRef())
                 input.attrs.insert_or_assign("ref", *ref);
 
-            auto rev = repoInfo.workdirInfo.headRev.value();
+            /* Return a rev of 000... if there are no commits yet. */
+            auto rev = repoInfo.workdirInfo.headRev.value_or(nullRev);
 
             input.attrs.insert_or_assign("rev", rev.gitRev());
-            input.attrs.insert_or_assign("revCount", getRevCount(repoInfo, repoInfo.url, rev));
+            input.attrs.insert_or_assign("revCount",
+                rev == nullRev ? 0 : getRevCount(repoInfo, repoInfo.url, rev));
 
             verifyCommit(input, repo);
         } else {
@@ -732,8 +736,6 @@ struct GitInputScheme : InputScheme
             repoInfo.workdirInfo.headRev
             ? getLastModified(repoInfo, repoInfo.url, *repoInfo.workdirInfo.headRev)
             : 0);
-
-        input.locked = true; // FIXME
 
         return {accessor, std::move(input)};
     }
@@ -770,6 +772,11 @@ struct GitInputScheme : InputScheme
             return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
         else
             return std::nullopt;
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
     }
 };
 

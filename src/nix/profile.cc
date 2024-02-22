@@ -400,13 +400,13 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             //       See https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
             auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
                 for (auto it = begin; it != end; it++) {
-                    auto & profileElement = it->second;
+                    auto & [name, profileElement] = *it;
                     for (auto & storePath : profileElement.storePaths) {
                         if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
-                            return std::pair(conflictError.fileA, profileElement.toInstallables(*store));
+                            return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
                         }
                         if (conflictError.fileB.starts_with(store->printStorePath(storePath))) {
-                            return std::pair(conflictError.fileB, profileElement.toInstallables(*store));
+                            return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
                         }
                     }
                 }
@@ -415,9 +415,9 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             // There are 2 conflicting files. We need to find out which one is from the already installed package and
             // which one is the package that is the new package that is being installed.
             // The first matching package is the one that was already installed (original).
-            auto [originalConflictingFilePath, originalConflictingRefs] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+            auto [originalConflictingFilePath, originalEntryName, originalConflictingRefs] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
             // The last matching package is the one that was going to be installed (new).
-            auto [newConflictingFilePath, newConflictingRefs] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+            auto [newConflictingFilePath, newEntryName, newConflictingRefs] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
 
             throw Error(
                 "An existing package already provides the following file:\n"
@@ -443,7 +443,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 "  nix profile install %4% --priority %7%\n",
                 originalConflictingFilePath,
                 newConflictingFilePath,
-                concatStringsSep(" ", originalConflictingRefs),
+                originalEntryName,
                 concatStringsSep(" ", newConflictingRefs),
                 conflictError.priority,
                 conflictError.priority - 1,

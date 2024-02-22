@@ -115,7 +115,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     return res;
 }
 
-static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bool resolveSymlinks = true)
+static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full)
 {
     NixStringContext context;
 
@@ -127,7 +127,7 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, bo
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
             path = {path.accessor, CanonPath(realPath)};
         }
-        return resolveSymlinks ? path.resolveSymlinks() : path;
+        return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
         throw;
@@ -167,7 +167,7 @@ static void mkOutputString(
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath, false);
+    auto path = realisePath(state, pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
     // FIXME
@@ -760,15 +760,6 @@ static RegisterPrimOp primop_break({
 
             auto & dt = state.debugTraces.front();
             state.runDebugRepl(&error, dt.env, dt.expr);
-
-            if (state.debugQuit) {
-                // If the user elects to quit the repl, throw an exception.
-                throw Error(ErrorInfo{
-                    .level = lvlInfo,
-                    .msg = HintFmt("quit the debugger"),
-                    .pos = nullptr,
-                });
-            }
         }
 
         // Return the value we were passed.
@@ -879,7 +870,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     /* increment state.trylevel, and decrement it when this function returns. */
     MaintainCount trylevel(state.trylevel);
 
-    void (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
+    ReplExitStatus (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
     if (state.debugRepl && evalSettings.ignoreExceptionsDuringTry)
     {
         /* to prevent starting the repl from exceptions withing a tryEval, null it. */
@@ -995,6 +986,10 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
         printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
+    if (evalSettings.builtinsTraceDebugger && state.debugRepl && !state.debugTraces.empty()) {
+        const DebugTrace & last = state.debugTraces.front();
+        state.runDebugRepl(nullptr, last.env, last.expr);
+    }
     state.forceValue(*args[1], pos);
     v = *args[1];
 }
@@ -1006,6 +1001,12 @@ static RegisterPrimOp primop_trace({
       Evaluate *e1* and print its abstract syntax representation on
       standard error. Then return *e2*. This function is useful for
       debugging.
+
+      If the
+      [`debugger-on-trace`](@docroot@/command-ref/conf-file.md#conf-debugger-on-trace)
+      option is set to `true` and the `--debugger` flag is given, the
+      interactive debugger will be started when `trace` is called (like
+      [`break`](@docroot@/language/builtins.md#builtins-break)).
     )",
     .fun = prim_trace,
 });
@@ -1521,12 +1522,15 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
     try {
         auto & arg = *args[0];
 
-        auto path = realisePath(state, pos, arg);
-
         /* SourcePath doesn't know about trailing slash. */
+        state.forceValue(arg, pos);
         auto mustBeDir = arg.type() == nString
             && (arg.string_view().ends_with("/")
                 || arg.string_view().ends_with("/."));
+
+        auto symlinkResolution =
+            mustBeDir ? SymlinkResolution::Full : SymlinkResolution::Ancestors;
+        auto path = realisePath(state, pos, arg, symlinkResolution);
 
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
@@ -1765,7 +1769,7 @@ static std::string_view fileTypeToString(InputAccessor::Type type)
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0], false);
+    auto path = realisePath(state, pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
     v.mkString(fileTypeToString(path.lstat().type));
 }
@@ -2228,7 +2232,14 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = fetchToStore(*state.store, path.resolveSymlinks(), name, method, filter.get(), state.repair);
+            auto dstPath = fetchToStore(
+                *state.store,
+                path.resolveSymlinks(),
+                settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+                name,
+                method,
+                filter.get(),
+                state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.error<EvalError>(
                     "store path mismatch in (possibly filtered) path added from '%s'",

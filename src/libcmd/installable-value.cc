@@ -45,7 +45,7 @@ ref<InstallableValue> InstallableValue::require(ref<Installable> installable)
 std::optional<DerivedPathWithInfo> InstallableValue::trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     if (v.type() == nPath) {
-        auto storePath = fetchToStore(*state->store, v.path());
+        auto storePath = fetchToStore(*state->store, v.path(), FetchMode::Copy);
         return {{
             .path = DerivedPath::Opaque {
                 .path = std::move(storePath),

@@ -347,6 +347,11 @@ struct MercurialInputScheme : InputScheme
         return makeResult(infoAttrs, std::move(storePath));
     }
 
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
+    }
+
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())

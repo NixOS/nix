@@ -30,6 +30,11 @@ std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
 {
     return root.empty()
         ? (std::filesystem::path { path.abs() })
+        : path.isRoot()
+        ? /* Don't append a slash for the root of the accessor, since
+             it can be a non-directory (e.g. in the case of `fetchTree
+             { type = "file" }`). */
+          root
         : root / path.rel();
 }
 
