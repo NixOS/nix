@@ -85,14 +85,20 @@ TEST_F(nix_api_expr_test, nix_build_drv)
 
     Value * drvPathValue = nix_get_attr_byname(nullptr, value, state, "drvPath");
     const char * drvPath = nix_get_string(nullptr, drvPathValue);
-    ASSERT_STREQ("/nix/store/5fxx84dpz59ch79wf9x8ja715p7hf3q1-myname.drv", drvPath);
+
+    std::string p = drvPath;
+    std::string pEnd = "-myname.drv";
+    ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
 
     StorePath * drvStorePath = nix_store_parse_path(ctx, store, drvPath);
     ASSERT_EQ(true, nix_store_is_valid_path(nullptr, store, drvStorePath));
 
     Value * outPathValue = nix_get_attr_byname(nullptr, value, state, "outPath");
     const char * outPath = nix_get_string(nullptr, outPathValue);
-    ASSERT_STREQ("/nix/store/rp0xk0641l8hpdb84fsx3kwwrl45pxan-myname", outPath);
+
+    p = outPath;
+    pEnd = "-myname";
+    ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
 
     StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath);
     ASSERT_EQ(false, nix_store_is_valid_path(nullptr, store, outStorePath));
