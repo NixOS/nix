@@ -45,3 +45,8 @@ clearStore
     [[ "$path1" == "$path2" ]]
     path4=$(nix store add --mode flat --hash-algo sha1 ./dummy)
 )
+(
+    path1=$(nix store add --mode text ./dummy)
+    path2=$(nix eval --impure --raw --expr 'builtins.toFile "dummy" (builtins.readFile ./dummy)')
+    [[ "$path1" == "$path2" ]]
+)

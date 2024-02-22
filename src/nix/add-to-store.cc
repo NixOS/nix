@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "archive.hh"
 #include "posix-source-accessor.hh"
+#include "misc-store-flags.hh"
 
 using namespace nix;
 
@@ -26,23 +27,9 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .handler = {&namePart},
         });
 
-        addFlag({
-            .longName  = "mode",
-            .description = R"(
-    How to compute the hash of the input.
-    One of:
+        addFlag(flag::contentAddressMethod(&caMethod));
 
-    - `nar` (the default): Serialises the input as an archive (following the [_Nix Archive Format_](https://edolstra.github.io/pubs/phd-thesis.pdf#page=101)) and passes that to the hash function.
-
-    - `flat`: Assumes that the input is a single file and directly passes it to the hash function;
-            )",
-            .labels = {"hash-mode"},
-            .handler = {[this](std::string s) {
-                this->caMethod = parseFileIngestionMethod(s);
-            }},
-        });
-
-        addFlag(Flag::mkHashAlgoFlag(&hashAlgo));
+        addFlag(flag::hashAlgo(&hashAlgo));
     }
 
     void run(ref<Store> store) override
@@ -63,7 +50,6 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
 struct CmdAdd : CmdAddToStore
 {
-
     std::string description() override
     {
         return "Add a file or directory to the Nix store";
