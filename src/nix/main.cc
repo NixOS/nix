@@ -23,7 +23,6 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <regex>
-#include <cstdlib>
 
 #include <nlohmann/json.hpp>
 
@@ -35,7 +34,7 @@ namespace nix {
 
 static bool haveProxyEnvironmentVariables()
 {
-    static const char * const proxyVariables[] = {
+    static const std::vector<std::string> proxyVariables = {
         "http_proxy",
         "https_proxy",
         "ftp_proxy",
@@ -44,7 +43,7 @@ static bool haveProxyEnvironmentVariables()
         "FTP_PROXY"
     };
     for (auto & proxyVariable: proxyVariables) {
-        if (std::getenv(proxyVariable)) {
+        if (getEnv(proxyVariable).has_value()) {
             return true;
         }
     }
