@@ -41,4 +41,11 @@ error:
              |                ^
             5|     if n > 0
 
+       … while calling the 'throw' builtin
+         at /pwd/lang/eval-fail-duplicate-traces.nix:7:10:
+            6|     then throwAfter (n - 1)
+            7|     else throw "Uh oh!";
+             |          ^
+            8| in
+
        error: Uh oh!
