@@ -11,9 +11,9 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, bool frame)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint });
 }
 
 void throwExceptionSelfCheck(){
@@ -61,8 +61,7 @@ inline bool operator<(const Trace& lhs, const Trace& rhs)
     // This formats a freshly formatted hint string and then throws it away, which
     // shouldn't be much of a problem because it only runs when pos is equal, and this function is
     // used for trace printing, which is infrequent.
-    return std::forward_as_tuple(lhs.hint.str(), lhs.frame)
-        < std::forward_as_tuple(rhs.hint.str(), rhs.frame);
+    return lhs.hint.str() < rhs.hint.str();
 }
 inline bool operator> (const Trace& lhs, const Trace& rhs) { return rhs < lhs; }
 inline bool operator<=(const Trace& lhs, const Trace& rhs) { return !(lhs > rhs); }

@@ -435,7 +435,7 @@ public:
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
+    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const;
 
 public:
     /**

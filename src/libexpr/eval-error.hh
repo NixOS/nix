@@ -89,7 +89,7 @@ public:
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withFrame(const Env & e, const Expr & ex);
 
-    [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & addTrace(PosIdx pos, HintFmt hint, bool frame = false);
+    [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & addTrace(PosIdx pos, HintFmt hint);
 
     template<typename... Args>
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> &

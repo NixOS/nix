@@ -64,7 +64,6 @@ void printCodeLines(std::ostream & out,
 struct Trace {
     std::shared_ptr<Pos> pos;
     HintFmt hint;
-    bool frame;
 };
 
 inline bool operator<(const Trace& lhs, const Trace& rhs);
@@ -162,7 +161,7 @@ public:
         addTrace(std::move(e), HintFmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint, bool frame = false);
+    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint);
 
     bool hasTrace() const { return !err.traces.empty(); }
 

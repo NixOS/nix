@@ -811,9 +811,9 @@ void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2)
     e.addTrace(nullptr, s, s2);
 }
 
-void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame) const
+void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const
 {
-    e.addTrace(positions[pos], HintFmt(s, s2), frame);
+    e.addTrace(positions[pos], HintFmt(s, s2));
 }
 
 template<typename... Args>
@@ -1587,9 +1587,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         "while calling %s",
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
-                        : "anonymous lambda",
-                        true);
-                    if (pos) addErrorTrace(e, pos, "from call site%s", "", true);
+                        : "anonymous lambda");
+                    if (pos) addErrorTrace(e, pos, "from call site%s", "");
                 }
                 throw;
             }
