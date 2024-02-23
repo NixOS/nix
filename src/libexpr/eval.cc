@@ -806,14 +806,16 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     }
 }
 
-void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2) const
+template<typename... Args>
+void EvalState::addErrorTrace(Error & e, const Args & ... formatArgs) const
 {
-    e.addTrace(nullptr, s, s2);
+    e.addTrace(nullptr, HintFmt(formatArgs...));
 }
 
-void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const
+template<typename... Args>
+void EvalState::addErrorTrace(Error & e, const PosIdx pos, const Args & ... formatArgs) const
 {
-    e.addTrace(positions[pos], HintFmt(s, s2));
+    e.addTrace(positions[pos], HintFmt(formatArgs...));
 }
 
 template<typename... Args>
@@ -1588,7 +1590,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
                         : "anonymous lambda");
-                    if (pos) addErrorTrace(e, pos, "from call site%s", "");
+                    if (pos) addErrorTrace(e, pos, "from call site");
                 }
                 throw;
             }
