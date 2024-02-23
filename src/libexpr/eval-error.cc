@@ -28,15 +28,7 @@ template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withTrace(PosIdx pos, const std::string_view text)
 {
     error.err.traces.push_front(
-        Trace{.pos = error.state.positions[pos], .hint = HintFmt(std::string(text)), .frame = false});
-    return *this;
-}
-
-template<class T>
-EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrameTrace(PosIdx pos, const std::string_view text)
-{
-    error.err.traces.push_front(
-        Trace{.pos = error.state.positions[pos], .hint = HintFmt(std::string(text)), .frame = true});
+        Trace{.pos = error.state.positions[pos], .hint = HintFmt(std::string(text))});
     return *this;
 }
 
@@ -63,9 +55,9 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
 }
 
 template<class T>
-EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, HintFmt hint, bool frame)
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, HintFmt hint)
 {
-    error.addTrace(error.state.positions[pos], hint, frame);
+    error.addTrace(error.state.positions[pos], hint);
     return *this;
 }
 
