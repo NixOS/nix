@@ -373,7 +373,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     // prepended to each element of the trace
     auto ellipsisIndent = "  ";
 
-    bool frameOnly = false;
     if (!einfo.traces.empty()) {
         // Stack traces seen since we last printed a chunk of `duplicate frames
         // omitted`.
@@ -384,7 +383,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
         for (const auto & trace : einfo.traces) {
             if (trace.hint.str().empty()) continue;
-            if (frameOnly && !trace.frame) continue;
 
             if (!showTrace && count > 3) {
                 oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
@@ -400,7 +398,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
 
             count++;
-            frameOnly = trace.frame;
 
             printTrace(oss, ellipsisIndent, count, trace);
         }
