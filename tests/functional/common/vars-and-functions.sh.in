@@ -232,6 +232,12 @@ enableFeatures() {
     sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
 }
 
+disableFeature() {
+  local feature="$1"
+  sed -i '/^\(extra-\)\?experimental-features/s/\b'"$feature"'\b//g' "$NIX_CONF_DIR"/nix.conf
+  sed -i '/^\(extra-\)\?experimental-features/s/\b'"$feature"'\b//g' "$NIX_CONF_DIR"/nix.conf.extra
+}
+
 set -x
 
 onError() {
