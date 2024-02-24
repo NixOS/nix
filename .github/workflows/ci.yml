@@ -153,6 +153,8 @@ jobs:
         IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
 
         docker tag nix:$NIX_VERSION $IMAGE_ID:$NIX_VERSION
-        docker tag nix:$NIX_VERSION $IMAGE_ID:master
+        docker tag nix:$NIX_VERSION $IMAGE_ID:latest
         docker push $IMAGE_ID:$NIX_VERSION
+        docker push $IMAGE_ID:latest
+        # deprecated 2024-02-24
         docker push $IMAGE_ID:master
