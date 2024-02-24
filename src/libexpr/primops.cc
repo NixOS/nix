@@ -705,38 +705,53 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .args = {"attrset"},
     .arity = 1,
     .doc = R"(
-      Take an *attrset* with values named `startSet` and `operator` in order to
-      return a *list of attrsets* by starting with the `startSet` and recursively
-      applying the `operator` function to each `item`. The *attrsets* in the
-      `startSet` and the *attrsets* produced by `operator` must contain a value
-      named `key` which is comparable. The result is produced by calling `operator`
-      for each `item` with a value for `key` that has not been called yet including
-      newly produced `item`s. The function terminates when no new `item`s are
-      produced. The resulting *list of attrsets* contains only *attrsets* with a
-      unique key. For example,
+      `builtins.genericClosure` iteratively computes the transitive closure over an arbitrary relation defined by a function.
 
-      ```
-      builtins.genericClosure {
-        startSet = [ {key = 5;} ];
-        operator = item: [{
-          key = if (item.key / 2 ) * 2 == item.key
-               then item.key / 2
-               else 3 * item.key + 1;
-        }];
-      }
-      ```
-      evaluates to
-      ```
-      [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
-      ```
+      It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attrbute sets:
 
-      `key` can be one of the following types:
+      - `startSet`:
+        The initial list of attribute sets.
+
+      - `operator`:
+        A function that takes an attribute set and returns a list of attribute sets.
+        It defines how each item in the current set is processed and expanded into more items.
+
+      Each attribute set in the list `startSet` and the list returned by `operator` must have an attribute `key`, which must support equality comparison.
+      The value of `key` can be one of the following types:
+
       - [Number](@docroot@/language/values.md#type-number)
       - [Boolean](@docroot@/language/values.md#type-boolean)
       - [String](@docroot@/language/values.md#type-string)
       - [Path](@docroot@/language/values.md#type-path)
       - [List](@docroot@/language/values.md#list)
 
+      The result is produced by calling the `operator` on each `item` that has not been called yet, including newly added items, until no new items are added.
+      Items are compared by their `key` attribute.
+
+      Common usages are:
+
+      - Generating unique collections of items, such as dependency graphs.
+      - Traversing through structures that may contain cycles or loops.
+      - Processing data structures with complex internal relationships.
+
+      > **Example**
+      >
+      > ```nix
+      > builtins.genericClosure {
+      >   startSet = [ {key = 5;} ];
+      >   operator = item: [{
+      >     key = if (item.key / 2 ) * 2 == item.key
+      >          then item.key / 2
+      >          else 3 * item.key + 1;
+      >   }];
+      > }
+      > ```
+      >
+      > evaluates to
+      >
+      > ```nix
+      > [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
+      > ```
       )",
     .fun = prim_genericClosure,
 });
