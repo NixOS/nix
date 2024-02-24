@@ -278,12 +278,14 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
  * @return error code, NIX_OK on success.
  */
 nix_err nix_init_bool(nix_c_context * context, Value * value, bool b);
+
 /** @brief Set a string
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] str the string, copied
  * @return error code, NIX_OK on success.
  */
+
 nix_err nix_init_string(nix_c_context * context, Value * value, const char * str);
 /** @brief Set a path
  * @param[out] context Optional, stores error information
@@ -291,6 +293,7 @@ nix_err nix_init_string(nix_c_context * context, Value * value, const char * str
  * @param[in] str the path string, copied
  * @return error code, NIX_OK on success.
  */
+
 nix_err nix_init_path_string(nix_c_context * context, Value * value, const char * str);
 /** @brief Set a float
  * @param[out] context Optional, stores error information
@@ -298,6 +301,7 @@ nix_err nix_init_path_string(nix_c_context * context, Value * value, const char 
  * @param[in] d the float, 64-bits
  * @return error code, NIX_OK on success.
  */
+
 nix_err nix_init_float(nix_c_context * context, Value * value, double d);
 /** @brief Set an int
  * @param[out] context Optional, stores error information
