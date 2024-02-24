@@ -705,23 +705,34 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .args = {"attrset"},
     .arity = 1,
     .doc = R"(
-      `builtins.genericClosure` computes the transitive closure over an arbitrary relation defined by an `operator` function.
-      It is designed to handle potentially cyclic data structures or any complex language constructs that require iterative processing.
+      `builtins.genericClosure` iteratively computes the transitive closure over an arbitrary relation defined by a function.
+
+      It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attrbute sets:
+
+      - `startSet`:
+        The initial list of attribute sets.
+
+      - `operator`:
+        A function that takes an attribute set and returns a list of attribute sets.
+        It defines how each item in the current set is processed and expanded into more items.
+
+      Each attribute set in the list `startSet` and the list returned by `operator` must have an attribute `key`, which must support equality comparison.
+      The value of `key` can be one of the following types:
+
+      - [Number](@docroot@/language/values.md#type-number)
+      - [Boolean](@docroot@/language/values.md#type-boolean)
+      - [String](@docroot@/language/values.md#type-string)
+      - [Path](@docroot@/language/values.md#type-path)
+      - [List](@docroot@/language/values.md#list)
+
+      The result is produced by calling the `operator` on each `item` that has not been called yet, including newly added items, until no new items are added.
+      Items are compared by their `key` attribute.
 
       Common usages are:
 
-      - Generating dependency trees or unique collections of items.
+      - Generating unique collections of items, such as dependency graphs.
       - Traversing through structures that may contain cycles or loops.
-      - Processing data structures with complex relationships.
-
-      ## Concept
-
-      - **startSet**: The initial collection of attribute sets from which the closure begins its computation.
-      - **operator**: A function that takes an attrset and returns a list of attribute sets. It defines how each item in the current set is processed and expanded into more items.
-
-      The result is produced by calling the `operator` recursively over again, until no new items (compared by key) are returned.
-
-      The `genericClosure` function terminates when no new `items` are produced.
+      - Processing data structures with complex internal relationships.
 
       > **Example**
       >
@@ -741,22 +752,6 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
       > ```nix
       > [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
       > ```
-
-      > **Prerequisites**
-      >
-      > - Ensure key in startSet and in operator's output is of the type listed below.
-      > - Repeated application of the operator function to the working set must eventually stop producing new keys.
-
-      ## Reference
-
-      `key` can be one of the following types:
-
-      - [Number](@docroot@/language/values.md#type-number)
-      - [Boolean](@docroot@/language/values.md#type-boolean)
-      - [String](@docroot@/language/values.md#type-string)
-      - [Path](@docroot@/language/values.md#type-path)
-      - [List](@docroot@/language/values.md#list)
-
       )",
     .fun = prim_genericClosure,
 });
