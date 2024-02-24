@@ -20,21 +20,6 @@
 #include "gc_cpp.h"
 #endif
 
-struct nix_string_return
-{
-    std::string str;
-};
-
-struct nix_printer
-{
-    std::ostream & s;
-};
-
-struct nix_string_context
-{
-    nix::NixStringContext & ctx;
-};
-
 void nix_set_string_return(nix_string_return * str, const char * c)
 {
     str->str = c;

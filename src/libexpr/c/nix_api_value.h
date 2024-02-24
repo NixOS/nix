@@ -52,7 +52,7 @@ typedef class ListBuilder ListBuilder;
  * @ingroup primops
  *
  * Owned by the GC
- * @see nix_alloc_primop, nix_set_primop
+ * @see nix_alloc_primop, nix_init_primop
  */
 typedef struct PrimOp PrimOp;
 /** @brief External Value
