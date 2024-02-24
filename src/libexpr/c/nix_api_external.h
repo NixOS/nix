@@ -165,7 +165,7 @@ typedef struct NixCExternalValueDesc
 } NixCExternalValueDesc;
 
 /**
- * @brief Create an external value, that can be given to nix_set_external
+ * @brief Create an external value, that can be given to nix_init_external
  *
  * Owned by the GC. Use nix_gc_decref when you're done with the pointer.
  *
@@ -174,7 +174,7 @@ typedef struct NixCExternalValueDesc
  * as the ExternalValue lives
  * @param[in] v the value to store
  * @returns external value, owned by the garbage collector
- * @see nix_set_external
+ * @see nix_init_external
  */
 ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v);
 

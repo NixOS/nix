@@ -108,17 +108,21 @@ public:
      * Coerce the value to a string.
      */
     virtual std::string coerceToString(
-        const nix::Pos & pos, nix::NixStringContext & context, bool copyMore, bool copyToStore) const override
+        nix::EvalState & state,
+        const nix::PosIdx & pos,
+        nix::NixStringContext & context,
+        bool copyMore,
+        bool copyToStore) const override
     {
         if (!desc.coerceToString) {
-            return nix::ExternalValueBase::coerceToString(pos, context, copyMore, copyToStore);
+            return nix::ExternalValueBase::coerceToString(state, pos, context, copyMore, copyToStore);
         }
         nix_string_context ctx{context};
         nix_string_return res{""};
         // todo: pos, errors
         desc.coerceToString(v, &ctx, copyMore, copyToStore, &res);
         if (res.str.empty()) {
-            return nix::ExternalValueBase::coerceToString(pos, context, copyMore, copyToStore);
+            return nix::ExternalValueBase::coerceToString(state, pos, context, copyMore, copyToStore);
         }
         return std::move(res.str);
     }
