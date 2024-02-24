@@ -82,7 +82,7 @@ will increment the argument if it is an integer and throw an error otherwise.
 void increment(void* user_data, nix_c_context* ctx, EvalState* state, Value** args, Value* v) {
     nix_value_force(NULL, state, args[0]);
     if (nix_get_type(NULL, args[0]) == NIX_TYPE_INT) {
-      nix_set_int(NULL, v, nix_get_int(NULL, args[0]) + 1);
+      nix_init_int(NULL, v, nix_get_int(NULL, args[0]) + 1);
     } else {
       nix_set_err_msg(ctx, NIX_ERR_UNKNOWN, "First argument should be an integer.");
     }
