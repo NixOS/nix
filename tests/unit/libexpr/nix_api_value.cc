@@ -5,32 +5,14 @@
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 
-#include "tests/nix_api_store.hh"
+#include "tests/nix_api_expr.hh"
 
 #include <cstdlib>
 #include <gtest/gtest.h>
 
 namespace nixC {
 
-class nix_api_value_test : public nix_api_store_test
-{
-public:
-    nix_api_value_test()
-    {
-        state = nix_state_create(nullptr, nullptr, store);
-        value = nix_alloc_value(nullptr, state);
-    }
-    ~nix_api_value_test()
-    {
-        nix_gc_decref(nullptr, value);
-        nix_state_free(state);
-    }
-
-    EvalState * state;
-    Value * value;
-};
-
-TEST_F(nix_api_value_test, nix_value_set_get_int)
+TEST_F(nix_api_expr_test, nix_value_set_get_int)
 {
     int myInt = 1;
     nix_init_int(nullptr, value, myInt);
@@ -38,7 +20,7 @@ TEST_F(nix_api_value_test, nix_value_set_get_int)
     ASSERT_EQ(myInt, nix_get_int(nullptr, value));
 }
 
-TEST_F(nix_api_value_test, nix_make_and_set_list)
+TEST_F(nix_api_expr_test, nix_build_and_init_list)
 {
     int size = 10;
     ListBuilder * builder = nix_make_list_builder(nullptr, state, size);
@@ -56,7 +38,7 @@ TEST_F(nix_api_value_test, nix_make_and_set_list)
     nix_gc_decref(nullptr, intValue);
 }
 
-TEST_F(nix_api_value_test, nix_make_attrs_t)
+TEST_F(nix_api_expr_test, nix_build_and_init_attr)
 {
     int size = 10;
     const char ** out_name = (const char **) malloc(sizeof(char *));

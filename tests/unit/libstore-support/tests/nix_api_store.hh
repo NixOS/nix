@@ -10,21 +10,16 @@
 
 namespace fs = std::filesystem;
 
+namespace nixC {
 class nix_api_store_test : public nix_api_util_context
 {
 public:
     nix_api_store_test()
     {
         nix_libstore_init(ctx);
-
-        auto tmpl = nix::getEnv("TMPDIR").value_or("/tmp") + "/tests_nix-store.XXXXXX";
-        nixStoreDir = mkdtemp((char *) tmpl.c_str());
-
-        // Options documented in `nix help-stores`
-        const char * p1[] = {"root", nixStoreDir.c_str()};
-        const char ** params[] = {p1, nullptr};
-        store = nix_store_open(ctx, "local", params);
+        init_local_store();
     };
+
     ~nix_api_store_test() override
     {
         nix_store_free(store);
@@ -37,4 +32,17 @@ public:
 
     Store * store;
     std::string nixStoreDir;
+
+protected:
+    void init_local_store()
+    {
+        auto tmpl = nix::getEnv("TMPDIR").value_or("/tmp") + "/tests_nix-store.XXXXXX";
+        nixStoreDir = mkdtemp((char *) tmpl.c_str());
+
+        // Options documented in `nix help-stores`
+        const char * p1[] = {"root", nixStoreDir.c_str()};
+        const char ** params[] = {p1, nullptr};
+        store = nix_store_open(ctx, "local", params);
+    }
 };
+}
