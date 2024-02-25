@@ -18,7 +18,7 @@
  *
  *    nix_gc_decref(NULL, value);
  *    nix_state_free(state);
- *    nix_store_unref(store);
+ *    nix_store_free(store);
  *    return 0;
  *    }
  * @endcode

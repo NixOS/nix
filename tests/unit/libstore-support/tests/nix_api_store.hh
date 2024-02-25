@@ -27,7 +27,7 @@ public:
     };
     ~nix_api_store_test() override
     {
-        nix_store_unref(store);
+        nix_store_free(store);
 
         for (auto & path : fs::recursive_directory_iterator(nixStoreDir)) {
             fs::permissions(path, fs::perms::owner_all);
