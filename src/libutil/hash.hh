@@ -58,7 +58,7 @@ struct Hash
      * Parse the hash from a string representation in the format
      * "[<type>:]<base16|base32|base64>" or "<type>-<base64>" (a
      * Subresource Integrity hash expression). If the 'type' argument
-     * is not present, then the hash type must be specified in the
+     * is not present, then the hash algorithm must be specified in the
      * string.
      */
     static Hash parseAny(std::string_view s, std::optional<HashAlgorithm> optAlgo);
@@ -200,7 +200,7 @@ std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName);
 std::string_view printHashFormat(HashFormat hashFormat);
 
 /**
- * Parse a string representing a hash type.
+ * Parse a string representing a hash algorithm.
  */
 HashAlgorithm parseHashAlgo(std::string_view s);
 

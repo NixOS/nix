@@ -63,10 +63,10 @@ void restorePath(
 
 HashResult hashPath(
     SourceAccessor & accessor, const CanonPath & path,
-    FileIngestionMethod method, HashAlgorithm ht,
+    FileIngestionMethod method, HashAlgorithm ha,
     PathFilter & filter)
 {
-    HashSink sink { ht };
+    HashSink sink { ha };
     dumpPath(accessor, path, sink, method, filter);
     return sink.finish();
 }

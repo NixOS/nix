@@ -701,7 +701,7 @@ DerivationType BasicDerivation::type() const
                     floatingHashAlgo = dof.hashAlgo;
                 } else {
                     if (*floatingHashAlgo != dof.hashAlgo)
-                        throw Error("all floating outputs must use the same hash type");
+                        throw Error("all floating outputs must use the same hash algorithm");
                 }
             },
             [&](const DerivationOutput::Deferred &) {

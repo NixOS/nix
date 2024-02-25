@@ -274,7 +274,7 @@ Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha
 {
     if (hashStr.empty()) {
         if (!ha)
-            throw BadHash("empty hash requires explicit hash type");
+            throw BadHash("empty hash requires explicit hash algorithm");
         Hash h(*ha);
         warn("found empty hash, assuming '%s'", h.to_string(HashFormat::SRI, true));
         return h;
