@@ -48,23 +48,24 @@ nix_err nix_init_plugins(nix_c_context * context);
 
 /**
  * @brief Open a nix store
+ * Store instances may share state and resources behind the scenes.
  * @param[out] context Optional, stores error information
  * @param[in] uri URI of the nix store, copied
  * @param[in] params optional, array of key-value pairs, {{"endpoint",
  * "https://s3.local"}}
- * @return ref-counted Store pointer, NULL in case of errors
- * @see nix_store_unref
+ * @return a Store pointer, NULL in case of errors
+ * @see nix_store_free
  */
 Store * nix_store_open(nix_c_context *, const char * uri, const char *** params);
 
 /**
- * @brief Unref a nix store
+ * @brief Deallocate a nix store and free any resources if not also held by other Store instances.
  *
  * Does not fail.
- * It'll be closed and deallocated when all references are gone.
- * @param[in] builder the store to unref
+ *
+ * @param[in] store the store to free
  */
-void nix_store_unref(Store * store);
+void nix_store_free(Store * store);
 
 /**
  * @brief get the URI of a nix store

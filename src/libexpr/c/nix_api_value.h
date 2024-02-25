@@ -269,6 +269,11 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
 
 /**@}*/
 /** @name Initializers
+ *
+ * Values are typically "returned" by initializing already allocated memory that serves as the return value.
+ * For this reason, the construction of values is not tied their allocation.
+ * Nix is a language with immutable values. Respect this property by only initializing Values once; and only initialize
+ * Values that are meant to be initialized by you. Failing to adhere to these rules may lead to undefined behavior.
  */
 /**@{*/
 /** @brief Set boolean value

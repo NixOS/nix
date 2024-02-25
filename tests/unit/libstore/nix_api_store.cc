@@ -69,7 +69,7 @@ TEST_F(nix_api_util_context, nix_store_open_dummy)
     nix_store_get_version(ctx, store, value, 256);
     ASSERT_STREQ("", value);
 
-    nix_store_unref(store);
+    nix_store_free(store);
 }
 
 TEST_F(nix_api_util_context, nix_store_open_invalid)
@@ -78,7 +78,7 @@ TEST_F(nix_api_util_context, nix_store_open_invalid)
     Store * store = nix_store_open(ctx, "invalid://", nullptr);
     ASSERT_EQ(NIX_ERR_NIX_ERROR, ctx->last_err_code);
     ASSERT_EQ(nullptr, store);
-    nix_store_unref(store);
+    nix_store_free(store);
 }
 
 TEST_F(nix_api_store_test, nix_store_is_valid_path_not_in_store)

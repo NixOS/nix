@@ -50,7 +50,7 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_store_unref(Store * store)
+void nix_store_free(Store * store)
 {
     delete store;
 }
