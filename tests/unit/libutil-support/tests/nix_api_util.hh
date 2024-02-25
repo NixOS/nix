@@ -4,17 +4,15 @@
 
 #include <gtest/gtest.h>
 
+namespace nixC {
 class nix_api_util_context : public ::testing::Test
 {
 protected:
-    static void SetUpTestSuite()
-    {
-        nix_libutil_init(NULL);
-    }
 
     nix_api_util_context()
     {
         ctx = nix_c_context_create();
+        nix_libutil_init(ctx);
     };
 
     ~nix_api_util_context() override
@@ -25,3 +23,4 @@ protected:
 
     nix_c_context * ctx;
 };
+}
