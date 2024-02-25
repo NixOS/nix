@@ -897,11 +897,6 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
     copyContextToValue(*this, context);
 }
 
-void Value::mkPath(std::string_view path)
-{
-    mkPath(makeImmutableString(path));
-}
-
 void Value::mkPath(const SourcePath & path)
 {
     mkPath(&*path.accessor, makeImmutableString(path.path.abs()));

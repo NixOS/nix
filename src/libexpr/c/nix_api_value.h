@@ -129,6 +129,7 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp);
  * @return value, or null in case of errors
  *
  */
+
 Value * nix_alloc_value(nix_c_context * context, EvalState * state);
 /** @addtogroup value_manip Manipulating values
  * @brief Functions to inspect and change Nix language values, represented by Value.
@@ -142,6 +143,7 @@ Value * nix_alloc_value(nix_c_context * context, EvalState * state);
  * @param[in] value Nix value to inspect
  * @return type of nix value
  */
+
 ValueType nix_get_type(nix_c_context * context, const Value * value);
 /** @brief Get type name of value as defined in the evaluator
  * @param[out] context Optional, stores error information
@@ -149,6 +151,7 @@ ValueType nix_get_type(nix_c_context * context, const Value * value);
  * @return type name, owned string
  * @todo way to free the result
  */
+
 const char * nix_get_typename(nix_c_context * context, const Value * value);
 
 /** @brief Get boolean value
@@ -290,24 +293,24 @@ nix_err nix_init_bool(nix_c_context * context, Value * value, bool b);
  * @param[in] str the string, copied
  * @return error code, NIX_OK on success.
  */
-
 nix_err nix_init_string(nix_c_context * context, Value * value, const char * str);
+
 /** @brief Set a path
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] str the path string, copied
  * @return error code, NIX_OK on success.
  */
+nix_err nix_init_path_string(nix_c_context * context, EvalState * s, Value * value, const char * str);
 
-nix_err nix_init_path_string(nix_c_context * context, Value * value, const char * str);
 /** @brief Set a float
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
  * @param[in] d the float, 64-bits
  * @return error code, NIX_OK on success.
  */
-
 nix_err nix_init_float(nix_c_context * context, Value * value, double d);
+
 /** @brief Set an int
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify

@@ -9,11 +9,12 @@
 
 namespace nixC {
 
-TEST_F(nix_api_util_context, nix_context_error) {
+TEST_F(nix_api_util_context, nix_context_error)
+{
     std::string err_msg_ref;
     try {
         throw nix::Error("testing error");
-    } catch(nix::Error &e) {
+    } catch (nix::Error & e) {
         err_msg_ref = e.what();
         nix_context_error(ctx);
     }
@@ -24,7 +25,7 @@ TEST_F(nix_api_util_context, nix_context_error) {
 
     try {
         throw std::runtime_error("testing exception");
-    } catch(std::exception &e) {
+    } catch (std::exception & e) {
         err_msg_ref = e.what();
         nix_context_error(ctx);
     }
@@ -32,14 +33,16 @@ TEST_F(nix_api_util_context, nix_context_error) {
     ASSERT_EQ(*ctx->last_err, err_msg_ref);
 }
 
-TEST_F(nix_api_util_context, nix_set_err_msg) {
+TEST_F(nix_api_util_context, nix_set_err_msg)
+{
     ASSERT_EQ(ctx->last_err_code, NIX_OK);
     nix_set_err_msg(ctx, NIX_ERR_UNKNOWN, "unknown test error");
     ASSERT_EQ(ctx->last_err_code, NIX_ERR_UNKNOWN);
     ASSERT_EQ(*ctx->last_err, "unknown test error");
 }
 
-TEST(nix_api_util, nix_version_get) {
+TEST(nix_api_util, nix_version_get)
+{
     ASSERT_EQ(std::string(nix_version_get()), PACKAGE_VERSION);
 }
 
@@ -77,9 +80,10 @@ TEST_F(nix_api_util_context, nix_setting_set)
     ASSERT_STREQ("new-value", value);
 }
 
-TEST_F(nix_api_util_context, nix_err_msg) {
+TEST_F(nix_api_util_context, nix_err_msg)
+{
     // no error
-    EXPECT_THROW(nix_err_msg(NULL, ctx, NULL), nix::Error);
+    EXPECT_THROW(nix_err_msg(nullptr, ctx, NULL), nix::Error);
 
     // set error
     nix_set_err_msg(ctx, NIX_ERR_UNKNOWN, "unknown test error");
@@ -90,46 +94,49 @@ TEST_F(nix_api_util_context, nix_err_msg) {
 
     // advanced usage
     unsigned int sz;
-    err_msg = nix_err_msg(NULL, ctx, &sz);
+    err_msg = nix_err_msg(nix_c_context_create(), ctx, &sz);
     ASSERT_EQ(sz, err_msg.size());
 }
 
-TEST_F(nix_api_util_context, nix_err_info_msg) {
+TEST_F(nix_api_util_context, nix_err_info_msg)
+{
     // no error
     EXPECT_THROW(nix_err_info_msg(NULL, ctx, NULL, 256), nix::Error);
 
     try {
         throw nix::Error("testing error");
-    } catch(...) {
+    } catch (...) {
         nix_context_error(ctx);
     }
     char buf[256];
-    nix_err_info_msg(NULL, ctx, buf, 256);
+    nix_err_info_msg(nix_c_context_create(), ctx, buf, 256);
     ASSERT_EQ(std::string(buf), "testing error");
 
     // should overflow
     EXPECT_THROW(nix_err_info_msg(NULL, ctx, buf, 1), nix::Error);
 }
 
-TEST_F(nix_api_util_context, nix_err_name) {
+TEST_F(nix_api_util_context, nix_err_name)
+{
     // no error
     EXPECT_THROW(nix_err_name(NULL, ctx, NULL, 256), nix::Error);
 
     std::string err_msg_ref;
     try {
         throw nix::Error("testing error");
-    } catch(...) {
+    } catch (...) {
         nix_context_error(ctx);
     }
     char err_name[32];
-    nix_err_name(NULL, ctx, err_name, 32);
+    nix_err_name(nix_c_context_create(), ctx, err_name, 32);
     ASSERT_EQ(std::string(err_name), "nix::Error");
 
     // overflow
     EXPECT_THROW(nix_err_name(NULL, ctx, err_name, 1), nix::Error);
 }
 
-TEST_F(nix_api_util_context, nix_err_code) {
+TEST_F(nix_api_util_context, nix_err_code)
+{
     ASSERT_EQ(nix_err_code(ctx), NIX_OK);
     nix_set_err_msg(ctx, NIX_ERR_UNKNOWN, "unknown test error");
     ASSERT_EQ(nix_err_code(ctx), NIX_ERR_UNKNOWN);

@@ -31,7 +31,6 @@ private:
 
     static void type_of_function(void * self, nix_string_return * res)
     {
-        std::cout << self << std::endl;
         MyExternalValueDesc * obj = static_cast<MyExternalValueDesc *>(self);
 
         std::string type_string = "nix-external<MyExternalValueDesc( ";
