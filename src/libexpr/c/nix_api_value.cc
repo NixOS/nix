@@ -382,13 +382,13 @@ nix_err nix_init_string(nix_c_context * context, Value * value, const char * str
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_path_string(nix_c_context * context, Value * value, const char * str)
+nix_err nix_init_path_string(nix_c_context * context, EvalState * s, Value * value, const char * str)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        v.mkPath(std::string_view(str));
+        v.mkPath(s->state.rootPath(nix::CanonPath(str)));
     }
     NIXC_CATCH_ERRS
 }
