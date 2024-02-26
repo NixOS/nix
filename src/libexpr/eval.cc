@@ -1220,7 +1220,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         Displacement displ = 0;
         for (auto & i : attrs) {
             Value * vAttr;
-            if (hasOverrides && !i.second.inherited()) {
+            if (hasOverrides && i.second.kind != AttrDef::Kind::Inherited) {
                 vAttr = state.allocValue();
                 mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), i.second.e);
             } else
