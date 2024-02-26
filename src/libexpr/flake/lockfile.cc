@@ -84,8 +84,10 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
     return doFind(root, path, visited);
 }
 
-LockFile::LockFile(const nlohmann::json & json, const Path & path)
+LockFile::LockFile(std::string_view contents, std::string_view path)
 {
+    auto json = nlohmann::json::parse(contents);
+
     auto version = json.value("version", 0);
     if (version < 5 || version > 7)
         throw Error("lock file '%s' has unsupported version %d", path, version);
@@ -201,12 +203,6 @@ std::pair<std::string, LockFile::KeyMap> LockFile::to_string() const
 {
     auto [json, nodeKeys] = toJSON();
     return {json.dump(2), std::move(nodeKeys)};
-}
-
-LockFile LockFile::read(const Path & path)
-{
-    if (!pathExists(path)) return LockFile();
-    return LockFile(nlohmann::json::parse(readFile(path)), path);
 }
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
