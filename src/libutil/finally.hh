@@ -1,11 +1,13 @@
 #pragma once
 ///@file
 
+#include <utility>
+
 /**
  * A trivial class to run a function at the end of a scope.
  */
 template<typename Fn>
-class Finally
+class [[nodiscard("Finally values must be used")]] Finally
 {
 private:
     Fn fun;
