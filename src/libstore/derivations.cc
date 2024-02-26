@@ -1366,7 +1366,7 @@ Derivation Derivation::fromJSON(
 
     ensureType(json, value_t::object);
 
-    res.name = ensureType(valueAt(json, "name"), value_t::string);
+    res.name = getString(valueAt(json, "name"));
 
     try {
         auto & outputsObj = ensureType(valueAt(json, "outputs"), value_t::object);
@@ -1410,8 +1410,8 @@ Derivation Derivation::fromJSON(
         throw;
     }
 
-    res.platform = ensureType(valueAt(json, "system"), value_t::string);
-    res.builder = ensureType(valueAt(json, "builder"), value_t::string);
+    res.platform = getString(valueAt(json, "system"));
+    res.builder = getString(valueAt(json, "builder"));
     res.args = ensureType(valueAt(json, "args"), value_t::array);
     res.env = ensureType(valueAt(json, "env"), value_t::object);
 

@@ -40,4 +40,34 @@ const nlohmann::json & ensureType(
 
     return value;
 }
+
+const nlohmann::json::string_t & getString(const nlohmann::json & value)
+{
+    if (!value.is_string())
+        throw Error(
+            "Expected JSON value to be a 'string' but it is of type '%s'",
+            value.type_name());
+
+    return value.get_ref<const nlohmann::json::string_t &>();
+}
+
+const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value)
+{
+    if (!value.is_number_integer())
+        throw Error(
+            "Expected JSON value to be an 'integer' but it is of type '%s'",
+            value.type_name());
+
+    return value.get_ref<const nlohmann::json::number_integer_t &>();
+}
+
+const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value)
+{
+    if (!value.is_boolean())
+        throw Error(
+            "Expected JSON value to be a 'boolean' but it is of type '%s'",
+            value.type_name());
+
+    return value.get_ref<const nlohmann::json::boolean_t &>();
+}
 }

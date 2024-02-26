@@ -12,7 +12,7 @@ nlohmann::json * get(nlohmann::json & map, const std::string & key);
 
 /**
  * Get the value of a json object at a key safely, failing
- * with a Nix Error if the key does not exist.
+ * with a nice Error if the key does not exist.
  *
  * Use instead of nlohmann::json::at() to avoid ugly exceptions.
  *
@@ -31,6 +31,14 @@ const nlohmann::json & valueAt(
 const nlohmann::json & ensureType(
     const nlohmann::json & value,
     nlohmann::json::value_type expectedType);
+
+/**
+ * Downcast the json object, failing with a nice error if the conversion fails.
+ * See https://json.nlohmann.me/features/types/
+ */
+const nlohmann::json::string_t & getString(const nlohmann::json & value);
+const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value);
+const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value);
 
 /**
  * For `adl_serializer<std::optional<T>>` below, we need to track what

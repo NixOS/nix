@@ -199,11 +199,8 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
     };
 
     ensureType(json, value_t::object);
-    res.narHash = Hash::parseAny(
-        static_cast<const std::string &>(
-            ensureType(valueAt(json, "narHash"), value_t::string)),
-        std::nullopt);
-    res.narSize = ensureType(valueAt(json, "narSize"), value_t::number_integer);
+    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+    res.narSize = getInteger(valueAt(json, "narSize"));
 
     try {
         auto & references = ensureType(valueAt(json, "references"), value_t::array);
@@ -216,20 +213,16 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
     }
 
     if (json.contains("ca"))
-        res.ca = ContentAddress::parse(
-            static_cast<const std::string &>(
-                ensureType(valueAt(json, "ca"), value_t::string)));
+        res.ca = ContentAddress::parse(getString(valueAt(json, "ca")));
 
     if (json.contains("deriver"))
-        res.deriver = store.parseStorePath(
-            static_cast<const std::string &>(
-                ensureType(valueAt(json, "deriver"), value_t::string)));
+        res.deriver = store.parseStorePath(getString(valueAt(json, "deriver")));
 
     if (json.contains("registrationTime"))
-        res.registrationTime = ensureType(valueAt(json, "registrationTime"), value_t::number_integer);
+        res.registrationTime = getInteger(valueAt(json, "registrationTime"));
 
     if (json.contains("ultimate"))
-        res.ultimate = ensureType(valueAt(json, "ultimate"), value_t::boolean);
+        res.ultimate = getBoolean(valueAt(json, "ultimate"));
 
     if (json.contains("signatures"))
         res.sigs = valueAt(json, "signatures");
