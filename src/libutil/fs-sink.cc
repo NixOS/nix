@@ -5,52 +5,6 @@
 
 namespace nix {
 
-void copyRecursive(
-    SourceAccessor & accessor, const CanonPath & from,
-    FileSystemObjectSink & sink, const Path & to)
-{
-    auto stat = accessor.lstat(from);
-
-    switch (stat.type) {
-    case SourceAccessor::tSymlink:
-    {
-        sink.createSymlink(to, accessor.readLink(from));
-        break;
-    }
-
-    case SourceAccessor::tRegular:
-    {
-        sink.createRegularFile(to, [&](CreateRegularFileSink & crf) {
-            if (stat.isExecutable)
-                crf.isExecutable();
-            accessor.readFile(from, crf, [&](uint64_t size) {
-                crf.preallocateContents(size);
-            });
-        });
-        break;
-    }
-
-    case SourceAccessor::tDirectory:
-    {
-        sink.createDirectory(to);
-        for (auto & [name, _] : accessor.readDirectory(from)) {
-            copyRecursive(
-                accessor, from / name,
-                sink, to + "/" + name);
-            break;
-        }
-        break;
-    }
-
-    case SourceAccessor::tMisc:
-        throw Error("file '%1%' has an unsupported type", from);
-
-    default:
-        abort();
-    }
-}
-
-
 struct RestoreSinkSettings : Config
 {
     Setting<bool> preallocateContents{this, false, "preallocate-contents",
