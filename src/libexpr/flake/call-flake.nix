@@ -38,10 +38,17 @@ let
       (key: node:
         let
 
+          parentNode = allNodes.${getInputByPath lockFile.root node.parent};
+
           sourceInfo =
             if overrides ? ${key}
             then
               overrides.${key}.sourceInfo
+            else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/"
+            then
+              parentNode.sourceInfo // {
+                outPath = parentNode.sourceInfo.outPath + ("/" + node.locked.path);
+              }
             else
               # FIXME: remove obsolete node.info.
               fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);

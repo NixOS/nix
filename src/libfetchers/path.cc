@@ -92,6 +92,15 @@ struct PathInputScheme : InputScheme
         return (bool) input.getNarHash();
     }
 
+    std::optional<std::string> isRelative(const Input & input) const override
+    {
+        auto path = getStrAttr(input.attrs, "path");
+        if (hasPrefix(path, "/"))
+            return std::nullopt;
+        else
+            return path;
+    }
+
     CanonPath getAbsPath(const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");
@@ -105,31 +114,14 @@ struct PathInputScheme : InputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
-        std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
-        if (path[0] != '/') {
-            if (!input.parent)
-                throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
+        auto absPath = getAbsPath(input);
 
-            auto parent = canonPath(*input.parent);
-
-            // the path isn't relative, prefix it
-            absPath = nix::absPath(path, parent);
-
-            // for security, ensure that if the parent is a store path, it's inside it
-            if (store->isInStore(parent)) {
-                auto storePath = store->printStorePath(store->toStorePath(parent).first);
-                if (!isDirOrInDir(absPath, storePath))
-                    throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
-            }
-        } else
-            absPath = path;
-
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to the store", absPath));
 
         // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store->maybeParseStorePath(absPath);
+        auto storePath = store->maybeParseStorePath(absPath.abs());
 
         if (storePath)
             store->addTempRoot(*storePath);
@@ -138,7 +130,7 @@ struct PathInputScheme : InputScheme
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
             auto src = sinkToSource([&](Sink & sink) {
-                mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
+                mtime = dumpPathAndGetMtime(absPath.abs(), sink, defaultPathFilter);
             });
             storePath = store->addToStoreFromDump(*src, "source");
         }
