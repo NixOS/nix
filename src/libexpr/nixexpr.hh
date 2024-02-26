@@ -135,6 +135,11 @@ struct ExprVar : Expr
     COMMON_METHODS
 };
 
+/**
+ * A pseudo-expression for the purpose of evaluating the `from` expression in `inherit (from)` syntax.
+ * Unlike normal variable references, the displacement is set during parsing, and always refers to
+ * `ExprAttrs::inheritFromExprs` (by itself or in `ExprLet`), whose values are put into their own `Env`.
+ */
 struct ExprInheritFrom : ExprVar
 {
     ExprInheritFrom(PosIdx pos, Displacement displ): ExprVar(pos, {})
