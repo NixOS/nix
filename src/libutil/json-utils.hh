@@ -36,6 +36,8 @@ const nlohmann::json & ensureType(
  * Downcast the json object, failing with a nice error if the conversion fails.
  * See https://json.nlohmann.me/features/types/
  */
+const nlohmann::json::object_t & getObject(const nlohmann::json & value);
+const nlohmann::json::array_t & getArray(const nlohmann::json & value);
 const nlohmann::json::string_t & getString(const nlohmann::json & value);
 const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value);
 const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value);

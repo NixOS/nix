@@ -190,20 +190,18 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
 
 UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
     const Store & store,
-    const nlohmann::json & json)
+    const nlohmann::json & _json)
 {
-    using nlohmann::detail::value_t;
-
     UnkeyedValidPathInfo res {
         Hash(Hash::dummy),
     };
 
-    ensureType(json, value_t::object);
+    auto json = getObject(_json);
     res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
     res.narSize = getInteger(valueAt(json, "narSize"));
 
     try {
-        auto & references = ensureType(valueAt(json, "references"), value_t::array);
+        auto & references = getArray(valueAt(json, "references"));
         for (auto & input : references)
             res.references.insert(store.parseStorePath(static_cast<const std::string &>
 (input)));

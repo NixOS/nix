@@ -41,6 +41,26 @@ const nlohmann::json & ensureType(
     return value;
 }
 
+const nlohmann::json::object_t & getObject(const nlohmann::json & value)
+{
+    if (!value.is_array())
+        throw Error(
+            "Expected JSON value to be an 'object' but it is of type '%s'",
+            value.type_name());
+
+    return value.get_ref<const nlohmann::json::object_t &>();
+}
+
+const nlohmann::json::array_t & getArray(const nlohmann::json & value)
+{
+    if (!value.is_array())
+        throw Error(
+            "Expected JSON value to be an 'array' but it is of type '%s'",
+            value.type_name());
+
+    return value.get_ref<const nlohmann::json::array_t &>();
+}
+
 const nlohmann::json::string_t & getString(const nlohmann::json & value)
 {
     if (!value.is_string())

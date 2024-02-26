@@ -1239,8 +1239,7 @@ DerivationOutput DerivationOutput::fromJSON(
     const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
-    ensureType(_json, nlohmann::detail::value_t::object);
-    auto json = (std::map<std::string, nlohmann::json>) _json;
+    auto json = getObject(_json);
 
     for (const auto & [key, _] : json)
         keys.insert(key);
@@ -1357,20 +1356,20 @@ nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
 
 Derivation Derivation::fromJSON(
     const StoreDirConfig & store,
-    const nlohmann::json & json,
+    const nlohmann::json & _json,
     const ExperimentalFeatureSettings & xpSettings)
 {
     using nlohmann::detail::value_t;
 
     Derivation res;
 
-    ensureType(json, value_t::object);
+    auto json = getObject(_json);
 
     res.name = getString(valueAt(json, "name"));
 
     try {
-        auto & outputsObj = ensureType(valueAt(json, "outputs"), value_t::object);
-        for (auto & [outputName, output] : outputsObj.items()) {
+        auto & outputsObj = getObject(valueAt(json, "outputs"));
+        for (auto & [outputName, output] : outputsObj) {
             res.outputs.insert_or_assign(
                 outputName,
                 DerivationOutput::fromJSON(store, res.name, outputName, output));
@@ -1381,7 +1380,7 @@ Derivation Derivation::fromJSON(
     }
 
     try {
-        auto & inputsList = ensureType(valueAt(json, "inputSrcs"), value_t::array);
+        auto & inputsList = getArray(valueAt(json, "inputSrcs"));
         for (auto & input : inputsList)
             res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
     } catch (Error & e) {
@@ -1395,14 +1394,14 @@ Derivation Derivation::fromJSON(
             DerivedPathMap<StringSet>::ChildNode node;
             node.value = static_cast<const StringSet &>(
                 ensureType(valueAt(json, "outputs"), value_t::array));
-            for (auto & [outputId, childNode] : ensureType(valueAt(json, "dynamicOutputs"), value_t::object).items()) {
+            for (auto & [outputId, childNode] : getObject(valueAt(json, "dynamicOutputs"))) {
                 xpSettings.require(Xp::DynamicDerivations);
                 node.childMap[outputId] = doInput(childNode);
             }
             return node;
         };
-        auto & inputDrvsObj = ensureType(valueAt(json, "inputDrvs"), value_t::object);
-        for (auto & [inputDrvPath, inputOutputs] : inputDrvsObj.items())
+        auto & inputDrvsObj = getObject(valueAt(json, "inputDrvs"));
+        for (auto & [inputDrvPath, inputOutputs] : inputDrvsObj)
             res.inputDrvs.map[store.parseStorePath(inputDrvPath)] =
                 doInput(inputOutputs);
     } catch (Error & e) {
