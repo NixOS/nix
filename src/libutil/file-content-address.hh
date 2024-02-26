@@ -63,11 +63,11 @@ void restorePath(
  * Compute the hash of the given file system object according to the
  * given method.
  *
- * The hash is defined as (essentially) hashString(ht, dumpPath(path)).
+ * The hash is defined as (essentially) hashString(ha, dumpPath(path)).
  */
 HashResult hashPath(
     SourceAccessor & accessor, const CanonPath & path,
-    FileIngestionMethod method, HashAlgorithm ht,
+    FileIngestionMethod method, HashAlgorithm ha,
     PathFilter & filter = defaultPathFilter);
 
 }

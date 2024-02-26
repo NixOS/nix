@@ -91,17 +91,17 @@ struct ContentAddressMethod
     std::string_view renderPrefix() const;
 
     /**
-     * Parse a content addressing method and hash type.
+     * Parse a content addressing method and hash algorithm.
      */
     static std::pair<ContentAddressMethod, HashAlgorithm> parseWithAlgo(std::string_view rawCaMethod);
 
     /**
-     * Render a content addressing method and hash type in a
+     * Render a content addressing method and hash algorithm in a
      * nicer way, prefixing both cases.
      *
      * The rough inverse of `parse()`.
      */
-    std::string renderWithAlgo(HashAlgorithm ht) const;
+    std::string renderWithAlgo(HashAlgorithm ha) const;
 
     /**
      * Get the underlying way to content-address file system objects.
@@ -127,7 +127,7 @@ struct ContentAddressMethod
  *   ‘text:sha256:<sha256 hash of file contents>’
  *
  * - `FixedIngestionMethod`:
- *   ‘fixed:<r?>:<hash type>:<hash of file contents>’
+ *   ‘fixed:<r?>:<hash algorithm>:<hash of file contents>’
  */
 struct ContentAddress
 {

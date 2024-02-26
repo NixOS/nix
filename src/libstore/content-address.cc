@@ -111,10 +111,10 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
     }
 
     auto parseHashAlgorithm_ = [&](){
-        auto hashTypeRaw = splitPrefixTo(rest, ':');
-        if (!hashTypeRaw)
+        auto hashAlgoRaw = splitPrefixTo(rest, ':');
+        if (!hashAlgoRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
-        HashAlgorithm hashAlgo = parseHashAlgo(*hashTypeRaw);
+        HashAlgorithm hashAlgo = parseHashAlgo(*hashAlgoRaw);
         return hashAlgo;
     };
 
