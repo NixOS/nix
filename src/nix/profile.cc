@@ -395,7 +395,26 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
             element.updateStorePaths(getEvalStore(), store, res);
 
-            manifest.addElement(std::move(element));
+            auto elementName = getNameFromElement(element);
+
+            // Check if the element already exists.
+            auto existingPair = manifest.elements.find(elementName);
+            if (existingPair != manifest.elements.end()) {
+                auto existingElement = existingPair->second;
+                auto existingSource = existingElement.source;
+                auto elementSource = element.source;
+                if (existingSource
+                    && elementSource
+                    && existingElement.priority == element.priority
+                    && existingSource->originalRef == elementSource->originalRef
+                    && existingSource->attrPath == elementSource->attrPath
+                    ) {
+                    warn("'%s' is already installed", elementName);
+                    continue;
+                }
+            }
+
+            manifest.addElement(elementName, std::move(element));
         }
 
         try {
