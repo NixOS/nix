@@ -1,5 +1,3 @@
-#include "file-system.hh"
-#include "libcmd/repl.hh"
 #include <cstdio>
 
 #ifdef USE_READLINE
@@ -19,6 +17,8 @@ extern "C" {
 #include "signals.hh"
 #include "finally.hh"
 #include "repl-interacter.hh"
+#include "file-system.hh"
+#include "libcmd/repl.hh"
 
 namespace nix {
 
@@ -124,7 +124,18 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
     return restoreRepl;
 }
 
-bool ReadlineLikeInteracter::getLine(std::string & input, const std::string & prompt)
+static constexpr const char * promptForType(ReplPromptType promptType)
+{
+    switch (promptType) {
+    case ReplPromptType::ReplPrompt:
+        return "nix-repl> ";
+    case ReplPromptType::ContinuationPrompt:
+        return "          ";
+    }
+    assert(false);
+}
+
+bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptType)
 {
     struct sigaction act, old;
     sigset_t savedSignalMask, set;
@@ -150,7 +161,7 @@ bool ReadlineLikeInteracter::getLine(std::string & input, const std::string & pr
     };
 
     setupSignals();
-    char * s = readline(prompt.c_str());
+    char * s = readline(promptForType(promptType));
     Finally doFree([&]() { free(s); });
     restoreSignals();
 

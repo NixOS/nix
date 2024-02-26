@@ -195,7 +195,7 @@ ReplExitStatus NixRepl::mainLoop()
         logger->pause();
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
-        if (!interacter->getLine(input, input.empty() ? "nix-repl> " : "          ")) {
+        if (!interacter->getLine(input, input.empty() ? ReplPromptType::ReplPrompt : ReplPromptType::ContinuationPrompt)) {
             // Ctrl-D should exit the debugger.
             state->debugStop = false;
             logger->cout("");
