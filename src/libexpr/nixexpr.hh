@@ -189,8 +189,6 @@ struct ExprAttrs : Expr
             : kind(kind), e(e), pos(pos) { };
         AttrDef() { };
 
-        bool inherited() const { return kind == Kind::Inherited; }
-
         template<typename T>
         const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
         {
