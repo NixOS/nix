@@ -101,6 +101,15 @@ struct ProfileElement
     }
 };
 
+std::string getNameFromElement(const ProfileElement & element)
+{
+    std::optional<std::string> result = std::nullopt;
+    if (element.source) {
+        result = getNameFromURL(parseURL(element.source->to_string()));
+    }
+    return result.value_or(element.identifier());
+}
+
 struct ProfileManifest
 {
     using ProfileElementName = std::string;
@@ -189,12 +198,8 @@ struct ProfileManifest
 
     void addElement(ProfileElement element)
     {
-        auto name =
-            element.source
-            ? getNameFromURL(parseURL(element.source->to_string()))
-            : std::nullopt;
-        auto name2 = name ? *name : element.identifier();
-        addElement(name2, std::move(element));
+        auto name = getNameFromElement(element);
+        addElement(name, std::move(element));
     }
 
     nlohmann::json toJSON(Store & store) const
