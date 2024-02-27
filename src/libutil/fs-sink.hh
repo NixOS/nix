@@ -42,6 +42,13 @@ struct FileSystemObjectSink
 };
 
 /**
+ * Recursively copy file system objects from the source into the sink.
+ */
+void copyRecursive(
+    SourceAccessor & accessor, const CanonPath & sourcePath,
+    FileSystemObjectSink & sink, const Path & destPath);
+
+/**
  * Ignore everything and do nothing
  */
 struct NullFileSystemObjectSink : FileSystemObjectSink
