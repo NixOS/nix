@@ -960,11 +960,8 @@ struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRu
 
     void run(ref<Store> store) override
     {
-        if (minAge) {
-            auto t = parseOlderThanTimeSpec(*minAge);
-            deleteGenerationsOlderThan(*profile, t, dryRun);
-        } else
-            deleteOldGenerations(*profile, dryRun);
+        auto period = minAge ? *minAge : "old";
+        deleteUnusedGenerations(*profile, period, dryRun);
     }
 };
 

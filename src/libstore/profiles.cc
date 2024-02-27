@@ -139,8 +139,7 @@ void deleteGeneration(const Path & profile, GenerationNumber gen, bool dryRun)
     }
 }
 
-
-void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun)
+void deleteNumberedGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -248,6 +247,26 @@ time_t parseOlderThanTimeSpec(std::string_view timeSpec)
 
     return curTime - *days * 24 * 3600;
 }
+
+void deleteUnusedGenerations(const Path & profile, std::string_view period, bool dryRun) {
+    if (period == "old") {
+        deleteOldGenerations(profile, dryRun);
+    } else if (period.find('d') != std::string::npos) {
+        auto t = parseOlderThanTimeSpec(period);
+        deleteGenerationsOlderThan(profile, t, dryRun);
+    } else if (period.find('+') != std::string::npos) {
+        if (period.size() < 2)
+            throw Error("invalid number of generations '%1%'", period);
+        auto str_max = period.substr(1);
+        auto max = string2Int<GenerationNumber>(str_max);
+        if (!max)
+            throw Error("invalid number of generations to keep '%1%'", period);
+        deleteGenerationsGreaterThan(profile, *max, dryRun);
+    } else {
+        throw Error("invalid generation to delete '%1%'", period);
+    }
+}
+
 
 
 void switchLink(Path link, Path target)
