@@ -397,7 +397,7 @@
           nativeBuildInputs = attrs.nativeBuildInputs or []
             # TODO: Remove the darwin check once
             # https://github.com/NixOS/nixpkgs/pull/291814 is available
-            ++ lib.optional (stdenv.cc.isClang && !stdenv.isDarwin) pkgs.buildPackages.bear
+            ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
         });
         in
