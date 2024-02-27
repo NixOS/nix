@@ -6,6 +6,7 @@ perl/Makefile.config
 /autom4te.cache
 /precompiled-headers.h.gch
 /config.*
+/config/
 /configure
 /stamp-h1
 /svn-revision
