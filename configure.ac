@@ -347,7 +347,7 @@ fi
 AC_ARG_ENABLE(gc, AS_HELP_STRING([--enable-gc],[enable garbage collection in the Nix expression evaluator (requires Boehm GC) [default=yes]]),
   gc=$enableval, gc=yes)
 if test "$gc" = yes; then
-  PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
+  PKG_CHECK_MODULES([BDW_GC], [bdw-gc >= 8.2.4])
   CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
 fi
