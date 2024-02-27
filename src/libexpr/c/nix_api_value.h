@@ -46,7 +46,14 @@ typedef struct EvalState EvalState;
  */
 typedef struct BindingsBuilder BindingsBuilder;
 
-typedef class ListBuilder ListBuilder;
+/** @brief Stores an under-construction list
+ * @ingroup value_manip
+ *
+ * Do not reuse.
+ * @see nix_make_list_builder, nix_list_builder_free, nix_make_list
+ * @see nix_list_builder_insert
+ */
+typedef struct ListBuilder ListBuilder;
 
 /** @brief PrimOp function
  * @ingroup primops
@@ -336,11 +343,11 @@ nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue 
 
 /** @brief Create a list from a list builder
  * @param[out] context Optional, stores error information
+ * @param[in] list_builder list builder to use. Make sure to unref this afterwards.
  * @param[out] value Nix value to modify
- * @param[in] b list builder to use. Make sure to unref this afterwards.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, ListBuilder * b);
+nix_err nix_make_list(nix_c_context * context, EvalState * s, ListBuilder * list_builder, Value * value);
 
 /** @brief Create a list builder
  * @param[out] context Optional, stores error information
@@ -352,11 +359,11 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
 
 /** @brief Insert bindings into a builder
  * @param[out] context Optional, stores error information
- * @param[in] builder ListBuilder to insert into
+ * @param[in] list_builder ListBuilder to insert into
  * @param[in] value value to insert
  * @return error code, NIX_OK on success.
  */
-nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * builder, Value * value);
+nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, Value * value);
 
 /** @brief Free a list builder
  *

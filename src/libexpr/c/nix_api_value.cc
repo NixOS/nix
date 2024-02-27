@@ -17,32 +17,6 @@
 #include "gc_cpp.h"
 #endif
 
-class ListBuilder
-{
-private:
-    std::vector<nix::Value *> values;
-
-public:
-    ListBuilder(size_t capacity)
-    {
-        values.reserve(capacity);
-    }
-
-    void push_back(nix::Value * value)
-    {
-        values.push_back(value);
-    }
-
-    Value * finish(nix::EvalState * state, nix::Value * list)
-    {
-        state->mkList(*list, values.size());
-        for (size_t n = 0; n < list->listSize(); ++n) {
-            list->listElems()[n] = values[n];
-        }
-        return list;
-    }
-};
-
 // Helper function to throw an exception if value is null
 static const nix::Value & check_value_not_null(const Value * value)
 {
@@ -443,7 +417,7 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto builder = ListBuilder(capacity);
+        auto builder = CListBuilder(capacity);
         return new
 #if HAVE_BOEHMGC
             (NoGC)
@@ -453,12 +427,12 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * builder, Value * value)
+nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        builder->push_back((nix::Value *) value);
+        list_builder->builder.push_back((nix::Value *) value);
     }
     NIXC_CATCH_ERRS
 }
@@ -472,13 +446,13 @@ void nix_list_builder_free(ListBuilder * bb)
 #endif
 }
 
-nix_err nix_make_list(nix_c_context * context, EvalState * s, Value * value, ListBuilder * b)
+nix_err nix_make_list(nix_c_context * context, EvalState * s, ListBuilder * list_builder, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        b->finish(&(s->state), &v);
+        list_builder->builder.finish(&(s->state), &v);
     }
     NIXC_CATCH_ERRS
 }

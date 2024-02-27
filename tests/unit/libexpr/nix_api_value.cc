@@ -78,7 +78,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
     Value * intValue = nix_alloc_value(nullptr, state);
     nix_init_int(nullptr, intValue, 42);
     nix_list_builder_insert(nullptr, builder, intValue);
-    nix_make_list(nullptr, state, value, builder);
+    nix_make_list(nullptr, state, builder, value);
     nix_list_builder_free(builder);
 
     ASSERT_EQ(42, nix_get_int(nullptr, nix_get_list_byidx(nullptr, value, state, 0)));
