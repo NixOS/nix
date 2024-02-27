@@ -100,7 +100,7 @@ StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const c
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_store_build(
+nix_err nix_store_realise(
     nix_c_context * context,
     Store * store,
     StorePath * path,

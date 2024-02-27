@@ -85,7 +85,7 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath);
     ASSERT_EQ(false, nix_store_is_valid_path(nullptr, store, outStorePath));
 
-    nix_store_build(ctx, store, drvStorePath, nullptr, nullptr);
+    nix_store_realise(ctx, store, drvStorePath, nullptr, nullptr);
 
     // TODO figure out why fails.
     // `make libexpr-tests_RUN` works, but `nix build .` fails
