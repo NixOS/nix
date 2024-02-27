@@ -29,7 +29,7 @@ static std::string quoteRegexChars(const std::string & raw)
 }
 static std::regex storePathRegex(const fs::path storeDir)
 {
-    return std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+    return std::regex(quoteRegexChars(storeDir) + R"((?!\.\.?(-|$))[0-9a-zA-Z\+\-\._\?=]+)");
 }
 
 static bool isInStore(fs::path storeDir, fs::path dir)
