@@ -35,7 +35,12 @@ Because of the need for a second daemon, this makes the setup a bit more complex
     sudo -u nix-daemon mkdir -p /nix/var/nix/gc-socket
     sudo -u nix-daemon rm -rf "$DAEMON_HOME"
     ```
-5. Install the systemd services for the daemon:
+5. Move the tracing daemon executable out of the store (as we don't want Nix
+   to own it)
+   ```sh
+   sudo cp /nix/var/nix/profiles/default/bin/nix-find-roots /usr/bin/
+   ```
+6. Install the systemd services for the daemon:
     ```sh
     cat <<EOF | sudo tee /etc/systemd/system/nix-daemon.service
     [Unit]
@@ -74,7 +79,7 @@ Because of the need for a second daemon, this makes the setup a bit more complex
     WantedBy=sockets.target
     EOF
     ```
-6. Install the systemd services for the tracing daemon:
+7. Install the systemd services for the tracing daemon:
     ```sh
     cat <<EOF | sudo tee /etc/systemd/system/nix-find-roots.service
     [Unit]
@@ -85,7 +90,7 @@ Because of the need for a second daemon, this makes the setup a bit more complex
     ProcSubset=pid
 
     [Service]
-    ExecStart=@/nix/var/nix/profiles/default/bin/nix-find-roots nix-find-roots
+    ExecStart=@/usr/bin/nix-find-roots nix-find-roots
     Type=simple
     StandardError=journal
     ProtectSystem=full
@@ -116,7 +121,7 @@ Because of the need for a second daemon, this makes the setup a bit more complex
     WantedBy=sockets.target
     EOF
     ```
-7. Enable the required experimental Nix feature and basic configuration:
+8. Enable the required experimental Nix feature and basic configuration:
     ```sh
     sudo mkdir /etc/nix
     cat <<EOF | sudo tee /etc/nix/nix.conf
@@ -125,9 +130,9 @@ Because of the need for a second daemon, this makes the setup a bit more complex
     substituters = https://cache.nixos.org/
     EOF
     ```
-8. Start the systemd sockets:
+9. Start the systemd sockets:
     ```sh
     sudo systemctl start nix-daemon.socket
     sudo systemctl start nix-find-roots.socket
     ```
-9. Profit
+10. Profit
