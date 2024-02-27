@@ -409,8 +409,9 @@
               (forAllStdenvs (stdenvName: makeShell pkgs pkgs.${stdenvName}));
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
-            (makeShells "static" nixpkgsFor.${system}.static) //
-            (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+            (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
+              (makeShells "static" nixpkgsFor.${system}.static)) //
+              (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }
