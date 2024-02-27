@@ -21,9 +21,8 @@
 
 namespace nix::roots_tracer {
 namespace fs = std::filesystem;
-using std::set, std::string;
 
-static string quoteRegexChars(const string & raw)
+static std::string quoteRegexChars(const std::string & raw)
 {
     static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
     return std::regex_replace(raw, specialRegex, R"(\$&)");
@@ -117,7 +116,7 @@ static void traceStaticRoot(
     }
 }
 
-TraceResult traceStaticRoots(TracerConfig opts, set<fs::path> roots)
+TraceResult traceStaticRoots(TracerConfig opts, std::set<fs::path> roots)
 {
     int maxRecursionLevel = 2;
     TraceResult res;
@@ -197,7 +196,7 @@ Roots getRuntimeRoots(TracerConfig opts)
 
         // A set of paths used by the executable and possibly symlinks to a
         // path in the store
-        set<fs::path> pathsToConsider;
+        std::set<fs::path> pathsToConsider;
         pathsToConsider.insert(procEntry.path()/"exe");
         pathsToConsider.insert(procEntry.path()/"cwd");
         try {

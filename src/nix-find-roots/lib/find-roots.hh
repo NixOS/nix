@@ -5,7 +5,6 @@
 
 namespace nix::roots_tracer {
 namespace fs = std::filesystem;
-using std::set, std::map, std::string;
 
 class Error : public std::runtime_error {
 public:
@@ -27,11 +26,11 @@ struct TracerConfig {
 /**
  * A value of type `Roots` is a mapping from a store path to the set of roots that keep it alive
  */
-typedef map<fs::path, std::set<fs::path>> Roots;
+typedef std::map<fs::path, std::set<fs::path>> Roots;
 
 struct TraceResult {
     Roots storeRoots;
-    set<fs::path> deadLinks;
+    std::set<fs::path> deadLinks;
 };
 
 /**
@@ -45,7 +44,7 @@ struct TraceResult {
  * Also returns the set of all dead links encountered during the process (so
  * that they can be removed if it makes sense).
  */
-TraceResult traceStaticRoots(TracerConfig opts, set<fs::path> initialRoots);
+TraceResult traceStaticRoots(TracerConfig opts, std::set<fs::path> initialRoots);
 
 Roots getRuntimeRoots(TracerConfig opts);
 

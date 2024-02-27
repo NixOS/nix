@@ -78,7 +78,7 @@ TracerConfig parseCmdLine(int argc, char** argv)
  */
 std::string escape(std::string original)
 {
-    map<string, string> replacements = {
+    std::map<std::string, std::string> replacements = {
         {"\n", "\\n"},
         {"\t", "\\t"},
     };
@@ -98,7 +98,7 @@ std::string escape(std::string original)
 int main(int argc, char * * argv)
 {
     const TracerConfig opts = parseCmdLine(argc, argv);
-    const set<fs::path> standardRoots = {
+    const std::set<fs::path> standardRoots = {
         opts.stateDir / fs::path("profiles"),
         opts.stateDir / fs::path("gcroots"),
     };
