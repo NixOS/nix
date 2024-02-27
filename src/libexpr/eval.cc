@@ -31,6 +31,7 @@
 #include <sstream>
 #include <cstring>
 #include <optional>
+#include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <fstream>
@@ -250,6 +251,50 @@ class BoehmGCStackAllocator : public StackAllocator {
 
 static BoehmGCStackAllocator boehmGCStackAllocator;
 
+/**
+ * When a thread goes into a coroutine, we lose its original sp until
+ * control flow returns to the thread.
+ * While in the coroutine, the sp points outside the thread stack,
+ * so we can detect this and push the entire thread stack instead,
+ * as an approximation.
+ * The coroutine's stack is covered by `BoehmGCStackAllocator`.
+ * This is not an optimal solution, because the garbage is scanned when a
+ * coroutine is active, for both the coroutine and the original thread stack.
+ * However, the implementation is quite lean, and usually we don't have active
+ * coroutines during evaluation, so this is acceptable.
+ */
+void fixupBoehmStackPointer(void ** sp_ptr, void * pthread_id) {
+    void *& sp = *sp_ptr;
+    pthread_attr_t pattr;
+    size_t osStackSize;
+    void * osStackLow;
+    void * osStackBase;
+
+    #ifdef __APPLE__
+    osStackSize = pthread_get_stacksize_np((pthread_t)pthread_id);
+    osStackLow = pthread_get_stackaddr_np((pthread_t)pthread_id);
+    #else
+    if (pthread_attr_init(&pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
+    }
+    if (pthread_getattr_np((pthread_t)pthread_id, &pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_getattr_np failed");
+    }
+    if (pthread_attr_getstack(&pattr, &osStackLow, &osStackSize)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_getstack failed");
+    }
+    if (pthread_attr_destroy(&pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_destroy failed");
+    }
+    #endif
+    osStackBase = (char *)osStackLow + osStackSize;
+    // NOTE: We assume the stack grows down, as it does on all architectures we support.
+    //       Architectures that grow the stack up are rare.
+    if (sp >= osStackBase || sp < osStackLow) { // lo is outside the os stack
+        sp = osStackBase;
+    }
+}
+
 #endif
 
 
@@ -303,16 +348,21 @@ void initGC()
 
     GC_set_oom_fn(oomHandler);
 
+    // TODO: Comment suggests an implementation that works on darwin and windows
+    //       https://github.com/ivmai/bdwgc/issues/362#issuecomment-1936672196
+    #ifndef __APPLE__
+    GC_set_sp_corrector(&fixupBoehmStackPointer);
+    #endif
+
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
 
-
-#if NIX_BOEHM_PATCH_VERSION != 1
-    printTalkative("Unpatched BoehmGC, disabling GC inside coroutines");
-    /* Used to disable GC when entering coroutines on macOS */
-    create_coro_gc_hook = []() -> std::shared_ptr<void> {
-        return std::make_shared<BoehmDisableGC>();
-    };
-#endif
+    if (!GC_get_sp_corrector()) {
+        printTalkative("BoehmGC on this platform does not support sp_corrector; will disable GC inside coroutines");
+        /* Used to disable GC when entering coroutines on macOS */
+        create_coro_gc_hook = []() -> std::shared_ptr<void> {
+            return std::make_shared<BoehmDisableGC>();
+        };
+    }
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
