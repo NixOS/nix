@@ -118,7 +118,7 @@ bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath *
  * @param[in] userdata data to pass to every callback invocation
  * @param[in] callback called for every realised output
  */
-nix_err nix_store_build(
+nix_err nix_store_realise(
     nix_c_context * context,
     Store * store,
     StorePath * path,
