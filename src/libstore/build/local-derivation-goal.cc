@@ -1397,7 +1397,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         BuildMode buildMode = bmNormal) override
     { unsupported("buildDerivation"); }
 
-    void addTempRoot(const StorePath & path) override
+    void addTempRoots(const StorePathSet & path) override
     { }
 
     void addIndirectRoot(const Path & path) override

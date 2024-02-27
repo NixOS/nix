@@ -164,6 +164,7 @@ enum struct WorkerProto::Op : uint64_t
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    AddTempRoots = 48,
 };
 
 /**
