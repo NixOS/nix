@@ -77,6 +77,18 @@ nix profile upgrade --regex '.*'
 [[ $(readlink $TEST_HOME/.nix-profile/bin/hello) =~ .*-profile-test-2\.1/bin/hello ]]
 nix profile rollback
 
+# Test matching no packages using literal package name.
+assertStderr nix --offline profile upgrade this_package_is_not_installed << EOF
+warning: Package name 'this_package_is_not_installed' does not match any packages in the profile.
+warning: No packages to upgrade. Use 'nix profile list' to see the current profile.
+EOF
+
+# Test matching no packages using regular expression.
+assertStderr nix --offline profile upgrade --regex '.*unknown_package.*' << EOF
+warning: Regex '.*unknown_package.*' does not match any packages in the profile.
+warning: No packages to upgrade. Use 'nix profile list' to see the current profile.
+EOF
+
 # Test removing all packages using regular expression.
 nix profile remove --regex '.*' 2>&1 | grep "removed 2 packages, kept 0 packages"
 nix profile rollback
@@ -85,6 +97,10 @@ nix profile rollback
 nix profile diff-closures
 
 # Test rollback.
+printf World > $flake1Dir/who
+nix profile upgrade flake1
+printf NixOS > $flake1Dir/who
+nix profile upgrade flake1
 nix profile rollback
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
 
