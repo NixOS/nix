@@ -56,31 +56,63 @@ void parseBlob(
     FileSystemObjectSink & sink,
     const Path & sinkPath,
     Source & source,
-    bool executable,
+    BlobMode blobMode,
     const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);
 
-    sink.createRegularFile(sinkPath, [&](auto & crf) {
-        if (executable)
-            crf.isExecutable();
+    unsigned long long size = std::stoi(getStringUntil(source, 0));
 
-        unsigned long long size = std::stoi(getStringUntil(source, 0));
+    auto doRegularFile = [&](bool executable) {
+        sink.createRegularFile(sinkPath, [&](auto & crf) {
+            if (executable)
+                crf.isExecutable();
 
-        crf.preallocateContents(size);
+            crf.preallocateContents(size);
 
-        unsigned long long left = size;
-        std::string buf;
-        buf.reserve(65536);
+            unsigned long long left = size;
+            std::string buf;
+            buf.reserve(65536);
 
-        while (left) {
+            while (left) {
+                checkInterrupt();
+                buf.resize(std::min((unsigned long long)buf.capacity(), left));
+                source(buf);
+                crf(buf);
+                left -= buf.size();
+            }
+        });
+    };
+
+    switch (blobMode) {
+
+    case BlobMode::Regular:
+        doRegularFile(false);
+        break;
+
+    case BlobMode::Executable:
+        doRegularFile(true);
+        break;
+
+    case BlobMode::Symlink:
+    {
+        std::string target;
+        target.resize(size, '0');
+        target.reserve(size);
+        for (size_t n = 0; n < target.size();) {
             checkInterrupt();
-            buf.resize(std::min((unsigned long long)buf.capacity(), left));
-            source(buf);
-            crf(buf);
-            left -= buf.size();
+            n += source.read(
+                const_cast<char *>(target.c_str()) + n,
+                target.size() - n);
         }
-    });
+
+        sink.createSymlink(sinkPath, target);
+        break;
+    }
+
+    default:
+        assert(false);
+    }
 }
 
 void parseTree(
@@ -142,7 +174,7 @@ void parse(
     FileSystemObjectSink & sink,
     const Path & sinkPath,
     Source & source,
-    bool executable,
+    BlobMode rootModeIfBlob,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -152,7 +184,7 @@ void parse(
 
     switch (type) {
     case ObjectType::Blob:
-        parseBlob(sink, sinkPath, source, executable, xpSettings);
+        parseBlob(sink, sinkPath, source, rootModeIfBlob, xpSettings);
         break;
     case ObjectType::Tree:
         parseTree(sink, sinkPath, source, hook, xpSettings);
@@ -177,7 +209,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
 
 void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook)
 {
-    parse(sink, "", source, false, [&](Path name, TreeEntry entry) {
+    parse(sink, "", source, BlobMode::Regular, [&](Path name, TreeEntry entry) {
         auto [accessor, from] = hook(entry.hash);
         auto stat = accessor->lstat(from);
         auto gotOpt = convertMode(stat.type);
@@ -275,6 +307,13 @@ Mode dump(
     }
 
     case SourceAccessor::tSymlink:
+    {
+        auto target = accessor.readLink(path);
+        dumpBlobPrefix(target.size(), sink, xpSettings);
+        sink(target);
+        return Mode::Symlink;
+    }
+
     case SourceAccessor::tMisc:
     default:
         throw Error("file '%1%' has an unsupported type", path);
