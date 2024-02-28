@@ -396,6 +396,7 @@
             # Make bash completion work.
             XDG_DATA_DIRS+=:$out/share
           '';
+
           nativeBuildInputs = attrs.nativeBuildInputs or []
             # TODO: Remove the darwin check once
             # https://github.com/NixOS/nixpkgs/pull/291814 is available
