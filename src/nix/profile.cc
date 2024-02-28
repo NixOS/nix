@@ -457,6 +457,7 @@ enum MatcherType
 {
     Regex,
     StorePath,
+    Name,
 };
 
 struct Matcher
@@ -489,6 +490,16 @@ Matcher createStorePathMatcher(const nix::StorePath & storePath)
     };
 }
 
+Matcher createNameMatcher(const std::string & name) {
+    return {
+        .type = MatcherType::Name,
+        .title = fmt("Package name '%s'", name),
+        .matches = [name](const std::string &elementName, const ProfileElement & element) {
+            return elementName == name;
+        }
+    };
+}
+
 class MixProfileElementMatchers : virtual Args, virtual StoreCommand
 {
     std::vector<Matcher> _matchers;
@@ -507,7 +518,7 @@ public:
                     } else if (getStore()->isStorePath(arg)) {
                         _matchers.push_back(createStorePathMatcher(getStore()->parseStorePath(arg)));
                     } else {
-                        _matchers.push_back(createRegexMatcher(arg));
+                        _matchers.push_back(createNameMatcher(arg));
                     }
                 }
             }}
