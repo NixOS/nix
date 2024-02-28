@@ -1225,14 +1225,65 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     auto name = visitor.getAttr(state->sName)->getString();
                     if (json) {
                         std::optional<std::string> description;
+                        std::optional<std::string> homepage;
+                        std::optional<std::vector<Bindings *>> maintainers;
+                        std::optional<std::vector<Symbol>> license;
+                        std::shared_ptr<eval_cache::AttrCursor> aLicense;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
                             if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                                 description = aDescription->getString();
+                            if (auto aHomepage = aMeta->maybeGetAttr(state->sHomepage))
+                                homepage = aHomepage->getString();
+                            if (auto aMaintainers = aMeta->maybeGetAttr(state->sMaintainers))
+                                maintainers = aMaintainers->getListOfAttrs();
+                            aLicense = aMeta->maybeGetAttr(state->sLicense);
+                            if (aLicense)
+                                license = aLicense->getAttrs();
                         }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
                         if (description)
                             j.emplace("description", *description);
+                        if (homepage)
+                            j.emplace("homepage", *homepage);
+                        if (maintainers) {
+                            std::string github = "";
+                            auto jMaintainers = nlohmann::json::object();
+                            for(auto k : *maintainers) {
+                                auto jFields = nlohmann::json::object();
+                                Bindings::iterator i = k->begin();
+                                while(i != k->end()) {
+                                    auto val = *i->value;
+                                    PathSet context;
+
+                                    std::string valString = state->coerceToString(i->pos, val, context, true, false).toOwned();
+                                    std::string symbolString = std::string(state->symbols[i->name]);
+
+                                    jFields.emplace(symbolString, valString);
+
+                                    // TODO: what if no github? name?
+                                    if (i->name == state->symbols.create("github")) {
+                                        github = valString;
+                                    }
+                                    ++i;
+                                }
+                                if (github.empty()) {
+                                    throw Error("set in maintainers expects github attribute");
+                                }
+                                jMaintainers.emplace(github, std::move(jFields));
+                            }
+                            j.emplace("maintainers", std::move(jMaintainers));
+                        }
+                        if (license) {
+                            auto jLicense = nlohmann::json::object();
+                            for(const auto & attr : *license) {
+                                auto attrName = state->symbols[attr];
+                                // TODO: clean up
+                                auto valStr = aLicense->getAttr(attr)->getString();
+                                jLicense.emplace(std::string(attrName), valStr);
+                            } 
+                            j.emplace("license", jLicense);
+                        }
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,

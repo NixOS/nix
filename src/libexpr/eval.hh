@@ -166,7 +166,7 @@ public:
         sContentAddressed, sImpure,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
-        sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
+        sDescription, sHomepage, sMaintainers, sLicense, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
         sPrefix,
         sOutputSpecified;
 
