@@ -102,6 +102,9 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
         if (isFlake) {
 
+            if (!S_ISDIR(lstat(path).st_mode))
+                throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
+
             if (!allowMissing && !pathExists(path + "/flake.nix")){
                 notice("path '%s' does not contain a 'flake.nix', searching up",path);
 
@@ -123,9 +126,6 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 if (!found)
                     throw BadURL("could not find a flake.nix file");
             }
-
-            if (!S_ISDIR(lstat(path).st_mode))
-                throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
 
             if (!allowMissing && !pathExists(path + "/flake.nix"))
                 throw BadURL("path '%s' is not a flake (because it doesn't contain a 'flake.nix' file)", path);
