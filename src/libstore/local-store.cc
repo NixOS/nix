@@ -1202,7 +1202,7 @@ StorePath LocalStore::addToStoreFromDump(
     Path tempDir;
     AutoCloseFD tempDirFd;
 
-    bool methodsMatch = (FileIngestionMethod) dumpMethod == hashMethod;
+    bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
 
     /* If the methods don't match, our streaming hash of the dump is the
        wrong sort, and we need to rehash. */
