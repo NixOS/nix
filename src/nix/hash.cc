@@ -5,6 +5,7 @@
 #include "shared.hh"
 #include "references.hh"
 #include "archive.hh"
+#include "git.hh"
 #include "posix-source-accessor.hh"
 #include "misc-store-flags.hh"
 
@@ -66,9 +67,11 @@ struct CmdHashBase : Command
     {
         switch (mode) {
         case FileIngestionMethod::Flat:
-            return  "print cryptographic hash of a regular file";
+            return "print cryptographic hash of a regular file";
         case FileIngestionMethod::Recursive:
             return "print cryptographic hash of the NAR serialisation of a path";
+        case FileIngestionMethod::Git:
+            return "print cryptographic hash of the Git serialisation of a path";
         default:
             assert(false);
         };
@@ -77,17 +80,41 @@ struct CmdHashBase : Command
     void run() override
     {
         for (auto path : paths) {
+            auto makeSink = [&]() -> std::unique_ptr<AbstractHashSink> {
+                if (modulus)
+                    return std::make_unique<HashModuloSink>(hashAlgo, *modulus);
+                else
+                    return std::make_unique<HashSink>(hashAlgo);
+            };
 
-            std::unique_ptr<AbstractHashSink> hashSink;
-            if (modulus)
-                hashSink = std::make_unique<HashModuloSink>(hashAlgo, *modulus);
-            else
-                hashSink = std::make_unique<HashSink>(hashAlgo);
+            auto [accessor_, canonPath] = PosixSourceAccessor::createAtRoot(path);
+            auto & accessor = accessor_;
+            Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
+            switch (mode) {
+            case FileIngestionMethod::Flat:
+            case FileIngestionMethod::Recursive:
+            {
+                auto hashSink = makeSink();
+                dumpPath(accessor, canonPath, *hashSink, (FileSerialisationMethod) mode);
+                h = hashSink->finish().first;
+                break;
+            }
+            case FileIngestionMethod::Git: {
+                std::function<git::DumpHook> hook;
+                hook = [&](const CanonPath & path) -> git::TreeEntry {
+                    auto hashSink = makeSink();
+                    auto mode = dump(accessor, path, *hashSink, hook);
+                    auto hash = hashSink->finish().first;
+                    return {
+                        .mode = mode,
+                        .hash = hash,
+                    };
+                };
+                h = hook(canonPath).hash;
+                break;
+            }
+            }
 
-            auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
-            dumpPath(accessor, canonPath, *hashSink, mode);
-
-            Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
             logger->cout(h.to_string(hashFormat, hashFormat == HashFormat::SRI));
         }

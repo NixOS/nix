@@ -466,14 +466,23 @@ public:
      * in `dump`, which is either a NAR serialisation (if recursive ==
      * true) or simply the contents of a regular file (if recursive ==
      * false).
-     * `dump` may be drained
      *
-     * \todo remove?
+     * `dump` may be drained.
+     *
+     * @param dumpMethod What serialisation format is `dump`, i.e. how
+     * to deserialize it. Must either match hashMethod or be
+     * `FileSerialisationMethod::Recursive`.
+     *
+     * @param hashMethod How content addressing? Need not match be the
+     * same as `dumpMethod`.
+     *
+     * @todo remove?
      */
     virtual StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) = 0;
@@ -772,7 +781,7 @@ protected:
      * Helper for methods that are not unsupported: this is used for
      * default definitions for virtual methods that are meant to be overriden.
      *
-     * \todo Using this should be a last resort. It is better to make
+     * @todo Using this should be a last resort. It is better to make
      * the method "virtual pure" and/or move it to a subclass.
      */
     [[noreturn]] void unsupported(const std::string & op)

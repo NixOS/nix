@@ -1138,7 +1138,10 @@ drvName, Bindings * attrs, Value & v)
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else if (s == "text") {
+            else if (s == "git") {
+                experimentalFeatureSettings.require(Xp::GitHashing);
+                ingestionMethod = FileIngestionMethod::Git;
+            } else if (s == "text") {
                 experimentalFeatureSettings.require(Xp::DynamicDerivations);
                 ingestionMethod = TextIngestionMethod {};
             } else
@@ -2089,7 +2092,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
         })
         : ({
             StringSource s { contents };
-            state.store->addToStoreFromDump(s, name, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
         });
 
     /* Note: we don't need to add `context' to the context of the

@@ -151,7 +151,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         PosixSourceAccessor accessor;
         hashPath(
             accessor, CanonPath { path },
-            FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first;
+            FileSerialisationMethod::Recursive, HashAlgorithm::SHA256).first;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
@@ -166,7 +166,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
                 PosixSourceAccessor accessor;
                 hashPath(
                     accessor, CanonPath { linkPath },
-                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first;
+                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256).first;
            })))
         {
             // XXX: Consider overwriting linkPath with our valid version.
