@@ -27,6 +27,7 @@
   - [Language Constructs](language/constructs.md)
     - [String interpolation](language/string-interpolation.md)
     - [Lookup path](language/constructs/lookup-path.md)
+    - [String context](language/string-context.md)
   - [Operators](language/operators.md)
   - [Derivations](language/derivations.md)
     - [Advanced Attributes](language/advanced-attributes.md)
