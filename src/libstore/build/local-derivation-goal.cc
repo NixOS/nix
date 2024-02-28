@@ -2480,6 +2480,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         CanonPath { tmpDir + "/tmp" }).hash;
                 }
                 }
+                assert(false);
             }();
 
             ValidPathInfo newInfo0 {

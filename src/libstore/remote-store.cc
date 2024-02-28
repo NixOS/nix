@@ -527,6 +527,8 @@ StorePath RemoteStore::addToStoreFromDump(
         // Use NAR; Git is not a serialization method
         fsm = FileSerialisationMethod::Recursive;
         break;
+    default:
+        assert(false);
     }
     if (fsm != dumpMethod)
         unsupported("RemoteStore::addToStoreFromDump doesn't support this `dumpMethod` `hashMethod` combination");

@@ -123,6 +123,11 @@ struct KeyedBuildResult : BuildResult
      * The derivation we built or the store path we substituted.
      */
     DerivedPath path;
+
+    // Hack to work around a gcc "may be used uninitialized" warning.
+    KeyedBuildResult(BuildResult res, DerivedPath path)
+        : BuildResult(std::move(res)), path(std::move(path))
+    { }
 };
 
 }
