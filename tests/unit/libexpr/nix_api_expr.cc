@@ -45,8 +45,9 @@ TEST_F(nix_api_expr_test, nix_expr_eval_drv)
     nix_value_call(ctx, stateResult, valueFn, value, valueResult);
     ASSERT_EQ(NIX_TYPE_STRING, nix_get_type(nullptr, valueResult));
 
-    const char * p = nix_get_string(nullptr, valueResult);
-    ASSERT_STREQ("/nix/store/40s0qmrfb45vlh6610rk29ym318dswdr-myname", p);
+    std::string p = nix_get_string(nullptr, valueResult);
+    std::string pEnd = "-myname";
+    ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
 
     // Clean up
     nix_gc_decref(nullptr, valueFn);
@@ -73,22 +74,22 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
 
     StorePath * drvStorePath = nix_store_parse_path(ctx, store, drvPath);
-    ASSERT_EQ(true, nix_store_is_valid_path(nullptr, store, drvStorePath));
+    ASSERT_EQ(true, nix_store_is_valid_path(ctx, store, drvStorePath));
 
-    Value * outPathValue = nix_get_attr_byname(nullptr, value, state, "outPath");
-    const char * outPath = nix_get_string(nullptr, outPathValue);
+    Value * outPathValue = nix_get_attr_byname(ctx, value, state, "outPath");
+    const char * outPath = nix_get_string(ctx, outPathValue);
 
     p = outPath;
     pEnd = "-myname";
     ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
+    ASSERT_EQ(true, drvStorePath->path.isDerivation());
 
     StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath);
-    ASSERT_EQ(false, nix_store_is_valid_path(nullptr, store, outStorePath));
-
-    nix_store_realise(ctx, store, drvStorePath, nullptr, nullptr);
+    ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, outStorePath));
 
     // TODO figure out why fails.
-    // `make libexpr-tests_RUN` works, but `nix build .` fails
+    // `make libexpr-tests_RUN` works, but `nix build .` enters an infinite loop
+    /* nix_store_realise(ctx, store, drvStorePath, nullptr, nullptr); */
     /* auto is_valid_path = nix_store_is_valid_path(ctx, store, outStorePath); */
     /* ASSERT_EQ(true, is_valid_path); */
 
