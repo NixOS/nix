@@ -5,6 +5,7 @@
 
 #include "path.hh"
 #include "store-api.hh"
+#include "build-result.hh"
 
 #include "globals.hh"
 
@@ -110,16 +111,19 @@ nix_err nix_store_realise(
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        store->ptr->buildPaths({
-            nix::DerivedPath::Built{
-                .drvPath = nix::makeConstantStorePathRef(path->path),
-                .outputs = nix::OutputsSpec::All{},
-            },
-        });
+
+        const std::vector<nix::DerivedPath> paths{nix::DerivedPath::Built{
+            .drvPath = nix::makeConstantStorePathRef(path->path), .outputs = nix::OutputsSpec::All{}}};
+
+        const auto nixStore = store->ptr;
+        auto results = nixStore->buildPathsWithResults(paths, nix::bmNormal, nixStore);
+
         if (callback) {
-            for (auto & [outputName, outputPath] : store->ptr->queryDerivationOutputMap(path->path)) {
-                auto op = store->ptr->printStorePath(outputPath);
-                callback(userdata, outputName.c_str(), op.c_str());
+            for (const auto & result : results) {
+                for (const auto & [outputName, realisation] : result.builtOutputs) {
+                    auto op = store->ptr->printStorePath(realisation.outPath);
+                    callback(userdata, outputName.c_str(), op.c_str());
+                }
             }
         }
     }
