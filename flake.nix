@@ -1,7 +1,9 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
+  # TODO switch to nixos-23.11-small
+  #      https://nixpk.gs/pr-tracker.html?pr=291954
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
@@ -10,19 +12,9 @@
 
     let
       inherit (nixpkgs) lib;
-
-      # Experimental fileset library: https://github.com/NixOS/nixpkgs/pull/222981
-      # Not an "idiomatic" flake input because:
-      #  - Propagation to dependent locks: https://github.com/NixOS/nix/issues/7730
-      #  - Subflake would download redundant and huge parent flake
-      #  - No git tree hash support: https://github.com/NixOS/nix/issues/6044
-      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nix/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
-        fileset;
+      inherit (lib) fileset;
 
       officialRelease = false;
-
-      # Set to true to build the release notes for the next release.
-      buildUnreleasedNotes = false;
 
       version = lib.fileContents ./.version + versionSuffix;
       versionSuffix =
@@ -404,8 +396,11 @@
             # Make bash completion work.
             XDG_DATA_DIRS+=:$out/share
           '';
+
           nativeBuildInputs = attrs.nativeBuildInputs or []
-            ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
+            # TODO: Remove the darwin check once
+            # https://github.com/NixOS/nixpkgs/pull/291814 is available
+            ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
         });
         in
@@ -417,8 +412,9 @@
               (forAllStdenvs (stdenvName: makeShell pkgs pkgs.${stdenvName}));
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
-            (makeShells "static" nixpkgsFor.${system}.static) //
-            (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+            (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
+              (makeShells "static" nixpkgsFor.${system}.static)) //
+              (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }

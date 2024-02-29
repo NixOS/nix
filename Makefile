@@ -69,6 +69,7 @@ ifeq ($(OPTIMIZE), 1)
   GLOBAL_LDFLAGS += $(CXXLTO)
 else
   GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
+  unexport NIX_HARDENING_ENABLE
 endif
 
 include mk/platform.mk
