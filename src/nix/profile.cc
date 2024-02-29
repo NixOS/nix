@@ -101,6 +101,15 @@ struct ProfileElement
     }
 };
 
+std::string getNameFromElement(const ProfileElement & element)
+{
+    std::optional<std::string> result = std::nullopt;
+    if (element.source) {
+        result = getNameFromURL(parseURL(element.source->to_string()));
+    }
+    return result.value_or(element.identifier());
+}
+
 struct ProfileManifest
 {
     using ProfileElementName = std::string;
@@ -189,12 +198,8 @@ struct ProfileManifest
 
     void addElement(ProfileElement element)
     {
-        auto name =
-            element.source
-            ? getNameFromURL(parseURL(element.source->to_string()))
-            : std::nullopt;
-        auto name2 = name ? *name : element.identifier();
-        addElement(name2, std::move(element));
+        auto name = getNameFromElement(element);
+        addElement(name, std::move(element));
     }
 
     nlohmann::json toJSON(Store & store) const
@@ -390,7 +395,26 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
             element.updateStorePaths(getEvalStore(), store, res);
 
-            manifest.addElement(std::move(element));
+            auto elementName = getNameFromElement(element);
+
+            // Check if the element already exists.
+            auto existingPair = manifest.elements.find(elementName);
+            if (existingPair != manifest.elements.end()) {
+                auto existingElement = existingPair->second;
+                auto existingSource = existingElement.source;
+                auto elementSource = element.source;
+                if (existingSource
+                    && elementSource
+                    && existingElement.priority == element.priority
+                    && existingSource->originalRef == elementSource->originalRef
+                    && existingSource->attrPath == elementSource->attrPath
+                    ) {
+                    warn("'%s' is already installed", elementName);
+                    continue;
+                }
+            }
+
+            manifest.addElement(elementName, std::move(element));
         }
 
         try {
