@@ -154,7 +154,7 @@ in {
     in
       fileset.toSource {
         root = ./.;
-        fileset = fileset.intersection baseFiles (fileset.unions ([
+        fileset = fileset.intersect baseFiles (fileset.unions ([
           # For configure
           ./.version
           ./configure.ac
