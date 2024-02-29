@@ -475,6 +475,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
+    if (options.action == GCOptions::gcDeleteSpecific && options.pathsToDelete.empty()) {
+        // This violates the convention that an empty `pathsToDelete` corresponds
+        // to the whole store, but deleting the whole store doesn't make sense,
+        // and `nix-store --delete` is a valid command that deletes nothing, so
+        // we need to keep it as-it-is.
+        return;
+    }
+
     StorePathSet roots, dead, alive;
 
     struct Shared
@@ -732,7 +740,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return markAlive();
             }
 
-            if (options.action == GCOptions::gcDeleteSpecific
+            if (!options.pathsToDelete.empty()
                 && !options.pathsToDelete.count(*path))
                 return;
 
@@ -790,11 +798,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Either delete all garbage paths, or just the specified
        paths (for gcDeleteSpecific). */
-    if (options.action == GCOptions::gcDeleteSpecific) {
+    if (!options.pathsToDelete.empty()) {
 
         for (auto & i : options.pathsToDelete) {
-            deleteReferrersClosure(i);
-            if (!dead.count(i))
+            if (shouldDelete) {
+                deleteReferrersClosure(i);
+            }
+            if (options.action == GCOptions::gcDeleteSpecific && !dead.count(i))
                 throw Error(
                     "Cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
