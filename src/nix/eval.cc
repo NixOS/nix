@@ -66,7 +66,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         if (apply) {
             auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, state->rootPath(CanonPath::fromCwd())), *vApply);
+            state->eval(state->parseExprFromString(*apply, state->rootPath(".")), *vApply);
             auto vRes = state->allocValue();
             state->callFunction(*vApply, *v, *vRes, noPos);
             v = vRes;
@@ -98,13 +98,13 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                         } catch (Error & e) {
                             e.addTrace(
                                 state->positions[attr.pos],
-                                hintfmt("while evaluating the attribute '%s'", name));
+                                HintFmt("while evaluating the attribute '%s'", name));
                             throw;
                         }
                     }
                 }
                 else
-                    throw TypeError("value at '%s' is not a string or an attribute set", state->positions[pos]);
+                    state->error<TypeError>("value at '%s' is not a string or an attribute set", state->positions[pos]).debugThrow();
             };
 
             recurse(*v, pos, *writeTo);

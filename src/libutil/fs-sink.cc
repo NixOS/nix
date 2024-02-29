@@ -15,6 +15,7 @@ void copyRecursive(
     case SourceAccessor::tSymlink:
     {
         sink.createSymlink(to, accessor.readLink(from));
+        break;
     }
 
     case SourceAccessor::tRegular:
@@ -34,10 +35,11 @@ void copyRecursive(
         sink.createDirectory(to);
         for (auto & [name, _] : accessor.readDirectory(from)) {
             copyRecursive(
-                accessor, from + name,
+                accessor, from / name,
                 sink, to + "/" + name);
             break;
         }
+        break;
     }
 
     case SourceAccessor::tMisc:

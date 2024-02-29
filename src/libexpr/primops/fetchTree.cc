@@ -9,6 +9,7 @@
 #include "tarball.hh"
 #include "url.hh"
 #include "value-to-json.hh"
+#include "fetch-to-store.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -24,8 +25,6 @@ void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isLocked());
-
     auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
@@ -100,16 +99,14 @@ static void fetchTree(
 
         if (auto aType = args[0]->attrs->get(state.sType)) {
             if (type)
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unexpected attribute 'type'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "unexpected attribute 'type'"
+                ).atPos(pos).debugThrow();
             type = state.forceStringNoCtx(*aType->value, aType->pos, "while evaluating the `type` attribute passed to builtins.fetchTree");
         } else if (!type)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = state.positions[pos]
-            }));
+            state.error<EvalError>(
+                "attribute 'type' is missing in call to 'fetchTree'"
+            ).atPos(pos).debugThrow();
 
         attrs.emplace("type", type.value());
 
@@ -132,8 +129,8 @@ static void fetchTree(
                 attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
             }
             else
-                state.debugThrowLastTrace(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    state.symbols[attr.name], showType(*attr.value)));
+                state.error<TypeError>("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                    state.symbols[attr.name], showType(*attr.value)).debugThrow();
         }
 
         if (params.isFetchGit && !attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
@@ -142,10 +139,9 @@ static void fetchTree(
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "attribute 'name' isn’t supported in call to 'fetchTree'"
+                ).atPos(pos).debugThrow();
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
@@ -163,10 +159,9 @@ static void fetchTree(
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
+                ).atPos(pos).debugThrow();
             input = fetchers::Input::fromURL(url);
         }
     }
@@ -175,10 +170,14 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked()) {
+        auto fetcher = "fetchTree";
         if (params.isFetchGit)
-            state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchGit' requires a locked input, at %s", state.positions[pos]));
-        else
-            state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+            fetcher = "fetchGit";
+
+        state.error<EvalError>(
+            "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
+            fetcher, input.to_string()
+        ).atPos(pos).debugThrow();
     }
 
     state.checkURI(input.toURLString());
@@ -432,17 +431,13 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             else
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
-                    .errPos = state.positions[attr.pos]
-                }));
+                state.error<EvalError>("unsupported argument '%s' to '%s'", n, who)
+                .atPos(pos).debugThrow();
         }
 
         if (!url)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            }));
+            state.error<EvalError>(
+                "'url' argument required").atPos(pos).debugThrow();
     } else
         url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
@@ -455,7 +450,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         name = baseNameOf(*url);
 
     if (evalSettings.pureEval && !expectedHash)
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
+        state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who).atPos(pos).debugThrow();
 
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
@@ -477,16 +472,22 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
+        ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, FetchMode::Copy, name)
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
-        if (hash != *expectedHash)
-            state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                                                *url, expectedHash->to_string(HashFormat::Nix32, true), hash.to_string(HashFormat::Nix32, true)));
+        if (hash != *expectedHash) {
+            state.error<EvalError>(
+                "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                *url,
+                expectedHash->to_string(HashFormat::Nix32, true),
+                hash.to_string(HashFormat::Nix32, true)
+            ).withExitStatus(102)
+            .debugThrow();
+        }
     }
 
     state.allowAndSetStorePathString(storePath, v);

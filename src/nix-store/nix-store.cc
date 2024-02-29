@@ -176,12 +176,11 @@ static void opAdd(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
-    PosixSourceAccessor accessor;
-    for (auto & i : opArgs)
+    for (auto & i : opArgs) {
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         cout << fmt("%s\n", store->printStorePath(store->addToStore(
-            std::string(baseNameOf(i)),
-            accessor,
-            CanonPath::fromCwd(i))));
+            std::string(baseNameOf(i)), accessor, canonPath)));
+    }
 }
 
 
@@ -201,14 +200,15 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     HashAlgorithm hashAlgo = parseHashAlgo(opArgs.front());
     opArgs.pop_front();
 
-    PosixSourceAccessor accessor;
-    for (auto & i : opArgs)
+    for (auto & i : opArgs) {
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(
             baseNameOf(i),
             accessor,
-            CanonPath::fromCwd(i),
+            canonPath,
             method,
             hashAlgo).path));
+    }
 }
 
 
@@ -555,7 +555,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                 HashResult hash = hashPath(
                     *store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) },
 
-                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }
@@ -950,8 +950,8 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->buildPaths(toDerivedPaths(paths));
                     out << 0;
                 } catch (Error & e) {
-                    assert(e.status);
-                    out << e.status << e.msg();
+                    assert(e.info().status);
+                    out << e.info().status << e.msg();
                 }
                 break;
             }

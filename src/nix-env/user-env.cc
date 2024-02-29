@@ -113,7 +113,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
         std::string str2 = str.str();
         StringSource source { str2 };
         state.store->addToStoreFromDump(
-            source, "env-manifest.nix", TextIngestionMethod {}, HashAlgorithm::SHA256, references);
+            source, "env-manifest.nix", FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, references);
     });
 
     /* Get the environment builder expression. */

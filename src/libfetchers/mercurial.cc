@@ -141,7 +141,7 @@ struct MercurialInputScheme : InputScheme
         if (!isLocal)
             throw Error("cannot commit '%s' to Mercurial repository '%s' because it's not a working tree", path, input.to_string());
 
-        auto absPath = CanonPath(repoPath) + path;
+        auto absPath = CanonPath(repoPath) / path;
 
         writeFile(absPath.abs(), contents);
 
@@ -345,6 +345,11 @@ struct MercurialInputScheme : InputScheme
             true);
 
         return makeResult(infoAttrs, std::move(storePath));
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
     }
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override

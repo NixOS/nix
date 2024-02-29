@@ -1,16 +1,25 @@
 #include "canon-path.hh"
-#include "file-system.hh"
+#include "util.hh"
+#include "file-path-impl.hh"
 
 namespace nix {
 
 CanonPath CanonPath::root = CanonPath("/");
 
+static std::string absPathPure(std::string_view path)
+{
+    return canonPathInner<UnixPathTrait>(path, [](auto &, auto &){});
+}
+
 CanonPath::CanonPath(std::string_view raw)
-    : path(absPath(raw, "/"))
+    : path(absPathPure(concatStrings("/", raw)))
 { }
 
 CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
-    : path(absPath(raw, root.abs()))
+    : path(absPathPure(
+        raw.size() > 0 && raw[0] == '/'
+            ? raw
+            : concatStrings(root.abs(), "/", raw)))
 { }
 
 CanonPath::CanonPath(const std::vector<std::string> & elems)
@@ -18,11 +27,6 @@ CanonPath::CanonPath(const std::vector<std::string> & elems)
 {
     for (auto & s : elems)
         push(s);
-}
-
-CanonPath CanonPath::fromCwd(std::string_view path)
-{
-    return CanonPath(unchecked_t(), absPath(path));
 }
 
 std::optional<CanonPath> CanonPath::parent() const
@@ -63,7 +67,7 @@ void CanonPath::extend(const CanonPath & x)
         path += x.abs();
 }
 
-CanonPath CanonPath::operator + (const CanonPath & x) const
+CanonPath CanonPath::operator / (const CanonPath & x) const
 {
     auto res = *this;
     res.extend(x);
@@ -78,7 +82,7 @@ void CanonPath::push(std::string_view c)
     path += c;
 }
 
-CanonPath CanonPath::operator + (std::string_view c) const
+CanonPath CanonPath::operator / (std::string_view c) const
 {
     auto res = *this;
     res.push(c);

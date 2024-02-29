@@ -9,6 +9,7 @@
 
 #include <iostream>
 
+#include "fmt.hh"
 #include "print-options.hh"
 
 namespace nix {
@@ -78,4 +79,13 @@ public:
 };
 
 std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer);
+
+
+/**
+ * `ValuePrinter` does its own ANSI formatting, so we don't color it
+ * magenta.
+ */
+template<>
+HintFmt & HintFmt::operator%(const ValuePrinter & value);
+
 }

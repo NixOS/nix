@@ -17,47 +17,61 @@
 #include <sodium.h>
 #include <nlohmann/json.hpp>
 
-
 using namespace nix;
 
+static bool libStoreInitialized = false;
 
-static ref<Store> store()
-{
-    static std::shared_ptr<Store> _store;
-    if (!_store) {
-        try {
-            initLibStore();
-            _store = openStore();
-        } catch (Error & e) {
-            croak("%s", e.what());
-        }
-    }
-    return ref<Store>(_store);
-}
-
+struct StoreWrapper {
+    ref<Store> store;
+};
 
 MODULE = Nix::Store PACKAGE = Nix::Store
 PROTOTYPES: ENABLE
 
+TYPEMAP: <<HERE
+StoreWrapper *      O_OBJECT
+
+OUTPUT
+O_OBJECT
+    sv_setref_pv( $arg, CLASS, (void*)$var );
+
+INPUT
+O_OBJECT
+    if ( sv_isobject($arg) && (SvTYPE(SvRV($arg)) == SVt_PVMG) ) {
+        $var = ($type)SvIV((SV*)SvRV( $arg ));
+    }
+    else {
+        warn( \"${Package}::$func_name() -- \"
+		\"$var not a blessed SV reference\");
+        XSRETURN_UNDEF;
+    }
+HERE
 
 #undef dNOOP // Hack to work around "error: declaration of 'Perl___notused' has a different language linkage" error message on clang.
 #define dNOOP
 
+void
+StoreWrapper::DESTROY()
 
-void init()
+StoreWrapper *
+StoreWrapper::new(char * s = nullptr)
     CODE:
-        store();
-
-
-void setVerbosity(int level)
-    CODE:
-        verbosity = (Verbosity) level;
-
-
-int isValidPath(char * path)
-    CODE:
+        static std::shared_ptr<Store> _store;
         try {
-            RETVAL = store()->isValidPath(store()->parseStorePath(path));
+            if (!libStoreInitialized) {
+                initLibStore();
+                libStoreInitialized = true;
+            }
+            if (items == 1) {
+                _store = openStore();
+                RETVAL = new StoreWrapper {
+                    .store = ref<Store>{_store}
+                };
+            } else {
+                RETVAL = new StoreWrapper {
+                    .store = openStore(s)
+                };
+            }
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -65,52 +79,81 @@ int isValidPath(char * path)
         RETVAL
 
 
-SV * queryReferences(char * path)
+void init()
+    CODE:
+        if (!libStoreInitialized) {
+            initLibStore();
+            libStoreInitialized = true;
+        }
+
+
+void setVerbosity(int level)
+    CODE:
+        verbosity = (Verbosity) level;
+
+
+int
+StoreWrapper::isValidPath(char * path)
+    CODE:
+        try {
+            RETVAL = THIS->store->isValidPath(THIS->store->parseStorePath(path));
+        } catch (Error & e) {
+            croak("%s", e.what());
+        }
+    OUTPUT:
+        RETVAL
+
+
+SV *
+StoreWrapper::queryReferences(char * path)
     PPCODE:
         try {
-            for (auto & i : store()->queryPathInfo(store()->parseStorePath(path))->references)
-                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
+            for (auto & i : THIS->store->queryPathInfo(THIS->store->parseStorePath(path))->references)
+                XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * queryPathHash(char * path)
+SV *
+StoreWrapper::queryPathHash(char * path)
     PPCODE:
         try {
-            auto s = store()->queryPathInfo(store()->parseStorePath(path))->narHash.to_string(HashFormat::Nix32, true);
+            auto s = THIS->store->queryPathInfo(THIS->store->parseStorePath(path))->narHash.to_string(HashFormat::Nix32, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * queryDeriver(char * path)
+SV *
+StoreWrapper::queryDeriver(char * path)
     PPCODE:
         try {
-            auto info = store()->queryPathInfo(store()->parseStorePath(path));
+            auto info = THIS->store->queryPathInfo(THIS->store->parseStorePath(path));
             if (!info->deriver) XSRETURN_UNDEF;
-            XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
+            XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(*info->deriver).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * queryPathInfo(char * path, int base32)
+SV *
+StoreWrapper::queryPathInfo(char * path, int base32)
     PPCODE:
         try {
-            auto info = store()->queryPathInfo(store()->parseStorePath(path));
+            auto info = THIS->store->queryPathInfo(THIS->store->parseStorePath(path));
             if (!info->deriver)
                 XPUSHs(&PL_sv_undef);
             else
-                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(*info->deriver).c_str(), 0)));
+                XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(*info->deriver).c_str(), 0)));
             auto s = info->narHash.to_string(base32 ? HashFormat::Nix32 : HashFormat::Base16, true);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
             AV * refs = newAV();
             for (auto & i : info->references)
-                av_push(refs, newSVpv(store()->printStorePath(i).c_str(), 0));
+                av_push(refs, newSVpv(THIS->store->printStorePath(i).c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) refs)));
             AV * sigs = newAV();
             for (auto & i : info->sigs)
@@ -120,10 +163,11 @@ SV * queryPathInfo(char * path, int base32)
             croak("%s", e.what());
         }
 
-SV * queryRawRealisation(char * outputId)
+SV *
+StoreWrapper::queryRawRealisation(char * outputId)
     PPCODE:
       try {
-        auto realisation = store()->queryRealisation(DrvOutput::parse(outputId));
+        auto realisation = THIS->store->queryRealisation(DrvOutput::parse(outputId));
         if (realisation)
             XPUSHs(sv_2mortal(newSVpv(realisation->toJSON().dump().c_str(), 0)));
         else
@@ -133,46 +177,50 @@ SV * queryRawRealisation(char * outputId)
       }
 
 
-SV * queryPathFromHashPart(char * hashPart)
+SV *
+StoreWrapper::queryPathFromHashPart(char * hashPart)
     PPCODE:
         try {
-            auto path = store()->queryPathFromHashPart(hashPart);
-            XPUSHs(sv_2mortal(newSVpv(path ? store()->printStorePath(*path).c_str() : "", 0)));
+            auto path = THIS->store->queryPathFromHashPart(hashPart);
+            XPUSHs(sv_2mortal(newSVpv(path ? THIS->store->printStorePath(*path).c_str() : "", 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * computeFSClosure(int flipDirection, int includeOutputs, ...)
+SV *
+StoreWrapper::computeFSClosure(int flipDirection, int includeOutputs, ...)
     PPCODE:
         try {
             StorePathSet paths;
             for (int n = 2; n < items; ++n)
-                store()->computeFSClosure(store()->parseStorePath(SvPV_nolen(ST(n))), paths, flipDirection, includeOutputs);
+                THIS->store->computeFSClosure(THIS->store->parseStorePath(SvPV_nolen(ST(n))), paths, flipDirection, includeOutputs);
             for (auto & i : paths)
-                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
+                XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * topoSortPaths(...)
+SV *
+StoreWrapper::topoSortPaths(...)
     PPCODE:
         try {
             StorePathSet paths;
-            for (int n = 0; n < items; ++n) paths.insert(store()->parseStorePath(SvPV_nolen(ST(n))));
-            auto sorted = store()->topoSortPaths(paths);
+            for (int n = 0; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
+            auto sorted = THIS->store->topoSortPaths(paths);
             for (auto & i : sorted)
-                XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
+                XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * followLinksToStorePath(char * path)
+SV *
+StoreWrapper::followLinksToStorePath(char * path)
     CODE:
         try {
-            RETVAL = newSVpv(store()->printStorePath(store()->followLinksToStorePath(path)).c_str(), 0);
+            RETVAL = newSVpv(THIS->store->printStorePath(THIS->store->followLinksToStorePath(path)).c_str(), 0);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -180,35 +228,38 @@ SV * followLinksToStorePath(char * path)
         RETVAL
 
 
-void exportPaths(int fd, ...)
+void
+StoreWrapper::exportPaths(int fd, ...)
     PPCODE:
         try {
             StorePathSet paths;
-            for (int n = 1; n < items; ++n) paths.insert(store()->parseStorePath(SvPV_nolen(ST(n))));
+            for (int n = 1; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
             FdSink sink(fd);
-            store()->exportPaths(paths, sink);
+            THIS->store->exportPaths(paths, sink);
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-void importPaths(int fd, int dontCheckSigs)
+void
+StoreWrapper::importPaths(int fd, int dontCheckSigs)
     PPCODE:
         try {
             FdSource source(fd);
-            store()->importPaths(source, dontCheckSigs ? NoCheckSigs : CheckSigs);
+            THIS->store->importPaths(source, dontCheckSigs ? NoCheckSigs : CheckSigs);
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * hashPath(char * algo, int base32, char * path)
+SV *
+hashPath(char * algo, int base32, char * path)
     PPCODE:
         try {
-            PosixSourceAccessor accessor;
+            auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
             Hash h = hashPath(
-                accessor, CanonPath::fromCwd(path),
-                FileIngestionMethod::Recursive, parseHashAlgo(algo)).first;
+                accessor, canonPath,
+                FileIngestionMethod::Recursive, parseHashAlgo(algo));
             auto s = h.to_string(base32 ? HashFormat::Nix32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -280,64 +331,67 @@ int checkSignature(SV * publicKey_, SV * sig_, char * msg)
         RETVAL
 
 
-SV * addToStore(char * srcPath, int recursive, char * algo)
+SV *
+StoreWrapper::addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            PosixSourceAccessor accessor;
-            auto path = store()->addToStore(
+            auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(srcPath);
+            auto path = THIS->store->addToStore(
                 std::string(baseNameOf(srcPath)),
-                accessor, CanonPath::fromCwd(srcPath),
+                accessor, canonPath,
                 method, parseHashAlgo(algo));
-            XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
+            XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
+SV *
+StoreWrapper::makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
     PPCODE:
         try {
             auto h = Hash::parseAny(hash, parseHashAlgo(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
+            auto path = THIS->store->makeFixedOutputPath(name, FixedOutputInfo {
                 .method = method,
                 .hash = h,
                 .references = {},
             });
-            XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
+            XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
         }
 
 
-SV * derivationFromPath(char * drvPath)
+SV *
+StoreWrapper::derivationFromPath(char * drvPath)
     PREINIT:
         HV *hash;
     CODE:
         try {
-            Derivation drv = store()->derivationFromPath(store()->parseStorePath(drvPath));
+            Derivation drv = THIS->store->derivationFromPath(THIS->store->parseStorePath(drvPath));
             hash = newHV();
 
             HV * outputs = newHV();
-            for (auto & i : drv.outputsAndOptPaths(*store())) {
+            for (auto & i : drv.outputsAndOptPaths(*THIS->store)) {
                 hv_store(
                     outputs, i.first.c_str(), i.first.size(),
                     !i.second.second
                         ? newSV(0) /* null value */
-                        : newSVpv(store()->printStorePath(*i.second.second).c_str(), 0),
+                        : newSVpv(THIS->store->printStorePath(*i.second.second).c_str(), 0),
                     0);
             }
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();
             for (auto & i : drv.inputDrvs.map)
-                av_push(inputDrvs, newSVpv(store()->printStorePath(i.first).c_str(), 0)); // !!! ignores i->second
+                av_push(inputDrvs, newSVpv(THIS->store->printStorePath(i.first).c_str(), 0)); // !!! ignores i->second
             hv_stores(hash, "inputDrvs", newRV((SV *) inputDrvs));
 
             AV * inputSrcs = newAV();
             for (auto & i : drv.inputSrcs)
-                av_push(inputSrcs, newSVpv(store()->printStorePath(i).c_str(), 0));
+                av_push(inputSrcs, newSVpv(THIS->store->printStorePath(i).c_str(), 0));
             hv_stores(hash, "inputSrcs", newRV((SV *) inputSrcs));
 
             hv_stores(hash, "platform", newSVpv(drv.platform.c_str(), 0));
@@ -361,10 +415,11 @@ SV * derivationFromPath(char * drvPath)
         RETVAL
 
 
-void addTempRoot(char * storePath)
+void
+StoreWrapper::addTempRoot(char * storePath)
     PPCODE:
         try {
-            store()->addTempRoot(store()->parseStorePath(storePath));
+            THIS->store->addTempRoot(THIS->store->parseStorePath(storePath));
         } catch (Error & e) {
             croak("%s", e.what());
         }

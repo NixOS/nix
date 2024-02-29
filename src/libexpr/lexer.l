@@ -94,6 +94,9 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 
 }
 
+// yacc generates code that uses unannotated fallthrough.
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+
 #define YY_USER_INIT initLoc(yylloc)
 #define YY_USER_ACTION adjustLoc(yylloc, yytext, yyleng);
 
@@ -146,9 +149,9 @@ or          { return OR_KW; }
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
               } catch (const boost::bad_lexical_cast &) {
-                  throw ParseError({
-                      .msg = hintfmt("invalid integer '%1%'", yytext),
-                      .errPos = state->positions[CUR_POS],
+                  throw ParseError(ErrorInfo{
+                      .msg = HintFmt("invalid integer '%1%'", yytext),
+                      .pos = state->positions[CUR_POS],
                   });
               }
               return INT_LIT;
@@ -156,9 +159,9 @@ or          { return OR_KW; }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
               if (errno != 0)
-                  throw ParseError({
-                      .msg = hintfmt("invalid float '%1%'", yytext),
-                      .errPos = state->positions[CUR_POS],
+                  throw ParseError(ErrorInfo{
+                      .msg = HintFmt("invalid float '%1%'", yytext),
+                      .pos = state->positions[CUR_POS],
                   });
               return FLOAT_LIT;
             }
@@ -285,9 +288,9 @@ or          { return OR_KW; }
 
 <INPATH_SLASH>{ANY} |
 <INPATH_SLASH><<EOF>> {
-  throw ParseError({
-      .msg = hintfmt("path has a trailing slash"),
-      .errPos = state->positions[CUR_POS],
+  throw ParseError(ErrorInfo{
+      .msg = HintFmt("path has a trailing slash"),
+      .pos = state->positions[CUR_POS],
   });
 }
 

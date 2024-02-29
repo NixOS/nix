@@ -29,7 +29,6 @@ struct Input
 
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
-    bool locked = false;
 
     /**
      * path of the parent of this input, used for relative path resolution
@@ -71,7 +70,7 @@ public:
      * Check whether this is a "locked" input, that is,
      * one that contains a commit hash or content hash.
      */
-    bool isLocked() const { return locked; }
+    bool isLocked() const;
 
     bool operator ==(const Input & other) const;
 
@@ -120,7 +119,6 @@ public:
      */
     std::optional<std::string> getFingerprint(ref<Store> store) const;
 };
-
 
 /**
  * The `InputScheme` represents a type of fetcher.  Each fetcher
@@ -196,6 +194,14 @@ struct InputScheme
      */
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }
+
+    /**
+     * Return `true` if this input is considered "locked", i.e. it has
+     * attributes like a Git revision or NAR hash that uniquely
+     * identify its contents.
+     */
+    virtual bool isLocked(const Input & input) const
+    { return false; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

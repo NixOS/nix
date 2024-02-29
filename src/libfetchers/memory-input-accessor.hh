@@ -13,4 +13,6 @@ struct MemoryInputAccessor : InputAccessor
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor();
 
+ref<InputAccessor> makeEmptyInputAccessor();
+
 }

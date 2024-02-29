@@ -7,6 +7,7 @@ namespace nix {
 StorePath fetchToStore(
     Store & store,
     const SourcePath & path,
+    FetchMode mode,
     std::string_view name,
     ContentAddressMethod method,
     PathFilter * filter,
@@ -21,23 +22,9 @@ StorePath fetchToStore(
         cacheKey = fetchers::Attrs{
             {"_what", "fetchToStore"},
             {"store", store.storeDir},
-            {"name", std::string(name)},
+            {"name", std::string{name}},
             {"fingerprint", *path.accessor->fingerprint},
-            {
-                "method",
-                std::visit(overloaded {
-                    [](const TextIngestionMethod &) {
-                        return "text";
-                    },
-                    [](const FileIngestionMethod & fim) {
-                        switch (fim) {
-                        case FileIngestionMethod::Flat: return "flat";
-                        case FileIngestionMethod::Recursive: return "nar";
-                        default: assert(false);
-                        }
-                    },
-                }, method.raw),
-            },
+            {"method", std::string{method.render()}},
             {"path", path.path.abs()}
         };
         if (auto res = fetchers::getCache()->lookup(store, *cacheKey)) {
@@ -47,18 +34,19 @@ StorePath fetchToStore(
     } else
         debug("source path '%s' is uncacheable", path);
 
-    Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", path));
+    Activity act(*logger, lvlChatty, actUnknown,
+        fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path));
 
     auto filter2 = filter ? *filter : defaultPathFilter;
 
     auto storePath =
-        settings.readOnlyMode
+        mode == FetchMode::DryRun
         ? store.computeStorePath(
             name, *path.accessor, path.path, method, HashAlgorithm::SHA256, {}, filter2).first
         : store.addToStore(
             name, *path.accessor, path.path, method, HashAlgorithm::SHA256, {}, filter2, repair);
 
-    if (cacheKey)
+    if (cacheKey && mode == FetchMode::Copy)
         fetchers::getCache()->add(store, *cacheKey, {}, storePath, true);
 
     return storePath;

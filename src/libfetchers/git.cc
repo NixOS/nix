@@ -158,6 +158,8 @@ std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 
 }  // end namespace
 
+static const Hash nullRev{HashAlgorithm::SHA1};
+
 struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
@@ -319,7 +321,7 @@ struct GitInputScheme : InputScheme
         if (!repoInfo.isLocal)
             throw Error("cannot commit '%s' to Git repository '%s' because it's not a working tree", path, input.to_string());
 
-        writeFile((CanonPath(repoInfo.url) + path).abs(), contents);
+        writeFile((CanonPath(repoInfo.url) / path).abs(), contents);
 
         auto result = runProgram(RunOptions {
             .program = "git",
@@ -415,7 +417,7 @@ struct GitInputScheme : InputScheme
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
         if (!input.getRef() && !input.getRev() && repoInfo.isLocal)
-            repoInfo.workdirInfo = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirInfo();
+            repoInfo.workdirInfo = GitRepo::openRepo(repoInfo.url)->getWorkdirInfo();
 
         return repoInfo;
     }
@@ -429,7 +431,7 @@ struct GitInputScheme : InputScheme
         if (auto res = cache->lookup(key))
             return getIntAttr(*res, "lastModified");
 
-        auto lastModified = GitRepo::openRepo(CanonPath(repoDir))->getLastModified(rev);
+        auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
 
         cache->upsert(key, Attrs{{"lastModified", lastModified}});
 
@@ -447,7 +449,7 @@ struct GitInputScheme : InputScheme
 
         Activity act(*logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.url));
 
-        auto revCount = GitRepo::openRepo(CanonPath(repoDir))->getRevCount(rev);
+        auto revCount = GitRepo::openRepo(repoDir)->getRevCount(rev);
 
         cache->upsert(key, Attrs{{"revCount", revCount}});
 
@@ -457,7 +459,7 @@ struct GitInputScheme : InputScheme
     std::string getDefaultRef(const RepoInfo & repoInfo) const
     {
         auto head = repoInfo.isLocal
-            ? GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirRef()
+            ? GitRepo::openRepo(repoInfo.url)->getWorkdirRef()
             : readHeadCached(repoInfo.url);
         if (!head) {
             warn("could not read HEAD ref from repo at '%s', using 'master'", repoInfo.url);
@@ -510,7 +512,7 @@ struct GitInputScheme : InputScheme
         if (repoInfo.isLocal) {
             repoDir = repoInfo.url;
             if (!input.getRev())
-                input.attrs.insert_or_assign("rev", GitRepo::openRepo(CanonPath(repoDir))->resolveRef(ref).gitRev());
+                input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
         } else {
             Path cacheDir = getCachePath(repoInfo.url, getShallowAttr(input));
             repoDir = cacheDir;
@@ -519,7 +521,7 @@ struct GitInputScheme : InputScheme
             createDirs(dirOf(cacheDir));
             PathLocks cacheDirLock({cacheDir});
 
-            auto repo = GitRepo::openRepo(CanonPath(cacheDir), true, true);
+            auto repo = GitRepo::openRepo(cacheDir, true, true);
 
             Path localRefFile =
                 ref.compare(0, 5, "refs/") == 0
@@ -588,7 +590,7 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        auto repo = GitRepo::openRepo(CanonPath(repoDir));
+        auto repo = GitRepo::openRepo(repoDir);
 
         auto isShallow = repo->isShallow();
 
@@ -664,7 +666,7 @@ struct GitInputScheme : InputScheme
             for (auto & submodule : repoInfo.workdirInfo.submodules)
                 repoInfo.workdirInfo.files.insert(submodule.path);
 
-        auto repo = GitRepo::openRepo(CanonPath(repoInfo.url), false, false);
+        auto repo = GitRepo::openRepo(repoInfo.url, false, false);
 
         auto exportIgnore = getExportIgnoreAttr(input);
 
@@ -680,7 +682,7 @@ struct GitInputScheme : InputScheme
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {
-                auto submodulePath = CanonPath(repoInfo.url) + submodule.path;
+                auto submodulePath = CanonPath(repoInfo.url) / submodule.path;
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", submodulePath.abs());
@@ -703,15 +705,17 @@ struct GitInputScheme : InputScheme
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
-            auto repo = GitRepo::openRepo(CanonPath(repoInfo.url));
+            auto repo = GitRepo::openRepo(repoInfo.url);
 
             if (auto ref = repo->getWorkdirRef())
                 input.attrs.insert_or_assign("ref", *ref);
 
-            auto rev = repoInfo.workdirInfo.headRev.value();
+            /* Return a rev of 000... if there are no commits yet. */
+            auto rev = repoInfo.workdirInfo.headRev.value_or(nullRev);
 
             input.attrs.insert_or_assign("rev", rev.gitRev());
-            input.attrs.insert_or_assign("revCount", getRevCount(repoInfo, repoInfo.url, rev));
+            input.attrs.insert_or_assign("revCount",
+                rev == nullRev ? 0 : getRevCount(repoInfo, repoInfo.url, rev));
 
             verifyCommit(input, repo);
         } else {
@@ -732,8 +736,6 @@ struct GitInputScheme : InputScheme
             repoInfo.workdirInfo.headRev
             ? getLastModified(repoInfo, repoInfo.url, *repoInfo.workdirInfo.headRev)
             : 0);
-
-        input.locked = true; // FIXME
 
         return {accessor, std::move(input)};
     }
@@ -770,6 +772,11 @@ struct GitInputScheme : InputScheme
             return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
         else
             return std::nullopt;
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
     }
 };
 

@@ -150,7 +150,7 @@ StorePath writeDerivation(Store & store,
         })
         : ({
             StringSource s { contents };
-            store.addToStoreFromDump(s, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair);
+            store.addToStoreFromDump(s, suffix, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair);
         });
 }
 
@@ -601,7 +601,7 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo));
+                s += ','; printUnquotedString(s, std::string { dof.method.renderPrefix() } + printHashAlgo(dof.hashAlgo));
                 s += ','; printUnquotedString(s, "");
             },
             [&](const DerivationOutput::Deferred &) {
@@ -612,7 +612,7 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
             [&](const DerivationOutput::Impure & doi) {
                 // FIXME
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo));
+                s += ','; printUnquotedString(s, std::string { doi.method.renderPrefix() } + printHashAlgo(doi.hashAlgo));
                 s += ','; printUnquotedString(s, "impure");
             }
         }, i.second.raw);
@@ -701,7 +701,7 @@ DerivationType BasicDerivation::type() const
                     floatingHashAlgo = dof.hashAlgo;
                 } else {
                     if (*floatingHashAlgo != dof.hashAlgo)
-                        throw Error("all floating outputs must use the same hash type");
+                        throw Error("all floating outputs must use the same hash algorithm");
                 }
             },
             [&](const DerivationOutput::Deferred &) {
@@ -984,7 +984,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 out << ""
-                    << (dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo))
+                    << (std::string { dof.method.renderPrefix() } + printHashAlgo(dof.hashAlgo))
                     << "";
             },
             [&](const DerivationOutput::Deferred &) {
@@ -994,7 +994,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
             },
             [&](const DerivationOutput::Impure & doi) {
                 out << ""
-                    << (doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo))
+                    << (std::string { doi.method.renderPrefix() } + printHashAlgo(doi.hashAlgo))
                     << "impure";
             },
         }, i.second.raw);
@@ -1221,11 +1221,11 @@ nlohmann::json DerivationOutput::toJSON(
             // FIXME print refs?
         },
         [&](const DerivationOutput::CAFloating & dof) {
-            res["hashAlgo"] = dof.method.renderPrefix() + printHashAlgo(dof.hashAlgo);
+            res["hashAlgo"] = std::string { dof.method.renderPrefix() } + printHashAlgo(dof.hashAlgo);
         },
         [&](const DerivationOutput::Deferred &) {},
         [&](const DerivationOutput::Impure & doi) {
-            res["hashAlgo"] = doi.method.renderPrefix() + printHashAlgo(doi.hashAlgo);
+            res["hashAlgo"] = std::string { doi.method.renderPrefix() } + printHashAlgo(doi.hashAlgo);
             res["impure"] = true;
         },
     }, raw);

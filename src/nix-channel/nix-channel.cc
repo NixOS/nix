@@ -138,7 +138,7 @@ static void update(const StringSet & channelNames)
 
     // Unpack the channel tarballs into the Nix store and install them
     // into the channels profile.
-    std::cerr << "unpacking channels...\n";
+    std::cerr << "unpacking " << exprs.size() << " channels...\n";
     Strings envArgs{ "--profile", profile, "--file", unpackChannelPath, "--install", "--remove-all", "--from-expression" };
     for (auto & expr : exprs)
         envArgs.push_back(std::move(expr));

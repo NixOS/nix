@@ -2,6 +2,7 @@
 ///@file
 
 #include "serialise.hh"
+#include "fs-sink.hh"
 #include <archive.h>
 
 namespace nix {
@@ -28,5 +29,7 @@ struct TarArchive {
 void unpackTarfile(Source & source, const Path & destDir);
 
 void unpackTarfile(const Path & tarFile, const Path & destDir);
+
+time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSink);
 
 }

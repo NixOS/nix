@@ -10,6 +10,7 @@
 #include "eval-inline.hh"
 #include "legacy.hh"
 #include "posix-source-accessor.hh"
+#include "misc-store-flags.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -123,10 +124,9 @@ std::tuple<StorePath, Hash> prefetchFile(
         Activity act(*logger, lvlChatty, actUnknown,
             fmt("adding '%s' to the store", url));
 
-        PosixSourceAccessor accessor;
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(tmpFile);
         auto info = store->addToStoreSlow(
-            *name,
-            accessor, CanonPath::fromCwd(tmpFile),
+            *name, accessor, canonPath,
             ingestionMethod, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);
@@ -285,7 +285,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             }}
         });
 
-        addFlag(Flag::mkHashAlgoFlag("hash-type", &hashAlgo));
+        addFlag(flag::hashAlgo("hash-type", &hashAlgo));
 
         addFlag({
             .longName = "executable",

@@ -448,7 +448,7 @@ Error readError(Source & source)
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,
-        .msg = hintfmt(msg),
+        .msg = HintFmt(msg),
     };
     auto havePos = readNum<size_t>(source);
     assert(havePos == 0);
@@ -457,7 +457,7 @@ Error readError(Source & source)
         havePos = readNum<size_t>(source);
         assert(havePos == 0);
         info.traces.push_back(Trace {
-            .hint = hintfmt(readString(source))
+            .hint = HintFmt(readString(source))
         });
     }
     return Error(std::move(info));

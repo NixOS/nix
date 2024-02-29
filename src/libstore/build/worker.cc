@@ -331,13 +331,23 @@ void Worker::run(const Goals & _topGoals)
             if (awake.empty() && 0U == settings.maxBuildJobs)
             {
                 if (getMachines().empty())
-                   throw Error("unable to start any build; either increase '--max-jobs' "
-                            "or enable remote builds."
-                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+                   throw Error(
+                        R"(
+                        Unable to start any build;
+                        either increase '--max-jobs' or enable remote builds.
+
+                        For more information run 'man nix.conf' and search for '/machines'.
+                        )"
+                    );
                 else
-                   throw Error("unable to start any build; remote machines may not have "
-                            "all required system features."
-                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+                   throw Error(
+                        R"(
+                        Unable to start any build;
+                        remote machines may not have all required system features.
+
+                        For more information run 'man nix.conf' and search for '/machines'.
+                        )"
+                    );
 
             }
             assert(!awake.empty());
@@ -519,11 +529,11 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        HashResult current = hashPath(
+        Hash current = hashPath(
             *store.getFSAccessor(), CanonPath { store.printStorePath(path) },
             FileIngestionMethod::Recursive, info->narHash.algo);
         Hash nullHash(HashAlgorithm::SHA256);
-        res = info->narHash == nullHash || info->narHash == current.first;
+        res = info->narHash == nullHash || info->narHash == current;
     }
     pathContentsGoodCache.insert_or_assign(path, res);
     if (!res)

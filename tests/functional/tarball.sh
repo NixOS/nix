@@ -42,11 +42,11 @@ test_tarball() {
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" >&2
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" 2>&1 | grep 'true'
 
-    nix-instantiate --eval -E '1 + 2' -I fnord=file://no-such-tarball.tar$ext
-    nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file://no-such-tarball$ext
-    (! nix-instantiate --eval -E '<fnord/xyzzy> 1' -I fnord=file://no-such-tarball$ext)
+    nix-instantiate --eval -E '1 + 2' -I fnord=file:///no-such-tarball.tar$ext
+    nix-instantiate --eval -E 'with <fnord/xyzzy>; 1 + 2' -I fnord=file:///no-such-tarball$ext
+    (! nix-instantiate --eval -E '<fnord/xyzzy> 1' -I fnord=file:///no-such-tarball$ext)
 
-    nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file://no-such-tarball$ext -I fnord=.
+    nix-instantiate --eval -E '<fnord/config.nix>' -I fnord=file:///no-such-tarball$ext -I fnord=.
 
     # Ensure that the `name` attribute isn’t accepted as that would mess
     # with the content-addressing
@@ -57,8 +57,3 @@ test_tarball() {
 test_tarball '' cat
 test_tarball .xz xz
 test_tarball .gz gzip
-
-rm -rf $TEST_ROOT/tmp
-mkdir -p $TEST_ROOT/tmp
-(! TMPDIR=$TEST_ROOT/tmp XDG_RUNTIME_DIR=$TEST_ROOT/tmp nix-env -f file://$(pwd)/bad.tar.xz -qa --out-path)
-(! [ -e $TEST_ROOT/tmp/bad ])

@@ -32,6 +32,24 @@ void chrootHelper(int argc, char * * argv);
 
 namespace nix {
 
+static bool haveProxyEnvironmentVariables()
+{
+    static const std::vector<std::string> proxyVariables = {
+        "http_proxy",
+        "https_proxy",
+        "ftp_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "FTP_PROXY"
+    };
+    for (auto & proxyVariable: proxyVariables) {
+        if (getEnv(proxyVariable).has_value()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
 {
@@ -54,6 +72,8 @@ static bool haveInternet()
                 return true;
         }
     }
+
+    if (haveProxyEnvironmentVariables()) return true;
 
     return false;
 }

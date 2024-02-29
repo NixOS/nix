@@ -8,8 +8,9 @@ namespace nix {
 class StorePath;
 class Store;
 
-ref<InputAccessor> makeFSInputAccessor(
-    const CanonPath & root);
+ref<InputAccessor> makeFSInputAccessor();
+
+ref<InputAccessor> makeFSInputAccessor(std::filesystem::path root);
 
 ref<InputAccessor> makeStorePathAccessor(
     ref<Store> store,

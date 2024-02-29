@@ -41,6 +41,24 @@ namespace nix {
         }
     }
 
+    TEST(CanonPath, from_existing) {
+        CanonPath p0("foo//bar/");
+        {
+            CanonPath p("/baz//quux/", p0);
+            ASSERT_EQ(p.abs(), "/baz/quux");
+            ASSERT_EQ(p.rel(), "baz/quux");
+            ASSERT_EQ(*p.baseName(), "quux");
+            ASSERT_EQ(*p.dirOf(), "/baz");
+        }
+        {
+            CanonPath p("baz//quux/", p0);
+            ASSERT_EQ(p.abs(), "/foo/bar/baz/quux");
+            ASSERT_EQ(p.rel(), "foo/bar/baz/quux");
+            ASSERT_EQ(*p.baseName(), "quux");
+            ASSERT_EQ(*p.dirOf(), "/foo/bar/baz");
+        }
+    }
+
     TEST(CanonPath, pop) {
         CanonPath p("foo/bar/x");
         ASSERT_EQ(p.abs(), "/foo/bar/x");
@@ -80,29 +98,29 @@ namespace nix {
         {
             CanonPath p1("a//foo/bar//");
             CanonPath p2("xyzzy/bla");
-            ASSERT_EQ((p1 + p2).abs(), "/a/foo/bar/xyzzy/bla");
+            ASSERT_EQ((p1 / p2).abs(), "/a/foo/bar/xyzzy/bla");
         }
 
         {
             CanonPath p1("/");
             CanonPath p2("/a/b");
-            ASSERT_EQ((p1 + p2).abs(), "/a/b");
+            ASSERT_EQ((p1 / p2).abs(), "/a/b");
         }
 
         {
             CanonPath p1("/a/b");
             CanonPath p2("/");
-            ASSERT_EQ((p1 + p2).abs(), "/a/b");
+            ASSERT_EQ((p1 / p2).abs(), "/a/b");
         }
 
         {
             CanonPath p("/foo/bar");
-            ASSERT_EQ((p + "x").abs(), "/foo/bar/x");
+            ASSERT_EQ((p / "x").abs(), "/foo/bar/x");
         }
 
         {
             CanonPath p("/");
-            ASSERT_EQ((p + "foo" + "bar").abs(), "/foo/bar");
+            ASSERT_EQ((p / "foo" / "bar").abs(), "/foo/bar");
         }
     }
 

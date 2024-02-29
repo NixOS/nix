@@ -9,6 +9,7 @@
 #include "store-api.hh"
 #include "command.hh"
 #include "tarball.hh"
+#include "fetch-to-store.hh"
 
 namespace nix {
 
@@ -156,7 +157,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     for (auto & i : autoArgs) {
         auto v = state.allocValue();
         if (i.second[0] == 'E')
-            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), state.rootPath(CanonPath::fromCwd())));
+            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), state.rootPath(".")));
         else
             v->mkString(((std::string_view) i.second).substr(1));
         res.insert(state.symbols.create(i.first), v);
@@ -164,11 +165,12 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir)
+SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
-        auto storePath = fetchers::downloadTarball(
-            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).storePath;
+        auto accessor = fetchers::downloadTarball(
+            EvalSettings::resolvePseudoUrl(s)).accessor;
+        auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
         return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }
 
@@ -185,7 +187,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDi
     }
 
     else
-        return state.rootPath(CanonPath(s, baseDir));
+        return state.rootPath(baseDir ? absPath(s, *baseDir) : absPath(s));
 }
 
 }

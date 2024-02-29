@@ -167,3 +167,36 @@
 
          error: expected a set but found an integer
   ```
+
+- Functions are printed with more detail [#7145](https://github.com/NixOS/nix/issues/7145) [#9606](https://github.com/NixOS/nix/pull/9606)
+
+  `nix repl`, `nix eval`, `builtins.trace`, and most other places values are
+  printed will now include function names and source location information:
+
+  ```
+  $ nix repl nixpkgs
+  nix-repl> builtins.map
+  «primop map»
+
+  nix-repl> builtins.map lib.id
+  «partially applied primop map»
+
+  nix-repl> builtins.trace lib.id "my-value"
+  trace: «lambda id @ /nix/store/8rrzq23h2zq7sv5l2vhw44kls5w0f654-source/lib/trivial.nix:26:5»
+  "my-value"
+  ```
+
+- Flake operations like `nix develop` will no longer fail when run in a Git
+  repository where the `flake.lock` file is `.gitignore`d
+  [#8854](https://github.com/NixOS/nix/issues/8854)
+  [#9324](https://github.com/NixOS/nix/pull/9324)
+
+- Nix commands will now respect Ctrl-C
+  [#7145](https://github.com/NixOS/nix/issues/7145)
+  [#6995](https://github.com/NixOS/nix/pull/6995)
+  [#9687](https://github.com/NixOS/nix/pull/9687)
+
+  Previously, many Nix commands would hang indefinitely if Ctrl-C was pressed
+  while performing various operations (including `nix develop`, `nix flake
+  update`, and so on). With several fixes to Nix's signal handlers, Nix
+  commands will now exit quickly after Ctrl-C is pressed.

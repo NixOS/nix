@@ -45,13 +45,16 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
+/src/libexpr/tests
 /tests/unit/libexpr/libnixexpr-tests
 
 # /src/libstore/
 *.gen.*
+/src/libstore/tests
 /tests/unit/libstore/libnixstore-tests
 
 # /src/libutil/
+/src/libutil/tests
 /tests/unit/libutil/libnixutil-tests
 
 /src/nix/nix
@@ -94,6 +97,7 @@ perl/Makefile.config
 /tests/functional/ca/config.nix
 /tests/functional/dyn-drv/config.nix
 /tests/functional/repl-result-out
+/tests/functional/debugger-test-out
 /tests/functional/test-libstoreconsumer/test-libstoreconsumer
 
 # /tests/functional/lang/

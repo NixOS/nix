@@ -52,6 +52,27 @@ extern "C" {
 
 namespace nix {
 
+/**
+ * Returned by `NixRepl::processLine`.
+ */
+enum class ProcessLineResult {
+    /**
+     * The user exited with `:quit`. The REPL should exit. The surrounding
+     * program or evaluation (e.g., if the REPL was acting as the debugger)
+     * should also exit.
+     */
+    Quit,
+    /**
+     * The user exited with `:continue`. The REPL should exit, but the program
+     * should continue running.
+     */
+    Continue,
+    /**
+     * The user did not exit. The REPL should request another line of input.
+     */
+    PromptAgain,
+};
+
 struct NixRepl
     : AbstractNixRepl
     #if HAVE_BOEHMGC
@@ -75,13 +96,13 @@ struct NixRepl
             std::function<AnnotatedValues()> getValues);
     virtual ~NixRepl();
 
-    void mainLoop() override;
+    ReplExitStatus mainLoop() override;
     void initEnv() override;
 
     StringSet completePrefix(const std::string & prefix);
     bool getLine(std::string & input, const std::string & prompt);
     StorePath getDerivationPath(Value & v);
-    bool processLine(std::string line);
+    ProcessLineResult processLine(std::string line);
 
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
@@ -101,7 +122,8 @@ struct NixRepl
             .ansiColors = true,
             .force = true,
             .derivationPaths = true,
-            .maxDepth = maxDepth
+            .maxDepth = maxDepth,
+            .prettyIndent = 2
         });
     }
 };
@@ -232,7 +254,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
         : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
-        out << pos;
+        out << *pos;
         if (auto loc = pos->getCodeLines()) {
             out << "\n";
             printCodeLines(out, "", *pos, *loc);
@@ -243,10 +265,19 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     return out;
 }
 
-void NixRepl::mainLoop()
+static bool isFirstRepl = true;
+
+ReplExitStatus NixRepl::mainLoop()
 {
-    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
+    if (isFirstRepl) {
+        std::string_view debuggerNotice = "";
+        if (state->debugRepl) {
+            debuggerNotice = " debugger";
+        }
+        notice("Nix %1%%2%\nType :? for help.", nixVersion, debuggerNotice);
+    }
+
+    isFirstRepl = false;
 
     loadFiles();
 
@@ -277,15 +308,25 @@ void NixRepl::mainLoop()
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
         if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
-            // ctrl-D should exit the debugger.
+            // Ctrl-D should exit the debugger.
             state->debugStop = false;
-            state->debugQuit = true;
             logger->cout("");
-            break;
+            // TODO: Should Ctrl-D exit just the current debugger session or
+            // the entire program?
+            return ReplExitStatus::QuitAll;
         }
         logger->resume();
         try {
-            if (!removeWhitespace(input).empty() && !processLine(input)) return;
+            switch (processLine(input)) {
+                case ProcessLineResult::Quit:
+                    return ReplExitStatus::QuitAll;
+                case ProcessLineResult::Continue:
+                    return ReplExitStatus::Continue;
+                case ProcessLineResult::PromptAgain:
+                    break;
+                default:
+                    abort();
+            }
         } catch (ParseError & e) {
             if (e.msg().find("unexpected end of file") != std::string::npos) {
                 // For parse errors on incomplete input, we continue waiting for the next line of
@@ -342,7 +383,6 @@ bool NixRepl::getLine(std::string & input, const std::string & prompt)
     };
 
     setupSignals();
-    Finally resetTerminal([&]() { rl_deprep_terminal(); });
     char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
     restoreSignals();
@@ -422,8 +462,6 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             // Quietly ignore parse errors.
         } catch (EvalError & e) {
             // Quietly ignore evaluation errors.
-        } catch (UndefinedVarError & e) {
-            // Quietly ignore undefined variable errors.
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
         }
@@ -475,10 +513,11 @@ void NixRepl::loadDebugTraceEnv(DebugTrace & dt)
     }
 }
 
-bool NixRepl::processLine(std::string line)
+ProcessLineResult NixRepl::processLine(std::string line)
 {
     line = trim(line);
-    if (line == "") return true;
+    if (line.empty())
+        return ProcessLineResult::PromptAgain;
 
     _isInterrupted = false;
 
@@ -573,13 +612,13 @@ bool NixRepl::processLine(std::string line)
     else if (state->debugRepl && (command == ":s" || command == ":step")) {
         // set flag to stop at next DebugTrace; exit repl.
         state->debugStop = true;
-        return false;
+        return ProcessLineResult::Continue;
     }
 
     else if (state->debugRepl && (command == ":c" || command == ":continue")) {
         // set flag to run to next breakpoint or end of program; exit repl.
         state->debugStop = false;
-        return false;
+        return ProcessLineResult::Continue;
     }
 
     else if (command == ":a" || command == ":add") {
@@ -722,8 +761,7 @@ bool NixRepl::processLine(std::string line)
 
     else if (command == ":q" || command == ":quit") {
         state->debugStop = false;
-        state->debugQuit = true;
-        return false;
+        return ProcessLineResult::Quit;
     }
 
     else if (command == ":doc") {
@@ -784,7 +822,7 @@ bool NixRepl::processLine(std::string line)
         }
     }
 
-    return true;
+    return ProcessLineResult::PromptAgain;
 }
 
 void NixRepl::loadFile(const Path & path)
@@ -890,7 +928,7 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    return state->parseExprFromString(std::move(s), state->rootPath(CanonPath::fromCwd()), staticEnv);
+    return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
 }
 
 
@@ -915,7 +953,7 @@ std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
 }
 
 
-void AbstractNixRepl::runSimple(
+ReplExitStatus AbstractNixRepl::runSimple(
     ref<EvalState> evalState,
     const ValMap & extraEnv)
 {
@@ -937,7 +975,7 @@ void AbstractNixRepl::runSimple(
     for (auto & [name, value] : extraEnv)
         repl->addVarToScope(repl->state->symbols.create(name), *value);
 
-    repl->mainLoop();
+    return repl->mainLoop();
 }
 
 }

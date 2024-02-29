@@ -14,3 +14,8 @@ error:
             8|
 
        error: expected a string but found an integer: 1
+       at /pwd/lang/eval-fail-attr-name-type.nix:7:17:
+            6| in
+            7|   attrs.puppy.${key}
+             |                 ^
+            8|

@@ -156,6 +156,8 @@ function and the fifth being a set.
 
 Note that lists are only lazy in values, and they are strict in length.
 
+Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#builtins-elemAt). 
+
 ## Attribute Set
 
 An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).

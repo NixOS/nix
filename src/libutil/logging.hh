@@ -120,6 +120,17 @@ public:
     { }
 };
 
+/**
+ * A variadic template that does nothing.
+ *
+ * Useful to call a function with each argument in a parameter pack.
+ */
+struct nop
+{
+    template<typename... T> nop(T...)
+    { }
+};
+
 ActivityId getCurActivity();
 void setCurActivity(const ActivityId activityId);
 

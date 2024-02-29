@@ -98,30 +98,30 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
 
 	auto contextSize = context.size();
     if (contextSize != 1) {
-        throw EvalError({
-            .msg = hintfmt("context of string '%s' must have exactly one element, but has %d", *s, contextSize),
-            .errPos = state.positions[pos]
-        });
+        state.error<EvalError>(
+            "context of string '%s' must have exactly one element, but has %d",
+            *s,
+            contextSize
+        ).atPos(pos).debugThrow();
     }
     NixStringContext context2 {
         (NixStringContextElem { std::visit(overloaded {
             [&](const NixStringContextElem::Opaque & c) -> NixStringContextElem::DrvDeep {
                 if (!c.path.isDerivation()) {
-                    throw EvalError({
-                        .msg = hintfmt("path '%s' is not a derivation",
-                            state.store->printStorePath(c.path)),
-                        .errPos = state.positions[pos],
-                    });
+                    state.error<EvalError>(
+                        "path '%s' is not a derivation",
+                        state.store->printStorePath(c.path)
+                    ).atPos(pos).debugThrow();
                 }
                 return NixStringContextElem::DrvDeep {
                     .drvPath = c.path,
                 };
             },
             [&](const NixStringContextElem::Built & c) -> NixStringContextElem::DrvDeep {
-                throw EvalError({
-                    .msg = hintfmt("`addDrvOutputDependencies` can only act on derivations, not on a derivation output such as '%1%'", c.output),
-                    .errPos = state.positions[pos],
-                });
+                state.error<EvalError>(
+                    "`addDrvOutputDependencies` can only act on derivations, not on a derivation output such as '%1%'",
+                    c.output
+                ).atPos(pos).debugThrow();
             },
             [&](const NixStringContextElem::DrvDeep & c) -> NixStringContextElem::DrvDeep {
                 /* Reuse original item because we want this to be idempotent. */
@@ -261,10 +261,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
     for (auto & i : *args[1]->attrs) {
         const auto & name = state.symbols[i.name];
         if (!state.store->isStorePath(name))
-            throw EvalError({
-                .msg = hintfmt("context key '%s' is not a store path", name),
-                .errPos = state.positions[i.pos]
-            });
+            state.error<EvalError>(
+                "context key '%s' is not a store path",
+                name
+            ).atPos(i.pos).debugThrow();
         auto namePath = state.store->parseStorePath(name);
         if (!settings.readOnlyMode)
             state.store->ensurePath(namePath);
@@ -281,10 +281,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
         if (iter != i.value->attrs->end()) {
             if (state.forceBool(*iter->value, iter->pos, "while evaluating the `allOutputs` attribute of a string context")) {
                 if (!isDerivation(name)) {
-                    throw EvalError({
-                        .msg = hintfmt("tried to add all-outputs context of %s, which is not a derivation, to a string", name),
-                        .errPos = state.positions[i.pos]
-                    });
+                    state.error<EvalError>(
+                        "tried to add all-outputs context of %s, which is not a derivation, to a string",
+                        name
+                    ).atPos(i.pos).debugThrow();
                 }
                 context.emplace(NixStringContextElem::DrvDeep {
                     .drvPath = namePath,
@@ -296,10 +296,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
         if (iter != i.value->attrs->end()) {
             state.forceList(*iter->value, iter->pos, "while evaluating the `outputs` attribute of a string context");
             if (iter->value->listSize() && !isDerivation(name)) {
-                throw EvalError({
-                    .msg = hintfmt("tried to add derivation output context of %s, which is not a derivation, to a string", name),
-                    .errPos = state.positions[i.pos]
-                });
+                state.error<EvalError>(
+                    "tried to add derivation output context of %s, which is not a derivation, to a string",
+                    name
+                ).atPos(i.pos).debugThrow();
             }
             for (auto elem : iter->value->listItems()) {
                 auto outputName = state.forceStringNoCtx(*elem, iter->pos, "while evaluating an output name within a string context");

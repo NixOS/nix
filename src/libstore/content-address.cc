@@ -4,22 +4,44 @@
 
 namespace nix {
 
-std::string makeFileIngestionPrefix(FileIngestionMethod m)
+std::string_view makeFileIngestionPrefix(FileIngestionMethod m)
 {
     switch (m) {
     case FileIngestionMethod::Flat:
         return "";
     case FileIngestionMethod::Recursive:
         return "r:";
+    case FileIngestionMethod::Git:
+        experimentalFeatureSettings.require(Xp::GitHashing);
+        return "git:";
     default:
         throw Error("impossible, caught both cases");
     }
 }
 
-std::string ContentAddressMethod::renderPrefix() const
+std::string_view ContentAddressMethod::render() const
 {
     return std::visit(overloaded {
-        [](TextIngestionMethod) -> std::string { return "text:"; },
+        [](TextIngestionMethod) -> std::string_view { return "text"; },
+        [](FileIngestionMethod m2) {
+             /* Not prefixed for back compat with things that couldn't produce text before. */
+            return renderFileIngestionMethod(m2);
+        },
+    }, raw);
+}
+
+ContentAddressMethod ContentAddressMethod::parse(std::string_view m)
+{
+    if (m == "text")
+        return TextIngestionMethod {};
+    else
+        return parseFileIngestionMethod(m);
+}
+
+std::string_view ContentAddressMethod::renderPrefix() const
+{
+    return std::visit(overloaded {
+        [](TextIngestionMethod) -> std::string_view { return "text:"; },
         [](FileIngestionMethod m2) {
              /* Not prefixed for back compat with things that couldn't produce text before. */
             return makeFileIngestionPrefix(m2);
@@ -32,13 +54,17 @@ ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
     if (splitPrefix(m, "r:")) {
         return FileIngestionMethod::Recursive;
     }
+    else if (splitPrefix(m, "git:")) {
+        experimentalFeatureSettings.require(Xp::GitHashing);
+        return FileIngestionMethod::Git;
+    }
     else if (splitPrefix(m, "text:")) {
         return TextIngestionMethod {};
     }
     return FileIngestionMethod::Flat;
 }
 
-std::string ContentAddressMethod::render(HashAlgorithm ha) const
+std::string ContentAddressMethod::renderWithAlgo(HashAlgorithm ha) const
 {
     return std::visit(overloaded {
         [&](const TextIngestionMethod & th) {
@@ -92,10 +118,10 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
     }
 
     auto parseHashAlgorithm_ = [&](){
-        auto hashTypeRaw = splitPrefixTo(rest, ':');
-        if (!hashTypeRaw)
+        auto hashAlgoRaw = splitPrefixTo(rest, ':');
+        if (!hashAlgoRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
-        HashAlgorithm hashAlgo = parseHashAlgo(*hashTypeRaw);
+        HashAlgorithm hashAlgo = parseHashAlgo(*hashAlgoRaw);
         return hashAlgo;
     };
 
@@ -112,6 +138,10 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
         auto method = FileIngestionMethod::Flat;
         if (splitPrefix(rest, "r:"))
             method = FileIngestionMethod::Recursive;
+        else if (splitPrefix(rest, "git:")) {
+            experimentalFeatureSettings.require(Xp::GitHashing);
+            method = FileIngestionMethod::Git;
+        }
         HashAlgorithm hashAlgo = parseHashAlgorithm_();
         return {
             std::move(method),
@@ -133,7 +163,7 @@ ContentAddress ContentAddress::parse(std::string_view rawCa)
     };
 }
 
-std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parse(std::string_view caMethod)
+std::pair<ContentAddressMethod, HashAlgorithm> ContentAddressMethod::parseWithAlgo(std::string_view caMethod)
 {
     std::string asPrefix = std::string{caMethod} + ":";
     // parseContentAddressMethodPrefix takes its argument by reference
@@ -155,7 +185,7 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 
 std::string ContentAddress::printMethodAlgo() const
 {
-    return method.renderPrefix()
+    return std::string { method.renderPrefix() }
         + printHashAlgo(hash.algo);
 }
 

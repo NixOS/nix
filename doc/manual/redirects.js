@@ -18,7 +18,7 @@ const redirects = {
     "chap-tuning-cores-and-jobs": "advanced-topics/cores-vs-jobs.html",
     "chap-diff-hook": "advanced-topics/diff-hook.html",
     "check-dirs-are-unregistered": "advanced-topics/diff-hook.html#check-dirs-are-unregistered",
-    "chap-distributed-builds": "advanced-topics/distributed-builds.html",
+    "chap-distributed-builds": "command-ref/conf-file.html#conf-builders",
     "chap-post-build-hook": "advanced-topics/post-build-hook.html",
     "chap-post-build-hook-caveats": "advanced-topics/post-build-hook.html#implementation-caveats",
     "chap-writing-nix-expressions": "language/index.html",
@@ -358,7 +358,11 @@ const redirects = {
     "one-time-setup": "testing.html#one-time-setup",
     "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
     "characterization-testing": "#characterisation-testing-unit",
-  }
+  },
+  "glossary.html": {
+    "gloss-local-store": "store/types/local-store.html",
+    "gloss-chroot-store": "store/types/local-store.html",
+  },
 };
 
 // the following code matches the current page's URL against the set of redirects.

@@ -2,6 +2,7 @@
 ///@file
 
 #include "attr-set.hh"
+#include "eval-error.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
@@ -10,6 +11,7 @@
 #include "experimental-features.hh"
 #include "input-accessor.hh"
 #include "search-path.hh"
+#include "repl-exit-status.hh"
 
 #include <map>
 #include <optional>
@@ -147,48 +149,9 @@ struct DebugTrace {
     std::shared_ptr<Pos> pos;
     const Expr & expr;
     const Env & env;
-    hintformat hint;
+    HintFmt hint;
     bool isError;
 };
-
-void debugError(Error * e, Env & env, Expr & expr);
-
-class ErrorBuilder
-{
-    private:
-        EvalState & state;
-        ErrorInfo info;
-
-        ErrorBuilder(EvalState & s, ErrorInfo && i): state(s), info(i) { }
-
-    public:
-        template<typename... Args>
-        [[nodiscard, gnu::noinline]]
-        static ErrorBuilder * create(EvalState & s, const Args & ... args)
-        {
-            return new ErrorBuilder(s, ErrorInfo { .msg = hintfmt(args...) });
-        }
-
-        [[nodiscard, gnu::noinline]]
-        ErrorBuilder & atPos(PosIdx pos);
-
-        [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withTrace(PosIdx pos, const std::string_view text);
-
-        [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withFrameTrace(PosIdx pos, const std::string_view text);
-
-        [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withSuggestions(Suggestions & s);
-
-        [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withFrame(const Env & e, const Expr & ex);
-
-        template<class ErrorType>
-        [[gnu::noinline, gnu::noreturn]]
-        void debugThrow();
-};
-
 
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
@@ -257,9 +220,8 @@ public:
     /**
      * Debugger
      */
-    void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
+    ReplExitStatus (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
-    bool debugQuit;
     int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
@@ -274,39 +236,11 @@ public:
 
     void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
 
-    template<class E>
-    [[gnu::noinline, gnu::noreturn]]
-    void debugThrowLastTrace(E && error)
-    {
-        debugThrow(error, nullptr, nullptr);
-    }
-
-    template<class E>
-    [[gnu::noinline, gnu::noreturn]]
-    void debugThrow(E && error, const Env * env, const Expr * expr)
-    {
-        if (debugRepl && ((env && expr) || !debugTraces.empty())) {
-            if (!env || !expr) {
-                const DebugTrace & last = debugTraces.front();
-                env = &last.env;
-                expr = &last.expr;
-            }
-            runDebugRepl(&error, *env, *expr);
-        }
-
-        throw std::move(error);
-    }
-
-    // This is dangerous, but gets in line with the idea that error creation and
-    // throwing should not allocate on the stack of hot functions.
-    // as long as errors are immediately thrown, it works.
-    ErrorBuilder * errorBuilder;
-
-    template<typename... Args>
+    template<class T, typename... Args>
     [[nodiscard, gnu::noinline]]
-    ErrorBuilder & error(const Args & ... args) {
-        errorBuilder = ErrorBuilder::create(*this, args...);
-        return *errorBuilder;
+    EvalErrorBuilder<T> & error(const Args & ... args) {
+        // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
+        return *new EvalErrorBuilder<T>(*this, args...);
     }
 
 private:
@@ -371,6 +305,11 @@ public:
      * filesystem.
      */
     SourcePath rootPath(CanonPath path);
+
+    /**
+     * Variant which accepts relative paths too.
+     */
+    SourcePath rootPath(PathView path);
 
     /**
      * Allow access to a path.
@@ -493,10 +432,12 @@ public:
     std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
+    void addErrorTrace(Error & e, const Args & ... formatArgs) const;
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
+    void addErrorTrace(Error & e, const PosIdx pos, const Args & ... formatArgs) const;
 
 public:
     /**
@@ -819,7 +760,6 @@ struct DebugTraceStacker {
     DebugTraceStacker(EvalState & evalState, DebugTrace t);
     ~DebugTraceStacker()
     {
-        // assert(evalState.debugTraces.front() == trace);
         evalState.debugTraces.pop_front();
     }
     EvalState & evalState;
@@ -844,22 +784,6 @@ SourcePath resolveExprPath(SourcePath path);
  * Whether a URI is allowed, assuming restrictEval is enabled
  */
 bool isAllowedURI(std::string_view uri, const Strings & allowedPaths);
-
-struct InvalidPathError : EvalError
-{
-    Path path;
-    InvalidPathError(const Path & path);
-#ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~InvalidPathError() throw () { };
-#endif
-};
-
-template<class ErrorType>
-void ErrorBuilder::debugThrow()
-{
-    // NOTE: We always use the -LastTrace version as we push the new trace in withFrame()
-    state.debugThrowLastTrace(ErrorType(info));
-}
 
 }
 

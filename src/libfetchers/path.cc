@@ -84,7 +84,12 @@ struct PathInputScheme : InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const override
     {
-        writeFile((CanonPath(getAbsPath(input)) + path).abs(), contents);
+        writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getNarHash();
     }
 
     CanonPath getAbsPath(const Input & input) const

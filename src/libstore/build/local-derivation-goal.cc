@@ -8,6 +8,7 @@
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
+#include "git.hh"
 #include "compression.hh"
 #include "daemon.hh"
 #include "topo-sort.hh"
@@ -92,7 +93,7 @@ void handleDiffHook(
         } catch (Error & error) {
             ErrorInfo ei = error.info();
             // FIXME: wrap errors.
-            ei.msg = hintfmt("diff hook execution failed: %s", ei.msg.str());
+            ei.msg = HintFmt("diff hook execution failed: %s", ei.msg.str());
             logError(ei);
         }
     }
@@ -232,7 +233,7 @@ void LocalDerivationGoal::tryLocalBuild()
         if (!buildUser) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                    fmt("waiting for a free build user ID for '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
+                    fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }
@@ -1311,12 +1312,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, references, repair);
+        auto path = next->addToStoreFromDump(dump, name, dumpMethod, hashMethod, hashAlgo, references, repair);
         goal.addDependency(path);
         return path;
     }
@@ -2130,16 +2132,17 @@ void LocalDerivationGoal::runChild()
             try {
                 logger = makeJSONLogger(*logger);
 
-                BasicDerivation & drv2(*drv);
-                for (auto & e : drv2.env)
-                    e.second = rewriteStrings(e.second, inputRewrites);
+                std::map<std::string, Path> outputs;
+                for (auto & e : drv->outputs)
+                    outputs.insert_or_assign(e.first,
+                        worker.store.printStorePath(scratchOutputs.at(e.first)));
 
                 if (drv->builder == "builtin:fetchurl")
-                    builtinFetchurl(drv2, netrcData);
+                    builtinFetchurl(*drv, outputs, netrcData);
                 else if (drv->builder == "builtin:buildenv")
-                    builtinBuildenv(drv2);
+                    builtinBuildenv(*drv, outputs);
                 else if (drv->builder == "builtin:unpack-channel")
-                    builtinUnpackChannel(drv2);
+                    builtinUnpackChannel(*drv, outputs);
                 else
                     throw Error("unsupported builtin builder '%1%'", drv->builder.substr(8));
                 _exit(0);
@@ -2456,15 +2459,28 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             rewriteOutput(outputRewrites);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
-            auto got = ({
-                HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
+            auto got = [&]{
                 PosixSourceAccessor accessor;
-                dumpPath(
-                    accessor, CanonPath { actualPath },
-                    caSink,
-                    outputHash.method.getFileIngestionMethod());
-                caSink.finish().first;
-            });
+                auto fim = outputHash.method.getFileIngestionMethod();
+                switch (fim) {
+                case FileIngestionMethod::Flat:
+                case FileIngestionMethod::Recursive:
+                {
+                    HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
+                    auto fim = outputHash.method.getFileIngestionMethod();
+                    dumpPath(
+                        accessor, CanonPath { actualPath },
+                        caSink,
+                        (FileSerialisationMethod) fim);
+                    return caSink.finish().first;
+                }
+                case FileIngestionMethod::Git: {
+                    return git::dumpHash(
+                        outputHash.hashAlgo, accessor,
+                        CanonPath { tmpDir + "/tmp" }).hash;
+                }
+                }
+            }();
 
             ValidPathInfo newInfo0 {
                 worker.store,
@@ -2490,7 +2506,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
                     accessor, CanonPath { actualPath },
-                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
             }
@@ -2514,7 +2530,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
                     accessor, CanonPath { actualPath },
-                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();

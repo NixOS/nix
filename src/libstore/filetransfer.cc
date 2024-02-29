@@ -106,6 +106,8 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            result.urls.push_back(request.uri);
+
             requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
@@ -182,6 +184,14 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->writeCallback(contents, size, nmemb);
         }
 
+        void appendCurrentUrl()
+        {
+            char * effectiveUriCStr = nullptr;
+            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
+            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr)
+                result.urls.push_back(effectiveUriCStr);
+        }
+
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
         {
             size_t realSize = size * nmemb;
@@ -196,6 +206,7 @@ struct curlFileTransfer : public FileTransfer
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
+                appendCurrentUrl();
             } else {
 
                 auto i = line.find(':');
@@ -360,13 +371,10 @@ struct curlFileTransfer : public FileTransfer
         {
             auto httpStatus = getHTTPStatus();
 
-            char * effectiveUriCStr = nullptr;
-            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
-            if (effectiveUriCStr)
-                result.effectiveUri = effectiveUriCStr;
-
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
+
+            appendCurrentUrl();
 
             if (decompressionSink) {
                 try {
@@ -779,7 +787,10 @@ FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
     return enqueueFileTransfer(request).get();
 }
 
-void FileTransfer::download(FileTransferRequest && request, Sink & sink)
+void FileTransfer::download(
+    FileTransferRequest && request,
+    Sink & sink,
+    std::function<void(FileTransferResult)> resultCallback)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
        that would cause the sink to execute on the fileTransfer
@@ -829,11 +840,13 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
     };
 
     enqueueFileTransfer(request,
-        {[_state](std::future<FileTransferResult> fut) {
+        {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
             try {
-                fut.get();
+                auto res = fut.get();
+                if (resultCallback)
+                    resultCallback(std::move(res));
             } catch (...) {
                 state->exc = std::current_exception();
             }
@@ -882,12 +895,12 @@ template<typename... Args>
 FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args)
     : Error(args...), error(error), response(response)
 {
-    const auto hf = hintfmt(args...);
+    const auto hf = HintFmt(args...);
     // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
     if (response && (response->size() < 1024 || response->find("<html>") != std::string::npos))
-        err.msg = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), chomp(*response));
+        err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), chomp(*response));
     else
         err.msg = hf;
 }

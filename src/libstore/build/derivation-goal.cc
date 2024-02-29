@@ -708,7 +708,7 @@ void DerivationGoal::tryToBuild()
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                fmt("waiting for lock on %s", yellowtxt(showPaths(lockFiles))));
+                fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
         return;
     }
@@ -762,7 +762,7 @@ void DerivationGoal::tryToBuild()
                    the wake-up timeout expires. */
                 if (!actLock)
                     actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                        fmt("waiting for a machine to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
+                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
                 worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
                 return;
@@ -780,9 +780,13 @@ void DerivationGoal::tryToBuild()
 
 void DerivationGoal::tryLocalBuild() {
     throw Error(
-        "unable to build with a primary store that isn't a local store; "
-        "either pass a different '--store' or enable remote builds."
-        "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+        R"(
+        Unable to build with a primary store that isn't a local store;
+        either pass a different '--store' or enable remote builds.
+
+        For more information check 'man nix.conf' and search for '/machines'.
+        )"
+    );
 }
 
 
@@ -891,7 +895,7 @@ void runPostBuildHook(
     if (hook == "")
         return;
 
-    Activity act(logger, lvlInfo, actPostBuildHook,
+    Activity act(logger, lvlTalkative, actPostBuildHook,
             fmt("running post-build-hook '%s'", settings.postBuildHook),
             Logger::Fields{store.printStorePath(drvPath)});
     PushActivity pact(act.id);
@@ -987,7 +991,7 @@ void DerivationGoal::buildDone()
             diskFull |= cleanupDecideWhetherDiskFull();
 
             auto msg = fmt("builder for '%s' %s",
-                yellowtxt(worker.store.printStorePath(drvPath)),
+                Magenta(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
             if (!logger->isVerbose() && !logTail.empty()) {
@@ -1523,7 +1527,7 @@ void DerivationGoal::done(
     outputLocks.unlock();
     buildResult.status = status;
     if (ex)
-        buildResult.errorMsg = fmt("%s", normaltxt(ex->info().msg));
+        buildResult.errorMsg = fmt("%s", Uncolored(ex->info().msg));
     if (buildResult.status == BuildResult::TimedOut)
         worker.timedOut = true;
     if (buildResult.status == BuildResult::PermanentFailure)

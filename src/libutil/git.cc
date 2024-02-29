@@ -259,7 +259,7 @@ Mode dump(
     {
         Tree entries;
         for (auto & [name, _] : accessor.readDirectory(path)) {
-            auto child = path + name;
+            auto child = path / name;
             if (!filter(child.abs())) continue;
 
             auto entry = hook(child);

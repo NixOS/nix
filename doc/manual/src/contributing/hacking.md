@@ -44,13 +44,13 @@ To build Nix itself in this shell:
 ```console
 [nix-shell]$ autoreconfPhase
 [nix-shell]$ configurePhase
-[nix-shell]$ make -j $NIX_BUILD_CORES
+[nix-shell]$ make -j $NIX_BUILD_CORES OPTIMIZE=0
 ```
 
 To install it in `$(pwd)/outputs` and test it:
 
 ```console
-[nix-shell]$ make install
+[nix-shell]$ make install OPTIMIZE=0
 [nix-shell]$ make installcheck check -j $NIX_BUILD_CORES
 [nix-shell]$ nix --version
 nix (Nix) 2.12
@@ -147,10 +147,10 @@ Nix can be built for various platforms, as specified in [`flake.nix`]:
 
 In order to build Nix for a different platform than the one you're currently
 on, you need a way for your current Nix installation to build code for that
-platform. Common solutions include [remote builders] and [binary format emulation]
+platform. Common solutions include [remote build machines] and [binary format emulation]
 (only supported on NixOS).
 
-[remote builders]: ../advanced-topics/distributed-builds.md
+[remote builders]: @docroot@/language/derivations.md#attr-builder
 [binary format emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
 Given such a setup, executing the build only requires selecting the respective attribute.

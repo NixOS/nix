@@ -65,8 +65,8 @@ using namespace nix;
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
 {
     throw ParseError({
-        .msg = hintfmt(error),
-        .errPos = state->positions[state->at(*loc)]
+        .msg = HintFmt(error),
+        .pos = state->positions[state->at(*loc)]
     });
 }
 
@@ -154,8 +154,8 @@ expr_function
   | LET binds IN_KW expr_function
     { if (!$2->dynamicAttrs.empty())
         throw ParseError({
-            .msg = hintfmt("dynamic attributes not allowed in let"),
-            .errPos = state->positions[CUR_POS]
+            .msg = HintFmt("dynamic attributes not allowed in let"),
+            .pos = state->positions[CUR_POS]
         });
       $$ = new ExprLet($2, $4);
     }
@@ -244,8 +244,8 @@ expr_simple
       static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
       if (noURLLiterals)
           throw ParseError({
-              .msg = hintfmt("URL literals are disabled"),
-              .errPos = state->positions[CUR_POS]
+              .msg = HintFmt("URL literals are disabled"),
+              .pos = state->positions[CUR_POS]
           });
       $$ = new ExprString(std::string($1));
   }
@@ -313,17 +313,27 @@ binds
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               state->dupAttr(i.symbol, state->at(@3), $$->attrs[i.symbol].pos);
           auto pos = state->at(@3);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
+          $$->attrs.emplace(
+              i.symbol,
+              ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, ExprAttrs::AttrDef::Kind::Inherited));
       }
       delete $3;
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
-      /* !!! Should ensure sharing of the expression in $4. */
+      if (!$$->inheritFromExprs)
+          $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+      $$->inheritFromExprs->push_back($4);
+      auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               state->dupAttr(i.symbol, state->at(@6), $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), state->at(@6)));
+          $$->attrs.emplace(
+              i.symbol,
+              ExprAttrs::AttrDef(
+                  new ExprSelect(CUR_POS, from, i.symbol),
+                  state->at(@6),
+                  ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
       delete $6;
     }
@@ -340,8 +350,8 @@ attrs
           delete str;
       } else
           throw ParseError({
-              .msg = hintfmt("dynamic attributes not allowed in inherit"),
-              .errPos = state->positions[state->at(@2)]
+              .msg = HintFmt("dynamic attributes not allowed in inherit"),
+              .pos = state->positions[state->at(@2)]
           });
     }
   | { $$ = new AttrPath; }

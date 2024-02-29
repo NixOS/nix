@@ -42,7 +42,7 @@ namespace nix {
 
         makeJSONLogger(*logger)->logEI({
                 .name = "error name",
-                .msg = hintfmt("this hint has %1% templated %2%!!",
+                .msg = HintFmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foFile, problem_file, 02, 13)
@@ -62,7 +62,7 @@ namespace nix {
             throw TestError(e.info());
         } catch (Error &e) {
             ErrorInfo ei = e.info();
-            ei.msg = hintfmt("%s; subsequent error message.", normaltxt(e.info().msg.str()));
+            ei.msg = HintFmt("%s; subsequent error message.", Uncolored(e.info().msg.str()));
 
             testing::internal::CaptureStderr();
             logger->logEI(ei);
@@ -176,7 +176,7 @@ namespace nix {
 
         logError({
                 .name = "error name",
-                .msg = hintfmt("this hint has %1% templated %2%!!",
+                .msg = HintFmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foString, problem_file, 02, 13),
@@ -193,7 +193,7 @@ namespace nix {
 
         logError({
                 .name = "error name",
-                .msg = hintfmt("this hint has %1% templated %2%!!",
+                .msg = HintFmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foFile, problem_file, 02, 13)
@@ -208,7 +208,7 @@ namespace nix {
 
         logError({
                 .name = "error name",
-                .msg = hintfmt("hint %1%", "only"),
+                .msg = HintFmt("hint %1%", "only"),
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -225,7 +225,7 @@ namespace nix {
 
         logWarning({
                 .name = "name",
-                .msg = hintfmt("there was a %1%", "warning"),
+                .msg = HintFmt("there was a %1%", "warning"),
             });
 
         auto str = testing::internal::GetCapturedStderr();
@@ -241,7 +241,7 @@ namespace nix {
 
         logWarning({
                 .name = "warning name",
-                .msg = hintfmt("this hint has %1% templated %2%!!",
+                .msg = HintFmt("this hint has %1% templated %2%!!",
                     "yellow",
                     "values"),
                 .errPos = Pos(foStdin, problem_file, 2, 13),
@@ -264,7 +264,7 @@ namespace nix {
 
         auto e = AssertionError(ErrorInfo {
                 .name = "wat",
-                .msg = hintfmt("it has been %1% days since our last error", "zero"),
+                .msg = HintFmt("it has been %1% days since our last error", "zero"),
                 .errPos = Pos(foString, problem_file, 2, 13),
             });
 
@@ -290,7 +290,7 @@ namespace nix {
 
         auto e = AssertionError(ErrorInfo {
                 .name = "wat",
-                .msg = hintfmt("it has been %1% days since our last error", "zero"),
+                .msg = HintFmt("it has been %1% days since our last error", "zero"),
                 .errPos = Pos(foString, problem_file, 2, 13),
             });
 
@@ -310,39 +310,39 @@ namespace nix {
 
 
     /* ----------------------------------------------------------------------------
-     * hintfmt
+     * HintFmt
      * --------------------------------------------------------------------------*/
 
-    TEST(hintfmt, percentStringWithoutArgs) {
+    TEST(HintFmt, percentStringWithoutArgs) {
 
         const char *teststr = "this is 100%s correct!";
 
         ASSERT_STREQ(
-            hintfmt(teststr).str().c_str(),
+            HintFmt(teststr).str().c_str(),
             teststr);
 
     }
 
-    TEST(hintfmt, fmtToHintfmt) {
+    TEST(HintFmt, fmtToHintfmt) {
 
         ASSERT_STREQ(
-            hintfmt(fmt("the color of this this text is %1%", "not yellow")).str().c_str(),
+            HintFmt(fmt("the color of this this text is %1%", "not yellow")).str().c_str(),
             "the color of this this text is not yellow");
 
     }
 
-    TEST(hintfmt, tooFewArguments) {
+    TEST(HintFmt, tooFewArguments) {
 
         ASSERT_STREQ(
-            hintfmt("only one arg %1% %2%", "fulfilled").str().c_str(),
+            HintFmt("only one arg %1% %2%", "fulfilled").str().c_str(),
             "only one arg " ANSI_WARNING "fulfilled" ANSI_NORMAL " ");
 
     }
 
-    TEST(hintfmt, tooManyArguments) {
+    TEST(HintFmt, tooManyArguments) {
 
         ASSERT_STREQ(
-            hintfmt("what about this %1% %2%", "%3%", "one", "two").str().c_str(),
+            HintFmt("what about this %1% %2%", "%3%", "one", "two").str().c_str(),
             "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_YELLOW "one" ANSI_NORMAL);
 
     }

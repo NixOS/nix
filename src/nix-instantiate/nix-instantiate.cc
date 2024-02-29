@@ -168,7 +168,7 @@ static int main_nix_instantiate(int argc, char * * argv)
             for (auto & i : files) {
                 auto p = state->findFile(i);
                 if (auto fn = p.getPhysicalPath())
-                    std::cout << fn->abs() << std::endl;
+                    std::cout << fn->native() << std::endl;
                 else
                     throw Error("'%s' has no physical path", p);
             }
@@ -184,7 +184,7 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         for (auto & i : files) {
             Expr * e = fromArgs
-                ? state->parseExprFromString(i, state->rootPath(CanonPath::fromCwd()))
+                ? state->parseExprFromString(i, state->rootPath("."))
                 : state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, i)));
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);

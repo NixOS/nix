@@ -31,15 +31,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-/* Before 4.7, gcc's std::exception uses empty throw() specifiers for
- * its (virtual) destructor and what() in c++11 mode, in violation of spec
- */
-#ifdef __GNUC__
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
-#define EXCEPTION_NEEDS_THROW_SPEC
-#endif
-#endif
-
 namespace nix {
 
 
@@ -72,8 +63,7 @@ void printCodeLines(std::ostream & out,
 
 struct Trace {
     std::shared_ptr<Pos> pos;
-    hintformat hint;
-    bool frame;
+    HintFmt hint;
 };
 
 inline bool operator<(const Trace& lhs, const Trace& rhs);
@@ -83,9 +73,14 @@ inline bool operator>=(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;
-    hintformat msg;
-    std::shared_ptr<Pos> errPos;
+    HintFmt msg;
+    std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
+
+    /**
+     * Exit status.
+     */
+    unsigned int status = 1;
 
     Suggestions suggestions;
 
@@ -103,31 +98,34 @@ class BaseError : public std::exception
 protected:
     mutable ErrorInfo err;
 
+    /**
+     * Cached formatted contents of `err.msg`.
+     */
     mutable std::optional<std::string> what_;
+    /**
+     * Format `err.msg` and set `what_` to the resulting value.
+     */
     const std::string & calcWhat() const;
 
 public:
-    unsigned int status = 1; // exit status
-
     BaseError(const BaseError &) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...) }
-        , status(status)
+        : err { .level = lvlError, .msg = HintFmt(args...), .status = status }
     { }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(fs, args...) }
+        : err { .level = lvlError, .msg = HintFmt(fs, args...) }
     { }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
+        : err { .level = lvlError, .msg = HintFmt(args...), .suggestions = sug }
     { }
 
-    BaseError(hintformat hint)
+    BaseError(HintFmt hint)
         : err { .level = lvlError, .msg = hint }
     { }
 
@@ -139,15 +137,18 @@ public:
         : err(e)
     { }
 
-#ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~BaseError() throw () { };
-    const char * what() const throw () { return calcWhat().c_str(); }
-#else
     const char * what() const noexcept override { return calcWhat().c_str(); }
-#endif
-
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
+
+    void withExitStatus(unsigned int status)
+    {
+        err.status = status;
+    }
+
+    void atPos(std::shared_ptr<Pos> pos) {
+        err.pos = pos;
+    }
 
     void pushTrace(Trace trace)
     {
@@ -157,10 +158,10 @@ public:
     template<typename... Args>
     void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
     {
-        addTrace(std::move(e), hintfmt(std::string(fs), args...));
+        addTrace(std::move(e), HintFmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame = false);
+    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint);
 
     bool hasTrace() const { return !err.traces.empty(); }
 
@@ -212,8 +213,8 @@ public:
     SysError(int errNo, const Args & ... args)
         : SystemError(""), errNo(errNo)
     {
-        auto hf = hintfmt(args...);
-        err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
+        auto hf = HintFmt(args...);
+        err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), strerror(errNo));
     }
 
     /**

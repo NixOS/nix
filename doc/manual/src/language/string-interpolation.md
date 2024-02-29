@@ -20,6 +20,8 @@ Rather than writing
 
 (where `freetype` is a [derivation]), you can instead write
 
+[derivation]: ../glossary.md#gloss-derivation
+
 ```nix
 "--with-freetype2-library=${freetype}/lib"
 ```

@@ -64,17 +64,17 @@ struct ParserState
 inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
-         .msg = hintfmt("attribute '%1%' already defined at %2%",
+         .msg = HintFmt("attribute '%1%' already defined at %2%",
              showAttrPath(symbols, attrPath), positions[prevPos]),
-         .errPos = positions[pos]
+         .pos = positions[pos]
     });
 }
 
 inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError({
-        .msg = hintfmt("attribute '%1%' already defined at %2%", symbols[attr], positions[prevPos]),
-        .errPos = positions[pos]
+        .msg = HintFmt("attribute '%1%' already defined at %2%", symbols[attr], positions[prevPos]),
+        .pos = positions[pos]
     });
 }
 
@@ -89,7 +89,7 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
         if (i->symbol) {
             ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
-                if (!j->second.inherited) {
+                if (j->second.kind != ExprAttrs::AttrDef::Kind::Inherited) {
                     ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
                     if (!attrs2) dupAttr(attrPath, pos, j->second.pos);
                     attrs = attrs2;
@@ -118,13 +118,24 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
             auto ae = dynamic_cast<ExprAttrs *>(e);
             auto jAttrs = dynamic_cast<ExprAttrs *>(j->second.e);
             if (jAttrs && ae) {
+                if (ae->inheritFromExprs && !jAttrs->inheritFromExprs)
+                    jAttrs->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
                 for (auto & ad : ae->attrs) {
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
                         dupAttr(ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs.emplace(ad.first, ad.second);
+                    if (ad.second.kind == ExprAttrs::AttrDef::Kind::InheritedFrom) {
+                        auto & sel = dynamic_cast<ExprSelect &>(*ad.second.e);
+                        auto & from = dynamic_cast<ExprInheritFrom &>(*sel.e);
+                        from.displ += jAttrs->inheritFromExprs->size();
+                    }
                 }
                 jAttrs->dynamicAttrs.insert(jAttrs->dynamicAttrs.end(), ae->dynamicAttrs.begin(), ae->dynamicAttrs.end());
+                if (ae->inheritFromExprs) {
+                    jAttrs->inheritFromExprs->insert(jAttrs->inheritFromExprs->end(),
+                        ae->inheritFromExprs->begin(), ae->inheritFromExprs->end());
+                }
             } else {
                 dupAttr(attrPath, pos, j->second.pos);
             }
@@ -154,14 +165,14 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
     }
     if (duplicate)
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
-            .errPos = positions[duplicate->second]
+            .msg = HintFmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
+            .pos = positions[duplicate->second]
         });
 
     if (arg && formals->has(arg))
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'", symbols[arg]),
-            .errPos = positions[pos]
+            .msg = HintFmt("duplicate formal function argument '%1%'", symbols[arg]),
+            .pos = positions[pos]
         });
 
     return formals;

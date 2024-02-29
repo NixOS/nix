@@ -12,7 +12,9 @@
 #include "references.hh"
 #include "archive.hh"
 #include "callback.hh"
+#include "git.hh"
 #include "remote-store.hh"
+#include "posix-source-accessor.hh"
 // FIXME this should not be here, see TODO below on
 // `addMultipleToStore`.
 #include "worker-protocol.hh"
@@ -65,85 +67,13 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 }
 
 
-/* Store paths have the following form:
+/*
+The exact specification of store paths is in `protocols/store-path.md`
+in the Nix manual. These few functions implement that specification.
 
-   <realized-path> = <store>/<h>-<name>
-
-   where
-
-   <store> = the location of the Nix store, usually /nix/store
-
-   <name> = a human readable name for the path, typically obtained
-     from the name attribute of the derivation, or the name of the
-     source file from which the store path is created.  For derivation
-     outputs other than the default "out" output, the string "-<id>"
-     is suffixed to <name>.
-
-   <h> = base-32 representation of the first 160 bits of a SHA-256
-     hash of <s>; the hash part of the store name
-
-   <s> = the string "<type>:sha256:<h2>:<store>:<name>";
-     note that it includes the location of the store as well as the
-     name to make sure that changes to either of those are reflected
-     in the hash (e.g. you won't get /nix/store/<h>-name1 and
-     /nix/store/<h>-name2 with equal hash parts).
-
-   <type> = one of:
-     "text:<r1>:<r2>:...<rN>"
-       for plain text files written to the store using
-       addTextToStore(); <r1> ... <rN> are the store paths referenced
-       by this path, in the form described by <realized-path>
-     "source:<r1>:<r2>:...:<rN>:self"
-       for paths copied to the store using addToStore() when recursive
-       = true and hashAlgo = "sha256". Just like in the text case, we
-       can have the store paths referenced by the path.
-       Additionally, we can have an optional :self label to denote self
-       reference.
-     "output:<id>"
-       for either the outputs created by derivations, OR paths copied
-       to the store using addToStore() with recursive != true or
-       hashAlgo != "sha256" (in that case "source" is used; it's
-       silly, but it's done that way for compatibility).  <id> is the
-       name of the output (usually, "out").
-
-   <h2> = base-16 representation of a SHA-256 hash of <s2>
-
-   <s2> =
-     if <type> = "text:...":
-       the string written to the resulting store path
-     if <type> = "source:...":
-       the serialisation of the path from which this store path is
-       copied, as returned by hashPath()
-     if <type> = "output:<id>":
-       for non-fixed derivation outputs:
-         the derivation (see hashDerivationModulo() in
-         primops.cc)
-       for paths copied by addToStore() or produced by fixed-output
-       derivations:
-         the string "fixed:out:<rec><algo>:<hash>:", where
-           <rec> = "r:" for recursive (path) hashes, or "" for flat
-             (file) hashes
-           <algo> = "md5", "sha1" or "sha256"
-           <hash> = base-16 representation of the path or flat hash of
-             the contents of the path (or expected contents of the
-             path for fixed-output derivations)
-
-   Note that since an output derivation has always type output, while
-   something added by addToStore can have type output or source depending
-   on the hash, this means that the same input can be hashed differently
-   if added to the store via addToStore or via a derivation, in the sha256
-   recursive case.
-
-   It would have been nicer to handle fixed-output derivations under
-   "source", e.g. have something like "source:<rec><algo>", but we're
-   stuck with this for now...
-
-   The main reason for this way of computing names is to prevent name
-   collisions (for security).  For instance, it shouldn't be feasible
-   to come up with a derivation whose output path collides with the
-   path for a copied source.  The former would have a <s> starting with
-   "output:out:", while the latter would have a <s> starting with
-   "source:".
+If changes to these functions go beyond mere implementation changes i.e.
+also update the user-visible behavior, please update the specification
+to match.
 */
 
 
@@ -191,6 +121,9 @@ static std::string makeType(
 
 StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
+    if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
+        throw Error("Git file ingestion must use SHA-1 hash");
+
     if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
@@ -238,7 +171,7 @@ std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     const StorePathSet & references,
     PathFilter & filter) const
 {
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
     return {
         makeFixedOutputPathFromCA(
             name,
@@ -264,10 +197,23 @@ StorePath Store::addToStore(
     PathFilter & filter,
     RepairFlag repair)
 {
+    FileSerialisationMethod fsm;
+    switch (method.getFileIngestionMethod()) {
+    case FileIngestionMethod::Flat:
+        fsm = FileSerialisationMethod::Flat;
+        break;
+    case FileIngestionMethod::Recursive:
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    case FileIngestionMethod::Git:
+        // Use NAR; Git is not a serialization method
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    }
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(accessor, path, sink, method.getFileIngestionMethod(), filter);
+        dumpPath(accessor, path, sink, fsm, filter);
     });
-    return addToStoreFromDump(*source, name, method, hashAlgo, references, repair);
+    return addToStoreFromDump(*source, name, fsm, method, hashAlgo, references, repair);
 }
 
 void Store::addMultipleToStore(
@@ -427,9 +373,7 @@ ValidPathInfo Store::addToStoreSlow(
     NullFileSystemObjectSink blank;
     auto & parseSink = method.getFileIngestionMethod() == FileIngestionMethod::Flat
         ? (FileSystemObjectSink &) fileSink
-        : method.getFileIngestionMethod() == FileIngestionMethod::Recursive
-        ? (FileSystemObjectSink &) blank
-        : (abort(), (FileSystemObjectSink &)*(FileSystemObjectSink *)nullptr); // handled both cases
+        : (FileSystemObjectSink &) blank; // for recursive or git we do recursive
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */
@@ -441,6 +385,8 @@ ValidPathInfo Store::addToStoreSlow(
 
     auto hash = method == FileIngestionMethod::Recursive && hashAlgo == HashAlgorithm::SHA256
         ? narHash
+        : method == FileIngestionMethod::Git
+        ? git::dumpHash(hashAlgo, accessor, srcPath).hash
         : caHashSink.finish().first;
 
     if (expectedCAHash && expectedCAHash != hash)
@@ -847,7 +793,7 @@ void Store::substitutePaths(const StorePathSet & paths)
     if (!willSubstitute.empty())
         try {
             std::vector<DerivedPath> subs;
-            for (auto & p : willSubstitute) subs.push_back(DerivedPath::Opaque{p});
+            for (auto & p : willSubstitute) subs.emplace_back(DerivedPath::Opaque{p});
             buildPaths(subs);
         } catch (Error & e) {
             logWarning(e.info());

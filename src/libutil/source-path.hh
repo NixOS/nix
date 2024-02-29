@@ -12,6 +12,26 @@
 namespace nix {
 
 /**
+ * Note there is a decent chance this type soon goes away because the problem is solved another way.
+ * See the discussion in https://github.com/NixOS/nix/pull/9985.
+ */
+enum class SymlinkResolution {
+    /**
+     * Resolve symlinks in the ancestors only.
+     *
+     * Only the last component of the result is possibly a symlink.
+     */
+    Ancestors,
+
+    /**
+     * Resolve symlinks fully, realpath(3)-style.
+     *
+     * No component of the result will be a symlink.
+     */
+    Full,
+};
+
+/**
  * An abstraction for accessing source files during
  * evaluation. Currently, it's just a wrapper around `CanonPath` that
  * accesses files in the regular filesystem, but in the future it will
@@ -82,31 +102,35 @@ struct SourcePath
      * Return the location of this path in the "real" filesystem, if
      * it has a physical location.
      */
-    std::optional<CanonPath> getPhysicalPath() const;
+    std::optional<std::filesystem::path> getPhysicalPath() const;
 
     std::string to_string() const;
 
     /**
      * Append a `CanonPath` to this path.
      */
-    SourcePath operator + (const CanonPath & x) const;
+    SourcePath operator / (const CanonPath & x) const;
 
     /**
      * Append a single component `c` to this path. `c` must not
      * contain a slash. A slash is implicitly added between this path
      * and `c`.
      */
-    SourcePath operator+(std::string_view c) const;
+    SourcePath operator / (std::string_view c) const;
+
     bool operator==(const SourcePath & x) const;
     bool operator!=(const SourcePath & x) const;
     bool operator<(const SourcePath & x) const;
 
     /**
-     * Resolve any symlinks in this `SourcePath` (including its
-     * parents). The result is a `SourcePath` in which no element is a
-     * symlink.
+     * Resolve any symlinks in this `SourcePath` according to the
+     * given resolution mode.
+     *
+     * @param mode might only be a temporary solution for this. 
+     * See the discussion in https://github.com/NixOS/nix/pull/9985.
      */
-    SourcePath resolveSymlinks() const;
+    SourcePath resolveSymlinks(
+        SymlinkResolution mode = SymlinkResolution::Full) const;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);
