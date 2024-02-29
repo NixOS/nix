@@ -415,6 +415,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     // Use NAR; Git is not a serialization method
                     dumpMethod = FileSerialisationMethod::Recursive;
                     break;
+                default:
+                    assert(false);
                 }
                 // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
                 auto path = store->addToStoreFromDump(source, name, dumpMethod, contentAddressMethod, hashAlgo, refs, repair);

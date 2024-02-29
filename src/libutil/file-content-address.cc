@@ -123,7 +123,7 @@ Hash hashPath(
     case FileIngestionMethod::Git:
         return git::dumpHash(ht, accessor, path, filter).hash;
     }
-
+    assert(false);
 }
 
 }
