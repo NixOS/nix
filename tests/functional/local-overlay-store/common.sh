@@ -65,7 +65,7 @@ initLowerStore () {
   nix-store --store "$storeA" --add ../dummy
 
   # Build something in lower store
-  drvPath=$(nix-instantiate --store $storeA ../hermetic.nix --arg busybox "$busybox" --arg seed 1)
+  drvPath=$(nix-instantiate --store $storeA ../hermetic.nix --arg withFinalRefs true --arg busybox "$busybox" --arg seed 1)
   pathInLowerStore=$(nix-store --store "$storeA" --realise $drvPath)
 }
 

@@ -16,10 +16,10 @@ mountOverlayfs
 
 export NIX_REMOTE="$storeB"
 stateB="$storeBRoot/nix/var/nix"
-hermetic=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg seed 2)
-input1=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg seed 2 -A passthru.input1 -j0)
-input2=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg seed 2 -A passthru.input2 -j0)
-input3=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg seed 2 -A passthru.input3 -j0)
+hermetic=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg withFinalRefs true --arg seed 2)
+input1=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg withFinalRefs true --arg seed 2 -A passthru.input1 -j0)
+input2=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg withFinalRefs true --arg seed 2 -A passthru.input2 -j0)
+input3=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg withFinalRefs true --arg seed 2 -A passthru.input3 -j0)
 
 # Can't delete because referenced
 expectStderr 1 nix-store --delete $input1 | grepQuiet "Cannot delete path"

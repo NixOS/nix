@@ -1,4 +1,9 @@
-{ busybox, seed }:
+{ busybox
+, seed
+# If we want the final derivation output to have references to its
+# dependencies. Some tests need/want this, other don't.
+, withFinalRefs ? false
+}:
 
 with import ./config.nix;
 
@@ -54,6 +59,6 @@ in
       ''
         read x < ${input1}
         read y < ${input3}
-        echo ${input1} ${input3} "$x $y" > $out
+        echo ${if (builtins.trace withFinalRefs withFinalRefs) then "${input1} ${input3}" else ""} "$x $y" > $out
       '';
   }
