@@ -5,11 +5,9 @@
 
 #include "tests/nix_api_store.hh"
 
-#define STORE_DIR "/nix/store/"
-#define HASH_PART "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q"
-const char * validPath = STORE_DIR HASH_PART "-x";
-
 namespace nixC {
+
+std::string PATH_SUFFIX = "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-name";
 
 TEST_F(nix_api_util_context, nix_libstore_init)
 {
@@ -33,21 +31,21 @@ TEST_F(nix_api_store_test, InvalidPathFails)
 
 TEST_F(nix_api_store_test, ReturnsValidStorePath)
 {
-    StorePath * result = nix_store_parse_path(ctx, store, validPath);
+    StorePath * result = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
     ASSERT_NE(result, nullptr);
-    ASSERT_STREQ("x", result->path.name().data());
-    ASSERT_STREQ(HASH_PART "-x", result->path.to_string().data());
+    ASSERT_STREQ("name", result->path.name().data());
+    ASSERT_STREQ(PATH_SUFFIX.substr(1).c_str(), result->path.to_string().data());
 }
 
 TEST_F(nix_api_store_test, SetsLastErrCodeToNixOk)
 {
-    nix_store_parse_path(ctx, store, validPath);
+    nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
     ASSERT_EQ(ctx->last_err_code, NIX_OK);
 }
 
 TEST_F(nix_api_store_test, DoesNotCrashWhenContextIsNull)
 {
-    ASSERT_NO_THROW(nix_store_parse_path(nullptr, store, validPath));
+    ASSERT_NO_THROW(nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str()));
 }
 
 TEST_F(nix_api_store_test, get_version)
@@ -83,7 +81,7 @@ TEST_F(nix_api_util_context, nix_store_open_invalid)
 
 TEST_F(nix_api_store_test, nix_store_is_valid_path_not_in_store)
 {
-    StorePath * path = nix_store_parse_path(ctx, store, validPath);
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
     ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, path));
 }
 

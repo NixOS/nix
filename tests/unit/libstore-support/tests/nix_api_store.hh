@@ -24,24 +24,30 @@ public:
     {
         nix_store_free(store);
 
-        for (auto & path : fs::recursive_directory_iterator(nixStoreDir)) {
+        for (auto & path : fs::recursive_directory_iterator(nixDir)) {
             fs::permissions(path, fs::perms::owner_all);
         }
-        fs::remove_all(nixStoreDir);
+        fs::remove_all(nixDir);
     }
 
     Store * store;
+    std::string nixDir;
     std::string nixStoreDir;
 
 protected:
     void init_local_store()
     {
         auto tmpl = nix::getEnv("TMPDIR").value_or("/tmp") + "/tests_nix-store.XXXXXX";
-        nixStoreDir = mkdtemp((char *) tmpl.c_str());
+        nixDir = mkdtemp((char *) tmpl.c_str());
+        nixStoreDir = nixDir + "/my_nix_store";
 
         // Options documented in `nix help-stores`
-        const char * p1[] = {"root", nixStoreDir.c_str()};
-        const char ** params[] = {p1, nullptr};
+        const char * p1[] = {"store", nixStoreDir.c_str()};
+        const char * p2[] = {"state", (new std::string(nixDir + "/my_state"))->c_str()};
+        const char * p3[] = {"log", (new std::string(nixDir + "/my_log"))->c_str()};
+
+        const char ** params[] = {p1, p2, p3, nullptr};
+
         store = nix_store_open(ctx, "local", params);
     }
 };
