@@ -78,19 +78,25 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     std::string path = url;
     std::string fragment = "";
     std::map<std::string, std::string> query;
-    auto pathEnd = url.find_first_of("#?");
-    auto fragmentStart = pathEnd;
-    if (pathEnd != std::string::npos && url[pathEnd] == '?') {
-        fragmentStart = url.find("#");
-    }
+    auto pathEnd = url.find_first_of("?#");
     if (pathEnd != std::string::npos) {
+        // There's something (either a query string or a fragment) in addition
+        // to the path
         path = url.substr(0, pathEnd);
-    }
-    if (fragmentStart != std::string::npos) {
-        fragment = percentDecode(url.substr(fragmentStart+1));
-    }
-    if (pathEnd != std::string::npos && fragmentStart != std::string::npos) {
-        query = decodeQuery(url.substr(pathEnd+1, fragmentStart-pathEnd-1));
+        std::string non_path_part = url.substr(pathEnd + 1);
+        if (url[pathEnd] == '#') {
+            // Not query, just a fragment
+            fragment = percentDecode(non_path_part);
+        } else {
+            // We have a query, and maybe a fragment too
+            auto fragmentStart = non_path_part.find("#");
+            if (fragmentStart != std::string::npos) {
+                query = decodeQuery(non_path_part.substr(0, fragmentStart));
+                fragment = percentDecode(non_path_part.substr(fragmentStart+1));
+            } else {
+                query = decodeQuery(non_path_part);
+            }
+        }
     }
 
     if (baseDir) {
