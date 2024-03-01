@@ -115,4 +115,16 @@ StringMap getStringMap(const nlohmann::json & value)
 
     return stringMap;
 }
+
+StringSet getStringSet(const nlohmann::json & value)
+{
+    auto jsonArray = getArray(value);
+
+    StringSet stringSet;
+
+    for (const auto & elem: jsonArray)
+        stringSet.insert(getString(elem));
+
+    return stringSet;
+}
 }

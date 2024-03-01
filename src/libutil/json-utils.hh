@@ -3,6 +3,7 @@
 
 #include <nlohmann/json.hpp>
 #include <list>
+#include <nlohmann/json_fwd.hpp>
 #include "types.hh"
 
 namespace nix {
@@ -44,6 +45,7 @@ const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value
 const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value);
 Strings getStringList(const nlohmann::json & value);
 StringMap getStringMap(const nlohmann::json & value);
+StringSet getStringSet(const nlohmann::json & value);
 
 /**
  * For `adl_serializer<std::optional<T>>` below, we need to track what

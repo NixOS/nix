@@ -1392,8 +1392,7 @@ Derivation Derivation::fromJSON(
         std::function<DerivedPathMap<StringSet>::ChildNode(const nlohmann::json &)> doInput;
         doInput = [&](const auto & json) {
             DerivedPathMap<StringSet>::ChildNode node;
-            node.value = static_cast<const StringSet &>(
-                ensureType(valueAt(json, "outputs"), value_t::array));
+            node.value = getStringSet(valueAt(json, "outputs"));
             for (auto & [outputId, childNode] : getObject(valueAt(json, "dynamicOutputs"))) {
                 xpSettings.require(Xp::DynamicDerivations);
                 node.childMap[outputId] = doInput(childNode);
