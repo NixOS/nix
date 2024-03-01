@@ -49,3 +49,6 @@ printf 123 > $TEST_ROOT/xyzzy/default.nix
 if [[ -e /proc/version ]]; then
     [[ "$(nix eval --raw --arg-from-file foo /proc/version --expr '{ foo }: { inherit foo; }' foo)" = "$(cat /proc/version)" ]]
 fi
+
+# Test --arg-from-stdin.
+[[ "$(echo bla | nix eval --raw --arg-from-stdin foo --expr '{ foo }: { inherit foo; }' foo)" = bla ]]

@@ -29,8 +29,9 @@ private:
     struct AutoArgExpr { std::string expr; };
     struct AutoArgString { std::string s; };
     struct AutoArgFile { std::filesystem::path path; };
+    struct AutoArgStdin { };
 
-    using AutoArg = std::variant<AutoArgExpr, AutoArgString, AutoArgFile>;
+    using AutoArg = std::variant<AutoArgExpr, AutoArgString, AutoArgFile, AutoArgStdin>;
 
     std::map<std::string, AutoArg> autoArgs;
 };

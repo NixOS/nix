@@ -41,6 +41,14 @@ MixEvalArgs::MixEvalArgs()
     });
 
     addFlag({
+        .longName = "arg-from-stdin",
+        .description = "Pass the contents of stdin as the argument *name* to Nix functions.",
+        .category = category,
+        .labels = {"name"},
+        .handler = {[&](std::string name) { autoArgs.insert_or_assign(name, AutoArg{AutoArgStdin{}}); }},
+    });
+
+    addFlag({
         .longName = "include",
         .shortName = 'I',
         .description = R"(
@@ -174,6 +182,9 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
             },
             [&](const AutoArgFile & arg) {
                 v->mkString(readFile(arg.path));
+            },
+            [&](const AutoArgStdin & arg) {
+                v->mkString(readFile(STDIN_FILENO));
             }
         }, arg);
         res.insert(state.symbols.create(name), v);
