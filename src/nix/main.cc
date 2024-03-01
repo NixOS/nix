@@ -378,7 +378,7 @@ void mainWrapped(int argc, char * * argv)
     settings.verboseBuild = false;
 
     // If on a terminal, progress will be displayed via progress bars etc. (thus verbosity=notice)
-    if (nix::shouldANSI()) {
+    if (nix::isTTY()) {
         verbosity = lvlNotice;
     } else {
         verbosity = lvlInfo;

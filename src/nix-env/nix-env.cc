@@ -1090,7 +1090,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
-    bool tty = shouldANSI();
+    bool tty = isTTY();
     RunPager pager;
 
     Table table;

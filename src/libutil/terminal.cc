@@ -7,7 +7,7 @@
 
 namespace nix {
 
-bool shouldANSI()
+bool isTTY()
 {
     return isatty(STDERR_FILENO)
         && getEnv("TERM").value_or("dumb") != "dumb"
