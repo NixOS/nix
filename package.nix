@@ -154,7 +154,7 @@ in {
     in
       fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect baseFiles (fileset.unions ([
+        fileset = fileset.intersection baseFiles (fileset.unions ([
           # For configure
           ./.version
           ./configure.ac
@@ -209,6 +209,10 @@ in {
     (lib.getBin lowdown)
     mdbook
     mdbook-linkcheck
+  ] ++ lib.optionals doInstallCheck [
+    git
+    mercurial
+    openssh
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
@@ -248,12 +252,6 @@ in {
 
   dontBuild = !attrs.doBuild;
   doCheck = attrs.doCheck;
-
-  nativeCheckInputs = [
-    git
-    mercurial
-    openssh
-  ];
 
   disallowedReferences = [ boost ];
 

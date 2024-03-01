@@ -13,6 +13,7 @@ TEST(ContentAddressMethod, testRoundTripPrintParse_1) {
         ContentAddressMethod { TextIngestionMethod {} },
         ContentAddressMethod { FileIngestionMethod::Flat },
         ContentAddressMethod { FileIngestionMethod::Recursive },
+        ContentAddressMethod { FileIngestionMethod::Git },
     }) {
         EXPECT_EQ(ContentAddressMethod::parse(cam.render()), cam);
     }
@@ -23,6 +24,7 @@ TEST(ContentAddressMethod, testRoundTripPrintParse_2) {
         "text",
         "flat",
         "nar",
+        "git",
     }) {
         EXPECT_EQ(ContentAddressMethod::parse(camS).render(), camS);
     }

@@ -10,6 +10,7 @@
 #include "eval-inline.hh"
 #include "legacy.hh"
 #include "posix-source-accessor.hh"
+#include "misc-store-flags.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -284,7 +285,7 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             }}
         });
 
-        addFlag(Flag::mkHashAlgoFlag("hash-type", &hashAlgo));
+        addFlag(flag::hashAlgo("hash-type", &hashAlgo));
 
         addFlag({
             .longName = "executable",

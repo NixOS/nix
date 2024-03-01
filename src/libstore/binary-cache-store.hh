@@ -125,7 +125,8 @@ public:
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override;
@@ -147,7 +148,7 @@ public:
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 
-    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 

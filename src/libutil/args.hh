@@ -155,6 +155,8 @@ protected:
      */
     using CompleterClosure = std::function<CompleterFun>;
 
+public:
+
     /**
      * Description of flags / options
      *
@@ -175,18 +177,9 @@ protected:
         CompleterClosure completer;
 
         std::optional<ExperimentalFeature> experimentalFeature;
-
-        static Flag mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha);
-        static Flag mkHashAlgoFlag(HashAlgorithm * ha) {
-            return mkHashAlgoFlag("hash-algo", ha);
-        }
-        static Flag mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
-        static Flag mkHashAlgoOptFlag(std::optional<HashAlgorithm> * oha) {
-            return mkHashAlgoOptFlag("hash-algo", oha);
-        }
-        static Flag mkHashFormatFlagWithDefault(std::string && longName, HashFormat * hf);
-        static Flag mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf);
     };
+
+protected:
 
     /**
      * Index of all registered "long" flag descriptions (flags like
@@ -206,6 +199,8 @@ protected:
      */
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
 
+public:
+
     /**
      * Description of positional arguments
      *
@@ -219,6 +214,8 @@ protected:
         Handler handler;
         CompleterClosure completer;
     };
+
+protected:
 
     /**
      * Queue of expected positional argument forms.

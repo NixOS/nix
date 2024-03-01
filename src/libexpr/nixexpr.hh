@@ -135,6 +135,23 @@ struct ExprVar : Expr
     COMMON_METHODS
 };
 
+/**
+ * A pseudo-expression for the purpose of evaluating the `from` expression in `inherit (from)` syntax.
+ * Unlike normal variable references, the displacement is set during parsing, and always refers to
+ * `ExprAttrs::inheritFromExprs` (by itself or in `ExprLet`), whose values are put into their own `Env`.
+ */
+struct ExprInheritFrom : ExprVar
+{
+    ExprInheritFrom(PosIdx pos, Displacement displ): ExprVar(pos, {})
+    {
+        this->level = 0;
+        this->displ = displ;
+        this->fromWith = nullptr;
+    }
+
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+};
+
 struct ExprSelect : Expr
 {
     PosIdx pos;
@@ -160,16 +177,40 @@ struct ExprAttrs : Expr
     bool recursive;
     PosIdx pos;
     struct AttrDef {
-        bool inherited;
+        enum class Kind {
+            /** `attr = expr;` */
+            Plain,
+            /** `inherit attr1 attrn;` */
+            Inherited,
+            /** `inherit (expr) attr1 attrn;` */
+            InheritedFrom,
+        };
+
+        Kind kind;
         Expr * e;
         PosIdx pos;
         Displacement displ; // displacement
-        AttrDef(Expr * e, const PosIdx & pos, bool inherited=false)
-            : inherited(inherited), e(e), pos(pos) { };
+        AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
+            : kind(kind), e(e), pos(pos) { };
         AttrDef() { };
+
+        template<typename T>
+        const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
+        {
+            switch (kind) {
+            case Kind::Plain:
+                return plain;
+            case Kind::Inherited:
+                return inherited;
+            default:
+            case Kind::InheritedFrom:
+                return inheritedFrom;
+            }
+        }
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
+    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
     struct DynamicAttrDef {
         Expr * nameExpr, * valueExpr;
         PosIdx pos;
@@ -182,6 +223,11 @@ struct ExprAttrs : Expr
     ExprAttrs() : recursive(false) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
+
+    std::shared_ptr<const StaticEnv> bindInheritSources(
+        EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+    Env * buildInheritFromEnv(EvalState & state, Env & up);
+    void showBindings(const SymbolTable & symbols, std::ostream & str) const;
 };
 
 struct ExprList : Expr

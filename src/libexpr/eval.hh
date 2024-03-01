@@ -454,10 +454,12 @@ public:
     std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
+    void addErrorTrace(Error & e, const Args & ... formatArgs) const;
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
+    void addErrorTrace(Error & e, const PosIdx pos, const Args & ... formatArgs) const;
 
 public:
     /**

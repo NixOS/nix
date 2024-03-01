@@ -226,7 +226,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto getEnvShPath = ({
         StringSource source { getEnvSh };
         evalStore->addToStoreFromDump(
-            source, "get-env.sh", TextIngestionMethod {}, HashAlgorithm::SHA256, {});
+            source, "get-env.sh", FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, {});
     });
 
     drv.args = {store->printStorePath(getEnvShPath)};

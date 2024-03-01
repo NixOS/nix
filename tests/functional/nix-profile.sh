@@ -66,6 +66,9 @@ nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG
 
+# Test conflicting package install.
+nix profile install $flake1Dir 2>&1 | grep "warning: 'flake1' is already installed"
+
 # Test upgrading a package.
 printf NixOS > $flake1Dir/who
 printf 2.0 > $flake1Dir/version
@@ -168,7 +171,7 @@ error: An existing package already provides the following file:
 
        To remove the existing package:
 
-         nix profile remove path:${flake1Dir}#packages.${system}.default
+         nix profile remove flake1
 
        The new package can also be installed next to the existing one by assigning a different priority.
        The conflicting packages have a priority of 5.
