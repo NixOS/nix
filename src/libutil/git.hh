@@ -75,10 +75,23 @@ ObjectType parseObjectType(
     Source & source,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
+/**
+ * These 3 modes are represented by blob objects.
+ *
+ * Sometimes we need this information to disambiguate how a blob is
+ * being used to better match our own "file system object" data model.
+ */
+enum struct BlobMode : RawMode
+{
+    Regular = static_cast<RawMode>(Mode::Regular),
+    Executable = static_cast<RawMode>(Mode::Executable),
+    Symlink = static_cast<RawMode>(Mode::Symlink),
+};
+
 void parseBlob(
     FileSystemObjectSink & sink, const Path & sinkPath,
     Source & source,
-    bool executable,
+    BlobMode blobMode,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 void parseTree(
@@ -89,11 +102,15 @@ void parseTree(
 
 /**
  * Helper putting the previous three `parse*` functions together.
+ *
+ * @rootModeIfBlob How to interpret a root blob, for which there is no
+ * disambiguating dir entry to answer that questino. If the root it not
+ * a blob, this is ignored.
  */
 void parse(
     FileSystemObjectSink & sink, const Path & sinkPath,
     Source & source,
-    bool executable,
+    BlobMode rootModeIfBlob,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
