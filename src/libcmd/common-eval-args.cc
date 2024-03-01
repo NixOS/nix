@@ -32,6 +32,15 @@ MixEvalArgs::MixEvalArgs()
     });
 
     addFlag({
+        .longName = "arg-from-file",
+        .description = "Pass the contents of file *path* as the argument *name* to Nix functions.",
+        .category = category,
+        .labels = {"name", "path"},
+        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile(path)}); }},
+        .completer = completePath
+    });
+
+    addFlag({
         .longName = "include",
         .shortName = 'I',
         .description = R"(
@@ -162,6 +171,9 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
             },
             [&](const AutoArgString & arg) {
                 v->mkString(arg.s);
+            },
+            [&](const AutoArgFile & arg) {
+                v->mkString(readFile(arg.path));
             }
         }, arg);
         res.insert(state.symbols.create(name), v);

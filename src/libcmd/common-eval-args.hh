@@ -28,8 +28,9 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 private:
     struct AutoArgExpr { std::string expr; };
     struct AutoArgString { std::string s; };
+    struct AutoArgFile { std::filesystem::path path; };
 
-    using AutoArg = std::variant<AutoArgExpr, AutoArgString>;
+    using AutoArg = std::variant<AutoArgExpr, AutoArgString, AutoArgFile>;
 
     std::map<std::string, AutoArg> autoArgs;
 };
