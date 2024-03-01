@@ -1,5 +1,6 @@
 #include "json-utils.hh"
 #include "error.hh"
+#include "types.hh"
 
 namespace nix {
 
@@ -89,5 +90,17 @@ const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value)
             value.type_name());
 
     return value.get_ref<const nlohmann::json::boolean_t &>();
+}
+
+Strings getStringList(const nlohmann::json & value)
+{
+    auto jsonArray = getArray(value);
+
+    Strings stringList;
+
+    for (const auto & elem: jsonArray)
+        stringList.push_back(elem);
+
+    return stringList;
 }
 }

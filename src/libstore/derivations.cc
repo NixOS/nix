@@ -1411,7 +1411,7 @@ Derivation Derivation::fromJSON(
 
     res.platform = getString(valueAt(json, "system"));
     res.builder = getString(valueAt(json, "builder"));
-    res.args = ensureType(valueAt(json, "args"), value_t::array);
+    res.args = getStringList(valueAt(json, "args"));
     res.env = ensureType(valueAt(json, "env"), value_t::object);
 
     return res;
