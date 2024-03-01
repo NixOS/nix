@@ -103,4 +103,16 @@ Strings getStringList(const nlohmann::json & value)
 
     return stringList;
 }
+
+StringMap getStringMap(const nlohmann::json & value)
+{
+    auto jsonArray = getObject(value);
+
+    StringMap stringMap;
+
+    for (const auto & [key, value]: jsonArray)
+        stringMap[getString(key)] = getString(value);
+
+    return stringMap;
+}
 }

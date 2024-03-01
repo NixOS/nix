@@ -1412,7 +1412,7 @@ Derivation Derivation::fromJSON(
     res.platform = getString(valueAt(json, "system"));
     res.builder = getString(valueAt(json, "builder"));
     res.args = getStringList(valueAt(json, "args"));
-    res.env = ensureType(valueAt(json, "env"), value_t::object);
+    res.env = getStringMap(valueAt(json, "env"));
 
     return res;
 }
