@@ -42,6 +42,7 @@ ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
 makefiles += \
   tests/functional/local.mk \
   tests/functional/ca/local.mk \
+  tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
@@ -67,6 +68,7 @@ ifeq ($(OPTIMIZE), 1)
   GLOBAL_LDFLAGS += $(CXXLTO)
 else
   GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
+  unexport NIX_HARDENING_ENABLE
 endif
 
 include mk/platform.mk
@@ -81,7 +83,7 @@ ifdef HOST_WINDOWS
   GLOBAL_LDFLAGS += -Wl,--export-all-symbols
 endif
 
-GLOBAL_CXXFLAGS += -g -Wall -include $(buildprefix)config.h -std=c++2a -I src
+GLOBAL_CXXFLAGS += -g -Wall -Wimplicit-fallthrough -include $(buildprefix)config.h -std=c++2a -I src
 
 # Include the main lib, causing rules to be defined
 

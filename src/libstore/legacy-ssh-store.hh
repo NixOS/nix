@@ -72,7 +72,8 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     virtual StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override

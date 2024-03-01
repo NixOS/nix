@@ -1,7 +1,7 @@
 source common.sh
 
 # Needs the config option 'impure-env' to work
-requireDaemonNewerThan "2.18.0pre20230816"
+requireDaemonNewerThan "2.19.0"
 
 enableFeatures "configurable-impure-env"
 restartDaemon

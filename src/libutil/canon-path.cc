@@ -8,7 +8,7 @@ CanonPath CanonPath::root = CanonPath("/");
 
 static std::string absPathPure(std::string_view path)
 {
-    return canonPathInner(path, [](auto &, auto &){});
+    return canonPathInner<UnixPathTrait>(path, [](auto &, auto &){});
 }
 
 CanonPath::CanonPath(std::string_view raw)

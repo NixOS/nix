@@ -259,7 +259,7 @@ hashPath(char * algo, int base32, char * path)
             auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(path);
             Hash h = hashPath(
                 accessor, canonPath,
-                FileIngestionMethod::Recursive, parseHashAlgo(algo)).first;
+                FileIngestionMethod::Recursive, parseHashAlgo(algo));
             auto s = h.to_string(base32 ? HashFormat::Nix32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {

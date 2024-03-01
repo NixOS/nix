@@ -313,17 +313,27 @@ binds
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               state->dupAttr(i.symbol, state->at(@3), $$->attrs[i.symbol].pos);
           auto pos = state->at(@3);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
+          $$->attrs.emplace(
+              i.symbol,
+              ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, ExprAttrs::AttrDef::Kind::Inherited));
       }
       delete $3;
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
-      /* !!! Should ensure sharing of the expression in $4. */
+      if (!$$->inheritFromExprs)
+          $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+      $$->inheritFromExprs->push_back($4);
+      auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               state->dupAttr(i.symbol, state->at(@6), $$->attrs[i.symbol].pos);
-          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), state->at(@6)));
+          $$->attrs.emplace(
+              i.symbol,
+              ExprAttrs::AttrDef(
+                  new ExprSelect(CUR_POS, from, i.symbol),
+                  state->at(@6),
+                  ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
       delete $6;
     }

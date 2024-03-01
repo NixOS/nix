@@ -305,7 +305,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 StorePath BinaryCacheStore::addToStoreFromDump(
     Source & dump,
     std::string_view name,
-    ContentAddressMethod method,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     RepairFlag repair)
@@ -313,17 +314,27 @@ StorePath BinaryCacheStore::addToStoreFromDump(
     std::optional<Hash> caHash;
     std::string nar;
 
+    // Calculating Git hash from NAR stream not yet implemented. May not
+    // be possible to implement in single-pass if the NAR is in an
+    // inconvenient order. Could fetch after uploading, however.
+    if (hashMethod.getFileIngestionMethod() == FileIngestionMethod::Git)
+        unsupported("addToStoreFromDump");
+
     if (auto * dump2p = dynamic_cast<StringSource *>(&dump)) {
         auto & dump2 = *dump2p;
         // Hack, this gives us a "replayable" source so we can compute
         // multiple hashes more easily.
-        caHash = hashString(HashAlgorithm::SHA256, dump2.s);
-        switch (method.getFileIngestionMethod()) {
-        case FileIngestionMethod::Recursive:
+        //
+        // Only calculate if the dump is in the right format, however.
+        if (static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod())
+            caHash = hashString(HashAlgorithm::SHA256, dump2.s);
+        switch (dumpMethod) {
+        case FileSerialisationMethod::Recursive:
             // The dump is already NAR in this case, just use it.
             nar = dump2.s;
             break;
-        case FileIngestionMethod::Flat:
+        case FileSerialisationMethod::Flat:
+        {
             // The dump is Flat, so we need to convert it to NAR with a
             // single file.
             StringSink s;
@@ -331,10 +342,11 @@ StorePath BinaryCacheStore::addToStoreFromDump(
             nar = std::move(s.s);
             break;
         }
+        }
     } else {
         // Otherwise, we have to do th same hashing as NAR so our single
         // hash will suffice for both purposes.
-        if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
+        if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
             unsupported("addToStoreFromDump");
     }
     StringSource narDump { nar };
@@ -349,7 +361,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
             *this,
             name,
             ContentAddressWithReferences::fromParts(
-                method,
+                hashMethod,
                 caHash ? *caHash : nar.first,
                 {
                     .others = references,
@@ -450,7 +462,7 @@ StorePath BinaryCacheStore::addToStore(
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
 
     auto source = sinkToSource([&](Sink & sink) {
         accessor.dumpPath(path, sink, filter);

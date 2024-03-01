@@ -90,14 +90,19 @@ where
       - `rec` = one of:
 
         - ```ebnf
+          | ""
+          ```
+          (empty string) for hashes of the flat (single file) serialization
+
+        - ```ebnf
           | "r:"
           ```
           hashes of the for [Nix Archive (NAR)] (arbitrary file system object) serialization
 
         - ```ebnf
-          | ""
+          | "git:"
           ```
-          (empty string) for hashes of the flat (single file) serialization
+          hashes of the [Git blob/tree](https://git-scm.com/book/en/v2/Git-Internals-Git-Objects) [Merkel tree](https://en.wikipedia.org/wiki/Merkle_tree) format
 
       - ```ebnf
         algo = "md5" | "sha1" | "sha256"

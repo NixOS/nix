@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "git.hh"
 #include "posix-source-accessor.hh"
 #include "misc-store-flags.hh"
 
