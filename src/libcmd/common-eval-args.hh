@@ -26,7 +26,12 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
     std::optional<std::string> evalStoreUrl;
 
 private:
-    std::map<std::string, std::string> autoArgs;
+    struct AutoArgExpr { std::string expr; };
+    struct AutoArgString { std::string s; };
+
+    using AutoArg = std::variant<AutoArgExpr, AutoArgString>;
+
+    std::map<std::string, AutoArg> autoArgs;
 };
 
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir = nullptr);

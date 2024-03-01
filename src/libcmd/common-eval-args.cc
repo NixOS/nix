@@ -20,7 +20,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "expr"},
-        .handler = {[&](std::string name, std::string expr) { autoArgs[name] = 'E' + expr; }}
+        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr(expr)}); }}
     });
 
     addFlag({
@@ -28,7 +28,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the string *string* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "string"},
-        .handler = {[&](std::string name, std::string s) { autoArgs[name] = 'S' + s; }},
+        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString(s)}); }},
     });
 
     addFlag({
@@ -154,13 +154,17 @@ MixEvalArgs::MixEvalArgs()
 Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 {
     auto res = state.buildBindings(autoArgs.size());
-    for (auto & i : autoArgs) {
+    for (auto & [name, arg] : autoArgs) {
         auto v = state.allocValue();
-        if (i.second[0] == 'E')
-            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), state.rootPath(".")));
-        else
-            v->mkString(((std::string_view) i.second).substr(1));
-        res.insert(state.symbols.create(i.first), v);
+        std::visit(overloaded {
+            [&](const AutoArgExpr & arg) {
+                state.mkThunk_(*v, state.parseExprFromString(arg.expr, state.rootPath(".")));
+            },
+            [&](const AutoArgString & arg) {
+                v->mkString(arg.s);
+            }
+        }, arg);
+        res.insert(state.symbols.create(name), v);
     }
     return res.finish();
 }
