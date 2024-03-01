@@ -16,6 +16,7 @@
 #include "xml-writer.hh"
 #include "legacy.hh"
 #include "eval-settings.hh" // for defexpr
+#include "terminal.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -1089,7 +1090,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
-    bool tty = isatty(STDOUT_FILENO);
+    bool tty = shouldANSI();
     RunPager pager;
 
     Table table;
