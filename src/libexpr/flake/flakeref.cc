@@ -55,7 +55,7 @@ FlakeRef parseFlakeRef(
 {
     auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing, isFlake);
     if (fragment != "")
-        throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
+        throw FlakeRefError("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
 }
 
@@ -113,10 +113,10 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         found = true;
                         break;
                     } else if (pathExists(path + "/.git"))
-                        throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
+                        throw FlakeRefError("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
                     else {
                         if (lstat(path).st_dev != device)
-                            throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
+                            throw FlakeRefError("unable to find a flake before encountering filesystem boundary at '%s'", path);
                     }
                     path = dirOf(path);
                 }
@@ -148,7 +148,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
                     if (subdir != "") {
                         if (parsedURL.query.count("dir"))
-                            throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
+                            throw FlakeRefError("flake URL '%s' has an inconsistent 'dir' parameter", url);
                         parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
