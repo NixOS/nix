@@ -102,8 +102,18 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
         if (isFlake) {
 
-            if (!S_ISDIR(lstat(path).st_mode))
-                throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
+            if (!S_ISDIR(lstat(path).st_mode)) {
+                if (baseNameOf(path) == "flake.nix") {
+                    // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
+                    warn(
+                        "Path '%s' should point at the directory containing the 'flake.nix' file, not the file itself. "
+                        "Pretending that you meant '%s'"
+                        , path, dirOf(path));
+                    path = dirOf(path);
+                } else {
+                    throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
+                }
+            }
 
             if (!allowMissing && !pathExists(path + "/flake.nix")){
                 notice("path '%s' does not contain a 'flake.nix', searching up",path);
