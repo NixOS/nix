@@ -1,6 +1,6 @@
 let
   inherit (builtins) attrValues concatStringsSep isAttrs isBool mapAttrs;
-  inherit (import ./utils.nix) concatStrings indent optionalString squash;
+  inherit (import <nix/utils.nix>) concatStrings indent optionalString squash;
 in
 
 # `inlineHTML` is a hack to accommodate inconsistent output from `lowdown`
