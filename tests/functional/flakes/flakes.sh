@@ -564,6 +564,16 @@ nix flake lock "$flake3Dir"
 nix flake update flake2/flake1 --flake "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
 
+# Test updating multiple inputs.
+nix flake lock "$flake3Dir" --override-input flake1 flake1/master/$hash1
+nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1/master/$hash1
+[[ $(jq -r .nodes.flake1.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
+
+nix flake update flake1 flake2/flake1 --flake "$flake3Dir"
+[[ $(jq -r .nodes.flake1.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+
 # Test 'nix flake metadata --json'.
 nix flake metadata "$flake3Dir" --json | jq .
 
