@@ -157,4 +157,5 @@ jobs:
         docker push $IMAGE_ID:$NIX_VERSION
         docker push $IMAGE_ID:latest
         # deprecated 2024-02-24
+        docker tag nix:$NIX_VERSION $IMAGE_ID:master
         docker push $IMAGE_ID:master
