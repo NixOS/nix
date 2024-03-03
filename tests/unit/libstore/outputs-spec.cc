@@ -6,11 +6,9 @@
 
 namespace nix {
 
-#ifndef NDEBUG
 TEST(OutputsSpec, no_empty_names) {
     ASSERT_DEATH(OutputsSpec::Names { std::set<std::string> { } }, "");
 }
-#endif
 
 #define TEST_DONT_PARSE(NAME, STR)           \
     TEST(OutputsSpec, bad_ ## NAME) {        \
