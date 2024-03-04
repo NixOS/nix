@@ -177,8 +177,7 @@ static Flake readFlake(
     const SourcePath & rootDir,
     const InputPath & lockRootPath)
 {
-    CanonPath flakeDir(resolvedRef.subdir);
-    auto flakePath = rootDir / flakeDir / "flake.nix";
+    auto flakePath = rootDir / CanonPath(resolvedRef.subdir) / "flake.nix";
 
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
