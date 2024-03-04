@@ -8,6 +8,38 @@ permissions: read-all
 
 jobs:
 
+  build-pedantic:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: cachix/install-nix-action@v25
+      with:
+        # The sandbox would otherwise be disabled by default on Darwin
+        extra_nix_config: "sandbox = true"
+    - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
+    - uses: cachix/cachix-action@v14
+      if: needs.check_secrets.outputs.cachix == 'true'
+      with:
+        name: '${{ env.CACHIX_NAME }}'
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - name: cache ccache files
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ccache
+        key: ${{ matrix.os }}-ccache-${{ github.run_number }}
+        restore-keys: |
+          ${{ matrix.os }}-ccache-
+    - run: |
+        nix --experimental-features 'nix-command flakes' build ".#nix-pedantic" -L
+
   tests:
     needs: [check_secrets]
     strategy:
