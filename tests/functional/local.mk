@@ -129,7 +129,8 @@ nix_tests = \
   read-only-store.sh \
   nested-sandboxing.sh \
   impure-env.sh \
-  debugger.sh
+  debugger.sh \
+	help.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
   nix_tests += compute-levels.sh
