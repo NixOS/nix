@@ -381,6 +381,11 @@ struct GitInputScheme : InputScheme
         return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
     }
 
+    bool getLfsAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "lfs").value_or(false);
+    }
+
     bool getExportIgnoreAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false);
@@ -646,6 +651,11 @@ struct GitInputScheme : InputScheme
                 mounts.insert_or_assign(CanonPath::root, accessor);
                 accessor = makeMountedInputAccessor(std::move(mounts));
             }
+        }
+
+        if (getLfsAttr(input)) {
+            // urlencoded `?lfs=1` param is set,
+            repo->smudgeLfs();
         }
 
         assert(!origRev || origRev == rev);

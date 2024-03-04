@@ -318,6 +318,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
+    void smudgeLfs() override;
+
     std::string resolveSubmoduleUrl(
         const std::string & url,
         const std::string & base) override
@@ -1005,6 +1007,15 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     }
 
     return result;
+}
+
+void GitRepoImpl::smudgeLfs() {
+    runProgram(RunOptions{
+            .program = "git",
+            .searchPath = true,
+            .args = { "lfs", "pull" },
+            .chdir = std::make_optional(this->path)
+            });
 }
 
 ref<GitRepo> getTarballCache()
