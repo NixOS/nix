@@ -73,7 +73,10 @@ endif
 
 PEDANTIC = 0
 ifeq ($(PEDANTIC), 1)
-    GLOBAL_CXXFLAGS += -Werror
+    # Required by -fsanitize
+    BUILD_PIE_EXES = 1
+    GLOBAL_CXXFLAGS += -Werror -fsanitize=undefined
+    GLOBAL_LDFLAGS += -fsanitize=undefined
 endif
 
 include mk/platform.mk
