@@ -71,6 +71,11 @@ else
   unexport NIX_HARDENING_ENABLE
 endif
 
+PEDANTIC = 0
+ifeq ($(PEDANTIC), 1)
+    GLOBAL_CXXFLAGS += -Werror
+endif
+
 include mk/platform.mk
 
 ifdef HOST_WINDOWS
