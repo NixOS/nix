@@ -24,6 +24,7 @@
 , libgit2
 , libseccomp
 , libsodium
+, man
 , lowdown
 , mdbook
 , mdbook-linkcheck
@@ -213,6 +214,7 @@ in {
     git
     mercurial
     openssh
+    man # for testing `nix-* --help`
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
