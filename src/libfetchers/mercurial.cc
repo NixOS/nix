@@ -6,8 +6,8 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
+#include "fs-input-accessor.hh"
 #include "posix-source-accessor.hh"
-
 #include "fetch-settings.hh"
 
 #include <sys/time.h>
@@ -161,9 +161,9 @@ struct MercurialInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    StorePath fetchToStore(ref<Store> store, Input & input) const
     {
-        Input input(_input);
+        auto origRev = input.getRev();
 
         auto name = input.getName();
 
@@ -218,7 +218,7 @@ struct MercurialInputScheme : InputScheme
                     FileIngestionMethod::Recursive, HashAlgorithm::SHA256, {},
                     filter);
 
-                return {std::move(storePath), input};
+                return storePath;
             }
         }
 
@@ -242,13 +242,12 @@ struct MercurialInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<StorePath, Input>
+        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> StorePath
         {
             assert(input.getRev());
-            assert(!_input.getRev() || _input.getRev() == input.getRev());
+            assert(!origRev || origRev == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-            return {std::move(storePath), input};
+            return storePath;
         };
 
         if (input.getRev()) {
@@ -329,7 +328,7 @@ struct MercurialInputScheme : InputScheme
             {"revCount", (uint64_t) revCount},
         });
 
-        if (!_input.getRev())
+        if (!origRev)
             getCache()->add(
                 *store,
                 unlockedAttrs,
@@ -345,6 +344,15 @@ struct MercurialInputScheme : InputScheme
             true);
 
         return makeResult(infoAttrs, std::move(storePath));
+    }
+
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    {
+        Input input(_input);
+
+        auto storePath = fetchToStore(store, input);
+
+        return {makeStorePathAccessor(store, storePath), input};
     }
 
     bool isLocked(const Input & input) const override
