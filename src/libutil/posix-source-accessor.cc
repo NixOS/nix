@@ -85,16 +85,18 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static Sync<std::unordered_map<CanonPath, std::optional<struct stat>>> _cache;
+    static Sync<std::unordered_map<std::filesystem::path, std::optional<struct stat>>> _cache;
+
+    auto absPath = makeAbsPath(path);
 
     {
         auto cache(_cache.lock());
-        auto i = cache->find(path);
+        auto i = cache->find(absPath);
         if (i != cache->end()) return i->second;
     }
 
     std::optional<struct stat> st{std::in_place};
-    if (::lstat(makeAbsPath(path).c_str(), &*st)) {
+    if (::lstat(absPath.c_str(), &*st)) {
         if (errno == ENOENT || errno == ENOTDIR)
             st.reset();
         else
@@ -103,7 +105,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
 
     auto cache(_cache.lock());
     if (cache->size() >= 16384) cache->clear();
-    cache->emplace(path, st);
+    cache->emplace(absPath, st);
 
     return st;
 }
