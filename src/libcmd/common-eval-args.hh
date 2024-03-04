@@ -6,6 +6,8 @@
 #include "common-args.hh"
 #include "search-path.hh"
 
+#include <filesystem>
+
 namespace nix {
 
 class Store;
