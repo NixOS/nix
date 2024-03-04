@@ -46,6 +46,9 @@ static Strings parseNixPath(const std::string & s)
 
 EvalSettings::EvalSettings()
 {
+    if (!nixPath.overridden) {
+        nixPath = getDefaultNixPath();
+    }
     auto var = getEnv("NIX_PATH");
     if (var) nixPath = parseNixPath(*var);
 }
@@ -63,7 +66,7 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    if (!evalSettings.restrictEval && !evalSettings.pureEval) {
+    if (!restrictEval && !pureEval) {
         add(getNixDefExpr() + "/channels");
         add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
         add(rootChannelsDir());
