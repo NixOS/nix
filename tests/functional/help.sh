@@ -53,24 +53,14 @@ nix-prefetch-url --help
 function subcommands() {
   jq -r '
 def recurse($prefix):
-  if .commands then
-    .commands | to_entries[] | .key as $k |
-    ($prefix + " " + $k) as $newPrefix |
-    if .value | has("commands") then
-      (.value | recurse($newPrefix))
+    to_entries[] |
+    ($prefix + [.key]) as $newPrefix |
+    (if .value | has("commands") then
+      ($newPrefix, (.value.commands | recurse($newPrefix)))
     else
       $newPrefix
-    end
-  else
-    $prefix
-  end;
-
-.args.commands | to_entries[] | .key as $cmd |
-  if .value | has("commands") then
-    (.value | recurse($cmd))
-  else
-    $cmd
-  end
+    end);
+.args.commands | recurse([]) | join(" ")
 '
 }
 
