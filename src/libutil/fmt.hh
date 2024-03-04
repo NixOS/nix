@@ -34,7 +34,7 @@ inline void formatHelper(F & f, const T & x, const Args & ... args)
 /**
  * Set the correct exceptions for `fmt`.
  */
-void setExceptions(boost::format & fmt)
+inline void setExceptions(boost::format & fmt)
 {
     fmt.exceptions(
         boost::io::all_error_bits ^
