@@ -44,7 +44,7 @@ const nlohmann::json & ensureType(
 
 const nlohmann::json::object_t & getObject(const nlohmann::json & value)
 {
-    if (!value.is_array())
+    if (!value.is_object())
         throw Error(
             "Expected JSON value to be an 'object' but it is of type '%s'",
             value.type_name());
@@ -99,7 +99,7 @@ Strings getStringList(const nlohmann::json & value)
     Strings stringList;
 
     for (const auto & elem: jsonArray)
-        stringList.push_back(elem);
+        stringList.push_back(getString(elem));
 
     return stringList;
 }
