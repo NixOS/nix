@@ -590,7 +590,7 @@ struct GitInputAccessor : InputAccessor
             i = lookupCache.emplace(path, std::move(entry)).first;
         }
 
-        return &*i->second;
+        return i->second.get();
     }
 
     git_tree_entry * need(const CanonPath & path)
