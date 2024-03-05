@@ -348,13 +348,13 @@ void initGC()
 
     GC_set_oom_fn(oomHandler);
 
-    // TODO: Comment suggests an implementation that works on darwin and windows
-    //       https://github.com/ivmai/bdwgc/issues/362#issuecomment-1936672196
-    #ifndef __APPLE__
-    GC_set_sp_corrector(&fixupBoehmStackPointer);
-    #endif
-
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
+
+    // TODO: Remove __APPLE__ condition.
+    //       Comment suggests an implementation that works on darwin and windows
+    //       https://github.com/ivmai/bdwgc/issues/362#issuecomment-1936672196
+    #if GC_VERSION_MAJOR >= 8 && GC_VERSION_MINOR >= 4 && !defined(__APPLE__)
+    GC_set_sp_corrector(&fixupBoehmStackPointer);
 
     if (!GC_get_sp_corrector()) {
         printTalkative("BoehmGC on this platform does not support sp_corrector; will disable GC inside coroutines");
@@ -363,6 +363,10 @@ void initGC()
             return std::make_shared<BoehmDisableGC>();
         };
     }
+    #else
+    #warning "BoehmGC version does not support GC while coroutine exists. GC will be disabled inside coroutines. Consider updating bwd-gc to 8.4 or later."
+    #endif
+
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
