@@ -8,7 +8,6 @@
 
 namespace nix {
 
-namespace {
 /**
  * A helper for writing `boost::format` expressions.
  *
@@ -35,13 +34,12 @@ inline void formatHelper(F & f, const T & x, const Args & ... args)
 /**
  * Set the correct exceptions for `fmt`.
  */
-void setExceptions(boost::format & fmt)
+inline void setExceptions(boost::format & fmt)
 {
     fmt.exceptions(
         boost::io::all_error_bits ^
         boost::io::too_many_args_bit ^
         boost::io::too_few_args_bit);
-}
 }
 
 /**

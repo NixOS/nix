@@ -762,10 +762,24 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
     return vm;
 }
 
+/**
+ * Sets `inDebugger` to true on construction and false on destruction.
+ */
+class DebuggerGuard {
+    bool & inDebugger;
+public:
+    DebuggerGuard(bool & inDebugger) : inDebugger(inDebugger) {
+        inDebugger = true;
+    }
+    ~DebuggerGuard() {
+        inDebugger = false;
+    }
+};
+
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
-    // double check we've got the debugRepl function pointer.
-    if (!debugRepl)
+    // Make sure we have a debugger to run and we're not already in a debugger.
+    if (!debugRepl || inDebugger)
         return;
 
     auto dts =
@@ -792,6 +806,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     auto se = getStaticEnv(expr);
     if (se) {
         auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
+        DebuggerGuard _guard(inDebugger);
         auto exitStatus = (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
         switch (exitStatus) {
             case ReplExitStatus::QuitAll:
