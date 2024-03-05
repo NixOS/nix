@@ -365,7 +365,6 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
     return 0;
 }
 
-#ifndef __WIN32
 RunPager::RunPager()
 {
     if (!isatty(STDOUT_FILENO)) return;
@@ -375,6 +374,7 @@ RunPager::RunPager()
 
     stopProgressBar();
 
+#ifndef __WIN32
     Pipe toPager;
     toPager.create();
 
@@ -396,11 +396,13 @@ RunPager::RunPager()
     std_out = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping standard output");
+#endif
 }
 
 
 RunPager::~RunPager()
 {
+#ifndef __WIN32
     try {
         if (pid != -1) {
             std::cout.flush();
@@ -410,8 +412,8 @@ RunPager::~RunPager()
     } catch (...) {
         ignoreException();
     }
-}
 #endif
+}
 
 
 PrintFreed::~PrintFreed()

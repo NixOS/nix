@@ -273,9 +273,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
 
-#ifndef __WIN32
     RunPager pager;
-#endif
     std::cout << renderMarkdownToTerminal(markdown) << "\n";
 }
 

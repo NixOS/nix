@@ -50,9 +50,7 @@ struct CmdLog : InstallableCommand
         }, b.path.raw());
         auto path = resolveDerivedPath(*store, *oneUp);
 
-#ifndef __WIN32
         RunPager pager;
-#endif
         for (auto & sub : subs) {
             auto * logSubP = dynamic_cast<LogStore *>(&*sub);
             if (!logSubP) {

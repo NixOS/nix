@@ -576,9 +576,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             subs.push_front(state->store);
 
             bool foundLog = false;
-#ifndef __WIN32
             RunPager pager;
-#endif
             for (auto & sub : subs) {
                 auto * logSubP = dynamic_cast<LogStore *>(&*sub);
                 if (!logSubP) {

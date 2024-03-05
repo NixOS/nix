@@ -84,7 +84,6 @@ void showManPage(const std::string & name);
  * terminal and $PAGER is set. Standard output is redirected to the
  * pager.
  */
-#ifndef __WIN32
 class RunPager
 {
 public:
@@ -92,10 +91,11 @@ public:
     ~RunPager();
 
 private:
+#ifndef __WIN32
     Pid pid;
     int std_out;
-};
 #endif
+};
 
 extern volatile ::sig_atomic_t blockInt;
 

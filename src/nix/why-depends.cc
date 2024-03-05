@@ -291,9 +291,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             }
         };
 
-#ifndef __WIN32
         RunPager pager;
-#endif
         try {
             if (!precise) {
                 logger->cout("%s", store->printStorePath(graph.at(packagePath).path));
