@@ -9,12 +9,6 @@
 
 #include <nlohmann/json.hpp>
 
-#ifdef _WIN32
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
-# include <processthreadsapi.h>
-#endif
-
 using namespace nix;
 
 struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
@@ -122,14 +116,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         else if (raw) {
             stopProgressBar();
-            Descriptor standard_out =
-#ifdef _WIN32
-                GetStdHandle(STD_OUTPUT_HANDLE)
-#else
-                STDOUT_FILENO
-#endif
-                ;
-            writeFull(standard_out, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+            writeFull(getStandardOut(), *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {

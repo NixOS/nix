@@ -365,6 +365,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
     return 0;
 }
 
+
 RunPager::RunPager()
 {
     if (!isatty(STDOUT_FILENO)) return;

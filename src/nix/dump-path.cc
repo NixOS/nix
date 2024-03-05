@@ -2,12 +2,6 @@
 #include "store-api.hh"
 #include "archive.hh"
 
-#ifdef _WIN32
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
-# include <processthreadsapi.h>
-#endif
-
 using namespace nix;
 
 struct CmdDumpPath : StorePathCommand
@@ -26,14 +20,7 @@ struct CmdDumpPath : StorePathCommand
 
     void run(ref<Store> store, const StorePath & storePath) override
     {
-        Descriptor standard_out =
-#ifdef _WIN32
-            GetStdHandle(STD_OUTPUT_HANDLE)
-#else
-            STDOUT_FILENO
-#endif
-            ;
-        FdSink sink(standard_out);
+        FdSink sink(getStandardOut());
         store->narFromPath(storePath, sink);
         sink.flush();
     }
@@ -68,14 +55,7 @@ struct CmdDumpPath2 : Command
 
     void run() override
     {
-        Descriptor standard_out =
-#ifdef _WIN32
-            GetStdHandle(STD_OUTPUT_HANDLE)
-#else
-            STDOUT_FILENO
-#endif
-            ;
-        FdSink sink(standard_out);
+        FdSink sink(getStandardOut());
         dumpPath(path, sink);
         sink.flush();
     }

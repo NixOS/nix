@@ -5,8 +5,8 @@
 #include "error.hh"
 
 #ifdef _WIN32
-# include <handleapi.h>
-# include <io.h>
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
 #endif
 
 namespace nix {
@@ -96,6 +96,15 @@ void drainFD(
     , bool block = true
 #endif
     );
+
+[[gnu::always_inline]]
+inline Descriptor getStandardOut() {
+#ifndef __WIN32
+    return STDOUT_FILENO;
+#else
+    return GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
+}
 
 /**
  * Automatic cleanup of resources.

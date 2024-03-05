@@ -5,12 +5,6 @@
 #include "log-store.hh"
 #include "progress-bar.hh"
 
-#ifdef _WIN32
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
-# include <processthreadsapi.h>
-#endif
-
 using namespace nix;
 
 struct CmdLog : InstallableCommand
@@ -63,14 +57,7 @@ struct CmdLog : InstallableCommand
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
-            Descriptor standard_out =
-#ifdef _WIN32
-                GetStdHandle(STD_OUTPUT_HANDLE)
-#else
-                STDOUT_FILENO
-#endif
-                ;
-                writeFull(standard_out, *log);
+            writeFull(getStandardOut(), *log);
             return;
         }
 

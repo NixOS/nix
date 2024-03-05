@@ -11,12 +11,6 @@
 #include <nlohmann/json.hpp>
 #include <iostream>
 
-#ifdef _WIN32
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
-# include <processthreadsapi.h>
-#endif
-
 namespace nix {
 
 LoggerSettings loggerSettings;
@@ -43,13 +37,7 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    Descriptor standard_out =
-#ifdef _WIN32
-        GetStdHandle(STD_OUTPUT_HANDLE)
-#else
-        STDOUT_FILENO
-#endif
-        ;
+    Descriptor standard_out = getStandardOut();
     writeFull(standard_out, s);
     writeFull(standard_out, "\n");
 }
