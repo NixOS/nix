@@ -35,9 +35,9 @@ const nlohmann::json & ensureType(
 {
     if (value.type() != expectedType)
         throw Error(
-            "Expected JSON value to be of type '%s' but it is of type '%s'",
+            "Expected JSON value to be of type '%s' but it is of type '%s': %s",
             nlohmann::json(expectedType).type_name(),
-            value.type_name());
+            value.type_name(), value.dump());
 
     return value;
 }
@@ -46,8 +46,8 @@ const nlohmann::json::object_t & getObject(const nlohmann::json & value)
 {
     if (!value.is_object())
         throw Error(
-            "Expected JSON value to be an 'object' but it is of type '%s'",
-            value.type_name());
+            "Expected JSON value to be an 'object' but it is of type '%s': %s",
+            value.type_name(), value.dump());
 
     return value.get_ref<const nlohmann::json::object_t &>();
 }
@@ -56,8 +56,8 @@ const nlohmann::json::array_t & getArray(const nlohmann::json & value)
 {
     if (!value.is_array())
         throw Error(
-            "Expected JSON value to be an 'array' but it is of type '%s'",
-            value.type_name());
+            "Expected JSON value to be an 'array' but it is of type '%s': %s",
+            value.type_name(), value.dump());
 
     return value.get_ref<const nlohmann::json::array_t &>();
 }
@@ -66,8 +66,8 @@ const nlohmann::json::string_t & getString(const nlohmann::json & value)
 {
     if (!value.is_string())
         throw Error(
-            "Expected JSON value to be a 'string' but it is of type '%s'",
-            value.type_name());
+            "Expected JSON value to be a 'string' but it is of type '%s': %s",
+            value.type_name(), value.dump());
 
     return value.get_ref<const nlohmann::json::string_t &>();
 }
@@ -76,8 +76,8 @@ const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value
 {
     if (!value.is_number_integer())
         throw Error(
-            "Expected JSON value to be an 'integer' but it is of type '%s'",
-            value.type_name());
+            "Expected JSON value to be an 'integer' but it is of type '%s': %s",
+            value.type_name(), value.dump());
 
     return value.get_ref<const nlohmann::json::number_integer_t &>();
 }
@@ -86,8 +86,8 @@ const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value)
 {
     if (!value.is_boolean())
         throw Error(
-            "Expected JSON value to be a 'boolean' but it is of type '%s'",
-            value.type_name());
+            "Expected JSON value to be a 'boolean' but it is of type '%s': %s",
+            value.type_name(), value.dump());
 
     return value.get_ref<const nlohmann::json::boolean_t &>();
 }
