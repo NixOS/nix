@@ -1,7 +1,9 @@
 #pragma once
 ///@file
 
+#ifndef __WIN32
 #include "processes.hh"
+#endif
 #include "args.hh"
 #include "args/root.hh"
 #include "common-args.hh"
@@ -82,6 +84,7 @@ void showManPage(const std::string & name);
  * terminal and $PAGER is set. Standard output is redirected to the
  * pager.
  */
+#ifndef __WIN32
 class RunPager
 {
 public:
@@ -92,6 +95,7 @@ private:
     Pid pid;
     int std_out;
 };
+#endif
 
 extern volatile ::sig_atomic_t blockInt;
 
@@ -112,6 +116,7 @@ struct PrintFreed
 };
 
 
+#ifndef __WIN32
 /**
  * Install a SIGSEGV handler to detect stack overflows.
  */
@@ -141,5 +146,6 @@ extern std::function<void(siginfo_t * info, void * ctx)> stackOverflowHandler;
  * logger. Exits the process immediately after.
  */
 void defaultStackOverflowHandler(siginfo_t * info, void * ctx);
+#endif
 
 }

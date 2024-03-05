@@ -7,6 +7,12 @@
 
 #include <atomic>
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+# include <processthreadsapi.h>
+#endif
+
 using namespace nix;
 
 struct CmdCopySigs : StorePathsCommand
@@ -177,7 +183,14 @@ struct CmdKeyGenerateSecret : Command
             throw UsageError("required argument '--key-name' is missing");
 
         stopProgressBar();
-        writeFull(STDOUT_FILENO, SecretKey::generate(*keyName).to_string());
+        Descriptor standard_out =
+#ifdef _WIN32
+            GetStdHandle(STD_OUTPUT_HANDLE)
+#else
+            STDOUT_FILENO
+#endif
+            ;
+        writeFull(standard_out, SecretKey::generate(*keyName).to_string());
     }
 };
 
@@ -199,7 +212,14 @@ struct CmdKeyConvertSecretToPublic : Command
     {
         SecretKey secretKey(drainFD(STDIN_FILENO));
         stopProgressBar();
-        writeFull(STDOUT_FILENO, secretKey.toPublicKey().to_string());
+        Descriptor standard_out =
+#ifdef _WIN32
+            GetStdHandle(STD_OUTPUT_HANDLE)
+#else
+            STDOUT_FILENO
+#endif
+            ;
+        writeFull(standard_out, secretKey.toPublicKey().to_string());
     }
 };
 

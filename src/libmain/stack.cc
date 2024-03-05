@@ -10,7 +10,7 @@
 
 namespace nix {
 
-
+#ifndef __WIN32
 static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
 {
     /* Detect stack overflows by comparing the faulting address with
@@ -73,5 +73,6 @@ void defaultStackOverflowHandler(siginfo_t * info, void * ctx) {
     [[gnu::unused]] auto res = write(2, msg, strlen(msg));
     _exit(1); // maybe abort instead?
 }
+#endif
 
 }

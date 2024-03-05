@@ -1,3 +1,5 @@
+#ifndef __WIN32
+
 #include "current-process.hh"
 #include "run.hh"
 #include "command-installable-value.hh"
@@ -287,3 +289,5 @@ void chrootHelper(int argc, char * * argv)
     throw Error("mounting the Nix store on '%s' is not supported on this platform", storeDir);
 #endif
 }
+
+#endif

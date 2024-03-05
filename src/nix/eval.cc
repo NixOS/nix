@@ -9,6 +9,12 @@
 
 #include <nlohmann/json.hpp>
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+# include <processthreadsapi.h>
+#endif
+
 using namespace nix;
 
 struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
@@ -87,7 +93,11 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                     // FIXME: disallow strings with contexts?
                     writeFile(path, v.string_view());
                 else if (v.type() == nAttrs) {
-                    if (mkdir(path.c_str(), 0777) == -1)
+                    if (mkdir(path.c_str()
+#ifndef __WIN32
+                        , 0777
+#endif
+                        ) == -1)
                         throw SysError("creating directory '%s'", path);
                     for (auto & attr : *v.attrs) {
                         std::string_view name = state->symbols[attr.name];
@@ -112,7 +122,14 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         else if (raw) {
             stopProgressBar();
-            writeFull(STDOUT_FILENO, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+            Descriptor standard_out =
+#ifdef _WIN32
+                GetStdHandle(STD_OUTPUT_HANDLE)
+#else
+                STDOUT_FILENO
+#endif
+                ;
+            writeFull(standard_out, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {

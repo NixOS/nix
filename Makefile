@@ -16,13 +16,13 @@ makefiles = \
   src/libutil/local.mk \
   src/libstore/local.mk \
   src/libfetchers/local.mk \
-  src/libexpr/local.mk
+  src/libexpr/local.mk \
+  src/libmain/local.mk \
+  src/libcmd/local.mk \
+  src/nix/local.mk
 
 ifdef HOST_UNIX
 makefiles += \
-  src/libmain/local.mk \
-  src/libcmd/local.mk \
-  src/nix/local.mk \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
   misc/bash/local.mk \

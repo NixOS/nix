@@ -1,3 +1,5 @@
+#ifndef __WIN32
+
 #include "command.hh"
 #include "installable-value.hh"
 #include "run.hh"
@@ -54,3 +56,5 @@ struct CmdFmt : SourceExprCommand {
 };
 
 static auto r2 = registerCommand<CmdFmt>("fmt");
+
+#endif

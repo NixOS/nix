@@ -406,7 +406,11 @@ public:
             }
         }
 
+#ifndef __WIN32
         auto width = getWindowSize().second;
+#else
+        auto width = 0;
+#endif
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
         writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");

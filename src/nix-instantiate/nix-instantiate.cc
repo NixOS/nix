@@ -168,7 +168,7 @@ static int main_nix_instantiate(int argc, char * * argv)
             for (auto & i : files) {
                 auto p = state->findFile(i);
                 if (auto fn = p.getPhysicalPath())
-                    std::cout << fn->native() << std::endl;
+                    std::cout << fn->string() << std::endl;
                 else
                     throw Error("'%s' has no physical path", p);
             }

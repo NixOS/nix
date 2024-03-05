@@ -4,7 +4,9 @@
 #include "local-fs-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
+#ifndef __WIN32
 #include "profiles.hh"
+#endif
 #include "repl.hh"
 
 #include <nlohmann/json.hpp>
@@ -235,6 +237,7 @@ void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
     run(store, *storePaths.begin());
 }
 
+#ifndef __WIN32
 MixProfile::MixProfile()
 {
     addFlag({
@@ -285,6 +288,7 @@ MixDefaultProfile::MixDefaultProfile()
 {
     profile = getDefaultProfile();
 }
+#endif
 
 MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
 {
@@ -328,8 +332,10 @@ void MixEnvironment::setEnviron() {
         if (!keep.empty())
             throw UsageError("--keep does not make sense without --ignore-environment");
 
+#ifndef __WIN32
         for (const auto & var : unset)
             unsetenv(var.c_str());
+#endif
     }
 }
 

@@ -3,6 +3,12 @@
 #include "nar-accessor.hh"
 #include "progress-bar.hh"
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+# include <processthreadsapi.h>
+#endif
+
 using namespace nix;
 
 struct MixCat : virtual Args
@@ -15,7 +21,15 @@ struct MixCat : virtual Args
         if (st.type != SourceAccessor::Type::tRegular)
             throw Error("path '%1%' is not a regular file", path);
         stopProgressBar();
-        writeFull(STDOUT_FILENO, accessor->readFile(CanonPath(path)));
+
+        Descriptor standard_out =
+#ifdef _WIN32
+            GetStdHandle(STD_OUTPUT_HANDLE)
+#else
+            STDOUT_FILENO
+#endif
+            ;
+        writeFull(standard_out, accessor->readFile(CanonPath(path)));
     }
 };
 

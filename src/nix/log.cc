@@ -5,6 +5,12 @@
 #include "log-store.hh"
 #include "progress-bar.hh"
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+# include <processthreadsapi.h>
+#endif
+
 using namespace nix;
 
 struct CmdLog : InstallableCommand
@@ -44,7 +50,9 @@ struct CmdLog : InstallableCommand
         }, b.path.raw());
         auto path = resolveDerivedPath(*store, *oneUp);
 
+#ifndef __WIN32
         RunPager pager;
+#endif
         for (auto & sub : subs) {
             auto * logSubP = dynamic_cast<LogStore *>(&*sub);
             if (!logSubP) {
@@ -57,7 +65,14 @@ struct CmdLog : InstallableCommand
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
-            writeFull(STDOUT_FILENO, *log);
+            Descriptor standard_out =
+#ifdef _WIN32
+                GetStdHandle(STD_OUTPUT_HANDLE)
+#else
+                STDOUT_FILENO
+#endif
+                ;
+                writeFull(standard_out, *log);
             return;
         }
 

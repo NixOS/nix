@@ -108,7 +108,9 @@ std::string getArg(const std::string & opt,
     return *i;
 }
 
+#ifndef __WIN32
 static void sigHandler(int signo) { }
+#endif
 
 
 void initNix()
@@ -121,6 +123,7 @@ void initNix()
 
     initLibStore();
 
+#ifndef __WIN32
     startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
@@ -135,6 +138,7 @@ void initNix()
     /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
     if (sigaction(SIGUSR1, &act, 0)) throw SysError("handling SIGUSR1");
+#endif
 
 #if __APPLE__
     /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
@@ -156,21 +160,26 @@ void initNix()
     if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
 #endif
 
+#ifndef __WIN32
     /* Register a SIGSEGV handler to detect stack overflows.
        Why not initLibExpr()? initGC() is essentially that, but
        detectStackOverflow is not an instance of the init function concept, as
        it may have to be invoked more than once per process. */
     detectStackOverflow();
+#endif
 
     /* There is no privacy in the Nix system ;-)  At least not for
        now.  In particular, store objects should be readable by
        everybody. */
     umask(0022);
 
+#ifndef __WIN32
     /* Initialise the PRNG. */
     struct timeval tv;
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
+#endif
+
 
 }
 
@@ -308,7 +317,9 @@ void printVersion(const std::string & programName)
 void showManPage(const std::string & name)
 {
     restoreProcessContext();
+#ifndef __WIN32
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
+#endif
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
 }
@@ -329,7 +340,9 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
                condition is discharged before we reach printMsg()
                below, since otherwise it will throw an (uncaught)
                exception. */
+#ifndef __WIN32
             setInterruptThrown();
+#endif
             throw;
         }
     } catch (Exit & e) {
@@ -352,7 +365,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
     return 0;
 }
 
-
+#ifndef __WIN32
 RunPager::RunPager()
 {
     if (!isatty(STDOUT_FILENO)) return;
@@ -398,6 +411,7 @@ RunPager::~RunPager()
         ignoreException();
     }
 }
+#endif
 
 
 PrintFreed::~PrintFreed()
