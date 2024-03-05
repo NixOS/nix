@@ -1368,7 +1368,7 @@ Derivation Derivation::fromJSON(
     res.name = getString(valueAt(json, "name"));
 
     try {
-        auto & outputsObj = getObject(valueAt(json, "outputs"));
+        auto outputsObj = getObject(valueAt(json, "outputs"));
         for (auto & [outputName, output] : outputsObj) {
             res.outputs.insert_or_assign(
                 outputName,
@@ -1380,7 +1380,7 @@ Derivation Derivation::fromJSON(
     }
 
     try {
-        auto & inputsList = getArray(valueAt(json, "inputSrcs"));
+        auto inputsList = getArray(valueAt(json, "inputSrcs"));
         for (auto & input : inputsList)
             res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
     } catch (Error & e) {
@@ -1399,7 +1399,7 @@ Derivation Derivation::fromJSON(
             }
             return node;
         };
-        auto & inputDrvsObj = getObject(valueAt(json, "inputDrvs"));
+        auto inputDrvsObj = getObject(valueAt(json, "inputDrvs"));
         for (auto & [inputDrvPath, inputOutputs] : inputDrvsObj)
             res.inputDrvs.map[store.parseStorePath(inputDrvPath)] =
                 doInput(inputOutputs);
