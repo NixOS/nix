@@ -1,7 +1,7 @@
 let
   inherit (builtins) attrValues mapAttrs;
-  inherit (import ./utils.nix) concatStrings optionalString;
-  showSettings = import ./generate-settings.nix;
+  inherit (import <nix/utils.nix>) concatStrings optionalString;
+  showSettings = import <nix/generate-settings.nix>;
 in
 
 inlineHTML: storesInfo:

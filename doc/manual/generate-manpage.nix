@@ -3,7 +3,7 @@ let
     attrNames attrValues fromJSON listToAttrs mapAttrs groupBy
     concatStringsSep concatMap length lessThan replaceStrings sort;
   inherit (import <nix/utils.nix>) attrsToList concatStrings optionalString filterAttrs trim squash unique;
-  showStoreDocs = import ./generate-store-info.nix;
+  showStoreDocs = import <nix/generate-store-info.nix>;
 in
 
 inlineHTML: commandDump:
