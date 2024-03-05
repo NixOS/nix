@@ -322,10 +322,19 @@
 
           nixpkgsLibTests =
             forAllSystems (system:
-              import (nixpkgs + "/lib/tests/release.nix")
-                { pkgs = nixpkgsFor.${system}.native;
-                  nixVersions = [ self.packages.${system}.nix ];
-                }
+              if nixpkgsChannel == "nixos-23.11"
+              then
+                import (nixpkgs + "/lib/tests/release.nix")
+                  { pkgs = nixpkgsFor.${system}.native;
+                    nixVersions = [ self.packages.${system}.nix ];
+                  }
+              else
+                import (nixpkgs + "/lib/tests/test-with-nix.nix")
+                  {
+                    lib = nixpkgsFor.${system}.native.lib;
+                    nix = self.packages.${system}.nix;
+                    pkgs = nixpkgsFor.${system}.native;
+                  }
             );
         };
 
