@@ -22,6 +22,9 @@
 #endif
 
 #include <openssl/crypto.h>
+#if HAVE_BOEHMGC
+#include <gc/gc.h>
+#endif
 
 
 namespace nix {
@@ -300,6 +303,17 @@ void printVersion(const std::string & programName)
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
         std::cout << "Data directory: " << settings.nixDataDir << "\n";
+#if HAVE_BOEHMGC
+#define _TO_STRING(x) #x
+#define TO_STRING(x) _TO_STRING(x)
+        std::cout << "Evaluator gc: bdw-gc "
+            << TO_STRING(GC_VERSION_MAJOR) << "."
+            << TO_STRING(GC_VERSION_MINOR) << "."
+            << TO_STRING(GC_VERSION_MICRO) << "\n";
+#undef TO_STRING
+#else
+        std::cout << "Evaluator gc: built without gc support" << "\n";
+#endif
     }
     throw Exit();
 }
