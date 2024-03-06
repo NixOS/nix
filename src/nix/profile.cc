@@ -458,6 +458,7 @@ enum MatcherType
     Regex,
     StorePath,
     Name,
+    All,
 };
 
 struct Matcher
@@ -500,6 +501,14 @@ Matcher createNameMatcher(const std::string & name) {
     };
 }
 
+Matcher all = {
+    .type = MatcherType::All,
+    .title = "--all",
+    .matches = [](const std::string &name, const ProfileElement & element) {
+        return true;
+    }
+};
+
 class MixProfileElementMatchers : virtual Args, virtual StoreCommand
 {
     std::vector<Matcher> _matchers;
@@ -508,6 +517,13 @@ public:
 
     MixProfileElementMatchers()
     {
+        addFlag({
+            .longName = "all",
+            .description = "Match all packages in the profile.",
+            .handler = {[this]() {
+                _matchers.push_back(all);
+            }},
+        });
         addFlag({
             .longName = "regex",
             .description = "A regular expression to match one or more packages in the profile.",

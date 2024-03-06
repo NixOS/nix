@@ -77,6 +77,13 @@ nix profile upgrade --regex '.*'
 [[ $(readlink $TEST_HOME/.nix-profile/bin/hello) =~ .*-profile-test-2\.1/bin/hello ]]
 nix profile rollback
 
+# Test upgrading all packages
+printf 2.2 > $flake1Dir/version
+nix profile upgrade --all
+[[ $(readlink $TEST_HOME/.nix-profile/bin/hello) =~ .*-profile-test-2\.2/bin/hello ]]
+nix profile rollback
+printf 1.0 > $flake1Dir/version
+
 # Test matching no packages using literal package name.
 assertStderr nix --offline profile upgrade this_package_is_not_installed << EOF
 warning: Package name 'this_package_is_not_installed' does not match any packages in the profile.
