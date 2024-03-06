@@ -35,7 +35,8 @@ cat > $flakeDir/flake.nix <<EOF
 EOF
 
 checkRes=$(nix flake check $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
-echo "$checkRes" | grepQuiet "error: overlay is not a function, but a set instead"
+echo "$checkRes" | grepQuiet "error: expected a function, but got a set"
+echo "$checkRes" | grepQuiet "while checking the overlay"
 
 cat > $flakeDir/flake.nix <<EOF
 {
