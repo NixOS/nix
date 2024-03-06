@@ -895,8 +895,10 @@ struct CmdProfile : NixMultiCommand
             {
               {"install", []() { return make_ref<CmdProfileInstall>(); }},
               {"remove", []() { return make_ref<CmdProfileRemove>(); }},
+              {"rm", []() { return make_ref<CmdProfileRemove>(); }},
               {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
               {"list", []() { return make_ref<CmdProfileList>(); }},
+              {"ls", []() { return make_ref<CmdProfileList>(); }},
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
               {"history", []() { return make_ref<CmdProfileHistory>(); }},
               {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
