@@ -41,14 +41,14 @@ struct CmdCopySigs : StorePathsCommand
 
         ThreadPool pool;
 
-        std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
-        //logger->setExpected(doneLabel, storePaths.size());
+        Activity act(*logger, lvlInfo, actCopyPaths, "copying signatures");
+        act.setExpected(actCopyPaths, storePaths.size());
+
+        std::atomic_uint64_t counter = 0;
 
         auto doPath = [&](const Path & storePathS) {
-            //Activity act(*logger, lvlInfo, "getting signatures for '%s'", storePath);
-
             checkInterrupt();
 
             auto storePath = store->parseStorePath(storePathS);
@@ -72,15 +72,17 @@ struct CmdCopySigs : StorePathsCommand
                         if (!info->sigs.count(sig))
                             newSigs.insert(sig);
                 } catch (InvalidPath &) {
+                    debug("path %s was invalid in substituter %s", storePath.to_string(), store2->getUri());
                 }
             }
 
             if (!newSigs.empty()) {
+                debug("adding %d signatures to store for %s", newSigs.size(), storePathS);
                 store->addSignatures(storePath, newSigs);
                 added += newSigs.size();
             }
 
-            //logger->incProgress(doneLabel);
+            act.progress(counter++);
         };
 
         for (auto & storePath : storePaths)
