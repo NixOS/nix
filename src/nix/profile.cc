@@ -554,6 +554,15 @@ public:
             throw UsageError("No packages specified.");
         }
 
+        if (std::find_if(_matchers.begin(), _matchers.end(), [](const Matcher & m) { return m.type == MatcherType::All; }) != _matchers.end() && _matchers.size() > 1) {
+            throw UsageError("--all cannot be used with package names or regular expressions.");
+        }
+
+        if (manifest.elements.empty()) {
+            warn("There are no packages in the profile.");
+            return {};
+        }
+
         std::set<std::string> result;
         for (auto & matcher : _matchers) {
             bool foundMatch = false;

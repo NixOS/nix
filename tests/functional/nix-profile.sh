@@ -84,6 +84,12 @@ nix profile upgrade --all
 nix profile rollback
 printf 1.0 > $flake1Dir/version
 
+# Test --all exclusivity.
+assertStderr nix --offline profile upgrade --all foo << EOF
+error: --all cannot be used with package names or regular expressions.
+Try 'nix --help' for more information.
+EOF
+
 # Test matching no packages using literal package name.
 assertStderr nix --offline profile upgrade this_package_is_not_installed << EOF
 warning: Package name 'this_package_is_not_installed' does not match any packages in the profile.
