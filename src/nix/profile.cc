@@ -222,6 +222,8 @@ struct ProfileManifest
             es[name] = obj;
         }
         nlohmann::json json;
+        // Only upgrade with great care as changing it can break fresh installs
+        // like in https://github.com/NixOS/nix/issues/10109
         json["version"] = 3;
         json["elements"] = es;
         return json;
