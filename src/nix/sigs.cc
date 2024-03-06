@@ -46,7 +46,7 @@ struct CmdCopySigs : StorePathsCommand
         Activity act(*logger, lvlInfo, actCopyPaths, "copying signatures");
         act.setExpected(actCopyPaths, storePaths.size());
 
-        std::atomic_uint64_t counter;
+        std::atomic_uint64_t counter = 0;
 
         auto doPath = [&](const Path & storePathS) {
             checkInterrupt();
