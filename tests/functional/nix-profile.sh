@@ -64,6 +64,9 @@ nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG
 
+# Test conflicting package install.
+nix profile install $flake1Dir 2>&1 | grep "warning: 'flake1' is already installed"
+
 # Test upgrading a package.
 printf NixOS > $flake1Dir/who
 printf 2.0 > $flake1Dir/version

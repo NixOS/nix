@@ -94,6 +94,9 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 
 }
 
+// yacc generates code that uses unannotated fallthrough.
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+
 #define YY_USER_INIT initLoc(yylloc)
 #define YY_USER_ACTION adjustLoc(yylloc, yytext, yyleng);
 

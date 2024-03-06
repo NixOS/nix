@@ -87,7 +87,8 @@ public:
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override;
@@ -184,7 +185,7 @@ protected:
 
     friend struct ConnectionHandle;
 
-    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 

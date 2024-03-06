@@ -12,7 +12,9 @@
 #include "references.hh"
 #include "archive.hh"
 #include "callback.hh"
+#include "git.hh"
 #include "remote-store.hh"
+#include "posix-source-accessor.hh"
 // FIXME this should not be here, see TODO below on
 // `addMultipleToStore`.
 #include "worker-protocol.hh"
@@ -119,6 +121,9 @@ static std::string makeType(
 
 StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
+    if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
+        throw Error("Git file ingestion must use SHA-1 hash");
+
     if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
@@ -166,7 +171,7 @@ std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     const StorePathSet & references,
     PathFilter & filter) const
 {
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
     return {
         makeFixedOutputPathFromCA(
             name,
@@ -192,10 +197,23 @@ StorePath Store::addToStore(
     PathFilter & filter,
     RepairFlag repair)
 {
+    FileSerialisationMethod fsm;
+    switch (method.getFileIngestionMethod()) {
+    case FileIngestionMethod::Flat:
+        fsm = FileSerialisationMethod::Flat;
+        break;
+    case FileIngestionMethod::Recursive:
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    case FileIngestionMethod::Git:
+        // Use NAR; Git is not a serialization method
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    }
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(accessor, path, sink, method.getFileIngestionMethod(), filter);
+        dumpPath(accessor, path, sink, fsm, filter);
     });
-    return addToStoreFromDump(*source, name, method, hashAlgo, references, repair);
+    return addToStoreFromDump(*source, name, fsm, method, hashAlgo, references, repair);
 }
 
 void Store::addMultipleToStore(
@@ -355,9 +373,7 @@ ValidPathInfo Store::addToStoreSlow(
     NullFileSystemObjectSink blank;
     auto & parseSink = method.getFileIngestionMethod() == FileIngestionMethod::Flat
         ? (FileSystemObjectSink &) fileSink
-        : method.getFileIngestionMethod() == FileIngestionMethod::Recursive
-        ? (FileSystemObjectSink &) blank
-        : (abort(), (FileSystemObjectSink &)*(FileSystemObjectSink *)nullptr); // handled both cases
+        : (FileSystemObjectSink &) blank; // for recursive or git we do recursive
 
     /* The information that flows from tapped (besides being replicated in
        narSink), is now put in parseSink. */
@@ -369,6 +385,8 @@ ValidPathInfo Store::addToStoreSlow(
 
     auto hash = method == FileIngestionMethod::Recursive && hashAlgo == HashAlgorithm::SHA256
         ? narHash
+        : method == FileIngestionMethod::Git
+        ? git::dumpHash(hashAlgo, accessor, srcPath).hash
         : caHashSink.finish().first;
 
     if (expectedCAHash && expectedCAHash != hash)

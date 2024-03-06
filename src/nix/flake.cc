@@ -88,17 +88,19 @@ public:
         expectArgs({
             .label="inputs",
             .optional=true,
-            .handler={[&](std::string inputToUpdate){
-                InputPath inputPath;
-                try {
-                    inputPath = flake::parseInputPath(inputToUpdate);
-                } catch (Error & e) {
-                    warn("Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.", inputToUpdate, inputToUpdate);
-                    throw e;
+            .handler={[&](std::vector<std::string> inputsToUpdate){
+                for (auto inputToUpdate : inputsToUpdate) {
+                    InputPath inputPath;
+                    try {
+                        inputPath = flake::parseInputPath(inputToUpdate);
+                    } catch (Error & e) {
+                        warn("Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.", inputToUpdate, inputToUpdate);
+                        throw e;
+                    }
+                    if (lockFlags.inputUpdates.contains(inputPath))
+                        warn("Input '%s' was specified multiple times. You may have done this by accident.");
+                    lockFlags.inputUpdates.insert(inputPath);
                 }
-                if (lockFlags.inputUpdates.contains(inputPath))
-                    warn("Input '%s' was specified multiple times. You may have done this by accident.");
-                lockFlags.inputUpdates.insert(inputPath);
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
                 completeFlakeInputPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
@@ -205,6 +207,9 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
 
+        // Currently, all flakes are in the Nix store via the rootFS accessor.
+        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
+
         if (json) {
             nlohmann::json j;
             if (flake.description)
@@ -223,7 +228,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
-            j["path"] = store->printStorePath(flake.storePath);
+            j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             logger->cout("%s", j.dump());
         } else {
@@ -239,7 +244,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     *flake.description);
             logger->cout(
                 ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
-                store->printStorePath(flake.storePath));
+                storePath);
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
@@ -1031,7 +1036,9 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        sources.insert(flake.flake.storePath);
+        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
+
+        sources.insert(storePath);
 
         // FIXME: use graph output, handle cycles.
         std::function<nlohmann::json(const Node & node)> traverse;
@@ -1060,7 +1067,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         if (json) {
             nlohmann::json jsonRoot = {
-                {"path", store->printStorePath(flake.flake.storePath)},
+                {"path", store->printStorePath(storePath)},
                 {"inputs", traverse(*flake.lockFile.root)},
             };
             logger->cout("%s", jsonRoot);

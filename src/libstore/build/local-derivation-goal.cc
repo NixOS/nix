@@ -8,6 +8,7 @@
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
+#include "git.hh"
 #include "compression.hh"
 #include "daemon.hh"
 #include "topo-sort.hh"
@@ -1319,12 +1320,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override
     {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, references, repair);
+        auto path = next->addToStoreFromDump(dump, name, dumpMethod, hashMethod, hashAlgo, references, repair);
         goal.addDependency(path);
         return path;
     }
@@ -2467,15 +2469,29 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             rewriteOutput(outputRewrites);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
-            auto got = ({
-                HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
+            auto got = [&]{
                 PosixSourceAccessor accessor;
-                dumpPath(
-                    accessor, CanonPath { actualPath },
-                    caSink,
-                    outputHash.method.getFileIngestionMethod());
-                caSink.finish().first;
-            });
+                auto fim = outputHash.method.getFileIngestionMethod();
+                switch (fim) {
+                case FileIngestionMethod::Flat:
+                case FileIngestionMethod::Recursive:
+                {
+                    HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
+                    auto fim = outputHash.method.getFileIngestionMethod();
+                    dumpPath(
+                        accessor, CanonPath { actualPath },
+                        caSink,
+                        (FileSerialisationMethod) fim);
+                    return caSink.finish().first;
+                }
+                case FileIngestionMethod::Git: {
+                    return git::dumpHash(
+                        outputHash.hashAlgo, accessor,
+                        CanonPath { tmpDir + "/tmp" }).hash;
+                }
+                }
+                assert(false);
+            }();
 
             ValidPathInfo newInfo0 {
                 worker.store,
@@ -2501,7 +2517,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
                     accessor, CanonPath { actualPath },
-                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
             }
@@ -2525,7 +2541,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
                     accessor, CanonPath { actualPath },
-                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();

@@ -555,7 +555,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                 HashResult hash = hashPath(
                     *store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) },
 
-                    FileIngestionMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }

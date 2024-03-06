@@ -14,6 +14,7 @@ namespace nix {
         ASSERT_EQ(getNameFromURL(parseURL("path:./repos/myflake#nonStandardAttr.mylaptop")), "mylaptop");
         ASSERT_EQ(getNameFromURL(parseURL("path:./nixpkgs#packages.x86_64-linux.complex^bin,man")), "complex");
         ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#packages.x86_64-linux.default^*")), "myproj");
+        ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#defaultPackage.x86_64-linux")), "myproj");
 
         ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs#packages.x86_64-linux.hello")), "hello");
         ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs#hello")), "hello");

@@ -130,6 +130,7 @@ nix_tests = \
   nested-sandboxing.sh \
   impure-env.sh \
   debugger.sh \
+  help.sh \
   auth.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)

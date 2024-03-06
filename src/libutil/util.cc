@@ -9,6 +9,10 @@
 
 #include <sodium.h>
 
+#ifdef NDEBUG
+#error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
+#endif
+
 namespace nix {
 
 void initLibUtil() {

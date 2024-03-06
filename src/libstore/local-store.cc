@@ -1,5 +1,6 @@
 #include "local-store.hh"
 #include "globals.hh"
+#include "git.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
@@ -1097,19 +1098,29 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             if (info.ca) {
                 auto & specified = *info.ca;
                 auto actualHash = ({
-                    HashModuloSink caSink {
-                        specified.hash.algo,
-                        std::string { info.path.hashPart() },
-                    };
-                    PosixSourceAccessor accessor;
-                    dumpPath(
-                        *getFSAccessor(false),
-                        CanonPath { printStorePath(info.path) },
-                        caSink,
-                        specified.method.getFileIngestionMethod());
+                    auto accessor = getFSAccessor(false);
+                    CanonPath path { printStorePath(info.path) };
+                    Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
+                    auto fim = specified.method.getFileIngestionMethod();
+                    switch (fim) {
+                    case FileIngestionMethod::Flat:
+                    case FileIngestionMethod::Recursive:
+                    {
+                        HashModuloSink caSink {
+                            specified.hash.algo,
+                            std::string { info.path.hashPart() },
+                        };
+                        dumpPath(*accessor, path, caSink, (FileSerialisationMethod) fim);
+                        h = caSink.finish().first;
+                        break;
+                    }
+                    case FileIngestionMethod::Git:
+                        h = git::dumpHash(specified.hash.algo, *accessor, path).hash;
+                        break;
+                    }
                     ContentAddress {
                         .method = specified.method,
-                        .hash = caSink.finish().first,
+                        .hash = std::move(h),
                     };
                 });
                 if (specified.hash != actualHash.hash) {
@@ -1137,7 +1148,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 StorePath LocalStore::addToStoreFromDump(
     Source & source0,
     std::string_view name,
-    ContentAddressMethod method,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     RepairFlag repair)
@@ -1190,7 +1202,13 @@ StorePath LocalStore::addToStoreFromDump(
     Path tempDir;
     AutoCloseFD tempDirFd;
 
-    if (!inMemory) {
+    bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
+
+    /* If the methods don't match, our streaming hash of the dump is the
+       wrong sort, and we need to rehash. */
+    bool inMemoryAndDontNeedRestore = inMemory && methodsMatch;
+
+    if (!inMemoryAndDontNeedRestore) {
         /* Drain what we pulled so far, and then keep on pulling */
         StringSource dumpSource { dump };
         ChainSource bothSource { dumpSource, source };
@@ -1199,17 +1217,23 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
-        restorePath(tempPath, bothSource, method.getFileIngestionMethod());
+        restorePath(tempPath, bothSource, dumpMethod);
 
         dumpBuffer.reset();
         dump = {};
     }
 
-    auto [hash, size] = hashSink->finish();
+    auto [dumpHash, size] = hashSink->finish();
+
+    PosixSourceAccessor accessor;
 
     auto desc = ContentAddressWithReferences::fromParts(
-        method,
-        hash,
+        hashMethod,
+        methodsMatch
+            ? dumpHash
+            : hashPath(
+                accessor, CanonPath { tempPath },
+                hashMethod.getFileIngestionMethod(), hashAlgo),
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1235,10 +1259,20 @@ StorePath LocalStore::addToStoreFromDump(
 
             autoGC();
 
-            if (inMemory) {
+            if (inMemoryAndDontNeedRestore) {
                 StringSource dumpSource { dump };
                 /* Restore from the buffer in memory. */
-                restorePath(realPath, dumpSource, method.getFileIngestionMethod());
+                auto fim = hashMethod.getFileIngestionMethod();
+                switch (fim) {
+                case FileIngestionMethod::Flat:
+                case FileIngestionMethod::Recursive:
+                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
+                    break;
+                case FileIngestionMethod::Git:
+                    // doesn't correspond to serialization method, so
+                    // this should be unreachable
+                    assert(false);
+                }
             } else {
                 /* Move the temporary path we restored above. */
                 moveFile(tempPath, realPath);
@@ -1246,8 +1280,8 @@ StorePath LocalStore::addToStoreFromDump(
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
-            auto narHash = std::pair { hash, size };
-            if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+            auto narHash = std::pair { dumpHash, size };
+            if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
@@ -1367,7 +1401,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 accessor, CanonPath { linkPath },
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);

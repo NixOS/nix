@@ -150,7 +150,7 @@ StorePath writeDerivation(Store & store,
         })
         : ({
             StringSource s { contents };
-            store.addToStoreFromDump(s, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair);
+            store.addToStoreFromDump(s, suffix, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair);
         });
 }
 
@@ -701,7 +701,7 @@ DerivationType BasicDerivation::type() const
                     floatingHashAlgo = dof.hashAlgo;
                 } else {
                     if (*floatingHashAlgo != dof.hashAlgo)
-                        throw Error("all floating outputs must use the same hash type");
+                        throw Error("all floating outputs must use the same hash algorithm");
                 }
             },
             [&](const DerivationOutput::Deferred &) {

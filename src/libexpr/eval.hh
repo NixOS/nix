@@ -153,6 +153,7 @@ struct DebugTrace {
     bool isError;
 };
 
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
@@ -222,6 +223,7 @@ public:
      */
     ReplExitStatus (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
+    bool inDebugger = false;
     int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
@@ -432,10 +434,12 @@ public:
     std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
+    void addErrorTrace(Error & e, const Args & ... formatArgs) const;
+    template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
+    void addErrorTrace(Error & e, const PosIdx pos, const Args & ... formatArgs) const;
 
 public:
     /**

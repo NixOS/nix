@@ -705,38 +705,53 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .args = {"attrset"},
     .arity = 1,
     .doc = R"(
-      Take an *attrset* with values named `startSet` and `operator` in order to
-      return a *list of attrsets* by starting with the `startSet` and recursively
-      applying the `operator` function to each `item`. The *attrsets* in the
-      `startSet` and the *attrsets* produced by `operator` must contain a value
-      named `key` which is comparable. The result is produced by calling `operator`
-      for each `item` with a value for `key` that has not been called yet including
-      newly produced `item`s. The function terminates when no new `item`s are
-      produced. The resulting *list of attrsets* contains only *attrsets* with a
-      unique key. For example,
+      `builtins.genericClosure` iteratively computes the transitive closure over an arbitrary relation defined by a function.
 
-      ```
-      builtins.genericClosure {
-        startSet = [ {key = 5;} ];
-        operator = item: [{
-          key = if (item.key / 2 ) * 2 == item.key
-               then item.key / 2
-               else 3 * item.key + 1;
-        }];
-      }
-      ```
-      evaluates to
-      ```
-      [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
-      ```
+      It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attrbute sets:
 
-      `key` can be one of the following types:
+      - `startSet`:
+        The initial list of attribute sets.
+
+      - `operator`:
+        A function that takes an attribute set and returns a list of attribute sets.
+        It defines how each item in the current set is processed and expanded into more items.
+
+      Each attribute set in the list `startSet` and the list returned by `operator` must have an attribute `key`, which must support equality comparison.
+      The value of `key` can be one of the following types:
+
       - [Number](@docroot@/language/values.md#type-number)
       - [Boolean](@docroot@/language/values.md#type-boolean)
       - [String](@docroot@/language/values.md#type-string)
       - [Path](@docroot@/language/values.md#type-path)
       - [List](@docroot@/language/values.md#list)
 
+      The result is produced by calling the `operator` on each `item` that has not been called yet, including newly added items, until no new items are added.
+      Items are compared by their `key` attribute.
+
+      Common usages are:
+
+      - Generating unique collections of items, such as dependency graphs.
+      - Traversing through structures that may contain cycles or loops.
+      - Processing data structures with complex internal relationships.
+
+      > **Example**
+      >
+      > ```nix
+      > builtins.genericClosure {
+      >   startSet = [ {key = 5;} ];
+      >   operator = item: [{
+      >     key = if (item.key / 2 ) * 2 == item.key
+      >          then item.key / 2
+      >          else 3 * item.key + 1;
+      >   }];
+      > }
+      > ```
+      >
+      > evaluates to
+      >
+      > ```nix
+      > [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
+      > ```
       )",
     .fun = prim_genericClosure,
 });
@@ -811,7 +826,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         auto message = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.addErrorContext",
                 false, false).toOwned();
-        e.addTrace(nullptr, HintFmt(message), true);
+        e.addTrace(nullptr, HintFmt(message));
         throw;
     }
 }
@@ -1075,7 +1090,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
         e.addTrace(nullptr, HintFmt(
                 "while evaluating derivation '%s'\n"
                 "  whose name attribute is located at %s",
-                drvName, pos), true);
+                drvName, pos));
         throw;
     }
 }
@@ -1123,7 +1138,10 @@ drvName, Bindings * attrs, Value & v)
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else if (s == "text") {
+            else if (s == "git") {
+                experimentalFeatureSettings.require(Xp::GitHashing);
+                ingestionMethod = FileIngestionMethod::Git;
+            } else if (s == "text") {
                 experimentalFeatureSettings.require(Xp::DynamicDerivations);
                 ingestionMethod = TextIngestionMethod {};
             } else
@@ -1233,8 +1251,7 @@ drvName, Bindings * attrs, Value & v)
 
         } catch (Error & e) {
             e.addTrace(state.positions[i->pos],
-                HintFmt("while evaluating attribute '%1%' of derivation '%2%'", key, drvName),
-                true);
+                HintFmt("while evaluating attribute '%1%' of derivation '%2%'", key, drvName));
             throw;
         }
     }
@@ -2075,7 +2092,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
         })
         : ({
             StringSource s { contents };
-            state.store->addToStoreFromDump(s, name, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
         });
 
     /* Note: we don't need to add `context' to the context of the
