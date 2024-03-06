@@ -23,7 +23,7 @@ The parts of a local overlay store are as follows:
   Something else could modify the lower store, but there are restrictions on this
   Nix itself requires that this store only grow, and not change in other ways.
   For example, new store objects can be added, but deleting or modifying store objects is not allowed in general, because that will confuse and corrupt any local overlay store using those objects.
-  (In addition, the underlying filesystem overlay mechanism may imposed additional restrictions, see below.)
+  (In addition, the underlying filesystem overlay mechanism may impose additional restrictions, see below.)
 
   The lower store must not change while it is mounted as part of an overlay store.
   To ensure it does not, you might want to mount the store directory read-only (which then requires the [read-only] parameter to be set to `true`).
