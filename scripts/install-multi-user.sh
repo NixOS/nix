@@ -69,16 +69,17 @@ readonly PROXY_ENVIRONMENT_VARIABLES=(
     NO_PROXY
 )
 
-SUDO_EXTRA_ENVIRONMENT_VARIABLES=()
+SUDO_KEPT_ENVIRONMENT_VARIABLES=""
 
 setup_sudo_extra_environment_variables() {
-    local i=${#SUDO_EXTRA_ENVIRONMENT_VARIABLES[@]}
     for variable in "${PROXY_ENVIRONMENT_VARIABLES[@]}"; do
         if [ "x${!variable:-}" != "x" ]; then
-            SUDO_EXTRA_ENVIRONMENT_VARIABLES[i]="$variable=${!variable}"
-            i=$((i + 1))
+            SUDO_KEPT_ENVIRONMENT_VARIABLES="$SUDO_KEPT_ENVIRONMENT_VARIABLES,$variable"
         fi
     done
+
+    # Required by the darwin installer
+    export SUDO_KEPT_ENVIRONMENT_VARIABLES
 }
 
 setup_sudo_extra_environment_variables
@@ -386,7 +387,7 @@ _sudo() {
     if is_root; then
         env "$@"
     else
-        sudo "${SUDO_EXTRA_ENVIRONMENT_VARIABLES[@]}" "$@"
+        sudo --preserve-env="$SUDO_KEPT_ENVIRONMENT_VARIABLES" "$@"
     fi
 }
 
