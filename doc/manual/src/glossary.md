@@ -86,7 +86,7 @@
 
   [store path]: #gloss-store-path
 
-- [file system object]{#gloss-store-object}
+- [file system object]{#gloss-file-system-object}
 
   The Nix data model for representing simplified file system data.
 
