@@ -72,7 +72,7 @@ struct CmdCopySigs : StorePathsCommand
                         if (!info->sigs.count(sig))
                             newSigs.insert(sig);
                 } catch (InvalidPath &) {
-                    printError("path %s was invalid in substituter %s", storePath.to_string(), store2->getUri());
+                    debug("path %s was invalid in substituter %s", storePath.to_string(), store2->getUri());
                 }
             }
 
