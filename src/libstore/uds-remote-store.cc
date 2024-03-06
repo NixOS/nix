@@ -88,8 +88,10 @@ void UDSRemoteStore::initConnection(RemoteStore::Connection & _conn)
 
     RemoteStore::initConnection(conn);
 
-    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 38 && conn.remoteTrustsUs) {
-
+    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 38
+        && conn.remoteTrustsUs
+        && experimentalFeatureSettings.isEnabled(Xp::PluggableAuth))
+    {
         conn.authTunnel = std::make_unique<AuthTunnel>(
             *this, ((WorkerProto::ReadConn) _conn).version);
 

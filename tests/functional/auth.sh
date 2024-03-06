@@ -28,5 +28,5 @@ fi
 EOF
 chmod +x $myHelper
 
-[[ $(printf "protocol=https\nhost=bla.org\n" | nix auth fill --auth-sources "builtin:nix $myHelper") = $(printf "protocol=https\nhost=bla.org\nusername=bob\npassword=xyzzy\n") ]]
-[[ -z $(printf "protocol=https\nhost=bla2.org\n" | nix auth fill --auth-sources "builtin:nix $myHelper") ]]
+[[ $(printf "protocol=https\nhost=bla.org\n" | nix auth fill --extra-experimental-features 'pluggable-auth' --auth-sources "builtin:nix $myHelper") = $(printf "protocol=https\nhost=bla.org\nusername=bob\npassword=xyzzy\n") ]]
+[[ -z $(printf "protocol=https\nhost=bla2.org\n" | nix auth fill --extra-experimental-features 'pluggable-auth' --auth-sources "builtin:nix $myHelper") ]]

@@ -221,7 +221,9 @@ struct ExternalAuthSource : AuthSource
 
     ExternalAuthSource(Path program)
         : program(program)
-    { }
+    {
+        experimentalFeatureSettings.require(Xp::PluggableAuth);
+    }
 
     std::optional<AuthData> get(const AuthData & request, bool required) override
     {
