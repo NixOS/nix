@@ -122,6 +122,7 @@ is_os_darwin() {
     fi
 }
 
+
 contact_us() {
     echo "You can open an issue at"
     echo "https://github.com/NixOS/nix/issues/new?labels=installer&template=installer.md"
