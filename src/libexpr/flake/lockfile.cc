@@ -36,8 +36,9 @@ LockedNode::LockedNode(const nlohmann::json & json)
     : lockedRef(getFlakeRef(json, "locked", "info")) // FIXME: remove "info"
     , originalRef(getFlakeRef(json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
+    , parentPath(json.find("parent") != json.end() ? (std::optional<InputPath>) json["parent"] : std::nullopt)
 {
-    if (!lockedRef.input.isLocked())
+    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative())
         throw Error("lock file contains unlocked input '%s'",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
@@ -184,6 +185,8 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
             n["locked"] = fetchers::attrsToJSON(lockedNode->lockedRef.toAttrs());
             if (!lockedNode->isFlake)
                 n["flake"] = false;
+            if (lockedNode->parentPath)
+                n["parent"] = *lockedNode->parentPath;
         }
 
         nodes[key] = std::move(n);
@@ -230,7 +233,9 @@ std::optional<FlakeRef> LockFile::isUnlocked() const
     for (auto & i : nodes) {
         if (i == ref<const Node>(root)) continue;
         auto node = i.dynamic_pointer_cast<const LockedNode>();
-        if (node && !node->lockedRef.input.isLocked())
+        if (node
+            && !node->lockedRef.input.isLocked()
+            && !node->lockedRef.input.isRelative())
             return node->lockedRef;
     }
 

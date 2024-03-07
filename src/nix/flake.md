@@ -195,18 +195,29 @@ Currently the `type` attribute can be one of the following:
   If the flake at *path* is not inside a git repository, the `path:`
   prefix is implied and can be omitted.
 
-  *path* generally must be an absolute path. However, on the command
-  line, it can be a relative path (e.g. `.` or `./foo`) which is
-  interpreted as relative to the current directory. In this case, it
-  must start with `.` to avoid ambiguity with registry lookups
-  (e.g. `nixpkgs` is a registry lookup; `./nixpkgs` is a relative
-  path).
+  If *path* is a relative path (i.e. if it does not start with `/`),
+  it is interpreted as follows:
+
+  - If *path* is a command line argument, it is interpreted relative
+    to the current directory.
+
+  - If *path* is used in a `flake.nix`, it is interpreted relative to
+    the directory containing that `flake.nix`. However, the resolved
+    path must be in the same tree. For instance, a `flake.nix` in the
+    root of a tree can use `path:./foo` to access the flake in
+    subdirectory `foo`, but `path:../bar` is illegal.
+
+  Note that if you omit `path:`, relative paths must start with `.` to
+  avoid ambiguity with registry lookups (e.g. `nixpkgs` is a registry
+  lookup; `./nixpkgs` is a relative path).
 
   For example, these are valid path flake references:
 
   * `path:/home/user/sub/dir`
   * `/home/user/sub/dir` (if `dir/flake.nix` is *not* in a git repository)
-  * `./sub/dir` (when used on the command line and `dir/flake.nix` is *not* in a git repository)
+  * `path:sub/dir`
+  * `./sub/dir`
+  * `path:../parent`
 
 * `git`: Git repositories. The location of the repository is specified
   by the attribute `url`.

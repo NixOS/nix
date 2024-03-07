@@ -141,6 +141,12 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
+std::optional<std::string> Input::isRelative() const
+{
+    assert(scheme);
+    return scheme->isRelative(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;
