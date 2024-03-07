@@ -482,6 +482,8 @@ struct CmdFlakeCheck : FlakeCommand
 
         checkHydraJobs = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking Hydra job '%s'", attrPath));
                 state->forceAttrs(v, pos, "");
 
                 if (state->isDerivation(v))
