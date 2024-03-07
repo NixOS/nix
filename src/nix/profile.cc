@@ -453,65 +453,85 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     }
 };
 
-enum MatcherType
-{
-    Regex,
-    StorePath,
-    Name,
-    All,
-};
-
 struct Matcher
 {
-    MatcherType type;
-    std::string title;
-    std::function<bool(const std::string & name, const ProfileElement & element)> matches;
+    virtual std::string getTitle() = 0;
+    virtual bool matches(const std::string & name, const ProfileElement & element) = 0;
 };
 
-Matcher createRegexMatcher(const std::string & pattern)
+struct RegexMatcher : public Matcher
 {
-    std::regex reg(pattern, std::regex::extended | std::regex::icase);
-    return {
-        .type = MatcherType::Regex,
-        .title = fmt("Regex '%s'", pattern),
-        .matches = [reg](const std::string &name, const ProfileElement & element) {
-            return std::regex_match(element.identifier(), reg);
-        },
-    };
-}
+    std::regex regex;
+    std::string pattern;
 
-Matcher createStorePathMatcher(const nix::StorePath & storePath)
+    RegexMatcher(const std::string & pattern) : regex(pattern, std::regex::extended | std::regex::icase), pattern(pattern)
+    { }
+
+    std::string getTitle() override
+    {
+        return fmt("Regex '%s'", pattern);
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        return std::regex_match(element.identifier(), regex);
+    }
+};
+
+struct StorePathMatcher : public Matcher
 {
-    return {
-        .type = MatcherType::StorePath,
-        .title = fmt("Store path '%s'", storePath.to_string()),
-        .matches = [storePath](const std::string &name, const ProfileElement & element) {
-            return element.storePaths.count(storePath);
-        }
-    };
-}
+    nix::StorePath storePath;
 
-Matcher createNameMatcher(const std::string & name) {
-    return {
-        .type = MatcherType::Name,
-        .title = fmt("Package name '%s'", name),
-        .matches = [name](const std::string &elementName, const ProfileElement & element) {
-            return elementName == name;
-        }
-    };
-}
+    StorePathMatcher(const nix::StorePath & storePath) : storePath(storePath)
+    { }
 
-Matcher all = {
-    .type = MatcherType::All,
-    .title = "--all",
-    .matches = [](const std::string &name, const ProfileElement & element) {
+    std::string getTitle() override
+    {
+        return fmt("Store path '%s'", storePath.to_string());
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        return element.storePaths.count(storePath);
+    }
+};
+
+struct NameMatcher : public Matcher
+{
+    std::string name;
+
+    NameMatcher(const std::string & name) : name(name)
+    { }
+
+    std::string getTitle() override
+    {
+        return fmt("Package name '%s'", name);
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        return name == this->name;
+    }
+};
+
+struct AllMatcher : public Matcher
+{
+    std::string getTitle() override
+    {
+        return "--all";
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
         return true;
     }
 };
 
+AllMatcher all;
+
 class MixProfileElementMatchers : virtual Args, virtual StoreCommand
 {
-    std::vector<Matcher> _matchers;
+    std::vector<ref<Matcher>> _matchers;
 
 public:
 
@@ -521,7 +541,7 @@ public:
             .longName = "all",
             .description = "Match all packages in the profile.",
             .handler = {[this]() {
-                _matchers.push_back(all);
+                _matchers.push_back(ref<AllMatcher>(std::shared_ptr<AllMatcher>(&all, [](AllMatcher*) {})));
             }},
         });
         addFlag({
@@ -529,7 +549,7 @@ public:
             .description = "A regular expression to match one or more packages in the profile.",
             .labels = {"pattern"},
             .handler = {[this](std::string arg) {
-                _matchers.push_back(createRegexMatcher(arg));
+                _matchers.push_back(make_ref<RegexMatcher>(arg));
             }},
         });
         expectArgs({
@@ -540,9 +560,9 @@ public:
                     if (auto n = string2Int<size_t>(arg)) {
                         throw Error("'nix profile' no longer supports indices ('%d')", *n);
                     } else if (getStore()->isStorePath(arg)) {
-                        _matchers.push_back(createStorePathMatcher(getStore()->parseStorePath(arg)));
+                        _matchers.push_back(make_ref<StorePathMatcher>(getStore()->parseStorePath(arg)));
                     } else {
-                        _matchers.push_back(createNameMatcher(arg));
+                        _matchers.push_back(make_ref<NameMatcher>(arg));
                     }
                 }
             }}
@@ -554,7 +574,7 @@ public:
             throw UsageError("No packages specified.");
         }
 
-        if (std::find_if(_matchers.begin(), _matchers.end(), [](const Matcher & m) { return m.type == MatcherType::All; }) != _matchers.end() && _matchers.size() > 1) {
+        if (std::find_if(_matchers.begin(), _matchers.end(), [](const ref<Matcher> & m) { return m.dynamic_pointer_cast<AllMatcher>(); }) != _matchers.end() && _matchers.size() > 1) {
             throw UsageError("--all cannot be used with package names or regular expressions.");
         }
 
@@ -567,13 +587,13 @@ public:
         for (auto & matcher : _matchers) {
             bool foundMatch = false;
             for (auto & [name, element] : manifest.elements) {
-                if (matcher.matches(name, element)) {
+                if (matcher->matches(name, element)) {
                     result.insert(name);
                     foundMatch = true;
                 }
             }
             if (!foundMatch) {
-                warn("%s does not match any packages in the profile.", matcher.title);
+                warn("%s does not match any packages in the profile.", matcher->getTitle());
             }
         }
         return result;
