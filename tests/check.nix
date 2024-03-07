@@ -11,7 +11,7 @@ with import ./config.nix;
   };
 
   hashmismatch = import <nix/fetchurl.nix> {
-    url = "file://" + builtins.getEnv "TMPDIR" + "/dummy";
+    url = "file://" + toString ./dummy;
     sha256 = "0mdqa9w1p6cmli6976v4wi0sw9r4p5prkj7lzfd1877wk11c9c73";
   };
 

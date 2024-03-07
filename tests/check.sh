@@ -34,9 +34,9 @@ nix-build check.nix -A fetchurl --no-out-link --repair --hashed-mirrors ''
 nix-build check.nix -A hashmismatch --no-out-link --hashed-mirrors '' || status=$?
 [ "$status" = "102" ]
 
-echo -n > $TMPDIR/dummy
+echo -n > ./dummy
 nix-build check.nix -A hashmismatch --no-out-link --hashed-mirrors ''
-echo 'Hello World' > $TMPDIR/dummy
+echo 'Hello World' > ./dummy
 
 nix-build check.nix -A hashmismatch --no-out-link --check --hashed-mirrors '' || status=$?
 [ "$status" = "102" ]
