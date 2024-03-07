@@ -341,7 +341,6 @@
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
-        perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -351,6 +350,11 @@
         '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
+      } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
+        # Some perl dependencies are broken on i686-linux.
+        # Since the support is only best-effort there, disable the perl
+        # bindings
+        perlBindings = self.hydraJobs.perlBindings.${system};
       });
 
       packages = forAllSystems (system: rec {
