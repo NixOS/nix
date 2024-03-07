@@ -89,6 +89,15 @@ struct PathInputScheme : InputScheme
         writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
     }
 
+    std::optional<std::string> isRelative(const Input & input) const
+    {
+        auto path = getStrAttr(input.attrs, "path");
+        if (hasPrefix(path, "/"))
+            return std::nullopt;
+        else
+            return path;
+    }
+
     bool isLocked(const Input & input) const override
     {
         return (bool) input.getNarHash();
@@ -151,6 +160,9 @@ struct PathInputScheme : InputScheme
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
+        if (isRelative(input))
+            return std::nullopt;
+
         /* If this path is in the Nix store, use the hash of the
            store object and the subpath. */
         auto path = getAbsPath(input);
