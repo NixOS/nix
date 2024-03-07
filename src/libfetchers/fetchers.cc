@@ -141,6 +141,12 @@ bool Input::isLocked() const
     return scheme && scheme->isLocked(*this);
 }
 
+std::optional<std::string> Input::isRelative() const
+{
+    assert(scheme);
+    return scheme->isRelative(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;
@@ -163,35 +169,11 @@ bool Input::contains(const Input & other) const
 
 std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
-    if (!scheme)
-        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
-
-    /* The tree may already be in the Nix store, or it could be
-       substituted (which is often faster than fetching from the
-       original source). So check that. */
-    if (getNarHash()) {
-        try {
-            auto storePath = computeStorePath(*store);
-
-            store->ensurePath(storePath);
-
-            debug("using substituted/cached input '%s' in '%s'",
-                to_string(), store->printStorePath(storePath));
-
-            return {std::move(storePath), *this};
-        } catch (Error & e) {
-            debug("substitution of input '%s' failed: %s", to_string(), e.what());
-        }
-    }
-
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
             auto [accessor, final] = getAccessorUnchecked(store);
 
             auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, final.getName());
-
-            auto narHash = store->queryPathInfo(storePath)->narHash;
-            final.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
             scheme->checkLocks(*this, final);
 
@@ -239,6 +221,11 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
 
 std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
+    // FIXME: cache the accessor
+
+    if (!scheme)
+        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
+
     try {
         auto [accessor, final] = getAccessorUnchecked(store);
 
@@ -279,12 +266,6 @@ void Input::clone(const Path & destDir) const
     scheme->clone(*this, destDir);
 }
 
-std::optional<Path> Input::getSourcePath() const
-{
-    assert(scheme);
-    return scheme->getSourcePath(*this);
-}
-
 void Input::putFile(
     const CanonPath & path,
     std::string_view contents,
@@ -297,18 +278,6 @@ void Input::putFile(
 std::string Input::getName() const
 {
     return maybeGetStrAttr(attrs, "name").value_or("source");
-}
-
-StorePath Input::computeStorePath(Store & store) const
-{
-    auto narHash = getNarHash();
-    if (!narHash)
-        throw Error("cannot compute store path for unlocked input '%s'", to_string());
-    return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .method = FileIngestionMethod::Recursive,
-        .hash = *narHash,
-        .references = {},
-    });
 }
 
 std::string Input::getType() const
@@ -380,11 +349,6 @@ Input InputScheme::applyOverrides(
     if (rev)
         throw Error("don't know how to set revision of input '%s' to '%s'", input.to_string(), rev->gitRev());
     return input;
-}
-
-std::optional<Path> InputScheme::getSourcePath(const Input & input) const
-{
-    return {};
 }
 
 void InputScheme::putFile(

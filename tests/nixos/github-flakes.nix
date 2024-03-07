@@ -58,7 +58,7 @@ let
       mkdir -p $out/{commits,tarball}
 
       # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-      echo '{"sha": "${private-flake-rev}"}' > $out/commits/HEAD
+      echo '{"sha": "${private-flake-rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
 
       # Setup tarball download via API
       dir=private-flake
@@ -72,7 +72,7 @@ let
       mkdir -p $out/commits
 
       # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-      echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/HEAD
+      echo '{"sha": "${nixpkgs.rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
     '';
 
   archive = pkgs.runCommand "nixpkgs-flake" {}
@@ -170,6 +170,7 @@ in
     cat_log()
 
     # If no github access token is provided, nix should use the public archive url...
+    client.succeed("nix flake metadata nixpkgs 2>&1 | grep 'Git tree hash mismatch'")
     out = client.succeed("nix flake metadata nixpkgs --json")
     print(out)
     info = json.loads(out)

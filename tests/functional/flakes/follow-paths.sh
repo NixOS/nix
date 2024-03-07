@@ -24,7 +24,7 @@ cat > $flakeFollowsA/flake.nix <<EOF
             inputs.foobar.follows = "foobar";
         };
 
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
     };
     outputs = { ... }: {};
 }
@@ -34,7 +34,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
 {
     description = "Flake B";
     inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
         goodoo.follows = "C/goodoo";
         C = {
             url = "path:./flakeC";
@@ -49,7 +49,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
 {
     description = "Flake C";
     inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
         goodoo.follows = "foobar";
     };
     outputs = { ... }: {};
@@ -115,20 +115,26 @@ nix flake lock $flakeFollowsA
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
 jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
 
-# Ensure a relative path is not allowed to go outside the store path
+# Check that subflakes are allowed to access flakes in the parent.
 cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
-        B.url = "path:../flakeB";
+        B.url = "../flakeB"; # test relative paths without 'path:'
+        E.flake = false;
+        E.url = "path:./foo.nix";
     };
-    outputs = { ... }: {};
+    outputs = { E, ... }: { e = import E; };
 }
 EOF
 
-git -C $flakeFollowsA add flake.nix
+echo 123 > $flakeFollowsA/foo.nix
 
-expect 1 nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
+git -C $flakeFollowsA add flake.nix foo.nix
+
+nix flake lock $flakeFollowsA
+
+[[ $(nix eval --json $flakeFollowsA#e) = 123 ]]
 
 # Non-existant follows should print a warning.
 cat >$flakeFollowsA/flake.nix <<EOF

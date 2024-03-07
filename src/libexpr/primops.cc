@@ -170,6 +170,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     auto path = realisePath(state, pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
+#if 0
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
         if (!state.store->isStorePath(path2))
@@ -210,7 +211,9 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
         state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
     }
 
-    else {
+    else
+#endif
+    {
         if (!vScope)
             state.evalFile(path, v);
         else {
@@ -331,6 +334,9 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    throw UnimplementedError("importNative");
+
+    #if 0
     auto path = realisePath(state, pos, *args[0]);
 
     std::string sym(state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
@@ -352,6 +358,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Valu
     (func)(state, v);
 
     /* We don't dlclose because v may be a primop referencing a function in the shared object file */
+    #endif
 }
 
 
@@ -792,7 +799,7 @@ static RegisterPrimOp primop_abort({
     {
         NixStringContext context;
         auto s = state.coerceToString(pos, *args[0], context,
-                "while evaluating the error message passed to builtins.abort").toOwned();
+                "while evaluating the error message passed to 'builtins.abort'").toOwned();
         state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).debugThrow();
     }
 });
@@ -811,7 +818,7 @@ static RegisterPrimOp primop_throw({
     {
       NixStringContext context;
       auto s = state.coerceToString(pos, *args[0], context,
-              "while evaluating the error message passed to builtin.throw").toOwned();
+              "while evaluating the error message passed to 'builtin.throw'").toOwned();
       state.error<ThrownError>(s).debugThrow();
     }
 });
@@ -824,7 +831,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
     } catch (Error & e) {
         NixStringContext context;
         auto message = state.coerceToString(pos, *args[0], context,
-                "while evaluating the error message passed to builtins.addErrorContext",
+                "while evaluating the error message passed to 'builtins.addErrorContext'",
                 false, false).toOwned();
         e.addTrace(nullptr, HintFmt(message));
         throw;
@@ -998,7 +1005,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", args[0]->string_view());
+        printError("trace: %1%", state.decodePaths(args[0]->string_view()));
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
     if (evalSettings.builtinsTraceDebugger && state.debugRepl && !state.debugTraces.empty()) {
@@ -1463,7 +1470,8 @@ static RegisterPrimOp primop_placeholder({
  *************************************************************/
 
 
-/* Convert the argument to a path.  !!! obsolete? */
+/* Convert the argument to a path and then to a string (confusing,
+   eh?).  !!! obsolete? */
 static void prim_toPath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
@@ -1631,6 +1639,7 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
     StorePathSet refs;
     if (state.store->isInStore(path.path.abs())) {
         try {
+            // FIXME: only do queryPathInfo if path.accessor is the store accessor
             refs = state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references;
         } catch (Error &) { // FIXME: should be InvalidPathError
         }
@@ -2247,6 +2256,10 @@ static void addPath(
                 .hash = *expectedHash,
                 .references = {},
             });
+
+        // FIXME: instead of a store path, we could return a
+        // SourcePath that applies the filter lazily and copies to the
+        // store on-demand.
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             auto dstPath = fetchToStore(

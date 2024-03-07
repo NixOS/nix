@@ -7,6 +7,7 @@
 #include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
+#include "input-accessor.hh"
 #include "tarball.hh"
 #include "tarfile.hh"
 #include "git-utils.hh"
@@ -111,6 +112,7 @@ struct GitArchiveInputScheme : InputScheme
             "narHash",
             "lastModified",
             "host",
+            "treeHash",
         };
     }
 
@@ -158,6 +160,25 @@ struct GitArchiveInputScheme : InputScheme
             input.attrs.erase("rev");
         }
         return input;
+    }
+
+    std::optional<Hash> getTreeHash(const Input & input) const
+    {
+        if (auto treeHash = maybeGetStrAttr(input.attrs, "treeHash"))
+            return Hash::parseAny(*treeHash, HashAlgorithm::SHA1);
+        else
+            return std::nullopt;
+    }
+
+    void checkLocks(const Input & specified, const Input & final) const override
+    {
+        InputScheme::checkLocks(specified, final);
+
+        if (auto prevTreeHash = getTreeHash(specified)) {
+            if (getTreeHash(final) != prevTreeHash)
+                throw Error("Git tree hash mismatch in input '%s', expected '%s'",
+                    specified.to_string(), prevTreeHash->gitRev());
+        }
     }
 
     std::optional<std::string> getAccessToken(const std::string & host) const
@@ -281,10 +302,9 @@ struct GitArchiveInputScheme : InputScheme
     bool isLocked(const Input & input) const override
     {
         /* Since we can't verify the integrity of the tarball from the
-           Git revision alone, we also require a NAR hash for
-           locking. FIXME: in the future, we may want to require a Git
-           tree hash instead of a NAR hash. */
-        return input.getRev().has_value() && input.getNarHash().has_value();
+           Git revision alone, we also require a Git tree hash for
+           locking. */
+        return input.getRev().has_value() && getTreeHash(input).has_value();
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() const override
@@ -331,6 +351,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return getStrAttr(input.attrs, "repo");
     }
 
+    /* .commit.tree.sha, .commit.committer.date */
     RefInfo getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = getHost(input);

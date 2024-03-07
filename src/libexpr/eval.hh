@@ -30,6 +30,8 @@ constexpr size_t maxPrimOpArity = 8;
 class Store;
 class EvalState;
 class StorePath;
+struct DerivedPath;
+struct SourcePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemoryInputAccessor;
@@ -206,6 +208,10 @@ public:
 
     const SourcePath callFlakeInternal;
 
+    /* A map keyed by InputAccessor::number that keeps input accessors
+       alive. */
+    std::unordered_map<size_t, ref<InputAccessor>> inputAccessors;
+
     /**
      * Store used to materialise .drv files.
      */
@@ -273,7 +279,7 @@ private:
 
     SearchPath searchPath;
 
-    std::map<std::string, std::optional<std::string>> searchPathResolved;
+    std::map<std::string, std::optional<SourcePath>> searchPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -307,6 +313,22 @@ public:
      * filesystem.
      */
     SourcePath rootPath(CanonPath path);
+
+    void registerAccessor(ref<InputAccessor> accessor);
+
+    /* Convert a path to a string representation of the format
+       `/nix/store/virtual000...<accessor-number>/<path>`. */
+    std::string encodePath(const SourcePath & path);
+
+    /* Decode a path encoded by `encodePath()`. */
+    SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
+
+    const std::string virtualPathMarker;
+
+    /* Decode all virtual paths in a string, i.e. all
+       /nix/store/virtual000... substrings are replaced by the
+       corresponding input accessor. */
+    std::string decodePaths(std::string_view s);
 
     /**
      * Variant which accepts relative paths too.
@@ -378,7 +400,7 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(
+    std::optional<SourcePath> resolveSearchPathPath(
         const SearchPath::Path & elem,
         bool initAccessControl = false);
 
@@ -461,8 +483,7 @@ public:
      */
     BackedStringView coerceToString(const PosIdx pos, Value & v, NixStringContext & context,
         std::string_view errorCtx,
-        bool coerceMore = false, bool copyToStore = true,
-        bool canonicalizePath = true);
+        bool coerceMore = false, bool copyToStore = true);
 
     StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
 

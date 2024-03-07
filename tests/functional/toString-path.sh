@@ -5,4 +5,10 @@ echo bla > $TEST_ROOT/foo/bar
 
 [[ $(nix eval --raw --impure --expr "builtins.readFile (builtins.toString (builtins.fetchTree { type = \"path\"; path = \"$TEST_ROOT/foo\"; } + \"/bar\"))") = bla ]]
 
+[[ $(nix eval --raw --impure --expr "builtins.readFile (builtins.toString (builtins.fetchTree { type = \"path\"; path = \"$TEST_ROOT/foo\"; } + \"/b\" + \"ar\"))") = bla ]]
+
+(! nix eval --raw --impure --expr "builtins.fetchTree { type = \"path\"; path = \"$TEST_ROOT/foo\"; } + \"bar\"")
+
 [[ $(nix eval --json --impure --expr "builtins.readDir (builtins.toString (builtins.fetchTree { type = \"path\"; path = \"$TEST_ROOT/foo\"; }))") = '{"bar":"regular"}' ]]
+
+[[ $(nix eval --json --impure --expr "builtins.readDir (builtins.toString (builtins.fetchTree { type = \"path\"; path = \"$TEST_ROOT/foo\"; } + \"\"))") = '{"bar":"regular"}' ]]

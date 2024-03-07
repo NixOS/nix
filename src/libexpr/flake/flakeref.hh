@@ -63,7 +63,7 @@ struct FlakeRef
 
     static FlakeRef fromAttrs(const fetchers::Attrs & attrs);
 
-    std::pair<StorePath, FlakeRef> fetchTree(ref<Store> store) const;
+    std::pair<ref<InputAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
@@ -72,7 +72,8 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool allowRelative = false);
 
 std::optional<FlakeRef> maybeParseFlake(
     const std::string & url, const std::optional<Path> & baseDir = {});
@@ -81,7 +82,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool allowRelative = false);
 
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const std::string & url, const std::optional<Path> & baseDir = {});

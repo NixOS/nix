@@ -49,6 +49,7 @@ struct FlakeInput
     bool isFlake = true;
     std::optional<InputPath> follows;
     FlakeInputs overrides;
+    std::vector<std::string> patchFiles;
 };
 
 struct ConfigFile
@@ -207,7 +208,7 @@ void callFlake(
 
 void emitTreeAttrs(
     EvalState & state,
-    const StorePath & storePath,
+    const SourcePath & path,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback = false,

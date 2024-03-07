@@ -423,6 +423,7 @@ EvalState::EvalState(
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #endif
+    , virtualPathMarker(settings.nixStore + "/virtual00000000000000000")
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
@@ -952,7 +953,7 @@ void EvalState::mkPos(Value & v, PosIdx p)
     auto pos = positions[p];
     if (auto path = std::get_if<SourcePath>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(path->path.abs());
+        attrs.alloc(sFile).mkString(encodePath(*path));
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
@@ -2009,44 +2010,65 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     // List of returned strings. References to these Values must NOT be persisted.
     SmallTemporaryValueVector<conservativeStackReservation> values(es->size());
     Value * vTmpP = values.data();
+    std::shared_ptr<InputAccessor> accessor;
 
     for (auto & [i_pos, i] : *es) {
-        Value & vTmp = *vTmpP++;
-        i->eval(state, env, vTmp);
+        Value * vTmp = vTmpP++;
+        i->eval(state, env, *vTmp);
+
+        if (vTmp->type() == nAttrs) {
+            auto j = vTmp->attrs->find(state.sOutPath);
+            if (j != vTmp->attrs->end())
+                vTmp = j->value;
+        }
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
            since paths are copied when they are used in a derivation),
            and none of the strings are allowed to have contexts. */
         if (first) {
-            firstType = vTmp.type();
+            firstType = vTmp->type();
+            if (vTmp->type() == nPath) {
+                accessor = vTmp->path().accessor;
+                auto part = vTmp->path().path.abs();
+                sSize += part.size();
+                s.emplace_back(std::move(part));
+            }
         }
 
         if (firstType == nInt) {
-            if (vTmp.type() == nInt) {
-                n += vTmp.integer;
-            } else if (vTmp.type() == nFloat) {
+            if (vTmp->type() == nInt) {
+                n += vTmp->integer;
+            } else if (vTmp->type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
                 nf = n;
-                nf += vTmp.fpoint;
+                nf += vTmp->fpoint;
             } else
-                state.error<EvalError>("cannot add %1% to an integer", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
+                state.error<EvalError>("cannot add %1% to an integer", showType(*vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
         } else if (firstType == nFloat) {
-            if (vTmp.type() == nInt) {
-                nf += vTmp.integer;
-            } else if (vTmp.type() == nFloat) {
-                nf += vTmp.fpoint;
+            if (vTmp->type() == nInt) {
+                nf += vTmp->integer;
+            } else if (vTmp->type() == nFloat) {
+                nf += vTmp->fpoint;
             } else
-                state.error<EvalError>("cannot add %1% to a float", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
+                state.error<EvalError>("cannot add %1% to a float", showType(*vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
+        } else if (firstType == nPath) {
+            if (!first) {
+                auto part = state.coerceToString(i_pos, *vTmp, context, "while evaluating a path segment", false, false);
+                if (sSize <= 1 && !hasPrefix(*part, "/") && accessor != state.rootFS.get_ptr() && !part->empty())
+                    state.error<EvalError>(
+                        "cannot append non-absolute path '%1%' to '%2%' (hint: change it to '/%1%')",
+                        (std::string) *part, SourcePath(ref(accessor)).to_string())
+                        .atPos(i_pos)
+                        .withFrame(env, *this)
+                        .debugThrow();
+                sSize += part->size();
+                s.emplace_back(std::move(part));
+            }
         } else {
             if (s.empty()) s.reserve(es->size());
-            /* skip canonization of first path, which would only be not
-            canonized in the first place if it's coming from a ./${foo} type
-            path */
-            auto part = state.coerceToString(i_pos, vTmp, context,
-                                             "while evaluating a path segment",
-                                             false, firstType == nString, !first);
+            auto part = state.coerceToString(i_pos, *vTmp, context, "while evaluating a path segment", false, firstType == nString);
             sSize += part->size();
             s.emplace_back(std::move(part));
         }
@@ -2061,7 +2083,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.error<EvalError>("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow();
-        v.mkPath(state.rootPath(CanonPath(canonPath(str()))));
+        v.mkPath({ref(accessor), CanonPath(str())});
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2293,8 +2315,7 @@ BackedStringView EvalState::coerceToString(
     NixStringContext & context,
     std::string_view errorCtx,
     bool coerceMore,
-    bool copyToStore,
-    bool canonicalizePath)
+    bool copyToStore)
 {
     forceValue(v, pos);
 
@@ -2304,14 +2325,10 @@ BackedStringView EvalState::coerceToString(
     }
 
     if (v.type() == nPath) {
-        return
-            !canonicalizePath && !copyToStore
-            ? // FIXME: hack to preserve path literals that end in a
-              // slash, as in /foo/${x}.
-              v._path.path
-            : copyToStore
-            ? store->printStorePath(copyPathToStore(context, v.path()))
-            : std::string(v.path().path.abs());
+        auto path = v.path();
+        return copyToStore
+            ? store->printStorePath(copyPathToStore(context, path))
+            : encodePath(path);
     }
 
     if (v.type() == nAttrs) {
@@ -2328,8 +2345,7 @@ BackedStringView EvalState::coerceToString(
                 .withTrace(pos, errorCtx)
                 .debugThrow();
         }
-        return coerceToString(pos, *i->value, context, errorCtx,
-                              coerceMore, copyToStore, canonicalizePath);
+        return coerceToString(pos, *i->value, context, errorCtx, coerceMore, copyToStore);
     }
 
     if (v.type() == nExternal) {
@@ -2356,7 +2372,7 @@ BackedStringView EvalState::coerceToString(
                 try {
                     result += *coerceToString(pos, *v2, context,
                             "while evaluating one element of the list",
-                            coerceMore, copyToStore, canonicalizePath);
+                            coerceMore, copyToStore);
                 } catch (Error & e) {
                     e.addTrace(positions[pos], errorCtx);
                     throw;
@@ -2434,18 +2450,20 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
         }
     }
 
-    /* Any other value should be coercable to a string, interpreted
-       relative to the root filesystem. */
-    auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
-    if (path == "" || path[0] != '/')
-        error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(CanonPath(path));
+    /* Any other value should be coercable to a string. */
+    auto s = coerceToString(pos, v, context, errorCtx, false, false).toOwned();
+    try {
+        return decodePath(s, pos);
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx);
+        throw;
+    }
 }
 
 
 StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
-    auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
+    auto path = coerceToString(pos, v, context, errorCtx, false, false).toOwned();
     if (auto storePath = store->maybeParseStorePath(path))
         return *storePath;
     error<EvalError>("path '%1%' is not in the Nix store", path).withTrace(pos, errorCtx).debugThrow();
@@ -2818,8 +2836,8 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
         if (!rOpt) continue;
         auto r = *rOpt;
 
-        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
+        auto res = r / CanonPath(suffix);
+        if (res.pathExists()) return res;
     }
 
     if (hasPrefix(path, "nix/"))
@@ -2834,20 +2852,20 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
+std::optional<SourcePath> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = searchPathResolved.find(value);
     if (i != searchPathResolved.end()) return i->second;
 
-    std::optional<std::string> res;
+    std::optional<SourcePath> res;
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto accessor = fetchers::downloadTarball(
                 EvalSettings::resolvePseudoUrl(value)).accessor;
-            auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
-            res = { store->toRealPath(storePath) };
+            registerAccessor(accessor);
+            res.emplace(SourcePath(accessor));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -2859,40 +2877,37 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", value);
-        auto storePath = flakeRef.resolve(store).fetchTree(store).first;
-        res = { store->toRealPath(storePath) };
+        auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
+        res.emplace(SourcePath(accessor));
     }
 
     else {
-        auto path = absPath(value);
+        auto path = rootPath(value);
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
-            allowPath(path);
-            if (store->isInStore(path)) {
+            allowPath(path.path.abs());
+            if (store->isInStore(path.path.abs())) {
                 try {
                     StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    store->computeFSClosure(store->toStorePath(path.path.abs()).first, closure);
                     for (auto & p : closure)
                         allowPath(p);
                 } catch (InvalidPath &) { }
             }
         }
 
-        if (pathExists(path))
-            res = { path };
+        if (path.pathExists())
+            res.emplace(path);
         else {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' does not exist, ignoring", value)
             });
-            res = std::nullopt;
         }
     }
 
     if (res)
         debug("resolved search path element '%s' to '%s'", value, *res);
-    else
-        debug("failed to resolve search path element '%s'", value);
 
     searchPathResolved.emplace(value, res);
     return res;

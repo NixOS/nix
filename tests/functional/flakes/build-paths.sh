@@ -74,6 +74,10 @@ nix build --json --out-link $TEST_ROOT/result $flake1Dir#a3
 
 nix build --json --out-link $TEST_ROOT/result $flake1Dir#a4
 
+# Add an uncopyable file to test laziness.
+mkfifo $flake1Dir/fifo
+(! nix build --json --out-link $TEST_ROOT/result $flake1Dir#a3)
+
 nix build --json --out-link $TEST_ROOT/result $flake1Dir#a6
 [[ -e $TEST_ROOT/result/simple.nix ]]
 

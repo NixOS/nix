@@ -17,23 +17,22 @@
 
 namespace nix {
 
-void emitTreeAttrs(
+static void emitTreeAttrs(
     EvalState & state,
-    const StorePath & storePath,
     const fetchers::Input & input,
     Value & v,
+    std::function<void(Value &)> setOutPath,
     bool emptyRevFallback,
     bool forceDirty)
 {
     auto attrs = state.buildBindings(100);
 
-    state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
+    setOutPath(attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    if (auto narHash = input.getNarHash())
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -72,10 +71,27 @@ void emitTreeAttrs(
     v.mkAttrs(attrs);
 }
 
+void emitTreeAttrs(
+    EvalState & state,
+    const SourcePath & path,
+    const fetchers::Input & input,
+    Value & v,
+    bool emptyRevFallback,
+    bool forceDirty)
+{
+    emitTreeAttrs(state, input, v,
+        [&](Value & vOutPath) {
+            vOutPath.mkPath(path);
+        },
+        emptyRevFallback,
+        forceDirty);
+}
+
 struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
     bool isFetchGit = false;
+    bool returnPath = true; // whether to return a lazily fetched SourcePath or a StorePath
 };
 
 static void fetchTree(
@@ -112,7 +128,9 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
+
             state.forceValue(*attr.value, attr.pos);
+
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(state.symbols[attr.name],
@@ -182,11 +200,31 @@ static void fetchTree(
 
     state.checkURI(input.toURLString());
 
-    auto [storePath, input2] = input.fetchToStore(state.store);
+    if (params.returnPath) {
+        auto [accessor, input2] = input.getAccessor(state.store);
 
-    state.allowPath(storePath);
+        state.registerAccessor(accessor);
 
-    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
+        emitTreeAttrs(
+            state,
+            { accessor, CanonPath::root },
+            input2,
+            v,
+            params.emptyRevFallback,
+            false);
+    } else {
+        auto [storePath, input2] = input.fetchToStore(state.store);
+
+        emitTreeAttrs(
+            state, input2, v,
+            [&, storePath(storePath)](Value & vOutPath) {
+                state.mkStorePathString(storePath, vOutPath);
+            },
+            params.emptyRevFallback,
+            false);
+
+        state.allowPath(storePath);
+    }
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -565,7 +603,8 @@ static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, V
         FetchTreeParams {
             .emptyRevFallback = true,
             .allowNameArgument = true,
-            .isFetchGit = true
+            .isFetchGit = true,
+            .returnPath = false,
         });
 }
 
