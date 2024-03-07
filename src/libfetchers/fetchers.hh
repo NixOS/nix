@@ -80,9 +80,20 @@ public:
      * Fetch the entire input into the Nix store, returning the
      * location in the Nix store and the locked input.
      */
-    std::pair<StorePath, Input> fetch(ref<Store> store) const;
+    std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
 
+    /**
+     * Return an InputAccessor that allows access to files in the
+     * input without copying it to the store. Also return a possibly
+     * unlocked input.
+     */
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store) const;
+
+private:
+
+    std::pair<ref<InputAccessor>, Input> getAccessorUnchecked(ref<Store> store) const;
+
+public:
 
     Input applyOverrides(
         std::optional<std::string> ref,
@@ -173,9 +184,7 @@ struct InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
-    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input);
-
-    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const;
+    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const = 0;
 
     /**
      * Is this `InputScheme` part of an experimental feature?
@@ -202,6 +211,14 @@ struct InputScheme
      */
     virtual bool isLocked(const Input & input) const
     { return false; }
+
+    /**
+     * Check the locking attributes in `final` against
+     * `specified`. E.g. if `specified` has a `rev` attribute, then
+     * `final` must have the same `rev` attribute. Throw an exception
+     * if there is a mismatch.
+     */
+    virtual void checkLocks(const Input & specified, const Input & final) const;
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

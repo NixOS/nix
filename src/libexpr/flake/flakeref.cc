@@ -284,7 +284,7 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
 
 std::pair<StorePath, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
 {
-    auto [storePath, lockedInput] = input.fetch(store);
+    auto [storePath, lockedInput] = input.fetchToStore(store);
     return {std::move(storePath), FlakeRef(std::move(lockedInput), subdir)};
 }
 

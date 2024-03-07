@@ -275,8 +275,6 @@ struct GitArchiveInputScheme : InputScheme
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
-        accessor->fingerprint = input.getFingerprint(store);
-
         return {accessor, input};
     }
 
