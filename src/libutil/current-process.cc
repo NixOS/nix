@@ -38,6 +38,11 @@ unsigned int getMaxCPU()
 
         auto cpuMax = readFile(cpuFile);
         auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+
+        if (cpuMaxParts.size() != 2) {
+            return 0;
+        }
+
         auto quota = cpuMaxParts[0];
         auto period = cpuMaxParts[1];
         if (quota != "max")
