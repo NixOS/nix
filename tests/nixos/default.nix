@@ -109,7 +109,7 @@ in
       nix.package = lib.mkForce pkgs.nixVersions.nix_2_13;
     };
   };
-  
+
   # TODO: (nixpkgs update) remoteBuildsSshNg_remote_2_18 = ...
 
   # Test our Nix as a builder for clients that are older
@@ -156,4 +156,6 @@ in
     (system: runNixOSTestFor system ./setuid.nix);
 
   fetch-git = runNixOSTestFor "x86_64-linux" ./fetch-git;
+
+  ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
 }
