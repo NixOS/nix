@@ -147,6 +147,20 @@ struct PathInputScheme : InputScheme
         return {std::move(*storePath), input};
     }
 
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        /* If this path is in the Nix store, use the hash of the
+           store object and the subpath. */
+        auto path = getAbsPath(input);
+        try {
+            auto [storePath, subPath] = store->toStorePath(path.abs());
+            auto info = store->queryPathInfo(storePath);
+            return fmt("path:%s:%s", info->narHash.to_string(HashFormat::Base16, false), subPath);
+        } catch (Error &) {
+            return std::nullopt;
+        }
+    }
+
     std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;

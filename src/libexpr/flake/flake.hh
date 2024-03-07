@@ -119,7 +119,7 @@ struct LockedFlake
      */
     std::map<ref<Node>, SourcePath> nodePaths;
 
-    Fingerprint getFingerprint() const;
+    std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
 };
 
 struct LockFlags
