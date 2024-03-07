@@ -158,14 +158,16 @@ struct PathInputScheme : InputScheme
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
-        /* If this path is in the Nix store, we can consider it
-           locked, so just use the path as its fingerprint. Maybe we
-           should restrict this to CA paths but that's not
-           super-important. */
+        /* If this path is in the Nix store, use the hash of the
+           store object and the subpath. */
         auto path = getAbsPath(input);
-        if (store->isInStore(path.abs()))
-            return path.abs();
-        return std::nullopt;
+        try {
+            auto [storePath, subPath] = store->toStorePath(path.abs());
+            auto info = store->queryPathInfo(storePath);
+            return fmt("path:%s:%s", info->narHash.to_string(HashFormat::Base16, false), subPath);
+        } catch (Error &) {
+            return std::nullopt;
+        }
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() const override

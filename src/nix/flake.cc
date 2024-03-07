@@ -216,6 +216,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             j["resolvedUrl"] = flake.resolvedRef.to_string();
             j["resolved"] = fetchers::attrsToJSON(flake.resolvedRef.toAttrs());
             j["url"] = flake.lockedRef.to_string(); // FIXME: rename to lockedUrl
+            // "locked" is a misnomer - this is the result of the
+            // attempt to lock.
             j["locked"] = fetchers::attrsToJSON(flake.lockedRef.toAttrs());
             if (auto rev = flake.lockedRef.input.getRev())
                 j["revision"] = rev->to_string(HashFormat::Base16, false);
@@ -231,9 +233,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             logger->cout(
                 ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s",
                 flake.resolvedRef.to_string());
-            logger->cout(
-                ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s",
-                flake.lockedRef.to_string());
+            if (flake.lockedRef.input.isLocked())
+                logger->cout(
+                    ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s",
+                    flake.lockedRef.to_string());
             if (flake.description)
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",

@@ -22,7 +22,7 @@ mkdir subdir
 pushd subdir
 
 success=("" . .# .#test ../subdir ../subdir#test "$PWD")
-failure=("path:$PWD")
+failure=("path:$PWD" "../simple.nix")
 
 for i in "${success[@]}"; do
     nix build $i || fail "flake should be found by searching up directories"

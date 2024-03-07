@@ -64,7 +64,6 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
-    // FIXME: use name
     auto [storePath, input2] = input.fetchToStore(state.store);
 
     auto attrs2 = state.buildBindings(8);

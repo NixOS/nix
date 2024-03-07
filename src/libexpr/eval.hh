@@ -155,6 +155,7 @@ struct DebugTrace {
     bool isError;
 };
 
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
@@ -228,6 +229,7 @@ public:
      */
     ReplExitStatus (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
+    bool inDebugger = false;
     int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;

@@ -171,9 +171,13 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
-            auto [accessor, input2] = getAccessor(store);
-            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, input2.getName());
-            return {storePath, input2};
+            auto [accessor, final] = getAccessorUnchecked(store);
+
+            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, final.getName());
+
+            scheme->checkLocks(*this, final);
+
+            return {storePath, final};
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());
             throw;
@@ -223,14 +227,29 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
     try {
-        auto [accessor, final] = scheme->getAccessor(store, *this);
-        accessor->fingerprint = scheme->getFingerprint(store, final);
+        auto [accessor, final] = getAccessorUnchecked(store);
+
         scheme->checkLocks(*this, final);
+
         return {accessor, std::move(final)};
     } catch (Error & e) {
         e.addTrace({}, "while fetching the input '%s'", to_string());
         throw;
     }
+}
+
+std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
+{
+    // FIXME: cache the accessor
+
+    if (!scheme)
+        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
+
+    auto [accessor, final] = scheme->getAccessor(store, *this);
+
+    accessor->fingerprint = scheme->getFingerprint(store, final);
+
+    return {accessor, std::move(final)};
 }
 
 Input Input::applyOverrides(

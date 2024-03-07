@@ -90,6 +90,12 @@ public:
      */
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store) const;
 
+private:
+
+    std::pair<ref<InputAccessor>, Input> getAccessorUnchecked(ref<Store> store) const;
+
+public:
+
     Input applyOverrides(
         std::optional<std::string> ref,
         std::optional<Hash> rev) const;
@@ -204,6 +210,12 @@ struct InputScheme
     virtual std::optional<std::string> isRelative(const Input & input) const
     { return std::nullopt; }
 
+    /**
+     * Check the locking attributes in `final` against
+     * `specified`. E.g. if `specified` has a `rev` attribute, then
+     * `final` must have the same `rev` attribute. Throw an exception
+     * if there is a mismatch.
+     */
     virtual void checkLocks(const Input & specified, const Input & final) const;
 };
 

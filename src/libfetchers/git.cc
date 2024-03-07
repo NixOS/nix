@@ -754,8 +754,6 @@ struct GitInputScheme : InputScheme
             ? getAccessorFromCommit(store, repoInfo, std::move(input))
             : getAccessorFromWorkdir(store, repoInfo, std::move(input));
 
-        accessor->fingerprint = final.getFingerprint(store);
-
         return {accessor, std::move(final)};
     }
 
