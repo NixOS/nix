@@ -186,6 +186,13 @@ void renameFile(const Path & src, const Path & dst);
  */
 void moveFile(const Path & src, const Path & dst);
 
+/**
+ * Recursively copy the content of `oldPath` to `newPath`. If `andDelete` is
+ * `true`, then also remove `oldPath` (making this equivalent to `moveFile`, but
+ * with the guaranty that the destination will be “fresh”, with no stale inode
+ * or file descriptor pointing to it).
+ */
+void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
 
 /**
  * Automatic cleanup of resources.
