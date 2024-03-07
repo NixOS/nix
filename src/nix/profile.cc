@@ -508,7 +508,15 @@ public:
 
     MixProfileElementMatchers()
     {
-        expectArgs(ExpectedArg {
+        addFlag({
+            .longName = "regex",
+            .description = "A regular expression to match one or more packages in the profile.",
+            .labels = {"pattern"},
+            .handler = {[this](std::string arg) {
+                _matchers.push_back(createRegexMatcher(arg));
+            }},
+        });
+        expectArgs({
             .label = "elements",
             .optional = true,
             .handler = {[this](std::vector<std::string> args) {

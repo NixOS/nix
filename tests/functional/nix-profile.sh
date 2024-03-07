@@ -71,6 +71,16 @@ nix profile upgrade flake1
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello NixOS" ]]
 nix profile history | grep "packages.$system.default: 1.0, 1.0-man -> 2.0, 2.0-man"
 
+# Test upgrading package using regular expression.
+printf 2.1 > $flake1Dir/version
+nix profile upgrade --regex '.*'
+[[ $(readlink $TEST_HOME/.nix-profile/bin/hello) =~ .*-profile-test-2\.1/bin/hello ]]
+nix profile rollback
+
+# Test removing all packages using regular expression.
+nix profile remove --regex '.*' 2>&1 | grep "removed 2 packages, kept 0 packages"
+nix profile rollback
+
 # Test 'history', 'diff-closures'.
 nix profile diff-closures
 

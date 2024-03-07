@@ -6,7 +6,7 @@ R""(
   reference:
 
   ```console
-  # nix profile upgrade '.*'
+  # nix profile upgrade --regex '.*'
   ```
 
 * Upgrade a specific package by name:

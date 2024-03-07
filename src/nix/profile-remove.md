@@ -11,7 +11,7 @@ R""(
 * Remove all packages:
 
   ```console
-  # nix profile remove '.*'
+  # nix profile remove --regex '.*'
   ```
 
 * Remove a package by store path:
