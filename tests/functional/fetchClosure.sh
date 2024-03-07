@@ -1,7 +1,5 @@
 source common.sh
 
-enableFeatures "fetch-closure"
-
 clearStore
 clearCacheCache
 
