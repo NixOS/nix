@@ -3286,10 +3286,17 @@ void DerivationGoal::registerOutputs()
             throw BuildError(format("suspicious ownership or permission on '%1%'; rejecting this build output") % path);
 #endif
 
-        /* Apply hash rewriting if necessary. */
+        /* Apply hash rewriting if necessary.
+         *
+         * For FODs, we always do the dump-and-restore dance regardless to make
+         * sure that there's no stale file descriptor pointing to the output
+         * of the path.
+         * */
         bool rewritten = false;
-        if (!outputRewrites.empty()) {
+        if (fixedOutput || !outputRewrites.empty()) {
+            if (!outputRewrites.empty()) {
             printError(format("warning: rewriting hashes in '%1%'; cross fingers") % path);
+            }
 
             /* Canonicalise first.  This ensures that the path we're
                rewriting doesn't contain a hard link to /etc/shadow or
