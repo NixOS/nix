@@ -11,26 +11,31 @@ clearStore
 # TODO make `nix-env` doesn't work with CA derivations, and make
 # `ca/nix-collect-garbage-d.sh` wrapper.
 
-testCollectGarbageD () {
+
+testCollectGarbageSetup () {
     clearProfiles
-    # Run two `nix-env` commands, should create two generations of
+    # Run six `nix-env` commands, should create six generations of
     # the profile
     nix-env -f ./user-envs.nix -i foo-1.0 "$@"
     nix-env -f ./user-envs.nix -i foo-2.0pre1 "$@"
-    [[ $(nix-env --list-generations "$@" | wc -l) -eq 2 ]]
-
-    # Clear the profile history. There should be only one generation
-    # left
-    nix-collect-garbage -d
-    [[ $(nix-env --list-generations "$@" | wc -l) -eq 1 ]]
+    nix-env -f ./user-envs.nix -i bar-0.1 "$@"
+    nix-env -f ./user-envs.nix -i foo-2.0 "$@"
+    nix-env -f ./user-envs.nix -i bar-0.1.1 "$@"
+    nix-env -f ./user-envs.nix -i foo-0.1 "$@"
+    [[ $(nix-env --list-generations "$@" | wc -l) -eq 6 ]]
 }
 
-testCollectGarbageD
+# Basic test that should leave 1 generation
+testCollectGarbageSetup
+nix-collect-garbage -d
+[[ $(nix-env --list-generations | wc -l) -eq 1 ]]
 
 # Run the same test, but forcing the profiles an arbitrary location.
 rm ~/.nix-profile
 ln -s $TEST_ROOT/blah ~/.nix-profile
-testCollectGarbageD
+testCollectGarbageSetup
+nix-collect-garbage -d
+[[ $(nix-env --list-generations | wc -l) -eq 1 ]]
 
 # Run the same test, but forcing the profiles at their legacy location under
 # /nix/var/nix.
@@ -41,4 +46,6 @@ testCollectGarbageD
 #
 # Regression test for #8294
 rm ~/.nix-profile
-testCollectGarbageD --profile "$NIX_STATE_DIR/profiles/per-user/me"
+testCollectGarbageSetup --profile "$NIX_STATE_DIR/profiles/per-user/me"
+nix-collect-garbage -d
+[[ $(nix-env --list-generations --profile "$NIX_STATE_DIR/profiles/per-user/me" | wc -l) -eq 1 ]]
