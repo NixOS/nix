@@ -650,7 +650,9 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
             assert(infop);
             auto & info = *infop;
 
-            if (element.source->lockedRef == info.flake.lockedRef) continue;
+            if (info.flake.lockedRef.input.isLocked()
+                && element.source->lockedRef == info.flake.lockedRef)
+                continue;
 
             printInfo("upgrading '%s' from flake '%s' to '%s'",
                 element.source->attrPath, element.source->lockedRef, info.flake.lockedRef);
