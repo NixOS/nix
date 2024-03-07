@@ -4,15 +4,33 @@
   # TODO switch to nixos-23.11-small
   #      https://nixpk.gs/pr-tracker.html?pr=291954
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
-  inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+  # dev
+  inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
+  inputs.nixpkgs-nixos-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
 
     let
       inherit (nixpkgs) lib;
       inherit (lib) fileset;
+
+      nixpkgsChannel = inputs.nixpkgsChannel or "nixos-23.11";
+      # If nixpkgsChannel hasn't been set, its the default invocation of the
+      # flake outputs, and we want to add attributes for the other variants.
+      shouldAddVariants = ! inputs?nixpkgsChannel;
+
+      self_nixos-unstable =
+        (import ./flake.nix).outputs
+          (inputs // {
+            nixpkgs = inputs.nixpkgs-nixos-unstable;
+            nixpkgsChannel = "nixos-unstable";
+            self = self_nixos-unstable;
+          });
+
+      prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}${k}" = v; });
 
       officialRelease = false;
 
@@ -155,8 +173,6 @@
             enableLargeConfig = true;
           }).overrideAttrs(o: {
             patches = (o.patches or []) ++ [
-              ./dep-patches/boehmgc-coroutine-sp-fallback.diff
-
               # https://github.com/ivmai/bdwgc/pull/586
               ./dep-patches/boehmgc-traceable_allocator-public.diff
             ];
@@ -306,10 +322,19 @@
 
           nixpkgsLibTests =
             forAllSystems (system:
-              import (nixpkgs + "/lib/tests/release.nix")
-                { pkgs = nixpkgsFor.${system}.native;
-                  nixVersions = [ self.packages.${system}.nix ];
-                }
+              if nixpkgsChannel == "nixos-23.11"
+              then
+                import (nixpkgs + "/lib/tests/release.nix")
+                  { pkgs = nixpkgsFor.${system}.native;
+                    nixVersions = [ self.packages.${system}.nix ];
+                  }
+              else
+                import (nixpkgs + "/lib/tests/test-with-nix.nix")
+                  {
+                    lib = nixpkgsFor.${system}.native.lib;
+                    nix = self.packages.${system}.nix;
+                    pkgs = nixpkgsFor.${system}.native;
+                  }
             );
         };
 
@@ -336,7 +361,8 @@
           binaryTarballs = self.hydraJobs.binaryTarball;
           inherit nixpkgsFor;
         };
-
+      } // lib.optionalAttrs shouldAddVariants {
+        nixos-unstable = self_nixos-unstable.hydraJobs;
       };
 
       checks = forAllSystems (system: {
@@ -351,7 +377,9 @@
         '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
-      });
+      } // lib.optionalAttrs shouldAddVariants (
+        prefixAttrs "nixos-unstable-" self_nixos-unstable.checks.${system}
+      ));
 
       packages = forAllSystems (system: rec {
         inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
@@ -383,7 +411,11 @@
             name = "nix-${stdenvName}";
             value = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nix;
           })
-          stdenvs)));
+          stdenvs))
+        // lib.optionalAttrs shouldAddVariants (
+          prefixAttrs "nixos-unstable-" self_nixos-unstable.packages.${system}
+        )
+      );
 
       devShells = let
         makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs: {
@@ -418,6 +450,9 @@
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }
+            // lib.optionalAttrs shouldAddVariants (
+              prefixAttrs "nixos-unstable-" self_nixos-unstable.devShells.${system}
+            )
         );
   };
 }
