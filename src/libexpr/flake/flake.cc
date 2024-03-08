@@ -212,10 +212,9 @@ static Flake readFlake(
 {
     auto flakePath = rootDir / CanonPath(resolvedRef.subdir) / "flake.nix";
 
+    // NOTE evalFile forces vInfo to be an attrset because mustBeTrivial is true.
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
-
-    expectType(state, nAttrs, vInfo, state.positions.add(Pos::Origin(rootDir), 1, 1));
 
     Flake flake {
         .originalRef = originalRef,
