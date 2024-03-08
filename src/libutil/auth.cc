@@ -1,5 +1,4 @@
 #include "auth.hh"
-#include "canon-path.hh"
 #include "file-system.hh"
 #include "users.hh"
 #include "util.hh"
@@ -86,18 +85,18 @@ std::ostream & operator << (std::ostream & str, const AuthData & authData)
 
 struct NixAuthSource : AuthSource
 {
+    const std::filesystem::path authDir;
+
     std::vector<AuthData> authDatas;
 
     NixAuthSource()
+        : authDir(std::filesystem::path(getDataDir()) / "nix" / "auth")
     {
-        // FIXME: read the auth directory lazily.
-        auto authDir = CanonPath(getDataDir()) / "nix" / "auth";
-
-        if (pathExists(authDir.abs()))
-            for (auto & file : readDirectory(authDir.abs())) {
+        if (pathExists(authDir))
+            for (auto & file : readDirectory(authDir)) {
                 if (hasSuffix(file.name, "~")) continue;
                 auto path = authDir / file.name;
-                auto authData = AuthData::parseGitAuthData(readFile(path.abs()));
+                auto authData = AuthData::parseGitAuthData(readFile(path));
                 if (!authData.password)
                     warn("authentication file '%s' does not contain a password, skipping", path);
                 else
@@ -112,6 +111,17 @@ struct NixAuthSource : AuthSource
                 return res;
 
         return std::nullopt;
+    }
+
+    bool set(const AuthData & authData) override
+    {
+        if (get(authData, false)) return true;
+
+        auto authFile = authDir / fmt("auto-%s-%s", authData.host.value_or("none"), authData.userName.value_or("none"));
+
+        writeFile(authFile, authData.toGitAuthData());
+
+        return true;
     }
 };
 
