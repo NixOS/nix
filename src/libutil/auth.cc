@@ -336,9 +336,11 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
             if (res.userName && res.password) {
                 cache.push_back(res);
 
-                for (auto & authSource : authSources) {
-                    if (authSource->set(res))
-                        break;
+                if (authSettings.storeAuth) {
+                    for (auto & authSource : authSources) {
+                        if (authSource->set(res))
+                            break;
+                    }
                 }
             }
 

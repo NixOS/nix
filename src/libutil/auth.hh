@@ -63,6 +63,13 @@ struct AuthSettings : Config
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.
         )"};
+
+    Setting<bool> storeAuth{
+        this, false, "store-auth",
+        R"(
+          Whether to store user names and passwords using the
+          authentication sources configured in `auth-sources`.
+        )"};
 };
 
 extern AuthSettings authSettings;
