@@ -440,7 +440,8 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   Adds the variables to the current set (attrset or `let`). Desugars to `pkgs = pkgs; src = src;`
+   Adds the variables to the current scope (attribute set or `let` binding).
+   Desugars to `pkgs = pkgs; src = src;`
 
   </td>
  </tr>
@@ -452,7 +453,8 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   Adds the attributes, from the variable in the brackets, to the current set (attrset or `let`). Desugars to `lib = pkgs.lib; stdenv = pkgs.stdenv;`
+   Adds the attributes, from the attribute set in parentheses, to the current scope (attribute set or `let` binding).
+   Desugars to `lib = pkgs.lib; stdenv = pkgs.stdenv;`
 
   </td>
  </tr>
