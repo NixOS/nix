@@ -6,8 +6,15 @@ using namespace nix;
 
 struct CmdAuthFill : Command
 {
+    bool require = false;
+
     CmdAuthFill()
     {
+        addFlag({
+            .longName = "require",
+            .description = "Prompt the user for authentication if no authentication source provides it.",
+            .handler = {&require, true},
+        });
     }
 
     std::string description() override
@@ -29,7 +36,7 @@ struct CmdAuthFill : Command
         using namespace auth;
         stopProgressBar();
         auto authRequest = AuthData::parseGitAuthData(drainFD(STDIN_FILENO));
-        auto authData = getAuthenticator()->fill(authRequest, false);
+        auto authData = getAuthenticator()->fill(authRequest, require);
         if (authData)
             writeFull(STDOUT_FILENO, authData->toGitAuthData());
     }
