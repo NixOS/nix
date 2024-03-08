@@ -31,7 +31,6 @@
       crossSystems = [
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
-        "x86_64-unknown-freebsd13"
         "x86_64-unknown-netbsd"
       ];
 
