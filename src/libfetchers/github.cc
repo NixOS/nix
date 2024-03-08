@@ -109,6 +109,7 @@ struct GitArchiveInputScheme : InputScheme
             "narHash",
             "lastModified",
             "host",
+            "treeHash",
         };
     }
 
