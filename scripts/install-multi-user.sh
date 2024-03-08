@@ -58,6 +58,32 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME=~root
 
+readonly IN_SUDO=$EXTRACTED_NIX_PATH/in-sudo
+readonly PROXY_ENVIRONMENT_VARIABLES=(
+    http_proxy
+    https_proxy
+    ftp_proxy
+    no_proxy
+    HTTP_PROXY
+    HTTPS_PROXY
+    FTP_PROXY
+    NO_PROXY
+)
+
+SUDO_EXTRA_ENVIRONMENT_VARIABLES=()
+
+setup_sudo_extra_environment_variables() {
+    local i=${#SUDO_EXTRA_ENVIRONMENT_VARIABLES[@]}
+    for variable in "${PROXY_ENVIRONMENT_VARIABLES[@]}"; do
+        if [ "x${!variable:-}" != "x" ]; then
+            SUDO_EXTRA_ENVIRONMENT_VARIABLES[i]="$variable=${!variable}"
+            i=$((i + 1))
+        fi
+    done
+}
+
+setup_sudo_extra_environment_variables
+
 if [ -t 0 ] && [ -z "${NIX_INSTALLER_YES:-}" ]; then
     readonly IS_HEADLESS='no'
 else
@@ -361,7 +387,7 @@ _sudo() {
     if is_root; then
         env "$@"
     else
-        sudo "$@"
+        sudo "$IN_SUDO" "${SUDO_EXTRA_ENVIRONMENT_VARIABLES[@]}" "$@"
     fi
 }
 
