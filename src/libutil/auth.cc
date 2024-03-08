@@ -4,6 +4,42 @@
 #include "util.hh"
 #include "processes.hh"
 #include "environment-variables.hh"
+#include "config-impl.hh"
+#include "abstract-setting-to-json.hh"
+
+namespace nix {
+
+using namespace auth;
+
+// FIXME: need to generalize defining enum settings.
+template<> AuthForwarding BaseSetting<AuthForwarding>::parse(const std::string & str) const
+{
+    if (str == "false") return AuthForwarding::Disabled;
+    else if (str == "trusted-users") return AuthForwarding::TrustedUsers;
+    else if (str == "all-users") return AuthForwarding::AllUsers;
+    else throw UsageError("option '%s' has invalid value '%s'", name, str);
+}
+
+template<> struct BaseSetting<AuthForwarding>::trait
+{
+    static constexpr bool appendable = false;
+};
+
+template<> std::string BaseSetting<AuthForwarding>::to_string() const
+{
+    if (value == AuthForwarding::Disabled) return "false";
+    else if (value == AuthForwarding::TrustedUsers) return "trusted-users";
+    else if (value == AuthForwarding::AllUsers) return "all-users";
+    else abort();
+}
+
+NLOHMANN_JSON_SERIALIZE_ENUM(AuthForwarding, {
+    {AuthForwarding::Disabled, "false"},
+    {AuthForwarding::TrustedUsers, "trusted-users"},
+    {AuthForwarding::AllUsers, "all-users"},
+});
+
+}
 
 namespace nix::auth {
 

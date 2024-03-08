@@ -1033,7 +1033,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         logger->startWork();
 
-        if (trusted && experimentalFeatureSettings.isEnabled(Xp::AuthForwarding))
+        if (experimentalFeatureSettings.isEnabled(Xp::AuthForwarding)
+            && ((auth::authSettings.authForwarding == auth::AuthForwarding::TrustedUsers && trusted)
+                || (auth::authSettings.authForwarding == auth::AuthForwarding::AllUsers)))
             auth::getAuthenticator()->addAuthSource(
                 makeTunneledAuthSource(store, clientVersion, std::move(fd)));
 

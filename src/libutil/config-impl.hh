@@ -13,6 +13,7 @@
  */
 
 #include "config.hh"
+#include "args.hh"
 
 namespace nix {
 

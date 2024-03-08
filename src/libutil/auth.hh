@@ -7,6 +7,8 @@
 
 namespace nix::auth {
 
+enum struct AuthForwarding { Disabled, TrustedUsers, AllUsers };
+
 struct AuthSettings : Config
 {
     Setting<Strings> authSources{
@@ -68,8 +70,19 @@ struct AuthSettings : Config
         this, false, "store-auth",
         R"(
           Whether to store user names and passwords using the
-          authentication sources configured in `auth-sources`.
+          authentication sources configured in [`auth-sources`](#conf-auth-sources).
         )"};
+
+    Setting<AuthForwarding> authForwarding{
+        this, AuthForwarding::TrustedUsers, "auth-forwarding",
+        R"(
+          Whether to forward authentication data to the Nix daemon. This setting can have the following values:
+
+          * `false`: Forwarding is disabled.
+          * `trusted-users`: Forwarding is only supported for [trusted users](#conf-trusted-users).
+          * `all-users`: Forwarding is supported for all users.
+        )",
+        {}, true, Xp::AuthForwarding};
 };
 
 extern AuthSettings authSettings;
