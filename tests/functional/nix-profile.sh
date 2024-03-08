@@ -106,8 +106,27 @@ warning: No packages to upgrade. Use 'nix profile list' to see the current profi
 EOF
 
 # Test removing all packages using regular expression.
-nix profile remove --regex '.*' 2>&1 | grep "removed 2 packages, kept 0 packages"
+assertStderr nix --offline profile remove --regex '.*' << EOF
+removing 'path:$flake1Dir#packages.$system.default'
+removing 'foo'
+removed 2 packages, kept 0 packages
+EOF
 nix profile rollback
+
+# Test removing package using full url.
+nix profile remove "path:$flake1Dir#packages.$system.default"
+[[ ! -f $TEST_HOME/.nix-profile/bin/hello ]]
+nix profile install $flake1Dir
+
+# Test removing package using shorthand flake url.
+nix profile remove path:$flake1Dir
+[[ ! -f $TEST_HOME/.nix-profile/bin/hello ]]
+nix profile install $flake1Dir
+
+# Test removing package using shorthand package name.
+nix profile remove path:$flake1Dir#default
+[[ ! -f $TEST_HOME/.nix-profile/bin/hello ]]
+nix profile install $flake1Dir
 
 # Test 'history', 'diff-closures'.
 nix profile diff-closures

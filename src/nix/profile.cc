@@ -541,6 +541,43 @@ struct NameMatcher final : public Matcher
     }
 };
 
+std::regex defaultPackageFragmentPattern("(?:legacyPackages|packages)\\.(?:[^\\.]+)\\.default");
+std::regex packageFragmentPattern("(?:legacyPackages|packages)\\.(?:[^\\.]+)\\.(.+)");
+struct InstallableMatcher : public Matcher
+{
+    const FlakeRef flakeRef;
+    const std::string fragment;
+
+    InstallableMatcher(const FlakeRef flakeRef, const std::string fragment) : flakeRef(flakeRef), fragment(fragment)
+    { }
+
+    std::string getTitle() override
+    {
+        return fmt("Installable '%s#%s'", flakeRef.to_string(), fragment);
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        if (element.source->originalRef != flakeRef) {
+            return false;
+        }
+        // Match "#packages.{system}.default"
+        if (fragment == "") {
+            return std::regex_match(element.source->attrPath, defaultPackageFragmentPattern);
+        }
+        // Match "#{name}"
+        if (element.source->attrPath == fragment) {
+            return true;
+        }
+        // Match "#packages.{system}.{name}"
+        std::smatch match;
+        if (std::regex_match(element.source->attrPath, match, packageFragmentPattern)) {
+            return match.str(1) == fragment;
+        }
+        return false;
+    }
+};
+
 struct AllMatcher final : public Matcher
 {
     std::string getTitle() override
@@ -588,6 +625,9 @@ public:
                         throw Error("'nix profile' no longer supports indices ('%d')", *n);
                     } else if (getStore()->isStorePath(arg)) {
                         _matchers.push_back(make_ref<StorePathMatcher>(getStore()->parseStorePath(arg)));
+                    } else if (std::regex_match(arg, std::regex(".*[#:].*"))) {
+                        auto pair = parseFlakeRefWithFragment(arg);
+                        _matchers.push_back(make_ref<InstallableMatcher>(pair.first, pair.second));
                     } else {
                         _matchers.push_back(make_ref<NameMatcher>(arg));
                     }
