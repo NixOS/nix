@@ -7,6 +7,8 @@
 #include "config-impl.hh"
 #include "abstract-setting-to-json.hh"
 
+#include <filesystem>
+
 namespace nix {
 
 using namespace auth;
