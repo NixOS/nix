@@ -216,6 +216,17 @@ expectStderr() {
     return 0
 }
 
+# Run a command and check whether the stderr matches stdin.
+# Show a diff when output does not match.
+# Usage:
+#
+#   assertStderr nix profile remove nothing << EOF
+#   error: This error is expected
+#   EOF
+assertStderr() {
+    diff -u /dev/stdin <($@ 2>/dev/null 2>&1)
+}
+
 needLocalStore() {
   if [[ "$NIX_REMOTE" == "daemon" ]]; then
     skipTest "Can’t run through the daemon ($1)"
