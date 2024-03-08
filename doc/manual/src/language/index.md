@@ -435,6 +435,30 @@ This is an incomplete overview of language features, by example.
  <tr>
   <td>
 
+   `inherit pkgs src;`
+
+  </td>
+  <td>
+
+   Adds the variables to the current set (attrset or `let`). Desugars to `pkgs = pkgs; src = src;`
+
+  </td>
+ </tr>
+ <tr>
+  <td>
+
+   `inherit (pkgs) lib stdenv;`
+
+  </td>
+  <td>
+
+   Adds the attributes, from the variable in the brackets, to the current set (attrset or `let`). Desugars to `lib = pkgs.lib; stdenv = pkgs.stdenv;`
+
+  </td>
+ </tr>
+ <tr>
+  <td>
+
    *Functions (lambdas)*
 
   </td>
