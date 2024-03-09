@@ -120,8 +120,17 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         }
 
         else {
-            state->forceValueDeep(*v);
-            logger->cout("%s", ValuePrinter(*state, *v, PrintOptions { .force = true }));
+            logger->cout(
+                "%s",
+                ValuePrinter(
+                    *state,
+                    *v,
+                    PrintOptions {
+                        .force = true,
+                        .derivationPaths = true
+                    }
+                )
+            );
         }
     }
 };
