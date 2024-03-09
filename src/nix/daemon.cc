@@ -57,10 +57,10 @@ struct AuthorizationSettings : Config {
     Setting<Strings> trustedUsers{
         this, {"root"}, "trusted-users",
         R"(
-          A list of user names, separated by whitespace.
+          A list of user names and/or numeric UIDs, separated by whitespace.
           These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned [NARs](@docroot@/glossary.md#gloss-nar).
 
-          You can also specify groups by prefixing names with `@`.
+          You can also specify group names and/or numeric GIDs by prefixing names with `@`.
           For instance, `@wheel` means all users in the `wheel` group.
 
           > **Warning**
@@ -75,7 +75,7 @@ struct AuthorizationSettings : Config {
     Setting<Strings> allowedUsers{
         this, {"*"}, "allowed-users",
         R"(
-          A list user names, separated by whitespace.
+          A list user names and/or numeric UIDs, separated by whitespace.
           These users are allowed to connect to the Nix daemon.
 
           You can specify groups by prefixing names with `@`.
@@ -140,7 +140,7 @@ static void setSigChldAction(bool autoReap)
  *
  * @param group Group the user might be a member of.
  */
-static bool matchUser(std::string_view user, const struct group & gr)
+static bool isUserInGroup(std::string_view user, const struct group & gr)
 {
     for (char * * mem = gr.gr_mem; *mem; mem++)
         if (user == std::string_view(*mem)) return true;
@@ -162,21 +162,43 @@ static bool matchUser(std::string_view user, const struct group & gr)
  *
  * Otherwise: No.
  */
-static bool matchUser(const std::string & user, const std::string & group, const Strings & users)
+static bool matchUser(std::optional<uid_t> uid, std::optional<gid_t> gid, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;
 
-    if (find(users.begin(), users.end(), user) != users.end())
+    if (!uid)
+        return false;
+
+    if (find(users.begin(), users.end(), std::to_string(uid.value())) != users.end())
         return true;
 
-    for (auto & i : users)
-        if (i.substr(0, 1) == "@") {
-            if (group == i.substr(1)) return true;
-            struct group * gr = getgrnam(i.c_str() + 1);
-            if (!gr) continue;
-            if (matchUser(user, *gr)) return true;
+    auto pw = getpwuid(uid.value());
+
+    if (pw) {
+        if (find(users.begin(), users.end(), pw->pw_name) != users.end())
+            return true;
+
+        if (gid) {
+            auto gr = getgrgid(gid.value());
+
+            /* Don't allow connecting as the build users group. */
+            if (gr && gr->gr_name == settings.buildUsersGroup)
+                return false;
+
+            for (auto & i : users)
+                if (i.substr(0, 1) == "@") {
+                    /* Check if the client's primary group matches. */
+                    if (gr && gr->gr_name == i.substr(1)) return true;
+                    if (std::to_string(gid.value()) == i.substr(1)) return true;
+                    /* Otherwise, check if the client's uid is a
+                       member of this group. */
+                    auto gr2 = getgrnam(i.c_str() + 1);
+                    if (!gr2) continue;
+                    if (isUserInGroup(pw->pw_name, *gr2)) return true;
+                }
         }
+    }
 
     return false;
 }
@@ -184,12 +206,9 @@ static bool matchUser(const std::string & user, const std::string & group, const
 
 struct PeerInfo
 {
-    bool pidKnown;
-    pid_t pid;
-    bool uidKnown;
-    uid_t uid;
-    bool gidKnown;
-    gid_t gid;
+    std::optional<pid_t> pid;
+    std::optional<uid_t> uid;
+    std::optional<gid_t> gid;
 };
 
 
@@ -198,7 +217,7 @@ struct PeerInfo
  */
 static PeerInfo getPeerInfo(int remote)
 {
-    PeerInfo peer = { false, 0, false, 0, false, 0 };
+    PeerInfo peer;
 
 #if defined(SO_PEERCRED)
 
@@ -206,7 +225,7 @@ static PeerInfo getPeerInfo(int remote)
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = { true, cred.pid, true, cred.uid, true, cred.gid };
+    peer = { .pid = cred.pid, .uid = cred.uid, .gid = cred.gid };
 
 #elif defined(LOCAL_PEERCRED)
 
@@ -218,7 +237,7 @@ static PeerInfo getPeerInfo(int remote)
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = { false, 0, true, cred.cr_uid, false, 0 };
+    peer = { .uid = cred.cr_uid };
 
 #endif
 
@@ -255,22 +274,16 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
 {
     TrustedFlag trusted = NotTrusted;
 
-    struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
-    std::string user = pw ? pw->pw_name : std::to_string(peer.uid);
+    auto pw = peer.uid ? getpwuid(peer.uid.value()) : nullptr;
+    std::string userName = pw ? pw->pw_name : peer.uid ? std::to_string(peer.uid.value()) : "unknown";
 
-    struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
-    std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
-
-    const Strings & trustedUsers = authorizationSettings.trustedUsers;
-    const Strings & allowedUsers = authorizationSettings.allowedUsers;
-
-    if (matchUser(user, group, trustedUsers))
+    if (matchUser(peer.uid, peer.gid, authorizationSettings.trustedUsers))
         trusted = Trusted;
 
-    if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
-        throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
+    if ((!trusted && !matchUser(peer.uid, peer.gid, authorizationSettings.allowedUsers)))
+        throw Error("user '%1%' is not allowed to connect to the Nix daemon", userName);
 
-    return { trusted, std::move(user) };
+    return { trusted, userName };
 }
 
 
@@ -325,7 +338,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 
             closeOnExec(remote.get());
 
-            PeerInfo peer { .pidKnown = false };
+            PeerInfo peer;
             TrustedFlag trusted;
             std::string user;
 
@@ -339,8 +352,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
             };
 
             printInfo((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
-                peer.pidKnown ? std::to_string(peer.pid) : "<unknown>",
-                peer.uidKnown ? user : "<unknown>");
+                peer.pid ? std::to_string(peer.pid.value()) : "<unknown>",
+                peer.uid ? user : "<unknown>");
 
             //  Fork a child to handle the connection.
             ProcessOptions options;
@@ -359,8 +372,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 setSigChldAction(false);
 
                 //  For debugging, stuff the pid into argv[1].
-                if (peer.pidKnown && savedArgv[1]) {
-                    auto processName = std::to_string(peer.pid);
+                if (peer.pid && savedArgv[1]) {
+                    auto processName = std::to_string(peer.pid.value());
                     strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
                 }
 
