@@ -23,7 +23,7 @@ struct EvalSettings : Config
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath).
+          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtin-constants.md#builtins-findFile).
 
           The default value is
 
