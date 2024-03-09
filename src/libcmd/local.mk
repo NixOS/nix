@@ -13,3 +13,5 @@ libcmd_LDFLAGS = $(EDITLINE_LIBS) $(LOWDOWN_LIBS) $(THREAD_LDFLAGS)
 libcmd_LIBS = libstore libutil libexpr libmain libfetchers
 
 $(eval $(call install-file-in, $(buildprefix)$(d)/nix-cmd.pc, $(libdir)/pkgconfig, 0644))
+
+$(d)/repl.cc: $(d)/repl-init-files.nix.gen.hh
