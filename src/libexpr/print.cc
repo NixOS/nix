@@ -496,7 +496,12 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_RED;
-        output << "«error: " << filterANSIEscapes(e.info().msg.str(), true) << "»";
+        auto message = filterANSIEscapes(e.info().msg.str(), true);
+        auto newline = message.find('\n');
+        if (newline != std::string::npos) {
+            message = message.substr(0, newline);
+        }
+        output << "«error: " << message << "»";
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
