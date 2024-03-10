@@ -481,6 +481,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
 struct Matcher
 {
+    virtual ~Matcher() { }
     virtual std::string getTitle() = 0;
     virtual bool matches(const std::string & name, const ProfileElement & element) = 0;
 };
