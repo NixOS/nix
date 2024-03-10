@@ -240,7 +240,7 @@ public:
 
     template<class T, typename... Args>
     [[nodiscard, gnu::noinline]]
-    EvalErrorBuilder<T> & error(const Args & ... args) {
+    EvalErrorBuilder<T> & error(Args && ... args) {
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
         return *new EvalErrorBuilder<T>(*this, args...);
     }
@@ -689,7 +689,7 @@ public:
      * Realise the given context, and return a mapping from the placeholders
      * used to construct the associated value to their final store path
      */
-    [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
+    [[nodiscard]] StringMap realiseContext(Value & v, const NixStringContext & context);
 
     /* Call the binary path filter predicate used builtins.path etc. */
     bool callPathFilter(

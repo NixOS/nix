@@ -605,6 +605,9 @@ string_t AttrCursor::getStringWithContext()
                         [&](const NixStringContextElem::Opaque & o) -> const StorePath & {
                             return o.path;
                         },
+                        [&](const NixStringContextElem::Poison & p) -> const StorePath & {
+                            root->state.error<PoisonContextError>().debugThrow();
+                        },
                     }, c.raw);
                     if (!root->state.store->isValidPath(path)) {
                         valid = false;

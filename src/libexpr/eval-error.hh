@@ -4,6 +4,8 @@
 
 #include "error.hh"
 #include "pos-idx.hh"
+#include "print-options.hh"
+#include "print.hh"
 
 namespace nix {
 
@@ -56,6 +58,19 @@ public:
     }
 };
 
+struct PoisonContextError : public EvalError
+{
+public:
+    Value & value;
+    PoisonContextError(EvalState & state, Value & value)
+        : EvalError(state, "Value contains 'poison' context that may not be built or included in derivations: %1%", ValuePrinter(state, value, errorPrintOptions))
+        , value(value)
+    {
+    }
+
+    PoisonContextError(EvalState & state);
+};
+
 /**
  * `EvalErrorBuilder`s may only be constructed by `EvalState`. The `debugThrow`
  * method must be the final method in any such `EvalErrorBuilder` usage, and it
@@ -67,7 +82,7 @@ class EvalErrorBuilder final
     friend class EvalState;
 
     template<typename... Args>
-    explicit EvalErrorBuilder(EvalState & state, const Args &... args)
+    explicit EvalErrorBuilder(EvalState & state, Args &&... args)
         : error(T(state, args...))
     {
     }

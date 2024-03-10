@@ -69,7 +69,8 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
         throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expectedType);
 
     if (type == "app") {
-        auto [program, context] = cursor->getAttr("program")->getStringWithContext();
+        auto attr = cursor->getAttr("program");
+        auto [program, context] = attr->getStringWithContext();
 
         std::vector<DerivedPath> context2;
         for (auto & c : context) {
@@ -91,6 +92,9 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                     return DerivedPath::Opaque {
                         .path = o.path,
                     };
+                },
+                [&](const NixStringContextElem::Poison & p) -> DerivedPath {
+                    state.error<PoisonContextError>(attr->getValue()).debugThrow();
                 },
             }, c.raw));
         }

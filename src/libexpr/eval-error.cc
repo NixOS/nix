@@ -1,5 +1,6 @@
 #include "eval-error.hh"
 #include "eval.hh"
+#include "print.hh"
 #include "value.hh"
 
 namespace nix {
@@ -101,5 +102,12 @@ template class EvalErrorBuilder<MissingArgumentError>;
 template class EvalErrorBuilder<InfiniteRecursionError>;
 template class EvalErrorBuilder<CachedEvalError>;
 template class EvalErrorBuilder<InvalidPathError>;
+template class EvalErrorBuilder<PoisonContextError>;
+
+PoisonContextError::PoisonContextError(EvalState & state)
+    : EvalError(state, "Found 'poison' context that may not be built or included in derivations")
+    , value(*state.allocValue())
+{
+}
 
 }

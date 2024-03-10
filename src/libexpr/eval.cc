@@ -2473,6 +2473,9 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
         [&](NixStringContextElem::Built && b) -> SingleDerivedPath {
             return std::move(b);
         },
+        [&](NixStringContextElem::Poison && p) -> SingleDerivedPath {
+            error<PoisonContextError>(v).debugThrow();
+        },
     }, ((NixStringContextElem &&) *context.begin()).raw);
     return {
         std::move(derivedPath),

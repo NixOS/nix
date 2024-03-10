@@ -127,6 +127,9 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                 /* Reuse original item because we want this to be idempotent. */
                 return std::move(c);
             },
+            [&](const NixStringContextElem::Poison & p) -> NixStringContextElem::DrvDeep {
+                state.error<PoisonContextError>(*args[0]).debugThrow();
+            },
         }, context.begin()->raw) }),
     };
 
@@ -178,20 +181,23 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
     };
     NixStringContext context;
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.getContext");
-    auto contextInfos = std::map<StorePath, ContextInfo>();
+    auto contextInfos = std::map<std::string, ContextInfo>();
     for (auto && i : context) {
         std::visit(overloaded {
             [&](NixStringContextElem::DrvDeep && d) {
-                contextInfos[std::move(d.drvPath)].allOutputs = true;
+                contextInfos[state.store->printStorePath(d.drvPath)].allOutputs = true;
             },
             [&](NixStringContextElem::Built && b) {
                 // FIXME should eventually show string context as is, no
                 // resolving here.
                 auto drvPath = resolveDerivedPath(*state.store, *b.drvPath);
-                contextInfos[std::move(drvPath)].outputs.emplace_back(std::move(b.output));
+                contextInfos[state.store->printStorePath(drvPath)].outputs.emplace_back(std::move(b.output));
             },
             [&](NixStringContextElem::Opaque && o) {
-                contextInfos[std::move(o.path)].path = true;
+                contextInfos[state.store->printStorePath(o.path)].path = true;
+            },
+            [&](NixStringContextElem::Poison && p) {
+                contextInfos["poison"] = {};
             },
         }, ((NixStringContextElem &&) i).raw);
     }
@@ -212,7 +218,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             for (const auto & [i, output] : enumerate(info.second.outputs))
                 (outputsVal.listElems()[i] = state.allocValue())->mkString(output);
         }
-        attrs.alloc(state.store->printStorePath(info.first)).mkAttrs(infoAttrs);
+        attrs.alloc(info.first).mkAttrs(infoAttrs);
     }
 
     v.mkAttrs(attrs);
@@ -239,6 +245,11 @@ static RegisterPrimOp primop_getContext({
       ```
       { "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = { outputs = [ "out" ]; }; }
       ```
+
+      There also exists a special "poison" context added by functions like
+      [`builtins.toStringDebug`](#builtins-toStringDebug) which will prevent
+      the string from being included in derivations. If the poison context is
+      present, an attribute named `poison` will be present in the output.
     )",
     .fun = prim_getContext
 });

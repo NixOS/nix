@@ -39,7 +39,7 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
-StringMap EvalState::realiseContext(const NixStringContext & context)
+StringMap EvalState::realiseContext(Value & v, const NixStringContext & context)
 {
     std::vector<DerivedPath::Built> drvs;
     StringMap res;
@@ -67,6 +67,9 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                 auto ctxS = store->printStorePath(d.drvPath);
                 res.insert_or_assign(ctxS, ctxS);
                 ensureValid(d.drvPath);
+            },
+            [&](const NixStringContextElem::Poison & p) {
+                error<PoisonContextError>(v).debugThrow();
             },
         }, c.raw);
     }
@@ -123,7 +126,7 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, st
 
     try {
         if (!context.empty() && path.accessor == state.rootFS) {
-            auto rewrites = state.realiseContext(context);
+            auto rewrites = state.realiseContext(v, context);
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
             path = {path.accessor, CanonPath(realPath)};
         }
@@ -375,7 +378,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                         false, false).toOwned());
     }
     try {
-        auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
+        auto _ = state.realiseContext(v, context); // FIXME: Handle CA derivations
     } catch (InvalidPathError & e) {
         state.error<EvalError>("cannot execute '%1%', since path '%2%' is not valid", program, e.path).atPos(pos).debugThrow();
     }
@@ -1040,7 +1043,7 @@ static void prim_second(EvalState & state, const PosIdx pos, Value * * args, Val
  * Derivations
  *************************************************************/
 
-static void derivationStrictInternal(EvalState & state, const std::string & name, Bindings * attrs, Value & v);
+static void derivationStrictInternal(EvalState & state, const std::string & name, Bindings * attrs, Value & input, Value & v);
 
 /* Construct (as a unobservable side effect) a Nix derivation
    expression that performs the derivation described by the argument
@@ -1067,7 +1070,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 
     try {
-        derivationStrictInternal(state, drvName, attrs, v);
+        derivationStrictInternal(state, drvName, attrs, *args[0], v);
     } catch (Error & e) {
         Pos pos = state.positions[nameAttr->pos];
         /*
@@ -1096,7 +1099,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
 }
 
 static void derivationStrictInternal(EvalState & state, const std::string &
-drvName, Bindings * attrs, Value & v)
+drvName, Bindings * attrs, Value & input, Value & v)
 {
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
@@ -1287,6 +1290,10 @@ drvName, Bindings * attrs, Value & v)
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
+            },
+            [&](const NixStringContextElem::Poison & p) {
+                state.error<PoisonContextError>(input)
+                    .debugThrow();
             },
         }, c.raw);
     }
@@ -1681,7 +1688,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
                 false, false).toOwned();
 
         try {
-            auto rewrites = state.realiseContext(context);
+            auto rewrites = state.realiseContext(*i->value, context);
             path = rewriteStrings(path, rewrites);
         } catch (InvalidPathError & e) {
             state.error<EvalError>(
@@ -2209,6 +2216,7 @@ static void addPath(
     const PosIdx pos,
     std::string_view name,
     SourcePath path,
+    Value & pathValue,
     Value * filterFun,
     FileIngestionMethod method,
     const std::optional<Hash> expectedHash,
@@ -2221,7 +2229,7 @@ static void addPath(
         if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
-            auto rewrites = state.realiseContext(context);
+            auto rewrites = state.realiseContext(pathValue, context);
             path = {state.rootFS, CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context))};
 
             try {
@@ -2279,7 +2287,18 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+    addPath(
+        state,
+        pos,
+        path.baseName(),
+        path,
+        *args[1],
+        args[0],
+        FileIngestionMethod::Recursive,
+        std::nullopt,
+        v,
+        context
+    );
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2339,7 +2358,7 @@ static RegisterPrimOp primop_filterSource({
 
 static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    std::optional<SourcePath> path;
+    std::optional<std::pair<SourcePath, Value &>> path;
     std::string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
@@ -2350,9 +2369,12 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
 
     for (auto & attr : *args[0]->attrs) {
         auto n = state.symbols[attr.name];
-        if (n == "path")
-            path.emplace(state.coerceToPath(attr.pos, *attr.value, context, "while evaluating the 'path' attribute passed to 'builtins.path'"));
-        else if (attr.name == state.sName)
+        if (n == "path") {
+            *path = std::pair(
+                state.coerceToPath(attr.pos, *attr.value, context, "while evaluating the 'path' attribute passed to 'builtins.path'"),
+                *attr.value
+            );
+        } else if (attr.name == state.sName)
             name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.path");
         else if (n == "filter")
             state.forceFunction(*(filterFun = attr.value), attr.pos, "while evaluating the `filter` parameter passed to builtins.path");
@@ -2371,9 +2393,20 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             "missing required 'path' attribute in the first argument to builtins.path"
         ).atPos(pos).debugThrow();
     if (name.empty())
-        name = path->baseName();
+        name = path->first.baseName();
 
-    addPath(state, pos, name, *path, filterFun, method, expectedHash, v, context);
+    addPath(
+        state,
+        pos,
+        name,
+        path->first,
+        path->second,
+        filterFun,
+        method,
+        expectedHash,
+        v,
+        context
+    );
 }
 
 static RegisterPrimOp primop_path({

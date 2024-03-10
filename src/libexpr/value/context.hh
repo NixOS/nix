@@ -54,10 +54,25 @@ struct NixStringContextElem {
      */
     using Built = SingleDerivedPath::Built;
 
+    /**
+     * "Poison pill" output that is rejected by `builtins.derivation`.
+     *
+     * Used to ensure the implementation of functions like
+     * `builtins.toStringDebug` do not get hashed into derivations.
+     *
+     * Encoded as ‘%poison’.
+     */
+    struct Poison {
+        bool operator ==(const Poison & other) const { return true; }
+        bool operator <(const Poison & other) const { return false; }
+        bool operator >(const Poison & other) const { return false; }
+    };
+
     using Raw = std::variant<
         Opaque,
         DrvDeep,
-        Built
+        Built,
+        Poison
     >;
 
     Raw raw;
@@ -71,6 +86,7 @@ struct NixStringContextElem {
      * - ‘<path>’
      * - ‘=<path>’
      * - ‘!<name>!<path>’
+     * - ‘%poison’
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */

@@ -82,8 +82,6 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 
     AttrKey getKey();
 
-    Value & getValue();
-
 public:
 
     AttrCursor(
@@ -129,6 +127,8 @@ public:
     std::vector<Symbol> getAttrs();
 
     bool isDerivation();
+
+    Value & getValue();
 
     Value & forceValue();
 
