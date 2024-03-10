@@ -26,10 +26,15 @@ expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext 
 expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello %" (throw "Foo")' | grepQuiet 'Hello %'
 
 nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
-  2>&1 | grepQuiet -E 'trace: { x = «potential infinite recursion»; }'
+  2>&1 | grepQuiet -F "trace: {
+  x = «potential infinite recursion»;
+}"
 
 nix-instantiate --eval -E 'let x = { repeating = x; tracing = builtins.trace x true; }; in x.tracing'\
-  2>&1 | grepQuiet -F 'trace: { repeating = «repeated»; tracing = «potential infinite recursion»; }'
+  2>&1 | grepQuiet -F "trace: {
+  repeating = «repeated»;
+  tracing = «potential infinite recursion»;
+}"
 
 set +x
 

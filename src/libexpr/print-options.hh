@@ -89,4 +89,21 @@ static PrintOptions errorPrintOptions = PrintOptions {
     .maxStringLength = 1024
 };
 
+/**
+ * `PrintOptions` for unknown and therefore potentially large values in
+ * debugging contexts, to avoid printing "too much" output.
+ *
+ * This is like `errorPrintOptions`, but prints more values.
+ */
+static PrintOptions debugPrintOptions = PrintOptions {
+    .ansiColors = true,
+    .force = true,
+    .derivationPaths = true,
+    .maxDepth = 15,
+    .maxAttrs = 32,
+    .maxListItems = 32,
+    .maxStringLength = 1024,
+    .prettyIndent = 2
+};
+
 }

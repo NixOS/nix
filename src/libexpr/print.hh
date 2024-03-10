@@ -62,6 +62,8 @@ std::ostream & printIdentifier(std::ostream & o, std::string_view s);
 
 void printValue(EvalState & state, std::ostream & str, Value & v, PrintOptions options = PrintOptions {});
 
+std::string printValue(EvalState & state, Value & v, PrintOptions options = PrintOptions {});
+
 /**
  * A partially-applied form of `printValue` which can be formatted using `<<`
  * without allocating an intermediate string.

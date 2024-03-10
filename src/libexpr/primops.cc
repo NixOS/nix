@@ -9,6 +9,7 @@
 #include "json-to-value.hh"
 #include "names.hh"
 #include "path-references.hh"
+#include "print-options.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "processes.hh"
@@ -1000,7 +1001,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
     if (args[0]->type() == nString)
         printError("trace: %1%", args[0]->string_view());
     else
-        printError("trace: %1%", ValuePrinter(state, *args[0]));
+        printError("trace: %1%", ValuePrinter(state, *args[0], debugPrintOptions));
     if (evalSettings.builtinsTraceDebugger && state.debugRepl && !state.debugTraces.empty()) {
         const DebugTrace & last = state.debugTraces.front();
         state.runDebugRepl(nullptr, last.env, last.expr);

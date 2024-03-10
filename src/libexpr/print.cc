@@ -592,9 +592,22 @@ public:
     }
 };
 
+/**
+ * Print the given value to `output`.
+ */
 void printValue(EvalState & state, std::ostream & output, Value & v, PrintOptions options)
 {
     Printer(output, state, options).print(v);
+}
+
+/**
+ * Print the given value to a new string.
+ */
+std::string printValue(EvalState & state, Value & v, PrintOptions options)
+{
+    std::ostringstream output;
+    printValue(state, output, v, options);
+    return output.str();
 }
 
 std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer)

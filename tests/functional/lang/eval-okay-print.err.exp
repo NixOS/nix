@@ -1,1 +1,3 @@
-trace: [ «thunk» ]
+trace: [
+  2
+]
