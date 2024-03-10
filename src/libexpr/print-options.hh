@@ -8,11 +8,21 @@
 
 namespace nix {
 
+struct Value;
+class EvalState;
+
 /**
  * Options for printing Nix values.
  */
 struct PrintOptions
 {
+    /**
+     * Construct `PrintOptions` from a Nix `Value`.
+     *
+     * See `builtins.toStringDebugOptions` for details on the format.
+     */
+    static PrintOptions fromValue(EvalState & state, Value & v);
+
     /**
      * If true, output ANSI color sequences.
      */
