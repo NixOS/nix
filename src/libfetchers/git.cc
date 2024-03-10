@@ -634,6 +634,8 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("url", resolved);
                 if (submodule.branch != "")
                     attrs.insert_or_assign("ref", submodule.branch);
+                else
+                    attrs.insert_or_assign("allRefs", Explicit<bool> { true });
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
