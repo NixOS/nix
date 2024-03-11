@@ -12,7 +12,36 @@ overrides:
 
 let
 
-  lockFile = builtins.fromJSON lockFileStr;
+  origLockFile = builtins.fromJSON lockFileStr;
+
+  # Build an optimized lock file by consolidating equivalent inputs.
+  lockFile =
+    let
+      nodeCacheKey = key: node:
+        let taint = if overrides ? ${key} then { taintedAs = key; } else {};
+        in builtins.toJSON (node.locked or {} // taint);
+
+      inputsCache = builtins.listToAttrs (builtins.attrValues
+        (builtins.mapAttrs
+          (key: node: { name = nodeCacheKey key node; value = key; })
+          origLockFile.nodes
+        )
+      );
+
+      resolveInputsFromCache = inputs:
+        builtins.mapAttrs
+          (inputName: inputSpec:
+            let resolvedInputName = resolveInput inputSpec;
+            in inputsCache.${nodeCacheKey resolvedInputName lockFile.nodes.${resolvedInputName}})
+          inputs;
+
+      nodes = builtins.mapAttrs
+        (key: node: node // {
+          inputs = resolveInputsFromCache (node.inputs or {});
+        })
+        origLockFile.nodes;
+    in
+    origLockFile // { inherit nodes; };
 
   # Resolve a input spec into a node name. An input spec is
   # either a node name, or a 'follows' path from the root
