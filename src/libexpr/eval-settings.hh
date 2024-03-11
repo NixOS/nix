@@ -138,7 +138,7 @@ struct EvalSettings : Config
           This is useful for debugging warnings in third-party Nix code.
         )"};
 
-    PathsSetting replInitFiles{this, Paths(), "repl-init-files",
+    PathsSetting replOverlays{this, Paths(), "repl-overlays",
         R"(
           A list of files containing Nix expressions that can be used to add
           default bindings to [`nix
@@ -153,10 +153,10 @@ struct EvalSettings : Config
              except that it's available in
              [`pure-eval`](@docroot@/command-ref/conf-file.html#conf-pure-eval)
              mode).
-          2. The top-level bindings produced by the previous `repl-init-files`
+          2. The top-level bindings produced by the previous `repl-overlays`
              value (or the default top-level bindings).
           3. The final top-level bindings produced by calling all
-             `repl-init-files`.
+             `repl-overlays`.
 
           For example, the following file would alias `pkgs` to
           `legacyPackages.${info.currentSystem}` (if that attribute is defined):

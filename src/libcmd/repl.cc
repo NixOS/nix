@@ -117,24 +117,24 @@ struct NixRepl
     void loadDebugTraceEnv(DebugTrace & dt);
 
     /**
-     * Load the `repl-init-files` and add the resulting AttrSet to the top-level
+     * Load the `repl-overlays` and add the resulting AttrSet to the top-level
      * bindings.
      */
-    void loadReplInitFiles();
+    void loadReplOverlays();
 
     /**
-     * Get a list of each of the `repl-init-files` (parsed and evaluated).
+     * Get a list of each of the `repl-overlays` (parsed and evaluated).
      */
-    Value * replInitFiles();
+    Value * replOverlays();
 
     /**
-     * Get the Nix function that composes the `repl-init-files` together.
+     * Get the Nix function that composes the `repl-overlays` together.
      */
-    Value * replInitFilesEvalFunction();
+    Value * replOverlaysEvalFunction();
 
     /**
      * Get the `info` AttrSet that's passed as the first argument to each
-     * of the `repl-init-files`.
+     * of the `repl-overlays`.
      */
     Value * replInitInfo();
 
@@ -921,20 +921,20 @@ void NixRepl::loadFiles()
         addAttrsToScope(*i);
     }
 
-    loadReplInitFiles();
+    loadReplOverlays();
 }
 
-void NixRepl::loadReplInitFiles()
+void NixRepl::loadReplOverlays()
 {
-    if (!evalSettings.replInitFiles) {
+    if (!evalSettings.replOverlays) {
         return;
     }
 
-    notice("Loading '%1%'...", Magenta("repl-init-files"));
-    auto replInitFilesFunction = replInitFilesEvalFunction();
+    notice("Loading '%1%'...", Magenta("repl-overlays"));
+    auto replInitFilesFunction = replOverlaysEvalFunction();
 
     Value &newAttrs(*state->allocValue());
-    SmallValueVector<3> args = {replInitInfo(), bindingsToAttrs(), replInitFiles()};
+    SmallValueVector<3> args = {replInitInfo(), bindingsToAttrs(), replOverlays()};
     state->callFunction(
         *replInitFilesFunction,
         args.size(),
@@ -946,13 +946,13 @@ void NixRepl::loadReplInitFiles()
     addAttrsToScope(newAttrs);
 }
 
-Value * NixRepl::replInitFilesEvalFunction()
+Value * NixRepl::replOverlaysEvalFunction()
 {
-    auto evalReplInitFilesPath = CanonPath("repl-init-files.nix");
+    auto evalReplInitFilesPath = CanonPath("repl-overlays.nix");
     if (!state->corepkgsFS->pathExists(evalReplInitFilesPath)) {
         state->corepkgsFS->addFile(
             evalReplInitFilesPath,
-            #include "repl-init-files.nix.gen.hh"
+            #include "repl-overlays.nix.gen.hh"
         );
     }
 
@@ -960,14 +960,14 @@ Value * NixRepl::replInitFilesEvalFunction()
     return evalFile(evalReplInitFilesSourcePath);
 }
 
-Value * NixRepl::replInitFiles()
+Value * NixRepl::replOverlays()
 {
     Value * replInits(state->allocValue());
-    state->mkList(*replInits, evalSettings.replInitFiles.get().size());
+    state->mkList(*replInits, evalSettings.replOverlays.get().size());
     Value ** replInitElems = replInits->listElems();
 
     size_t i = 0;
-    for (auto path : evalSettings.replInitFiles.get()) {
+    for (auto path : evalSettings.replOverlays.get()) {
         debug("Loading '%1%'...", path);
         SourcePath sourcePath(makeFSInputAccessor(), CanonPath(path));
         replInitElems[i] = evalFile(sourcePath);
