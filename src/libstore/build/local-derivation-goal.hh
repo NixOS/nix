@@ -3,6 +3,7 @@
 
 #include "derivation-goal.hh"
 #include "local-store.hh"
+#include "processes.hh"
 
 namespace nix {
 
@@ -86,8 +87,8 @@ struct LocalDerivationGoal : public DerivationGoal
             : source(source), optional(optional)
         { }
     };
-    typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
-    DirsInChroot dirsInChroot;
+    typedef map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+    PathsInChroot pathsInChroot;
 
     typedef map<std::string, std::string> Environment;
     Environment env;
@@ -105,7 +106,7 @@ struct LocalDerivationGoal : public DerivationGoal
     RedirectedOutputs redirectedOutputs;
 
     /**
-     * The outputs paths used during the build.
+     * The output paths used during the build.
      *
      * - Input-addressed derivations or fixed content-addressed outputs are
      *   sometimes built when some of their outputs already exist, and can not
@@ -119,14 +120,6 @@ struct LocalDerivationGoal : public DerivationGoal
      *   self-references.
      */
     OutputPathMap scratchOutputs;
-
-    /**
-     * Path registration info from the previous round, if we're
-     * building multiple times. Since this contains the hash, it
-     * allows us to compare whether two rounds produced the same
-     * result.
-     */
-    std::map<Path, ValidPathInfo> prevInfos;
 
     uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
     gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
@@ -272,8 +265,10 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /**
      * Forcibly kill the child process, if any.
+     *
+     * Called by destructor, can't be overridden
      */
-    void killChild() override;
+    void killChild() override final;
 
     /**
      * Kill any processes running under the build user UID or in the
@@ -295,7 +290,7 @@ struct LocalDerivationGoal : public DerivationGoal
      * @todo Add option to randomize, so we can audit whether our
      * rewrites caught everything
      */
-    StorePath makeFallbackPath(std::string_view outputName);
+    StorePath makeFallbackPath(OutputNameView outputName);
 };
 
 }

@@ -132,6 +132,8 @@ subcommands, these are `packages.`*system*,
 attributes `packages.x86_64-linux.hello`,
 `legacyPackages.x86_64-linux.hello` and `hello`.
 
+If *attrpath* begins with `.` then no prefixes or defaults are attempted. This allows the form *flakeref*[`#.`*attrpath*], such as `github:NixOS/nixpkgs#.lib.fakeSha256` to avoid a search of `packages.*system*.lib.fakeSha256`
+
 ### Store path
 
 Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`
@@ -233,7 +235,74 @@ operate are determined as follows:
 
 # Nix stores
 
-Most `nix` subcommands operate on a *Nix store*. These are documented
-in [`nix help-stores`](./nix3-help-stores.md).
+Most `nix` subcommands operate on a *Nix store*.
+The various store types are documented in the
+[Store Types](@docroot@/store/types/index.md)
+section of the manual.
+
+The same information is also available from the [`nix help-stores`](./nix3-help-stores.md) command.
+
+# Shebang interpreter
+
+The `nix` command can be used as a `#!` interpreter.
+Arguments to Nix can be passed on subsequent lines in the script.
+
+Verbatim strings may be passed in double backtick (```` `` ````) quotes. <!-- that's markdown for two backticks in inline code. -->
+Sequences of _n_ backticks of 3 or longer are parsed as _n-1_ literal backticks.
+A single space before the closing ```` `` ```` is ignored if present.
+
+`--file` and `--expr` resolve relative paths based on the script location.
+
+Examples:
+
+```
+#!/usr/bin/env nix
+#! nix shell --file ``<nixpkgs>`` hello cowsay --command bash
+
+hello | cowsay
+```
+
+or with **flakes**:
+
+```
+#!/usr/bin/env nix
+#! nix shell nixpkgs#bash nixpkgs#hello nixpkgs#cowsay --command bash
+
+hello | cowsay
+```
+
+or with an **expression**:
+
+```bash
+#! /usr/bin/env nix
+#! nix shell --impure --expr ``
+#! nix with (import (builtins.getFlake "nixpkgs") {});
+#! nix terraform.withPlugins (plugins: [ plugins.openstack ])
+#! nix ``
+#! nix --command bash
+
+terraform "$@"
+```
+
+or with cascading interpreters. Note that the `#! nix` lines don't need to follow after the first line, to accomodate other interpreters.
+
+```
+#!/usr/bin/env nix
+//! ```cargo
+//! [dependencies]
+//! time = "0.1.25"
+//! ```
+/*
+#!nix shell nixpkgs#rustc nixpkgs#rust-script nixpkgs#cargo --command rust-script
+*/
+fn main() {
+    for argument in std::env::args().skip(1) {
+        println!("{}", argument);
+    };
+    println!("{}", std::env::var("HOME").expect(""));
+    println!("{}", time::now().rfc822z());
+}
+// vim: ft=rust
+```
 
 )""

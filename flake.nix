@@ -1,16 +1,19 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
+  # TODO switch to nixos-23.11-small
+  #      https://nixpk.gs/pr-tracker.html?pr=291954
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
-  inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
   inputs.flake-schemas.url = "github:DeterminateSystems/flake-schemas";
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, flake-schemas }:
+  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, flake-schemas, ... }:
 
     let
       inherit (nixpkgs) lib;
+      inherit (lib) fileset;
 
       officialRelease = false;
 
@@ -20,13 +23,32 @@
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
+      linux32BitSystems = [ "i686-linux" ];
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
-      linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
+      linuxSystems = linux32BitSystems ++ linux64BitSystems;
+      darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
+      systems = linuxSystems ++ darwinSystems;
 
-      crossSystems = [ "armv6l-linux" "armv7l-linux" ];
+      crossSystems = [
+        "armv6l-unknown-linux-gnueabihf"
+        "armv7l-unknown-linux-gnueabihf"
+        "x86_64-unknown-netbsd"
+      ];
 
-      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
+      # Nix doesn't yet build on this platform, so we put it in a
+      # separate list. We just use this for `devShells` and
+      # `nixpkgsFor`, which this depends on.
+      shellCrossSystems = crossSystems ++ [
+        "x86_64-w64-mingw32"
+      ];
+
+      stdenvs = [
+        "ccacheStdenv"
+        "clangStdenv"
+        "gccStdenv"
+        "libcxxStdenv"
+        "stdenv"
+      ];
 
       forAllSystems = lib.genAttrs systems;
 
@@ -41,12 +63,18 @@
             })
             stdenvs);
 
-
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
         (system: let
           make-pkgs = crossSystem: stdenv: import nixpkgs {
-            inherit system crossSystem;
+            localSystem = {
+              inherit system;
+            };
+            crossSystem = if crossSystem == null then null else {
+              config = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
+              useLLVM = true;
+            };
             overlays = [
               (overlayFor (p: p.${stdenv}))
             ];
@@ -56,422 +84,115 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
-          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          cross = lib.genAttrs shellCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
-      commonDeps =
-        { pkgs
-        , isStatic ? pkgs.stdenv.hostPlatform.isStatic
-        }:
-        with pkgs; rec {
-        # Use "busybox-sandbox-shell" if present,
-        # if not (legacy) fallback and hope it's sufficient.
-        sh = pkgs.busybox-sandbox-shell or (busybox.override {
-          useMusl = true;
-          enableStatic = true;
-          enableMinimal = true;
-          extraConfig = ''
-            CONFIG_FEATURE_FANCY_ECHO y
-            CONFIG_FEATURE_SH_MATH y
-            CONFIG_FEATURE_SH_MATH_64 y
+      installScriptFor = tarballs:
+        nixpkgsFor.x86_64-linux.native.callPackage ./scripts/installer.nix {
+          inherit tarballs;
+        };
 
-            CONFIG_ASH y
-            CONFIG_ASH_OPTIMIZE_FOR_SIZE y
+      testNixVersions = pkgs: client: daemon:
+        pkgs.callPackage ./package.nix {
+          pname =
+            "nix-tests"
+            + lib.optionalString
+              (lib.versionAtLeast daemon.version "2.4pre20211005" &&
+               lib.versionAtLeast client.version "2.4pre20211005")
+              "-${client.version}-against-${daemon.version}";
 
-            CONFIG_ASH_ALIAS y
-            CONFIG_ASH_BASH_COMPAT y
-            CONFIG_ASH_CMDCMD y
-            CONFIG_ASH_ECHO y
-            CONFIG_ASH_GETOPTS y
-            CONFIG_ASH_INTERNAL_GLOB y
-            CONFIG_ASH_JOB_CONTROL y
-            CONFIG_ASH_PRINTF y
-            CONFIG_ASH_TEST y
-          '';
-        });
+          inherit fileset;
 
-        configureFlags =
-          lib.optionals stdenv.isLinux [
-            "--with-boost=${boost}/lib"
-            "--with-sandbox-shell=${sh}/bin/busybox"
-          ]
-          ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
-            "LDFLAGS=-fuse-ld=gold"
-          ];
+          test-client = client;
+          test-daemon = daemon;
 
-        testConfigureFlags = [
-          "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
-        ];
+          doBuild = false;
+        };
 
-        internalApiDocsConfigureFlags = [
-          "--enable-internal-api-docs"
-        ];
-
-        nativeBuildDeps =
-          [
-            buildPackages.bison
-            buildPackages.flex
-            (lib.getBin buildPackages.lowdown-nix)
-            buildPackages.mdbook
-            buildPackages.mdbook-linkcheck
-            buildPackages.autoconf-archive
-            buildPackages.autoreconfHook
-            buildPackages.pkg-config
-
-            # Tests
-            buildPackages.git
-            buildPackages.mercurial # FIXME: remove? only needed for tests
-            buildPackages.jq # Also for custom mdBook preprocessor.
-          ]
-          ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
-
-        buildDeps =
-          [ curl
-            bzip2 xz brotli editline
-            openssl sqlite
-            libarchive
-            boost
-            lowdown-nix
-          ]
-          ++ lib.optionals stdenv.isLinux [libseccomp]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-          ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
-
-        checkDeps = [
-          gtest
-          rapidcheck
-        ];
-
-        internalApiDocsDeps = [
-          buildPackages.doxygen
-        ];
-
-        awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
-          (aws-sdk-cpp.override {
-            apis = ["s3" "transfer"];
-            customMemoryManagement = false;
-          });
-
-        propagatedDeps =
-          [ ((boehmgc.override {
-              enableLargeConfig = true;
-            }).overrideAttrs(o: {
-              patches = (o.patches or []) ++ [
-                ./boehmgc-coroutine-sp-fallback.diff
-              ];
-            })
-            )
-            nlohmann_json
-          ];
+      binaryTarball = nix: pkgs: pkgs.callPackage ./scripts/binary-tarball.nix {
+        inherit nix;
       };
-
-      installScriptFor = systems:
-        with nixpkgsFor.x86_64-linux.native;
-        runCommand "installer-script"
-          { buildInputs = [ nix ];
-          }
-          ''
-            mkdir -p $out/nix-support
-
-            # Converts /nix/store/50p3qk8k...-nix-2.4pre20201102_550e11f/bin/nix to 50p3qk8k.../bin/nix.
-            tarballPath() {
-              # Remove the store prefix
-              local path=''${1#${builtins.storeDir}/}
-              # Get the path relative to the derivation root
-              local rest=''${path#*/}
-              # Get the derivation hash
-              local drvHash=''${path%%-*}
-              echo "$drvHash/$rest"
-            }
-
-            substitute ${./scripts/install.in} $out/install \
-              ${pkgs.lib.concatMapStrings
-                (system: let
-                    tarball = if builtins.elem system crossSystems then self.hydraJobs.binaryTarballCross.x86_64-linux.${system} else self.hydraJobs.binaryTarball.${system};
-                  in '' \
-                  --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
-                  --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
-                  ''
-                )
-                systems
-              } --replace '@nixVersion@' ${version}
-
-            echo "file installer $out/install" >> $out/nix-support/hydra-build-products
-          '';
-
-      testNixVersions = pkgs: client: daemon: with commonDeps { inherit pkgs; }; with pkgs.lib; pkgs.stdenv.mkDerivation {
-        NIX_DAEMON_PACKAGE = daemon;
-        NIX_CLIENT_PACKAGE = client;
-        name =
-          "nix-tests"
-          + optionalString
-            (versionAtLeast daemon.version "2.4pre20211005" &&
-             versionAtLeast client.version "2.4pre20211005")
-            "-${client.version}-against-${daemon.version}";
-        inherit version;
-
-        src = self;
-
-        VERSION_SUFFIX = versionSuffix;
-
-        nativeBuildInputs = nativeBuildDeps;
-        buildInputs = buildDeps ++ awsDeps ++ checkDeps;
-        propagatedBuildInputs = propagatedDeps;
-
-        enableParallelBuilding = true;
-
-        configureFlags = testConfigureFlags; # otherwise configure fails
-        dontBuild = true;
-        doInstallCheck = true;
-
-        installPhase = ''
-          mkdir -p $out
-        '';
-
-        installCheckPhase = "make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES";
-      };
-
-      binaryTarball = nix: pkgs:
-        let
-          inherit (pkgs) buildPackages;
-          inherit (pkgs) cacert;
-          installerClosureInfo = buildPackages.closureInfo { rootPaths = [ nix cacert ]; };
-        in
-
-        buildPackages.runCommand "nix-binary-tarball-${version}"
-          { #nativeBuildInputs = lib.optional (system != "aarch64-linux") shellcheck;
-            meta.description = "Distribution-independent Nix bootstrap binaries for ${pkgs.system}";
-          }
-          ''
-            cp ${installerClosureInfo}/registration $TMPDIR/reginfo
-            cp ${./scripts/create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-            substitute ${./scripts/install-nix-from-closure.sh} $TMPDIR/install \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-
-            substitute ${./scripts/install-darwin-multi-user.sh} $TMPDIR/install-darwin-multi-user.sh \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-            substitute ${./scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-            substitute ${./scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
-              --subst-var-by nix ${nix} \
-              --subst-var-by cacert ${cacert}
-
-            if type -p shellcheck; then
-              # SC1090: Don't worry about not being able to find
-              #         $nix/etc/profile.d/nix.sh
-              shellcheck --exclude SC1090 $TMPDIR/install
-              shellcheck $TMPDIR/create-darwin-volume.sh
-              shellcheck $TMPDIR/install-darwin-multi-user.sh
-              shellcheck $TMPDIR/install-systemd-multi-user.sh
-
-              # SC1091: Don't panic about not being able to source
-              #         /etc/profile
-              # SC2002: Ignore "useless cat" "error", when loading
-              #         .reginfo, as the cat is a much cleaner
-              #         implementation, even though it is "useless"
-              # SC2116: Allow ROOT_HOME=$(echo ~root) for resolving
-              #         root's home directory
-              shellcheck --external-sources \
-                --exclude SC1091,SC2002,SC2116 $TMPDIR/install-multi-user
-            fi
-
-            chmod +x $TMPDIR/install
-            chmod +x $TMPDIR/create-darwin-volume.sh
-            chmod +x $TMPDIR/install-darwin-multi-user.sh
-            chmod +x $TMPDIR/install-systemd-multi-user.sh
-            chmod +x $TMPDIR/install-multi-user
-            dir=nix-${version}-${pkgs.system}
-            fn=$out/$dir.tar.xz
-            mkdir -p $out/nix-support
-            echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
-            tar cvfJ $fn \
-              --owner=0 --group=0 --mode=u+rw,uga+r \
-              --mtime='1970-01-01' \
-              --absolute-names \
-              --hard-dereference \
-              --transform "s,$TMPDIR/install,$dir/install," \
-              --transform "s,$TMPDIR/create-darwin-volume.sh,$dir/create-darwin-volume.sh," \
-              --transform "s,$TMPDIR/reginfo,$dir/.reginfo," \
-              --transform "s,$NIX_STORE,$dir/store,S" \
-              $TMPDIR/install \
-              $TMPDIR/create-darwin-volume.sh \
-              $TMPDIR/install-darwin-multi-user.sh \
-              $TMPDIR/install-systemd-multi-user.sh \
-              $TMPDIR/install-multi-user \
-              $TMPDIR/reginfo \
-              $(cat ${installerClosureInfo}/store-paths)
-          '';
 
       overlayFor = getStdenv: final: prev:
-        let currentStdenv = getStdenv final; in
+        let
+          stdenv = getStdenv final;
+        in
         {
           nixStable = prev.nix;
 
-          # Forward from the previous stage as we don’t want it to pick the lowdown override
-          nixUnstable = prev.nixUnstable;
+          default-busybox-sandbox-shell = final.busybox.override {
+            useMusl = true;
+            enableStatic = true;
+            enableMinimal = true;
+            extraConfig = ''
+              CONFIG_FEATURE_FANCY_ECHO y
+              CONFIG_FEATURE_SH_MATH y
+              CONFIG_FEATURE_SH_MATH_64 y
 
-          nix =
-          with final;
-          with commonDeps {
-            inherit pkgs;
-            inherit (currentStdenv.hostPlatform) isStatic;
-          };
-          let
-            canRunInstalled = currentStdenv.buildPlatform.canExecute currentStdenv.hostPlatform;
+              CONFIG_ASH y
+              CONFIG_ASH_OPTIMIZE_FOR_SIZE y
 
-            sourceByRegexInverted = rxs: origSrc: final.lib.cleanSourceWith {
-              filter = (path: type:
-                let relPath = final.lib.removePrefix (toString origSrc + "/") (toString path);
-                in ! lib.any (re: builtins.match re relPath != null) rxs);
-              src = origSrc;
-            };
-          in currentStdenv.mkDerivation (finalAttrs: {
-            name = "nix-${version}";
-            inherit version;
-
-            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" ] self;
-            VERSION_SUFFIX = versionSuffix;
-
-            outputs = [ "out" "dev" "doc" ];
-
-            nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps
-              # There have been issues building these dependencies
-              ++ lib.optionals (currentStdenv.hostPlatform == currentStdenv.buildPlatform) awsDeps
-              ++ lib.optionals finalAttrs.doCheck checkDeps;
-
-            propagatedBuildInputs = propagatedDeps;
-
-            disallowedReferences = [ boost ];
-
-            preConfigure = lib.optionalString (! currentStdenv.hostPlatform.isStatic)
-              ''
-                # Copy libboost_context so we don't get all of Boost in our closure.
-                # https://github.com/NixOS/nixpkgs/issues/45462
-                mkdir -p $out/lib
-                cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
-                rm -f $out/lib/*.a
-                ${lib.optionalString currentStdenv.hostPlatform.isLinux ''
-                  chmod u+w $out/lib/*.so.*
-                  patchelf --set-rpath $out/lib:${currentStdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
-                ''}
-                ${lib.optionalString currentStdenv.hostPlatform.isDarwin ''
-                  for LIB in $out/lib/*.dylib; do
-                    chmod u+w $LIB
-                    install_name_tool -id $LIB $LIB
-                    install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
-                  done
-                  install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
-                ''}
-              '';
-
-            configureFlags = configureFlags ++
-              [ "--sysconfdir=/etc" ] ++
-              lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell" ++
-              [ (lib.enableFeature finalAttrs.doCheck "tests") ] ++
-              lib.optionals finalAttrs.doCheck testConfigureFlags ++
-              lib.optional (!canRunInstalled) "--disable-doc-gen";
-
-            enableParallelBuilding = true;
-
-            makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
-
-            doCheck = true;
-
-            installFlags = "sysconfdir=$(out)/etc";
-
-            postInstall = ''
-              mkdir -p $doc/nix-support
-              echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
-              ${lib.optionalString currentStdenv.hostPlatform.isStatic ''
-              mkdir -p $out/nix-support
-              echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
-              ''}
-              ${lib.optionalString currentStdenv.isDarwin ''
-              install_name_tool \
-                -change ${boost}/lib/libboost_context.dylib \
-                $out/lib/libboost_context.dylib \
-                $out/lib/libnixutil.dylib
-              ''}
+              CONFIG_ASH_ALIAS y
+              CONFIG_ASH_BASH_COMPAT y
+              CONFIG_ASH_CMDCMD y
+              CONFIG_ASH_ECHO y
+              CONFIG_ASH_GETOPTS y
+              CONFIG_ASH_INTERNAL_GLOB y
+              CONFIG_ASH_JOB_CONTROL y
+              CONFIG_ASH_PRINTF y
+              CONFIG_ASH_TEST y
             '';
+          };
 
-            doInstallCheck = finalAttrs.doCheck;
-            installCheckFlags = "sysconfdir=$(out)/etc";
-            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
-
-            separateDebugInfo = !currentStdenv.hostPlatform.isStatic;
-
-            strictDeps = true;
-
-            hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
-
-            passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
-              name = "nix-perl-${version}";
-
-              src = self;
-
-              nativeBuildInputs =
-                [ buildPackages.autoconf-archive
-                  buildPackages.autoreconfHook
-                  buildPackages.pkg-config
-                ];
-
-              buildInputs =
-                [ nix
-                  curl
-                  bzip2
-                  xz
-                  pkgs.perl
-                  boost
-                ]
-                ++ lib.optional (currentStdenv.isLinux || currentStdenv.isDarwin) libsodium
-                ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security;
-
-              configureFlags = [
-                "--with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}"
-                "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}"
-              ];
-
-              enableParallelBuilding = true;
-
-              postUnpack = "sourceRoot=$sourceRoot/perl";
-            });
-
-            meta.platforms = lib.platforms.unix;
+          libgit2-nix = final.libgit2.overrideAttrs (attrs: {
+            src = libgit2;
+            version = libgit2.lastModifiedDate;
+            cmakeFlags = attrs.cmakeFlags or []
+              ++ [ "-DUSE_SSH=exec" ];
           });
 
-          lowdown-nix = with final; currentStdenv.mkDerivation rec {
-            name = "lowdown-0.9.0";
+          boehmgc-nix = (final.boehmgc.override {
+            enableLargeConfig = true;
+          }).overrideAttrs(o: {
+            patches = (o.patches or []) ++ [
+              ./dep-patches/boehmgc-coroutine-sp-fallback.diff
 
-            src = lowdown-src;
+              # https://github.com/ivmai/bdwgc/pull/586
+              ./dep-patches/boehmgc-traceable_allocator-public.diff
+            ];
+          });
 
-            outputs = [ "out" "bin" "dev" ];
+          changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
 
-            nativeBuildInputs = [ buildPackages.which ];
+          nix =
+            let
+              officialRelease = false;
+              versionSuffix =
+                if officialRelease
+                then ""
+                else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
-            configurePhase = ''
-                ${if (currentStdenv.isDarwin && currentStdenv.isAarch64) then "echo \"HAVE_SANDBOX_INIT=false\" > configure.local" else ""}
-                ./configure \
-                  PREFIX=${placeholder "dev"} \
-                  BINDIR=${placeholder "bin"}/bin
-            '';
+            in final.callPackage ./package.nix {
+              inherit
+                fileset
+                stdenv
+                versionSuffix
+                ;
+              officialRelease = false;
+              boehmgc = final.boehmgc-nix;
+              libgit2 = final.libgit2-nix;
+              busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+            } // {
+              # this is a proper separate downstream package, but put
+              # here also for back compat reasons.
+              perl-bindings = final.nix-perl-bindings;
+            };
+
+          nix-perl-bindings = final.callPackage ./perl {
+            inherit fileset stdenv;
           };
-        };
 
-      nixos-lib = import (nixpkgs + "/nixos/lib") { };
-
-      # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
-      runNixOSTestFor = system: test: nixos-lib.runTest {
-        imports = [ test ];
-        hostPkgs = nixpkgsFor.${system}.native;
-        defaults = {
-          nixpkgs.pkgs = nixpkgsFor.${system}.native;
         };
-        _module.args.nixpkgs = nixpkgs;
-      };
 
     in {
       schemas = flake-schemas.schemas;
@@ -485,19 +206,32 @@
         # Binary package for various platforms.
         build = forAllSystems (system: self.packages.${system}.nix);
 
+        shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
+
         buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
 
         buildCross = forAllCrossSystems (crossSystem:
           lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
-        buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
+        buildNoGc = forAllSystems (system:
+          self.packages.${system}.nix.override { enableGC = false; }
+        );
 
         buildNoTests = forAllSystems (system:
-          self.packages.${system}.nix.overrideAttrs (a: {
-            doCheck =
-              assert ! a?dontCheck;
-              false;
-          })
+          self.packages.${system}.nix.override {
+            doCheck = false;
+            doInstallCheck = false;
+            installUnitTests = false;
+          }
+        );
+
+        # Toggles some settings for better coverage. Windows needs these
+        # library combinations, and Debian build Nix with GNU readline too.
+        buildReadlineNoMarkdown = forAllSystems (system:
+          self.packages.${system}.nix.override {
+            enableMarkdown = false;
+            readlineFlavor = "readline";
+          }
         );
 
         # Perl bindings for various platforms.
@@ -518,108 +252,71 @@
         # to https://nixos.org/nix/install. It downloads the binary
         # tarball for the user's system and calls the second half of the
         # installation script.
-        installerScript = installScriptFor [ "x86_64-linux" "i686-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" "armv6l-linux" "armv7l-linux" ];
-        installerScriptForGHA = installScriptFor [ "x86_64-linux" "x86_64-darwin" "armv6l-linux" "armv7l-linux"];
+        installerScript = installScriptFor [
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."i686-linux"
+          self.hydraJobs.binaryTarball."aarch64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          self.hydraJobs.binaryTarball."aarch64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+        ];
+        installerScriptForGHA = installScriptFor [
+          # Native
+          self.hydraJobs.binaryTarball."x86_64-linux"
+          self.hydraJobs.binaryTarball."x86_64-darwin"
+          # Cross
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+        ];
 
         # docker image with Nix inside
         dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
         # Line coverage analysis.
-        coverage =
-          with nixpkgsFor.x86_64-linux.native;
-          with commonDeps { inherit pkgs; };
-
-          releaseTools.coverageAnalysis {
-            name = "nix-coverage-${version}";
-
-            src = self;
-
-            configureFlags = testConfigureFlags;
-
-            enableParallelBuilding = true;
-
-            nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
-
-            dontInstall = false;
-
-            doInstallCheck = true;
-            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
-
-            lcovFilter = [ "*/boost/*" "*-tab.*" ];
-
-            hardeningDisable = ["fortify"];
-          };
+        coverage = nixpkgsFor.x86_64-linux.native.nix.override {
+          pname = "nix-coverage";
+          withCoverageChecks = true;
+        };
 
         # API docs for Nix's unstable internal C++ interfaces.
-        internal-api-docs =
-          with nixpkgsFor.x86_64-linux.native;
-          with commonDeps { inherit pkgs; };
-
-          stdenv.mkDerivation {
-            pname = "nix-internal-api-docs";
-            inherit version;
-
-            src = self;
-
-            configureFlags = testConfigureFlags ++ internalApiDocsConfigureFlags;
-
-            nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps ++ propagatedDeps
-              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
-
-            dontBuild = true;
-
-            installTargets = [ "internal-api-html" ];
-
-            postInstall = ''
-              mkdir -p $out/nix-support
-              echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> $out/nix-support/hydra-build-products
-            '';
-          };
+        internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+          inherit fileset;
+          doBuild = false;
+          enableInternalAPIDocs = true;
+        };
 
         # System tests.
-        tests.authorization = runNixOSTestFor "x86_64-linux" ./tests/nixos/authorization.nix;
+        tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
 
-        tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
+          # Make sure that nix-env still produces the exact same result
+          # on a particular version of Nixpkgs.
+          evalNixpkgs =
+            let
+              inherit (nixpkgsFor.x86_64-linux.native) runCommand nix;
+            in
+            runCommand "eval-nixos" { buildInputs = [ nix ]; }
+              ''
+                type -p nix-env
+                # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
+                (
+                  set -x
+                  time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+                  [[ $(sha1sum < packages | cut -c1-40) = e01b031fc9785a572a38be6bc473957e3b6faad7 ]]
+                )
+                mkdir $out
+              '';
 
-        tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
-
-        tests.nix-copy = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy.nix;
-
-        tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
-
-        tests.githubFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/github-flakes.nix;
-
-        tests.sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/sourcehut-flakes.nix;
-
-        tests.tarballFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/tarball-flakes.nix;
-
-        tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
-
-        tests.setuid = lib.genAttrs
-          ["i686-linux" "x86_64-linux"]
-          (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
-
-
-        # Make sure that nix-env still produces the exact same result
-        # on a particular version of Nixpkgs.
-        tests.evalNixpkgs =
-          with nixpkgsFor.x86_64-linux.native;
-          runCommand "eval-nixos" { buildInputs = [ nix ]; }
-            ''
-              type -p nix-env
-              # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
-              time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
-              [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
-              mkdir $out
-            '';
-
-        tests.nixpkgsLibTests =
-          forAllSystems (system:
-            import (nixpkgs + "/lib/tests/release.nix")
-              { pkgs = nixpkgsFor.${system}.native; }
-          );
+          nixpkgsLibTests =
+            forAllSystems (system:
+              import (nixpkgs + "/lib/tests/release.nix")
+                { pkgs = nixpkgsFor.${system}.native;
+                  nixVersions = [ self.packages.${system}.nix ];
+                }
+            );
+        };
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
           pkgs = nixpkgsFor.x86_64-linux.native;
@@ -649,15 +346,24 @@
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
-        perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
+        rl-next =
+          let pkgs = nixpkgsFor.${system}.native;
+          in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
+          LANG=C.UTF-8 ${pkgs.changelog-d-nix}/bin/changelog-d ${./doc/manual/rl-next} >$out
+        '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
+      } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
+        # Some perl dependencies are broken on i686-linux.
+        # Since the support is only best-effort there, disable the perl
+        # bindings
+        perlBindings = self.hydraJobs.perlBindings.${system};
       });
 
       packages = forAllSystems (system: rec {
-        inherit (nixpkgsFor.${system}.native) nix;
+        inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
         default = nix;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
@@ -689,36 +395,23 @@
           stdenvs)));
 
       devShells = let
-        makeShell = pkgs: stdenv:
-          with commonDeps { inherit pkgs; };
-          stdenv.mkDerivation {
-            name = "nix";
+        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs: {
+          installFlags = "sysconfdir=$(out)/etc";
+          shellHook = ''
+            PATH=$prefix/bin:$PATH
+            unset PYTHONPATH
+            export MANPATH=$out/share/man:$MANPATH
 
-            outputs = [ "out" "dev" "doc" ];
+            # Make bash completion work.
+            XDG_DATA_DIRS+=:$out/share
+          '';
 
-            nativeBuildInputs = nativeBuildDeps
-                                ++ (lib.optionals stdenv.cc.isClang [ pkgs.bear pkgs.clang-tools ]);
-
-            buildInputs = buildDeps ++ propagatedDeps
-              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
-
-            configureFlags = configureFlags
-              ++ testConfigureFlags ++ internalApiDocsConfigureFlags;
-
-            enableParallelBuilding = true;
-
-            installFlags = "sysconfdir=$(out)/etc";
-
-            shellHook =
-              ''
-                PATH=$prefix/bin:$PATH
-                unset PYTHONPATH
-                export MANPATH=$out/share/man:$MANPATH
-
-                # Make bash completion work.
-                XDG_DATA_DIRS+=:$out/share
-              '';
-          };
+          nativeBuildInputs = attrs.nativeBuildInputs or []
+            # TODO: Remove the darwin check once
+            # https://github.com/NixOS/nixpkgs/pull/291814 is available
+            ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
+            ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
+        });
         in
         forAllSystems (system:
           let
@@ -728,8 +421,9 @@
               (forAllStdenvs (stdenvName: makeShell pkgs pkgs.${stdenvName}));
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
-            (makeShells "static" nixpkgsFor.${system}.static) //
-            (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+            (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
+              (makeShells "static" nixpkgsFor.${system}.static)) //
+              (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }

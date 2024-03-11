@@ -3,7 +3,8 @@
 
 #include "types.hh"
 #include "config.hh"
-#include "util.hh"
+#include "environment-variables.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -116,10 +117,11 @@ public:
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
         R"(
-          The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
           to use for most operations.
-          See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md)
-          for supported store types and settings.
+          See the
+          [Store Types](@docroot@/store/types/index.md)
+          section of the manual for supported store types and settings.
         )"};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
@@ -142,20 +144,25 @@ public:
      */
     bool verboseBuild = true;
 
-    Setting<size_t> logLines{this, 10, "log-lines",
+    Setting<size_t> logLines{this, 25, "log-lines",
         "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
         this, 1, "max-jobs",
         R"(
-          This option defines the maximum number of jobs that Nix will try to
-          build in parallel. The default is `1`. The special value `auto`
-          causes Nix to use the number of CPUs in your system. `0` is useful
-          when using remote builders to prevent any local builds (except for
-          `preferLocalBuild` derivation attribute which executes locally
-          regardless). It can be overridden using the `--max-jobs` (`-j`)
-          command line switch.
+          Maximum number of jobs that Nix will try to build locally in parallel.
+
+          The special value `auto` causes Nix to use the number of CPUs in your system.
+          Use `0` to disable local builds and directly use the remote machines specified in [`builders`](#conf-builders).
+          This will not affect derivations that have [`preferLocalBuild = true`](@docroot@/language/advanced-attributes.md#adv-attr-preferLocalBuild), which are always built locally.
+
+          > **Note**
+          >
+          > The number of CPU cores to use for each build job is independently determined by the [`cores`](#conf-cores) setting.
+
+          <!-- TODO(@fricklerhandwerk): would be good to have those shorthands for common options as part of the specification -->
+          The setting can be overridden using the `--max-jobs` (`-j`) command line switch.
         )",
         {"build-max-jobs"}};
 
@@ -173,16 +180,25 @@ public:
         getDefaultCores(),
         "cores",
         R"(
-          Sets the value of the `NIX_BUILD_CORES` environment variable in the
-          invocation of builders. Builders can use this variable at their
-          discretion to control the maximum amount of parallelism. For
-          instance, in Nixpkgs, if the derivation attribute
-          `enableParallelBuilding` is set to `true`, the builder passes the
-          `-jN` flag to GNU Make. It can be overridden using the `--cores`
-          command line switch and defaults to `1`. The value `0` means that
-          the builder should use all available CPU cores in the system.
+          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
+          The `builder` executable can use this variable to control its own maximum amount of parallelism.
+
+          <!--
+          FIXME(@fricklerhandwerk): I don't think this should even be mentioned here.
+          A very generic example using `derivation` and `xargs` may be more appropriate to explain the mechanism.
+          Using `mkDerivation` as an example requires being aware of that there are multiple independent layers that are completely opaque here.
+          -->
+          For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it will pass the `-j${NIX_BUILD_CORES}` flag to GNU Make.
+
+          The value `0` means that the `builder` should use all available CPU cores in the system.
+
+          > **Note**
+          >
+          > The number of parallel local Nix build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
         )",
-        {"build-cores"}, false};
+        {"build-cores"},
+        // Don't document the machine-specific default value
+        false};
 
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
@@ -197,7 +213,7 @@ public:
           Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
-          The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
+          The following system types are widely used, as Nix is actively supported on these platforms:
 
           - `x86_64-linux`
           - `x86_64-darwin`
@@ -210,7 +226,11 @@ public:
           In general, you do not have to modify this setting.
           While you can force Nix to run a Darwin-specific `builder` executable on a Linux machine, the result would obviously be wrong.
 
-          This value is available in the Nix language as [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem).
+          This value is available in the Nix language as
+          [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+          if the
+          [`eval-system`](#conf-eval-system)
+          configuration option is set as the empty string.
         )"};
 
     Setting<time_t> maxSilentTime{
@@ -257,20 +277,135 @@ public:
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
         R"(
-          A semicolon-separated list of build machines.
-          For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
+          A semicolon- or newline-separated list of build machines.
+
+          In addition to the [usual ways of setting configuration options](@docroot@/command-ref/conf-file.md), the value can be read from a file by prefixing its absolute path with `@`.
+
+          > **Example**
+          >
+          > This is the default setting:
+          >
+          > ```
+          > builders = @/etc/nix/machines
+          > ```
+
+          Each machine specification consists of the following elements, separated by spaces.
+          Only the first element is required.
+          To leave a field at its default, set it to `-`.
+
+          1. The URI of the remote store in the format `ssh://[username@]hostname`.
+
+             > **Example**
+             >
+             > `ssh://nix@mac`
+
+             For backward compatibility, `ssh://` may be omitted.
+             The hostname may be an alias defined in `~/.ssh/config`.
+
+          2. A comma-separated list of [Nix system types](@docroot@/contributing/hacking.md#system-type).
+             If omitted, this defaults to the local platform type.
+
+             > **Example**
+             >
+             > `aarch64-darwin`
+
+             It is possible for a machine to support multiple platform types.
+
+             > **Example**
+             >
+             > `i686-linux,x86_64-linux`
+
+          3. The SSH identity file to be used to log in to the remote machine.
+             If omitted, SSH will use its regular identities.
+
+             > **Example**
+             >
+             > `/home/user/.ssh/id_mac`
+
+          4. The maximum number of builds that Nix will execute in parallel on the machine.
+             Typically this should be equal to the number of CPU cores.
+
+          5. The “speed factor”, indicating the relative speed of the machine as a positive integer.
+             If there are multiple machines of the right type, Nix will prefer the fastest, taking load into account.
+
+          6. A comma-separated list of supported [system features](#conf-system-features).
+
+             A machine will only be used to build a derivation if all the features in the derivation's [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute are supported by that machine.
+
+          7. A comma-separated list of required [system features](#conf-system-features).
+
+             A machine will only be used to build a derivation if all of the machine’s required features appear in the derivation’s [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute.
+
+          8. The (base64-encoded) public host key of the remote machine.
+             If omitted, SSH will use its regular `known_hosts` file.
+
+             The value for this field can be obtained via `base64 -w0`.
+
+          > **Example**
+          >
+          > Multiple builders specified on the command line:
+          >
+          > ```console
+          > --builders 'ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd'
+          > ```
+
+          > **Example**
+          >
+          > This specifies several machines that can perform `i686-linux` builds:
+          >
+          > ```
+          > nix@scratchy.labs.cs.uu.nl i686-linux /home/nix/.ssh/id_scratchy 8 1 kvm
+          > nix@itchy.labs.cs.uu.nl    i686-linux /home/nix/.ssh/id_scratchy 8 2
+          > nix@poochie.labs.cs.uu.nl  i686-linux /home/nix/.ssh/id_scratchy 1 2 kvm benchmark
+          > ```
+          >
+          > However, `poochie` will only build derivations that have the attribute
+          >
+          > ```nix
+          > requiredSystemFeatures = [ "benchmark" ];
+          > ```
+          >
+          > or
+          >
+          > ```nix
+          > requiredSystemFeatures = [ "benchmark" "kvm" ];
+          > ```
+          >
+          > `itchy` cannot do builds that require `kvm`, but `scratchy` does support such builds.
+          > For regular builds, `itchy` will be preferred over `scratchy` because it has a higher speed factor.
+
+          For Nix to use substituters, the calling user must be in the [`trusted-users`](#conf-trusted-users) list.
+
+          > **Note**
+          >
+          > A build machine must be accessible via SSH and have Nix installed.
+          > `nix` must be available in `$PATH` for the user connecting over SSH.
+
+          > **Warning**
+          >
+          > If you are building via the Nix daemon (default), the Nix daemon user account on the local machine (that is, `root`) requires access to a user account on the remote machine (not necessarily `root`).
+          >
+          > If you can’t or don’t want to configure `root` to be able to access the remote machine, set [`store`](#conf-store) to any [local store](@docroot@/store/types/local-store.html), e.g. by passing `--store /tmp` to the command on the local machine.
+
+          To build only on remote machines and disable local builds, set [`max-jobs`](#conf-max-jobs) to 0.
+
+          If you want the remote machines to use substituters, set [`builders-use-substitutes`](#conf-builders-use-substituters) to `true`.
+        )",
+        {}, false};
+
+    Setting<bool> alwaysAllowSubstitutes{
+        this, false, "always-allow-substitutes",
+        R"(
+          If set to `true`, Nix will ignore the [`allowSubstitutes`](@docroot@/language/advanced-attributes.md) attribute in derivations and always attempt to use [available substituters](#conf-substituters).
         )"};
 
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
         R"(
-          If set to `true`, Nix will instruct remote build machines to use
-          their own binary substitutes if available. In practical terms, this
-          means that remote hosts will fetch as many build dependencies as
-          possible from their own substitutes (e.g, from `cache.nixos.org`),
-          instead of waiting for this host to upload them all. This can
-          drastically reduce build times if the network connection between
-          this computer and the remote build host is slow.
+          If set to `true`, Nix will instruct [remote build machines](#conf-builders) to use their own [`substituters`](#conf-substituters) if available.
+
+          It means that remote build hosts will fetch as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
+          This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
     Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
@@ -343,7 +478,7 @@ public:
           users in `build-users-group`.
 
           UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
-        )"};
+        )", {}, true, Xp::AutoAllocateUids};
 
     Setting<uint32_t> startId{this,
         #if __linux__
@@ -554,7 +689,7 @@ public:
         R"(
           This option determines the maximum size of the `tmpfs` filesystem
           mounted on `/dev/shm` in Linux sandboxes. For the format, see the
-          description of the `size` option of `tmpfs` in mount8. The default
+          description of the `size` option of `tmpfs` in mount(8). The default
           is `50%`.
         )"};
 
@@ -620,11 +755,11 @@ public:
 
           At least one of the following condition must be met
           for Nix to accept copying a store object from another
-          Nix store (such as a substituter):
+          Nix store (such as a [substituter](#conf-substituters)):
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
+          - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
 
@@ -690,35 +825,66 @@ public:
 
           Build systems will usually detect the target platform to be the current physical system and therefore produce machine code incompatible with what may be intended in the derivation.
           You should design your derivation's `builder` accordingly and cross-check the results when using this option against natively-built versions of your derivation.
-        )", {}, false};
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
     Setting<StringSet> systemFeatures{
         this,
         getDefaultSystemFeatures(),
         "system-features",
         R"(
-          A set of system “features” supported by this machine, e.g. `kvm`.
-          Derivations can express a dependency on such features through the
-          derivation attribute `requiredSystemFeatures`. For example, the
-          attribute
+          A set of system “features” supported by this machine.
 
-              requiredSystemFeatures = [ "kvm" ];
+          This complements the [`system`](#conf-system) and [`extra-platforms`](#conf-extra-platforms) configuration options and the corresponding [`system`](@docroot@/language/derivations.md#attr-system) attribute on derivations.
 
-          ensures that the derivation can only be built on a machine with the
-          `kvm` feature.
+          A derivation can require system features in the [`requiredSystemFeatures` attribute](@docroot@/language/advanced-attributes.md#adv-attr-requiredSystemFeatures), and the machine to build the derivation must have them.
 
-          This setting by default includes `kvm` if `/dev/kvm` is accessible,
-          and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
-          that are used in Nixpkgs to route builds to specific machines.
-        )", {}, false};
+          System features are user-defined, but Nix sets the following defaults:
+
+          - `apple-virt`
+
+            Included on Darwin if virtualization is available.
+
+          - `kvm`
+
+            Included on Linux if `/dev/kvm` is accessible.
+
+          - `nixos-test`, `benchmark`, `big-parallel`
+
+            These historical pseudo-features are always enabled for backwards compatibility, as they are used in Nixpkgs to route Hydra builds to specific machines.
+
+          - `ca-derivations`
+
+            Included by default if the [`ca-derivations` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) is enabled.
+
+            This system feature is implicitly required by derivations with the [`__contentAddressed` attribute](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed).
+
+          - `recursive-nix`
+
+            Included by default if the [`recursive-nix` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-recursive-nix) is enabled.
+
+          - `uid-range`
+
+            On Linux, Nix can run builds in a user namespace where they run as root (UID 0) and have 65,536 UIDs available.
+            This is primarily useful for running containers such as `systemd-nspawn` inside a Nix build. For an example, see [`tests/systemd-nspawn/nix`][nspawn].
+
+            [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
+
+            Included by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 
     Setting<Strings> substituters{
         this,
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store]{@docroot@/glossary.md##gloss-store} from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
@@ -736,7 +902,7 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
-          A list of [Nix store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format), separated by whitespace.
+          A list of [Nix store URLs](@docroot@/store/types/index.md#store-url-format), separated by whitespace.
           These are not used by default, but users of the Nix daemon can enable them by specifying [`substituters`](#conf-substituters).
 
           Unprivileged users (those set in only [`allowed-users`](#conf-allowed-users) but not [`trusted-users`](#conf-trusted-users)) can pass as `substituters` only those URLs listed in `trusted-substituters`.
@@ -746,10 +912,17 @@ public:
     Setting<unsigned int> ttlNegativeNarInfoCache{
         this, 3600, "narinfo-cache-negative-ttl",
         R"(
-          The TTL in seconds for negative lookups. If a store path is queried
-          from a substituter but was not found, there will be a negative
-          lookup cached in the local disk cache database for the specified
-          duration.
+          The TTL in seconds for negative lookups.
+          If a store path is queried from a [substituter](#conf-substituters) but was not found, there will be a negative lookup cached in the local disk cache database for the specified duration.
+
+          Set to `0` to force updating the lookup cache.
+
+          To wipe the lookup cache completely:
+
+          ```shell-session
+          $ rm $HOME/.cache/nix/binary-cache-v*.sqlite*
+          # rm /root/.cache/nix/binary-cache-v*.sqlite*
+          ```
         )"};
 
     Setting<unsigned int> ttlPositiveNarInfoCache{
@@ -904,7 +1077,9 @@ public:
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
         )"};
+#endif
 
+#if HAVE_ACL_SUPPORT
     Setting<StringSet> ignoredAcls{
         this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(
@@ -919,8 +1094,8 @@ public:
         this, {}, "hashed-mirrors",
         R"(
           A list of web servers used by `builtins.fetchurl` to obtain files by
-          hash. Given a hash type *ht* and a base-16 hash *h*, Nix will try to
-          download the file from *hashed-mirror*/*ht*/*h*. This allows files to
+          hash. Given a hash algorithm *ha* and a base-16 hash *h*, Nix will try to
+          download the file from *hashed-mirror*/*ha*/*h*. This allows files to
           be downloaded even if they have disappeared from their original URI.
           For example, given an example mirror `http://tarballs.nixos.org/`,
           when building the derivation
@@ -1029,6 +1204,35 @@ public:
           mv $HOME/.nix-defexpr $nix_state_home/defexpr
           mv $HOME/.nix-channels $nix_state_home/channels
           ```
+        )"
+    };
+
+    Setting<StringMap> impureEnv {this, {}, "impure-env",
+        R"(
+          A list of items, each in the format of:
+
+          - `name=value`: Set environment variable `name` to `value`.
+
+          If the user is trusted (see `trusted-users` option), when building
+          a fixed-output derivation, environment variables set in this option
+          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md##adv-attr-impureEnvVars).
+
+          This option is useful for, e.g., setting `https_proxy` for
+          fixed-output derivations and in a multi-user Nix installation, or
+          setting private access tokens when fetching a private repository.
+        )",
+        {}, // aliases
+        true, // document default
+        Xp::ConfigurableImpureEnv
+    };
+
+    Setting<std::string> upgradeNixStorePathUrl{
+        this,
+        "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix",
+        "upgrade-nix-store-path-url",
+        R"(
+          Used by `nix upgrade-nix`, the URL of the file that contains the
+          store paths of the latest Nix release.
         )"
     };
 };

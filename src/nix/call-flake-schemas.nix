@@ -15,7 +15,7 @@ rec {
 
   # FIXME: make this configurable
   # FIXME: a pre-cached copy of the flake-schemas needs to be built in to the nix binary
-  defaultSchemas = (builtins.getFlake "github:DeterminateSystems/flake-schemas/3b4d5fef938f698c8737515532a1be53bf6355f2").schemas;
+  defaultSchemas = (builtins.getFlake "github:DeterminateSystems/flake-schemas/3b4d5fef938f698c8737515532a1be53bf6355f2?narHash=sha256-TBmeIZHYzqKTaTe8YFgTimVBGLzkoUgZfkDMkZBZyfo%3D").schemas;
 
   schemaOverrides = {}; # FIXME
 

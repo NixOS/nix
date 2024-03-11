@@ -1,0 +1,177 @@
+#!/usr/bin/env nix
+#!nix shell .#changelog-d-nix --command bash
+
+# --- CONFIGURATION ---
+
+# This does double duty for
+# - including rl-next
+# - marking where to insert new links (right after)
+SUMMARY_MARKER_LINE='{{#include ./SUMMARY-rl-next.md}}'
+
+# --- LIB ---
+
+log() {
+  echo 1>&2 "release-notes:" "$@"
+}
+logcmd() {
+  local cmd="$1"
+  shift
+  logcmd2 "$cmd" "${*@Q}" "$cmd" "$@"
+}
+logcmd2() {
+  local fakecmd="$1"
+  local fakeargs="$2"
+  shift
+  shift
+  printf 1>&2 "release-notes: \033[34;1m$fakecmd\033[0m "
+  echo "$fakeargs" 1>&2
+  "$@"
+}
+die() {
+  # ANSI red
+  printf 1>&2 "release-notes: \033[31;1merror:\033[0m"
+  echo 1>&2 "" "$@"
+  exit 1
+}
+confirm() {
+  local answer
+  echo 1>&2 "$@" "[y/n]"
+  read -r answer
+  case "$answer" in
+    y|Y|yes|Yes|YES)
+      return 0
+      ;;
+    n|N|no|No|NO)
+      return 1
+      ;;
+    *)
+      echo 1>&2 "please answer y or n"
+      confirm "$@"
+      ;;
+  esac
+}
+report_done() {
+  logcmd2 "git" "show" git -c pager.show=false show
+  printf 1>&2 "release-notes: \033[32;1mdone\033[0m\n"
+}
+
+# --- PARSE ARGS ---
+
+if [[ $# -gt 0 ]]; then
+  die "Release notes takes no arguments, but make sure to set VERSION."
+fi
+
+# --- CHECKS ---
+
+if [[ ! -e flake.nix ]] || [[ ! -e .git ]]; then
+  die "must run in repo root"
+  exit 1
+fi
+
+# repo must be clean
+if ! git diff --quiet; then
+  die "repo is dirty, please commit or stash changes"
+fi
+
+if ! git diff --quiet --cached; then
+  die "repo has staged changes, please commit or stash them"
+fi
+
+if ! grep "$SUMMARY_MARKER_LINE" doc/manual/src/SUMMARY.md.in >/dev/null; then
+  # would have been nice to catch this early, but won't be worth the extra infra
+  die "SUMMARY.md.in is missing the marker line '$SUMMARY_MARKER_LINE', which would be used for inserting a new release notes page. Please fix the script."
+fi
+
+if [[ ! -n "${VERSION:-}" ]]; then
+  die "please set the VERSION environment variable before invoking this script"
+  exit 1
+fi
+
+# version_major_minor:      MAJOR.MINOR
+# version_full:             MAJOR.MINOR.PATCH
+# IS_PATCH:                 true if this is a patch release; append instead of create
+if grep -E '^[0-9]+\.[0-9]+$' <<< "$VERSION" >/dev/null; then
+  log 'is minor'
+  IS_PATCH=false
+  version_full="$VERSION.0"
+  version_major_minor="$VERSION"
+elif grep -E '^[0-9]+\.[0-9]+\.0$' <<< "$VERSION" >/dev/null; then
+  log 'is minor (.0)'
+  IS_PATCH=false
+  version_full="$VERSION"
+  version_major_minor="$(echo "$VERSION" | sed -e 's/\.0$//')"
+elif grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' <<< "$VERSION" >/dev/null; then
+  log 'is patch'
+  IS_PATCH=true
+  version_full="$VERSION"
+  version_major_minor="$(echo "$VERSION" | sed -e 's/\.[0-9]*$//')"
+else
+  die "VERSION must be MAJOR.MINOR[.PATCH], where each is a number, e.g. 2.20 or 2.20.1 (VERSION was set to $VERSION)"
+fi
+
+unset VERSION
+
+log "version_major_minor=$version_major_minor"
+log "version_full=$version_full"
+log "IS_PATCH=$IS_PATCH"
+
+basename=rl-${version_major_minor}.md
+file=doc/manual/src/release-notes/$basename
+
+if ! $IS_PATCH; then
+  if [[ -e $file ]]; then
+    die "release notes file $file already exists. If you'd like to make a minor release, pass a patch version, e.g. 2.20.1"
+  fi
+fi
+
+# --- DEFAULTS ---
+
+if [[ ! -n "${DATE:-}" ]]; then
+  DATE="$(date +%Y-%m-%d)"
+  log "DATE not set, using $DATE"
+fi
+
+case "$DATE" in
+  [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9])
+    ;;
+  *)
+    die "DATE must be YYYY-MM-DD, e.g. 2021-12-31 (DATE was set to $DATE)"
+    ;;
+esac
+
+# --- DO THE WORK ---
+
+# menu
+title="Release $version_major_minor ($DATE)"
+# section on page
+section_title="Release $version_full ($DATE)"
+
+(
+  # TODO add minor number, and append?
+  echo "# $section_title"
+  echo
+  changelog-d doc/manual/rl-next | sed -e 's/ *$//'
+) | tee -a $file
+
+log "Wrote $file"
+
+if ! $IS_PATCH; then
+  NEW_SUMMARY_LINE="  - [$title](release-notes/$basename)"
+
+  # find the marker line, insert new link after it
+  escaped_marker="$(echo "$SUMMARY_MARKER_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
+  escaped_line="$(echo "$NEW_SUMMARY_LINE" | sed -e 's/\//\\\//g' -e 's/ /\\ /g')"
+  logcmd sed -i -e "/$escaped_marker/a $escaped_line" doc/manual/src/SUMMARY.md.in
+fi
+
+for f in doc/manual/rl-next/*.md; do
+  if [[ config != "$(basename $f)" ]]; then
+    logcmd git rm $f
+  fi
+done
+
+logcmd git add $file doc/manual/src/SUMMARY.md.in
+logcmd git status
+logcmd git commit -m "release notes: $version_full"
+
+report_done

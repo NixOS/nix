@@ -1,6 +1,5 @@
 #include "command.hh"
 #include "store-api.hh"
-#include "fs-accessor.hh"
 #include "nar-accessor.hh"
 #include "common-args.hh"
 #include <nlohmann/json.hpp>
@@ -39,61 +38,58 @@ struct MixLs : virtual Args, MixJSON
         });
     }
 
-    void listText(ref<FSAccessor> accessor)
+    void listText(ref<SourceAccessor> accessor)
     {
-        std::function<void(const FSAccessor::Stat &, const Path &, const std::string &, bool)> doPath;
+        std::function<void(const SourceAccessor::Stat &, const CanonPath &, std::string_view, bool)> doPath;
 
-        auto showFile = [&](const Path & curPath, const std::string & relPath) {
+        auto showFile = [&](const CanonPath & curPath, std::string_view relPath) {
             if (verbose) {
-                auto st = accessor->stat(curPath);
+                auto st = accessor->lstat(curPath);
                 std::string tp =
-                    st.type == FSAccessor::Type::tRegular ?
+                    st.type == SourceAccessor::Type::tRegular ?
                         (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--") :
-                    st.type == FSAccessor::Type::tSymlink ? "lrwxrwxrwx" :
+                    st.type == SourceAccessor::Type::tSymlink ? "lrwxrwxrwx" :
                     "dr-xr-xr-x";
-                auto line = fmt("%s %20d %s", tp, st.fileSize, relPath);
-                if (st.type == FSAccessor::Type::tSymlink)
+                auto line = fmt("%s %20d %s", tp, st.fileSize.value_or(0), relPath);
+                if (st.type == SourceAccessor::Type::tSymlink)
                     line += " -> " + accessor->readLink(curPath);
                 logger->cout(line);
-                if (recursive && st.type == FSAccessor::Type::tDirectory)
+                if (recursive && st.type == SourceAccessor::Type::tDirectory)
                     doPath(st, curPath, relPath, false);
             } else {
                 logger->cout(relPath);
                 if (recursive) {
-                    auto st = accessor->stat(curPath);
-                    if (st.type == FSAccessor::Type::tDirectory)
+                    auto st = accessor->lstat(curPath);
+                    if (st.type == SourceAccessor::Type::tDirectory)
                         doPath(st, curPath, relPath, false);
                 }
             }
         };
 
-        doPath = [&](const FSAccessor::Stat & st, const Path & curPath,
-            const std::string & relPath, bool showDirectory)
+        doPath = [&](const SourceAccessor::Stat & st, const CanonPath & curPath,
+            std::string_view relPath, bool showDirectory)
         {
-            if (st.type == FSAccessor::Type::tDirectory && !showDirectory) {
+            if (st.type == SourceAccessor::Type::tDirectory && !showDirectory) {
                 auto names = accessor->readDirectory(curPath);
-                for (auto & name : names)
-                    showFile(curPath + "/" + name, relPath + "/" + name);
+                for (auto & [name, type] : names)
+                    showFile(curPath / name, relPath + "/" + name);
             } else
                 showFile(curPath, relPath);
         };
 
-        auto st = accessor->stat(path);
-        if (st.type == FSAccessor::Type::tMissing)
-            throw Error("path '%1%' does not exist", path);
-        doPath(st, path,
-            st.type == FSAccessor::Type::tDirectory ? "." : std::string(baseNameOf(path)),
+        auto path2 = CanonPath(path);
+        auto st = accessor->lstat(path2);
+        doPath(st, path2,
+            st.type == SourceAccessor::Type::tDirectory ? "." : path2.baseName().value_or(""),
             showDirectory);
     }
 
-    void list(ref<FSAccessor> accessor)
+    void list(ref<SourceAccessor> accessor)
     {
-        if (path == "/") path = "";
-
         if (json) {
             if (showDirectory)
                 throw UsageError("'--directory' is useless with '--json'");
-            logger->cout("%s", listNar(accessor, path, recursive));
+            logger->cout("%s", listNar(accessor, CanonPath(path), recursive));
         } else
             listText(accessor);
     }

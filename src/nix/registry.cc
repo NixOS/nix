@@ -175,8 +175,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
             .label = "locked",
             .optional = true,
             .handler = {&locked},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(getStore(), prefix);
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(completions, getStore(), prefix);
             }}
         });
     }
@@ -188,7 +188,9 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         auto ref = parseFlakeRef(url);
         auto lockedRef = parseFlakeRef(locked);
         registry->remove(ref.input);
-        auto [tree, resolved] = lockedRef.resolve(store).input.fetch(store);
+        auto resolved = lockedRef.resolve(store).input.getAccessor(store).second;
+        if (!resolved.isLocked())
+            warn("flake '%s' is not locked", resolved.to_string());
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
         registry->add(ref.input, resolved, extraAttrs);
@@ -196,10 +198,12 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     }
 };
 
-struct CmdRegistry : virtual NixMultiCommand
+struct CmdRegistry : NixMultiCommand
 {
     CmdRegistry()
-        : MultiCommand({
+        : NixMultiCommand(
+            "registry",
+            {
                 {"list", []() { return make_ref<CmdRegistryList>(); }},
                 {"add", []() { return make_ref<CmdRegistryAdd>(); }},
                 {"remove", []() { return make_ref<CmdRegistryRemove>(); }},
@@ -221,14 +225,6 @@ struct CmdRegistry : virtual NixMultiCommand
     }
 
     Category category() override { return catSecondary; }
-
-    void run() override
-    {
-        experimentalFeatureSettings.require(Xp::Flakes);
-        if (!command)
-            throw UsageError("'nix registry' requires a sub-command.");
-        command->second->run();
-    }
 };
 
 static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");

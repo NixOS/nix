@@ -1,236 +1,303 @@
 # Glossary
 
-  - [derivation]{#gloss-derivation}\
-    A description of a build task. The result of a derivation is a
-    store object. Derivations are typically specified in Nix expressions
-    using the [`derivation` primitive](./language/derivations.md). These are
-    translated into low-level *store derivations* (implicitly by
-    `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
+- [derivation]{#gloss-derivation}
 
-    [derivation]: #gloss-derivation
+  A description of a build task. The result of a derivation is a
+  store object. Derivations declared in Nix expressions are specified
+  using the [`derivation` primitive](./language/derivations.md). These are
+  translated into low-level *store derivations* (implicitly by
+  `nix-build`, or explicitly by `nix-instantiate`).
 
-  - [store derivation]{#gloss-store-derivation}\
-    A [derivation] represented as a `.drv` file in the [store].
-    It has a [store path], like any [store object].
+  [derivation]: #gloss-derivation
 
-    Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
+- [store derivation]{#gloss-store-derivation}
 
-    See [`nix derivation show`](./command-ref/new-cli/nix3-derivation-show.md) (experimental) for displaying the contents of store derivations.
+  A [derivation] represented as a `.drv` file in the [store].
+  It has a [store path], like any [store object].
+  It is the [instantiated][instantiate] form of a derivation.
 
-    [store derivation]: #gloss-store-derivation
+  Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
 
-  - [instantiate]{#gloss-instantiate}, instantiation\
-    Translate a [derivation] into a [store derivation].
+  See [`nix derivation show`](./command-ref/new-cli/nix3-derivation-show.md) (experimental) for displaying the contents of store derivations.
 
-    See [`nix-instantiate`](./command-ref/nix-instantiate.md).
+  [store derivation]: #gloss-store-derivation
 
-    [instantiate]: #gloss-instantiate
+- [instantiate]{#gloss-instantiate}, instantiation
 
-  - [realise]{#gloss-realise}, realisation\
-    Ensure a [store path] is [valid][validity].
+  Save an evaluated [derivation] as a [store derivation] in the Nix [store].
 
-    This means either running the `builder` executable as specified in the corresponding [derivation] or fetching a pre-built [store object] from a [substituter].
+  See [`nix-instantiate`](./command-ref/nix-instantiate.md), which produces a store derivation from a Nix expression that evaluates to a derivation.
 
-    See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md).
+  [instantiate]: #gloss-instantiate
 
-    See [`nix build`](./command-ref/new-cli/nix3-build.md) (experimental).
+- [realise]{#gloss-realise}, realisation
 
-    [realise]: #gloss-realise
+  Ensure a [store path] is [valid][validity].
 
-  - [content-addressed derivation]{#gloss-content-addressed-derivation}\
-    A derivation which has the
-    [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
-    attribute set to `true`.
+  This can be achieved by:
+  - Fetching a pre-built [store object] from a [substituter]
+  - Running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [derivation]
+  - Delegating to a [remote machine](@docroot@/command-ref/conf-file.md#conf-builders) and retrieving the outputs
+  <!-- TODO: link [running] to build process page, #8888 -->
 
-  - [fixed-output derivation]{#gloss-fixed-output-derivation}\
-    A derivation which includes the
-    [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
+  See [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md) for a detailed description of the algorithm.
 
-  - [store]{#gloss-store}\
-    The location in the file system where store objects live. Typically
-    `/nix/store`.
+  See also [`nix-build`](./command-ref/nix-build.md) and [`nix build`](./command-ref/new-cli/nix3-build.md) (experimental).
 
-    From   the  perspective   of   the  location   where  Nix   is
-    invoked, the  Nix store can be  referred to
-    as a "_local_" or a "_remote_" one:
+  [realise]: #gloss-realise
 
-    + A [local store]{#gloss-local-store} exists on the filesystem of
-      the machine where Nix is  invoked. You can use other
-      local stores  by passing  the `--store` flag  to the
-      `nix` command.  Local stores can be used for building derivations.
+- [content-addressed derivation]{#gloss-content-addressed-derivation}
 
-    + A  *remote store*  exists  anywhere  other than  the
-      local  filesystem. One  example is  the `/nix/store`
-      directory on another machine,  accessed via `ssh` or
-      served by the `nix-serve` Perl script.
+  A derivation which has the
+  [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
+  attribute set to `true`.
 
-    [store]: #gloss-store
-    [local store]: #gloss-local-store
+- [fixed-output derivation]{#gloss-fixed-output-derivation}
 
-  - [chroot store]{#gloss-chroot-store}\
-    A [local store] whose canonical path is anything other than `/nix/store`.
+  A derivation which includes the
+  [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
 
-  - [binary cache]{#gloss-binary-cache}\
-    A *binary cache* is a Nix store which uses a different format: its
-    metadata and signatures are kept in `.narinfo` files rather than in a
-    [Nix database]. This different format simplifies serving store objects
-    over the network, but cannot host builds. Examples of binary caches
-    include S3 buckets and the [NixOS binary cache](https://cache.nixos.org).
+- [store]{#gloss-store}
 
-  - [store path]{#gloss-store-path}\
-    The location of a [store object] in the file system, i.e., an
-    immediate child of the Nix store directory.
+  A collection of [store objects][store object], with operations to manipulate that collection.
+  See [Nix Store](./store/index.md) for details.
 
-    Example: `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+  There are many types of stores, see [Store Types](./store/types/index.md) for details.
 
-    [store path]: #gloss-store-path
+  [store]: #gloss-store
 
-  - [file system object]{#gloss-store-object}\
-    The Nix data model for representing simplified file system data.
+- [binary cache]{#gloss-binary-cache}
 
-    See [File System Object](@docroot@/architecture/file-system-object.md) for details.
+  A *binary cache* is a Nix store which uses a different format: its
+  metadata and signatures are kept in `.narinfo` files rather than in a
+  [Nix database]. This different format simplifies serving store objects
+  over the network, but cannot host builds. Examples of binary caches
+  include S3 buckets and the [NixOS binary cache](https://cache.nixos.org).
 
-    [file system object]: #gloss-file-system-object
+- [store path]{#gloss-store-path}
 
-  - [store object]{#gloss-store-object}\
+  The location of a [store object] in the file system, i.e., an immediate child of the Nix store directory.
 
-    A store object consists of a [file system object], [reference]s to other store objects, and other metadata.
-    It can be referred to by a [store path].
+  > **Example**
+  >
+  > `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
 
-    [store object]: #gloss-store-object
+  See [Store Path](@docroot@/store/store-path.md) for details.
 
-  - [input-addressed store object]{#gloss-input-addressed-store-object}\
-    A store object produced by building a
-    non-[content-addressed](#gloss-content-addressed-derivation),
-    non-[fixed-output](#gloss-fixed-output-derivation)
-    derivation.
+  [store path]: #gloss-store-path
 
-  - [output-addressed store object]{#gloss-output-addressed-store-object}\
-    A [store object] whose [store path] is determined by its contents.
-    This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
+- [file system object]{#gloss-file-system-object}
 
-  - [substitute]{#gloss-substitute}\
-    A substitute is a command invocation stored in the [Nix database] that
-    describes how to build a store object, bypassing the normal build
-    mechanism (i.e., derivations). Typically, the substitute builds the
-    store object by downloading a pre-built version of the store object
-    from some server.
+  The Nix data model for representing simplified file system data.
 
-  - [substituter]{#gloss-substituter}\
-    An additional [store]{#gloss-store} from which Nix can obtain store objects instead of building them.
-    Often the substituter is a [binary cache](#gloss-binary-cache), but any store can serve as substituter.
+  See [File System Object](@docroot@/store/file-system-object.md) for details.
 
-    See the [`substituters` configuration option](./command-ref/conf-file.md#conf-substituters) for details.
+  [file system object]: #gloss-file-system-object
 
-    [substituter]: #gloss-substituter
+- [store object]{#gloss-store-object}
 
-  - [purity]{#gloss-purity}\
-    The assumption that equal Nix derivations when run always produce
-    the same output. This cannot be guaranteed in general (e.g., a
-    builder can rely on external inputs such as the network or the
-    system time) but the Nix model assumes it.
+  Part of the contents of a [store].
 
-  - [Nix database]{#gloss-nix-database}\
-    An SQlite database to track [reference]s between [store object]s.
-    This is an implementation detail of the [local store].
+  A store object consists of a [file system object], [references][reference] to other store objects, and other metadata.
+  It can be referred to by a [store path].
 
-    Default location: `/nix/var/nix/db`.
+  See [Store Object](@docroot@/store/index.md#store-object) for details.
 
-    [Nix database]: #gloss-nix-database
+  [store object]: #gloss-store-object
 
-  - [Nix expression]{#gloss-nix-expression}\
-    A high-level description of software packages and compositions
+- [IFD]{#gloss-ifd}
+
+  [Import From Derivation](./language/import-from-derivation.md)
+
+- [input-addressed store object]{#gloss-input-addressed-store-object}
+
+  A store object produced by building a
+  non-[content-addressed](#gloss-content-addressed-derivation),
+  non-[fixed-output](#gloss-fixed-output-derivation)
+  derivation.
+
+- [content-addressed store object]{#gloss-content-addressed-store-object}
+
+  A [store object] whose [store path] is determined by its contents.
+  This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
+
+- [substitute]{#gloss-substitute}
+
+  A substitute is a command invocation stored in the [Nix database] that
+  describes how to build a store object, bypassing the normal build
+  mechanism (i.e., derivations). Typically, the substitute builds the
+  store object by downloading a pre-built version of the store object
+  from some server.
+
+- [substituter]{#gloss-substituter}
+
+  An additional [store]{#gloss-store} from which Nix can obtain store objects instead of building them.
+  Often the substituter is a [binary cache](#gloss-binary-cache), but any store can serve as substituter.
+
+  See the [`substituters` configuration option](./command-ref/conf-file.md#conf-substituters) for details.
+
+  [substituter]: #gloss-substituter
+
+- [purity]{#gloss-purity}
+
+  The assumption that equal Nix derivations when run always produce
+  the same output. This cannot be guaranteed in general (e.g., a
+  builder can rely on external inputs such as the network or the
+  system time) but the Nix model assumes it.
+
+- [impure derivation]{#gloss-impure-derivation}
+
+  [An experimental feature](#@docroot@/contributing/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
+  so that they are always rebuilt, and their outputs not reused by subsequent calls to realise them.
+
+- [Nix database]{#gloss-nix-database}
+
+  An SQlite database to track [reference]s between [store object]s.
+  This is an implementation detail of the [local store].
+
+  Default location: `/nix/var/nix/db`.
+
+  [Nix database]: #gloss-nix-database
+
+- [Nix expression]{#gloss-nix-expression}
+
+  1. Commonly, a high-level description of software packages and compositions
     thereof. Deploying software using Nix entails writing Nix
-    expressions for your packages. Nix expressions are translated to
-    derivations that are stored in the Nix store. These derivations can
-    then be built.
+    expressions for your packages. Nix expressions specify [derivations][derivation],
+    which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
+    These derivations can then be [realised][realise] to produce [outputs][output].
 
-  - [reference]{#gloss-reference}\
-    A [store object] `O` is said to have a *reference* to a store object `P` if a [store path] to `P` appears in the contents of `O`.
+  2. A syntactically valid use of the [Nix language]. For example, the contents of a `.nix` file form an expression.
 
-    Store objects can refer to both other store objects and themselves.
-    References from a store object to itself are called *self-references*.
-    References other than a self-reference must not form a cycle.
+- [reference]{#gloss-reference}
 
-    [reference]: #gloss-reference
+  A [store object] `O` is said to have a *reference* to a store object `P` if a [store path] to `P` appears in the contents of `O`.
 
-  - [reachable]{#gloss-reachable}\
-    A store path `Q` is reachable from another store path `P` if `Q`
-    is in the *closure* of the *references* relation.
+  Store objects can refer to both other store objects and themselves.
+  References from a store object to itself are called *self-references*.
+  References other than a self-reference must not form a cycle.
 
-  - [closure]{#gloss-closure}\
-    The closure of a store path is the set of store paths that are
-    directly or indirectly “reachable” from that store path; that is,
-    it’s the closure of the path under the *references* relation. For
-    a package, the closure of its derivation is equivalent to the
-    build-time dependencies, while the closure of its output path is
-    equivalent to its runtime dependencies. For correct deployment it
-    is necessary to deploy whole closures, since otherwise at runtime
-    files could be missing. The command `nix-store --query --requisites ` prints out
-    closures of store paths.
+  [reference]: #gloss-reference
 
-    As an example, if the [store object] at path `P` contains a [reference]
-    to a store object at path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
-    references `R` then `R` is also in the closure of `P`.
+- [reachable]{#gloss-reachable}
 
-    [closure]: #gloss-closure
+  A store path `Q` is reachable from another store path `P` if `Q`
+  is in the *closure* of the *references* relation.
 
-  - [output path]{#gloss-output-path}\
-    A [store path] produced by a [derivation].
+- [closure]{#gloss-closure}
 
-    [output path]: #gloss-output-path
+  The closure of a store path is the set of store paths that are
+  directly or indirectly “reachable” from that store path; that is,
+  it’s the closure of the path under the *references* relation. For
+  a package, the closure of its derivation is equivalent to the
+  build-time dependencies, while the closure of its output path is
+  equivalent to its runtime dependencies. For correct deployment it
+  is necessary to deploy whole closures, since otherwise at runtime
+  files could be missing. The command `nix-store --query --requisites ` prints out
+  closures of store paths.
 
-  - [deriver]{#gloss-deriver}\
-    The [store derivation] that produced an [output path].
+  As an example, if the [store object] at path `P` contains a [reference]
+  to a store object at path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
+  references `R` then `R` is also in the closure of `P`.
 
-  - [validity]{#gloss-validity}\
-    A store path is valid if all [store object]s in its [closure] can be read from the [store].
+  [closure]: #gloss-closure
 
-    For a [local store], this means:
-    - The store path leads to an existing [store object] in that [store].
-    - The store path is listed in the [Nix database] as being valid.
-    - All paths in the store path's [closure] are valid.
+- [output]{#gloss-output}
 
-    [validity]: #gloss-validity
+  A [store object] produced by a [derivation].
+  See [the `outputs` argument to the `derivation` function](@docroot@/language/derivations.md#attr-outputs) for details.
 
-  - [user environment]{#gloss-user-env}\
-    An automatically generated store object that consists of a set of
-    symlinks to “active” applications, i.e., other store paths. These
-    are generated automatically by
-    [`nix-env`](./command-ref/nix-env.md). See *profiles*.
+  [output]: #gloss-output
 
-  - [profile]{#gloss-profile}\
-    A symlink to the current *user environment* of a user, e.g.,
-    `/nix/var/nix/profiles/default`.
+- [output path]{#gloss-output-path}
 
-  - [installable]{#gloss-installable}\
-    Something that can be realised in the Nix store.
+  The [store path] to the [output] of a [derivation].
 
-    See [installables](./command-ref/new-cli/nix.md#installables) for [`nix` commands](./command-ref/new-cli/nix.md) (experimental) for details.
+  [output path]: #gloss-output-path
 
-  - [NAR]{#gloss-nar}\
-    A *N*ix *AR*chive. This is a serialisation of a path in the Nix
-    store. It can contain regular files, directories and symbolic
-    links.  NARs are generated and unpacked using `nix-store --dump`
-    and `nix-store --restore`.
+- [deriver]{#gloss-deriver}
 
-  - [`∅`]{#gloss-emtpy-set}\
-    The empty set symbol. In the context of profile history, this denotes a package is not present in a particular version of the profile.
+  The [store derivation] that produced an [output path].
 
-  - [`ε`]{#gloss-epsilon}\
-    The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
+  The deriver for an output path can be queried with the `--deriver` option to
+  [`nix-store --query`](@docroot@/command-ref/nix-store/query.md).
 
-  - [string interpolation]{#gloss-string-interpolation}\
-    Expanding expressions enclosed in `${ }` within a [string], [path], or [attribute name].
+- [validity]{#gloss-validity}
 
-    See [String interpolation](./language/string-interpolation.md) for details.
+  A store path is valid if all [store object]s in its [closure] can be read from the [store].
 
-    [string]: ./language/values.md#type-string
-    [path]: ./language/values.md#type-path
-    [attribute name]: ./language/values.md#attribute-set
+  For a [local store], this means:
+  - The store path leads to an existing [store object] in that [store].
+  - The store path is listed in the [Nix database] as being valid.
+  - All paths in the store path's [closure] are valid.
 
-  - [experimental feature]{#gloss-experimental-feature}\
-    Not yet stabilized functionality guarded by named experimental feature flags.
-    These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
+  [validity]: #gloss-validity
+  [local store]: @docroot@/store/types/local-store.md
 
-    See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/contributing/experimental-features.md).
+- [user environment]{#gloss-user-env}
+
+  An automatically generated store object that consists of a set of
+  symlinks to “active” applications, i.e., other store paths. These
+  are generated automatically by
+  [`nix-env`](./command-ref/nix-env.md). See *profiles*.
+
+- [profile]{#gloss-profile}
+
+  A symlink to the current *user environment* of a user, e.g.,
+  `/nix/var/nix/profiles/default`.
+
+- [installable]{#gloss-installable}
+
+  Something that can be realised in the Nix store.
+
+  See [installables](./command-ref/new-cli/nix.md#installables) for [`nix` commands](./command-ref/new-cli/nix.md) (experimental) for details.
+
+- [NAR]{#gloss-nar}
+
+  A *N*ix *AR*chive. This is a serialisation of a path in the Nix
+  store. It can contain regular files, directories and symbolic
+  links.  NARs are generated and unpacked using `nix-store --dump`
+  and `nix-store --restore`.
+
+- [`∅`]{#gloss-emtpy-set}
+
+  The empty set symbol. In the context of profile history, this denotes a package is not present in a particular version of the profile.
+
+- [`ε`]{#gloss-epsilon}
+
+  The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
+
+- [package]{#package}
+
+  1. A software package; a collection of files and other data.
+
+  2. A [package attribute set].
+
+- [package attribute set]{#package-attribute-set}
+
+  An [attribute set](@docroot@/language/values.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
+  - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
+  - attributes that declare something about how the package is supposed to be installed or used,
+  - other metadata or arbitrary attributes.
+
+  [package attribute set]: #package-attribute-set
+
+- [string interpolation]{#gloss-string-interpolation}
+
+  Expanding expressions enclosed in `${ }` within a [string], [path], or [attribute name].
+
+  See [String interpolation](./language/string-interpolation.md) for details.
+
+  [string]: ./language/values.md#type-string
+  [path]: ./language/values.md#type-path
+  [attribute name]: ./language/values.md#attribute-set
+
+- [experimental feature]{#gloss-experimental-feature}
+
+  Not yet stabilized functionality guarded by named experimental feature flags.
+  These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
+
+  See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/contributing/experimental-features.md).
+
+
+[Nix language]: ./language/index.md

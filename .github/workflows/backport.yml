@@ -14,14 +14,14 @@ jobs:
     if: github.repository_owner == 'NixOS' && github.event.pull_request.merged == true && (github.event_name != 'labeled' || startsWith('backport', github.event.label.name))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           # required to find all branches
           fetch-depth: 0
       - name: Create backport PRs
         # should be kept in sync with `version`
-        uses: zeebe-io/backport-action@v1.3.1
+        uses: zeebe-io/backport-action@v2.4.1
         with:
           # Config README: https://github.com/zeebe-io/backport-action#backport-action
           github_token: ${{ secrets.GITHUB_TOKEN }}

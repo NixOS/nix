@@ -83,7 +83,8 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A multi-line string. Strips common prefixed whitespace. Evaluates to `"multi\n line\n  string"`.
+   <!-- FIXME: using two no-break spaces, because apparently mdBook swallows the second regular space! -->
+   A multi-line string. Strips common prefixed whitespace. Evaluates to `"multi\n line\n  string"`.
 
   </td>
  </tr>
@@ -428,6 +429,32 @@ This is an incomplete overview of language features, by example.
   <td>
 
    Add all attributes from the given set to the scope (evaluates to `1`)
+
+  </td>
+ </tr>
+ <tr>
+  <td>
+
+   `inherit pkgs src;`
+
+  </td>
+  <td>
+
+   Adds the variables to the current scope (attribute set or `let` binding).
+   Desugars to `pkgs = pkgs; src = src;`
+
+  </td>
+ </tr>
+ <tr>
+  <td>
+
+   `inherit (pkgs) lib stdenv;`
+
+  </td>
+  <td>
+
+   Adds the attributes, from the attribute set in parentheses, to the current scope (attribute set or `let` binding).
+   Desugars to `lib = pkgs.lib; stdenv = pkgs.stdenv;`
 
   </td>
  </tr>

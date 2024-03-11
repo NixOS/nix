@@ -8,7 +8,7 @@
 #include "derived-path.hh"
 #include <nlohmann/json_fwd.hpp>
 #include "comparator.hh"
-#include "crypto.hh"
+#include "signature/signer.hh"
 
 namespace nix {
 
@@ -34,12 +34,12 @@ struct DrvOutput {
     /**
      * The name of the output.
      */
-    std::string outputName;
+    OutputName outputName;
 
     std::string to_string() const;
 
     std::string strHash() const
-    { return drvHash.to_string(Base16, true); }
+    { return drvHash.to_string(HashFormat::Base16, true); }
 
     static DrvOutput parse(const std::string &);
 
@@ -64,7 +64,7 @@ struct Realisation {
     static Realisation fromJSON(const nlohmann::json& json, const std::string& whence);
 
     std::string fingerprint() const;
-    void sign(const SecretKey &);
+    void sign(const Signer &);
     bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
     size_t checkSignatures(const PublicKeys & publicKeys) const;
 
@@ -84,7 +84,7 @@ struct Realisation {
  * Since these are the outputs of a single derivation, we know the
  * output names are unique so we can use them as the map key.
  */
-typedef std::map<std::string, Realisation> SingleDrvOutputs;
+typedef std::map<OutputName, Realisation> SingleDrvOutputs;
 
 /**
  * Collection type for multiple derivations' outputs' `Realisation`s.
@@ -146,7 +146,7 @@ public:
     MissingRealisation(DrvOutput & outputId)
         : MissingRealisation(outputId.outputName, outputId.strHash())
     {}
-    MissingRealisation(std::string_view drv, std::string outputName)
+    MissingRealisation(std::string_view drv, OutputName outputName)
         : Error( "cannot operate on output '%s' of the "
                 "unbuilt derivation '%s'",
                 outputName,

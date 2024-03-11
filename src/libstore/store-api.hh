@@ -1,8 +1,6 @@
 #pragma once
 ///@file
 
-#include "nar-info.hh"
-#include "realisation.hh"
 #include "path.hh"
 #include "derived-path.hh"
 #include "hash.hh"
@@ -14,6 +12,8 @@
 #include "config.hh"
 #include "path-info.hh"
 #include "repair-flag.hh"
+#include "store-dir-config.hh"
+#include "source-path.hh"
 
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
@@ -30,7 +30,7 @@
 namespace nix {
 
 /**
- * About the class hierarchy of the store implementations:
+ * About the class hierarchy of the store types:
  *
  * Each store type `Foo` consists of two classes:
  *
@@ -64,13 +64,17 @@ MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
-MakeError(BadStorePath, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+struct Realisation;
+struct RealisedPath;
+struct DrvOutput;
+
 struct BasicDerivation;
 struct Derivation;
-class FSAccessor;
+
+struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
 
@@ -80,7 +84,6 @@ typedef std::map<std::string, StorePath> OutputPathMap;
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
-enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 
 /**
  * Magic header of exportPath() output (obsolete).
@@ -97,15 +100,15 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
-struct StoreConfig : public Config
+struct StoreConfig : public StoreDirConfig
 {
     typedef std::map<std::string, std::string> Params;
 
-    using Config::Config;
+    using StoreDirConfig::StoreDirConfig;
 
     StoreConfig() = delete;
 
-    StringSet getDefaultSystemFeatures();
+    static StringSet getDefaultSystemFeatures();
 
     virtual ~StoreConfig() { }
 
@@ -131,15 +134,6 @@ struct StoreConfig : public Config
         return std::nullopt;
     }
 
-    const PathSetting storeDir_{this, settings.nixStore,
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
-    const Path storeDir = storeDir_;
-
     const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
         "Size of the in-memory store path metadata cache."};
 
@@ -153,19 +147,25 @@ struct StoreConfig : public Config
 
     Setting<int> priority{this, 0, "priority",
         R"(
-          Priority of this store when used as a substituter. A lower value means a higher priority.
+          Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
+          A lower value means a higher priority.
         )"};
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query",
         R"(
-          Whether this store (when used as a substituter) can be
-          queried efficiently for path validity.
+          Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
         )"};
 
     Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
-        "Optional features that the system this store builds on implements (like \"kvm\")."};
+        R"(
+          Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
 
+          Example: `"kvm"`
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 };
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
@@ -221,45 +221,6 @@ public:
 
     virtual std::string getUri() = 0;
 
-    StorePath parseStorePath(std::string_view path) const;
-
-    std::optional<StorePath> maybeParseStorePath(std::string_view path) const;
-
-    std::string printStorePath(const StorePath & path) const;
-
-    /**
-     * Deprecated
-     *
-     * \todo remove
-     */
-    StorePathSet parseStorePathSet(const PathSet & paths) const;
-
-    PathSet printStorePathSet(const StorePathSet & path) const;
-
-    /**
-     * Display a set of paths in human-readable form (i.e., between quotes
-     * and separated by commas).
-     */
-    std::string showPaths(const StorePathSet & paths);
-
-    /**
-     * @return true if ‘path’ is in the Nix store (but not the Nix
-     * store itself).
-     */
-    bool isInStore(PathView path) const;
-
-    /**
-     * @return true if ‘path’ is a store path, i.e. a direct child of the
-     * Nix store.
-     */
-    bool isStorePath(std::string_view path) const;
-
-    /**
-     * Split a path like /nix/store/<hash>-<name>/<bla> into
-     * /nix/store/<hash>-<name> and /<bla>.
-     */
-    std::pair<StorePath, Path> toStorePath(PathView path) const;
-
     /**
      * Follow symlinks until we end up with a path in the Nix store.
      */
@@ -270,54 +231,6 @@ public:
      * result.
      */
     StorePath followLinksToStorePath(std::string_view path) const;
-
-    /**
-     * Constructs a unique store path name.
-     */
-    StorePath makeStorePath(std::string_view type,
-        std::string_view hash, std::string_view name) const;
-    StorePath makeStorePath(std::string_view type,
-        const Hash & hash, std::string_view name) const;
-
-    StorePath makeOutputPath(std::string_view id,
-        const Hash & hash, std::string_view name) const;
-
-    StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
-
-    StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
-
-    StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
-
-    /**
-     * Preparatory part of addToStore().
-     *
-     * @return the store path to which srcPath is to be copied
-     * and the cryptographic hash of the contents of srcPath.
-     */
-    std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
-        const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
-
-    /**
-     * Preparatory part of addTextToStore().
-     *
-     * !!! Computation of the path should take the references given to
-     * addTextToStore() into account, otherwise we have a (relatively
-     * minor) security hole: a caller can register a source file with
-     * bogus references.  If there are too many references, the path may
-     * not be garbage collected when it has to be (not really a problem,
-     * the caller could create a root anyway), or it may be garbage
-     * collected when it shouldn't be (more serious).
-     *
-     * Hashing the references would solve this (bogus references would
-     * simply yield a different store path, so other users wouldn't be
-     * affected), but it has some backwards compatibility issues (the
-     * hashing scheme changes), so I'm not doing that for now.
-     */
-    StorePath computeStorePathForText(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references) const;
 
     /**
      * Check whether a path is valid.
@@ -368,6 +281,16 @@ public:
      */
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
+
+    /**
+     * Version of queryPathInfo() that only queries the local narinfo cache and not
+     * the actual store.
+     *
+     * @return `std::nullopt` if nothing is known about the path in the local narinfo cache.
+     * @return `std::make_optional(nullptr)` if the path is known to not exist.
+     * @return `std::make_optional(validPathInfo)` if the path is known to exist.
+     */
+    std::optional<std::shared_ptr<const ValidPathInfo>> queryPathInfoFromClientCache(const StorePath & path);
 
     /**
      * Query the information about a realisation.
@@ -457,7 +380,7 @@ public:
      * Query the mapping outputName=>outputPath for the given derivation.
      * Assume every output has a mapping and throw an exception otherwise.
      */
-    OutputPathMap queryDerivationOutputMap(const StorePath & path);
+    OutputPathMap queryDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr);
 
     /**
      * Query the full store path given the hash part of a valid store
@@ -516,20 +439,26 @@ public:
      */
     virtual StorePath addToStore(
         std::string_view name,
-        const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
         PathFilter & filter = defaultPathFilter,
-        RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet());
+        RepairFlag repair = NoRepair);
 
     /**
      * Copy the contents of a path to the store and register the
      * validity the resulting path, using a constant amount of
      * memory.
      */
-    ValidPathInfo addToStoreSlow(std::string_view name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
+    ValidPathInfo addToStoreSlow(
+        std::string_view name,
+        SourceAccessor & accessor,
+        const CanonPath & path,
+        ContentAddressMethod method = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
         std::optional<Hash> expectedCAHash = {});
 
     /**
@@ -537,23 +466,25 @@ public:
      * in `dump`, which is either a NAR serialisation (if recursive ==
      * true) or simply the contents of a regular file (if recursive ==
      * false).
-     * `dump` may be drained
      *
-     * \todo remove?
+     * `dump` may be drained.
+     *
+     * @param dumpMethod What serialisation format is `dump`, i.e. how
+     * to deserialize it. Must either match hashMethod or be
+     * `FileSerialisationMethod::Recursive`.
+     *
+     * @param hashMethod How content addressing? Need not match be the
+     * same as `dumpMethod`.
+     *
+     * @todo remove?
      */
-    virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
-        const StorePathSet & references = StorePathSet())
-    { unsupported("addToStoreFromDump"); }
-
-    /**
-     * Like addToStore, but the contents written to the output path is a
-     * regular file containing the given string.
-     */
-    virtual StorePath addTextToStore(
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
         std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) = 0;
 
     /**
@@ -662,28 +593,6 @@ public:
         bool showDerivers, bool showHash);
 
     /**
-     * Write a JSON representation of store path metadata, such as the
-     * hash and the references.
-     *
-     * @param includeImpureInfo If true, variable elements such as the
-     * registration time are included.
-     *
-     * @param showClosureSize If true, the closure size of each path is
-     * included.
-     */
-    nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
-        bool includeImpureInfo, bool showClosureSize,
-        Base hashBase = Base32,
-        AllowInvalidFlag allowInvalid = DisallowInvalid);
-
-    /**
-     * @return the size of the closure of the specified path, that is,
-     * the sum of the size of the NAR serialisation of each path in the
-     * closure.
-     */
-    std::pair<uint64_t, uint64_t> getClosureSize(const StorePath & storePath);
-
-    /**
      * Optimise the disk space usage of the Nix store by hard-linking files
      * with the same contents.
      */
@@ -699,7 +608,7 @@ public:
     /**
      * @return An object to access files in the Nix store.
      */
-    virtual ref<FSAccessor> getFSAccessor() = 0;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) = 0;
 
     /**
      * Repair the contents of the given path by redownloading it using
@@ -872,7 +781,7 @@ protected:
      * Helper for methods that are not unsupported: this is used for
      * default definitions for virtual methods that are meant to be overriden.
      *
-     * \todo Using this should be a last resort. It is better to make
+     * @todo Using this should be a last resort. It is better to make
      * the method "virtual pure" and/or move it to a subclass.
      */
     [[noreturn]] void unsupported(const std::string & op)
@@ -904,7 +813,7 @@ void copyStorePath(
  */
 std::map<StorePath, StorePath> copyPaths(
     Store & srcStore, Store & dstStore,
-    const RealisedPath::Set &,
+    const std::set<RealisedPath> &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -921,7 +830,7 @@ std::map<StorePath, StorePath> copyPaths(
  */
 void copyClosure(
     Store & srcStore, Store & dstStore,
-    const RealisedPath::Set & paths,
+    const std::set<RealisedPath> & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -978,7 +887,7 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
  * - ‘ssh://[user@]<host>’: A remote Nix store accessed by running
  *   ‘nix-store --serve’ via SSH.
  *
- * You can pass parameters to the store implementation by appending
+ * You can pass parameters to the store type by appending
  * ‘?key=value&key=value&...’ to the URI.
  */
 ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
@@ -1053,6 +962,7 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,
     const Derivation & drv,
-    const StorePath & outputPath);
+    const StorePath & outputPath,
+    Store * evalStore = nullptr);
 
 }

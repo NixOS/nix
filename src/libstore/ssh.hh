@@ -1,8 +1,9 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "sync.hh"
+#include "processes.hh"
+#include "file-system.hh"
 
 namespace nix {
 
@@ -40,7 +41,16 @@ public:
         AutoCloseFD out, in;
     };
 
-    std::unique_ptr<Connection> startCommand(const std::string & command);
+    /**
+     * @param command The command (arg vector) to execute.
+     *
+     * @param extraSShArgs Extra args to pass to SSH (not the command to
+     * execute). Will not be used when "fake SSHing" to the local
+     * machine.
+     */
+    std::unique_ptr<Connection> startCommand(
+        Strings && command,
+        Strings && extraSshArgs = {});
 
     Path startMaster();
 };

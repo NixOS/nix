@@ -9,6 +9,8 @@
 #include "attr-path.hh"
 #include "eval-inline.hh"
 #include "legacy.hh"
+#include "posix-source-accessor.hh"
+#include "misc-store-flags.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -46,13 +48,13 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 }
 
 std::tuple<StorePath, Hash> prefetchFile(
-    ref<Store> store,
-    std::string_view url,
-    std::optional<std::string> name,
-    HashType hashType,
-    std::optional<Hash> expectedHash,
-    bool unpack,
-    bool executable)
+        ref<Store> store,
+        std::string_view url,
+        std::optional<std::string> name,
+        HashAlgorithm hashAlgo,
+        std::optional<Hash> expectedHash,
+        bool unpack,
+        bool executable)
 {
     auto ingestionMethod = unpack || executable ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
 
@@ -69,7 +71,7 @@ std::tuple<StorePath, Hash> prefetchFile(
     /* If an expected hash is given, the file may already exist in
        the store. */
     if (expectedHash) {
-        hashType = expectedHash->type;
+        hashAlgo = expectedHash->algo;
         storePath = store->makeFixedOutputPath(*name, FixedOutputInfo {
             .method = ingestionMethod,
             .hash = *expectedHash,
@@ -122,7 +124,10 @@ std::tuple<StorePath, Hash> prefetchFile(
         Activity act(*logger, lvlChatty, actUnknown,
             fmt("adding '%s' to the store", url));
 
-        auto info = store->addToStoreSlow(*name, tmpFile, ingestionMethod, hashType, expectedHash);
+        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(tmpFile);
+        auto info = store->addToStoreSlow(
+            *name, accessor, canonPath,
+            ingestionMethod, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);
         hash = info.ca->hash;
@@ -134,7 +139,7 @@ std::tuple<StorePath, Hash> prefetchFile(
 static int main_nix_prefetch_url(int argc, char * * argv)
 {
     {
-        HashType ht = htSHA256;
+        HashAlgorithm ha = HashAlgorithm::SHA256;
         std::vector<std::string> args;
         bool printPath = getEnv("PRINT_PATH") == "1";
         bool fromExpr = false;
@@ -155,7 +160,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
                 printVersion("nix-prefetch-url");
             else if (*arg == "--type") {
                 auto s = getArg(*arg, arg, end);
-                ht = parseHashType(s);
+                ha = parseHashAlgo(s);
             }
             else if (*arg == "--print-path")
                 printPath = true;
@@ -233,10 +238,10 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
         std::optional<Hash> expectedHash;
         if (args.size() == 2)
-            expectedHash = Hash::parseAny(args[1], ht);
+            expectedHash = Hash::parseAny(args[1], ha);
 
         auto [storePath, hash] = prefetchFile(
-            store, resolveMirrorUrl(*state, url), name, ht, expectedHash, unpack, executable);
+            store, resolveMirrorUrl(*state, url), name, ha, expectedHash, unpack, executable);
 
         stopProgressBar();
 
@@ -257,8 +262,9 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
 {
     std::string url;
     bool executable = false;
+    bool unpack = false;
     std::optional<std::string> name;
-    HashType hashType = htSHA256;
+    HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
     std::optional<Hash> expectedHash;
 
     CmdStorePrefetchFile()
@@ -275,11 +281,11 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             .description = "The expected hash of the file.",
             .labels = {"hash"},
             .handler = {[&](std::string s) {
-                expectedHash = Hash::parseAny(s, hashType);
+                expectedHash = Hash::parseAny(s, hashAlgo);
             }}
         });
 
-        addFlag(Flag::mkHashTypeFlag("hash-type", &hashType));
+        addFlag(flag::hashAlgo("hash-type", &hashAlgo));
 
         addFlag({
             .longName = "executable",
@@ -287,6 +293,14 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
                 "Make the resulting file executable. Note that this causes the "
                 "resulting hash to be a NAR hash rather than a flat file hash.",
             .handler = {&executable, true},
+        });
+
+        addFlag({
+            .longName = "unpack",
+            .description =
+                "Unpack the archive (which must be a tarball or zip file) and add "
+                "the result to the Nix store.",
+            .handler = {&unpack, true},
         });
 
         expectArg("url", &url);
@@ -305,18 +319,18 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
     }
     void run(ref<Store> store) override
     {
-        auto [storePath, hash] = prefetchFile(store, url, name, hashType, expectedHash, false, executable);
+        auto [storePath, hash] = prefetchFile(store, url, name, hashAlgo, expectedHash, unpack, executable);
 
         if (json) {
             auto res = nlohmann::json::object();
             res["storePath"] = store->printStorePath(storePath);
-            res["hash"] = hash.to_string(SRI, true);
+            res["hash"] = hash.to_string(HashFormat::SRI, true);
             logger->cout(res.dump());
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 url,
                 store->printStorePath(storePath),
-                hash.to_string(SRI, true));
+                hash.to_string(HashFormat::SRI, true));
         }
     }
 };

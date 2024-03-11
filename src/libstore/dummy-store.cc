@@ -58,12 +58,15 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         RepairFlag repair, CheckSigsFlag checkSigs) override
     { unsupported("addToStore"); }
 
-    StorePath addTextToStore(
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
         std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override
-    { unsupported("addTextToStore"); }
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override
+    { unsupported("addToStore"); }
 
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
@@ -72,7 +75,7 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     { callback(nullptr); }
 
-    virtual ref<FSAccessor> getFSAccessor() override
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     { unsupported("getFSAccessor"); }
 };
 

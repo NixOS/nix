@@ -39,20 +39,41 @@ INPUT                  = \
   src/libcmd \
   src/libexpr \
   src/libexpr/flake \
-  src/libexpr/tests \
-  src/libexpr/tests/value \
+  tests/unit/libexpr \
+  tests/unit/libexpr/value \
+  tests/unit/libexpr/test \
+  tests/unit/libexpr/test/value \
   src/libexpr/value \
   src/libfetchers \
   src/libmain \
   src/libstore \
   src/libstore/build \
   src/libstore/builtins \
-  src/libstore/tests \
+  tests/unit/libstore \
+  tests/unit/libstore/test \
   src/libutil \
-  src/libutil/tests \
+  tests/unit/libutil \
+  tests/unit/libutil/test \
   src/nix \
   src/nix-env \
   src/nix-store
+
+# If the MACRO_EXPANSION tag is set to YES, doxygen will expand all macro names
+# in the source code. If set to NO, only conditional compilation will be
+# performed. Macro expansion can be done in a controlled way by setting
+# EXPAND_ONLY_PREDEF to YES.
+# The default value is: NO.
+# This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
+
+MACRO_EXPANSION        = YES
+
+# If the EXPAND_ONLY_PREDEF and MACRO_EXPANSION tags are both set to YES then
+# the macro expansion is limited to the macros specified with the PREDEFINED and
+# EXPAND_AS_DEFINED tags.
+# The default value is: NO.
+# This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
+
+EXPAND_ONLY_PREDEF     = YES
 
 # The INCLUDE_PATH tag can be used to specify one or more directories that
 # contain include files that are not input files but should be processed by the
@@ -60,4 +81,17 @@ INPUT                  = \
 # RECURSIVE has no effect here.
 # This tag requires that the tag SEARCH_INCLUDES is set to YES.
 
-INCLUDE_PATH           = @RAPIDCHECK_HEADERS@
+INCLUDE_PATH           =
+
+# If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then this
+# tag can be used to specify a list of macro names that should be expanded. The
+# macro definition that is found in the sources will be used. Use the PREDEFINED
+# tag if you want to use a different macro definition that overrules the
+# definition found in the source code.
+# This tag requires that the tag ENABLE_PREPROCESSING is set to YES.
+
+EXPAND_AS_DEFINED      = \
+  DECLARE_COMMON_SERIALISER \
+  DECLARE_WORKER_SERIALISER \
+  DECLARE_SERVE_SERIALISER \
+  LENGTH_PREFIXED_PROTO_HELPER

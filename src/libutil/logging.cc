@@ -1,6 +1,11 @@
 #include "logging.hh"
+#include "file-descriptor.hh"
+#include "environment-variables.hh"
+#include "terminal.hh"
 #include "util.hh"
 #include "config.hh"
+#include "source-path.hh"
+#include "position.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
@@ -67,7 +72,7 @@ public:
             case lvlWarn: c = '4'; break;
             case lvlNotice: case lvlInfo: c = '5'; break;
             case lvlTalkative: case lvlChatty: c = '6'; break;
-            case lvlDebug: case lvlVomit: c = '7';
+            case lvlDebug: case lvlVomit: c = '7'; break;
             default: c = '7'; break; // should not happen, and missing enum case is reported by -Werror=switch-enum
             }
             prefix = std::string("<") + c + ">";
@@ -111,7 +116,7 @@ void writeToStderr(std::string_view s)
 {
     try {
         writeFull(STDERR_FILENO, s, false);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
            errors to ensure that cleanup code that logs to stderr runs
            to completion if the other side of stderr has been closed
@@ -133,13 +138,13 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-void to_json(nlohmann::json & json, std::shared_ptr<AbstractPos> pos)
+void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
 {
     if (pos) {
         json["line"] = pos->line;
         json["column"] = pos->column;
         std::ostringstream str;
-        pos->print(str);
+        pos->print(str, true);
         json["file"] = str.str();
     } else {
         json["line"] = nullptr;
@@ -194,7 +199,7 @@ struct JSONLogger : Logger {
         json["level"] = ei.level;
         json["msg"] = oss.str();
         json["raw_msg"] = ei.msg.str();
-        to_json(json, ei.errPos);
+        to_json(json, ei.pos);
 
         if (loggerSettings.showTrace.get() && !ei.traces.empty()) {
             nlohmann::json traces = nlohmann::json::array();
@@ -220,8 +225,8 @@ struct JSONLogger : Logger {
         json["level"] = lvl;
         json["type"] = type;
         json["text"] = s;
+        json["parent"] = parent;
         addFields(json, fields);
-        // FIXME: handle parent
         write(json);
     }
 

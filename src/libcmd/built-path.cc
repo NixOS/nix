@@ -12,9 +12,9 @@ namespace nix {
     bool MY_TYPE ::operator COMPARATOR (const MY_TYPE & other) const \
     { \
         const MY_TYPE* me = this; \
-        auto fields1 = std::make_tuple<const CHILD_TYPE &, const FIELD_TYPE &>(*me->drvPath, me->FIELD); \
+        auto fields1 = std::tie(*me->drvPath, me->FIELD); \
         me = &other; \
-        auto fields2 = std::make_tuple<const CHILD_TYPE &, const FIELD_TYPE &>(*me->drvPath, me->FIELD); \
+        auto fields2 = std::tie(*me->drvPath, me->FIELD); \
         return fields1 COMPARATOR fields2; \
     }
 #define CMP(CHILD_TYPE, MY_TYPE, FIELD) \
@@ -58,7 +58,29 @@ StorePathSet BuiltPath::outPaths() const
     );
 }
 
-nlohmann::json BuiltPath::Built::toJSON(const Store & store) const
+SingleDerivedPath::Built SingleBuiltPath::Built::discardOutputPath() const
+{
+    return SingleDerivedPath::Built {
+        .drvPath = make_ref<SingleDerivedPath>(drvPath->discardOutputPath()),
+        .output = output.first,
+    };
+}
+
+SingleDerivedPath SingleBuiltPath::discardOutputPath() const
+{
+    return std::visit(
+        overloaded{
+            [](const SingleBuiltPath::Opaque & p) -> SingleDerivedPath {
+                return p;
+            },
+            [](const SingleBuiltPath::Built & b) -> SingleDerivedPath {
+                return b.discardOutputPath();
+            },
+        }, raw()
+    );
+}
+
+nlohmann::json BuiltPath::Built::toJSON(const StoreDirConfig & store) const
 {
     nlohmann::json res;
     res["drvPath"] = drvPath->toJSON(store);
@@ -68,7 +90,7 @@ nlohmann::json BuiltPath::Built::toJSON(const Store & store) const
     return res;
 }
 
-nlohmann::json SingleBuiltPath::Built::toJSON(const Store & store) const
+nlohmann::json SingleBuiltPath::Built::toJSON(const StoreDirConfig & store) const
 {
     nlohmann::json res;
     res["drvPath"] = drvPath->toJSON(store);
@@ -78,14 +100,14 @@ nlohmann::json SingleBuiltPath::Built::toJSON(const Store & store) const
     return res;
 }
 
-nlohmann::json SingleBuiltPath::toJSON(const Store & store) const
+nlohmann::json SingleBuiltPath::toJSON(const StoreDirConfig & store) const
 {
     return std::visit([&](const auto & buildable) {
         return buildable.toJSON(store);
     }, raw());
 }
 
-nlohmann::json BuiltPath::toJSON(const Store & store) const
+nlohmann::json BuiltPath::toJSON(const StoreDirConfig & store) const
 {
     return std::visit([&](const auto & buildable) {
         return buildable.toJSON(store);

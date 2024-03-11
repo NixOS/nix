@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "markdown.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "derivations.hh"
@@ -32,6 +33,19 @@ nlohmann::json NixMultiCommand::toJSON()
 {
     // FIXME: use Command::toJSON() as well.
     return MultiCommand::toJSON();
+}
+
+void NixMultiCommand::run()
+{
+    if (!command) {
+        std::set<std::string> subCommandTextLines;
+        for (auto & [name, _] : commands)
+            subCommandTextLines.insert(fmt("- `%s`", name));
+        std::string markdownError = fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
+                commandName, concatStringsSep("\n", subCommandTextLines));
+        throw UsageError(renderMarkdownToTerminal(markdownError));
+    }
+    command->second->run();
 }
 
 StoreCommand::StoreCommand()
@@ -98,7 +112,7 @@ EvalCommand::EvalCommand()
 EvalCommand::~EvalCommand()
 {
     if (evalState)
-        evalState->printStats();
+        evalState->maybePrintStats();
 }
 
 ref<Store> EvalCommand::getEvalStore()
@@ -175,7 +189,7 @@ void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            paths.push_back(BuiltPath::Opaque{p});
+            paths.emplace_back(BuiltPath::Opaque{p});
     } else {
         paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
@@ -188,7 +202,7 @@ void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
             }
             store->computeFSClosure(pathsRoots, pathsClosure);
             for (auto & path : pathsClosure)
-                paths.push_back(BuiltPath::Opaque{path});
+                paths.emplace_back(BuiltPath::Opaque{path});
         }
     }
 

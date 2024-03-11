@@ -34,7 +34,6 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
-
 /**
  * A mapping used to remember for each child process to what goal it
  * belongs, and file descriptors for receiving log data and output
@@ -117,7 +116,7 @@ private:
     WeakGoals waitingForAWhile;
 
     /**
-     * Last time the goals in `waitingForAWhile` where woken up.
+     * Last time the goals in `waitingForAWhile` were woken up.
      */
     steady_time_point lastWokenUp;
 

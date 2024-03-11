@@ -1,11 +1,32 @@
 let
   inherit (builtins)
-    attrNames attrValues fromJSON listToAttrs mapAttrs
-    concatStringsSep concatMap length lessThan replaceStrings sort;
-  inherit (import ./utils.nix) concatStrings optionalString filterAttrs trim squash unique showSettings;
+    attrNames
+    attrValues
+    concatMap
+    concatStringsSep
+    fromJSON
+    groupBy
+    length
+    lessThan
+    listToAttrs
+    mapAttrs
+    match
+    replaceStrings
+    sort
+    ;
+  inherit (import <nix/utils.nix>)
+    attrsToList
+    concatStrings
+    filterAttrs
+    optionalString
+    squash
+    trim
+    unique
+    ;
+  showStoreDocs = import <nix/generate-store-info.nix>;
 in
 
-commandDump:
+inlineHTML: commandDump:
 
 let
 
@@ -30,7 +51,7 @@ let
 
         ${maybeSubcommands}
 
-        ${maybeDocumentation}
+        ${maybeProse}
 
         ${maybeOptions}
       '';
@@ -40,15 +61,15 @@ let
           showArgument = arg: "*${arg.label}*" + optionalString (! arg ? arity) "...";
           arguments = concatStringsSep " " (map showArgument args);
         in ''
-         `${command}` [*option*...] ${arguments}
+          `${command}` [*option*...] ${arguments}
         '';
 
       maybeSubcommands = optionalString (details ? commands && details.commands != {})
-         ''
-           where *subcommand* is one of the following:
+        ''
+          where *subcommand* is one of the following:
 
-           ${subcommands}
-         '';
+          ${subcommands}
+        '';
 
       subcommands = if length categories > 1
         then listCategories
@@ -70,40 +91,85 @@ let
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
 
-      maybeDocumentation = optionalString
-        (details ? doc)
-        (replaceStrings ["@stores@"] [storeDocs] details.doc);
-
-      maybeOptions = optionalString (details.flags != {}) ''
-        # Options
-
-        ${showOptions details.flags toplevel.flags}
-      '';
-
-      showOptions = options: commonOptions:
+      maybeProse =
+        # FIXME: this is a horrible hack to keep `nix help-stores` working.
         let
-          allOptions = options // commonOptions;
-          showCategory = cat: ''
-            ${optionalString (cat != "") "**${cat}:**"}
+          help-stores = ''
+            ${index}
 
-            ${listOptions (filterAttrs (n: v: v.category == cat) allOptions)}
-            '';
-          listOptions = opts: concatStringsSep "\n" (attrValues (mapAttrs showOption opts));
+            ${allStores}
+          '';
+          index = replaceStrings
+            [ "@store-types@" "./local-store.md" "./local-daemon-store.md" ]
+            [ storesOverview "#local-store" "#local-daemon-store" ]
+            details.doc;
+          storesOverview =
+            let
+              showEntry = store:
+                "- [${store.name}](#${store.slug})";
+            in
+            concatStringsSep "\n" (map showEntry storesList) + "\n";
+          allStores = concatStringsSep "\n" (attrValues storePages);
+          storePages = listToAttrs
+            (map (s: { name = s.filename; value = s.page; }) storesList);
+          storesList = showStoreDocs {
+            storeInfo = commandInfo.stores;
+            inherit inlineHTML;
+          };
+        in
+        optionalString (details ? doc) (
+          if match ".*@store-types@.*" details.doc != null
+          then help-stores
+          else details.doc
+        );
+
+      maybeOptions =
+        let
+          allVisibleOptions = filterAttrs
+            (_: o: ! o.hiddenCategory)
+            (details.flags // toplevel.flags);
+        in
+        optionalString (allVisibleOptions != { }) ''
+          # Options
+
+          ${showOptions inlineHTML allVisibleOptions}
+
+          > **Note**
+          >
+          > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
+        '';
+
+      showOptions = inlineHTML: allOptions:
+        let
+          showCategory = cat: opts: ''
+            ${optionalString (cat != "") "## ${cat}"}
+
+            ${concatStringsSep "\n" (attrValues (mapAttrs showOption opts))}
+          '';
           showOption = name: option:
             let
+              result = trim ''
+                - ${item}
+
+                  ${option.description}
+              '';
+              item = if inlineHTML
+                then ''<span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}''
+                else "`--${name}` ${shortName} ${labels}";
               shortName = optionalString
                 (option ? shortName)
                 ("/ `-${option.shortName}`");
               labels = optionalString
                 (option ? labels)
                 (concatStringsSep " " (map (s: "*${s}*") option.labels));
-            in trim ''
-              - `--${name}` ${shortName} ${labels}
-
-                ${option.description}
-            '';
-          categories = sort lessThan (unique (map (cmd: cmd.category) (attrValues allOptions)));
-        in concatStrings (map showCategory categories);
+            in result;
+          categories = mapAttrs
+            # Convert each group from a list of key-value pairs back to an attrset
+            (_: listToAttrs)
+            (groupBy
+              (cmd: cmd.value.category)
+              (attrsToList allOptions));
+        in concatStrings (attrValues (mapAttrs showCategory categories));
     in squash result;
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
@@ -134,36 +200,5 @@ let
     showEntry = page:
       "    - [${page.command}](command-ref/new-cli/${page.name})";
     in concatStringsSep "\n" (map showEntry manpages) + "\n";
-
-  storeDocs =
-    let
-      showStore = name: { settings, doc, experimentalFeature }:
-        let
-          experimentalFeatureNote = optionalString (experimentalFeature != null) ''
-            > **Warning**
-            > This store is part of an
-            > [experimental feature](@docroot@/contributing/experimental-features.md).
-
-            To use this store, you need to make sure the corresponding experimental feature,
-            [`${experimentalFeature}`](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature}),
-            is enabled.
-            For example, include the following in [`nix.conf`](#):
-
-            ```
-            extra-experimental-features = ${experimentalFeature}
-            ```
-          '';
-        in ''
-          ## ${name}
-
-          ${doc}
-
-          ${experimentalFeatureNote}
-
-          **Settings**:
-
-          ${showSettings { useAnchors = false; } settings}
-        '';
-    in concatStrings (attrValues (mapAttrs showStore commandInfo.stores));
 
 in (listToAttrs manpages) // { "SUMMARY.md" = tableOfContents; }

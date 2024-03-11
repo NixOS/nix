@@ -1,7 +1,8 @@
 #include "globals.hh"
-#include "util.hh"
+#include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
+#include "users.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
 
@@ -14,16 +15,21 @@
 
 #include <nlohmann/json.hpp>
 
-#include <sodium/core.h>
-
 #ifdef __GLIBC__
-#include <gnu/lib-names.h>
-#include <nss.h>
-#include <dlfcn.h>
+# include <gnu/lib-names.h>
+# include <nss.h>
+# include <dlfcn.h>
+#endif
+
+#if __APPLE__
+# include "processes.hh"
 #endif
 
 #include "config-impl.hh"
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
 
 namespace nix {
 
@@ -108,7 +114,14 @@ Settings::Settings()
 
 void loadConfFile()
 {
-    globalConfig.applyConfigFile(settings.nixConfDir + "/nix.conf");
+    auto applyConfigFile = [&](const Path & path) {
+        try {
+            std::string contents = readFile(path);
+            globalConfig.applyConfig(contents, path);
+        } catch (SystemError &) { }
+    };
+
+    applyConfigFile(settings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
@@ -116,7 +129,7 @@ void loadConfFile()
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        globalConfig.applyConfigFile(*file);
+        applyConfigFile(*file);
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
@@ -154,6 +167,29 @@ unsigned int Settings::getDefaultCores()
       return concurrency;
 }
 
+#if __APPLE__
+static bool hasVirt() {
+
+    int hasVMM;
+    int hvSupport;
+    size_t size;
+
+    size = sizeof(hasVMM);
+    if (sysctlbyname("kern.hv_vmm_present", &hasVMM, &size, NULL, 0) == 0) {
+        if (hasVMM)
+            return false;
+    }
+
+    // whether the kernel and hardware supports virt
+    size = sizeof(hvSupport);
+    if (sysctlbyname("kern.hv_support", &hvSupport, &size, NULL, 0) == 0) {
+        return hvSupport == 1;
+    } else {
+        return false;
+    }
+}
+#endif
+
 StringSet Settings::getDefaultSystemFeatures()
 {
     /* For backwards compatibility, accept some "features" that are
@@ -168,6 +204,11 @@ StringSet Settings::getDefaultSystemFeatures()
     #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
+    #endif
+
+    #if __APPLE__
+    if (hasVirt())
+        features.insert("apple-virt");
     #endif
 
     return features;
@@ -365,9 +406,6 @@ void assertLibStoreInitialized() {
 void initLibStore() {
 
     initLibUtil();
-
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
 
     loadConfFile();
 

@@ -1,11 +1,9 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "comparator.hh"
 #include "derived-path.hh"
-
-#include <variant>
+#include "variant-wrapper.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -21,63 +19,52 @@ public:
         : Error("")
     {
         raw = raw_;
-        auto hf = hintfmt(args...);
-        err.msg = hintfmt("Bad String Context element: %1%: %2%", normaltxt(hf.str()), raw);
+        auto hf = HintFmt(args...);
+        err.msg = HintFmt("Bad String Context element: %1%: %2%", Uncolored(hf.str()), raw);
     }
 };
 
-/**
- * Plain opaque path to some store object.
- *
- * Encoded as just the path: ‘<path>’.
- */
-typedef SingleDerivedPath::Opaque NixStringContextElem_Opaque;
+struct NixStringContextElem {
+    /**
+     * Plain opaque path to some store object.
+     *
+     * Encoded as just the path: ‘<path>’.
+     */
+    using Opaque = SingleDerivedPath::Opaque;
 
-/**
- * Path to a derivation and its entire build closure.
- *
- * The path doesn't just refer to derivation itself and its closure, but
- * also all outputs of all derivations in that closure (including the
- * root derivation).
- *
- * Encoded in the form ‘=<drvPath>’.
- */
-struct NixStringContextElem_DrvDeep {
-    StorePath drvPath;
+    /**
+     * Path to a derivation and its entire build closure.
+     *
+     * The path doesn't just refer to derivation itself and its closure, but
+     * also all outputs of all derivations in that closure (including the
+     * root derivation).
+     *
+     * Encoded in the form ‘=<drvPath>’.
+     */
+    struct DrvDeep {
+        StorePath drvPath;
 
-    GENERATE_CMP(NixStringContextElem_DrvDeep, me->drvPath);
-};
+        GENERATE_CMP(DrvDeep, me->drvPath);
+    };
 
-/**
- * Derivation output.
- *
- * Encoded in the form ‘!<output>!<drvPath>’.
- */
-typedef SingleDerivedPath::Built NixStringContextElem_Built;
+    /**
+     * Derivation output.
+     *
+     * Encoded in the form ‘!<output>!<drvPath>’.
+     */
+    using Built = SingleDerivedPath::Built;
 
-using _NixStringContextElem_Raw = std::variant<
-    NixStringContextElem_Opaque,
-    NixStringContextElem_DrvDeep,
-    NixStringContextElem_Built
->;
+    using Raw = std::variant<
+        Opaque,
+        DrvDeep,
+        Built
+    >;
 
-struct NixStringContextElem : _NixStringContextElem_Raw {
-    using Raw = _NixStringContextElem_Raw;
-    using Raw::Raw;
+    Raw raw;
 
-    using Opaque = NixStringContextElem_Opaque;
-    using DrvDeep = NixStringContextElem_DrvDeep;
-    using Built = NixStringContextElem_Built;
+    GENERATE_CMP(NixStringContextElem, me->raw);
 
-    inline const Raw & raw() const & {
-        return static_cast<const Raw &>(*this);
-    }
-    inline Raw & raw() & {
-        return static_cast<Raw &>(*this);
-    }
-    inline Raw && raw() && {
-        return static_cast<Raw &&>(*this);
-    }
+    MAKE_WRAPPER_CONSTRUCTOR(NixStringContextElem);
 
     /**
      * Decode a context string, one of:

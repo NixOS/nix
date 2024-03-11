@@ -1,4 +1,6 @@
 #include "json-to-value.hh"
+#include "value.hh"
+#include "eval.hh"
 
 #include <variant>
 #include <nlohmann/json.hpp>
@@ -159,7 +161,7 @@ public:
     }
 
     bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex) {
-        throw JSONParseError(ex.what());
+        throw JSONParseError("%s", ex.what());
     }
 };
 

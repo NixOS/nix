@@ -55,7 +55,7 @@ InstallableDerivedPath InstallableDerivedPath::parse(
                 .outputs = outputSpec,
             };
         },
-    }, extendedOutputsSpec.raw());
+    }, extendedOutputsSpec.raw);
     return InstallableDerivedPath {
         store,
         std::move(derivedPath),

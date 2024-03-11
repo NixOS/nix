@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "remote-store.hh"
 #include "worker-protocol.hh"
 #include "pool.hh"
@@ -30,7 +33,7 @@ struct RemoteStore::Connection
      * sides support. (If the maximum doesn't exist, we would fail to
      * establish a connection and produce a value of this type.)
      */
-    unsigned int daemonVersion;
+    WorkerProto::Version daemonVersion;
 
     /**
      * Whether the remote side trusts us or not.
@@ -70,6 +73,7 @@ struct RemoteStore::Connection
     {
         return WorkerProto::ReadConn {
             .from = from,
+            .version = daemonVersion,
         };
     }
 
@@ -85,6 +89,7 @@ struct RemoteStore::Connection
     {
         return WorkerProto::WriteConn {
             .to = to,
+            .version = daemonVersion,
         };
     }
 

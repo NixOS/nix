@@ -1,5 +1,6 @@
-#include "util.hh"
 #include "editor-for.hh"
+#include "environment-variables.hh"
+#include "source-path.hh"
 
 namespace nix {
 
@@ -16,7 +17,7 @@ Strings editorFor(const SourcePath & file, uint32_t line)
         editor.find("vim") != std::string::npos ||
         editor.find("kak") != std::string::npos))
         args.push_back(fmt("+%d", line));
-    args.push_back(path->abs());
+    args.push_back(path->string());
     return args;
 }
 

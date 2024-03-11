@@ -1,6 +1,5 @@
 #include "attr-path.hh"
 #include "eval-inline.hh"
-#include "util.hh"
 
 
 namespace nix {
@@ -66,10 +65,10 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
         if (!attrIndex) {
 
             if (v->type() != nAttrs)
-                throw TypeError(
+                state.error<TypeError>(
                     "the expression selected by the selection path '%1%' should be a set but is %2%",
                     attrPath,
-                    showType(*v));
+                    showType(*v)).debugThrow();
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
@@ -89,10 +88,10 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
         else {
 
             if (!v->isList())
-                throw TypeError(
+                state.error<TypeError>(
                     "the expression selected by the selection path '%1%' should be a list but is %2%",
                     attrPath,
-                    showType(*v));
+                    showType(*v)).debugThrow();
             if (*attrIndex >= v->listSize())
                 throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", *attrIndex, attrPath);
 
@@ -132,7 +131,7 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
         if (colon == std::string::npos) fail();
         std::string filename(fn, 0, colon);
         auto lineno = std::stoi(std::string(fn, colon + 1, std::string::npos));
-        return {CanonPath(fn.substr(0, colon)), lineno};
+        return {SourcePath{path.accessor, CanonPath(fn.substr(0, colon))}, lineno};
     } catch (std::invalid_argument & e) {
         fail();
         abort();

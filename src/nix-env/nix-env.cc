@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
 #include "derivations.hh"
@@ -11,7 +12,6 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"
-#include "util.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
@@ -97,7 +97,7 @@ static bool isNixExpr(const SourcePath & path, struct InputAccessor::Stat & st)
 {
     return
         st.type == InputAccessor::tRegular
-        || (st.type == InputAccessor::tDirectory && (path + "default.nix").pathExists());
+        || (st.type == InputAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
 }
 
 
@@ -116,11 +116,11 @@ static void getAllExprs(EvalState & state,
            are implemented using profiles). */
         if (i == "manifest.nix") continue;
 
-        SourcePath path2 = path + i;
+        auto path2 = (path / i).resolveSymlinks();
 
         InputAccessor::Stat st;
         try {
-            st = path2.resolveSymlinks().lstat();
+            st = path2.lstat();
         } catch (Error &) {
             continue; // ignore dangling symlinks in ~/.nix-defexpr
         }
@@ -143,7 +143,7 @@ static void getAllExprs(EvalState & state,
             }
             /* Load the expression on demand. */
             auto vArg = state.allocValue();
-            vArg->mkString(path2.path.abs());
+            vArg->mkPath(path2);
             if (seen.size() == maxAttrs)
                 throw Error("too many Nix expressions in directory '%1%'", path);
             attrs.alloc(attrName).mkApp(&state.getBuiltin("import"), vArg);
@@ -172,7 +172,7 @@ static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v
        directory). */
     else if (st.type == InputAccessor::tDirectory) {
         auto attrs = state.buildBindings(maxAttrs);
-        attrs.alloc("_combineChannels").mkList(0);
+        state.mkList(attrs.alloc("_combineChannels"), 0);
         StringSet seen;
         getAllExprs(state, path, seen, attrs);
         v.mkAttrs(attrs);
@@ -184,7 +184,7 @@ static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v
 
 static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
     std::string systemFilter, Bindings & autoArgs,
-    const std::string & pathPrefix, DrvInfos & elems)
+    const std::string & pathPrefix, PackageInfos & elems)
 {
     Value vRoot;
     loadSourceExpr(state, nixExprPath, vRoot);
@@ -195,7 +195,7 @@ static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
 
     /* Filter out all derivations not applicable to the current
        system. */
-    for (DrvInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
+    for (PackageInfos::iterator i = elems.begin(), j; i != elems.end(); i = j) {
         j = i; j++;
         if (systemFilter != "*" && i->querySystem() != systemFilter)
             elems.erase(i);
@@ -203,13 +203,13 @@ static void loadDerivations(EvalState & state, const SourcePath & nixExprPath,
 }
 
 
-static long getPriority(EvalState & state, DrvInfo & drv)
+static long getPriority(EvalState & state, PackageInfo & drv)
 {
     return drv.queryMetaInt("priority", 0);
 }
 
 
-static long comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
+static long comparePriorities(EvalState & state, PackageInfo & drv1, PackageInfo & drv2)
 {
     return getPriority(state, drv2) - getPriority(state, drv1);
 }
@@ -217,7 +217,7 @@ static long comparePriorities(EvalState & state, DrvInfo & drv1, DrvInfo & drv2)
 
 // FIXME: this function is rather slow since it checks a single path
 // at a time.
-static bool isPrebuilt(EvalState & state, DrvInfo & elem)
+static bool isPrebuilt(EvalState & state, PackageInfo & elem)
 {
     auto path = elem.queryOutPath();
     if (state.store->isValidPath(path)) return true;
@@ -236,11 +236,11 @@ static void checkSelectorUse(DrvNames & selectors)
 
 namespace {
 
-std::set<std::string> searchByPrefix(const DrvInfos & allElems, std::string_view prefix) {
+std::set<std::string> searchByPrefix(const PackageInfos & allElems, std::string_view prefix) {
     constexpr std::size_t maxResults = 3;
     std::set<std::string> result;
-    for (const auto & drvInfo : allElems) {
-        const auto drvName = DrvName { drvInfo.queryName() };
+    for (const auto & packageInfo : allElems) {
+        const auto drvName = DrvName { packageInfo.queryName() };
         if (hasPrefix(drvName.name, prefix)) {
             result.emplace(drvName.name);
 
@@ -254,11 +254,11 @@ std::set<std::string> searchByPrefix(const DrvInfos & allElems, std::string_view
 
 struct Match
 {
-    DrvInfo drvInfo;
+    PackageInfo packageInfo;
     std::size_t index;
 
-    Match(DrvInfo drvInfo_, std::size_t index_)
-    : drvInfo{std::move(drvInfo_)}
+    Match(PackageInfo packageInfo_, std::size_t index_)
+    : packageInfo{std::move(packageInfo_)}
     , index{index_}
     {}
 };
@@ -276,7 +276,7 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
     StringSet multiple;
 
     for (auto & match : matches) {
-        auto & oneDrv = match.drvInfo;
+        auto & oneDrv = match.packageInfo;
 
         const auto drvName = DrvName { oneDrv.queryName() };
         long comparison = 1;
@@ -284,7 +284,7 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
         const auto itOther = newest.find(drvName.name);
 
         if (itOther != newest.end()) {
-            auto & newestDrv = itOther->second.drvInfo;
+            auto & newestDrv = itOther->second.packageInfo;
 
             comparison =
                 oneDrv.querySystem() == newestDrv.querySystem() ? 0 :
@@ -319,23 +319,23 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
 
 } // end namespace
 
-static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
+static PackageInfos filterBySelector(EvalState & state, const PackageInfos & allElems,
     const Strings & args, bool newestOnly)
 {
     DrvNames selectors = drvNamesFromArgs(args);
     if (selectors.empty())
         selectors.emplace_back("*");
 
-    DrvInfos elems;
+    PackageInfos elems;
     std::set<std::size_t> done;
 
     for (auto & selector : selectors) {
         std::vector<Match> matches;
-        for (const auto & [index, drvInfo] : enumerate(allElems)) {
-            const auto drvName = DrvName { drvInfo.queryName() };
+        for (const auto & [index, packageInfo] : enumerate(allElems)) {
+            const auto drvName = DrvName { packageInfo.queryName() };
             if (selector.matches(drvName)) {
                 ++selector.hits;
-                matches.emplace_back(drvInfo, index);
+                matches.emplace_back(packageInfo, index);
             }
         }
 
@@ -347,7 +347,7 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
            haven't inserted before. */
         for (auto & match : matches)
             if (done.insert(match.index).second)
-                elems.push_back(match.drvInfo);
+                elems.push_back(match.packageInfo);
 
         if (selector.hits == 0 && selector.fullName != "*") {
             const auto prefixHits = searchByPrefix(allElems, selector.name);
@@ -376,7 +376,7 @@ static bool isPath(std::string_view s)
 
 static void queryInstSources(EvalState & state,
     InstallSourceInfo & instSource, const Strings & args,
-    DrvInfos & elems, bool newestOnly)
+    PackageInfos & elems, bool newestOnly)
 {
     InstallSourceType type = instSource.type;
     if (type == srcUnknown && args.size() > 0 && isPath(args.front()))
@@ -392,7 +392,7 @@ static void queryInstSources(EvalState & state,
 
             /* Load the derivations from the (default or specified)
                Nix expression. */
-            DrvInfos allElems;
+            PackageInfos allElems;
             loadDerivations(state, *instSource.nixExprPath,
                 instSource.systemFilter, *instSource.autoArgs, "", allElems);
 
@@ -413,7 +413,7 @@ static void queryInstSources(EvalState & state,
             loadSourceExpr(state, *instSource.nixExprPath, vArg);
 
             for (auto & i : args) {
-                Expr * eFun = state.parseExprFromString(i, state.rootPath(CanonPath::fromCwd()));
+                Expr * eFun = state.parseExprFromString(i, state.rootPath("."));
                 Value vFun, vTmp;
                 state.eval(eFun, vFun);
                 vTmp.mkApp(&vFun, &vArg);
@@ -433,7 +433,7 @@ static void queryInstSources(EvalState & state,
 
                 std::string name(path.name());
 
-                DrvInfo elem(state, "", nullptr);
+                PackageInfo elem(state, "", nullptr);
                 elem.setName(name);
 
                 if (path.isDerivation()) {
@@ -476,17 +476,17 @@ static void queryInstSources(EvalState & state,
 }
 
 
-static void printMissing(EvalState & state, DrvInfos & elems)
+static void printMissing(EvalState & state, PackageInfos & elems)
 {
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
         if (auto drvPath = i.queryDrvPath())
-            targets.push_back(DerivedPath::Built{
+            targets.emplace_back(DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(*drvPath),
                 .outputs = OutputsSpec::All { },
             });
         else
-            targets.push_back(DerivedPath::Opaque{
+            targets.emplace_back(DerivedPath::Opaque{
                 .path = i.queryOutPath(),
             });
 
@@ -494,7 +494,7 @@ static void printMissing(EvalState & state, DrvInfos & elems)
 }
 
 
-static bool keep(DrvInfo & drv)
+static bool keep(PackageInfo & drv)
 {
     return drv.queryMetaBool("keep", false);
 }
@@ -506,7 +506,7 @@ static void installDerivations(Globals & globals,
     debug("installing derivations");
 
     /* Get the set of user environment elements to be installed. */
-    DrvInfos newElems, newElemsTmp;
+    PackageInfos newElems, newElemsTmp;
     queryInstSources(*globals.state, globals.instSource, args, newElemsTmp, true);
 
     /* If --prebuilt-only is given, filter out source-only packages. */
@@ -529,12 +529,12 @@ static void installDerivations(Globals & globals,
     while (true) {
         auto lockToken = optimisticLockProfile(profile);
 
-        DrvInfos allElems(newElems);
+        PackageInfos allElems(newElems);
 
         /* Add in the already installed derivations, unless they have
            the same name as a to-be-installed element. */
         if (!globals.removeAll) {
-            DrvInfos installedElems = queryInstalled(*globals.state, profile);
+            PackageInfos installedElems = queryInstalled(*globals.state, profile);
 
             for (auto & i : installedElems) {
                 DrvName drvName(i.queryName());
@@ -592,14 +592,14 @@ static void upgradeDerivations(Globals & globals,
     while (true) {
         auto lockToken = optimisticLockProfile(globals.profile);
 
-        DrvInfos installedElems = queryInstalled(*globals.state, globals.profile);
+        PackageInfos installedElems = queryInstalled(*globals.state, globals.profile);
 
         /* Fetch all derivations from the input file. */
-        DrvInfos availElems;
+        PackageInfos availElems;
         queryInstSources(*globals.state, globals.instSource, args, availElems, false);
 
         /* Go through all installed derivations. */
-        DrvInfos newElems;
+        PackageInfos newElems;
         for (auto & i : installedElems) {
             DrvName drvName(i.queryName());
 
@@ -617,7 +617,7 @@ static void upgradeDerivations(Globals & globals,
                    priority.  If there are still multiple matches,
                    take the one with the highest version.
                    Do not upgrade if it would decrease the priority. */
-                DrvInfos::iterator bestElem = availElems.end();
+                PackageInfos::iterator bestElem = availElems.end();
                 std::string bestVersion;
                 for (auto j = availElems.begin(); j != availElems.end(); ++j) {
                     if (comparePriorities(*globals.state, i, *j) > 0)
@@ -687,7 +687,7 @@ static void opUpgrade(Globals & globals, Strings opFlags, Strings opArgs)
 }
 
 
-static void setMetaFlag(EvalState & state, DrvInfo & drv,
+static void setMetaFlag(EvalState & state, PackageInfo & drv,
     const std::string & name, const std::string & value)
 {
     auto v = state.allocValue();
@@ -711,7 +711,7 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
     while (true) {
         std::string lockToken = optimisticLockProfile(globals.profile);
 
-        DrvInfos installedElems = queryInstalled(*globals.state, globals.profile);
+        PackageInfos installedElems = queryInstalled(*globals.state, globals.profile);
 
         /* Update all matching derivations. */
         for (auto & i : installedElems) {
@@ -745,13 +745,13 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
         else throw UsageError("unknown flag '%1%'", arg);
     }
 
-    DrvInfos elems;
+    PackageInfos elems;
     queryInstSources(*globals.state, globals.instSource, opArgs, elems, true);
 
     if (elems.size() != 1)
         throw Error("--set requires exactly one derivation");
 
-    DrvInfo & drv(elems.front());
+    PackageInfo & drv(elems.front());
 
     if (globals.forceName != "")
         drv.setName(globals.forceName);
@@ -786,10 +786,10 @@ static void uninstallDerivations(Globals & globals, Strings & selectors,
     while (true) {
         auto lockToken = optimisticLockProfile(profile);
 
-        DrvInfos workingElems = queryInstalled(*globals.state, profile);
+        PackageInfos workingElems = queryInstalled(*globals.state, profile);
 
         for (auto & selector : selectors) {
-            DrvInfos::iterator split = workingElems.begin();
+            PackageInfos::iterator split = workingElems.begin();
             if (isPath(selector)) {
                 StorePath selectorStorePath = globals.state->store->followLinksToStorePath(selector);
                 split = std::partition(
@@ -838,7 +838,7 @@ static bool cmpChars(char a, char b)
 }
 
 
-static bool cmpElemByName(const DrvInfo & a, const DrvInfo & b)
+static bool cmpElemByName(const PackageInfo & a, const PackageInfo & b)
 {
     auto a_name = a.queryName();
     auto b_name = b.queryName();
@@ -891,7 +891,7 @@ void printTable(Table & table)
 typedef enum { cvLess, cvEqual, cvGreater, cvUnavail } VersionDiff;
 
 static VersionDiff compareVersionAgainstSet(
-    const DrvInfo & elem, const DrvInfos & elems, std::string & version)
+    const PackageInfo & elem, const PackageInfos & elems, std::string & version)
 {
     DrvName name(elem.queryName());
 
@@ -922,7 +922,7 @@ static VersionDiff compareVersionAgainstSet(
 }
 
 
-static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
+static void queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool printOutPath, bool printDrvPath, bool printMeta)
 {
     using nlohmann::json;
     json topObj = json::object();
@@ -942,7 +942,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
             };
 
             {
-                DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
+                PackageInfo::Outputs outputs = i.queryOutputs(printOutPath);
                 json &outputObj = pkgObj["outputs"];
                 outputObj = json::object();
                 for (auto & j : outputs) {
@@ -951,6 +951,11 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                     else
                         outputObj[j.first] = nullptr;
                 }
+            }
+
+            if (printDrvPath) {
+                auto drvPath = i.queryDrvPath();
+                if (drvPath) pkgObj["drvPath"] = globals.state->store->printStorePath(*drvPath);
             }
 
             if (printMeta) {
@@ -1027,7 +1032,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("--attr-path(-P) only works with --available");
 
     /* Obtain derivation information from the specified source. */
-    DrvInfos availElems, installedElems;
+    PackageInfos availElems, installedElems;
 
     if (source == sInstalled || compareVersions || printStatus)
         installedElems = queryInstalled(*globals.state, globals.profile);
@@ -1037,16 +1042,16 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             globals.instSource.systemFilter, *globals.instSource.autoArgs,
             attrPath, availElems);
 
-    DrvInfos elems_ = filterBySelector(*globals.state,
+    PackageInfos elems_ = filterBySelector(*globals.state,
         source == sInstalled ? installedElems : availElems,
         opArgs, false);
 
-    DrvInfos & otherElems(source == sInstalled ? availElems : installedElems);
+    PackageInfos & otherElems(source == sInstalled ? availElems : installedElems);
 
 
     /* Sort them by name. */
     /* !!! */
-    std::vector<DrvInfo> elems;
+    std::vector<PackageInfo> elems;
     for (auto & i : elems_) elems.push_back(i);
     sort(elems.begin(), elems.end(), cmpElemByName);
 
@@ -1079,7 +1084,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
-        queryJSON(globals, elems, printOutPath, printMeta);
+        queryJSON(globals, elems, printOutPath, printDrvPath, printMeta);
         cout << '\n';
         return;
     }
@@ -1187,7 +1192,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 attrs["outputName"] = i.queryOutputName();
 
             if (printOutPath && !xmlOutput) {
-                DrvInfo::Outputs outputs = i.queryOutputs();
+                PackageInfo::Outputs outputs = i.queryOutputs();
                 std::string s;
                 for (auto & j : outputs) {
                     if (!s.empty()) s += ';';
@@ -1207,7 +1212,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
             if (xmlOutput) {
                 XMLOpenElement item(xml, "item", attrs);
-                DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
+                PackageInfo::Outputs outputs = i.queryOutputs(printOutPath);
                 for (auto & j : outputs) {
                     XMLAttrs attrs2;
                     attrs2["name"] = j.first;
@@ -1228,7 +1233,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                         else {
                             if (v->type() == nString) {
                                 attrs2["type"] = "string";
-                                attrs2["value"] = v->string.s;
+                                attrs2["value"] = v->c_str();
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nInt) {
                                 attrs2["type"] = "int";
@@ -1248,7 +1253,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 for (auto elem : v->listItems()) {
                                     if (elem->type() != nString) continue;
                                     XMLAttrs attrs3;
-                                    attrs3["value"] = elem->string.s;
+                                    attrs3["value"] = elem->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                                 }
                             } else if (v->type() == nAttrs) {
@@ -1260,7 +1265,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                     if(a.value->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["type"] = globals.state->symbols[i.name];
-                                    attrs3["value"] = a.value->string.s;
+                                    attrs3["value"] = a.value->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                             }
                             }
@@ -1531,7 +1536,7 @@ static int main_nix_env(int argc, char * * argv)
 
         op(globals, std::move(opFlags), std::move(opArgs));
 
-        globals.state->printStats();
+        globals.state->maybePrintStats();
 
         return 0;
     }

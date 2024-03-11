@@ -1,3 +1,4 @@
+#include "current-process.hh"
 #include "run.hh"
 #include "command-installable-value.hh"
 #include "common-args.hh"
@@ -6,7 +7,7 @@
 #include "derivations.hh"
 #include "local-store.hh"
 #include "finally.hh"
-#include "fs-accessor.hh"
+#include "source-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
 #include "build/personality.hh"
@@ -24,6 +25,7 @@ std::string chrootHelperName = "__run_in_chroot";
 namespace nix {
 
 void runProgramInStore(ref<Store> store,
+    UseSearchPath useSearchPath,
     const std::string & program,
     const Strings & args,
     std::optional<std::string_view> system)
@@ -57,7 +59,10 @@ void runProgramInStore(ref<Store> store,
     if (system)
         setPersonality(*system);
 
-    execvp(program.c_str(), stringsToCharPtrs(args).data());
+    if (useSearchPath == UseSearchPath::Use)
+        execvp(program.c_str(), stringsToCharPtrs(args).data());
+    else
+        execv(program.c_str(), stringsToCharPtrs(args).data());
 
     throw SysError("unable to execute '%s'", program);
 }
@@ -109,7 +114,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
         setEnviron();
 
-        auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
+        std::vector<std::string> pathAdditions;
 
         while (!todo.empty()) {
             auto path = todo.front();
@@ -117,21 +122,24 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             if (!done.insert(path).second) continue;
 
             if (true)
-                unixPath.push_front(store->printStorePath(path) + "/bin");
+                pathAdditions.push_back(store->printStorePath(path) + "/bin");
 
-            auto propPath = store->printStorePath(path) + "/nix-support/propagated-user-env-packages";
-            if (accessor->stat(propPath).type == FSAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(readFile(propPath)))
+            auto propPath = CanonPath(store->printStorePath(path)) / "nix-support" / "propagated-user-env-packages";
+            if (auto st = accessor->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
+                for (auto & p : tokenizeString<Paths>(accessor->readFile(propPath)))
                     todo.push(store->parseStorePath(p));
             }
         }
 
-        setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
+        auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
+        unixPath.insert(unixPath.begin(), pathAdditions.begin(), pathAdditions.end());
+        auto unixPathString = concatStringsSep(":", unixPath);
+        setenv("PATH", unixPathString.c_str(), 1);
 
         Strings args;
         for (auto & arg : command) args.push_back(arg);
 
-        runProgramInStore(store, *command.begin(), args);
+        runProgramInStore(store, UseSearchPath::Use, *command.begin(), args);
     }
 };
 
@@ -193,7 +201,7 @@ struct CmdRun : InstallableValueCommand
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
 
-        runProgramInStore(store, app.program, allArgs);
+        runProgramInStore(store, UseSearchPath::DontUse, app.program, allArgs);
     }
 };
 

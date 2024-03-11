@@ -1,4 +1,5 @@
 #include "buildenv.hh"
+#include "derivations.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -160,7 +161,9 @@ void buildProfile(const Path & out, Packages && pkgs)
     debug("created %d symlinks in user environment", state.symlinks);
 }
 
-void builtinBuildenv(const BasicDerivation & drv)
+void builtinBuildenv(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
@@ -168,21 +171,25 @@ void builtinBuildenv(const BasicDerivation & drv)
         return i->second;
     };
 
-    Path out = getAttr("out");
+    auto out = outputs.at("out");
     createDirs(out);
 
     /* Convert the stuff we get from the environment back into a
      * coherent data type. */
     Packages pkgs;
-    auto derivations = tokenizeString<Strings>(getAttr("derivations"));
-    while (!derivations.empty()) {
-        /* !!! We're trusting the caller to structure derivations env var correctly */
-        auto active = derivations.front(); derivations.pop_front();
-        auto priority = stoi(derivations.front()); derivations.pop_front();
-        auto outputs = stoi(derivations.front()); derivations.pop_front();
-        for (auto n = 0; n < outputs; n++) {
-            auto path = derivations.front(); derivations.pop_front();
-            pkgs.emplace_back(path, active != "false", priority);
+    {
+        auto derivations = tokenizeString<Strings>(getAttr("derivations"));
+
+        auto itemIt = derivations.begin();
+        while (itemIt != derivations.end()) {
+            /* !!! We're trusting the caller to structure derivations env var correctly */
+            const bool active = "false" != *itemIt++;
+            const int priority = stoi(*itemIt++);
+            const size_t outputs = stoul(*itemIt++);
+
+            for (size_t n {0}; n < outputs; n++) {
+                pkgs.emplace_back(std::move(*itemIt++), active, priority);
+            }
         }
     }
 

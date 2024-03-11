@@ -1,10 +1,10 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "comparator.hh"
+#include "config.hh"
 
 #include <variant>
 
@@ -12,6 +12,9 @@
 
 namespace nix {
 
+struct StoreDirConfig;
+
+// TODO stop needing this, `toJSON` below should be pure
 class Store;
 
 /**
@@ -24,9 +27,9 @@ class Store;
 struct DerivedPathOpaque {
     StorePath path;
 
-    std::string to_string(const Store & store) const;
-    static DerivedPathOpaque parse(const Store & store, std::string_view);
-    nlohmann::json toJSON(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
+    static DerivedPathOpaque parse(const StoreDirConfig & store, std::string_view);
+    nlohmann::json toJSON(const StoreDirConfig & store) const;
 
     GENERATE_CMP(DerivedPathOpaque, me->path);
 };
@@ -42,7 +45,7 @@ struct SingleDerivedPath;
  */
 struct SingleDerivedPathBuilt {
     ref<SingleDerivedPath> drvPath;
-    std::string output;
+    OutputName output;
 
     /**
      * Get the store path this is ultimately derived from (by realising
@@ -59,19 +62,19 @@ struct SingleDerivedPathBuilt {
     /**
      * Uses `^` as the separator
      */
-    std::string to_string(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
     /**
      * Uses `!` as the separator
      */
-    std::string to_string_legacy(const Store & store) const;
+    std::string to_string_legacy(const StoreDirConfig & store) const;
     /**
      * The caller splits on the separator, so it works for both variants.
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static SingleDerivedPathBuilt parse(
-        const Store & store, ref<SingleDerivedPath> drvPath,
-        std::string_view outputs,
+        const StoreDirConfig & store, ref<SingleDerivedPath> drvPath,
+        OutputNameView outputs,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
 
@@ -120,18 +123,18 @@ struct SingleDerivedPath : _SingleDerivedPathRaw {
     /**
      * Uses `^` as the separator
      */
-    std::string to_string(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
     /**
      * Uses `!` as the separator
      */
-    std::string to_string_legacy(const Store & store) const;
+    std::string to_string_legacy(const StoreDirConfig & store) const;
     /**
      * Uses `^` as the separator
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static SingleDerivedPath parse(
-        const Store & store,
+        const StoreDirConfig & store,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     /**
@@ -140,7 +143,7 @@ struct SingleDerivedPath : _SingleDerivedPathRaw {
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static SingleDerivedPath parseLegacy(
-        const Store & store,
+        const StoreDirConfig & store,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
@@ -182,18 +185,18 @@ struct DerivedPathBuilt {
     /**
      * Uses `^` as the separator
      */
-    std::string to_string(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
     /**
      * Uses `!` as the separator
      */
-    std::string to_string_legacy(const Store & store) const;
+    std::string to_string_legacy(const StoreDirConfig & store) const;
     /**
      * The caller splits on the separator, so it works for both variants.
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DerivedPathBuilt parse(
-        const Store & store, ref<SingleDerivedPath>,
+        const StoreDirConfig & store, ref<SingleDerivedPath>,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
@@ -242,18 +245,18 @@ struct DerivedPath : _DerivedPathRaw {
     /**
      * Uses `^` as the separator
      */
-    std::string to_string(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
     /**
      * Uses `!` as the separator
      */
-    std::string to_string_legacy(const Store & store) const;
+    std::string to_string_legacy(const StoreDirConfig & store) const;
     /**
      * Uses `^` as the separator
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DerivedPath parse(
-        const Store & store,
+        const StoreDirConfig & store,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     /**
@@ -262,7 +265,7 @@ struct DerivedPath : _DerivedPathRaw {
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DerivedPath parseLegacy(
-        const Store & store,
+        const StoreDirConfig & store,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 

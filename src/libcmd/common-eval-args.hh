@@ -2,8 +2,11 @@
 ///@file
 
 #include "args.hh"
+#include "canon-path.hh"
 #include "common-args.hh"
 #include "search-path.hh"
+
+#include <filesystem>
 
 namespace nix {
 
@@ -25,9 +28,16 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
     std::optional<std::string> evalStoreUrl;
 
 private:
-    std::map<std::string, std::string> autoArgs;
+    struct AutoArgExpr { std::string expr; };
+    struct AutoArgString { std::string s; };
+    struct AutoArgFile { std::filesystem::path path; };
+    struct AutoArgStdin { };
+
+    using AutoArg = std::variant<AutoArgExpr, AutoArgString, AutoArgFile, AutoArgStdin>;
+
+    std::map<std::string, AutoArg> autoArgs;
 };
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s);
+SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir = nullptr);
 
 }

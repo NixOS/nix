@@ -1,3 +1,4 @@
+#include "users.hh"
 #include "globals.hh"
 #include "profiles.hh"
 #include "eval.hh"
@@ -86,6 +87,12 @@ std::string EvalSettings::resolvePseudoUrl(std::string_view url)
         return "https://nixos.org/channels/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
     else
         return std::string(url);
+}
+
+const std::string & EvalSettings::getCurrentSystem()
+{
+    const auto & evalSystem = currentSystem.get();
+    return evalSystem != "" ? evalSystem : settings.thisSystem.get();
 }
 
 EvalSettings evalSettings;

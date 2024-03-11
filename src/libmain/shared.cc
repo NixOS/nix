@@ -1,10 +1,11 @@
 #include "globals.hh"
+#include "current-process.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
-#include "util.hh"
 #include "loggers.hh"
 #include "progress-bar.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <cctype>
@@ -339,7 +340,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
         return 1;
     } catch (BaseError & e) {
         logError(e.info());
-        return e.status;
+        return e.info().status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
         return 1;
@@ -379,9 +380,9 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
+    std_out = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
-        throw SysError("dupping stdout");
+        throw SysError("dupping standard output");
 }
 
 
@@ -390,7 +391,7 @@ RunPager::~RunPager()
     try {
         if (pid != -1) {
             std::cout.flush();
-            dup2(stdout, STDOUT_FILENO);
+            dup2(std_out, STDOUT_FILENO);
             pid.wait();
         }
     } catch (...) {
@@ -406,7 +407,5 @@ PrintFreed::~PrintFreed()
             results.paths.size(),
             showBytes(results.bytesFreed));
 }
-
-Exit::~Exit() { }
 
 }

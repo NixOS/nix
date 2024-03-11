@@ -2,6 +2,9 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "git.hh"
+#include "posix-source-accessor.hh"
+#include "misc-store-flags.hh"
 
 using namespace nix;
 
@@ -9,7 +12,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    FileIngestionMethod ingestionMethod;
+    ContentAddressMethod caMethod = FileIngestionMethod::Recursive;
+    HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
 
     CmdAddToStore()
     {
@@ -23,42 +27,40 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             .labels = {"name"},
             .handler = {&namePart},
         });
+
+        addFlag(flag::contentAddressMethod(&caMethod));
+
+        addFlag(flag::hashAlgo(&hashAlgo));
     }
 
     void run(ref<Store> store) override
     {
         if (!namePart) namePart = baseNameOf(path);
 
-        StringSink sink;
-        dumpPath(path, sink);
+        auto [accessor, path2] = PosixSourceAccessor::createAtRoot(path);
 
-        auto narHash = hashString(htSHA256, sink.s);
+        auto storePath = dryRun
+            ? store->computeStorePath(
+                *namePart, accessor, path2, caMethod, hashAlgo, {}).first
+            : store->addToStoreSlow(
+                *namePart, accessor, path2, caMethod, hashAlgo, {}).path;
 
-        Hash hash = narHash;
-        if (ingestionMethod == FileIngestionMethod::Flat) {
-            HashSink hsink(htSHA256);
-            readFile(path, hsink);
-            hash = hsink.finish().first;
-        }
+        logger->cout("%s", store->printStorePath(storePath));
+    }
+};
 
-        ValidPathInfo info {
-            *store,
-            std::move(*namePart),
-            FixedOutputInfo {
-                .method = std::move(ingestionMethod),
-                .hash = std::move(hash),
-                .references = {},
-            },
-            narHash,
-        };
-        info.narSize = sink.s.size();
+struct CmdAdd : CmdAddToStore
+{
+    std::string description() override
+    {
+        return "Add a file or directory to the Nix store";
+    }
 
-        if (!dryRun) {
-            auto source = StringSource(sink.s);
-            store->addToStore(info, source);
-        }
-
-        logger->cout("%s", store->printStorePath(info.path));
+    std::string doc() override
+    {
+        return
+          #include "add.md"
+          ;
     }
 };
 
@@ -66,41 +68,23 @@ struct CmdAddFile : CmdAddToStore
 {
     CmdAddFile()
     {
-        ingestionMethod = FileIngestionMethod::Flat;
+        caMethod = FileIngestionMethod::Flat;
     }
 
     std::string description() override
     {
-        return "add a regular file to the Nix store";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "add-file.md"
-          ;
+        return "Deprecated. Use [`nix store add --mode flat`](@docroot@/command-ref/new-cli/nix3-store-add.md) instead.";
     }
 };
 
 struct CmdAddPath : CmdAddToStore
 {
-    CmdAddPath()
-    {
-        ingestionMethod = FileIngestionMethod::Recursive;
-    }
-
     std::string description() override
     {
-        return "add a path to the Nix store";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "add-path.md"
-          ;
+        return "Deprecated alias to [`nix store add`](@docroot@/command-ref/new-cli/nix3-store-add.md).";
     }
 };
 
 static auto rCmdAddFile = registerCommand2<CmdAddFile>({"store", "add-file"});
 static auto rCmdAddPath = registerCommand2<CmdAddPath>({"store", "add-path"});
+static auto rCmdAdd = registerCommand2<CmdAdd>({"store", "add"});

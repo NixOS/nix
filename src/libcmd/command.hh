@@ -26,29 +26,40 @@ static constexpr Command::Category catNixInstallation = 102;
 
 static constexpr auto installablesCategory = "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
 
-struct NixMultiCommand : virtual MultiCommand, virtual Command
+struct NixMultiCommand : MultiCommand, virtual Command
 {
     nlohmann::json toJSON() override;
+
+    using MultiCommand::MultiCommand;
+
+    virtual void run() override;
 };
 
 // For the overloaded run methods
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
 
-/* A command that requires a Nix store. */
+/**
+ * A command that requires a \ref Store "Nix store".
+ */
 struct StoreCommand : virtual Command
 {
     StoreCommand();
     void run() override;
     ref<Store> getStore();
     virtual ref<Store> createStore();
+    /**
+     * Main entry point, with a `Store` provided
+     */
     virtual void run(ref<Store>) = 0;
 
 private:
     std::shared_ptr<Store> _store;
 };
 
-/* A command that copies something between `--from` and `--to`
-   stores. */
+/**
+ * A command that copies something between `--from` and `--to` \ref
+ * Store stores.
+ */
 struct CopyCommand : virtual StoreCommand
 {
     std::string srcUri, dstUri;
@@ -60,6 +71,9 @@ struct CopyCommand : virtual StoreCommand
     ref<Store> getDstStore();
 };
 
+/**
+ * A command that needs to evaluate Nix language expressions.
+ */
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
     bool startReplOnEvalErrors = false;
@@ -79,20 +93,26 @@ private:
     std::shared_ptr<EvalState> evalState;
 };
 
+/**
+ * A mixin class for commands that process flakes, adding a few standard
+ * flake-related options/flags.
+ */
 struct MixFlakeOptions : virtual Args, EvalCommand
 {
     flake::LockFlags lockFlags;
 
-    std::optional<std::string> needsFlakeInputCompletion = {};
-
     MixFlakeOptions();
 
-    virtual std::vector<std::string> getFlakesForCompletion()
+    /**
+     * The completion for some of these flags depends on the flake(s) in
+     * question.
+     *
+     * This method should be implemented to gather all flakerefs the
+     * command is operating with (presumably specified via some other
+     * arguments) so that the completions for these flags can use them.
+     */
+    virtual std::vector<FlakeRef> getFlakeRefsForCompletion()
     { return {}; }
-
-    void completeFlakeInput(std::string_view prefix);
-
-    void completionHook() override;
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
@@ -112,15 +132,35 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 
     virtual Strings getDefaultFlakeAttrPathPrefixes();
 
-    void completeInstallable(std::string_view prefix);
+    /**
+     * Complete an installable from the given prefix.
+     */
+    void completeInstallable(AddCompletions & completions, std::string_view prefix);
+
+    /**
+     * Convenience wrapper around the underlying function to make setting the
+     * callback easier.
+     */
+    CompleterClosure getCompleteInstallable();
 };
 
+/**
+ * A mixin class for commands that need a read-only flag.
+ *
+ * What exactly is "read-only" is unspecified, but it will usually be
+ * the \ref Store "Nix store".
+ */
 struct MixReadOnlyOption : virtual Args
 {
     MixReadOnlyOption();
 };
 
-/* Like InstallablesCommand but the installables are not loaded */
+/**
+ * Like InstallablesCommand but the installables are not loaded.
+ *
+ * This is needed by `CmdRepl` which wants to load (and reload) the
+ * installables itself.
+ */
 struct RawInstallablesCommand : virtual Args, SourceExprCommand
 {
     RawInstallablesCommand();
@@ -129,19 +169,22 @@ struct RawInstallablesCommand : virtual Args, SourceExprCommand
 
     void run(ref<Store> store) override;
 
-    // FIXME make const after CmdRepl's override is fixed up
+    // FIXME make const after `CmdRepl`'s override is fixed up
     virtual void applyDefaultInstallables(std::vector<std::string> & rawInstallables);
 
     bool readFromStdIn = false;
 
-    std::vector<std::string> getFlakesForCompletion() override;
+    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
 
 private:
 
     std::vector<std::string> rawInstallables;
 };
-/* A command that operates on a list of "installables", which can be
-   store paths, attribute paths, Nix expressions, etc. */
+
+/**
+ * A command that operates on a list of "installables", which can be
+ * store paths, attribute paths, Nix expressions, etc.
+ */
 struct InstallablesCommand : RawInstallablesCommand
 {
     virtual void run(ref<Store> store, Installables && installables) = 0;
@@ -149,7 +192,9 @@ struct InstallablesCommand : RawInstallablesCommand
     void run(ref<Store> store, std::vector<std::string> && rawInstallables) override;
 };
 
-/* A command that operates on exactly one "installable" */
+/**
+ * A command that operates on exactly one "installable".
+ */
 struct InstallableCommand : virtual Args, SourceExprCommand
 {
     InstallableCommand();
@@ -158,10 +203,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
     void run(ref<Store> store) override;
 
-    std::vector<std::string> getFlakesForCompletion() override
-    {
-        return {_installable};
-    }
+    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
 
 private:
 
@@ -175,7 +217,12 @@ struct MixOperateOnOptions : virtual Args
     MixOperateOnOptions();
 };
 
-/* A command that operates on zero or more store paths. */
+/**
+ * A command that operates on zero or more extant store paths.
+ *
+ * If the argument the user passes is a some sort of recipe for a path
+ * not yet built, it must be built first.
+ */
 struct BuiltPathsCommand : InstallablesCommand, virtual MixOperateOnOptions
 {
 private:
@@ -207,7 +254,9 @@ struct StorePathsCommand : public BuiltPathsCommand
     void run(ref<Store> store, BuiltPaths && paths) override;
 };
 
-/* A command that operates on exactly one store path. */
+/**
+ * A command that operates on exactly one store path.
+ */
 struct StorePathCommand : public StorePathsCommand
 {
     virtual void run(ref<Store> store, const StorePath & storePath) = 0;
@@ -215,7 +264,9 @@ struct StorePathCommand : public StorePathsCommand
     void run(ref<Store> store, StorePaths && storePaths) override;
 };
 
-/* A helper class for registering commands globally. */
+/**
+ * A helper class for registering \ref Command commands globally.
+ */
 struct RegisterCommand
 {
     typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
@@ -271,13 +322,24 @@ struct MixEnvironment : virtual Args {
 
     MixEnvironment();
 
-    /* Modify global environ based on ignoreEnvironment, keep, and unset. It's expected that exec will be called before this class goes out of scope, otherwise environ will become invalid. */
+    /***
+     * Modify global environ based on `ignoreEnvironment`, `keep`, and
+     * `unset`. It's expected that exec will be called before this class
+     * goes out of scope, otherwise `environ` will become invalid.
+     */
     void setEnviron();
 };
 
-void completeFlakeRef(ref<Store> store, std::string_view prefix);
+void completeFlakeInputPath(
+    AddCompletions & completions,
+    ref<EvalState> evalState,
+    const std::vector<FlakeRef> & flakeRefs,
+    std::string_view prefix);
+
+void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::string_view prefix);
 
 void completeFlakeRefWithFragment(
+    AddCompletions & completions,
     ref<EvalState> evalState,
     flake::LockFlags lockFlags,
     Strings attrPathPrefixes,
