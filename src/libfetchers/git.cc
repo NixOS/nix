@@ -180,7 +180,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
+            else if (name == "shallow" || name == "submodules" || name == "lfs" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -205,6 +205,7 @@ struct GitInputScheme : InputScheme
             "rev",
             "shallow",
             "submodules",
+            "lfs",
             "exportIgnore",
             "lastModified",
             "revCount",
