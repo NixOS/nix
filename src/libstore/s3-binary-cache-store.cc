@@ -213,7 +213,7 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
           support it.
 
           > **Note**
-          > 
+          >
           > HTTPS should be used if the cache might contain sensitive
           > information.
         )"};
@@ -224,7 +224,7 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
           Do not specify this setting if you're using Amazon S3.
 
           > **Note**
-          > 
+          >
           > This endpoint must support HTTPS and will use path-based
           > addressing instead of virtual host based addressing.
         )"};
@@ -269,8 +269,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const std::string & uriScheme,
-        const std::string & bucketName,
+        std::string_view uriScheme,
+        std::optional<std::string_view> bucketName,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
@@ -278,7 +278,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         , Store(params)
         , BinaryCacheStore(params)
         , S3BinaryCacheStore(params)
-        , bucketName(bucketName)
+        , bucketName(bucketName
+            ? *bucketName
+            : throw UsageError("`%s` store requires a bucket name in its Store URI", uriScheme))
         , s3Helper(profile, region, scheme, endpoint)
     {
         diskCache = getNarInfoDiskCache();

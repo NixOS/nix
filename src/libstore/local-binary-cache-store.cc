@@ -28,16 +28,20 @@ private:
 
 public:
 
+    /**
+     * @param binaryCacheDir `file://` is a short-hand for `file:///`
+     * for now.
+     */
     LocalBinaryCacheStore(
-        const std::string scheme,
-        const Path & binaryCacheDir,
+        std::string_view scheme,
+        std::optional<PathView> binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , LocalBinaryCacheStoreConfig(params)
         , Store(params)
         , BinaryCacheStore(params)
-        , binaryCacheDir(binaryCacheDir)
+        , binaryCacheDir(binaryCacheDir.value_or(""))
     {
     }
 

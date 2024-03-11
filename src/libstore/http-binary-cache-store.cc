@@ -39,15 +39,20 @@ private:
 public:
 
     HttpBinaryCacheStore(
-        const std::string & scheme,
-        const Path & _cacheUri,
+        std::string_view scheme,
+        std::optional<PathView> _cacheUri,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , HttpBinaryCacheStoreConfig(params)
         , Store(params)
         , BinaryCacheStore(params)
-        , cacheUri(scheme + "://" + _cacheUri)
+        , cacheUri(
+            std::string { scheme }
+            + "://"
+            + (_cacheUri
+                ? *_cacheUri
+                : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
     {
         if (cacheUri.back() == '/')
             cacheUri.pop_back();
