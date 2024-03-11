@@ -98,6 +98,10 @@ struct GitArchiveInputScheme : InputScheme
         if (ref) input.attrs.insert_or_assign("ref", *ref);
         if (host_url) input.attrs.insert_or_assign("host", *host_url);
 
+        auto narHash = url.query.find("narHash");
+        if (narHash != url.query.end())
+            input.attrs.insert_or_assign("narHash", narHash->second);
+
         return input;
     }
 
@@ -135,10 +139,13 @@ struct GitArchiveInputScheme : InputScheme
         assert(!(ref && rev));
         if (ref) path += "/" + *ref;
         if (rev) path += "/" + rev->to_string(HashFormat::Base16, false);
-        return ParsedURL {
+        auto url = ParsedURL {
             .scheme = std::string { schemeName() },
             .path = path,
         };
+        if (auto narHash = input.getNarHash())
+            url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+        return url;
     }
 
     Input applyOverrides(
