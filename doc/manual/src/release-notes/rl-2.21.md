@@ -1,5 +1,16 @@
 # Release 2.21.0 (2024-03-11)
 
+- Fix a fixed-output derivation sandbox escape (CVE-2024-27297)
+
+  Cooperating Nix derivations could send file descriptors to files in the Nix
+  store to each other via Unix domain sockets in the abstract namespace. This
+  allowed one derivation to modify the output of the other derivation, after Nix
+  has registered the path as "valid" and immutable in the Nix database.
+  In particular, this allowed the output of fixed-output derivations to be
+  modified from their expected content.
+
+  This isn't the case any more.
+
 - CLI options `--arg-from-file` and `--arg-from-stdin` [#10122](https://github.com/NixOS/nix/pull/10122)
 
   The new CLI option `--arg-from-file` *name* *path* passes the contents
@@ -102,17 +113,6 @@
 
   Now, Nix will correctly enter the debugger at both breakpoints.
 
-- Fix a FOD sandbox escape
-
-  Cooperating Nix derivations could send file descriptors to files in the Nix
-  store to each other via Unix domain sockets in the abstract namespace. This
-  allowed one derivation to modify the output of the other derivation, after Nix
-  has registered the path as "valid" and immutable in the Nix database.
-  In particular, this allowed the output of fixed-output derivations to be
-  modified from their expected content.
-
-  This isn't the case any more.
-
 - Nested debuggers are no longer supported [#9920](https://github.com/NixOS/nix/pull/9920)
 
   Previously, evaluating an expression that throws an error in the debugger would
@@ -143,83 +143,25 @@
          error: what
   ```
 
-- consistent order of lambda formals in printed expressions [#9874](https://github.com/NixOS/nix/pull/9874)
+- Consistent order of function arguments in printed expressions [#9874](https://github.com/NixOS/nix/pull/9874)
 
-  Always print lambda formals in lexicographic order rather than the internal, creation-time based symbol order.
-  This makes printed formals independent of the context they appear in.
+  Function arguments are now printed in lexicographic order rather than the internal, creation-time based symbol order.
 
-- fix duplicate attribute error positions for `inherit` [#9874](https://github.com/NixOS/nix/pull/9874)
+- Fix duplicate attribute error positions for `inherit` [#9874](https://github.com/NixOS/nix/pull/9874)
 
-  When an inherit caused a duplicate attribute error the position of the error was not reported correctly, placing the error with the inherit itself or at the start of the bindings block instead of the offending attribute name.
+  When an `inherit` caused a duplicate attribute error the position of the error was not reported correctly, placing the error with the inherit itself or at the start of the bindings block instead of the offending attribute name.
 
 - `inherit (x) ...` evaluates `x` only once [#9847](https://github.com/NixOS/nix/pull/9847)
 
   `inherit (x) a b ...` now evaluates the expression `x` only once for all inherited attributes rather than once for each inherited attribute.
   This does not usually have a measurable impact, but side-effects (such as `builtins.trace`) would be duplicated and expensive expressions (such as derivations) could cause a measurable slowdown.
 
-- Functions are printed with more detail [#7145](https://github.com/NixOS/nix/issues/7145) [#9606](https://github.com/NixOS/nix/pull/9606)
-
-  Functions and `builtins` are printed with more detail in `nix repl`, `nix
-  eval`, `builtins.trace`, and most other places values are printed.
-
-  Before:
-
-  ```
-  $ nix repl nixpkgs
-  nix-repl> builtins.map
-  «primop»
-
-  nix-repl> builtins.map lib.id
-  «primop-app»
-
-  nix-repl> builtins.trace lib.id "my-value"
-  trace: <LAMBDA>
-  "my-value"
-
-  $ nix eval --file functions.nix
-  { id = <LAMBDA>; primop = <PRIMOP>; primop-app = <PRIMOP-APP>; }
-  ```
-
-  After:
-
-  ```
-  $ nix repl nixpkgs
-  nix-repl> builtins.map
-  «primop map»
-
-  nix-repl> builtins.map lib.id
-  «partially applied primop map»
-
-  nix-repl> builtins.trace lib.id "my-value"
-  trace: «lambda id @ /nix/store/8rrzq23h2zq7sv5l2vhw44kls5w0f654-source/lib/trivial.nix:26:5»
-  "my-value"
-
-  $ nix eval --file functions.nix
-  { id = «lambda id @ /Users/wiggles/nix/functions.nix:2:8»; primop = «primop map»; primop-app = «partially applied primop map»; }
-  ```
-
-  This was actually released in Nix 2.20, but wasn't added to the release notes
-  so we're announcing it here. The historical release notes have been updated as well.
-
-  [type-error]: https://github.com/NixOS/nix/pull/9753
-  [coercion-error]: https://github.com/NixOS/nix/pull/9754
-
 - Store paths are allowed to start with `.` [#912](https://github.com/NixOS/nix/issues/912) [#9091](https://github.com/NixOS/nix/pull/9091) [#9095](https://github.com/NixOS/nix/pull/9095) [#9120](https://github.com/NixOS/nix/pull/9120) [#9121](https://github.com/NixOS/nix/pull/9121) [#9122](https://github.com/NixOS/nix/pull/9122) [#9130](https://github.com/NixOS/nix/pull/9130) [#9219](https://github.com/NixOS/nix/pull/9219) [#9224](https://github.com/NixOS/nix/pull/9224) [#9867](https://github.com/NixOS/nix/pull/9867)
 
   Leading periods were allowed by accident in Nix 2.4. The Nix team has considered this to be a bug, but this behavior has since been relied on by users, leading to unnecessary difficulties.
-  From now on, leading periods are officially, definitively supported. The names `.` and `..` are disallowed, as well as those starting with `.-` or `..-`.
+  From now on, leading periods are supported. The names `.` and `..` are disallowed, as well as those starting with `.-` or `..-`.
 
   Nix versions that denied leading periods are documented [in the issue](https://github.com/NixOS/nix/issues/912#issuecomment-1919583286).
-
-- Nix commands respect Ctrl-C [#7245](https://github.com/NixOS/nix/issues/7245) [#6995](https://github.com/NixOS/nix/pull/6995) [#9687](https://github.com/NixOS/nix/pull/9687)
-
-  Previously, many Nix commands would hang indefinitely if Ctrl-C was pressed
-  while performing various operations (including `nix develop`, `nix flake
-  update`, and so on). With several fixes to Nix's signal handlers, Nix commands
-  will now exit quickly after Ctrl-C is pressed.
-
-  This was actually released in Nix 2.20, but wasn't added to the release notes
-  so we're announcing it here. The historical release notes have been updated as well.
 
 - `nix repl` pretty-prints values [#9931](https://github.com/NixOS/nix/pull/9931)
 
@@ -310,12 +252,6 @@
 
   nix-repl>
   ```
-
-- `nix repl` now respects Ctrl-C while printing values [#9927](https://github.com/NixOS/nix/pull/9927)
-
-  `nix repl` will now halt immediately when Ctrl-C is pressed while it's printing
-  a value. This is useful if you got curious about what would happen if you
-  printed all of Nixpkgs.
 
 - Cycle detection in `nix repl` is simpler and more reliable [#8672](https://github.com/NixOS/nix/issues/8672) [#9926](https://github.com/NixOS/nix/pull/9926)
 
