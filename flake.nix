@@ -14,7 +14,7 @@
       inherit (nixpkgs) lib;
       inherit (lib) fileset;
 
-      officialRelease = false;
+      officialRelease = true;
 
       version = lib.fileContents ./.version + versionSuffix;
       versionSuffix =
@@ -165,7 +165,7 @@
 
           nix =
             let
-              officialRelease = false;
+              officialRelease = true;
               versionSuffix =
                 if officialRelease
                 then ""
@@ -177,7 +177,7 @@
                 stdenv
                 versionSuffix
                 ;
-              officialRelease = false;
+              officialRelease = true;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
