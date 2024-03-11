@@ -123,7 +123,8 @@ struct NixRepl
             .force = true,
             .derivationPaths = true,
             .maxDepth = maxDepth,
-            .prettyIndent = 2
+            .prettyIndent = 2,
+            .errors = ErrorPrintBehavior::ThrowTopLevel,
         });
     }
 };
