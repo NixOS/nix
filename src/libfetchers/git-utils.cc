@@ -510,6 +510,7 @@ struct GitInputAccessor : InputAccessor
     {
         auto blob = getBlob(path, symlink);
 
+        // read filters here, perform smudge
         auto data = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
 
         return std::string(data);
