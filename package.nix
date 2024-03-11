@@ -343,6 +343,7 @@ in {
 
   # Work around weird bug where it doesn't think there is a Makefile.
   installCheckPhase = if (!doBuild && doInstallCheck) then ''
+    runHook preInstallCheck
     mkdir -p src/nix-channel
     make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
   '' else null;
