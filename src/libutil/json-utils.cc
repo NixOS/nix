@@ -1,6 +1,7 @@
 #include "json-utils.hh"
 #include "error.hh"
 #include "types.hh"
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -44,52 +45,27 @@ const nlohmann::json & ensureType(
 
 const nlohmann::json::object_t & getObject(const nlohmann::json & value)
 {
-    if (!value.is_object())
-        throw Error(
-            "Expected JSON value to be an 'object' but it is of type '%s': %s",
-            value.type_name(), value.dump());
-
-    return value.get_ref<const nlohmann::json::object_t &>();
+    return ensureType(value, nlohmann::json::value_t::object).get_ref<const nlohmann::json::object_t &>();
 }
 
 const nlohmann::json::array_t & getArray(const nlohmann::json & value)
 {
-    if (!value.is_array())
-        throw Error(
-            "Expected JSON value to be an 'array' but it is of type '%s': %s",
-            value.type_name(), value.dump());
-
-    return value.get_ref<const nlohmann::json::array_t &>();
+    return ensureType(value, nlohmann::json::value_t::array).get_ref<const nlohmann::json::array_t &>();
 }
 
 const nlohmann::json::string_t & getString(const nlohmann::json & value)
 {
-    if (!value.is_string())
-        throw Error(
-            "Expected JSON value to be a 'string' but it is of type '%s': %s",
-            value.type_name(), value.dump());
-
-    return value.get_ref<const nlohmann::json::string_t &>();
+    return ensureType(value, nlohmann::json::value_t::string).get_ref<const nlohmann::json::string_t &>();
 }
 
 const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value)
 {
-    if (!value.is_number_integer())
-        throw Error(
-            "Expected JSON value to be an 'integer' but it is of type '%s': %s",
-            value.type_name(), value.dump());
-
-    return value.get_ref<const nlohmann::json::number_integer_t &>();
+    return ensureType(value, nlohmann::json::value_t::number_integer).get_ref<const nlohmann::json::number_integer_t &>();
 }
 
 const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value)
 {
-    if (!value.is_boolean())
-        throw Error(
-            "Expected JSON value to be a 'boolean' but it is of type '%s': %s",
-            value.type_name(), value.dump());
-
-    return value.get_ref<const nlohmann::json::boolean_t &>();
+    return ensureType(value, nlohmann::json::value_t::boolean).get_ref<const nlohmann::json::boolean_t &>();
 }
 
 Strings getStringList(const nlohmann::json & value)
