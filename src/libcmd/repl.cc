@@ -542,6 +542,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
              << "  :l, :load <path>             Load Nix expression and add it to scope\n"
              << "  :lf, :load-flake <ref>       Load Nix flake and add it to scope\n"
              << "  :p, :print <expr>            Evaluate and print expression recursively\n"
+             << "                               Strings are printed directly, without escaping.\n"
              << "  :q, :quit                    Exit nix-repl\n"
              << "  :r, :reload                  Reload all files\n"
              << "  :sh <expr>                   Build dependencies of derivation, then start\n"
@@ -749,7 +750,11 @@ ProcessLineResult NixRepl::processLine(std::string line)
     else if (command == ":p" || command == ":print") {
         Value v;
         evalString(arg, v);
-        printValue(std::cout, v);
+        if (v.type() == nString) {
+            std::cout << v.string_view();
+        } else {
+            printValue(std::cout, v);
+        }
         std::cout << std::endl;
     }
 
