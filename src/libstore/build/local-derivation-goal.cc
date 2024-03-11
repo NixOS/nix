@@ -51,7 +51,6 @@
 #if HAVE_SECCOMP
 #include <seccomp.h>
 #endif
-#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
 #if __APPLE__
@@ -1908,7 +1907,7 @@ void LocalDerivationGoal::runChild()
             if (mkdir("real-root", 0) == -1)
                 throw SysError("cannot create real-root directory");
 
-            if (pivot_root(".", "real-root") == -1)
+            if (syscall(SYS_pivot_root, ".", "real-root") == -1)
                 throw SysError("cannot pivot old root directory onto '%1%'", (chrootRootDir + "/real-root"));
 
             if (chroot(".") == -1)
