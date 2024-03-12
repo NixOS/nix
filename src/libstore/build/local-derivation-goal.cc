@@ -2522,6 +2522,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             [&](const DerivationOutput::CAFixed & dof) {
                 auto wanted = dof.ca.getHash();
 
+                // Replace the output by a fresh copy of itself to make sure
+                // that there's no stale file descriptor pointing to it
+                Path tmpOutput = actualPath + ".tmp";
+                copyFile(actualPath, tmpOutput, true);
+                renameFile(tmpOutput, actualPath);
+
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.ca.getMethod(),
                     .hashType = wanted.type,
