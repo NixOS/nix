@@ -104,10 +104,4 @@ template class EvalErrorBuilder<CachedEvalError>;
 template class EvalErrorBuilder<InvalidPathError>;
 template class EvalErrorBuilder<PoisonContextError>;
 
-PoisonContextError::PoisonContextError(EvalState & state)
-    : EvalError(state, "Found 'poison' context that may not be built or included in derivations")
-    , value(*state.allocValue())
-{
-}
-
 }

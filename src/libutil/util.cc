@@ -68,6 +68,7 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 template Strings tokenizeString(std::string_view s, std::string_view separators);
 template StringSet tokenizeString(std::string_view s, std::string_view separators);
 template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
+template std::vector<std::string_view> tokenizeString(std::string_view s, std::string_view separators);
 
 
 std::string chomp(std::string_view s)

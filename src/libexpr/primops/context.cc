@@ -128,7 +128,7 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                 return std::move(c);
             },
             [&](const NixStringContextElem::Poison & p) -> NixStringContextElem::DrvDeep {
-                state.error<PoisonContextError>(*args[0]).debugThrow();
+                state.error<PoisonContextError>(p, args[0]).debugThrow();
             },
         }, context.begin()->raw) }),
     };
@@ -178,6 +178,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
         bool path = false;
         bool allOutputs = false;
         Strings outputs;
+        Strings reasons;
     };
     NixStringContext context;
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.getContext");
@@ -197,7 +198,11 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
                 contextInfos[state.store->printStorePath(o.path)].path = true;
             },
             [&](NixStringContextElem::Poison && p) {
-                contextInfos["poison"] = {};
+                Strings reasons;
+                for (auto & reason : p.reasons) {
+                    reasons.push_front(reason);
+                }
+                contextInfos["poison"].reasons = reasons;
             },
         }, ((NixStringContextElem &&) i).raw);
     }
@@ -206,6 +211,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
+    auto sReasons = state.symbols.create("reasons");
     for (const auto & info : contextInfos) {
         auto infoAttrs = state.buildBindings(3);
         if (info.second.path)
@@ -217,6 +223,12 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             state.mkList(outputsVal, info.second.outputs.size());
             for (const auto & [i, output] : enumerate(info.second.outputs))
                 (outputsVal.listElems()[i] = state.allocValue())->mkString(output);
+        }
+        if (!info.second.reasons.empty()) {
+            auto & reasonsVal = infoAttrs.alloc(sReasons);
+            state.mkList(reasonsVal, info.second.reasons.size());
+            for (const auto & [i, reason] : enumerate(info.second.reasons))
+                (reasonsVal.listElems()[i] = state.allocValue())->mkString(reason);
         }
         attrs.alloc(info.first).mkAttrs(infoAttrs);
     }

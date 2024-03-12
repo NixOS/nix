@@ -1,8 +1,10 @@
 #pragma once
-///@file
+
+#include <set>
 
 #include "comparator.hh"
 #include "derived-path.hh"
+#include "source-path.hh"
 #include "variant-wrapper.hh"
 
 #include <nlohmann/json_fwd.hpp>
@@ -23,6 +25,32 @@ public:
         err.msg = HintFmt("Bad String Context element: %1%: %2%", Uncolored(hf.str()), raw);
     }
 };
+
+/**
+ * "Poison pill" output that is rejected by `builtins.derivation`.
+ *
+ * Used to ensure the implementation of functions like
+ * `builtins.toStringDebug` do not get hashed into derivations.
+ *
+ * Encoded as ‘%<reason>|<reason>|...’.
+ */
+struct Poison {
+    friend std::ostream & operator << (std::ostream & output, const Poison & poison);
+
+    std::set<std::string> reasons;
+
+    Poison() {}
+
+    static Poison parse(std::string_view raw);
+
+    void addReason(std::string reason);
+
+    void combine(Poison & other);
+
+    GENERATE_CMP(Poison, me->reasons);
+};
+
+std::ostream & operator << (std::ostream & output, const Poison & poison);
 
 struct NixStringContextElem {
     /**
@@ -54,19 +82,7 @@ struct NixStringContextElem {
      */
     using Built = SingleDerivedPath::Built;
 
-    /**
-     * "Poison pill" output that is rejected by `builtins.derivation`.
-     *
-     * Used to ensure the implementation of functions like
-     * `builtins.toStringDebug` do not get hashed into derivations.
-     *
-     * Encoded as ‘%poison’.
-     */
-    struct Poison {
-        bool operator ==(const Poison & other) const { return true; }
-        bool operator <(const Poison & other) const { return false; }
-        bool operator >(const Poison & other) const { return false; }
-    };
+    using Poison = Poison;
 
     using Raw = std::variant<
         Opaque,
@@ -86,7 +102,7 @@ struct NixStringContextElem {
      * - ‘<path>’
      * - ‘=<path>’
      * - ‘!<name>!<path>’
-     * - ‘%poison’
+     * - ‘%<reason>|<reason>|...’
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */

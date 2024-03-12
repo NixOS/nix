@@ -69,7 +69,7 @@ StringMap EvalState::realiseContext(Value & v, const NixStringContext & context)
                 ensureValid(d.drvPath);
             },
             [&](const NixStringContextElem::Poison & p) {
-                error<PoisonContextError>(v).debugThrow();
+                error<PoisonContextError>(p, &v).debugThrow();
             },
         }, c.raw);
     }
@@ -1292,7 +1292,7 @@ drvName, Bindings * attrs, Value & input, Value & v)
                 drv.inputSrcs.insert(o.path);
             },
             [&](const NixStringContextElem::Poison & p) {
-                state.error<PoisonContextError>(input)
+                state.error<PoisonContextError>(p, &input)
                     .debugThrow();
             },
         }, c.raw);

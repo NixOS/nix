@@ -6,6 +6,7 @@
 #include "pos-idx.hh"
 #include "print-options.hh"
 #include "print.hh"
+#include "value/context.hh"
 
 namespace nix {
 
@@ -61,14 +62,22 @@ public:
 struct PoisonContextError : public EvalError
 {
 public:
-    Value & value;
-    PoisonContextError(EvalState & state, Value & value)
-        : EvalError(state, "Value contains 'poison' context that may not be built or included in derivations: %1%", ValuePrinter(state, value, errorPrintOptions))
-        , value(value)
+    std::shared_ptr<Value> value;
+    const Poison & poison;
+
+    PoisonContextError(EvalState & state, const Poison & poison)
+        : EvalError(state, "Value is poisoned from %1% and may not be built or included in derivations", poison)
+        , value(nullptr)
+        , poison(poison)
     {
     }
 
-    PoisonContextError(EvalState & state);
+    PoisonContextError(EvalState & state, const Poison & poison, Value * value)
+        : EvalError(state, "Value is poisoned from %1% and may not be built or included in derivations: %2%", poison, ValuePrinter(state, *value, errorPrintOptions))
+        , value(value)
+        , poison(poison)
+    {
+    }
 };
 
 /**

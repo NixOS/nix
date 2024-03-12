@@ -1,9 +1,50 @@
+#include <optional>
+#include <vector>
+
 #include "util.hh"
 #include "value/context.hh"
 
-#include <optional>
-
 namespace nix {
+
+Poison Poison::parse(std::string_view raw)
+{
+    auto ret = Poison();
+    for (auto & reason : tokenizeString<std::vector<std::string_view>>(raw, "|")) {
+        ret.addReason(std::string(reason));
+    }
+    return ret;
+}
+
+void Poison::addReason(std::string reason)
+{
+    if (reason.find(';')) {
+        throw BadNixStringContextElem(reason, "poison context reasons can't contain `;`, which is used to delimit context elements");
+    }
+    if (reason.find('|')) {
+        throw BadNixStringContextElem(reason, "poison context reasons can't contain `|`, which is used to delimit poison reasons");
+    }
+
+    reasons.insert(reason);
+}
+
+void Poison::combine(Poison & other)
+{
+    for (auto & reason : other.reasons) {
+        addReason(reason);
+    }
+}
+
+std::ostream & operator << (std::ostream & output, const Poison & poison)
+{
+    auto end = poison.reasons.end();
+    for(auto iterator = poison.reasons.begin(); iterator != end; ++iterator) {
+        output << *iterator;
+        if (iterator != end) {
+            output << ", ";
+        }
+    }
+    return output;
+}
 
 NixStringContextElem NixStringContextElem::parse(
     std::string_view s0,
@@ -58,7 +99,7 @@ NixStringContextElem NixStringContextElem::parse(
         };
     }
     case '%': {
-        return Poison();
+        return Poison::parse(s.substr(1));
     }
     default: {
         // Ensure no '!'
@@ -104,7 +145,14 @@ std::string NixStringContextElem::to_string() const
             res += d.drvPath.to_string();
         },
         [&](const Poison & p) {
-            res += "%poison";
+            res += "%";
+            auto end = p.reasons.end();
+            for(auto iterator = p.reasons.begin(); iterator != end; ++iterator) {
+                res += *iterator;
+                if (iterator != end) {
+                    res += "|";
+                }
+            }
         },
     }, raw);
 

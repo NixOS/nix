@@ -94,7 +94,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                     };
                 },
                 [&](const NixStringContextElem::Poison & p) -> DerivedPath {
-                    state.error<PoisonContextError>(attr->getValue()).debugThrow();
+                    state.error<PoisonContextError>(p, &attr->getValue()).debugThrow();
                 },
             }, c.raw));
         }
