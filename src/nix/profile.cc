@@ -481,11 +481,12 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
 struct Matcher
 {
+    virtual ~Matcher() { }
     virtual std::string getTitle() = 0;
     virtual bool matches(const std::string & name, const ProfileElement & element) = 0;
 };
 
-struct RegexMatcher : public Matcher
+struct RegexMatcher final : public Matcher
 {
     std::regex regex;
     std::string pattern;
@@ -504,7 +505,7 @@ struct RegexMatcher : public Matcher
     }
 };
 
-struct StorePathMatcher : public Matcher
+struct StorePathMatcher final : public Matcher
 {
     nix::StorePath storePath;
 
@@ -522,7 +523,7 @@ struct StorePathMatcher : public Matcher
     }
 };
 
-struct NameMatcher : public Matcher
+struct NameMatcher final : public Matcher
 {
     std::string name;
 
@@ -540,7 +541,7 @@ struct NameMatcher : public Matcher
     }
 };
 
-struct AllMatcher : public Matcher
+struct AllMatcher final : public Matcher
 {
     std::string getTitle() override
     {
