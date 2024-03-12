@@ -318,7 +318,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
-    void smudgeLfs() override;
+    //void smudgeLfs() override;
 
     std::string resolveSubmoduleUrl(
         const std::string & url,
@@ -495,6 +495,17 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 /**
  * Raw git tree input accessor.
  */
+
+static int attr_callback(const char *name, const char *value, void *payload) {
+    warn("got an attribute! it's %s = %s", name, value);
+    return 0;
+    //// Check if the attribute is a filter attribute
+    //if (strncmp(name, "filter.", 7) == 0) {
+    //    printf("Filter attribute: %s\n", name);
+    //}
+    //return 0; // Continue iterating
+}
+
 struct GitInputAccessor : InputAccessor
 {
     ref<GitRepoImpl> repo;
@@ -510,7 +521,15 @@ struct GitInputAccessor : InputAccessor
     {
         auto blob = getBlob(path, symlink);
 
+        int error;
         // read filters here, perform smudge
+
+        // TODO: fix git_attr_foreach here, it can't seem to parse `.gitattributes` here even though it should
+        warn("on path %s", path.abs().c_str());
+         if ((error = git_attr_foreach(&(*(*repo).repo), GIT_ATTR_CHECK_INCLUDE_HEAD, path.rel_c_str(), attr_callback, NULL)) < 0) {
+             warn("git_attr_foreach: %s", git_error_last()->message);
+             }
+
         auto data = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
 
         return std::string(data);
@@ -1010,14 +1029,14 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     return result;
 }
 
-void GitRepoImpl::smudgeLfs() {
-    runProgram(RunOptions{
-            .program = "git",
-            .searchPath = true,
-            .args = { "lfs", "pull" },
-            .chdir = std::make_optional(this->path)
-            });
-}
+//void GitRepoImpl::smudgeLfs() {
+//    runProgram(RunOptions{
+//            .program = "git",
+//            .searchPath = true,
+//            .args = { "lfs", "pull" },
+//            .chdir = std::make_optional(this->path)
+//            });
+//}
 
 ref<GitRepo> getTarballCache()
 {

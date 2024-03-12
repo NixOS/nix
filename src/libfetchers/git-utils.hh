@@ -69,7 +69,7 @@ struct GitRepo
      */
     virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) = 0;
 
-    virtual void smudgeLfs() = 0;
+    //virtual void smudgeLfs() = 0;
 
     virtual std::string resolveSubmoduleUrl(
         const std::string & url,
