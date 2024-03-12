@@ -40,7 +40,7 @@ typedef enum {
     tExternal,
     tFloat,
     tPending,
-    tActive,
+    tAwaited,
 } InternalType;
 
 /**
@@ -177,7 +177,7 @@ private:
 public:
 
     Value()
-        : internalType(tInt)
+        : internalType(tUninitialized)
     { }
 
     Value(const Value & v)
@@ -189,7 +189,7 @@ public:
     Value & operator =(const Value & v)
     {
         auto type = v.internalType.load();
-        assert(type != tThunk && type != tApp && type != tPending && type != tActive);
+        assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
         internalType = type;
         payload = v.payload;
         return *this;
@@ -286,14 +286,10 @@ public:
     /**
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
-     *
-     * @param invalidIsThunk Instead of aborting an an invalid (probably
-     * 0, so uninitialized) internal type, return `nThunk`.
      */
-    inline ValueType type(bool invalidIsThunk = false) const
+    inline ValueType type() const
     {
         switch (internalType) {
-            case tUninitialized: break;
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
@@ -304,12 +300,11 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: case tPending: case tActive: return nThunk;
+            case tThunk: case tApp: case tPending: case tAwaited: return nThunk;
+            case tUninitialized:
+            default:
+                abort();
         }
-        if (invalidIsThunk)
-            return nThunk;
-        else
-            abort();
     }
 
     inline void finishValue(InternalType newType, Payload newPayload)
@@ -327,6 +322,37 @@ public:
     {
         return internalType != tUninitialized;
     }
+
+    /**
+     * Finish a pending thunk, waking up any threads that are waiting
+     * on it.
+     */
+    inline void finishValue(InternalType type)
+    {
+        // TODO: need a barrier here to ensure the payload of the
+        // value is updated before the type field.
+
+        auto oldType = internalType.exchange(type);
+
+        if (oldType == tPending)
+            // Nothing to do; no thread is waiting on this thunk.
+            ;
+        else if (oldType == tUninitialized)
+            // Uninitialized value; nothing to do.
+            ;
+        else if (oldType == tAwaited)
+            // Slow path: wake up the threads that are waiting on this
+            // thunk.
+            notifyWaiters();
+        else
+            abort();
+    }
+
+    /**
+     * Wake up any threads that are waiting on this value.
+     * FIXME: this should be in EvalState.
+     */
+    void notifyWaiters();
 
     inline void mkInt(NixInt n)
     {

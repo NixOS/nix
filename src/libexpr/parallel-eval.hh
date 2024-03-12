@@ -31,7 +31,7 @@ struct Executor
     Executor()
     {
         auto state(state_.lock());
-        for (size_t n = 0; n < 8; ++n)
+        for (size_t n = 0; n < 4; ++n)
             state->threads.push_back(std::thread([&]()
             {
                 GC_stack_base sb;

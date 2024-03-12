@@ -570,7 +570,9 @@ Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
 Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
-    *v2 = v;
+    //*v2 = v;
+    // FIXME: hack to bypass the thunk check in 'operator ='.
+    memcpy(v2, &v, sizeof(Value));
     addConstant(name, v2, info);
     return v2;
 }
@@ -587,8 +589,10 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 
            We might know the type of a thunk in advance, so be allowed
            to just write it down in that case. */
-        if (auto gotType = v->type(true); gotType != nThunk)
-            assert(info.type == gotType);
+        if (v->internalType != tUninitialized) {
+            if (auto gotType = v->type(); gotType != nThunk)
+                assert(info.type == gotType);
+        }
 
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
@@ -1548,6 +1552,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         for (size_t i = 0; i < nrArgs; ++i) {
             auto fun2 = allocValue();
             *fun2 = vRes;
+            vRes.internalType = tUninitialized;
             vRes.mkPrimOpApp(fun2, args[i]);
         }
     };
@@ -1642,6 +1647,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         : "anonymous lambda")
                     : nullptr;
 
+                vCur.internalType = tUninitialized;
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
@@ -1677,7 +1683,9 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    fn->fun(*this, vCur.determinePos(noPos), args, vCur);
+                    auto pos = vCur.determinePos(noPos);
+                    vCur.internalType = tUninitialized;
+                    fn->fun(*this, pos, args, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1726,7 +1734,9 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    auto pos = vCur.determinePos(noPos);
+                    vCur.internalType = tUninitialized;
+                    fn->fun(*this, pos, vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);

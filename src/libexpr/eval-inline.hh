@@ -110,7 +110,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
         // FIXME: mark as pending
         callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
     else if (type == tPending)
-        throw Error("HIT PENDING");
+        waitOnPendingThunk(v);
 }
 
 
