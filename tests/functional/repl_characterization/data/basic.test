@@ -9,3 +9,9 @@ meow meow
   output output output
 commentary
   output output output
+
+the blank below should be chomped
+  nix-repl> command three
+
+  meow output
+
