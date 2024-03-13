@@ -1,0 +1,60 @@
+  nix-repl> 1 + 1
+  2
+
+  nix-repl> :doc builtins.head
+  Synopsis: builtins.head list
+
+      Return the first element of a list; abort evaluation if
+      the argument isn’t a list or is an empty list. You can
+      test whether a list is empty by comparing it with [].
+
+  nix-repl> f = a: "" + a
+
+Expect the trace to not contain any traceback:
+
+  nix-repl> f 2
+  error:
+         … while evaluating a path segment
+           at «string»:1:10:
+              1|  a: "" + a
+               |          ^
+
+         error: cannot coerce an integer to a string: 2
+
+  nix-repl> :te
+  showing error traces
+
+Expect the trace to have traceback:
+
+  nix-repl> f 2
+  error:
+         … from call site
+           at «string»:1:1:
+              1| f 2
+               | ^
+
+         … while calling anonymous lambda
+           at «string»:1:2:
+              1|  a: "" + a
+               |  ^
+
+         … while evaluating a path segment
+           at «string»:1:10:
+              1|  a: "" + a
+               |          ^
+
+         error: cannot coerce an integer to a string: 2
+
+Turning it off should also work:
+
+  nix-repl> :te
+  not showing error traces
+
+  nix-repl> f 2
+  error:
+         … while evaluating a path segment
+           at «string»:1:10:
+              1|  a: "" + a
+               |          ^
+
+         error: cannot coerce an integer to a string: 2

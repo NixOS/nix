@@ -81,8 +81,15 @@ public:
     /** Parses an input in a non-streaming fashion */
     static auto parse(std::string prompt, std::string_view const & input, size_t indent = 2) -> std::vector<Node>;
 
+    /** Returns, losslessly, the string that would have generated a syntax tree */
+    static auto unparse(std::string const & prompt, std::vector<Node> const & syntax, size_t indent = 2) -> std::string;
+
     /** Consumes a CLILiterateParser and gives you the syntax out of it */
     static auto intoSyntax(CLILiterateParser && inst) -> std::vector<Node>;
+
+    /** Tidies syntax to remove trailing whitespace from outputs and remove any
+     * empty prompts */
+    static void tidyOutputForComparison(std::vector<Node> & syntax);
 
 private:
 

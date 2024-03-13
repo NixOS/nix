@@ -171,4 +171,77 @@ auto CLILiterateParser::syntax() const -> std::vector<Node> const &
     return syntax_;
 }
 
+auto CLILiterateParser::unparse(const std::string & prompt, const std::vector<Node> & syntax, size_t indent)
+    -> std::string
+{
+    std::string indent_str(indent, ' ');
+    std::ostringstream out{};
+
+    for (auto & node : syntax) {
+        switch (node.kind) {
+        case NodeKind::COMMENTARY:
+            // TODO: should not ignore commentary
+            break;
+        case NodeKind::COMMAND:
+            out << indent_str << prompt << node.text << "\n";
+            break;
+        case NodeKind::OUTPUT:
+            out << indent_str << node.text << "\n";
+            break;
+        }
+    }
+
+    return out.str();
+}
+
+void CLILiterateParser::tidyOutputForComparison(std::vector<Node> & syntax)
+{
+    std::vector<Node> newSyntax{};
+
+    // Eat trailing newlines, so assume that the very end was actually a command
+    bool lastWasCommand = true;
+    bool newLastWasCommand = true;
+
+    auto v = std::ranges::reverse_view(syntax);
+
+    for (auto it = v.begin(); it != v.end(); ++it) {
+        Node item = *it;
+
+        lastWasCommand = newLastWasCommand;
+        // chomp commentary
+        if (item.kind == NodeKind::COMMENTARY) {
+            continue;
+        }
+
+        if (item.kind == NodeKind::COMMAND) {
+            newLastWasCommand = true;
+
+            if (item.text == "") {
+                // chomp empty commands
+                continue;
+            }
+        }
+
+        if (item.kind == NodeKind::OUTPUT) {
+            // TODO: horrible
+            bool nextIsCommand =
+                (it + 1 == v.end()) ? false : (it + 1)->kind == NodeKind::COMMAND;
+            std::string trimmedText = boost::algorithm::trim_right_copy(item.text);
+            if ((lastWasCommand || nextIsCommand) && trimmedText == "") {
+                // chomp empty text above or directly below commands
+                continue;
+            }
+
+            // real output, stop chomping
+            newLastWasCommand = false;
+
+            item = Node::mkOutput(std::move(trimmedText));
+        }
+        newSyntax.push_back(std::move(item));
+    }
+
+    std::reverse(newSyntax.begin(), newSyntax.end());
+    syntax = std::move(newSyntax);
+}
+
 };
