@@ -188,8 +188,9 @@ Derivations can declare some infrequently used optional attributes.
     }
     ```
 
-    The `outputHash` attribute must be a string containing the hash in either hexadecimal or base-32 notation, or following the format for integrity metadata as defined by [SRI](https://www.w3.org/TR/SRI/).
-    (See the [`nix-hash` command](../command-ref/nix-hash.md) for information about converting to and from base-32 notation.)
+    The `outputHash` attribute must be a string containing the hash in either hexadecimal or "nix32" notation, or following the format for integrity metadata as defined by [SRI](https://www.w3.org/TR/SRI/).
+    The "nix32" notation is an adaptation of a base-32 notation.
+    The [`convertHash`](@docroot@/language/builtins.md#builtins-convertHash) function shows how to convert between different notations, and the [`nix-hash` command](../command-ref/nix-hash.md) has information about obtaining the hash for some contents, as well as converting to and from notations.
 
     The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
     It can currently be `"sha1"`, `"sha256"`, `"sha512"`, or `null`.
