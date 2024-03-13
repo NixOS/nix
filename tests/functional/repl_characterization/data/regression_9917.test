@@ -8,6 +8,26 @@ This test ensures that continues don't skip opportunities to enter the debugger.
   trace: before inner break
   info: breakpoint reached
 
+  nix-repl> :bt
+
+  0: error: breakpoint reached
+  «none»:0
+  1: while calling a function
+  TEST_DATA/regression_9917.nix:3:5
+
+       2|   a = builtins.trace "before inner break" (
+       3|     builtins.break { msg = "hello"; }
+        |     ^
+       4|   );
+
+  2: while calling a function
+  TEST_DATA/regression_9917.nix:2:7
+
+       1| let
+       2|   a = builtins.trace "before inner break" (
+        |       ^
+       3|     builtins.break { msg = "hello"; }
+
   nix-repl> :c
 
   nix-repl> msg
