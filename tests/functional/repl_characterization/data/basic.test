@@ -1,0 +1,11 @@
+meow meow meow
+  nix-repl> command
+  output output one
+
+
+  output output two
+meow meow
+  nix-repl> command two
+  output output output
+commentary
+  output output output

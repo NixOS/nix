@@ -14,6 +14,7 @@ libutil-test-support_SOURCES := $(wildcard $(d)/tests/*.cc)
 
 libutil-test-support_CXXFLAGS += $(libutil-tests_EXTRA_INCLUDES)
 
-libutil-test-support_LIBS = libutil
+# libexpr so we can steal their string printer from print.cc
+libutil-test-support_LIBS = libutil libexpr
 
 libutil-test-support_LDFLAGS := $(THREAD_LDFLAGS) -lrapidcheck

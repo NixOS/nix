@@ -45,6 +45,7 @@ makefiles += \
   tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
+  tests/functional/repl_characterization/local.mk \
   tests/functional/plugins/local.mk
 endif
 
