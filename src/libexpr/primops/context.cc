@@ -137,7 +137,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies({
     .name = "__addDrvOutputDependencies",
     .args = {"s"},
     .doc = R"(
-      Create a copy of the given string where a single consant string context element is turned into a "derivation deep" string context element.
+      Create a copy of the given string where a single constant string context element is turned into a "derivation deep" string context element.
 
       The store path that is the constant string context element should point to a valid derivation, and end in `.drv`.
 
