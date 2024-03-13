@@ -1,0 +1,74 @@
+  trace: before outer break
+  info: breakpoint reached
+
+Here we are in the outer break and the let of "meow". st should show meow there
+as it is in scope.
+  nix-repl> :st
+
+  0: error: breakpoint reached
+  «none»:0
+  Env level 0
+  static: meow
+
+  Env level 1
+  static: a b
+
+  Env level 2
+  builtins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation
+
+  nix-repl> meow
+  2
+
+If we :st past the frame in the backtrace with the meow in it, the meow should not be there.
+
+  nix-repl> :st 3
+
+  3: while calling a function
+  TEST_DATA/stack_vars.nix:5:7
+
+       4|   );
+       5|   b = builtins.trace "before outer break" (
+        |       ^
+       6|     let meow = 2; in builtins.break a
+
+  Env level 0
+  static: a b
+
+  Env level 1
+  builtins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation
+
+  nix-repl> :c
+  trace: before inner break
+  info: breakpoint reached
+
+  nix-repl> :st
+
+  0: error: breakpoint reached
+  «none»:0
+  Env level 0
+  static: meow'
+
+  Env level 1
+  static: a b
+
+  Env level 2
+  builtins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation
+
+  nix-repl> meow'
+  3
+
+  nix-repl> :st 3
+
+  3: while calling a function
+  TEST_DATA/stack_vars.nix:2:7
+
+       1| let
+       2|   a = builtins.trace "before inner break" (
+        |       ^
+       3|     let meow' = 3; in builtins.break { msg = "hello"; }
+
+  Env level 0
+  static: a b
+
+  Env level 1
+  builtins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation
