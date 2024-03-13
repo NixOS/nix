@@ -93,4 +93,15 @@ TEST_F(ReplSessionTest, repl_basic)
     readTest("basic_repl.test", [this](std::string input) { runReplTest(input); });
 }
 
+#define DEBUGGER_TEST(name) \
+    TEST_F(ReplSessionTest, name) \
+    { \
+        readTest(#name ".test", [this](std::string input) { \
+            runReplTest(input, {"--debugger", "-f", goldenMaster(#name ".nix")}); \
+        }); \
+    }
+
+DEBUGGER_TEST(regression_9918);
+DEBUGGER_TEST(regression_9917);
+
 };

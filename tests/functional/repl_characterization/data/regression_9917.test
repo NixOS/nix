@@ -1,0 +1,14 @@
+https://github.com/NixOS/nix/pull/9917 (Enter debugger more reliably in let expressions and function calls)
+
+This test ensures that continues don't skip opportunities to enter the debugger.
+  trace: before outer break
+  info: breakpoint reached
+
+  nix-repl> :c
+  trace: before inner break
+  info: breakpoint reached
+
+  nix-repl> :c
+
+  nix-repl> msg
+  "hello"

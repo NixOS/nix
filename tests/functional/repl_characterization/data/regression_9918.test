@@ -1,0 +1,16 @@
+  error:
+         … while evaluating the error message passed to builtin.throw
+
+         error: cannot coerce a list to a string: [ ]
+
+We expect to be able to see locals like r in the debugger:
+
+  nix-repl> r
+  [ ]
+
+  nix-repl> :env
+  Env level 0
+  static: x r
+
+  Env level 1
+  builtins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation
