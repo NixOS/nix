@@ -924,12 +924,12 @@ void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
     readInt(conn->from);
 }
 
-void RemoteStore::setAccessStatus(const StoreObject & storeObject, const RemoteStore::AccessStatus & status, const bool & ensureAccessCheck)
+void RemoteStore::setAccessStatus(const std::map<StoreObject, AccessStatus> & pathMap, const bool & ensureAccessCheck)
+
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::SetAccessStatus;
-    WorkerProto::Serialise<StoreObject>::write(*this, *conn, storeObject);
-    WorkerProto::Serialise<AccessStatus>::write(*this, *conn, status);
+    WorkerProto::Serialise<std::map<StoreObject, AccessStatus>>::write(*this, *conn, pathMap);
     WorkerProto::Serialise<bool>::write(*this, *conn, ensureAccessCheck);
     conn.processStderr();
     readInt(conn->from);

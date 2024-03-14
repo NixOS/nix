@@ -1303,7 +1303,7 @@ Path DerivationGoal::openLogFile()
                     localStore->futurePermissions.contains(storeObject)
                     ? localStore->futurePermissions.at(storeObject)
                     : LocalGranularAccessStore::AccessStatus {settings.protectByDefault.get(), {}};
-            localStore->setCurrentAccessStatus(logFileName, status);
+            localStore->setCurrentAccessStatus(storeObject, status);
         }
 
     return logFileName;

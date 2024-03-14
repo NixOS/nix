@@ -1461,7 +1461,7 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
                                 "while evaluating the `__permissions.outputs` "
                                 "attribute passed to builtins.derivationStrict");
                 auto outputMap = state.store->queryPartialDerivationOutputMap(drvPath);
-                std::map<StorePath, LocalGranularAccessStore::AccessStatus> accessMap;
+                std::map<StoreObject, LocalGranularAccessStore::AccessStatus> accessMap;
                 for (auto & output : *outputs->value->attrs) {
                     if (!drv.outputs.contains(state.symbols[output.name]))
                         state.debugThrowLastTrace(EvalError({

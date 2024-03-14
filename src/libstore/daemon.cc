@@ -1017,84 +1017,77 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::SetAccessStatus: {
-        auto object = WorkerProto::Serialise<StoreObject>::read(*store, rconn);
-        auto status = WorkerProto::Serialise<LocalStore::AccessStatus>::read(*store, rconn);
+        auto localStore = dynamic_cast<LocalStore*>(&*store);
+        std::map<StoreObject, LocalStore::AccessStatus> pathMap = WorkerProto::Serialise<std::map<StoreObject, LocalStore::AccessStatus>>::read(*store, rconn);
         bool ensureAccessCheck = WorkerProto::Serialise<bool>::read(*store, rconn);
         logger->startWork();
-        auto localStore = dynamic_cast<LocalStore*>(&*store);
-        // Could there be a race condition here ? If the path is added by a concurrent build, after we checked its existence.
-        if (!localStore->pathOfStoreObjectExists(object)){
-            localStore->setAccessStatus(object, status, ensureAccessCheck);
-        }
-        else {
-          auto curStatus = require<LocalGranularAccessStore>(*store).getAccessStatus(object);
-          if (status != curStatus) {
-            if (user.trusted) {
-                localStore->setAccessStatus(object, status, ensureAccessCheck);
-            } else {
-              // TODO document rationale behind this logic
-              auto [exists, description] = std::visit(
-                  overloaded{
-                      [&](StorePath p) {
-                        auto rp = store->toRealPath(p);
-                        return std::pair<bool, std::string>{pathExists(rp),
-                                                            fmt("path %s", rp)};
-                      },
-                      [&](StoreObjectDerivationOutput b) {
-                        auto drv = localStore->readDerivation(b.drvPath);
-                        auto outputHashes =
-                            staticOutputHashes(*localStore, drv);
-                        auto drvOutputs = drv.outputsAndOptPaths(*localStore);
-                        bool known = drvOutputs.contains(b.output) &&
-                                     drvOutputs.at(b.output).second;
-                        if (known) {
-                          auto realPath = store->toRealPath(
-                              *drvOutputs.at(b.output).second);
-                          bool exists = pathExists(realPath);
-                          return std::pair<bool, std::string>{
-                              exists, fmt("path %s", realPath)};
-                        } else {
-                          return std::pair<bool, std::string>{
-                              false, fmt("output %s of derivation %s", b.output,
-                                         store->toRealPath(b.drvPath))};
-                        }
-                      },
-                      [&](StoreObjectDerivationLog l) {
-                        auto baseName = l.drvPath.to_string();
+        for (auto [object, status] : pathMap) {
+          if (localStore->storeObjectPath(object)){
+            auto curStatus = require<LocalGranularAccessStore>(*store).getAccessStatus(object);
+            if (status != curStatus && !user.trusted) {
+                // TODO document rationale behind this logic
+                auto [exists, description] = std::visit(
+                    overloaded{
+                        [&](StorePath p) {
+                          auto rp = store->toRealPath(p);
+                          return std::pair<bool, std::string>{pathExists(rp),
+                                                              fmt("path %s", rp)};
+                        },
+                        [&](StoreObjectDerivationOutput b) {
+                          auto drv = localStore->readDerivation(b.drvPath);
+                          auto outputHashes =
+                              staticOutputHashes(*localStore, drv);
+                          auto drvOutputs = drv.outputsAndOptPaths(*localStore);
+                          bool known = drvOutputs.contains(b.output) &&
+                                       drvOutputs.at(b.output).second;
+                          if (known) {
+                            auto realPath = store->toRealPath(
+                                *drvOutputs.at(b.output).second);
+                            bool exists = pathExists(realPath);
+                            return std::pair<bool, std::string>{
+                                exists, fmt("path %s", realPath)};
+                          } else {
+                            return std::pair<bool, std::string>{
+                                false, fmt("output %s of derivation %s", b.output,
+                                           store->toRealPath(b.drvPath))};
+                          }
+                        },
+                        [&](StoreObjectDerivationLog l) {
+                          auto baseName = l.drvPath.to_string();
 
-                        auto logPath =
-                            fmt("%s/%s/%s/%s.bz2", localStore->logDir,
-                                localStore->drvsLogDir, baseName.substr(0, 2),
-                                baseName.substr(2));
+                          auto logPath =
+                              fmt("%s/%s/%s/%s.bz2", localStore->logDir,
+                                  localStore->drvsLogDir, baseName.substr(0, 2),
+                                  baseName.substr(2));
 
-                        return std::pair<bool, std::string>{
-                            pathExists(logPath),
-                            fmt("build log of derivation %s",
-                                store->toRealPath(l.drvPath))};
-                      }},
-                  object);
-              if (exists && status.isProtected != curStatus.isProtected)
-                throw AccessDenied("You have to be a trusted user to set a "
-                                   "protection status on an existing %s",
-                                   description);
-              if (!status.isProtected)
-                throw AccessDenied("Only trusted users can set allowed "
-                                   "entities on an unprotected %s",
-                                   description);
-              if (exists &&
-                  !std::includes(status.entities.begin(), status.entities.end(),
-                                 curStatus.entities.begin(),
-                                 curStatus.entities.end())) {
-                throw AccessDenied(
-                    "Only trusted users can revoke permissions on %s",
-                    description);
+                          return std::pair<bool, std::string>{
+                              pathExists(logPath),
+                              fmt("build log of derivation %s",
+                                  store->toRealPath(l.drvPath))};
+                        }},
+                    object);
+                if (exists && status.isProtected != curStatus.isProtected)
+                  throw AccessDenied("You have to be a trusted user to set a "
+                                     "protection status on an existing %s",
+                                     description);
+                if (!status.isProtected)
+                  throw AccessDenied("Only trusted users can set allowed "
+                                     "entities on an unprotected %s",
+                                     description);
+                if (exists &&
+                    !std::includes(status.entities.begin(), status.entities.end(),
+                                   curStatus.entities.begin(),
+                                   curStatus.entities.end())) {
+                  throw AccessDenied(
+                      "Only trusted users can revoke permissions on %s",
+                      description);
+                }
               }
-              localStore->setAccessStatus(object, status, ensureAccessCheck);
+            } else {
+              localStore->ensureAccess(status, object);
             }
-          } else {
-            localStore->ensureAccess(status, object);
-          }
         }
+        localStore->setAccessStatus(pathMap, ensureAccessCheck);
         logger->stopWork();
         to << 1;
         break;

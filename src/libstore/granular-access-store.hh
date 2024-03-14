@@ -53,19 +53,15 @@ struct GranularAccessStore : public virtual Store
     typedef std::variant<AccessControlSubject, AccessControlGroup> AccessControlEntity;
     typedef AccessStatusFor<AccessControlEntity> AccessStatus;
 
-
-    virtual void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status, const bool & ensureAccessCheck) = 0;
+    /** Get an access status of a path */
     virtual AccessStatus getAccessStatus(const StoreObject & storeObject) = 0;
 
-    virtual void setAccessStatus(const std::map<StorePath, AccessStatus> pathMap)
+    /** Set an access status on a set of paths, in a single "transaction" that gets rolled back in case of an error, and is self-consistent */
+    virtual void setAccessStatus(const std::map<StoreObject, AccessStatus> & pathMap, const bool & ensureAccessCheck = true) = 0;
+
+    virtual void setAccessStatus(StoreObject o, AccessStatus a, const bool & ensureAccessCheck = true)
     {
-        StorePathSet pathSet;
-        for (auto [path, _] : pathMap)
-            pathSet.insert(path);
-        auto paths = topoSortPaths(pathSet);
-        for (auto path : paths) {
-            setAccessStatus(path, pathMap.at(path), true);
-        }
+        setAccessStatus({{o, a}}, ensureAccessCheck);
     }
 
     virtual std::set<AccessControlGroup> getSubjectGroupsUncached(AccessControlSubject subject) = 0;

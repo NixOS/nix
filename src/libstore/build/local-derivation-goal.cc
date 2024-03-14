@@ -2450,9 +2450,6 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             auto & localStore = getLocalStore();
 
             StoreObjectDerivationOutput thisOutput(drvPath, outputName);
-            if (localStore.futurePermissions.contains(thisOutput)) {
-                localStore.setAccessStatus(finalStorePath, localStore.futurePermissions[thisOutput], false);
-            }
             /* Store the final path */
             finalOutputs.insert_or_assign(outputName, finalStorePath);
             /* The rewrite rule will be used in downstream outputs that refer to

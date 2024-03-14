@@ -302,15 +302,14 @@ public:
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void ensureAccess(const AccessStatus & accessStatus, const StoreObject & object);
-    void setAccessStatus(const StoreObject & storeObject, const AccessStatus & status, const bool & ensureAccessCheck) override;
-    void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status);
-    void setCurrentAccessStatus(const Path & path, const AccessStatus & status, bool doChecks = true);
+    void setAccessStatus(const std::map<StoreObject, AccessStatus> & pathMap, const bool & ensureAccessCheck) override;
+    void setCurrentAccessStatus(const StoreObject & storeObject, const AccessStatus & status, bool doChecks = true);
     AccessStatus getAccessStatus(const StoreObject & storeObject) override;
     std::optional<AccessStatus> getFutureAccessStatusOpt(const StoreObject & storeObject);
-    AccessStatus getCurrentAccessStatus(const Path & path);
     AccessStatus getCurrentAccessStatus(const StoreObject & storeObject);
     bool shouldSyncPermissions(const StoreObject &storeObject);
-    bool pathOfStoreObjectExists(const StoreObject & storeObject);
+    std::optional<Path> storeObjectPath(const StoreObject & storeObject);
+    std::optional<StorePath> storeObjectStorePath(const StoreObject & storeObject);
 
     void grantBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);
     void revokeBuildUserAccess(const StorePath & path, const AccessControlEntity & entity);

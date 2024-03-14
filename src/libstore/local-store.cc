@@ -966,9 +966,8 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 void LocalStore::syncPathPermissions(const ValidPathInfo & info)
 {
     if (experimentalFeatureSettings.isEnabled(Xp::ACLs)) {
-        auto realPath = Store::toRealPath(info.path);
         if (futurePermissions.contains(info.path)) {
-            setCurrentAccessStatus(realPath, futurePermissions[info.path]);
+            setCurrentAccessStatus(info.path, futurePermissions[info.path]);
             /* FIXME: we should erase the permissions to prevent memory leakage;
                However, it's not easy to only call this function once, so we end
                up resetting the permissions to the default ones */
@@ -976,10 +975,10 @@ void LocalStore::syncPathPermissions(const ValidPathInfo & info)
             if (info.accessStatus)
                 addAllowedEntities(info.path, info.accessStatus->entities);
         } else if (info.accessStatus) {
-            setCurrentAccessStatus(realPath, *info.accessStatus);
+            setCurrentAccessStatus(info.path, *info.accessStatus);
         } else {
             // TODO: a mode where all new paths are protected by default
-            setCurrentAccessStatus(realPath, AccessStatus());
+            setCurrentAccessStatus(info.path, AccessStatus());
         }
     }
 }
@@ -1061,7 +1060,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos, bool syncPermi
             } catch (AccessDenied e) {
                 if ((info.accessStatus && info.accessStatus->isProtected) || (futurePermissions.contains(path) && futurePermissions[path].isProtected)) {
                     // Upon failure, just mark path as protected to prevent data leakage
-                    setCurrentAccessStatus(Store::toRealPath(path), AccessStatus(true, {}), false);
+                    setCurrentAccessStatus(path, AccessStatus(true, {}), false);
                 }
                 ex = e;
             }
@@ -1070,9 +1069,14 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos, bool syncPermi
     if (ex) throw *ex;
 }
 
-void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::AccessStatus & status, bool doChecks)
+void LocalStore::setCurrentAccessStatus(const StoreObject & storeObject, const LocalStore::AccessStatus & status, bool doChecks)
 {
     experimentalFeatureSettings.require(Xp::ACLs);
+
+    auto path_ = storeObjectPath(storeObject);
+    if (!path_) throw Error("store object does not exist");
+    auto path = *path_;
+    
 
 
     // We check that everyone who has access to the path has access to runtimes dependencies
@@ -1103,7 +1107,7 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
             if (info) {
                 for (auto reference : info->references) {
                     if (reference == storePath) continue;
-                    auto otherStatus = getCurrentAccessStatus(printStorePath(reference));
+                    auto otherStatus = getCurrentAccessStatus(reference);
                     if (!otherStatus.isProtected) continue;
                     if (!status.isProtected)
                         throw AccessDenied("can not make %s non-protected because it references a protected path %s", path, printStorePath(reference));
@@ -1127,17 +1131,21 @@ void LocalStore::setCurrentAccessStatus(const Path & path, const LocalStore::Acc
             for (auto referrer : referrers) {
                 if (referrer == storePath) continue;
                 auto otherStatus = getAccessStatus(referrer);
+                auto otherStatus_ = otherStatus;
                 if (!status.isProtected) continue;
-                if (!otherStatus.isProtected)
-                    throw AccessDenied("can not make %s protected because it is referenced by a non-protected path %s", path, printStorePath(referrer));
+                if (!otherStatus.isProtected) {
+                    debug("protecting %s because %s is being protected", printStorePath(referrer), path);
+                    otherStatus.isProtected = true;
+                }
                 std::vector<AccessControlEntity> difference;
                 std::set_difference(otherStatus.entities.begin(), otherStatus.entities.end(), status.entities.begin(), status.entities.end(),std::inserter(difference, difference.begin()));
 
-                if (! difference.empty()) {
-                    std::string entities;
-                    for (auto entity : difference) entities += ACL::printTag(entity) + ", ";
-                    throw AccessDenied("can not deny %s access to %s because it is referenced by a path %s to which they do have access", entities.substr(0, entities.size()-2), path, printStorePath(referrer));
+                for (auto entity : difference) {
+                    debug("denying %s access to %s because they are being denied access to %s", ACL::printTag(entity), path, printStorePath(referrer));
+                    otherStatus.entities.erase(entity);
                 }
+
+                if (otherStatus != otherStatus_) setCurrentAccessStatus(referrer, otherStatus);
             }
         }
     }
@@ -1245,84 +1253,58 @@ void LocalStore::ensureAccess(const AccessStatus & accessStatus, const StoreObje
 }
 
 
-void LocalStore::setAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status, const bool & ensureAccessCheck)
+void LocalStore::setAccessStatus(const std::map<StoreObject, AccessStatus> & pathMap, const bool & ensureAccessCheck)
 {
-    if (ensureAccessCheck) ensureAccess(status, storePathstoreObject);
-    if (pathOfStoreObjectExists(storePathstoreObject)){
-        setCurrentAccessStatus(storePathstoreObject, status);
-    }
-    else {
-        // If adding future permissions to a StoreObjectDerivationOutput,
-        // also add permissions to the paths that will exist in the future.
-        std::visit(overloaded {
-            [&](StorePath p) {},
-            [&](StoreObjectDerivationOutput p) {
-                    auto drv = readDerivation(p.drvPath);
-                    auto outputHashes = staticOutputHashes(*this, drv);
-                    auto drvOutputs = drv.outputsAndOptPaths(*this);
-                    if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
-                        auto path = *drvOutputs.at(p.output).second;
-                        futurePermissions[path] = status;
-                    }
-            },
-            [&](StoreObjectDerivationLog l){}
-        }, storePathstoreObject);
-        futurePermissions[storePathstoreObject] = status;
-    }
-}
-
-void LocalStore::setCurrentAccessStatus(const StoreObject & storePathstoreObject, const AccessStatus & status)
-{
-    std::set<std::string> users;
-    std::set<std::string> groups;
-    for (auto entity : status.entities) {
-        std::visit(overloaded {
-            [&](ACL::User user) {
-                users.insert(getUserName(user.uid));
-            },
-            [&](ACL::Group group) {
-                groups.insert(getGroupName(group.gid));
-            }
-        }, entity);
-    }
-    std::visit(overloaded {
-        [&](StorePath p) {
-            auto path = Store::toRealPath(p);
-            if (pathExists(path)){
-                setCurrentAccessStatus(path, status);
-            }
-            else{
-                throw Error("setCurrentAccessStatus path does not exists (%s)", path);
-            }
-        },
-        [&](StoreObjectDerivationOutput p) {
-            auto drv = readDerivation(p.drvPath);
-            auto outputHashes = staticOutputHashes(*this, drv);
-            auto drvOutputs = drv.outputsAndOptPaths(*this);
-            if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
-                auto path = Store::toRealPath(*drvOutputs.at(p.output).second);
-                if (pathExists(path)) {
-                    setCurrentAccessStatus(path, status);
-                    return;
-                }
-                throw Error("setCurrentAccessStatus drv path does not exists (%s)", path);
-            }
-        },
-        [&](StoreObjectDerivationLog l) {
-            auto baseName = l.drvPath.to_string();
-
-            auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
-
-            if (!pathExists(logPath)){
-                throw Error("setCurrentAccessStatus log path does not exists (%s)", logPath);
-            }
-            setCurrentAccessStatus(logPath, status);
+    std::map<StorePath, AccessStatus> existingPathMap;
+    StorePathSet existingPaths;
+    std::set<StoreObject> remainder;
+    for (auto [object, status] : pathMap) {
+        if (ensureAccessCheck) ensureAccess(status, object);
+        auto p = storeObjectStorePath(object);
+        if (p) {
+            existingPaths.insert(*p);
+            existingPathMap[*p] = status;
         }
-    }, storePathstoreObject);
+        else
+            remainder.insert(object);
+    }
+    auto sortedPaths = topoSortPaths(existingPaths);
+    std::reverse(sortedPaths.begin(), sortedPaths.end());
+    for (auto p : sortedPaths)
+        setCurrentAccessStatus(p, existingPathMap[p]);
+    for (auto object : remainder) {
+        auto status = pathMap.at(object);
+        if (storeObjectPath(object)) {
+            setCurrentAccessStatus(object, status);
+        }
+        else {
+            // If adding future permissions to a StoreObjectDerivationOutput,
+            // also add permissions to the paths that will exist in the future.
+            std::visit(overloaded {
+                [&](StorePath p) {},
+                [&](StoreObjectDerivationOutput p) {
+                        auto drv = readDerivation(p.drvPath);
+                        auto outputHashes = staticOutputHashes(*this, drv);
+                        auto drvOutputs = drv.outputsAndOptPaths(*this);
+                        if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                            auto path = *drvOutputs.at(p.output).second;
+                            futurePermissions[path] = status;
+                        }
+                },
+                [&](StoreObjectDerivationLog l){}
+            }, object);
+            futurePermissions[object] = status;
+        }
+    }
 }
 
-LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const Path & path)
+LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const StoreObject & storeObject)
 {
+    auto path_ = storeObjectPath(storeObject);
+    if (!path_) throw Error("store object does not exist");
+
+    auto path = *path_;
+    
     AccessStatus status;
 
     using namespace ACL;
@@ -1343,42 +1325,6 @@ LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const Path & path)
     }
 
     return status;
-}
-
-LocalStore::AccessStatus LocalStore::getCurrentAccessStatus(const StoreObject & storeObject)
-{
-    experimentalFeatureSettings.require(Xp::ACLs);
-
-    return std::visit(overloaded {
-        [&](StorePath p){
-            auto path = Store::toRealPath(p);
-            if (pathExists(path))
-                return getCurrentAccessStatus(path);
-            throw Error("getCurrentAccessStatus of inexisting path (%s)", path);
-        },
-        [&](StoreObjectDerivationOutput p) {
-            auto drv = readDerivation(p.drvPath);
-            auto outputHashes = staticOutputHashes(*this, drv);
-            auto drvOutputs = drv.outputsAndOptPaths(*this);
-            if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
-                auto path = Store::toRealPath(*drvOutputs.at(p.output).second);
-                if (pathExists(path)) {
-                    return getCurrentAccessStatus(path);
-                }
-                throw Error("getCurrentAccessStatus of inexisting drv path (%s)", path);
-            }
-            throw Error("getCurrentAccessStatus of inexisting p.output (%s)", p.output);
-        },
-        [&](StoreObjectDerivationLog l) {
-            auto baseName = l.drvPath.to_string();
-
-            auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
-
-            if (pathExists(logPath))
-                return getCurrentAccessStatus(logPath);
-            throw Error("getCurrentAccessStatus of inexisting log path (%s)", logPath);
-        }
-    }, storeObject);
 }
 
 void LocalStore::grantBuildUserAccess(const StorePath & storePath, const LocalStore::AccessControlEntity & buildUser)
@@ -1430,31 +1376,61 @@ bool LocalStore::shouldSyncPermissions(const StoreObject &storeObject) {
     return false;
 }
 
-// TODO: make a pathOfStoreObjectFunction to deduplicate
-bool LocalStore::pathOfStoreObjectExists(const StoreObject & storeObject)
+std::optional<StorePath> LocalStore::storeObjectStorePath(const StoreObject & storeObject)
 {
     experimentalFeatureSettings.require(Xp::ACLs);
 
     return std::visit(overloaded {
         [&](StorePath p){
             auto path = Store::toRealPath(p);
-            return pathExists(path);
+            if (pathExists(path)) return std::optional<StorePath>(p);
+            return std::optional<StorePath>();
         },
         [&](StoreObjectDerivationOutput p) {
             auto drv = readDerivation(p.drvPath);
             auto outputHashes = staticOutputHashes(*this, drv);
             auto drvOutputs = drv.outputsAndOptPaths(*this);
             if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
-                auto path = Store::toRealPath(*drvOutputs.at(p.output).second);
-                return pathExists(path);
-                }
-            return false;
+                auto storePath = *drvOutputs.at(p.output).second;
+                auto path = Store::toRealPath(storePath);
+                if (pathExists(path)) return std::optional<StorePath>(storePath);
+            }
+            return std::optional<StorePath>();
+        }
+        ,
+        [&](StoreObjectDerivationLog l) {
+            return std::optional<StorePath>();
+        }
+    }, storeObject);
+}
+
+std::optional<Path> LocalStore::storeObjectPath(const StoreObject & storeObject)
+{
+    experimentalFeatureSettings.require(Xp::ACLs);
+
+    return std::visit(overloaded {
+        [&](StorePath p){
+            auto path = Store::toRealPath(p);
+            if (pathExists(path)) return std::optional<Path>(path);
+            return std::optional<Path>();
+        },
+        [&](StoreObjectDerivationOutput p) {
+            auto drv = readDerivation(p.drvPath);
+            auto outputHashes = staticOutputHashes(*this, drv);
+            auto drvOutputs = drv.outputsAndOptPaths(*this);
+            if (drvOutputs.contains(p.output) && drvOutputs.at(p.output).second) {
+                auto storePath = *drvOutputs.at(p.output).second;
+                auto path = Store::toRealPath(storePath);
+                if (pathExists(path)) return std::optional<Path>(path);
+            }
+            return std::optional<Path>();
         }
         ,
         [&](StoreObjectDerivationLog l) {
             auto baseName = l.drvPath.to_string();
             auto logPath = fmt("%s/%s/%s/%s.bz2", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
-            return pathExists(logPath);
+            if (pathExists(logPath)) return std::optional<Path>(logPath);
+            return std::optional<Path>();
         }
     }, storeObject);
 }
