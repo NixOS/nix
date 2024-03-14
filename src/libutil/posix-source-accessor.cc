@@ -166,4 +166,8 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     }
 }
 
+bool PosixSourceAccessor::toStringReturnsStorePath() const {
+    return false;
+}
+
 }

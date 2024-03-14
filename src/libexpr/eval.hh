@@ -236,6 +236,9 @@ public:
 
     const SourcePath callFlakeInternal;
 
+    /* A collection of InputAccessors, just to keep them alive. */
+    std::list<ref<InputAccessor>> inputAccessors;
+
     /**
      * Store used to materialise .drv files.
      */

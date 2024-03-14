@@ -67,4 +67,8 @@ std::string SourceAccessor::showPath(const CanonPath & path)
     return displayPrefix + path.abs() + displaySuffix;
 }
 
+bool SourceAccessor::toStringReturnsStorePath() const {
+    return true;
+}
+
 }
