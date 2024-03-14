@@ -239,6 +239,11 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
         info.sigs = readStrings<StringSet>(conn.from);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
     }
+    if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
+        bool hasAccessStatus = WorkerProto::Serialise<bool>::read(store, conn);
+        if (hasAccessStatus)
+            info.accessStatus = WorkerProto::Serialise<AccessStatusFor<std::variant<ACL::User, ACL::Group>>>::read(store, conn);
+    }
     return info;
 }
 
@@ -254,6 +259,11 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & 
             << pathInfo.ultimate
             << pathInfo.sigs
             << renderContentAddress(pathInfo.ca);
+    }
+    if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
+        WorkerProto::Serialise<bool>::write(store, conn, pathInfo.accessStatus.has_value());
+        if (pathInfo.accessStatus)
+            WorkerProto::Serialise<AccessStatusFor<std::variant<ACL::User, ACL::Group>>>::write(store, conn, *pathInfo.accessStatus);
     }
 }
 
