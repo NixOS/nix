@@ -1,3 +1,74 @@
+# Welcome to Nix
+
+# What Nix is for
+
+Nix makes computation repeatable
+
+It treats file system data like memory in a data flow program:
+- Ensures referential integrity
+- Enables caching and deduplication
+- Performs garbage collection
+
+This allows getting computer programs from one machine to another — and having them still work when they get there
+
+![](./figures/memory-filesystem.svg)
+
+<!--
++---------------------------+    +---------------------------+
+|         program           |    |     operating system      |
+| +-----------------------+ |    | +-----------------------+ |
+| |        memory         | |    | |         disk          | |
+| | +-------------------+ | |    | | +-------------------+ | |
+| | |       heap        | | |    | | |    file system    | | |
+| | | +---------------+ | | |    | | | +---------------+ | | |
+| | | |    object a   | | | |    | | | |     file a    | | | |
+| | | +---------------+ | | |    | | | +---------------+ | | |
+| | |         |         | | |    | | |         |         | | |
+| | |      pointer      | | |    | | |       path        | | |
+| | |         |         | | |    | | |         |         | | |
+| | |         v         | | |    | | |         v         | | |
+| | | +---------------+ | | |    | | | +---------------+ | | |
+| | | |    object b   | | | |    | | | |     file b    | | | |
+| | | +---------------+ | | |    | | | +---------------+ | | |
+| | +-------------------+ | |    | | +-------------------+ | |
+| +-----------------------+ |    | +-----------------------+ |
++---------------------------+    +---------------------------+
+-->
+
+It forces operating system processes to act like pure functions:
+- Output only changes if input changes
+- Composable as independent, reusable units
+- Deterministic and safely parallelisable
+
+![](./figures/function-process.svg)
+
+<!--
++-----------------------+        +-----------------------+
+|         thunk         |        |        process        |
+| +-------------------+ |        | +-------------------+ |
+| |       value       | |        | |       file        | |
+| +-------------------+ |        | +-------------------+ |
+|           |           |        |           |           |
+|         input         |        |         read          |
+|           |           |        |           |           |
+|           v           |        |           v           |
+| +-------------------+ |        | +-------------------+ |
+| |      function     | |        | |    instructions   | |
+| +-------------------+ |        | +-------------------+ |
+|           |           |        |           |           |
+|         output        |        |         write         |
+|           |           |        |           |           |
++-----------|-----------+        +-----------|-----------+
+            |                                |
+            v                                v
+  +-------------------+            +-------------------+
+  |       value       |            |       file        |
+  +-------------------+            +-------------------+
+-->
+
+Think of it as running `execve()` in a clean environment on read-only data and caching the output.
+Or think of it as functional programming with files and directories.
+
 # Introduction
 
 Nix is a _purely functional package manager_.  This means that it
