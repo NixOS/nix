@@ -1978,6 +1978,7 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, co
     v.mkList(list);
 }
 
+// FIXME limit recursion
 Value * resolveOutPath(EvalState & state, Value * v, const PosIdx pos)
 {
     state.forceValue(*v, pos);
@@ -2335,6 +2336,8 @@ BackedStringView EvalState::coerceToString(
               v.payload.path.path
             : copyToStore
             ? store->printStorePath(copyPathToStore(context, v.path()))
+            : v.path().accessor->toStringReturnsStorePath()
+            ? store->printStorePath(copyPathToStore(context, SourcePath(v.path().accessor, CanonPath::root))) + v.path().path.absOrEmpty()
             : std::string(v.path().path.abs());
     }
 
@@ -2447,10 +2450,14 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     if (v.type() == nPath)
         return v.path();
 
-    /* Similarly, handle __toString where the result may be a path
+    /* Similarly, handle outPath and __toString where the result may be a path
        value. */
     if (v.type() == nAttrs) {
-        auto i = v.attrs()->find(sToString);
+        auto i = v.attrs()->find(sOutPath);
+        if (i != v.attrs()->end()) {
+            return coerceToPath(pos, *i->value, context, errorCtx);
+        }
+        i = v.attrs()->find(sToString);
         if (i != v.attrs()->end()) {
             Value v1;
             callFunction(*i->value, v, v1, pos);
@@ -3115,6 +3122,8 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
                 store,
                 fetchSettings,
                 EvalSettings::resolvePseudoUrl(value));
+            // Traditional search path lookups use the absolute path space for
+            // historical consistency.
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
             res.emplace(rootPath(CanonPath(store->toRealPath(storePath))));
         } catch (Error & e) {

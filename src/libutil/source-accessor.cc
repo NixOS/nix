@@ -105,4 +105,8 @@ CanonPath SourceAccessor::resolveSymlinks(
     return res;
 }
 
+bool SourceAccessor::toStringReturnsStorePath() const {
+    return true;
+}
+
 }

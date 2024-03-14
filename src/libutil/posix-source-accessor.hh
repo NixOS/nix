@@ -57,6 +57,8 @@ struct PosixSourceAccessor : virtual SourceAccessor
      */
     static SourcePath createAtRoot(const std::filesystem::path & path);
 
+    virtual bool toStringReturnsStorePath() const override;
+
 private:
 
     /**
