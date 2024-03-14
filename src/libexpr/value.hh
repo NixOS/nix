@@ -18,6 +18,7 @@
 
 namespace nix {
 
+struct Value;
 class BindingsBuilder;
 
 
@@ -132,6 +133,34 @@ class ExternalValueBase
 };
 
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
+
+
+class ListBuilder
+{
+    const size_t size;
+    Value * inlineElems[2] = {nullptr, nullptr};
+public:
+    Value * * elems;
+    ListBuilder(EvalState & state, size_t size);
+
+    ListBuilder(ListBuilder && x)
+        : size(x.size)
+        , inlineElems{x.inlineElems[0], x.inlineElems[1]}
+        , elems(size <= 2 ? inlineElems : x.elems)
+    { }
+
+    Value * & operator [](size_t n)
+    {
+        return elems[n];
+    }
+
+    typedef Value * * iterator;
+
+    iterator begin() { return &elems[0]; }
+    iterator end() { return &elems[size]; }
+
+    friend class Value;
+};
 
 
 struct Value
@@ -323,16 +352,20 @@ public:
 
     Value & mkAttrs(BindingsBuilder & bindings);
 
-    inline void mkList(size_t size)
+    void mkList(const ListBuilder & builder)
     {
         clearValue();
-        if (size == 1)
+        if (builder.size == 1) {
+            smallList[0] = builder.inlineElems[0];
             internalType = tList1;
-        else if (size == 2)
+        } else if (builder.size == 2) {
+            smallList[0] = builder.inlineElems[0];
+            smallList[1] = builder.inlineElems[1];
             internalType = tList2;
-        else {
+        } else {
+            bigList.size = builder.size;
+            bigList.elems = builder.elems;
             internalType = tListN;
-            bigList.size = size;
         }
     }
 

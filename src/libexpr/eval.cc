@@ -435,7 +435,8 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
-    vEmptyList.mkList(0);
+    vEmptyList.mkList(buildList(0));
+    vNull.mkNull();
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -923,12 +924,11 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-void EvalState::mkList(Value & v, size_t size)
+ListBuilder::ListBuilder(EvalState & state, size_t size)
+    : size(size)
+    , elems(size <= 2 ? inlineElems : (Value * *) allocBytes(size * sizeof(Value *)))
 {
-    v.mkList(size);
-    if (size > 2)
-        v.bigList.elems = (Value * *) allocBytes(size * sizeof(Value *));
-    nrListElems += size;
+    state.nrListElems += size;
 }
 
 
@@ -1353,9 +1353,10 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkList(v, elems.size());
-    for (auto [n, v2] : enumerate(v.listItems()))
-        const_cast<Value * &>(v2) = elems[n]->maybeThunk(state, env);
+    auto list = state.buildList(elems.size());
+    for (const auto & [n, v2] : enumerate(list))
+        v2 = elems[n]->maybeThunk(state, env);
+    v.mkList(list);
 }
 
 
@@ -1963,14 +1964,15 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
         return;
     }
 
-    mkList(v, len);
-    auto out = v.listElems();
+    auto list = buildList(len);
+    auto out = list.elems;
     for (size_t n = 0, pos = 0; n < nrLists; ++n) {
         auto l = lists[n]->listSize();
         if (l)
             memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
     }
+    v.mkList(list);
 }
 
 
