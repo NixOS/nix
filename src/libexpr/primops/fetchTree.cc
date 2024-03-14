@@ -92,7 +92,7 @@ struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
     bool isFetchGit = false;
-    bool returnPath = true; // whether to return a SourcePath or a StorePath
+    bool returnPath = true; // whether to return a SourcePath instead of a StorePath
 };
 
 static void fetchTree(
@@ -201,18 +201,31 @@ static void fetchTree(
 
     state.checkURI(input.toURLString());
 
-    auto [storePath, input2] = input.fetchToStore(state.store);
+    if (params.returnPath) {
+        // Clang16+: change to `auto [accessor, input2] =`
+        auto pair = input.getAccessor(state.store);
+        auto & accessor = pair.first;
+        auto & input2 = pair.second;
 
-    state.allowPath(storePath);
+        emitTreeAttrs(state, input2, v,
+            [&](Value & vOutPath) {
+                state.registerAccessor(accessor);
+                vOutPath.mkPath(SourcePath { accessor, CanonPath::root });
+            },
+            params.emptyRevFallback, false);
+    } else {
+        auto pair = input.fetchToStore(state.store);
+        auto & storePath = pair.first;
+        auto & input2 = pair.second;
 
-    emitTreeAttrs(state, input2, v,
-        [&](Value & vOutPath) {
-            if (params.returnPath)
-                vOutPath.mkPath(state.rootPath(state.store->toRealPath(storePath)));
-            else
+        state.allowPath(storePath);
+
+        emitTreeAttrs(state, input2, v,
+            [&](Value & vOutPath) {
                 state.mkStorePathString(storePath, vOutPath);
-        },
-        params.emptyRevFallback, false);
+            },
+            params.emptyRevFallback, false);
+    }
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
