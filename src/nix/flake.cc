@@ -207,9 +207,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
 
-        // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
-
         if (json) {
             nlohmann::json j;
             if (flake.description)
@@ -230,7 +227,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
-            j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             logger->cout("%s", j.dump());
         } else {
@@ -245,9 +241,6 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Description:" ANSI_NORMAL "   %s",
                     *flake.description);
-            logger->cout(
-                ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
-                storePath);
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
@@ -1406,21 +1399,15 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     {
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
-        auto [storePath, lockedRef] = resolvedRef.fetchTree(store);
-        auto hash = store->queryPathInfo(storePath)->narHash;
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
 
         if (json) {
             auto res = nlohmann::json::object();
-            res["storePath"] = store->printStorePath(storePath);
-            res["hash"] = hash.to_string(HashFormat::SRI, true);
             res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
             res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
             logger->cout(res.dump());
         } else {
-            notice("Downloaded '%s' to '%s' (hash '%s').",
-                lockedRef.to_string(),
-                store->printStorePath(storePath),
-                hash.to_string(HashFormat::SRI, true));
+            notice("Fetched '%s'.", lockedRef.to_string());
         }
     }
 };
