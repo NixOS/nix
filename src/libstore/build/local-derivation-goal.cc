@@ -3017,15 +3017,18 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
             bool chowned = false;
             struct stat info;
             stat(tmpDir.c_str(), &info);
+            std::optional<SysError> e;
             if (experimentalFeatureSettings.isEnabled(Xp::ACLs))
                 if (auto store = dynamic_cast<LocalGranularAccessStore*>(&worker.store))
                     if (store->effectiveUser) {
-                        if (chown(tmpDir.c_str(), store->effectiveUser->uid, info.st_gid) == -1)
-                            throw SysError("cannot change ownership %s", tmpDir.c_str());
-                        chowned = true;
+                        if (chown(tmpDir.c_str(), store->effectiveUser->uid, info.st_gid) == 0)
+                            chowned = true;
+                        else
+                            e = SysError("cannot change ownership %s", tmpDir.c_str());
                     }
             if (!chowned)
                 chmod(tmpDir.c_str(), 0755);
+            if (e) throw e;
         }
         else
             deletePath(tmpDir);
