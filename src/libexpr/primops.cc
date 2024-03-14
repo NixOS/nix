@@ -1124,7 +1124,7 @@ drvName, Bindings * attrs, Value & v)
     bool contentAddressed = false;
     bool isImpure = false;
     std::optional<std::string> outputHash;
-    std::string outputHashAlgo;
+    std::optional<HashAlgorithm> outputHashAlgo;
     std::optional<ContentAddressMethod> ingestionMethod;
 
     StringSet outputs;
@@ -1136,18 +1136,20 @@ drvName, Bindings * attrs, Value & v)
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string_view s) {
-            if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
-            else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else if (s == "git") {
-                experimentalFeatureSettings.require(Xp::GitHashing);
-                ingestionMethod = FileIngestionMethod::Git;
-            } else if (s == "text") {
-                experimentalFeatureSettings.require(Xp::DynamicDerivations);
-                ingestionMethod = TextIngestionMethod {};
-            } else
+            if (s == "recursive") {
+                // back compat, new name is "nar"
+                ingestionMethod = FileIngestionMethod::Recursive;
+            } else try {
+                ingestionMethod = ContentAddressMethod::parse(s);
+            } catch (UsageError &) {
                 state.error<EvalError>(
                     "invalid value '%s' for 'outputHashMode' attribute", s
                 ).atPos(v).debugThrow();
+            }
+            if (ingestionMethod == TextIngestionMethod {})
+                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+            if (ingestionMethod == FileIngestionMethod::Git)
+                experimentalFeatureSettings.require(Xp::GitHashing);
         };
 
         auto handleOutputs = [&](const Strings & ss) {
@@ -1223,7 +1225,7 @@ drvName, Bindings * attrs, Value & v)
                     else if (i->name == state.sOutputHash)
                         outputHash = state.forceStringNoCtx(*i->value, pos, context_below);
                     else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = state.forceStringNoCtx(*i->value, pos, context_below);
+                        outputHashAlgo = parseHashAlgoOpt(state.forceStringNoCtx(*i->value, pos, context_below));
                     else if (i->name == state.sOutputHashMode)
                         handleHashMode(state.forceStringNoCtx(*i->value, pos, context_below));
                     else if (i->name == state.sOutputs) {
@@ -1241,7 +1243,7 @@ drvName, Bindings * attrs, Value & v)
                     if (i->name == state.sBuilder) drv.builder = std::move(s);
                     else if (i->name == state.sSystem) drv.platform = std::move(s);
                     else if (i->name == state.sOutputHash) outputHash = std::move(s);
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = std::move(s);
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = parseHashAlgoOpt(s);
                     else if (i->name == state.sOutputHashMode) handleHashMode(s);
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
@@ -1324,7 +1326,7 @@ drvName, Bindings * attrs, Value & v)
                 "multiple outputs are not supported in fixed-output derivations"
             ).atPos(v).debugThrow();
 
-        auto h = newHashAllowEmpty(*outputHash, parseHashAlgoOpt(outputHashAlgo));
+        auto h = newHashAllowEmpty(*outputHash, outputHashAlgo);
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
@@ -1344,7 +1346,7 @@ drvName, Bindings * attrs, Value & v)
             state.error<EvalError>("derivation cannot be both content-addressed and impure")
                 .atPos(v).debugThrow();
 
-        auto ha = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
+        auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
         auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
 
         for (auto & i : outputs) {

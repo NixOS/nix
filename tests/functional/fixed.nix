@@ -57,11 +57,13 @@ rec {
     outputHashMode = "flat";
   };
 
-  # Test for building two derivations in parallel that produce the
+  # Test for building derivations in parallel that produce the
   # same output path because they're fixed-output derivations.
   parallelSame = [
     (f2 "foo" ./fixed.builder2.sh "recursive" "md5" "3670af73070fa14077ad74e0f5ea4e42")
     (f2 "bar" ./fixed.builder2.sh "recursive" "md5" "3670af73070fa14077ad74e0f5ea4e42")
+    (f2 "foo" ./fixed.builder2.sh "nar" "md5" "3670af73070fa14077ad74e0f5ea4e42")
+    (f2 "bar" ./fixed.builder2.sh "nar" "md5" "3670af73070fa14077ad74e0f5ea4e42")
   ];
 
 }

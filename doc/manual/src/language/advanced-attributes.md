@@ -203,11 +203,16 @@ Derivations can declare some infrequently used optional attributes.
 
         This is the default.
 
-      - `"recursive"`\
-        The hash is computed over the NAR archive dump of the output
+      - `"recursive"` or `"nar"`\
+        The hash is computed over the [NAR archive](@docroot@/glossary.md#gloss-nar) dump of the output
         (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
         this case, the output can be anything, including a directory
         tree.
+
+        `"recursive"` is the traditional way of indicating this,
+        and is supported since 2005 (virtually the entire history of Nix).
+        `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
+        however support for it is only added in Nix version 2.21.
 
     The `outputHash` attribute, finally, must be a string containing
     the hash in either hexadecimal or base-32 notation. (See the
