@@ -55,6 +55,8 @@ struct PosixSourceAccessor : virtual SourceAccessor
      */
     static std::pair<PosixSourceAccessor, CanonPath> createAtRoot(const std::filesystem::path & path);
 
+    virtual bool toStringReturnsStorePath() const override;
+
 private:
 
     /**
