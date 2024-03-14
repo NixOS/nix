@@ -31,9 +31,8 @@ static void emitTreeAttrs(
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    if (auto narHash = input.getNarHash())
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -74,7 +73,7 @@ static void emitTreeAttrs(
 
 void emitTreeAttrs(
     EvalState & state,
-    const StorePath & storePath,
+    const SourcePath & storePath,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback,
@@ -82,7 +81,8 @@ void emitTreeAttrs(
 {
     emitTreeAttrs(state, input, v,
         [&](Value & vOutPath) {
-            state.mkStorePathString(storePath, vOutPath);
+            state.registerAccessor(storePath.accessor);
+            vOutPath.mkPath(storePath);
         },
         emptyRevFallback,
         forceDirty);
