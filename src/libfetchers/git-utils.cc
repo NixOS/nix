@@ -313,7 +313,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         std::string res(buf.ptr);
 
-        if (!hasPrefix(res, "/") && res.find("://") == res.npos)
+        // Git has a default protocol of 'ssh' for URLs without a protocol:
+        // https://git-scm.com/book/en/v2/Git-on-the-Server-The-Protocols#_the_ssh_protocol
+        // This code matches what git_submodule_resolve_url does inside of itself to see if the URL is already absolute.
+        // Inside libgit2 it just checks whether there's any ':' in the URL to default to the ssh:// protocol.
+        if (!hasPrefix(res, "/") && res.find(":") == res.npos)
             res = parseURL(base + "/" + res).canonicalise().to_string();
 
         return res;
