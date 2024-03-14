@@ -207,7 +207,7 @@ void callFlake(
 
 void emitTreeAttrs(
     EvalState & state,
-    const StorePath & storePath,
+    const SourcePath & storePath,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback = false,
