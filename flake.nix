@@ -598,6 +598,7 @@
           ["i686-linux" "x86_64-linux"]
           (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
 
+        tests.ca-fd-leak = runNixOSTestFor "x86_64-linux" ./tests/nixos/ca-fd-leak;
 
         # Make sure that nix-env still produces the exact same result
         # on a particular version of Nixpkgs.
