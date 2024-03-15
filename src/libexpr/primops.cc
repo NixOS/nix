@@ -3372,7 +3372,6 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
     auto list = state.buildList(len);
     for (const auto & [n, v] : enumerate(list))
         state.forceValue(*(v = args[1]->listElems()[n]), pos);
-    v.mkList(list);
 
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
@@ -3391,7 +3390,9 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
     /* FIXME: std::sort can segfault if the comparator is not a strict
        weak ordering. What to do? std::stable_sort() seems more
        resilient, but no guarantees... */
-    std::stable_sort(v.listElems(), v.listElems() + len, comparator);
+    std::stable_sort(list.begin(), list.end(), comparator);
+
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_sort({

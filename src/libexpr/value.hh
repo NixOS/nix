@@ -246,7 +246,7 @@ public:
         Bindings * attrs;
         struct {
             size_t size;
-            Value * * elems;
+            Value * const * elems;
         } bigList;
         Value * smallList[2];
         ClosureThunk thunk;
@@ -425,7 +425,7 @@ public:
         return internalType == tList1 || internalType == tList2 || internalType == tListN;
     }
 
-    Value * * listElems()
+    Value * const * listElems()
     {
         return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
