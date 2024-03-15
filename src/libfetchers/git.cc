@@ -523,6 +523,9 @@ struct GitInputScheme : InputScheme
 
             auto repo = GitRepo::openRepo(cacheDir, true, true);
 
+            // We need to set the origin so resolving submodule URLs works
+            repo->setRemote("origin", repoInfo.url);
+
             Path localRefFile =
                 ref.compare(0, 5, "refs/") == 0
                 ? cacheDir + "/" + ref
@@ -626,7 +629,7 @@ struct GitInputScheme : InputScheme
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
             for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
-                auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
+                auto resolved = repo->resolveSubmoduleUrl(submodule.url);
                 debug("Git submodule %s: %s %s %s -> %s",
                     submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
                 fetchers::Attrs attrs;
