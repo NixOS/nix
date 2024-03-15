@@ -38,3 +38,7 @@ testCollectGarbageD
 # Regression test for #8294
 rm ~/.nix-profile
 testCollectGarbageD --profile "$NIX_STATE_DIR/profiles/per-user/me"
+
+# Test shortcuts for these default profiles
+testCollectGarbageD --global-profile
+testCollectGarbageD --user-profile

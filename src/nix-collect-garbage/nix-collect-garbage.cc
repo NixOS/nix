@@ -82,7 +82,12 @@ static int main_nix_collect_garbage(int argc, char * * argv)
 
         if (removeOld) {
             std::set<Path> dirsToClean = {
-                profilesDir(), settings.nixStateDir + "/profiles", dirOf(getDefaultProfile())};
+                userProfilesDir(),
+            };
+            if (auto optProfile = tryGetDefaultProfile())
+                dirsToClean.insert(dirOf(*optProfile));
+            for (auto && dir : globalProfilesDirs())
+                dirsToClean.insert(std::move(dir));
             for (auto & dir : dirsToClean)
                 removeOldGenerations(dir);
         }

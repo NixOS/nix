@@ -9,7 +9,7 @@
   [`--arg` *name* *value*]
   [`--argstr` *name* *value*]
   [{`--file` | `-f`} *path*]
-  [{`--profile` | `-p`} *path*]
+  [{`--profile` | `-p`} *path* | `--global-profile` | `--user-profile`]
   [`--system-filter` *system*]
   [`--dry-run`]
 
