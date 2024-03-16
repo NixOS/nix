@@ -144,7 +144,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies({
       The original string context element must not be empty or have multiple elements, and it must not have any other type of element other than a constant or derivation deep element.
       The latter is supported so this function is idempotent.
 
-      This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-addDrvOutputDependencies).
+      This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-unsafeDiscardOutputDependency).
     )",
     .fun = prim_addDrvOutputDependencies
 });
