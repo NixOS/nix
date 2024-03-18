@@ -79,6 +79,7 @@ struct EvalSettings : Config
             - [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
             - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
             - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
+            - [`builtins.storePath`](@docroot@/language/builtin-constants.md#builtins-storePath)
         )"
         };
 
