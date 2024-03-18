@@ -142,6 +142,7 @@ GTAGS
 
 # auto-generated compilation database
 compile_commands.json
+*.compile_commands.json
 
 nix-rust/target
 
