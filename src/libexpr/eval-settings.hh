@@ -76,9 +76,10 @@ struct EvalSettings : Config
 
           - Restrict file system and network access to files specified by cryptographic hash
           - Disable impure constants:
-            - [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+            - [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
             - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
             - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
+            - [`builtins.storePath`](@docroot@/language/builtin-constants.md#builtins-storePath)
         )"
         };
 
