@@ -260,6 +260,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .description = R"(
             Allow the use of [local overlay store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-overlay-store).
         )",
+        .trackingUrl = ""https://github.com/NixOS/nix/milestone/50",
     },
     {
         .tag = Xp::ConfigurableImpureEnv,
