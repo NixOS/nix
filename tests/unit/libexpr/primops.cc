@@ -151,7 +151,7 @@ namespace nix {
     }
 
     TEST_F(PrimOpTest, unsafeGetAttrPos) {
-        state.corepkgsFS->addFile(CanonPath("foo.nix"), "{ y = \"x\"; }");
+        state.corepkgsFS->addFile(CanonPath("foo.nix"), "\n\r\n\r{ y = \"x\"; }");
 
         auto expr = "builtins.unsafeGetAttrPos \"y\" (import <nix/foo.nix>)";
         auto v = eval(expr);
@@ -165,10 +165,12 @@ namespace nix {
 
         auto line = v.attrs->find(createSymbol("line"));
         ASSERT_NE(line, nullptr);
-        ASSERT_THAT(*line->value, IsIntEq(1));
+        state.forceValue(*line->value, noPos);
+        ASSERT_THAT(*line->value, IsIntEq(4));
 
         auto column = v.attrs->find(createSymbol("column"));
         ASSERT_NE(column, nullptr);
+        state.forceValue(*column->value, noPos);
         ASSERT_THAT(*column->value, IsIntEq(3));
     }
 

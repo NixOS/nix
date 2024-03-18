@@ -762,10 +762,24 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
     return vm;
 }
 
+/**
+ * Sets `inDebugger` to true on construction and false on destruction.
+ */
+class DebuggerGuard {
+    bool & inDebugger;
+public:
+    DebuggerGuard(bool & inDebugger) : inDebugger(inDebugger) {
+        inDebugger = true;
+    }
+    ~DebuggerGuard() {
+        inDebugger = false;
+    }
+};
+
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
-    // double check we've got the debugRepl function pointer.
-    if (!debugRepl)
+    // Make sure we have a debugger to run and we're not already in a debugger.
+    if (!debugRepl || inDebugger)
         return;
 
     auto dts =
@@ -792,6 +806,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     auto se = getStaticEnv(expr);
     if (se) {
         auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
+        DebuggerGuard _guard(inDebugger);
         auto exitStatus = (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
         switch (exitStatus) {
             case ReplExitStatus::QuitAll:
@@ -934,12 +949,11 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 
 void EvalState::mkPos(Value & v, PosIdx p)
 {
-    auto pos = positions[p];
-    if (auto path = std::get_if<SourcePath>(&pos.origin)) {
+    auto origin = positions.originOf(p);
+    if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
         attrs.alloc(sFile).mkString(path->path.abs());
-        attrs.alloc(sLine).mkInt(pos.line);
-        attrs.alloc(sColumn).mkInt(pos.column);
+        makePositionThunks(*this, p, attrs.alloc(sLine), attrs.alloc(sColumn));
         v.mkAttrs(attrs);
     } else
         v.mkNull();
@@ -2762,9 +2776,12 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<Sta
 
 Expr * EvalState::parseExprFromString(std::string s_, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto s = make_ref<std::string>(std::move(s_));
-    s->append("\0\0", 2);
-    return parse(s->data(), s->size(), Pos::String{.source = s}, basePath, staticEnv);
+    // NOTE this method (and parseStdin) must take care to *fully copy* their input
+    // into their respective Pos::Origin until the parser stops overwriting its input
+    // data.
+    auto s = make_ref<std::string>(s_);
+    s_.append("\0\0", 2);
+    return parse(s_.data(), s_.size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
 
@@ -2776,12 +2793,15 @@ Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath
 
 Expr * EvalState::parseStdin()
 {
+    // NOTE this method (and parseExprFromString) must take care to *fully copy* their
+    // input into their respective Pos::Origin until the parser stops overwriting its
+    // input data.
     //Activity act(*logger, lvlTalkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    auto s = make_ref<std::string>(std::move(buffer));
-    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath("."), staticBaseEnv);
+    auto s = make_ref<std::string>(buffer);
+    return parse(buffer.data(), buffer.size(), Pos::Stdin{.source = s}, rootPath("."), staticBaseEnv);
 }
 
 

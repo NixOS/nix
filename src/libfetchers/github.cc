@@ -98,6 +98,10 @@ struct GitArchiveInputScheme : InputScheme
         if (ref) input.attrs.insert_or_assign("ref", *ref);
         if (host_url) input.attrs.insert_or_assign("host", *host_url);
 
+        auto narHash = url.query.find("narHash");
+        if (narHash != url.query.end())
+            input.attrs.insert_or_assign("narHash", narHash->second);
+
         return input;
     }
 
@@ -111,6 +115,7 @@ struct GitArchiveInputScheme : InputScheme
             "narHash",
             "lastModified",
             "host",
+            "treeHash",
         };
     }
 
@@ -134,10 +139,13 @@ struct GitArchiveInputScheme : InputScheme
         assert(!(ref && rev));
         if (ref) path += "/" + *ref;
         if (rev) path += "/" + rev->to_string(HashFormat::Base16, false);
-        return ParsedURL {
+        auto url = ParsedURL {
             .scheme = std::string { schemeName() },
             .path = path,
         };
+        if (auto narHash = input.getNarHash())
+            url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+        return url;
     }
 
     Input applyOverrides(
@@ -268,14 +276,14 @@ struct GitArchiveInputScheme : InputScheme
     {
         auto [input, tarballInfo] = downloadArchive(store, _input);
 
+        #if 0
         input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
+        #endif
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
         auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash, false);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
-
-        accessor->fingerprint = input.getFingerprint(store);
 
         return {accessor, input};
     }

@@ -1736,7 +1736,7 @@ static RegisterPrimOp primop_findFile(PrimOp {
       - If the suffix is found inside that directory, then the entry is a match.
         The combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
 
-      [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions can be [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath):
+      [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath):
 
       ```nix
       <nixpkgs>
@@ -2523,6 +2523,54 @@ static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .arity = 2,
     .fun = prim_unsafeGetAttrPos,
 });
+
+// access to exact position information (ie, line and colum numbers) is deferred
+// due to the cost associated with calculating that information and how rarely
+// it is used in practice. this is achieved by creating thunks to otherwise
+// inaccessible primops that are not exposed as __op or under builtins to turn
+// the internal PosIdx back into a line and column number, respectively. exposing
+// these primops in any way would at best be not useful and at worst create wildly
+// indeterministic eval results depending on parse order of files.
+//
+// in a simpler world this would instead be implemented as another kind of thunk,
+// but each type of thunk has an associated runtime cost in the current evaluator.
+// as with black holes this cost is too high to justify another thunk type to check
+// for in the very hot path that is forceValue.
+static struct LazyPosAcessors {
+    PrimOp primop_lineOfPos{
+        .arity = 1,
+        .fun = [] (EvalState & state, PosIdx pos, Value * * args, Value & v) {
+            v.mkInt(state.positions[PosIdx(args[0]->integer)].line);
+        }
+    };
+    PrimOp primop_columnOfPos{
+        .arity = 1,
+        .fun = [] (EvalState & state, PosIdx pos, Value * * args, Value & v) {
+            v.mkInt(state.positions[PosIdx(args[0]->integer)].column);
+        }
+    };
+
+    Value lineOfPos, columnOfPos;
+
+    LazyPosAcessors()
+    {
+        lineOfPos.mkPrimOp(&primop_lineOfPos);
+        columnOfPos.mkPrimOp(&primop_columnOfPos);
+    }
+
+    void operator()(EvalState & state, const PosIdx pos, Value & line, Value & column)
+    {
+        Value * posV = state.allocValue();
+        posV->mkInt(pos.id);
+        line.mkApp(&lineOfPos, posV);
+        column.mkApp(&columnOfPos, posV);
+    }
+} makeLazyPosAccessors;
+
+void makePositionThunks(EvalState & state, const PosIdx pos, Value & line, Value & column)
+{
+    makeLazyPosAccessors(state, pos, line, column);
+}
 
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -4522,11 +4570,9 @@ void EvalState::createBaseEnv()
     addConstant("__nixPath", v, {
         .type = nList,
         .doc = R"(
-          List of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
+          The value of the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path): a list of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
 
-          Lookup path expressions can be
-          [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar)
-          using this and
+          Lookup path expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and
           [`builtins.findFile`](./builtins.html#builtins-findFile):
 
           ```nix

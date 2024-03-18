@@ -21,11 +21,24 @@ struct EvalSettings : Config
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
         R"(
-          List of directories to be searched for `<...>` file references
+          List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
+          This setting determines the value of
+          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtin-constants.md#builtins-findFile).
 
-          In particular, outside of [pure evaluation mode](#conf-pure-eval), this determines the value of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath).
-        )"};
+          The default value is
+
+          ```
+          $HOME/.nix-defexpr/channels
+          nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs
+          $NIX_STATE_DIR/profiles/per-user/root/channels
+          ```
+
+          It can be overridden with the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH) or the [`-I` command line option](@docroot@/command-ref/opt-common.md#opt-I).
+
+          > **Note**
+          >
+          > If [pure evaluation](#conf-pure-eval) is enabled, `nixPath` evaluates to the empty list `[ ]`.
+        )", {}, false};
 
     Setting<std::string> currentSystem{
         this, "", "eval-system",
@@ -55,8 +68,6 @@ struct EvalSettings : Config
           [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath),
           or to URIs outside of
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
-
-          Also the default value for [`nix-path`](#conf-nix-path) is ignored, such that only explicitly set search path entries are taken into account.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",

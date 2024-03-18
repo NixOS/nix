@@ -11,8 +11,15 @@ R""(
 * Remove all packages:
 
   ```console
-  # nix profile remove '.*'
+  # nix profile remove --all
   ```
+
+* Remove packages by regular expression:
+
+  ```console
+  # nix profile remove --regex '.*vim.*'
+  ```
+
 
 * Remove a package by store path:
 

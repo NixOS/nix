@@ -56,3 +56,12 @@ echo Run Hello World! > $TEST_ROOT/dummy3/dir/executable
 path3=$(nix store add --mode git --hash-algo sha1 $TEST_ROOT/dummy3)
 hash3=$(nix-store -q --hash $path3)
 test "$hash3" = "sha256:08y3nm3mvn9qvskqnf13lfgax5lh73krxz4fcjd5cp202ggpw9nv"
+
+rm -rf $TEST_ROOT/dummy3
+mkdir -p $TEST_ROOT/dummy3
+mkdir -p $TEST_ROOT/dummy3/dir
+touch $TEST_ROOT/dummy3/dir/file
+ln -s './hello/world.txt' $TEST_ROOT/dummy3/dir/symlink
+path3=$(nix store add --mode git --hash-algo sha1 $TEST_ROOT/dummy3)
+hash3=$(nix-store -q --hash $path3)
+test "$hash3" = "sha256:1dwazas8irzpar89s8k2bnp72imfw7kgg4aflhhsfnicg8h428f3"
