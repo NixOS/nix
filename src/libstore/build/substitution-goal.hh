@@ -23,6 +23,11 @@ struct PathSubstitutionGoal : public Goal
     std::optional<StorePath> subPath;
 
     /**
+     * The first error we came across while substituting.
+     */
+    std::optional<Error> subError;
+
+    /**
      * The remaining substituters.
      */
     std::list<ref<Store>> subs;
