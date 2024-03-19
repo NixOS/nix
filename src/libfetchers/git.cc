@@ -504,15 +504,38 @@ struct GitInputScheme : InputScheme
         std::string name = input.getName();
 
         auto originalRef = input.getRef();
-        auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
-        input.attrs.insert_or_assign("ref", ref);
 
-        Path repoDir;
+        Path repoDir ;
+
+        /*
+        The lazy initialization of ref and localRefFile prevents unnecessary
+          network access in cases where those variables are not used.
+        For example, if the `rev` is specified in the input, we don't need to
+          fetch the HEAD ref from the remote repository.
+        */
+        std::optional<std::string> ref;
+        auto getRef = [this, &input, &originalRef, &ref, &repoInfo](){
+            if (!ref) {
+                ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
+                input.attrs.insert_or_assign("ref", *ref);
+            }
+            return *ref;
+        };
+
+        std::optional<std::string> localRefFile;
+        auto getLocalRefFile = [&getRef, &localRefFile, &repoInfo](){
+            if (!localRefFile) {
+                localRefFile = getRef().compare(0, 5, "refs/") == 0
+                    ? repoInfo.url + "/" + getRef()
+                    : repoInfo.url + "/refs/heads/" + getRef();
+            }
+            return *localRefFile;
+        };
 
         if (repoInfo.isLocal) {
             repoDir = repoInfo.url;
             if (!input.getRev())
-                input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
+                input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(getRef()).gitRev());
         } else {
             Path cacheDir = getCachePath(repoInfo.url, getShallowAttr(input));
             repoDir = cacheDir;
@@ -522,11 +545,6 @@ struct GitInputScheme : InputScheme
             PathLocks cacheDirLock({cacheDir});
 
             auto repo = GitRepo::openRepo(cacheDir, true, true);
-
-            Path localRefFile =
-                ref.compare(0, 5, "refs/") == 0
-                ? cacheDir + "/" + ref
-                : cacheDir + "/refs/heads/" + ref;
 
             bool doFetch;
             time_t now = time(0);
@@ -542,7 +560,7 @@ struct GitInputScheme : InputScheme
                     /* If the local ref is older than ‘tarball-ttl’ seconds, do a
                        git fetch to update the local ref to the remote ref. */
                     struct stat st;
-                    doFetch = stat(localRefFile.c_str(), &st) != 0 ||
+                    doFetch = stat(getLocalRefFile().c_str(), &st) != 0 ||
                         !isCacheFileWithinTtl(now, st);
                 }
             }
@@ -554,23 +572,23 @@ struct GitInputScheme : InputScheme
                         ? "refs/*"
                         : input.getRev()
                         ? input.getRev()->gitRev()
-                        : ref.compare(0, 5, "refs/") == 0
-                        ? ref
-                        : ref == "HEAD"
-                        ? ref
-                        : "refs/heads/" + ref;
+                        : getRef().compare(0, 5, "refs/") == 0
+                        ? getRef()
+                        : getRef() == "HEAD"
+                        ? getRef()
+                        : "refs/heads/" + getRef();
 
                     repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef), getShallowAttr(input));
                 } catch (Error & e) {
-                    if (!pathExists(localRefFile)) throw;
+                    if (!pathExists(getLocalRefFile())) throw;
                     logError(e.info());
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.url);
                 }
 
-                if (!touchCacheFile(localRefFile, now))
-                    warn("could not update mtime for file '%s': %s", localRefFile, strerror(errno));
-                if (!originalRef && !storeCachedHead(repoInfo.url, ref))
-                    warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);
+                if (!touchCacheFile(getLocalRefFile(), now))
+                    warn("could not update mtime for file '%s': %s", getLocalRefFile(), strerror(errno));
+                if (!originalRef && !storeCachedHead(repoInfo.url, getRef()))
+                    warn("could not update cached head '%s' for '%s'", getRef(), repoInfo.url);
             }
 
             if (auto rev = input.getRev()) {
@@ -581,11 +599,11 @@ struct GitInputScheme : InputScheme
                         ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
                         "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
                         rev->gitRev(),
-                        ref,
+                        getRef(),
                         repoInfo.url
                         );
             } else
-                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), HashAlgorithm::SHA1).gitRev());
+                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(getLocalRefFile())), HashAlgorithm::SHA1).gitRev());
 
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
