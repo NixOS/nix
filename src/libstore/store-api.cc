@@ -131,12 +131,12 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
             throw Error("fixed output derivation '%s' is not allowed to refer to other store paths.\nYou may need to use the 'unsafeDiscardReferences' derivation attribute, see the manual for more details.",
                 name);
         }
-        return makeStorePath("output:out",
-            hashString(HashAlgorithm::SHA256,
-                "fixed:out:"
+        // make a unique digest based on the parameters for creating this store object
+        auto payload = "fixed:out:"
                 + makeFileIngestionPrefix(info.method)
-                + info.hash.to_string(HashFormat::Base16, true) + ":"),
-            name);
+                + info.hash.to_string(HashFormat::Base16, true) + ":";
+        auto digest = hashString(HashAlgorithm::SHA256, payload);
+        return makeStorePath("output:out", digest, name);
     }
 }
 
