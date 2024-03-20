@@ -1775,20 +1775,20 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
-static std::string_view fileTypeToString(InputAccessor::Type type)
+static Value * fileTypeToString(EvalState & state, InputAccessor::Type type)
 {
     return
-        type == InputAccessor::Type::tRegular ? "regular" :
-        type == InputAccessor::Type::tDirectory ? "directory" :
-        type == InputAccessor::Type::tSymlink ? "symlink" :
-        "unknown";
+        type == InputAccessor::Type::tRegular ? &state.vStringRegular :
+        type == InputAccessor::Type::tDirectory ? &state.vStringDirectory :
+        type == InputAccessor::Type::tSymlink ? &state.vStringSymlink :
+        &state.vStringUnknown;
 }
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
-    v.mkString(fileTypeToString(path.lstat().type));
+    v = *fileTypeToString(state, path.lstat().type);
 }
 
 static RegisterPrimOp primop_readFileType({
@@ -1819,8 +1819,8 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
     Value * readFileType = nullptr;
 
     for (auto & [name, type] : entries) {
-        auto & attr = attrs.alloc(name);
         if (!type) {
+            auto & attr = attrs.alloc(name);
             // Some filesystems or operating systems may not be able to return
             // detailed node info quickly in this case we produce a thunk to
             // query the file type lazily.
@@ -1832,7 +1832,7 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
         } else {
             // This branch of the conditional is much more likely.
             // Here we just stringize the directory entry type.
-            attr.mkString(fileTypeToString(*type));
+            attrs.insert(state.symbols.create(name), fileTypeToString(state, *type));
         }
     }
 
@@ -2193,11 +2193,8 @@ bool EvalState::callPathFilter(
     Value arg1;
     arg1.mkString(pathArg);
 
-    Value arg2;
     // assert that type is not "unknown"
-    arg2.mkString(fileTypeToString(st.type));
-
-    Value * args []{&arg1, &arg2};
+    Value * args []{&arg1, fileTypeToString(*this, st.type)};
     Value res;
     callFunction(*filterFun, 2, args, res, pos);
 

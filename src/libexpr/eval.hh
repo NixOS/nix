@@ -191,6 +191,15 @@ public:
      */
     Value vNull;
 
+    /** `"regular"` */
+    Value vStringRegular;
+    /** `"directory"` */
+    Value vStringDirectory;
+    /** `"symlink"` */
+    Value vStringSymlink;
+    /** `"unknown"` */
+    Value vStringUnknown;
+
     /**
      * The accessor for the root filesystem.
      */

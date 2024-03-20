@@ -437,6 +437,10 @@ EvalState::EvalState(
 
     vEmptyList.mkList(buildList(0));
     vNull.mkNull();
+    vStringRegular.mkString("regular");
+    vStringDirectory.mkString("directory");
+    vStringSymlink.mkString("symlink");
+    vStringUnknown.mkString("unknown");
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
