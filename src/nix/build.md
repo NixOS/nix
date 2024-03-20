@@ -43,7 +43,7 @@ R""(
 * Build all outputs:
 
   ```console
-  # nix build nixpkgs#openssl^* --print-out-paths
+  # nix build "nixpkgs#openssl^*" --print-out-paths
   /nix/store/gvad6v0cmq1qccmc4wphsazqbj0xzjsl-openssl-3.0.13-bin
   /nix/store/a07jqdrc8afnk8r6f3lnhh4gvab7chk4-openssl-3.0.13-debug
   /nix/store/yg75achq89wgqn2fi3gglgsd77kjpi03-openssl-3.0.13-dev
