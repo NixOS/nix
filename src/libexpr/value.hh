@@ -159,7 +159,7 @@ public:
     iterator begin() { return &elems[0]; }
     iterator end() { return &elems[size]; }
 
-    friend class Value;
+    friend struct Value;
 };
 
 
