@@ -4430,8 +4430,7 @@ void EvalState::createBaseEnv()
         )",
     });
 
-    v.mkNull();
-    addConstant("null", v, {
+    addConstant("null", &vNull, {
         .type = nNull,
         .doc = R"(
           Primitive value.
