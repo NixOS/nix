@@ -187,6 +187,11 @@ public:
     Value vEmptyList;
 
     /**
+     * Null constant.
+     */
+    Value vNull;
+
+    /**
      * The accessor for the root filesystem.
      */
     const ref<InputAccessor> rootFS;
@@ -615,7 +620,11 @@ public:
         return BindingsBuilder(*this, allocBindings(capacity));
     }
 
-    void mkList(Value & v, size_t length);
+    ListBuilder buildList(size_t size)
+    {
+        return ListBuilder(*this, size);
+    }
+
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 
@@ -662,7 +671,7 @@ public:
         const SingleDerivedPath & p,
         Value & v);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
+    void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * Print statistics, if enabled.
@@ -756,6 +765,7 @@ private:
     friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
     friend struct Value;
+    friend class ListBuilder;
 };
 
 struct DebugTraceStacker {
