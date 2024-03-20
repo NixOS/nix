@@ -896,10 +896,11 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
-        attrs.alloc("success").mkBool(true);
+        attrs.insert(state.symbols.create("success"), &state.vTrue);
     } catch (AssertionError & e) {
-        attrs.alloc(state.sValue).mkBool(false);
-        attrs.alloc("success").mkBool(false);
+        // `value = false;` is unfortunate but removing it is a breaking change.
+        attrs.insert(state.sValue, &state.vFalse);
+        attrs.insert(state.symbols.create("success"), &state.vFalse);
     }
 
     // restore the debugRepl pointer if we saved it earlier.

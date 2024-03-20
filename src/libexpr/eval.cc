@@ -437,6 +437,8 @@ EvalState::EvalState(
 
     vEmptyList.mkList(buildList(0));
     vNull.mkNull();
+    vTrue.mkBool(true);
+    vFalse.mkBool(false);
     vStringRegular.mkString("regular");
     vStringDirectory.mkString("directory");
     vStringSymlink.mkString("symlink");

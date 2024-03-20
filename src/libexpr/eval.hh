@@ -187,9 +187,25 @@ public:
     Value vEmptyList;
 
     /**
-     * Null constant.
+     * `null` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
      */
     Value vNull;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vTrue;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vFalse;
 
     /** `"regular"` */
     Value vStringRegular;
