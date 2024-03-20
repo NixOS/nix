@@ -650,6 +650,11 @@ public:
         return ListBuilder(*this, size);
     }
 
+    /**
+     * Return a boolean `Value *` without allocating.
+     */
+    Value *getBool(bool b);
+
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 

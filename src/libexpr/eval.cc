@@ -937,6 +937,9 @@ ListBuilder::ListBuilder(EvalState & state, size_t size)
     state.nrListElems += size;
 }
 
+Value * EvalState::getBool(bool b) {
+    return b ? &vTrue : &vFalse;
+}
 
 unsigned long nrThunks = 0;
 
