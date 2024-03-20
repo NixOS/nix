@@ -90,6 +90,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
         addFlag({
             .longName = "print-out-paths",
+            .shortName = 'P',
             .description = "Print the resulting output paths",
             .handler = {&printOutputPaths, true},
         });
