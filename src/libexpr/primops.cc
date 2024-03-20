@@ -4004,7 +4004,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         auto list = state.buildList(match.size() - 1);
         for (const auto & [i, v2] : enumerate(list))
             if (!match[i + 1].matched)
-                (v2 = state.allocValue())->mkNull();
+                v2 = &state.vNull;
             else
                 (v2 = state.allocValue())->mkString(match[i + 1].str());
         v.mkList(list);
