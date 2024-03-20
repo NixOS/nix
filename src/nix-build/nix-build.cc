@@ -418,8 +418,8 @@ static void main_nix_build(int argc, char * * argv)
                 shellDrv = bashDrv;
 
             } catch (Error & e) {
-                logError(e.info());
-                notice("will use bash from your environment");
+                logErrorInfo(lvlDebug, e.info());
+                printInfo("Canont access '(import <nixpkgs>).bashInteractive'; using bash from your environment%s.", (interactive ? "" : " for bootstrapping"));
                 shell = "bash";
             }
         }
@@ -566,7 +566,7 @@ static void main_nix_build(int argc, char * * argv)
                 + structuredAttrsRC +
                 "\n[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
-                "PATH=%4%:\"$PATH\"; "
+                "%4%"
                 "SHELL=%5%; "
                 "BASH=%5%; "
                 "set +e; "
@@ -582,7 +582,7 @@ static void main_nix_build(int argc, char * * argv)
                 shellEscape(tmpDir),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                shellEscape(dirOf(*shell)),
+                (interactive && shell->substr(0, 1) == "/" ? "PATH=" + shellEscape(dirOf(*shell)) + ":\"$PATH\"; " : ""),
                 shellEscape(*shell),
                 (getenv("TZ") ? (std::string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
                 envCommand);
