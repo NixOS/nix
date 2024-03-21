@@ -12,36 +12,48 @@ overrides:
 
 let
 
-  origLockFile = builtins.fromJSON lockFileStr;
+  rawLockFile = builtins.fromJSON lockFileStr;
 
-  # Build an optimized lock file by consolidating equivalent inputs.
-  lockFile =
+  # Given a function that returns a string key that sufficiently
+  # identifies an attribute value, return an attribute set that
+  # returns a unique attribute name for all equivalent attribute values.
+  deduplicationMap = f: m:
+    builtins.listToAttrs (builtins.attrValues (builtins.mapAttrs
+      (name: value: { name = f value; value = name; })
+      m
+    ));
+
+  # A node is considered duplicate if its `locked` value is
+  # equivalent, unless `nodeKey` was overridden.
+  nodeDeduplicationKey = { nodeKey, node }:
+    if overrides ? ${nodeKey}
+    then builtins.toJSON { overriddenAs = nodeKey; }
+    else builtins.toJSON node.locked;
+
+  nodeKeyByDeduplicationKey =
+    deduplicationMap nodeDeduplicationKey
+      (builtins.mapAttrs (nodeKey: node: { inherit nodeKey node; }) rawLockFile.nodes);
+
+  # Resolve an `inputSpec` to a deduplicated root node key.
+  deduplicateInputName = inputSpec:
     let
-      nodeCacheKey = key: node:
-        let taint = if overrides ? ${key} then { taintedAs = key; } else {};
-        in builtins.toJSON (node.locked or {} // taint);
+      resolvedInputName = resolveInput inputSpec;
+      resolvedInputDeduplicationKey = nodeDeduplicationKey {
+        nodeKey = resolvedInputName;
+        node = lockFile.nodes.${resolvedInputName};
+      };
+    in
+    nodeKeyByDeduplicationKey.${resolvedInputDeduplicationKey};
 
-      inputsCache = builtins.listToAttrs (builtins.attrValues
-        (builtins.mapAttrs
-          (key: node: { name = nodeCacheKey key node; value = key; })
-          origLockFile.nodes
-        )
-      );
-
-      resolveInputsFromCache = inputs:
-        builtins.mapAttrs
-          (inputName: inputSpec:
-            let resolvedInputName = resolveInput inputSpec;
-            in inputsCache.${nodeCacheKey resolvedInputName lockFile.nodes.${resolvedInputName}})
-          inputs;
-
+  # A `lockFile` with all of its nodes' inputs resolved to their
+  # deduplicated equivalents.
+  lockFile = rawLockFile // {
       nodes = builtins.mapAttrs
         (key: node: node // {
-          inputs = resolveInputsFromCache (node.inputs or {});
+        inputs = builtins.mapAttrs (_nameForArg: deduplicateInputName) (node.inputs or {});
         })
-        origLockFile.nodes;
-    in
-    origLockFile // { inherit nodes; };
+      rawLockFile.nodes;
+  };
 
   # Resolve a input spec into a node name. An input spec is
   # either a node name, or a 'follows' path from the root
