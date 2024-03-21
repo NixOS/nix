@@ -1,4 +1,4 @@
-# source ./common.sh
+source ./common.sh
 
 test_equivalent_inputs() {
     baseDir=$TEST_ROOT/$RANDOM
