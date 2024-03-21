@@ -48,11 +48,11 @@ let
   # A `lockFile` with all of its nodes' inputs resolved to their
   # deduplicated equivalents.
   lockFile = rawLockFile // {
-      nodes = builtins.mapAttrs
-        (key: node: node // {
+    nodes = builtins.mapAttrs
+      (key: node: node // {
         inputs = builtins.mapAttrs (_nameForArg: deduplicateInputName) (node.inputs or {});
-        })
-      rawLockFile.nodes;
+      })
+    rawLockFile.nodes;
   };
 
   # Resolve a input spec into a node name. An input spec is
