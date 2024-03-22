@@ -23,7 +23,6 @@ in
 runCommand "nix-binary-tarball-${version}" env ''
   cp ${installerClosureInfo}/registration $TMPDIR/reginfo
   cp ${./create-darwin-volume.sh} $TMPDIR/create-darwin-volume.sh
-  cp ${./in-sudo.sh} $TMPDIR/in-sudo
   substitute ${./install-nix-from-closure.sh} $TMPDIR/install \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
@@ -45,7 +44,6 @@ runCommand "nix-binary-tarball-${version}" env ''
     shellcheck $TMPDIR/create-darwin-volume.sh
     shellcheck $TMPDIR/install-darwin-multi-user.sh
     shellcheck $TMPDIR/install-systemd-multi-user.sh
-    shellcheck $TMPDIR/in-sudo
 
     # SC1091: Don't panic about not being able to source
     #         /etc/profile
@@ -63,7 +61,6 @@ runCommand "nix-binary-tarball-${version}" env ''
   chmod +x $TMPDIR/install-darwin-multi-user.sh
   chmod +x $TMPDIR/install-systemd-multi-user.sh
   chmod +x $TMPDIR/install-multi-user
-  chmod +x $TMPDIR/in-sudo
   dir=nix-${version}-${system}
   fn=$out/$dir.tar.xz
   mkdir -p $out/nix-support
@@ -82,7 +79,6 @@ runCommand "nix-binary-tarball-${version}" env ''
     $TMPDIR/install-darwin-multi-user.sh \
     $TMPDIR/install-systemd-multi-user.sh \
     $TMPDIR/install-multi-user \
-    $TMPDIR/in-sudo \
     $TMPDIR/reginfo \
     $(cat ${installerClosureInfo}/store-paths)
 ''

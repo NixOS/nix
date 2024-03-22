@@ -58,7 +58,6 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME=~root
 
-readonly IN_SUDO=$EXTRACTED_NIX_PATH/in-sudo
 readonly PROXY_ENVIRONMENT_VARIABLES=(
     http_proxy
     https_proxy
@@ -387,7 +386,7 @@ _sudo() {
     if is_root; then
         env "$@"
     else
-        sudo "$IN_SUDO" "${SUDO_EXTRA_ENVIRONMENT_VARIABLES[@]}" "$@"
+        sudo env "${SUDO_EXTRA_ENVIRONMENT_VARIABLES[@]}" "$@"
     fi
 }
 
