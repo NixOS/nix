@@ -313,6 +313,8 @@
                   nixVersions = [ self.packages.${system}.nix ];
                 }
             );
+
+            nixosTests = lib.genAttrs linuxSystems (system: nixpkgsFor.${system}.native.nixosTests);
         };
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
