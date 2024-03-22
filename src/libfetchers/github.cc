@@ -31,22 +31,24 @@ struct GitArchiveInputScheme : InputScheme
 {
     virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
+    /**
+     * Parse the 'path' part of the repository URL to get the relevant
+     * informations about the repository.
+     *
+     * Different forges will have a different handling of these (in particular
+     * because they might or might not handle nested organisations).
+     */
+    virtual Attrs parseRepoPath(const ParsedURL & url) const
     {
-        if (url.scheme != schemeName()) return {};
+        Attrs attrs;
 
         auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
-
-        std::optional<Hash> rev;
-        std::optional<std::string> ref;
-        std::optional<std::string> host_url;
-
         auto size = path.size();
         if (size == 3) {
             if (std::regex_match(path[2], revRegex))
-                rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
+                attrs.insert_or_assign("rev", Hash::parseAny(path[2], HashAlgorithm::SHA1).gitRev());
             else if (std::regex_match(path[2], refRegex))
-                ref = path[2];
+                attrs.insert_or_assign("ref", path[2]);
             else
                 throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
         } else if (size > 3) {
@@ -59,12 +61,29 @@ struct GitArchiveInputScheme : InputScheme
             }
 
             if (std::regex_match(rs, refRegex)) {
-                ref = rs;
+                attrs.insert_or_assign("ref", rs);
             } else {
                 throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, rs);
             }
         } else if (size < 2)
             throw BadURL("URL '%s' is invalid", url.url);
+
+        attrs.insert_or_assign("owner", path[0]);
+        attrs.insert_or_assign("repo", path[1]);
+
+        return attrs;
+    }
+
+
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
+    {
+        if (url.scheme != schemeName()) return {};
+
+        std::optional<Hash> rev;
+        std::optional<std::string> ref;
+        std::optional<std::string> host_url;
+
+        auto attrsFromPath = parseRepoPath(url);
 
         for (auto &[name, value] : url.query) {
             if (name == "rev") {
@@ -90,10 +109,12 @@ struct GitArchiveInputScheme : InputScheme
         if (ref && rev)
             throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url.url, *ref, rev->gitRev());
 
-        Input input;
+        auto maybeInput = inputFromAttrs(attrsFromPath);
+        if (!maybeInput)
+            throw BadURL("in URL '%s', couldn't parse the path '%s'", url.url, url.path);
+        Input input = maybeInput.value();
+
         input.attrs.insert_or_assign("type", std::string { schemeName() });
-        input.attrs.insert_or_assign("owner", path[0]);
-        input.attrs.insert_or_assign("repo", path[1]);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
         if (ref) input.attrs.insert_or_assign("ref", *ref);
         if (host_url) input.attrs.insert_or_assign("host", *host_url);
@@ -397,6 +418,27 @@ struct GitHubInputScheme : GitArchiveInputScheme
 struct GitLabInputScheme : GitArchiveInputScheme
 {
     std::string_view schemeName() const override { return "gitlab"; }
+
+    Attrs parseRepoPath(const ParsedURL & url) const override
+    {
+        Attrs attrs;
+
+        // GitLab repository paths are slash-separated paths where the
+        // repository is the last element and the rest consists of nested
+        // groups.
+        // We only care about separating the repository from the rest, so just
+        // split on the last `/` element.
+        auto repo_instance = url.path.rfind("/");
+
+        if (repo_instance == std::string::npos) {
+            throw BadURL("in URL '%s', all Gitlab projects must be part of a group", url.url);
+        }
+
+        attrs.insert_or_assign("repo", url.path.substr(repo_instance + 1));
+        attrs.insert_or_assign("owner", url.path.substr(0, repo_instance));
+
+        return attrs;
+    }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
