@@ -4,6 +4,7 @@
 #include "derivation-goal.hh"
 #include "local-store.hh"
 #include "processes.hh"
+#include "namespaces.hh"
 
 namespace nix {
 
@@ -58,7 +59,11 @@ struct LocalDerivationGoal : public DerivationGoal
      * On Linux, whether we're doing the build in its own user
      * namespace.
      */
+#if __linux__
     bool usingUserNamespace = true;
+#else
+    bool usingUserNamespace = false;
+#endif
 
     /**
      * Whether we're currently doing a chroot build.
@@ -71,6 +76,11 @@ struct LocalDerivationGoal : public DerivationGoal
      * RAII object to delete the chroot directory.
      */
     std::shared_ptr<AutoDelete> autoDelChroot;
+#if __FreeBSD__
+    /* Destructors happen in reverse order from declaration */
+    std::shared_ptr<AutoRemoveJail> autoDelJail;
+    std::vector<std::shared_ptr<AutoUnmount>> autoDelMounts;
+#endif
 
     /**
      * Whether to run the build in a private network namespace.
@@ -291,6 +301,16 @@ struct LocalDerivationGoal : public DerivationGoal
      * rewrites caught everything
      */
     StorePath makeFallbackPath(OutputNameView outputName);
+
+    /**
+     * Setup common to all platforms which perform chroots.
+     */
+    void basicChrootSetup(Path & chrootRootDir);
+
+#include "linux/local-derivation-goal.hh"
+#include "darwin/local-derivation-goal.hh"
+#include "freebsd/local-derivation-goal.hh"
 };
 
+void openSlave(const std::string &slaveName);
 }

@@ -34,4 +34,18 @@ bool mountAndPidNamespacesSupported();
 
 #endif
 
+#if __FreeBSD__
+class AutoRemoveJail
+{
+    int jid;
+    bool del;
+public:
+    AutoRemoveJail(int jid);
+    AutoRemoveJail();
+    ~AutoRemoveJail();
+    void cancel();
+    void reset(int j);
+};
+#endif
+
 }

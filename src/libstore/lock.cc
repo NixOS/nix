@@ -197,6 +197,9 @@ bool useBuildUsers()
     #elif __APPLE__
     static bool b = settings.buildUsersGroup != "" && getuid() == 0;
     return b;
+    #elif __FreeBSD__
+    static bool b = settings.buildUsersGroup != "" && getuid() == 0;
+    return b;
     #else
     return false;
     #endif

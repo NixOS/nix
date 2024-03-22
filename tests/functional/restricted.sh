@@ -4,7 +4,7 @@ clearStore
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
 (! nix-instantiate --eval --restrict-eval ./restricted.nix)
-(! nix-instantiate --eval --restrict-eval <(echo '1 + 2'))
+TMPFILE=$(mktemp) && echo '1 + 2' >$TMPFILE && (! nix-instantiate --eval --restrict-eval $TMPFILE)
 nix-instantiate --restrict-eval ./simple.nix -I src=.
 nix-instantiate --restrict-eval ./simple.nix -I src1=simple.nix -I src2=config.nix -I src3=./simple.builder.sh
 

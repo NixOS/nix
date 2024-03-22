@@ -4,7 +4,7 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
+libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc $(d)/build/linux/*.cc $(d)/build/darwin/*.cc $(d)/build/freebsd/*.cc)
 
 libstore_LIBS = libutil
 
@@ -66,3 +66,9 @@ $(foreach i, $(wildcard src/libstore/builtins/*.hh), \
 
 $(foreach i, $(wildcard src/libstore/build/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/build, 0644)))
+$(foreach i, $(wildcard src/libstore/build/linux/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/build/linux, 0644)))
+$(foreach i, $(wildcard src/libstore/build/freebsd/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/build/freebsd, 0644)))
+$(foreach i, $(wildcard src/libstore/build/darwin/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/build/darwin, 0644)))

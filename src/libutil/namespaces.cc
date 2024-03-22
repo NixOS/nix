@@ -1,3 +1,4 @@
+#include "namespaces.hh"
 #include "current-process.hh"
 #include "util.hh"
 #include "finally.hh"
@@ -9,6 +10,11 @@
 # include <mutex>
 # include <sys/resource.h>
 # include "cgroup.hh"
+#endif
+
+#ifdef __FreeBSD__
+#include <sys/param.h>
+#include <sys/jail.h>
 #endif
 
 #include <sys/mount.h>
@@ -156,5 +162,36 @@ void unshareFilesystem()
         throw SysError("unsharing filesystem state in download thread");
 #endif
 }
+
+#if __FreeBSD__
+AutoRemoveJail::AutoRemoveJail() : del{false} {}
+
+AutoRemoveJail::AutoRemoveJail(int jid) : jid(jid), del(true) {}
+
+AutoRemoveJail::~AutoRemoveJail()
+{
+    try {
+        if (del) {
+            if (jail_remove(jid) < 0) {
+                throw SysError("Failed to remove jail %1%", jid);
+            }
+        }
+    } catch (...) {
+        ignoreException();
+    }
+}
+
+void AutoRemoveJail::cancel()
+{
+    del = false;
+}
+
+void AutoRemoveJail::reset(int j) {
+    del = true;
+    jid = j;
+}
+#endif
+
+//////////////////////////////////////////////////////////////////////
 
 }

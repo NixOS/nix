@@ -19,6 +19,11 @@
 # include "cgroup.hh"
 #endif
 
+#if __FreeBSD__
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#endif
+
 #include <sys/mount.h>
 
 namespace nix {
@@ -106,6 +111,18 @@ std::optional<Path> getSelfExe()
     {
         #if __linux__
         return readLink("/proc/self/exe");
+        #elif __FreeBSD__
+        int mib[4];
+        mib[0] = CTL_KERN;
+        mib[1] = KERN_PROC;
+        mib[2] = KERN_PROC_PATHNAME;
+        mib[3] = -1;
+        char buf[1024];
+        size_t cb = sizeof(buf);
+        if(sysctl(mib, 4, buf, &cb, NULL, 0) == -1) {
+	        return std::nullopt;
+        }
+        return Path(buf, cb);
         #elif __APPLE__
         char buf[1024];
         uint32_t size = sizeof(buf);
