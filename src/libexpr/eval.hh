@@ -187,9 +187,34 @@ public:
     Value vEmptyList;
 
     /**
-     * Null constant.
+     * `null` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
      */
     Value vNull;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vTrue;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vFalse;
+
+    /** `"regular"` */
+    Value vStringRegular;
+    /** `"directory"` */
+    Value vStringDirectory;
+    /** `"symlink"` */
+    Value vStringSymlink;
+    /** `"unknown"` */
+    Value vStringUnknown;
 
     /**
      * The accessor for the root filesystem.
@@ -624,6 +649,11 @@ public:
     {
         return ListBuilder(*this, size);
     }
+
+    /**
+     * Return a boolean `Value *` without allocating.
+     */
+    Value *getBool(bool b);
 
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);

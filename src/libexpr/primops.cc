@@ -896,10 +896,11 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
-        attrs.alloc("success").mkBool(true);
+        attrs.insert(state.symbols.create("success"), &state.vTrue);
     } catch (AssertionError & e) {
-        attrs.alloc(state.sValue).mkBool(false);
-        attrs.alloc("success").mkBool(false);
+        // `value = false;` is unfortunate but removing it is a breaking change.
+        attrs.insert(state.sValue, &state.vFalse);
+        attrs.insert(state.symbols.create("success"), &state.vFalse);
     }
 
     // restore the debugRepl pointer if we saved it earlier.
@@ -1775,20 +1776,20 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
-static std::string_view fileTypeToString(InputAccessor::Type type)
+static Value * fileTypeToString(EvalState & state, InputAccessor::Type type)
 {
     return
-        type == InputAccessor::Type::tRegular ? "regular" :
-        type == InputAccessor::Type::tDirectory ? "directory" :
-        type == InputAccessor::Type::tSymlink ? "symlink" :
-        "unknown";
+        type == InputAccessor::Type::tRegular ? &state.vStringRegular :
+        type == InputAccessor::Type::tDirectory ? &state.vStringDirectory :
+        type == InputAccessor::Type::tSymlink ? &state.vStringSymlink :
+        &state.vStringUnknown;
 }
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
-    v.mkString(fileTypeToString(path.lstat().type));
+    v = *fileTypeToString(state, path.lstat().type);
 }
 
 static RegisterPrimOp primop_readFileType({
@@ -1819,8 +1820,8 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
     Value * readFileType = nullptr;
 
     for (auto & [name, type] : entries) {
-        auto & attr = attrs.alloc(name);
         if (!type) {
+            auto & attr = attrs.alloc(name);
             // Some filesystems or operating systems may not be able to return
             // detailed node info quickly in this case we produce a thunk to
             // query the file type lazily.
@@ -1832,7 +1833,7 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
         } else {
             // This branch of the conditional is much more likely.
             // Here we just stringize the directory entry type.
-            attr.mkString(fileTypeToString(*type));
+            attrs.insert(state.symbols.create(name), fileTypeToString(state, *type));
         }
     }
 
@@ -2193,11 +2194,8 @@ bool EvalState::callPathFilter(
     Value arg1;
     arg1.mkString(pathArg);
 
-    Value arg2;
     // assert that type is not "unknown"
-    arg2.mkString(fileTypeToString(st.type));
-
-    Value * args []{&arg1, &arg2};
+    Value * args []{&arg1, fileTypeToString(*this, st.type)};
     Value res;
     callFunction(*filterFun, 2, args, res, pos);
 
@@ -2847,8 +2845,7 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * arg
 
     auto attrs = state.buildBindings(args[0]->lambda.fun->formals->formals.size());
     for (auto & i : args[0]->lambda.fun->formals->formals)
-        // !!! should optimise booleans (allocate only once)
-        attrs.alloc(i.name, i.pos).mkBool(i.def);
+        attrs.insert(i.name, state.getBool(i.def), i.pos);
     v.mkAttrs(attrs);
 }
 

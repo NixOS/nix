@@ -437,6 +437,12 @@ EvalState::EvalState(
 
     vEmptyList.mkList(buildList(0));
     vNull.mkNull();
+    vTrue.mkBool(true);
+    vFalse.mkBool(false);
+    vStringRegular.mkString("regular");
+    vStringDirectory.mkString("directory");
+    vStringSymlink.mkString("symlink");
+    vStringUnknown.mkString("unknown");
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -931,6 +937,9 @@ ListBuilder::ListBuilder(EvalState & state, size_t size)
     state.nrListElems += size;
 }
 
+Value * EvalState::getBool(bool b) {
+    return b ? &vTrue : &vFalse;
+}
 
 unsigned long nrThunks = 0;
 
