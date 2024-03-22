@@ -421,8 +421,10 @@ struct GitLabInputScheme : GitArchiveInputScheme
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // See rate limiting note below
-        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/"
+                       "commits?ref_name=%s",
+                       host, percentEncode(getStrAttr(input.attrs, "owner")),
+                       getStrAttr(input.attrs, "repo"), *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
@@ -444,9 +446,11 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // is 10 reqs/sec/ip-addr.  See
         // https://docs.gitlab.com/ee/user/gitlab_com/index.html#gitlabcom-specific-rate-limits
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
-        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
-            input.getRev()->to_string(HashFormat::Base16, false));
+        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/"
+                       "archive.tar.gz?sha=%s",
+                       host, percentEncode(getStrAttr(input.attrs, "owner")),
+                       getStrAttr(input.attrs, "repo"),
+                       input.getRev()->to_string(HashFormat::Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
         return DownloadUrl { url, headers };
