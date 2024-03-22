@@ -458,7 +458,7 @@ static void main_nix_build(int argc, char * * argv)
         auto env = getEnv();
 
         auto tmp = getEnv("TMPDIR");
-        if (!tmp) tmp = getEnv("XDG_RUNTIME_DIR").value_or("/tmp");
+        if (!tmp || tmp->empty()) tmp = getEnv("XDG_RUNTIME_DIR").value_or("/tmp");
 
         if (pure) {
             decltype(env) newEnv;
