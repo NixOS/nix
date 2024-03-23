@@ -1,6 +1,6 @@
 ---
 synopsis: Remove experimental repl-flake
-significant: significant
+significance: significant
 issues: 10103
 prs: 10299
 ---
