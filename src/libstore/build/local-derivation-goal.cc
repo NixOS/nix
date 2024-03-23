@@ -2093,7 +2093,8 @@ void LocalDerivationGoal::runChild()
             Path globalTmpDir = canonPath(defaultTempDir(), true);
 
             /* They don't like trailing slashes on subpath directives */
-            if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
+            while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
+                globalTmpDir.pop_back();
 
             if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
                 builder = "/usr/bin/sandbox-exec";
