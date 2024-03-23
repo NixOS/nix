@@ -1,19 +1,5 @@
 error:
-       … while calling the 'addErrorContext' builtin
-         at /pwd/lang/eval-fail-addErrorContext-example.nix:6:7:
-            5|     else
-            6|       builtins.addErrorContext
-             |       ^
-            7|         "while counting down; n = ${toString n}"
-
        … while counting down; n = 10
-
-       … while calling the 'addErrorContext' builtin
-         at /pwd/lang/eval-fail-addErrorContext-example.nix:6:7:
-            5|     else
-            6|       builtins.addErrorContext
-             |       ^
-            7|         "while counting down; n = ${toString n}"
 
        … while counting down; n = 9
 

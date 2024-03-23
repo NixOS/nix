@@ -834,6 +834,8 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
 static RegisterPrimOp primop_addErrorContext(PrimOp {
     .name = "__addErrorContext",
     .arity = 2,
+    // The normal trace item is redundant
+    .addTrace = false,
     .fun = prim_addErrorContext,
 });
 
