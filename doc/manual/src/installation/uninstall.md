@@ -141,6 +141,10 @@ which you may remove.
 > directory. This is an expected sign of a successful uninstall. The empty
 > `/nix` directory will disappear the next time you reboot.
 >
+> You may still have `bash.bashrc.backup-before-nix` file despite it being empty,
+> preventing the install to work properly. Removing this with `sudo rm -f bash.bashrc.backup-before-nix`
+> may help.
+>
 > You do not have to reboot to finish uninstalling Nix. The uninstall is
 > complete. macOS (Catalina+) directly controls root directories and its
 > read-only root will prevent you from manually deleting the empty `/nix`
