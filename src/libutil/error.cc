@@ -11,9 +11,9 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TraceKind kind)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .kind = kind });
 }
 
 void throwExceptionSelfCheck(){
@@ -379,29 +379,39 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         // A consecutive sequence of stack traces that are all in `tracesSeen`.
         std::vector<Trace> skippedTraces;
         size_t count = 0;
+        bool truncate = false;
 
         for (const auto & trace : einfo.traces) {
             if (trace.hint.str().empty()) continue;
 
             if (!showTrace && count > 3) {
-                oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
-                break;
+                truncate = true;
             }
 
-            if (tracesSeen.count(trace)) {
-                skippedTraces.push_back(trace);
-                continue;
+            if (!truncate || trace.kind == TraceKind::Custom) {
+
+                if (tracesSeen.count(trace)) {
+                    skippedTraces.push_back(trace);
+                    continue;
+                }
+
+                tracesSeen.insert(trace);
+
+                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+
+                count++;
+
+                printTrace(oss, ellipsisIndent, count, trace);
             }
-            tracesSeen.insert(trace);
-
-            printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
-
-            count++;
-
-            printTrace(oss, ellipsisIndent, count, trace);
         }
 
+
         printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+
+        if (truncate) {
+            oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL << "\n";
+        }
+
         oss << "\n" << prefix;
     }
 

@@ -61,9 +61,16 @@ void printCodeLines(std::ostream & out,
     const Pos & errPos,
     const LinesOfCode & loc);
 
+enum struct TraceKind {
+    Other,
+    /** Produced by builtins.addErrorContext. Always printed. */
+    Custom,
+};
+
 struct Trace {
     std::shared_ptr<Pos> pos;
     HintFmt hint;
+    TraceKind kind = TraceKind::Other;
 };
 
 inline bool operator<(const Trace& lhs, const Trace& rhs);
@@ -161,7 +168,7 @@ public:
         addTrace(std::move(e), HintFmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint);
+    void addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TraceKind kind = TraceKind::Other);
 
     bool hasTrace() const { return !err.traces.empty(); }
 
