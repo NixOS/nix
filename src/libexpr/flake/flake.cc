@@ -147,7 +147,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                             NixStringContext emptyContext = {};
                             attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, emptyContext).dump());
                         } else
-                            state.error<TypeError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
+                            state.error<EvalError>("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
                                 state.symbols[attr.name], showType(*attr.value)).debugThrow();
                 }
                 #pragma GCC diagnostic pop
@@ -279,14 +279,14 @@ static Flake readFlake(
                 std::vector<std::string> ss;
                 for (auto elem : setting.value->listItems()) {
                     if (elem->type() != nString)
-                        state.error<TypeError>("list element in flake configuration setting '%s' is %s while a string is expected",
+                        state.error<EvalError>("list element in flake configuration setting '%s' is %s while a string is expected",
                             state.symbols[setting.name], showType(*setting.value)).debugThrow();
                     ss.emplace_back(state.forceStringNoCtx(*elem, setting.pos, ""));
                 }
                 flake.config.settings.emplace(state.symbols[setting.name], ss);
             }
             else
-                state.error<TypeError>("flake configuration setting '%s' is %s",
+                state.error<EvalError>("flake configuration setting '%s' is %s",
                     state.symbols[setting.name], showType(*setting.value)).debugThrow();
         }
     }

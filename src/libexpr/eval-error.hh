@@ -4,6 +4,9 @@
 
 #include "error.hh"
 #include "pos-idx.hh"
+#include "print-options.hh"
+#include "print.hh"
+#include "value.hh"
 
 namespace nix {
 
@@ -40,11 +43,38 @@ MakeError(ParseError, Error);
 MakeError(AssertionError, EvalError);
 MakeError(ThrownError, AssertionError);
 MakeError(Abort, EvalError);
-MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, EvalError);
 MakeError(MissingArgumentError, EvalError);
 MakeError(CachedEvalError, EvalError);
 MakeError(InfiniteRecursionError, EvalError);
+
+std::string_view showType(ValueType type, bool article);
+
+struct TypeError : public EvalError
+{
+    ValueType expected;
+    Value & actual;
+
+    TypeError(EvalState & state, ValueType expected, Value & actual)
+        : EvalError(
+            state,
+            "expected %1% but found %2%: %3%",
+            showType(expected),
+            showType(actual),
+            ValuePrinter(state, actual, errorPrintOptions))
+        , expected(expected)
+        , actual(actual)
+    {
+    }
+};
+
+struct MissingAttrError : public EvalError
+{
+    Symbol attr;
+    Value & actual;
+
+    MissingAttrError(EvalState & state, Symbol attr, Value & actual);
+};
 
 struct InvalidPathError : public EvalError
 {
@@ -67,7 +97,7 @@ class EvalErrorBuilder final
     friend class EvalState;
 
     template<typename... Args>
-    explicit EvalErrorBuilder(EvalState & state, const Args &... args)
+    explicit EvalErrorBuilder(EvalState & state, Args && ... args)
         : error(T(state, args...))
     {
     }
@@ -82,8 +112,6 @@ public:
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & atPos(Value & value, PosIdx fallback = noPos);
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withTrace(PosIdx pos, const std::string_view text);
-
-    [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withFrameTrace(PosIdx pos, const std::string_view text);
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withSuggestions(Suggestions & s);
 
