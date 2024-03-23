@@ -163,7 +163,7 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
     return hasPos;
 }
 
-void printTrace(
+static void printTrace(
     std::ostream & output,
     const std::string_view & indent,
     size_t & count,
