@@ -11,12 +11,12 @@ using namespace git;
 
 class GitTest : public CharacterizationTest
 {
-    Path unitTestData = getUnitTestData() + "/git";
+    Path unitTestData = getUnitTestData();
 
 public:
 
     Path goldenMaster(std::string_view testStem) const override {
-        return unitTestData + "/" + testStem;
+        return unitTestData + "/git/" + testStem;
     }
 
     /**
