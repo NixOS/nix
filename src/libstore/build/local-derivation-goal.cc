@@ -488,7 +488,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
 
     chownToBuilder(tmpDir);
 
