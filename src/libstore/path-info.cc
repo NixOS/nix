@@ -161,27 +161,24 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
     jsonObject["narSize"] = narSize;
 
     {
-        auto& jsonRefs = (jsonObject["references"] = json::array());
+        auto & jsonRefs = (jsonObject["references"] = json::array());
         for (auto & ref : references)
             jsonRefs.emplace_back(store.printStorePath(ref));
     }
 
-    if (ca)
-        jsonObject["ca"] = renderContentAddress(ca);
+    jsonObject["ca"] = ca ? (std::optional { renderContentAddress(*ca) }) : std::nullopt;
 
     if (includeImpureInfo) {
-        if (deriver)
-            jsonObject["deriver"] = store.printStorePath(*deriver);
+        jsonObject["deriver"] = deriver ? (std::optional { store.printStorePath(*deriver) }) : std::nullopt;
 
-        if (registrationTime)
-            jsonObject["registrationTime"] = registrationTime;
+        jsonObject["registrationTime"] = registrationTime ? (std::optional { registrationTime }) : std::nullopt;
 
-        if (ultimate)
-            jsonObject["ultimate"] = ultimate;
+        jsonObject["ultimate"] = ultimate;
 
+        auto & sigsObj = jsonObject["signatures"] = json::array();
         if (!sigs.empty()) {
             for (auto & sig : sigs)
-                jsonObject["signatures"].push_back(sig);
+                sigsObj.push_back(sig);
         }
     }
 
@@ -215,10 +212,12 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
         throw;
     }
 
-    if (json.contains("ca"))
+    if (json.contains("ca")) {
+        auto ca = valueAt(json, "ca");
         res.ca = ContentAddress::parse(
             static_cast<const std::string &>(
                 ensureType(valueAt(json, "ca"), value_t::string)));
+    }
 
     if (json.contains("deriver"))
         res.deriver = store.parseStorePath(
@@ -232,7 +231,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
         res.ultimate = ensureType(valueAt(json, "ultimate"), value_t::boolean);
 
     if (json.contains("signatures"))
-        res.sigs = valueAt(json, "signatures");
+        res.sigs = ensureType(valueAt(json, "signatures"), value_t::array);
 
     return res;
 }
