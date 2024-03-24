@@ -1568,12 +1568,32 @@ static RegisterPrimOp primop_pathExists({
     .fun = prim_pathExists,
 });
 
+// Ideally, all trailing slashes should have been removed, but it's been like this for
+// almost a decade as of writing. Changing it will affect reproducibility.
+static std::string_view legacyBaseNameOf(std::string_view path)
+{
+    if (path.empty())
+        return "";
+
+    auto last = path.size() - 1;
+    if (path[last] == '/' && last > 0)
+        last -= 1;
+
+    auto pos = path.rfind('/', last);
+    if (pos == path.npos)
+        pos = 0;
+    else
+        pos += 1;
+
+    return path.substr(pos, last - pos + 1);
+}
+
 /* Return the base name of the given string, i.e., everything
    following the last slash. */
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
-    v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context,
+    v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
             false, false)), context);
 }
