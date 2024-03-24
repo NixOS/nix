@@ -10,7 +10,7 @@ src_dirs = [
     'libfetchers',
     'libexpr',
     'libcmd',
-    # 'nixbin',
+    'nixbin',
 ]
 
 # if get_option('nix_perl').allowed()

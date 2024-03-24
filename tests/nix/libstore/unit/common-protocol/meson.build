@@ -15,6 +15,7 @@ libstore_common_protocol_test = executable(
 test(
     'common-protocol-test',
     libstore_common_protocol_test,
+    env : ['_NIX_TEST_UNIT_DATA=@0@'.format(libstore_test_data_dir)],
     protocol : 'gtest',
     suite : ['unit', 'libstore'])
 

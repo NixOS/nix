@@ -43,14 +43,19 @@ nix_bin = executable(
         nix_env_src,
         nix_instantiate_src,
         nix_store_src,
-        # utils_nix,
-        # generate_manpage_nix
-        ],
+        
+        generate_manpage_nix,
+        generate_settings_nix,
+        generate_store_info_nix,
+        utils_nix,
+        nix_docgen_profile_md,
+        nix_docgen_help_stores_md],
     install : true,
     install_mode : 'rwxr-xr-x',
     install_dir : bindir,
     include_directories : [
         nix_inc,
+        nix_data_inc,
         # doc_manual_inc,
         proj_inc],
     cpp_args : nix_cxx_args,

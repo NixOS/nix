@@ -75,6 +75,16 @@ nix_src = files(
 
 nix_headers = files(
     'run.hh')
+    
 
-nix_markdown_files += files(
-    join_paths('realisation', 'info.md'))
+# targets
+#============================================================================
+
+# configure profile.md.gen.hh
+#---------------------------------------------------
+profile_md_gen_hh = custom_target(
+  'profile.md.gen.hh',
+  output : 'profile.md.gen.hh',
+  input : 'profile.cc',
+  command : [bash, '-c', gen_rheader, 'sh', '@OUTPUT@'])
+  
