@@ -1,7 +1,7 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 
-#include "../../toml11/toml.hpp"
+#include "toml.hpp"
 
 #include <sstream>
 

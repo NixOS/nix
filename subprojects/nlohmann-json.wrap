@@ -1,0 +1,6 @@
+[wrap-file]
+directory = nlohmann-json
+
+source_url = https://github.com/nlohmann/json
+revision = v3.11.3
+

@@ -1,0 +1,147 @@
+# Nix project build options
+#============================================================================
+
+# dirs
+#============================================================================
+
+option(
+    'nixstoredir',
+    type : 'string',
+    value : '/nix/store',
+    description : 'path of the Nix store (defaults to /nix/store)')
+
+option(
+    'profiledir',
+    type : 'string',
+    value : '/etc/profile.d',
+    description : 'path of the Nix store (defaults to /nix/store)')
+
+option(
+    'docdir',
+    type : 'string',
+    value : 'share/doc',
+    description : 'Documentation location path')
+
+# option(
+#     'mandir',
+#     type : 'string',
+#     value : 'share/man',
+#     description : 'Man pages location path')
+
+
+# compiler args
+#============================================================================
+
+option(
+    'ldflags',
+    type : 'array',
+    value : [
+        '-L/usr/local/lib',
+        '-L/usr/lib',
+        '-L/lib'],
+    description : 'Link flags')
+
+
+option(
+    'cxxflags',
+    type : 'array',
+    value : [
+        '-Wno-pedantic',
+        '-Wno-non-virtual-dtor',
+        '-Wno-unused-parameter',
+        '-Wno-variadic-macros',
+        '-Wdeprecated-declarations',
+        '-Wno-missing-field-initializers',
+    ],
+    description : 'C build flags')
+
+
+# location of rapidcheck install
+#============================================================================
+option(
+    'rapidcheck_dir',
+    type : 'string',
+    value : '/usr/lib',
+    description : 'path to rapidcheck')
+
+option(
+    'rapidcheck_headers',
+    type : 'string',
+    value : '/usr/include/rapidcheck',
+    description : 'path to rapidcheck')
+
+
+# location of aws_sdk_cpp install
+#============================================================================
+# FIXME: this isnt correct. Meson MUST find these dependencies itself to
+# allow for potability. hardcoding for now.
+option(
+    'aws_sdk_cpp_include_dir',
+    type : 'string',
+    value : '/usr/lib',
+    description : 'path to aws_sdk_cpp includes')
+option(
+    'aws_sdk_cpp_lib_dir',
+    type : 'string',
+    value : '/usr/lib',
+    description : 'path to aws_sdk_cpp libs')
+
+
+# optional dependencies
+#============================================================================
+
+option(
+    'gc',
+    type : 'feature',
+    value : 'auto',
+    description : 'Build nix with Boehm garbage collector')
+
+option(
+    's3',
+    type : 'feature',
+    value : 'auto',
+    description : 'Build nix with s3')
+
+option(
+    'coreutils_bin',
+    type : 'string',
+    description : 'path of cat, mkdir, etc.')
+
+option(
+    'nix_perl',
+    type : 'feature',
+    value : 'enabled',
+    description : 'Build nix with nix-perl')
+
+# misc
+#============================================================================
+option(
+    'doc_generate',
+    type : 'feature',
+    value : 'enabled',
+    description : 'Build the documentation and manpages')
+
+option(
+    'build_shared_libs',
+    type : 'boolean',
+    value : 'false',
+    description : 'Build nix with shared libs')
+
+option(
+    'sandbox_shell',
+    type : 'string',
+    value : '/usr/bin/busybox',
+    description : 'path of a statically-linked shell to use as /bin/sh in sandboxes')
+
+option(
+    'normal_var',
+    type : 'boolean',
+    value : 'true',
+    description : 'Whether to use `/nix/var` or the user-overridable `localstatedir`.')
+
+option(
+    'PRECOMPILE_HEADERS',
+    type : 'boolean',
+    value : 'true',
+    description : 'Whether to use precompiled headers.')
+

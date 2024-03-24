@@ -1,0 +1,7 @@
+[wrap-file]
+directory = toml11-3.8.1
+source_url = https://github.com/ToruNiina/toml11/archive/refs/tags/v3.8.1.zip
+source_filename = toml11-3.8.1.zip
+source_hash = 72e956f42002dd1566c5551a693ec0f6fa3bea3a0e7bcea29bcdace98738da74
+wrapdb_version = 3.8.0-1
+buildsystem = cmake
