@@ -1,20 +1,20 @@
-# libstore.test.derivation
+# libstore.test.nar-info
 # ============================================================================
 
 
 # build test
 #---------------------------------------------------
-libstore_derivation_test = executable(
-    'derivation',
+libstore_nar_info_test = executable(
+    'nar-info',
     install : false,
-    sources : 'derivation.cc',
+    sources : 'nar-info.cc',
     include_directories : proj_inc,
     dependencies : libstore_tests_dep_list)
 
 
 test(
-    'derivation',
-    libstore_derivation_test,
+    'nar-info',
+    libstore_nar_info_test,
     env : ['_NIX_TEST_UNIT_DATA=@0@'.format(libstore_test_data_dir)],
     protocol : 'gtest',
     suite : ['unit', 'libstore'])

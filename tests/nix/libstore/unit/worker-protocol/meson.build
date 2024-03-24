@@ -1,20 +1,20 @@
-# libstore.test.derivation
+# libstore.test.worker-protocol
 # ============================================================================
 
 
 # build test
 #---------------------------------------------------
-libstore_derivation_test = executable(
-    'derivation',
+libstore_worker_protocol_test = executable(
+    'worker-protocol',
     install : false,
-    sources : 'derivation.cc',
+    sources : 'worker-protocol.cc',
     include_directories : proj_inc,
     dependencies : libstore_tests_dep_list)
 
 
 test(
-    'derivation',
-    libstore_derivation_test,
+    'worker-protocol',
+    libstore_worker_protocol_test,
     env : ['_NIX_TEST_UNIT_DATA=@0@'.format(libstore_test_data_dir)],
     protocol : 'gtest',
     suite : ['unit', 'libstore'])

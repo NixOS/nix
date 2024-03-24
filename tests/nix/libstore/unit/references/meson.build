@@ -1,20 +1,20 @@
-# libstore.test.derivation
+# libstore.test.references
 # ============================================================================
 
 
 # build test
 #---------------------------------------------------
-libstore_derivation_test = executable(
-    'derivation',
+libstore_references_test = executable(
+    'references',
     install : false,
-    sources : 'derivation.cc',
+    sources : 'references.cc',
     include_directories : proj_inc,
     dependencies : libstore_tests_dep_list)
 
 
 test(
-    'derivation',
-    libstore_derivation_test,
+    'references',
+    libstore_references_test,
     env : ['_NIX_TEST_UNIT_DATA=@0@'.format(libstore_test_data_dir)],
     protocol : 'gtest',
     suite : ['unit', 'libstore'])

@@ -35,19 +35,18 @@ libstore_tests_dep_list = [
 libstore_unit_test_dirs = [
     'common-protocol',
     'content-address',
-    # 'derivation',
-    # 'derived-path',
-    # 'downstream-placeholder',
-    # 'machines',
-    # 'nar-info',
-    # 'nar-info-disk-cache',
-    # 'outputs-spec',
-    # 'path',
-    # 'path-info',
-    # 'references',
-    # 'serve-protocol',
-    # 'worker-protocol'
-    ]
+    'derivation',
+    'derived-path',
+    'downstream-placeholder',
+    'machines',
+    'nar-info',
+    'nar-info-disk-cache',
+    'outputs-spec',
+    'path',
+    'path-info',
+    'references',
+    'serve-protocol',
+    'worker-protocol']
 
 foreach dir : libstore_unit_test_dirs
     subdir(dir)
