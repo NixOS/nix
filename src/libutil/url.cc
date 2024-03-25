@@ -171,16 +171,16 @@ std::string fixGitURL(const std::string & url)
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
         return std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    else {
-        if (url.find("://") == std::string::npos) {
-            return (ParsedURL {
-                .scheme = "file",
-                .authority = "",
-                .path = url
-            }).to_string();
-        } else
-            return url;
+    if (hasPrefix(url, "file:"))
+        return url;
+    if (url.find("://") == std::string::npos) {
+        return (ParsedURL {
+            .scheme = "file",
+            .authority = "",
+            .path = url
+        }).to_string();
     }
+    return url;
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
