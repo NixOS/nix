@@ -11,6 +11,3 @@ The supported Nix versions are:
 
 Bugfixes and security issues are backported to every supported version.
 Patch releases are published as needed.
-
-Notable changes and additions are announced in the release notes for each version.
-
