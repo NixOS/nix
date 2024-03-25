@@ -137,6 +137,8 @@ in
   # TODO: (nixpkgs update) remoteBuildsSshNg_local_2_18 = ...
   */
 
+  rootless-daemon = runNixOSTestFor "x86_64-linux" ./rootless-daemon.nix;
+
   nix-copy-closure = runNixOSTestFor "x86_64-linux" ./nix-copy-closure.nix;
 
   nix-copy = runNixOSTestFor "x86_64-linux" ./nix-copy.nix;

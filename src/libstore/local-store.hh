@@ -329,7 +329,7 @@ private:
 
     void findRootsNoTemp(Roots & roots, bool censor);
 
-    void findRuntimeRoots(Roots & roots, bool censor);
+    void findRootsNoTempNoExternalDaemon(Roots & roots, bool censor);
 
     std::pair<Path, AutoCloseFD> createTempDirInStore();
 

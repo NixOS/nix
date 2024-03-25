@@ -12,6 +12,7 @@ makefiles = \
   mk/precompiled-headers.mk \
   local.mk \
   src/libutil/local.mk \
+  src/nix-find-roots/local.mk \
   src/libstore/local.mk \
   src/libfetchers/local.mk \
   src/libmain/local.mk \
@@ -41,6 +42,7 @@ endif
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
 makefiles += \
   tests/functional/local.mk \
+  tests/functional/gc-external-daemon/local.mk \
   tests/functional/ca/local.mk \
   tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \

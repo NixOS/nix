@@ -143,6 +143,30 @@
             '';
           };
 
+          nix-find-roots = prev.stdenv.mkDerivation {
+            pname = "nix-find-roots";
+            inherit version;
+
+            src = fileset.toSource {
+              root = ./src/nix-find-roots;
+              fileset = /*fileset.intersect baseFiles (*/fileset.unions [
+                ./src/nix-find-roots/main.cc
+                ./src/nix-find-roots/lib
+              ]/*)*/;
+            };
+
+            CXXFLAGS = prev.lib.optionalString prev.stdenv.hostPlatform.isStatic "-static";
+
+            buildPhase = ''
+              $CXX $CXXFLAGS -std=c++17 *.cc **/*.cc -I lib -o nix-find-roots
+            '';
+
+            installPhase = ''
+              mkdir -p $out/bin
+              cp nix-find-roots $out/bin/
+            '';
+          };
+
           libgit2-nix = final.libgit2.overrideAttrs (attrs: {
             src = libgit2;
             version = libgit2.lastModifiedDate;
@@ -364,6 +388,9 @@
         default = nix;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
+
+        inherit (nixpkgsFor.${system}.static) nix-find-roots;
+
         dockerImage =
           let
             pkgs = nixpkgsFor.${system}.native;
