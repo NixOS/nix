@@ -428,6 +428,7 @@ EvalState::EvalState(
 {
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
+    rootFS->setPathDisplay("/", "");
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
