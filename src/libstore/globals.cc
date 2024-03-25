@@ -262,7 +262,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smDisabled, false},
 });
 
-template<> SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const
+template<> SandboxMode Setting<SandboxMode>::parse(const std::string & str) const
 {
     if (str == "true") return smEnabled;
     else if (str == "relaxed") return smRelaxed;
@@ -270,12 +270,12 @@ template<> SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) 
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> struct BaseSetting<SandboxMode>::trait
+template<> struct Setting<SandboxMode>::trait
 {
     static constexpr bool appendable = false;
 };
 
-template<> std::string BaseSetting<SandboxMode>::to_string() const
+template<> std::string Setting<SandboxMode>::to_string() const
 {
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
@@ -283,7 +283,7 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     else abort();
 }
 
-template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
+template<> void Setting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
@@ -321,7 +321,7 @@ Paths PluginFilesSetting::parse(const std::string & str) const
 {
     if (pluginsLoaded)
         throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<Paths>::parse(str);
+    return Setting<Paths>::parse(str);
 }
 
 

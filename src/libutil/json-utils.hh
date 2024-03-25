@@ -64,6 +64,10 @@ struct json_avoids_null<std::list<T>> : std::true_type {};
 template<typename K, typename V>
 struct json_avoids_null<std::map<K, V>> : std::true_type {};
 
+enum class LogFormat;
+template<>
+struct json_avoids_null<LogFormat> : std::true_type {};
+
 }
 
 namespace nlohmann {

@@ -333,4 +333,101 @@ Activity::~Activity()
     }
 }
 
+LogFormat defaultLogFormat = LogFormat::raw;
+
+std::optional<LogFormat> parseLogFormat(const std::string & str)
+{
+    if (str == "raw" || getEnv("NIX_GET_COMPLETIONS"))
+        return LogFormat::raw;
+    else if (str == "raw-with-logs")
+        return LogFormat::rawWithLogs;
+    else if (str == "internal-json")
+        return LogFormat::internalJSON;
+    else if (str == "bar")
+        return LogFormat::bar;
+    else if (str == "bar-with-logs")
+        return LogFormat::barWithLogs;
+    else
+        return std::nullopt;
+}
+
+std::ostream & operator<<(std::ostream & output, const LogFormat & format)
+{
+    switch (format) {
+        case LogFormat::raw:
+            return output << "raw";
+        case LogFormat::rawWithLogs:
+            return output << "raw-with-logs";
+        case LogFormat::internalJSON:
+            return output << "internal-json";
+        case LogFormat::bar:
+            return output << "bar";
+        case LogFormat::barWithLogs:
+            return output << "bar-with-logs";
+        default:
+            abort();
+    }
+    return output;
+}
+
+std::string logFormatToString(const LogFormat & format)
+{
+    std::ostringstream stream;
+    stream << format;
+    return stream.str();
+}
+
+void to_json(nlohmann::json &j, const LogFormat &format)
+{
+    j = logFormatToString(format);
+}
+
+void from_json(const nlohmann::json &j, LogFormat &format)
+{
+    auto parsed = parseLogFormat(j.template get<std::string>());
+    if (parsed.has_value()) {
+        format = parsed.value();
+    } else {
+        // Error ID 302 seems to fit best:
+        // "During implicit or explicit value conversion, the JSON type
+        // must be compatible to the target type."
+        throw nlohmann::detail::type_error::create(302, "string is not a valid log-format", &j);
+    }
+}
+
+Logger * makeDefaultLogger()
+{
+    switch (defaultLogFormat) {
+    case LogFormat::raw:
+        return makeSimpleLogger(false);
+    case LogFormat::rawWithLogs:
+        return makeSimpleLogger(true);
+    case LogFormat::internalJSON:
+        return makeJSONLogger(*makeSimpleLogger(true));
+    case LogFormat::bar:
+        return makeProgressBar();
+    case LogFormat::barWithLogs: {
+        auto logger = makeProgressBar();
+        logger->setPrintBuildLogs(true);
+        return logger;
+    }
+    default:
+        abort();
+    }
+}
+
+void setLogFormat(const LogFormat & logFormat)
+{
+    if (defaultLogFormat == logFormat) {
+        return;
+    }
+    defaultLogFormat = logFormat;
+    createDefaultLogger();
+}
+
+void createDefaultLogger()
+{
+    logger = makeDefaultLogger();
+}
+
 }

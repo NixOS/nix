@@ -15,22 +15,20 @@ namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
-struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
+struct MaxBuildJobsSetting : public Setting<unsigned int>
 {
     MaxBuildJobsSetting(Config * options,
         unsigned int def,
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<unsigned int>(def, true, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
+        : Setting<unsigned int>(options, def, name, description, aliases)
+    { }
 
     unsigned int parse(const std::string & str) const override;
 };
 
-struct PluginFilesSetting : public BaseSetting<Paths>
+struct PluginFilesSetting : public Setting<Paths>
 {
     bool pluginsLoaded = false;
 
@@ -39,7 +37,7 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<Paths>(def, true, name, description, aliases)
+        : Setting<Paths>(options, def, name, description, aliases)
     {
         options->addSetting(this);
     }

@@ -6,8 +6,43 @@
 #include "config.hh"
 
 #include <nlohmann/json_fwd.hpp>
+#include <nlohmann/detail/exceptions.hpp>
 
 namespace nix {
+
+enum class LogFormat {
+  /**
+   * The format used by old-style commands like `nix-build`, but without build
+   * logs.
+   */
+  raw,
+  /**
+   * The format used by old-style commands like `nix-build`.
+   */
+  rawWithLogs,
+  /**
+   * A JSON format for internal use.
+   */
+  internalJSON,
+  /**
+   * The progress bar format used by `nix` (v3) commands.
+   */
+  bar,
+  /**
+   * The progress bar format used by `nix` (v3) commands, but with build logs.
+   */
+  barWithLogs,
+};
+
+std::ostream & operator<<(std::ostream & output, const LogFormat & format);
+std::string logFormatToString(const LogFormat & format);
+std::optional<LogFormat> parseLogFormat(const std::string & str);
+
+void to_json(nlohmann::json & j, const LogFormat & format);
+void from_json(const nlohmann::json & j, LogFormat & format);
+
+void setLogFormat(const LogFormat & logFormat);
+void createDefaultLogger();
 
 typedef enum {
     actUnknown = 0,
@@ -47,6 +82,26 @@ struct LoggerSettings : Config
         R"(
           Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
+        )"};
+
+    Setting<LogFormat> logFormat{
+        this, LogFormat::raw, "log-format",
+        R"(
+            The log format to use.
+            One of `raw`, `raw-with-logs`, `internal-json`, `bar`, or `bar-with-logs`.
+        )",
+        {},
+        false,
+        std::nullopt,
+        {[](const LogFormat & value) {
+            setLogFormat(value);
+        }}};
+
+    Setting<std::optional<LogFormat>> logFormatLegacy{
+        this, std::nullopt, "log-format-legacy",
+        R"(
+            The log format to use for legacy commands like `nix-build` and `nix-shell`.
+            One of `raw`, `raw-with-logs`, `internal-json`, `bar`, or `bar-with-logs`.
         )"};
 };
 
@@ -185,6 +240,8 @@ extern Logger * logger;
 Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
+
+Logger * makeProgressBar();
 
 std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
 
