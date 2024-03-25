@@ -9,7 +9,7 @@ struct EvalSettings : Config
 {
     EvalSettings();
 
-    static Strings getDefaultNixPath();
+    Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
 
@@ -19,7 +19,7 @@ struct EvalSettings : Config
         "Whether builtin functions that allow executing native code should be enabled."};
 
     Setting<Strings> nixPath{
-        this, getDefaultNixPath(), "nix-path",
+        this, {}, "nix-path",
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
