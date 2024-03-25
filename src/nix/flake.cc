@@ -18,6 +18,7 @@
 #include "markdown.hh"
 #include "users.hh"
 #include "terminal.hh"
+#include "value/context.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -884,7 +885,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto cursor = installable.getCursor(*evalState);
 
         auto templateDirAttr = cursor->getAttr("path");
-        auto templateDir = templateDirAttr->getString();
+        auto & v = templateDirAttr->forceValue();
+        NixStringContext ctx;
+        auto templateDir = evalState->coerceToString(noPos, v, ctx, "while casting the template value to a path", false, true).toOwned();
 
         if (!store->isInStore(templateDir))
             evalState->error<TypeError>(
