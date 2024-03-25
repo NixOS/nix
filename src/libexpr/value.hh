@@ -290,13 +290,7 @@ public:
 
     inline void finishValue(InternalType newType, Payload newPayload)
     {
-        /* After overwriting thunk/app values, be sure to clear
-           pointers in the Value to ensure that the target isn't kept
-           alive unnecessarily. */
-        payload.app.left = payload.app.right = 0;
-
         payload = newPayload;
-
         internalType = newType;
     }
 
