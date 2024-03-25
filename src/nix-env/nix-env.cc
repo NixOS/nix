@@ -1237,15 +1237,15 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nInt) {
                                 attrs2["type"] = "int";
-                                attrs2["value"] = fmt("%1%", v->integer);
+                                attrs2["value"] = fmt("%1%", v->integer());
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nFloat) {
                                 attrs2["type"] = "float";
-                                attrs2["value"] = fmt("%1%", v->fpoint);
+                                attrs2["value"] = fmt("%1%", v->fpoint());
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nBool) {
                                 attrs2["type"] = "bool";
-                                attrs2["value"] = v->boolean ? "true" : "false";
+                                attrs2["value"] = v->boolean() ? "true" : "false";
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nList) {
                                 attrs2["type"] = "strings";
@@ -1259,13 +1259,11 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                             } else if (v->type() == nAttrs) {
                                 attrs2["type"] = "strings";
                                 XMLOpenElement m(xml, "meta", attrs2);
-                                Bindings & attrs = *v->attrs;
-                                for (auto &i : attrs) {
-                                    Attr & a(*attrs.find(i.name));
-                                    if(a.value->type() != nString) continue;
+                                for (auto & i : *v->attrs()) {
+                                    if (i.value->type() != nString) continue;
                                     XMLAttrs attrs3;
                                     attrs3["type"] = globals.state->symbols[i.name];
-                                    attrs3["value"] = a.value->c_str();
+                                    attrs3["value"] = i.value->c_str();
                                     xml.writeEmptyElement("string", attrs3);
                             }
                             }

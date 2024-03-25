@@ -97,7 +97,7 @@ static void fetchTree(
 
         fetchers::Attrs attrs;
 
-        if (auto aType = args[0]->attrs->get(state.sType)) {
+        if (auto aType = args[0]->attrs()->get(state.sType)) {
             if (type)
                 state.error<EvalError>(
                     "unexpected attribute 'type'"
@@ -110,7 +110,7 @@ static void fetchTree(
 
         attrs.emplace("type", type.value());
 
-        for (auto & attr : *args[0]->attrs) {
+        for (auto & attr : *args[0]->attrs()) {
             if (attr.name == state.sType) continue;
             state.forceValue(*attr.value, attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
@@ -121,9 +121,9 @@ static void fetchTree(
                     : s);
             }
             else if (attr.value->type() == nBool)
-                attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean});
+                attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
             else if (attr.value->type() == nInt)
-                attrs.emplace(state.symbols[attr.name], uint64_t(attr.value->integer));
+                attrs.emplace(state.symbols[attr.name], uint64_t(attr.value->integer()));
             else if (state.symbols[attr.name] == "publicKeys") {
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
                 attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
@@ -422,7 +422,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     if (args[0]->type() == nAttrs) {
 
-        for (auto & attr : *args[0]->attrs) {
+        for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
