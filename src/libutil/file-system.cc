@@ -494,10 +494,14 @@ void AutoDelete::reset(const Path & p, bool recursive) {
 
 //////////////////////////////////////////////////////////////////////
 
+std::string defaultTempDir() {
+    return getEnvNonEmpty("TMPDIR").value_or("/tmp");
+}
+
 static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
     std::atomic<unsigned int> & counter)
 {
-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
+    tmpRoot = canonPath(tmpRoot.empty() ? defaultTempDir() : tmpRoot, true);
     if (includePid)
         return fmt("%1%/%2%-%3%-%4%", tmpRoot, prefix, getpid(), counter++);
     else
@@ -537,7 +541,7 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
 
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 {
-    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
+    Path tmpl(defaultTempDir() + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
     // FIXME: use O_TMPFILE.
     AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
