@@ -159,7 +159,7 @@ All comparison operators are implemented in terms of `<`, and the following equi
 
 | comparison   | implementation        |
 |--------------|-----------------------|
-| *a* `<=` *b* | `! (` *b* `<` *a* `)` |
+| *a* `<=` *b* | `! (` *b* `>` *a* `)` |
 | *a* `>`  *b* |       *b* `<` *a*     |
 | *a* `>=` *b* | `! (` *a* `<` *b* `)` |
 
