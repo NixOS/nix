@@ -25,8 +25,12 @@ void throwExceptionSelfCheck(){
 // This stringifies the error and caches it for use by what(), or similarly by msg().
 const std::string & BaseError::calcWhat() const
 {
-    if (what_.has_value())
+    if (what_.has_value()) {
+        if (err.level == Verbosity::lvlWarn) {
+            removeErrorPrefix(*what_);
+        }
         return *what_;
+    }
     else {
         std::ostringstream oss;
         showErrorInfo(oss, err, loggerSettings.showTrace);
