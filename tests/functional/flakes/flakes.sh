@@ -285,6 +285,35 @@ git -C "$flake3Dir" add flake.lock
 
 git -C "$flake3Dir" commit -m 'Add lockfile'
 
+# Test accessing output in installables with `.` (foobarbaz.<output>)
+cat > "$flake3Dir/flake.nix" <<EOF
+{
+    outputs = {self}: {
+      packages.$system.hello = (import ./config.nix).mkDerivation {
+        name = "hello";
+        outputs = [ "foo" "out" ];
+        meta.outputsToInstall = [ "out" ];
+        buildCommand = ''
+            mkdir \$foo \$out
+            echo "foo" > \$foo/file
+            echo "out" > \$out/file
+        '';
+        outputSpecified = true;
+      };
+    };
+}
+EOF
+
+cp ../config.nix "$flake3Dir"
+git -C "$flake3Dir" add flake.nix config.nix
+git -C "$flake3Dir" commit -m 'multi outputs flake'
+
+nix build "$flake3Dir#hello.foo" --json --no-link | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*hello.drv")) and
+    (.outputs | keys == ["foo"]))
+'
+
 # Test whether registry caching works.
 nix registry list --flake-registry "file://$registry" | grepQuiet flake3
 mv "$registry" "$registry.tmp"
