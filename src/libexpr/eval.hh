@@ -236,6 +236,9 @@ public:
 
     const SourcePath callFlakeInternal;
 
+    /* A collection of InputAccessors, just to keep them alive. */
+    std::list<ref<InputAccessor>> inputAccessors;
+
     /**
      * Store used to materialise .drv files.
      */
@@ -303,7 +306,7 @@ private:
 
     SearchPath searchPath;
 
-    std::map<std::string, std::optional<std::string>> searchPathResolved;
+    std::map<std::string, std::optional<SourcePath>> searchPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -342,6 +345,8 @@ public:
      * Variant which accepts relative paths too.
      */
     SourcePath rootPath(PathView path);
+
+    void registerAccessor(ref<InputAccessor> accessor);
 
     /**
      * Allow access to a path.
@@ -408,7 +413,7 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(
+    std::optional<SourcePath> resolveSearchPathPath(
         const SearchPath::Path & elem,
         bool initAccessControl = false);
 
