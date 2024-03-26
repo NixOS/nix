@@ -128,7 +128,7 @@ std::string_view baseNameOf(std::string_view path)
         return "";
 
     auto last = path.size() - 1;
-    if (path[last] == '/' && last > 0)
+    while (last > 0 && path[last] == '/')
         last -= 1;
 
     auto pos = path.rfind('/', last);
