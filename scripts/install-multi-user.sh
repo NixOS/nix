@@ -882,8 +882,12 @@ configure_shell_profile() {
     task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
-            _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
-                  cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+            if ! [ "$NIX_DO_NOT_BACKUP" = "1" ]; then
+                _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
+                      cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+            else
+                ok "shell profile $profile_target backup is skipped"
+            fi
         else
             # try to create the file if its directory exists
             target_dir="$(dirname "$profile_target")"
@@ -997,7 +1001,11 @@ main() {
     # the sudo/root check out of validate to the head of this func.
     # Cure is *intended* to subsume the validate-and-abort approach,
     # so it may eventually obsolete it.
-    validate_starting_assumptions
+    if ! [ "$NIX_DO_NOT_VALIDATE" = "1" ]; then
+        validate_starting_assumptions
+    else
+        ok "Skipping validation"
+    fi
 
     setup_report
 
@@ -1044,6 +1052,10 @@ case "${1-}" in
     #     uninstall "$@";;
     # install == same as the no-arg condition for now (but, explicit)
     ""|install)
+        main;;
+    cure)
+        export NIX_DO_NOT_VALIDATE=1
+        export NIX_DO_NOT_BACKUP=1
         main;;
     *) # holding space for future options (like uninstall + install?)
         failure "install-multi-user: invalid argument";;
