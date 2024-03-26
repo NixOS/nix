@@ -49,6 +49,16 @@ enum struct JobCategory {
      * A substitution an arbitrary store object; it will use network resources.
      */
     Substitution,
+    /**
+     * A goal that does no "real" work by itself, and just exists to depend on
+     * other goals which *do* do real work. These goals therefore are not
+     * limited.
+     *
+     * These goals cannot infinitely create themselves, so there is no risk of
+     * a "fork bomb" type situation (which would be a problem even though the
+     * goal do no real work) either.
+     */
+    Administration,
 };
 
 struct Goal : public std::enable_shared_from_this<Goal>

@@ -18,4 +18,6 @@ clearStore
 
 drvDep=$(nix-instantiate ./text-hashed-output.nix -A producingDrv)
 
-expectStderr 1 nix build "${drvDep}^out^out" --no-link | grepQuiet "Building dynamic derivations in one shot is not yet implemented"
+out2=$(nix build "${drvDep}^out^out" --no-link)
+
+test $out1 == $out2

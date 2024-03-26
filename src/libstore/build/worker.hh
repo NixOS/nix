@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "lock.hh"
 #include "store-api.hh"
+#include "derived-path-map.hh"
 #include "goal.hh"
 #include "realisation.hh"
 
@@ -13,6 +14,7 @@
 namespace nix {
 
 /* Forward definition. */
+struct CreateDerivationAndRealiseGoal;
 struct DerivationGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
@@ -31,8 +33,24 @@ class DrvOutputSubstitutionGoal;
  */
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
+
+/**
+ * The current implementation of impure derivations has
+ * `DerivationGoal`s accumulate realisations from their waitees.
+ * Unfortunately, `DerivationGoal`s don't directly depend on other
+ * goals, but instead depend on `CreateDerivationAndRealiseGoal`s.
+ *
+ * We try not to share any of the details of any goal type with any
+ * other, for sake of modularity and quicker rebuilds. This means we
+ * cannot "just" downcast and fish out the field. So as an escape hatch,
+ * we have made the function, written in `worker.cc` where all the goal
+ * types are visible, and use it instead.
+ */
+
+std::optional<std::pair<std::reference_wrapper<const DerivationGoal>, std::reference_wrapper<const SingleDerivedPath>>> tryGetConcreteDrvGoal(GoalPtr waitee);
 
 /**
  * A mapping used to remember for each child process to what goal it
@@ -101,6 +119,9 @@ private:
      * Maps used to prevent multiple instantiations of a goal for the
      * same derivation / path.
      */
+
+    DerivedPathMap<std::weak_ptr<CreateDerivationAndRealiseGoal>> outerDerivationGoals;
+
     std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
@@ -188,6 +209,9 @@ public:
      * @ref DerivationGoal "derivation goal"
      */
 private:
+    std::shared_ptr<CreateDerivationAndRealiseGoal> makeCreateDerivationAndRealiseGoal(
+        ref<SingleDerivedPath> drvPath,
+        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
         const StorePath & drvPath, const OutputsSpec & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
