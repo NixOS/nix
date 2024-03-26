@@ -687,15 +687,35 @@ public:
     Setting<std::string> sandboxShmSize{
         this, "50%", "sandbox-dev-shm-size",
         R"(
-          This option determines the maximum size of the `tmpfs` filesystem
-          mounted on `/dev/shm` in Linux sandboxes. For the format, see the
-          description of the `size` option of `tmpfs` in mount(8). The default
-          is `50%`.
+            *Linux only*
+
+            This option determines the maximum size of the `tmpfs` filesystem
+            mounted on `/dev/shm` in Linux sandboxes. For the format, see the
+            description of the `size` option of `tmpfs` in mount(8). The default
+            is `50%`.
         )"};
 
     Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir",
-        "The build directory inside the sandbox."};
+        R"(
+            *Linux only*
+
+            The build directory inside the sandbox.
+
+            This directory is backed by [`build-dir`](#conf-build-dir) on the host.
+        )"};
 #endif
+
+    Setting<std::optional<Path>> buildDir{this, std::nullopt, "build-dir",
+        R"(
+            The directory on the host, in which derivations' temporary build directories are created.
+
+            If not set, Nix will use the system temporary directory indicated by the `TMPDIR` environment variable.
+            Note that builds are often performed by the Nix daemon, so its `TMPDIR` is used, and not that of the Nix command line interface.
+
+            This is also the location where [`--keep-failed`](@docroot@/command-ref/opt-common.md#opt-keep-failed) leaves its files.
+
+            If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment will contain this directory, instead of the virtual location [`sandbox-build-dir`](#conf-sandbox-build-dir).
+        )"};
 
     Setting<PathSet> allowedImpureHostPrefixes{this, {}, "allowed-impure-host-deps",
         "Which prefixes to allow derivations to ask for access to (primarily for Darwin)."};
