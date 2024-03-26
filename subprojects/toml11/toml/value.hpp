@@ -247,6 +247,7 @@ class basic_value
     }
     basic_value& operator=(const basic_value& v)
     {
+        if(this == std::addressof(v)) {return *this;}
         this->cleanup();
         this->region_info_ = v.region_info_;
         this->comments_ = v.comments_;
@@ -269,6 +270,7 @@ class basic_value
     }
     basic_value& operator=(basic_value&& v)
     {
+        if(this == std::addressof(v)) {return *this;}
         this->cleanup();
         this->region_info_ = std::move(v.region_info_);
         this->comments_ = std::move(v.comments_);
@@ -1712,9 +1714,9 @@ class basic_value
     {
         switch(this->type_)
         {
-            case value_t::string  : {string_.~string();       return;}
-            case value_t::array   : {array_.~array_storage(); return;}
-            case value_t::table   : {table_.~table_storage(); return;}
+            case value_t::string : {string_.~string();       return;}
+            case value_t::array  : {array_.~array_storage(); return;}
+            case value_t::table  : {table_.~table_storage(); return;}
             default              : return;
         }
     }

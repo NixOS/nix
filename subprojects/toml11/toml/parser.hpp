@@ -8,6 +8,7 @@
 
 #include "combinator.hpp"
 #include "lexer.hpp"
+#include "macros.hpp"
 #include "region.hpp"
 #include "result.hpp"
 #include "types.hpp"
@@ -21,6 +22,11 @@
 #endif // has_include(<string_view>)
 #endif // __cpp_lib_filesystem
 #endif // TOML11_DISABLE_STD_FILESYSTEM
+
+// the previous commit works with 500+ recursions. so it may be too small.
+// but in most cases, i think we don't need such a deep recursion of
+// arrays or inline-tables.
+#define TOML11_VALUE_RECURSION_LIMIT 64
 
 namespace toml
 {
@@ -57,16 +63,55 @@ parse_binary_integer(location& loc)
     {
         auto str = token.unwrap().str();
         assert(str.size() > 2); // minimum -> 0b1
-        integer retval(0), base(1);
-        for(auto i(str.rbegin()), e(str.rend() - 2); i!=e; ++i)
+        assert(str.at(0) == '0' && str.at(1) == 'b');
+
+        // skip all the zeros and `_` locating at the MSB
+        str.erase(str.begin(), std::find_if(
+                str.begin() + 2, // to skip prefix `0b`
+                str.end(),
+                [](const char c) { return c == '1'; })
+            );
+        assert(str.empty() || str.front() == '1');
+
+        // since toml11 uses int64_t, 64bit (unsigned) input cannot be read.
+        const auto max_length = 63 + std::count(str.begin(), str.end(), '_');
+        if(static_cast<std::string::size_type>(max_length) < str.size())
         {
-            if     (*i == '1'){retval += base; base *= 2;}
-            else if(*i == '0'){base *= 2;}
-            else if(*i == '_'){/* do nothing. */}
-            else // internal error.
+            loc.reset(first);
+            return err(format_underline("toml::parse_binary_integer: "
+                "only signed 64bit integer is available",
+               {{source_location(loc), "too large input (> int64_t)"}}));
+        }
+
+        integer retval(0), base(1);
+        for(auto i(str.rbegin()), e(str.rend()); i!=e; ++i)
+        {
+            assert(base != 0); // means overflow, checked in the above code
+            if(*i == '1')
+            {
+                retval += base;
+                if( (std::numeric_limits<integer>::max)() / 2 < base )
+                {
+                    base = 0;
+                }
+                base *= 2;
+            }
+            else if(*i == '0')
+            {
+                if( (std::numeric_limits<integer>::max)() / 2 < base )
+                {
+                    base = 0;
+                }
+                base *= 2;
+            }
+            else if(*i == '_')
+            {
+                // do nothing.
+            }
+            else // should be detected by lex_bin_int. [[unlikely]]
             {
                 throw internal_error(format_underline(
-                    "toml::parse_integer: internal error",
+                    "toml::parse_binary_integer: internal error",
                     {{source_location(token.unwrap()), "invalid token"}}),
                     source_location(loc));
             }
@@ -91,6 +136,21 @@ parse_octal_integer(location& loc)
         std::istringstream iss(str);
         integer retval(0);
         iss >> std::oct >> retval;
+        if(iss.fail())
+        {
+            // `istream` sets `failbit` if internally-called `std::num_get::get`
+            // fails.
+            // `std::num_get::get` calls `std::strtoll` if the argument type is
+            // signed.
+            // `std::strtoll` fails if
+            //  - the value is out_of_range or
+            //  - no conversion is possible.
+            // since we already checked that the string is valid octal integer,
+            // so the error reason is out_of_range.
+            loc.reset(first);
+            return err(format_underline("toml::parse_octal_integer:",
+                       {{source_location(loc), "out of range"}}));
+        }
         return ok(std::make_pair(retval, token.unwrap()));
     }
     loc.reset(first);
@@ -111,6 +171,13 @@ parse_hexadecimal_integer(location& loc)
         std::istringstream iss(str);
         integer retval(0);
         iss >> std::hex >> retval;
+        if(iss.fail())
+        {
+            // see parse_octal_integer for detail of this error message.
+            loc.reset(first);
+            return err(format_underline("toml::parse_hexadecimal_integer:",
+                       {{source_location(loc), "out of range"}}));
+        }
         return ok(std::make_pair(retval, token.unwrap()));
     }
     loc.reset(first);
@@ -157,6 +224,13 @@ parse_integer(location& loc)
         std::istringstream iss(str);
         integer retval(0);
         iss >> retval;
+        if(iss.fail())
+        {
+            // see parse_octal_integer for detail of this error message.
+            loc.reset(first);
+            return err(format_underline("toml::parse_integer:",
+                       {{source_location(loc), "out of range"}}));
+        }
         return ok(std::make_pair(retval, token.unwrap()));
     }
     loc.reset(first);
@@ -245,6 +319,13 @@ parse_floating(location& loc)
         std::istringstream iss(str);
         floating v(0.0);
         iss >> v;
+        if(iss.fail())
+        {
+            // see parse_octal_integer for detail of this error message.
+            loc.reset(first);
+            return err(format_underline("toml::parse_floating:",
+                       {{source_location(loc), "out of range"}}));
+        }
         return ok(std::make_pair(v, token.unwrap()));
     }
     loc.reset(first);
@@ -327,6 +408,9 @@ inline result<std::string, std::string> parse_escape_sequence(location& loc)
         case 'n' :{loc.advance(); return ok(std::string("\n"));}
         case 'f' :{loc.advance(); return ok(std::string("\f"));}
         case 'r' :{loc.advance(); return ok(std::string("\r"));}
+#ifdef TOML11_USE_UNRELEASED_TOML_FEATURES
+        case 'e' :{loc.advance(); return ok(std::string("\x1b"));} // ESC
+#endif
         case 'u' :
         {
             if(const auto token = lex_escape_unicode_short::invoke(loc))
@@ -522,7 +606,7 @@ parse_basic_string(location& loc)
             inner_loc.reset(first);
             inner_loc.advance(err_loc);
             throw syntax_error(format_underline(
-                "parse_ml_basic_string: invalid utf8 sequence found",
+                "parse_basic_string: invalid utf8 sequence found",
                 {{source_location(inner_loc), "here"}}),
                 source_location(inner_loc));
         }
@@ -542,7 +626,8 @@ parse_ml_literal_string(location& loc)
     const auto first = loc.iter();
     if(const auto token = lex_ml_literal_string::invoke(loc))
     {
-        location inner_loc(loc.name(), token.unwrap().str());
+        auto inner_loc = loc;
+        inner_loc.reset(first);
 
         const auto open = lex_ml_literal_string_open::invoke(inner_loc);
         if(!open)
@@ -598,7 +683,7 @@ parse_ml_literal_string(location& loc)
             inner_loc.reset(first);
             inner_loc.advance(err_loc);
             throw syntax_error(format_underline(
-                "parse_ml_basic_string: invalid utf8 sequence found",
+                "parse_ml_literal_string: invalid utf8 sequence found",
                 {{source_location(inner_loc), "here"}}),
                 source_location(inner_loc));
         }
@@ -618,7 +703,8 @@ parse_literal_string(location& loc)
     const auto first = loc.iter();
     if(const auto token = lex_literal_string::invoke(loc))
     {
-        location inner_loc(loc.name(), token.unwrap().str());
+        auto inner_loc = loc;
+        inner_loc.reset(first);
 
         const auto open = lex_apostrophe::invoke(inner_loc);
         if(!open)
@@ -652,7 +738,7 @@ parse_literal_string(location& loc)
             inner_loc.reset(first);
             inner_loc.advance(err_loc);
             throw syntax_error(format_underline(
-                "parse_ml_basic_string: invalid utf8 sequence found",
+                "parse_literal_string: invalid utf8 sequence found",
                 {{source_location(inner_loc), "here"}}),
                 source_location(inner_loc));
         }
@@ -709,7 +795,7 @@ parse_local_date(location& loc)
         if(!y || inner_loc.iter() == inner_loc.end() || *inner_loc.iter() != '-')
         {
             throw internal_error(format_underline(
-                "toml::parse_inner_local_date: invalid year format",
+                "toml::parse_local_date: invalid year format",
                 {{source_location(inner_loc), "should be `-`"}}),
                 source_location(inner_loc));
         }
@@ -812,7 +898,7 @@ parse_local_time(location& loc)
         if((hour   < 0 || 23 < hour) || (minute < 0 || 59 < minute) ||
            (second < 0 || 60 < second)) // it may be leap second
         {
-            throw syntax_error(format_underline("toml::parse_time: "
+            throw syntax_error(format_underline("toml::parse_local_time: "
                 "invalid time: it does not conform RFC3339.", {{
                 source_location(loc), "hour should be 00-23, minute should be"
                 " 00-59, second should be 00-60 (depending on the leap"
@@ -1016,7 +1102,7 @@ parse_key(location& loc)
             else
             {
                 throw internal_error(format_underline(
-                    "toml::detail::parse_key: dotted key contains invalid key",
+                    "toml::parse_key: dotted key contains invalid key",
                     {{source_location(inner_loc), k.unwrap_err()}}),
                     source_location(inner_loc));
             }
@@ -1058,14 +1144,22 @@ parse_key(location& loc)
 
 // forward-decl to implement parse_array and parse_table
 template<typename Value>
-result<Value, std::string> parse_value(location&);
+result<Value, std::string> parse_value(location&, const std::size_t n_rec);
 
 template<typename Value>
 result<std::pair<typename Value::array_type, region>, std::string>
-parse_array(location& loc)
+parse_array(location& loc, const std::size_t n_rec)
 {
     using value_type = Value;
     using array_type = typename value_type::array_type;
+
+    if(n_rec > TOML11_VALUE_RECURSION_LIMIT)
+    {
+        // parse_array does not have any way to handle recursive error currently...
+        throw syntax_error(std::string("toml::parse_array: recursion limit ("
+                TOML11_STRINGIZE(TOML11_VALUE_RECURSION_LIMIT) ") exceeded"),
+                source_location(loc));
+    }
 
     const auto first = loc.iter();
     if(loc.iter() == loc.end())
@@ -1093,7 +1187,7 @@ parse_array(location& loc)
                       region(loc, first, loc.iter())));
         }
 
-        if(auto val = parse_value<value_type>(loc))
+        if(auto val = parse_value<value_type>(loc, n_rec+1))
         {
             // After TOML v1.0.0-rc.1, array becomes to be able to have values
             // with different types. So here we will omit this by default.
@@ -1167,7 +1261,7 @@ parse_array(location& loc)
 
 template<typename Value>
 result<std::pair<std::pair<std::vector<key>, region>, Value>, std::string>
-parse_key_value_pair(location& loc)
+parse_key_value_pair(location& loc, const std::size_t n_rec)
 {
     using value_type = Value;
 
@@ -1214,7 +1308,7 @@ parse_key_value_pair(location& loc)
     }
 
     const auto after_kvsp = loc.iter(); // err msg
-    auto val = parse_value<value_type>(loc);
+    auto val = parse_value<value_type>(loc, n_rec);
     if(!val)
     {
         std::string msg;
@@ -1257,9 +1351,11 @@ std::string format_dotted_keys(InputIterator first, const InputIterator last)
 // forward decl for is_valid_forward_table_definition
 result<std::pair<std::vector<key>, region>, std::string>
 parse_table_key(location& loc);
+result<std::pair<std::vector<key>, region>, std::string>
+parse_array_table_key(location& loc);
 template<typename Value>
 result<std::pair<typename Value::table_type, region>, std::string>
-parse_inline_table(location& loc);
+parse_inline_table(location& loc, const std::size_t n_rec);
 
 // The following toml file is allowed.
 // ```toml
@@ -1297,7 +1393,7 @@ bool is_valid_forward_table_definition(const Value& fwd, const Value& inserting,
         inserting_reg = ptr->str();
     }
     location inserting_def("internal", std::move(inserting_reg));
-    if(const auto inlinetable = parse_inline_table<Value>(inserting_def))
+    if(const auto inlinetable = parse_inline_table<Value>(inserting_def, 0))
     {
         // check if we are overwriting existing table.
         // ```toml
@@ -1309,6 +1405,46 @@ bool is_valid_forward_table_definition(const Value& fwd, const Value& inserting,
         // any case. If we found it, we can reject it without further checking.
         return false;
     }
+
+    // Valid and invalid cases when inserting to the [a.b] table:
+    //
+    // ## Invalid
+    //
+    // ```toml
+    // # invalid
+    // [a]
+    // b.c.d = "foo"
+    // [a.b]       # a.b is already defined and closed
+    // d = "bar"
+    // ```
+    // ```toml
+    // # invalid
+    // a = {b.c.d = "foo"}
+    // [a.b] # a is already defined and inline table is closed
+    // d = "bar"
+    // ```
+    // ```toml
+    // # invalid
+    // a.b.c.d = "foo"
+    // [a.b] # a.b is already defined and dotted-key table is closed
+    // d = "bar"
+    // ```
+    //
+    // ## Valid
+    //
+    // ```toml
+    // # OK. a.b is defined, but is *overwritable*
+    // [a.b.c]
+    // d = "foo"
+    // [a.b]
+    // d = "bar"
+    // ```
+    // ```toml
+    // # OK. a.b is defined, but is *overwritable*
+    // [a]
+    // b.c.d = "foo"
+    // b.e = "bar"
+    // ```
 
     // ------------------------------------------------------------------------
     // check table defined before
@@ -1332,7 +1468,22 @@ bool is_valid_forward_table_definition(const Value& fwd, const Value& inserting,
         // the keys are not equivalent. it is allowed.
         return true;
     }
-    if(const auto dotkeys = parse_key(def))
+    // nested array-of-table definition implicitly defines tables.
+    // those tables can be reopened.
+    if(const auto atabkeys = parse_array_table_key(def))
+    {
+        // table keys always contains all the nodes from the root.
+        const auto& tks = atabkeys.unwrap().first;
+        if(std::size_t(std::distance(key_first, key_last)) == tks.size() &&
+           std::equal(tks.begin(), tks.end(), key_first))
+        {
+            // the keys are equivalent. it is not allowed.
+            return false;
+        }
+        // the keys are not equivalent. it is allowed.
+        return true;
+    }
+    if(const auto dotkeys = parse_key(def)) // a.b.c = "foo"
     {
         // consider the following case.
         // [a]
@@ -1340,6 +1491,18 @@ bool is_valid_forward_table_definition(const Value& fwd, const Value& inserting,
         // [a.b.c]
         // e = 2.71
         // this defines the table [a.b.c] twice. no?
+        if(const auto reopening_dotkey_by_table = parse_table_key(inserting_def))
+        {
+            // re-opening a dotkey-defined table by a table is invalid.
+            // only dotkey can append a key-val. Like:
+            // ```toml
+            // a.b.c = "foo"
+            // a.b.d = "bar" # OK. reopen `a.b` by dotkey
+            // [a.b]
+            // e = "bar" # Invalid. re-opening `a.b` by [a.b] is not allowed.
+            // ```
+            return false;
+        }
 
         // a dotted key starts from the node representing a table in which the
         // dotted key belongs to.
@@ -1618,6 +1781,29 @@ insert_nested_key(typename Value::table_type& root, const Value& v,
                             {v.location(), "inserting this"}
                         }), v.location());
                 }
+                if(a.empty())
+                {
+                    throw syntax_error(format_underline(concat_to_string(
+                        "toml::insert_value: table (\"",
+                        format_dotted_keys(first, last), "\") conflicts with"
+                        " existing value"), {
+                            {tab->at(k).location(), std::string("this array is not insertable")},
+                            {v.location(), std::string("appending it to the statically sized array")}
+                        }), v.location());
+                }
+                if(const auto ptr = detail::get_region(a.at(0)))
+                {
+                    if(ptr->str().substr(0,2) != "[[")
+                    {
+                        throw syntax_error(format_underline(concat_to_string(
+                            "toml::insert_value: a table (\"",
+                            format_dotted_keys(first, last), "\") cannot be "
+                            "inserted to an existing inline array-of-tables"), {
+                                {tab->at(k).location(), std::string("this array of table has a static size")},
+                                {v.location(), std::string("appending it to the statically sized array")}
+                            }), v.location());
+                    }
+                }
                 tab = std::addressof(a.back().as_table());
             }
             else
@@ -1638,10 +1824,17 @@ insert_nested_key(typename Value::table_type& root, const Value& v,
 
 template<typename Value>
 result<std::pair<typename Value::table_type, region>, std::string>
-parse_inline_table(location& loc)
+parse_inline_table(location& loc, const std::size_t n_rec)
 {
     using value_type = Value;
     using table_type = typename value_type::table_type;
+
+    if(n_rec > TOML11_VALUE_RECURSION_LIMIT)
+    {
+        throw syntax_error(std::string("toml::parse_inline_table: recursion limit ("
+                TOML11_STRINGIZE(TOML11_VALUE_RECURSION_LIMIT) ") exceeded"),
+                source_location(loc));
+    }
 
     const auto first = loc.iter();
     table_type retval;
@@ -1663,7 +1856,7 @@ parse_inline_table(location& loc)
     // it starts from "{". it should be formatted as inline-table
     while(loc.iter() != loc.end())
     {
-        const auto kv_r = parse_key_value_pair<value_type>(loc);
+        const auto kv_r = parse_key_value_pair<value_type>(loc, n_rec+1);
         if(!kv_r)
         {
             return err(kv_r.unwrap_err());
@@ -1907,7 +2100,7 @@ parse_value_helper(result<std::pair<T, region>, std::string> rslt)
 }
 
 template<typename Value>
-result<Value, std::string> parse_value(location& loc)
+result<Value, std::string> parse_value(location& loc, const std::size_t n_rec)
 {
     const auto first = loc.iter();
     if(first == loc.end())
@@ -1932,8 +2125,8 @@ result<Value, std::string> parse_value(location& loc)
         case value_t::local_datetime : {return parse_value_helper<Value>(parse_local_datetime(loc)     );}
         case value_t::local_date     : {return parse_value_helper<Value>(parse_local_date(loc)         );}
         case value_t::local_time     : {return parse_value_helper<Value>(parse_local_time(loc)         );}
-        case value_t::array          : {return parse_value_helper<Value>(parse_array<Value>(loc)       );}
-        case value_t::table          : {return parse_value_helper<Value>(parse_inline_table<Value>(loc));}
+        case value_t::array          : {return parse_value_helper<Value>(parse_array<Value>(loc, n_rec));}
+        case value_t::table          : {return parse_value_helper<Value>(parse_inline_table<Value>(loc, n_rec));}
         default:
         {
             const auto msg = format_underline("toml::parse_value: "
@@ -2034,7 +2227,7 @@ parse_array_table_key(location& loc)
         if(!close)
         {
             throw internal_error(format_underline(
-                "toml::parse_table_key: no `]]`",
+                "toml::parse_array_table_key: no `]]`",
                 {{source_location(inner_loc), "should be `]]`"}}),
                 source_location(inner_loc));
         }
@@ -2098,7 +2291,7 @@ parse_ml_table(location& loc)
             return ok(tab);
         }
 
-        if(const auto kv = parse_key_value_pair<value_type>(loc))
+        if(const auto kv = parse_key_value_pair<value_type>(loc, 0))
         {
             const auto&              kvpair  = kv.unwrap();
             const std::vector<key>&  keys    = kvpair.first.first;
@@ -2256,26 +2449,13 @@ result<Value, std::string> parse_toml_file(location& loc)
     return ok(Value(std::move(data), file, comments));
 }
 
-} // detail
-
 template<typename                     Comment = TOML11_DEFAULT_COMMENT_STRATEGY,
          template<typename ...> class Table   = std::unordered_map,
          template<typename ...> class Array   = std::vector>
 basic_value<Comment, Table, Array>
-parse(std::istream& is, const std::string& fname = "unknown file")
+parse(std::vector<char>& letters, const std::string& fname)
 {
     using value_type = basic_value<Comment, Table, Array>;
-
-    const auto beg = is.tellg();
-    is.seekg(0, std::ios::end);
-    const auto end = is.tellg();
-    const auto fsize = end - beg;
-    is.seekg(beg);
-
-    // read whole file as a sequence of char
-    assert(fsize >= 0);
-    std::vector<char> letters(static_cast<std::size_t>(fsize));
-    is.read(letters.data(), fsize);
 
     // append LF.
     // Although TOML does not require LF at the EOF, to make parsing logic
@@ -2306,25 +2486,91 @@ parse(std::istream& is, const std::string& fname = "unknown file")
         }
     }
 
-    const auto data = detail::parse_toml_file<value_type>(loc);
-    if(!data)
+    if (auto data = detail::parse_toml_file<value_type>(loc))
     {
-        throw syntax_error(data.unwrap_err(), source_location(loc));
+        return std::move(data).unwrap();
     }
-    return data.unwrap();
+    else
+    {
+        throw syntax_error(std::move(data).unwrap_err(), source_location(loc));
+    }
+}
+
+} // detail
+
+template<typename                     Comment = TOML11_DEFAULT_COMMENT_STRATEGY,
+         template<typename ...> class Table   = std::unordered_map,
+         template<typename ...> class Array   = std::vector>
+basic_value<Comment, Table, Array>
+parse(FILE * file, const std::string& fname)
+{
+    const long beg = std::ftell(file);
+    if (beg == -1l)
+    {
+        throw file_io_error(errno, "Failed to access", fname);
+    }
+
+    const int res_seekend = std::fseek(file, 0, SEEK_END);
+    if (res_seekend != 0)
+    {
+        throw file_io_error(errno, "Failed to seek", fname);
+    }
+
+    const long end = std::ftell(file);
+    if (end == -1l)
+    {
+        throw file_io_error(errno, "Failed to access", fname);
+    }
+
+    const auto fsize = end - beg;
+
+    const auto res_seekbeg = std::fseek(file, beg, SEEK_SET);
+    if (res_seekbeg != 0)
+    {
+        throw file_io_error(errno, "Failed to seek", fname);
+    }
+
+    // read whole file as a sequence of char
+    assert(fsize >= 0);
+    std::vector<char> letters(static_cast<std::size_t>(fsize));
+    std::fread(letters.data(), sizeof(char), static_cast<std::size_t>(fsize), file);
+
+    return detail::parse<Comment, Table, Array>(letters, fname);
 }
 
 template<typename                     Comment = TOML11_DEFAULT_COMMENT_STRATEGY,
          template<typename ...> class Table   = std::unordered_map,
          template<typename ...> class Array   = std::vector>
-basic_value<Comment, Table, Array> parse(const std::string& fname)
+basic_value<Comment, Table, Array>
+parse(std::istream& is, std::string fname = "unknown file")
 {
-    std::ifstream ifs(fname.c_str(), std::ios_base::binary);
+    const auto beg = is.tellg();
+    is.seekg(0, std::ios::end);
+    const auto end = is.tellg();
+    const auto fsize = end - beg;
+    is.seekg(beg);
+
+    // read whole file as a sequence of char
+    assert(fsize >= 0);
+    std::vector<char> letters(static_cast<std::size_t>(fsize));
+    is.read(letters.data(), fsize);
+
+    return detail::parse<Comment, Table, Array>(letters, fname);
+}
+
+template<typename                     Comment = TOML11_DEFAULT_COMMENT_STRATEGY,
+         template<typename ...> class Table   = std::unordered_map,
+         template<typename ...> class Array   = std::vector>
+basic_value<Comment, Table, Array> parse(std::string fname)
+{
+    std::ifstream ifs(fname, std::ios_base::binary);
     if(!ifs.good())
     {
-        throw std::runtime_error("toml::parse: file open error -> " + fname);
+        throw std::ios_base::failure(
+                "toml::parse: Error opening file \"" + fname + "\"");
     }
-    return parse<Comment, Table, Array>(ifs, fname);
+    ifs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    return parse<Comment, Table, Array>(ifs, std::move(fname));
 }
 
 #ifdef TOML11_HAS_STD_FILESYSTEM
@@ -2353,9 +2599,10 @@ basic_value<Comment, Table, Array> parse(const std::filesystem::path& fpath)
     std::ifstream ifs(fpath, std::ios_base::binary);
     if(!ifs.good())
     {
-        throw std::runtime_error("toml::parse: file open error -> " +
-                                 fpath.string());
+        throw std::ios_base::failure(
+                "toml::parse: Error opening file \"" + fpath.string() + "\"");
     }
+    ifs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     return parse<Comment, Table, Array>(ifs, fpath.string());
 }
 #endif // TOML11_HAS_STD_FILESYSTEM

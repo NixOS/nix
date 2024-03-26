@@ -21,22 +21,7 @@ namespace toml
 namespace detail
 {
 // TODO: find more sophisticated way to handle this
-#if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || defined(_POSIX_SOURCE)
-inline std::tm localtime_s(const std::time_t* src)
-{
-    std::tm dst;
-    const auto result = ::localtime_r(src, &dst);
-    if (!result) { throw std::runtime_error("localtime_r failed."); }
-    return dst;
-}
-inline std::tm gmtime_s(const std::time_t* src)
-{
-    std::tm dst;
-    const auto result = ::gmtime_r(src, &dst);
-    if (!result) { throw std::runtime_error("gmtime_r failed."); }
-    return dst;
-}
-#elif defined(_MSC_VER)
+#if defined(_MSC_VER)
 inline std::tm localtime_s(const std::time_t* src)
 {
     std::tm dst;
@@ -49,6 +34,21 @@ inline std::tm gmtime_s(const std::time_t* src)
     std::tm dst;
     const auto result = ::gmtime_s(&dst, src);
     if (result) { throw std::runtime_error("gmtime_s failed."); }
+    return dst;
+}
+#elif (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || defined(_POSIX_SOURCE)
+inline std::tm localtime_s(const std::time_t* src)
+{
+    std::tm dst;
+    const auto result = ::localtime_r(src, &dst);
+    if (!result) { throw std::runtime_error("localtime_r failed."); }
+    return dst;
+}
+inline std::tm gmtime_s(const std::time_t* src)
+{
+    std::tm dst;
+    const auto result = ::gmtime_r(src, &dst);
+    if (!result) { throw std::runtime_error("gmtime_r failed."); }
     return dst;
 }
 #else // fallback. not threadsafe
@@ -85,9 +85,9 @@ enum class month_t : std::uint8_t
 
 struct local_date
 {
-    std::int16_t year;   // A.D. (like, 2018)
-    std::uint8_t month;  // [0, 11]
-    std::uint8_t day;    // [1, 31]
+    std::int16_t year{};   // A.D. (like, 2018)
+    std::uint8_t month{};  // [0, 11]
+    std::uint8_t day{};    // [1, 31]
 
     local_date(int y, month_t m, int d)
         : year (static_cast<std::int16_t>(y)),
@@ -181,12 +181,12 @@ operator<<(std::basic_ostream<charT, traits>& os, const local_date& date)
 
 struct local_time
 {
-    std::uint8_t  hour;        // [0, 23]
-    std::uint8_t  minute;      // [0, 59]
-    std::uint8_t  second;      // [0, 60]
-    std::uint16_t millisecond; // [0, 999]
-    std::uint16_t microsecond; // [0, 999]
-    std::uint16_t nanosecond;  // [0, 999]
+    std::uint8_t  hour{};        // [0, 23]
+    std::uint8_t  minute{};      // [0, 59]
+    std::uint8_t  second{};      // [0, 60]
+    std::uint16_t millisecond{}; // [0, 999]
+    std::uint16_t microsecond{}; // [0, 999]
+    std::uint16_t nanosecond{};  // [0, 999]
 
     local_time(int h, int m, int s,
                int ms = 0, int us = 0, int ns = 0)
@@ -297,8 +297,8 @@ operator<<(std::basic_ostream<charT, traits>& os, const local_time& time)
 
 struct time_offset
 {
-    std::int8_t hour;   // [-12, 12]
-    std::int8_t minute; // [-59, 59]
+    std::int8_t hour{};   // [-12, 12]
+    std::int8_t minute{}; // [-59, 59]
 
     time_offset(int h, int m)
         : hour  (static_cast<std::int8_t>(h)),
@@ -364,8 +364,8 @@ operator<<(std::basic_ostream<charT, traits>& os, const time_offset& offset)
 
 struct local_datetime
 {
-    local_date date;
-    local_time time;
+    local_date date{};
+    local_time time{};
 
     local_datetime(local_date d, local_time t): date(d), time(t) {}
 
@@ -478,9 +478,9 @@ operator<<(std::basic_ostream<charT, traits>& os, const local_datetime& dt)
 
 struct offset_datetime
 {
-    local_date  date;
-    local_time  time;
-    time_offset offset;
+    local_date  date{};
+    local_time  time{};
+    time_offset offset{};
 
     offset_datetime(local_date d, local_time t, time_offset o)
         : date(d), time(t), offset(o)

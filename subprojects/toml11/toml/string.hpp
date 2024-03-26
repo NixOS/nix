@@ -2,12 +2,15 @@
 // Distributed under the MIT License.
 #ifndef TOML11_STRING_HPP
 #define TOML11_STRING_HPP
+
+#include "version.hpp"
+
 #include <cstdint>
 
 #include <algorithm>
 #include <string>
 
-#if __cplusplus >= 201703L
+#if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201703L
 #if __has_include(<string_view>)
 #define TOML11_USING_STRING_VIEW 1
 #include <string_view>

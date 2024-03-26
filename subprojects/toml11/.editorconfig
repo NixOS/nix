@@ -1,0 +1,13 @@
+root = true
+
+[*]
+indent_style = space
+
+[CMakeLists.txt]
+indent_size = 4
+
+[*.{c,h}*]
+indent_size = 4
+
+[*.{md,yml}]
+indent_size = 2

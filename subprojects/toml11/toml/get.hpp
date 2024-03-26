@@ -215,6 +215,7 @@ template<typename T, typename C,
 detail::enable_if_t<detail::conjunction<
     detail::is_container<T>,                           // T is a container
     detail::negation<detail::has_push_back_method<T>>, // w/o push_back(...)
+    detail::negation<detail::has_specialized_from<T>>, // T does not have special conversion
     detail::negation<                                  // not toml::array
         detail::is_exact_toml_type<T, basic_value<C, M, V>>>
     >::value, T>
@@ -259,6 +260,11 @@ template<typename T, typename C,
 detail::enable_if_t<detail::has_specialized_from<T>::value, T>
 get(const basic_value<C, M, V>&);
 
+template<typename T, typename C,
+         template<typename ...> class M, template<typename ...> class V>
+detail::enable_if_t<detail::has_specialized_from<T>::value, T>
+get(basic_value<C, M, V>&);
+
 // T(const toml::value&) and T is not toml::basic_value,
 // and it does not have `from<T>` nor `from_toml`.
 template<typename T, typename C,
@@ -270,6 +276,16 @@ detail::enable_if_t<detail::conjunction<
     detail::negation<detail::has_specialized_from<T>>
     >::value, T>
 get(const basic_value<C, M, V>&);
+
+template<typename T, typename C,
+         template<typename ...> class M, template<typename ...> class V>
+detail::enable_if_t<detail::conjunction<
+    detail::negation<detail::is_basic_value<T>>,
+    std::is_constructible<T, basic_value<C, M, V>&>,
+    detail::negation<detail::has_from_toml_method<T, C, M, V>>,
+    detail::negation<detail::has_specialized_from<T>>
+    >::value, T>
+get(basic_value<C, M, V>&);
 
 // ============================================================================
 // array-like types; most likely STL container, like std::vector, etc.
@@ -324,6 +340,7 @@ template<typename T, typename C,
 detail::enable_if_t<detail::conjunction<
     detail::is_container<T>,                           // T is a container
     detail::negation<detail::has_push_back_method<T>>, // w/o push_back
+    detail::negation<detail::has_specialized_from<T>>, // T does not have special conversion
     detail::negation<                                  // T is not toml::array
         detail::is_exact_toml_type<T, basic_value<C, M, V>>>
     >::value, T>
@@ -449,6 +466,13 @@ get(const basic_value<C, M, V>& v)
 {
     return ::toml::from<T>::from_toml(v);
 }
+template<typename T, typename C,
+         template<typename ...> class M, template<typename ...> class V>
+detail::enable_if_t<detail::has_specialized_from<T>::value, T>
+get(basic_value<C, M, V>& v)
+{
+    return ::toml::from<T>::from_toml(v);
+}
 
 template<typename T, typename C,
          template<typename ...> class M, template<typename ...> class V>
@@ -459,6 +483,19 @@ detail::enable_if_t<detail::conjunction<
     detail::negation<detail::has_specialized_from<T>>           // and T does not have toml::from<T>{};
     >::value, T>
 get(const basic_value<C, M, V>& v)
+{
+    return T(v);
+}
+
+template<typename T, typename C,
+         template<typename ...> class M, template<typename ...> class V>
+detail::enable_if_t<detail::conjunction<
+    detail::negation<detail::is_basic_value<T>>,                // T is not a toml::value
+    std::is_constructible<T, basic_value<C, M, V>&>,      // T is constructible from toml::value
+    detail::negation<detail::has_from_toml_method<T, C, M, V>>, // and T does not have T.from_toml(v);
+    detail::negation<detail::has_specialized_from<T>>           // and T does not have toml::from<T>{};
+    >::value, T>
+get(basic_value<C, M, V>& v)
 {
     return T(v);
 }

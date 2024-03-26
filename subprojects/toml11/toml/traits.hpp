@@ -5,6 +5,7 @@
 
 #include "from.hpp"
 #include "into.hpp"
+#include "version.hpp"
 
 #include <chrono>
 #include <forward_list>
@@ -13,7 +14,7 @@
 #include <type_traits>
 #include <utility>
 
-#if __cplusplus >= 201703L
+#if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201703L
 #if __has_include(<string_view>)
 #include <string_view>
 #endif // has_include(<string_view>)
@@ -146,7 +147,7 @@ struct has_specialized_into : decltype(has_specialized_into_impl::check<T>(nullp
 // ---------------------------------------------------------------------------
 // C++17 and/or/not
 
-#if __cplusplus >= 201703L
+#if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201703L
 
 using std::conjunction;
 using std::disjunction;
@@ -208,7 +209,7 @@ template<typename T>
 struct is_container : conjunction<
     negation<is_map<T>>,                         // not a map
     negation<std::is_same<T, std::string>>,      // not a std::string
-#if __cplusplus >= 201703L
+#if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201703L
 #if __has_include(<string_view>)
     negation<std::is_same<T, std::string_view>>, // not a std::string_view
 #endif // has_include(<string_view>)
@@ -233,7 +234,7 @@ struct is_basic_value<::toml::basic_value<C, M, V>>: std::true_type{};
 // ---------------------------------------------------------------------------
 // C++14 index_sequence
 
-#if __cplusplus >= 201402L
+#if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201402L
 
 using std::index_sequence;
 using std::make_index_sequence;
@@ -263,12 +264,12 @@ struct index_sequence_maker<0>
 template<std::size_t N>
 using make_index_sequence = typename index_sequence_maker<N-1>::type;
 
-#endif // __cplusplus >= 2014
+#endif // cplusplus >= 2014
 
 // ---------------------------------------------------------------------------
 // C++14 enable_if_t
 
-#if __cplusplus >= 201402L
+#if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201402L
 
 using std::enable_if_t;
 
@@ -277,12 +278,12 @@ using std::enable_if_t;
 template<bool B, typename T>
 using enable_if_t = typename std::enable_if<B, T>::type;
 
-#endif // __cplusplus >= 2014
+#endif // cplusplus >= 2014
 
 // ---------------------------------------------------------------------------
 // return_type_of_t
 
-#if __cplusplus >= 201703L && defined(__cpp_lib_is_invocable) && __cpp_lib_is_invocable>=201703
+#if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201703L && defined(__cpp_lib_is_invocable) && __cpp_lib_is_invocable>=201703
 
 template<typename F, typename ... Args>
 using return_type_of_t = std::invoke_result_t<F, Args...>;

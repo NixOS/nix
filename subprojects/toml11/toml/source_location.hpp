@@ -125,7 +125,7 @@ inline std::string format_underline(const std::string& message,
 
     std::ostringstream retval;
 
-    if(colorize)
+    if(color::should_color() || colorize)
     {
         retval << color::colorize; // turn on ANSI color
     }
@@ -137,12 +137,18 @@ inline std::string format_underline(const std::string& message,
     // if it is "[error]", it removes that part from the message shown.
     if(message.size() > 7 && message.substr(0, 7) == "[error]")
     {
-        retval << color::bold << color::red << "[error]" << color::reset
+        retval
+#ifndef TOML11_NO_ERROR_PREFIX
+               << color::bold << color::red << "[error]" << color::reset
+#endif
                << color::bold << message.substr(7) << color::reset << '\n';
     }
     else
     {
-        retval << color::bold << color::red << "[error] " << color::reset
+        retval
+#ifndef TOML11_NO_ERROR_PREFIX
+               << color::bold << color::red << "[error] " << color::reset
+#endif
                << color::bold << message << color::reset << '\n';
     }
 

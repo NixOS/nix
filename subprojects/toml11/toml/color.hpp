@@ -17,11 +17,41 @@ namespace color_ansi
 {
 namespace detail
 {
+
 inline int colorize_index()
 {
     static const int index = std::ios_base::xalloc();
     return index;
 }
+
+// Control color mode globally
+class color_mode
+{
+  public:
+    inline void enable()
+    {
+        should_color_ = true;
+    }
+    inline void disable()
+    {
+        should_color_ = false;
+    }
+
+    inline bool should_color() const
+    {
+        return should_color_;
+    }
+
+    static color_mode& status()
+    {
+        static color_mode status_;
+        return status_;
+    }
+
+  private:
+    bool should_color_ = false;
+};
+
 } // detail
 
 inline std::ostream& colorize(std::ostream& os)
@@ -55,6 +85,21 @@ inline std::ostream& cyan   (std::ostream& os)
 {if(os.iword(detail::colorize_index()) == 1) {os << "\033[36m";} return os;}
 inline std::ostream& white  (std::ostream& os)
 {if(os.iword(detail::colorize_index()) == 1) {os << "\033[37m";} return os;}
+
+inline void enable()
+{
+    return detail::color_mode::status().enable();
+}
+inline void disable()
+{
+    return detail::color_mode::status().disable();
+}
+
+inline bool should_color()
+{
+    return detail::color_mode::status().should_color();
+}
+
 } // color_ansi
 
 // ANSI escape sequence is the only and default colorization method currently

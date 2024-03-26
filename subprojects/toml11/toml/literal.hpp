@@ -53,7 +53,7 @@ literal_internal_impl(::toml::detail::location loc)
     // If it is neither a table-key or a array-of-table-key, it may be a value.
     if(!is_table_key && !is_aots_key)
     {
-        if(auto data = ::toml::detail::parse_value<value_type>(loc))
+        if(auto data = ::toml::detail::parse_value<value_type>(loc, 0))
         {
             return data.unwrap();
         }

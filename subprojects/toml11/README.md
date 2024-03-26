@@ -2,7 +2,6 @@ toml11
 ======
 
 [![Build Status on GitHub Actions](https://github.com/ToruNiina/toml11/workflows/build/badge.svg)](https://github.com/ToruNiina/toml11/actions)
-[![Build Status on TravisCI](https://travis-ci.org/ToruNiina/toml11.svg?branch=master)](https://travis-ci.org/ToruNiina/toml11)
 [![Build status on Appveyor](https://ci.appveyor.com/api/projects/status/m2n08a926asvg5mg/branch/master?svg=true)](https://ci.appveyor.com/project/ToruNiina/toml11/branch/master)
 [![Build status on CircleCI](https://circleci.com/gh/ToruNiina/toml11/tree/master.svg?style=svg)](https://circleci.com/gh/ToruNiina/toml11/tree/master)
 [![Version](https://img.shields.io/github/release/ToruNiina/toml11.svg?style=flat)](https://github.com/ToruNiina/toml11/releases)
@@ -115,6 +114,37 @@ The convenient way is to add this repository as a git-submodule or to install
 it in your system by CMake.
 
 Note for MSVC: We recommend to set `/Zc:__cplusplus` to detect C++ version correctly.
+
+### Example installation
+
+For local installation build & use the provided install target
+
+```bash
+git clone https://github.com/ToruNiina/toml11.git
+mkdir -p toml11/build
+cd toml11/build
+cmake .. -DCMAKE_CXX_STANDARD=11
+sudo make install
+```
+
+In case you want to create a `.deb` you can use `checkinstall`.
+```bash
+sudo checkinstall
+[[ .. skipping for clarity ]]
+**********************************************************************
+
+ Done. The new package has been installed and saved to
+
+ /home/user/toml11/build/build_20230728-1_amd64.deb
+
+ You can remove it from your system anytime using:
+
+      dpkg -r build
+
+**********************************************************************
+```
+
+You should get a package that you can install with `dpkg -i <myfile>.deb` and remove with `dpkg -r <myfile>.deb`
 
 ## Decoding a toml file
 
@@ -478,10 +508,15 @@ elements.
 ```cpp
 const auto data = toml::parse("example.toml");
 std::cout << "keys in the top-level table are the following: \n";
-for(const auto& [k, v] : data.as_table())
+for(const auto& kv : data.as_table())
+{
+    std::cout << kv.first << '\n';
+}
+for(const auto& [k, v] : data.as_table()) // or in C++17
 {
     std::cout << k << '\n';
 }
+
 
 const auto& fruits = toml::find(data, "fruits");
 for(const auto& v : fruits.as_array())
@@ -837,7 +872,7 @@ const auto num  = toml::find_or(data, "num", 42);
 
 It works recursively if you pass several keys for subtables.
 In that case, the last argument is considered to be the optional value.
-All other arguments between `toml::value` and the optinoal value are considered as keys.
+All other arguments between `toml::value` and the optional value are considered as keys.
 
 ```cpp
 // [fruit.physical]
@@ -1169,7 +1204,7 @@ add a comma after the first element (like `[1,]`).
 "[[table]]"_toml; // This is a table that has an array of tables inside.
 
 "[[1]]"_toml;     // This literal is ambiguous.
-                  // Currently, it becomes a table that has array of table "1".
+                  // Currently, it becomes an empty array of table named "1".
 "1 = [{}]"_toml;  // This is a table that has an array of table named 1.
 "[[1,]]"_toml;    // This is an array of arrays.
 "[[1],]"_toml;    // ditto.
@@ -1626,9 +1661,61 @@ std::cerr << toml::format_error("[error] value should be positive",
                                 hints, /*colorize = */ true) << std::endl;
 ```
 
-Note: It colorize `[error]` in red. That means that it detects `[error]` prefix
+Note: It colorizes `[error]` in red. That means that it detects `[error]` prefix
 at the front of the error message. If there is no `[error]` prefix,
 `format_error` adds it to the error message.
+
+Compared to the `TOML11_COLORIZE_ERROR_MESSAGE` macro that enables colorization
+statically, toml11 provides `toml::color::enable` & `toml::color::disable`
+functions to dynamically change the color mode. This feature overwrites
+`TOML11_COLORIZE_ERROR_MESSAGE` and the `colorize` argument of
+`toml::format_error` when you call `enable`.
+
+Note: If either `TOML11_COLORIZE_ERROR_MESSAGE` is defined or the `colorize`
+argument is used, it takes precedence, meaning that `disable` won't work.
+Accordingly, we highly recommend using only one of them.
+
+```cpp
+toml::color::enable();  // enable colorization
+toml::color::disable(); // disable colorization
+```
+
+If you use user-defined error message, you can manage the setting as follows:
+
+```cpp
+toml::color::enable();
+std::cerr << toml::format_error("[error] value should be positive",
+                                data.at("num"), "positive number required",
+                                hints) << std::endl; // colorized
+
+toml::color::disable();
+std::cerr << toml::format_error("[error] value should be positive",
+                                data.at("num"), "positive number required",
+                                hints) << std::endl; // NOT colorized
+```
+
+Or you may use toml11 in your application like:
+
+```cpp
+std::vector<std::string> args(argv + 1, argv + argc);
+auto result = std::find(args.begin(), args.end(), "--color");
+if (result != args.end()) {
+    toml::color::enable();
+} else {
+    toml::color::disable();
+}
+
+// use toml11 ...
+```
+
+## Opting out of the default `[error]` prefix
+
+toml11 prints error messages with the `[error]` prefix by default.
+Defining `TOML11_NO_ERROR_PREFIX` will let toml11 omit the prefix regardless of colorized or not in case you would use a custom prefix, such as `Error:`.
+
+```cpp
+#define TOML11_NO_ERROR_PREFIX
+```
 
 ## Serializing TOML data
 
@@ -1764,16 +1851,13 @@ not capable of representing a Local Time independent from a specific day.
 
 ## Unreleased TOML features
 
-Since TOML v1.0.0-rc.1 has been released, those features are now activated by
-default. We no longer need to define `TOML11_USE_UNRELEASED_FEATURES`.
+After TOML v1.0.0 has been released, some features are added to the main branch
+of the TOML spec repository. (see: [CHANGELOG.md in toml-lang/toml repository](https://github.com/toml-lang/toml/blob/main/CHANGELOG.md)).
 
-- Leading zeroes in exponent parts of floats are permitted.
-  - e.g. `1.0e+01`, `5e+05`
-  - [toml-lang/toml/PR/656](https://github.com/toml-lang/toml/pull/656)
-- Allow raw tab characters in basic strings and multi-line basic strings.
-  - [toml-lang/toml/PR/627](https://github.com/toml-lang/toml/pull/627)
-- Allow heterogeneous arrays
-  - [toml-lang/toml/PR/676](https://github.com/toml-lang/toml/pull/676)
+The following list shows available "unreleased" features that can be activated
+by defining a macro named `TOML11_USE_UNRELEASED_FEATURES`.
+
+- Add new `\e` shorthand for the escape character.
 
 ## Note about heterogeneous arrays
 
@@ -1911,7 +1995,8 @@ I appreciate the help of the contributors who introduced the great feature to th
   - Fixed warnings on MSVC
 - Ivan Shynkarenka (@chronoxor)
   - Fixed Visual Studio 2019 warnings
-- @khoitd1997
+  - Fix compilation error in `<filesystem>` with MinGW
+- Khoi Dinh Trinh (@khoitd1997)
   - Fixed warnings while type conversion
 - @KerstinKeller
   - Added installation script to CMake
@@ -1922,6 +2007,7 @@ I appreciate the help of the contributors who introduced the great feature to th
   - Suppress warnings in Debug mode
 - OGAWA Kenichi (@kenichiice)
   - Suppress warnings on intel compiler
+  - Fix include path in README
 - Jordan Williams (@jwillikers)
   - Fixed clang range-loop-analysis warnings
   - Fixed feature test macro to suppress -Wundef
@@ -1933,12 +2019,8 @@ I appreciate the help of the contributors who introduced the great feature to th
   - fix "Finding a value in an array" example in README
 - @maass-tv and @SeverinLeonhardt
   - Fix MSVC warning C4866
-- OGAWA KenIchi (@kenichiice)
-  - Fix include path in README
 - Mohammed Alyousef (@MoAlyousef)
   - Made testing optional in CMake
-- Ivan Shynkarenka (@chronoxor)
-  - Fix compilation error in `<filesystem>` with MinGW
 - Alex Merry (@amerry)
   - Add missing include files
 - sneakypete81 (@sneakypete81)
@@ -1955,12 +2037,46 @@ I appreciate the help of the contributors who introduced the great feature to th
   - Improve checking standard library feature availability check
 - Louis Marascio (@marascio)
   - Fix free-nonheap-object warning
-
+- Axel Huebl (@ax3l)
+  - Make installation optional if the library is embedded
+- Ken Matsui (@ken-matsui)
+  - Support user-defined error message prefix
+  - Support dynamic color mode
+- Giel van Schijndel (@muggenhor)
+  - Remove needless copy in `parse` function
+- Lukáš Hrázký (@lukash)
+  - Add a `parse(FILE *)` interface and improve file-related error messages
+- spiderman idog (@spiderman-idog)
+  - Fix typo in README
+- Jajauma's GitHub (@Jajauma)
+  - Avoid possible lexer truncation warnings
+- Moritz Klammler (@ctcmkl)
+  - Many patches in (#200) including:
+  - Improve CMake scripts, build process, and test file handling
+  - Detect error when `discard_comments` is accessed
+  - And more.
+- Chris White (@cxw42)
+  - Fix address-sanitizer error when parsing literal strings having invalid UTF-8 characters
+  - Fix function name in error messages
+- offa (@offa)
+  - Update checkout action to v3
+  - Update Required CMake version
+  - Cleanup old CI settings
+- Sergey Vidyuk (@VestniK)
+  - Fix for case when vector iterator is raw pointer
+- Kfir Gollan (@kfirgollan)
+  - Add installation example with checkinstall and cmake
+- Martin Tournoij (@arp242)
+  - Escape control characters in keys
+- @DavidKorczynski
+  - Add fuzzing test based on ClusterFuzzLite
+- Esonhugh Skyworship (@Esonhugh)
+  - Fix function signature of `strerror_r` on macos
 
 ## Licensing terms
 
 This product is licensed under the terms of the [MIT License](LICENSE).
 
-- Copyright (c) 2017-2021 Toru Niina
+- Copyright (c) 2017-2024 Toru Niina
 
 All rights reserved.
