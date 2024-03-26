@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "traits.hpp"
-#include "version.hpp"
+// #include "version.hpp"
 
 #if TOML11_CPLUSPLUS_STANDARD_VERSION >= 201402L
 #  define TOML11_MARK_AS_DEPRECATED(msg) [[deprecated(msg)]]

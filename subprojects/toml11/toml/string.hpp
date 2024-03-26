@@ -3,7 +3,7 @@
 #ifndef TOML11_STRING_HPP
 #define TOML11_STRING_HPP
 
-#include "version.hpp"
+// #include "version.hpp"
 
 #include <cstdint>
 

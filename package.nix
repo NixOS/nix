@@ -172,6 +172,7 @@ in {
           ./doc
           ./misc
           ./precompiled-headers.h
+          ./subprojects/toml11
           ./src
           ./COPYING
           ./scripts/local.mk
@@ -182,6 +183,7 @@ in {
           # Source might not be compiled, but still must be available
           # for Doxygen to gather comments.
           ./src
+          ./subprojects/toml11
           ./tests/unit
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
