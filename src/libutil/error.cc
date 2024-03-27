@@ -11,9 +11,9 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TraceKind kind)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .kind = kind });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .print = print });
 }
 
 void throwExceptionSelfCheck(){
@@ -388,7 +388,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
                 truncate = true;
             }
 
-            if (!truncate || trace.kind == TraceKind::Custom) {
+            if (!truncate || trace.print == TracePrint::Always) {
 
                 if (tracesSeen.count(trace)) {
                     skippedTraces.push_back(trace);
