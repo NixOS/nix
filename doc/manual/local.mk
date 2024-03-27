@@ -175,6 +175,16 @@ $(d)/src/SUMMARY-rl-next.md: $(d)/src/release-notes/rl-next.md
 # Generate the HTML manual.
 .PHONY: manual-html
 manual-html: $(docdir)/manual/index.html
+
+# Open the built HTML manual in the default browser.
+manual-html-open: $(docdir)/manual/index.html
+	@echo "  OPEN  " $<; \
+	  xdg-open $< \
+		  || open $< \
+			|| { \
+		echo "Could not open the manual in a browser. Please open '$<'" >&2; \
+		false; \
+		}
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.
