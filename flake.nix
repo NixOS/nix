@@ -7,8 +7,10 @@
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
+  # Until https://github.com/commonmark/cmark/pull/524 is released
+  inputs.cmark = { url = "github:commonmark/cmark"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, cmark, ... }:
 
     let
       inherit (nixpkgs) lib;
@@ -143,6 +145,11 @@
             '';
           };
 
+          cmark-nix = final.cmark.overrideAttrs (_: {
+            src = cmark;
+            version = cmark.lastModifiedDate;
+          });
+
           libgit2-nix = final.libgit2.overrideAttrs (attrs: {
             src = libgit2;
             version = libgit2.lastModifiedDate;
@@ -179,6 +186,7 @@
                 ;
               officialRelease = false;
               boehmgc = final.boehmgc-nix;
+              cmark = final.cmark-nix;
               libgit2 = final.libgit2-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
             } // {
@@ -224,9 +232,9 @@
 
         # Toggles some settings for better coverage. Windows needs these
         # library combinations, and Debian build Nix with GNU readline too.
-        buildReadlineNoMarkdown = forAllSystems (system:
+        buildReadlineNoLowdown = forAllSystems (system:
           self.packages.${system}.nix.override {
-            enableMarkdown = false;
+            enableLowdown = false;
             readlineFlavor = "readline";
           }
         );

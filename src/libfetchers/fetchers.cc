@@ -8,8 +8,6 @@
 
 namespace nix::fetchers {
 
-using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
-
 std::unique_ptr<InputSchemeMap> inputSchemes = nullptr;
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
@@ -22,17 +20,9 @@ void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
     inputSchemes->insert_or_assign(schemeName, std::move(inputScheme));
 }
 
-nlohmann::json dumpRegisterInputSchemeInfo() {
-    using nlohmann::json;
-
-    auto res = json::object();
-
-    for (auto & [name, scheme] : *inputSchemes) {
-        auto & r = res[name] = json::object();
-        r["allowedAttrs"] = scheme->allowedAttrs();
-    }
-
-    return res;
+const InputSchemeMap & getAllInputSchemes()
+{
+    return *inputSchemes;
 }
 
 Input Input::fromURL(const std::string & url, bool requireTree)

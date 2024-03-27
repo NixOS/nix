@@ -246,17 +246,85 @@ struct CurlInputScheme : InputScheme
         return input;
     }
 
-    StringSet allowedAttrs() const override
+    std::map<std::string, AttributeInfo> allowedAttrs() const override
     {
         return {
-            "type",
-            "url",
-            "narHash",
-            "name",
-            "unpack",
-            "rev",
-            "revCount",
-            "lastModified",
+            {
+                "url",
+                {
+                    .type = "String",
+                    .required = true,
+                    .doc = R"(
+                      Supported protocols:
+
+                      - `https`
+
+                        > **Example**
+                        >
+                        > ```nix
+                        > fetchTree {
+                        >   type = "file";
+                        >   url = "https://example.com/index.html";
+                        > }
+                        > ```
+
+                      - `http`
+
+                        Insecure HTTP transfer for legacy sources.
+
+                        > **Warning**
+                        >
+                        > HTTP performs no encryption or authentication.
+                        > Use a `narHash` known in advance to ensure the output has expected contents.
+
+                      - `file`
+
+                        A file on the local file system.
+
+                        > **Example**
+                        >
+                        > ```nix
+                        > fetchTree {
+                        >   type = "file";
+                        >   url = "file:///home/eelco/nix/README.md";
+                        > }
+                        > ```
+
+                      > **Example**
+                      >
+                      > ```nix
+                      > fetchTree {
+                      >   type = "tarball";
+                      >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
+                      > }
+                      > ```
+                    )",
+                },
+            },
+            {
+                "narHash",
+                {},
+            },
+            {
+                "name",
+                {},
+            },
+            {
+                "unpack",
+                {},
+            },
+            {
+                "rev",
+                {},
+            },
+            {
+                "revCount",
+                {},
+            },
+            {
+                "lastModified",
+                {},
+            },
         };
     }
 
@@ -288,6 +356,14 @@ struct CurlInputScheme : InputScheme
 struct FileInputScheme : CurlInputScheme
 {
     std::string_view schemeName() const override { return "file"; }
+
+    std::string schemeDescription() const override
+    {
+        return stripIndentation(R"(
+          Place a plain file into the Nix store.
+          This is similar to [`builtins.fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl)
+        )");
+    }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
@@ -322,6 +398,15 @@ struct FileInputScheme : CurlInputScheme
 struct TarballInputScheme : CurlInputScheme
 {
     std::string_view schemeName() const override { return "tarball"; }
+
+    std::string schemeDescription() const override
+    {
+        return stripIndentation(R"(
+          Download a tar archive and extract it into the Nix store.
+          This has the same underyling implementation as [`builtins.fetchTarball`](@doc
+    root@/language/builtins.md#builtins-fetchTarball)
+        )");
+    }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {

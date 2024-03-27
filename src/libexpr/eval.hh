@@ -67,7 +67,7 @@ struct PrimOp
     /**
      * Optional free-form documentation about the primop.
      */
-    const char * doc = nullptr;
+    const std::string doc = "";
 
     /**
      * Implementation of the primop.

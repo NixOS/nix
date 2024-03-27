@@ -8,6 +8,7 @@
 #include "registry.hh"
 #include "tarball.hh"
 #include "url.hh"
+#include "cmark-cpp.hh"
 #include "value-to-json.hh"
 #include "fetch-to-store.hh"
 
@@ -197,217 +198,144 @@ static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, 
 static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
     .args = {"input"},
-    .doc = R"(
-      Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
+    .doc =  []() -> std::string {
+        using namespace cmark;
 
-      - the resulting fixed-output [store path](@docroot@/glossary.md#gloss-store-path)
-      - the corresponding [NAR](@docroot@/glossary.md#gloss-nar) hash
-      - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
+        // Stores strings referenced by AST. Deallocate after rendering.
+        std::vector<std::string> textArena;
 
-      *input* must be an attribute set with the following attributes:
+        auto root = node_new(CMARK_NODE_DOCUMENT);
 
-      - `type` (String, required)
+        auto & before = textArena.emplace_back(stripIndentation(R"(
+          Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
 
-        One of the [supported source types](#source-types).
-        This determines other required and allowed input attributes.
+          - the resulting fixed-output [store path](@docroot@/glossary.md#gloss-store-path)
+          - the corresponding [NAR](@docroot@/glossary.md#gloss-nar) hash
+          - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
 
-      - `narHash` (String, optional)
+          *input* must be an attribute set with the following attributes:
 
-        The `narHash` parameter can be used to substitute the source of the tree.
-        It also allows for verification of tree contents that may not be provided by the underlying transfer mechanism.
-        If `narHash` is set, the source is first looked up is the Nix store and [substituters](@docroot@/command-ref/conf-file.md#conf-substituters), and only fetched if not available.
+          - `type` (String, required)
 
-      A subset of the output attributes of `fetchTree` can be re-used for subsequent calls to `fetchTree` to produce the same result again.
-      That is, `fetchTree` is idempotent.
+            One of the [supported source types](#source-types).
+            This determines other required and allowed input attributes.
 
-      Downloads are cached in `$XDG_CACHE_HOME/nix`.
-      The remote source will be fetched from the network if both are true:
-      - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
+          - `narHash` (String, optional)
 
-        > **Note**
-        >
-        > [Substituters](@docroot@/command-ref/conf-file.md#conf-substituters) are not used in fetching.
+            The `narHash` parameter can be used to substitute the source of the tree.
+            It also allows for verification of tree contents that may not be provided by the underlying transfer mechanism.
+            If `narHash` is set, the source is first looked up is the Nix store and [substituters](@docroot@/command-ref/conf-file.md#conf-substituters), and only fetched if not available.
 
-      - There is no cache entry or the cache entry is older than [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
+          A subset of the output attributes of `fetchTree` can be re-used for subsequent calls to `fetchTree` to produce the same result again.
+          That is, `fetchTree` is idempotent.
 
-      ## Source types
+          Downloads are cached in `$XDG_CACHE_HOME/nix`.
+          The remote source will be fetched from the network if both are true:
+          - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
 
-      The following source types and associated input attributes are supported.
-
-      <!-- TODO: It would be soooo much more predictable to work with (and
-      document) if `fetchTree` was a curried call with the first paramter for
-      `type` or an attribute like `builtins.fetchTree.git`! -->
-
-      - `"file"`
-
-        Place a plain file into the Nix store.
-        This is similar to [`builtins.fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl)
-
-        - `url` (String, required)
-
-          Supported protocols:
-
-          - `https`
-
-            > **Example**
+            > **Note**
             >
-            > ```nix
-            > fetchTree {
-            >   type = "file";
-            >   url = "https://example.com/index.html";
-            > }
-            > ```
+            > [Substituters](@docroot@/command-ref/conf-file.md#conf-substituters) are not used in fetching.
 
-          - `http`
+          - There is no cache entry or the cache entry is older than [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
 
-            Insecure HTTP transfer for legacy sources.
+          ## Source types
 
-            > **Warning**
-            >
-            > HTTP performs no encryption or authentication.
-            > Use a `narHash` known in advance to ensure the output has expected contents.
+          The following source types and associated input attributes are supported.
 
-          - `file`
+          <!-- TODO: It would be soooo much more predictable to work with (and
+          document) if `fetchTree` was a curried call with the first paramter for
+          `type` or an attribute like `builtins.fetchTree.git`! -->
+        )"));
+        parse_document(*root, before, CMARK_OPT_DEFAULT);
 
-            A file on the local file system.
+        auto & schemes = node_append_child(*root, node_new(CMARK_NODE_LIST));
 
-            > **Example**
-            >
-            > ```nix
-            > fetchTree {
-            >   type = "file";
-            >   url = "file:///home/eelco/nix/README.md";
-            > }
-            > ```
+        for (const auto & [schemeName, scheme] : fetchers::getAllInputSchemes()) {
+            auto & s = node_append_child(schemes, node_new(CMARK_NODE_ITEM));
+            {
+                auto & name_p = node_append_child(s, node_new(CMARK_NODE_PARAGRAPH));
+                auto & name = node_append_child(name_p, node_new(CMARK_NODE_TEXT));
+                node_set_literal(name, schemeName.data());
+            }
+            parse_document(s, scheme->schemeDescription(), CMARK_OPT_DEFAULT);
 
-      - `"tarball"`
+            auto & attrs = node_append_child(s, node_new(CMARK_NODE_LIST));
+            for (const auto & [attrName, attribute] : scheme->allowedAttrs()) {
+                auto & a = node_append_child(attrs, node_new(CMARK_NODE_ITEM));
+                {
+                    auto & name_info = node_append_child(a, node_new(CMARK_NODE_PARAGRAPH));
+                    {
+                        auto & name = node_append_child(name_info, node_new(CMARK_NODE_CODE));
+                        auto & name_t = textArena.emplace_back(attrName);
+                        node_set_literal(name, name_t.c_str());
+                    }
+                    auto & info = node_append_child(name_info, node_new(CMARK_NODE_TEXT));
+                    auto & header = textArena.emplace_back(std::string { }
+                        + " (" + attribute.type
+                        + ", " + (attribute.required ? "required" : "optional")
+                        + ")");
+                    node_set_literal(info, header.c_str());
+                }
+                {
+                    auto & doc = textArena.emplace_back(stripIndentation(attribute.doc));
+                    parse_document(a, doc, CMARK_OPT_DEFAULT);
+                }
+            }
+        }
 
-        Download a tar archive and extract it into the Nix store.
-        This has the same underyling implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+        auto & after = textArena.emplace_back(stripIndentation(R"(
+          The following input types are still subject to change:
 
-        - `url` (String, required)
+          - `"path"`
+          - `"github"`
+          - `"gitlab"`
+          - `"sourcehut"`
+          - `"mercurial"`
 
-           > **Example**
-           >
-           > ```nix
-           > fetchTree {
-           >   type = "tarball";
-           >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
-           > }
-           > ```
-
-      - `"git"`
-
-        Fetch a Git tree and copy it to the Nix store.
-        This is similar to [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit).
-
-        - `url` (String, required)
-
-          The URL formats supported are the same as for Git itself.
+         *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
+         The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
 
           > **Example**
           >
+          > Fetch a GitHub repository using the attribute set representation:
+          >
           > ```nix
-          > fetchTree {
-          >   type = "git";
-          >   url = "git@github.com:NixOS/nixpkgs.git";
+          > builtins.fetchTree {
+          >   type = "github";
+          >   owner = "NixOS";
+          >   repo = "nixpkgs";
+          >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          > }
+          > ```
+          >
+          > This evaluates to the following attribute set:
+          >
+          > ```nix
+          > {
+          >   lastModified = 1686503798;
+          >   lastModifiedDate = "20230611171638";
+          >   narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
+          >   outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
+          >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          >   shortRev = "ae2e6b3";
           > }
           > ```
 
-          > **Note**
+          > **Example**
           >
-          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix will only consider files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
+          > Fetch the same GitHub repository using the URL-like syntax:
+          >
+          >   ```nix
+          >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
+          >   ```
+        )"));
+        parse_document(*root, after, CMARK_OPT_DEFAULT);
 
-        - `ref` (String, optional)
-
-          A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
-
-          Default: `"HEAD"`
-
-        - `rev` (String, optional)
-
-          A Git revision; a commit hash.
-
-          Default: the tip of `ref`
-
-        - `shallow` (Bool, optional)
-
-          Make a shallow clone when fetching the Git tree.
-
-          Default: `false`
-
-        - `submodules` (Bool, optional)
-
-          Also fetch submodules if available.
-
-          Default: `false`
-
-        - `allRefs` (Bool, optional)
-
-          If set to `true`, always fetch the entire repository, even if the latest commit is still in the cache.
-          Otherwise, only the latest commit is fetched if it is not already cached.
-
-          Default: `false`
-
-        - `lastModified` (Integer, optional)
-
-          Unix timestamp of the fetched commit.
-
-          If set, pass through the value to the output attribute set.
-          Otherwise, generated from the fetched Git tree.
-
-        - `revCount` (Integer, optional)
-
-          Number of revisions in the history of the Git repository before the fetched commit.
-
-          If set, pass through the value to the output attribute set.
-          Otherwise, generated from the fetched Git tree.
-
-      The following input types are still subject to change:
-
-      - `"path"`
-      - `"github"`
-      - `"gitlab"`
-      - `"sourcehut"`
-      - `"mercurial"`
-
-     *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
-     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
-
-      > **Example**
-      >
-      > Fetch a GitHub repository using the attribute set representation:
-      >
-      > ```nix
-      > builtins.fetchTree {
-      >   type = "github";
-      >   owner = "NixOS";
-      >   repo = "nixpkgs";
-      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-      > }
-      > ```
-      >
-      > This evaluates to the following attribute set:
-      >
-      > ```nix
-      > {
-      >   lastModified = 1686503798;
-      >   lastModifiedDate = "20230611171638";
-      >   narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
-      >   outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
-      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-      >   shortRev = "ae2e6b3";
-      > }
-      > ```
-
-      > **Example**
-      >
-      > Fetch the same GitHub repository using the URL-like syntax:
-      >
-      >   ```nix
-      >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
-      >   ```
-    )",
+        auto p = render_commonmark(*root, CMARK_OPT_DEFAULT, 0);
+        assert(p);
+        return { &*p };
+    }(),
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,
 });

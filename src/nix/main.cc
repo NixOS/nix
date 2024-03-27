@@ -199,21 +199,40 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
 
     std::string dumpCli()
     {
-        auto res = nlohmann::json::object();
+        using nlohmann::json;
+
+        auto res = json::object();
 
         res["args"] = toJSON();
 
-        auto stores = nlohmann::json::object();
-        for (auto & implem : *Implementations::registered) {
-            auto storeConfig = implem.getConfig();
-            auto storeName = storeConfig->name();
-            auto & j = stores[storeName];
-            j["doc"] = storeConfig->doc();
-            j["settings"] = storeConfig->toJSON();
-            j["experimentalFeature"] = storeConfig->experimentalFeature();
+        {
+            auto & stores = res["stores"] = json::object();
+            for (const auto & implem : *Implementations::registered) {
+                auto storeConfig = implem.getConfig();
+                auto storeName = storeConfig->name();
+                auto & j = stores[storeName];
+                j["doc"] = storeConfig->doc();
+                j["settings"] = storeConfig->toJSON();
+                j["experimentalFeature"] = storeConfig->experimentalFeature();
+            }
         }
-        res["stores"] = std::move(stores);
-        res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
+
+        {
+            auto & fetchers = res["fetchers"] = json::object();
+
+            for (const auto & [schemeName, scheme] : fetchers::getAllInputSchemes()) {
+                auto & s = fetchers[schemeName] = json::object();
+                s["description"] = scheme->schemeDescription();
+                auto & attrs = s["allowedAttrs"] = json::object();
+                for (auto & [fieldName, field] : scheme->allowedAttrs()) {
+                    auto & f = attrs[fieldName] = json::object();
+                    f["type"] = field.type;
+                    f["required"] = field.required;
+                    f["doc"] = stripIndentation(field.doc);
+                }
+            }
+
+        };
 
         return res.dump();
     }
@@ -405,7 +424,7 @@ void mainWrapped(int argc, char * * argv)
                 auto b = nlohmann::json::object();
                 if (!builtin.value->isPrimOp()) continue;
                 auto primOp = builtin.value->primOp;
-                if (!primOp->doc) continue;
+                if (primOp->doc == "") continue;
                 b["arity"] = primOp->arity;
                 b["args"] = primOp->args;
                 b["doc"] = trim(stripIndentation(primOp->doc));
