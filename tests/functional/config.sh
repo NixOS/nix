@@ -50,8 +50,13 @@ exp_cores=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
 exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2 | xargs)
 [[ $prev != $exp_cores ]]
 [[ $exp_cores == "4242" ]]
-# flakes implies fetch-tree
-[[ $exp_features == "fetch-tree flakes nix-command" ]]
+# flakes implies fetch-tree and a bunch of other things
+[[ $exp_features == "fetch-tree fetch-tree-git fetch-tree-urls flakes nix-command" ]]
+[[
+    $(NIX_CONFIG="experimental-features = fetch-tree nix-command" nix config show | grep '^experimental-features' | cut -d '=' -f 2 | xargs) \
+    == \
+    "fetch-tree fetch-tree-git fetch-tree-urls nix-command"
+]]
 
 # Test that it's possible to retrieve a single setting's value
 val=$(nix config show | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)

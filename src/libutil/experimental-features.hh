@@ -21,6 +21,8 @@ enum struct ExperimentalFeature
     ImpureDerivations,
     Flakes,
     FetchTree,
+    FetchTreeGit,
+    FetchTreeUrls,
     NixCommand,
     GitHashing,
     RecursiveNix,

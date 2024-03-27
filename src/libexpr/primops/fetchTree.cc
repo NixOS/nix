@@ -158,9 +158,9 @@ static void fetchTree(
             }
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
-            if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
+            if (!experimentalFeatureSettings.isEnabled(Xp::FetchTreeUrls))
                 state.error<EvalError>(
-                    "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
+                    "passing a string argument to 'fetchTree' requires the 'fetch-tree-urls' experimental feature"
                 ).atPos(pos).debugThrow();
             input = fetchers::Input::fromURL(url);
         }
@@ -409,7 +409,6 @@ static RegisterPrimOp primop_fetchTree({
       >   ```
     )",
     .fun = prim_fetchTree,
-    .experimentalFeature = Xp::FetchTree,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
