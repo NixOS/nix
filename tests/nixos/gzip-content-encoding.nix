@@ -57,6 +57,7 @@ in
 
     machine.wait_for_unit("nginx.service")
     machine.succeed("""
+      curl --compressed -v http://localhost/archive |& tr -s ' ' |& grep --ignore-case 'content-encoding: gzip'
       archive_path=$(nix-prefetch-url http://localhost/archive --print-path | tail -n1)
       ${fileCmd} -b $archive_path --extension | grep "zst"
       ! ${fileCmd} -b $archive_path --extension | grep "tar"
