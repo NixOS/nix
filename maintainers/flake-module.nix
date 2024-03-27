@@ -18,7 +18,6 @@
             ''^tests/unit/[^/]*/data/.*$''
 
             # Don't format vendored code
-            ''^src/toml11/.*''
             ''^doc/manual/redirects\.js$''
             ''^doc/manual/theme/highlight\.js$''
 

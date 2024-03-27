@@ -32,6 +32,7 @@
 , pkg-config
 , rapidcheck
 , sqlite
+, toml11
 , util-linux
 , xz
 
@@ -225,6 +226,7 @@ in {
     libsodium
     openssl
     sqlite
+    toml11
     xz
     ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [
