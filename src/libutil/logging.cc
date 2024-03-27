@@ -52,7 +52,7 @@ public:
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = shouldANSI();
+        tty = isTTY();
     }
 
     bool isVerbose() override {

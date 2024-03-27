@@ -11,6 +11,7 @@
 #include "legacy.hh"
 #include "posix-source-accessor.hh"
 #include "misc-store-flags.hh"
+#include "terminal.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -188,7 +189,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
         Finally f([]() { stopProgressBar(); });
 
-        if (isatty(STDERR_FILENO))
+        if (isTTY())
           startProgressBar();
 
         auto store = openStore();

@@ -8,7 +8,7 @@ namespace nix {
  * Determine whether ANSI escape sequences are appropriate for the
  * present output.
  */
-bool shouldANSI();
+bool isTTY();
 
 /**
  * Truncate a string to 'width' printable characters. If 'filterAll'
