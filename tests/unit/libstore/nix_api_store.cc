@@ -7,6 +7,11 @@
 
 namespace nixC {
 
+void observe_string_cb(const char * start, unsigned int n, std::string * user_data)
+{
+    *user_data = std::string(start);
+}
+
 std::string PATH_SUFFIX = "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-name";
 
 TEST_F(nix_api_util_context, nix_libstore_init)
@@ -17,10 +22,10 @@ TEST_F(nix_api_util_context, nix_libstore_init)
 
 TEST_F(nix_api_store_test, nix_store_get_uri)
 {
-    char value[256];
-    auto ret = nix_store_get_uri(ctx, store, value, 256);
+    std::string str;
+    auto ret = nix_store_get_uri(ctx, store, (void *) observe_string_cb, &str);
     ASSERT_EQ(NIX_OK, ret);
-    ASSERT_STREQ("local", value);
+    ASSERT_STREQ("local", str.c_str());
 }
 
 TEST_F(nix_api_store_test, InvalidPathFails)
@@ -50,10 +55,10 @@ TEST_F(nix_api_store_test, DoesNotCrashWhenContextIsNull)
 
 TEST_F(nix_api_store_test, get_version)
 {
-    char value[256];
-    auto ret = nix_store_get_version(ctx, store, value, 256);
+    std::string str;
+    auto ret = nix_store_get_version(ctx, store, (void *) observe_string_cb, &str);
     ASSERT_EQ(NIX_OK, ret);
-    ASSERT_STREQ(PACKAGE_VERSION, value);
+    ASSERT_STREQ(PACKAGE_VERSION, str.c_str());
 }
 
 TEST_F(nix_api_util_context, nix_store_open_dummy)
@@ -63,9 +68,9 @@ TEST_F(nix_api_util_context, nix_store_open_dummy)
     ASSERT_EQ(NIX_OK, ctx->last_err_code);
     ASSERT_STREQ("dummy", store->ptr->getUri().c_str());
 
-    char value[256];
-    nix_store_get_version(ctx, store, value, 256);
-    ASSERT_STREQ("", value);
+    std::string str;
+    nix_store_get_version(ctx, store, (void *) observe_string_cb, &str);
+    ASSERT_STREQ("", str.c_str());
 
     nix_store_free(store);
 }

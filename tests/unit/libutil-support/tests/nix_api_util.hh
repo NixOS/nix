@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 namespace nixC {
+
 class nix_api_util_context : public ::testing::Test
 {
 protected:

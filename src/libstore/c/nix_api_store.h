@@ -71,11 +71,12 @@ void nix_store_free(Store * store);
  * @brief get the URI of a nix store
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
- * @param[out] dest The allocated area to write the string to.
- * @param[in] n Maximum size of the returned string.
+ * @param[in] callback Called with the URI.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_observe_string
  * @return error code, NIX_OK on success.
  */
-nix_err nix_store_get_uri(nix_c_context * context, Store * store, char * dest, unsigned int n);
+nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callback, void * user_data);
 
 // returns: owned StorePath*
 /**
@@ -130,11 +131,12 @@ nix_err nix_store_realise(
  * If the store doesn't have a version (like the dummy store), returns an empty string.
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
- * @param[out] dest The allocated area to write the string to.
- * @param[in] n Maximum size of the returned string.
+ * @param[in] callback Called with the version.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_observe_string
  * @return error code, NIX_OK on success.
  */
-nix_err nix_store_get_version(nix_c_context *, Store * store, char * dest, unsigned int n);
+nix_err nix_store_get_version(nix_c_context * context, Store * store, void * callback, void * user_data);
 
 // cffi end
 #ifdef __cplusplus
