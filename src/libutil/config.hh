@@ -375,6 +375,26 @@ public:
     void operator =(const std::optional<Path> & v);
 };
 
+/**
+ * Like `OptionalPathSetting`, but allows multiple paths.
+ */
+class PathsSetting : public BaseSetting<Paths>
+{
+public:
+
+    PathsSetting(Config * options,
+        const Paths & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {});
+
+    Paths parse(const std::string & str) const override;
+
+    void operator =(const Paths & v);
+
+    operator bool() const noexcept;
+};
+
 struct GlobalConfig : public AbstractConfig
 {
     typedef std::vector<Config*> ConfigRegistrations;
