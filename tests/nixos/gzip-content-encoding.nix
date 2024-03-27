@@ -46,7 +46,6 @@ in
           virtualisation.writableStore = true;
           virtualisation.additionalPaths = with pkgs; [ file ];
           nix.settings.substituters = lib.mkForce [ ];
-          nix.extraOptions = "experimental-features = nix-command flakes";
         };
     };
 
