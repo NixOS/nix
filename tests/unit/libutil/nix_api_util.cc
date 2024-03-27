@@ -9,6 +9,11 @@
 
 namespace nixC {
 
+void observe_string_cb(const char * start, unsigned int n, std::string * user_data)
+{
+    *user_data = std::string(start);
+}
+
 TEST_F(nix_api_util_context, nix_context_error)
 {
     std::string err_msg_ref;
@@ -57,13 +62,13 @@ static nix::GlobalConfig::Register rs(&mySettings);
 TEST_F(nix_api_util_context, nix_setting_get)
 {
     ASSERT_EQ(ctx->last_err_code, NIX_OK);
-    char value[256];
-    nix_err result = nix_setting_get(ctx, "invalid-key", value, 256);
+    std::string setting_value;
+    nix_err result = nix_setting_get(ctx, "invalid-key", (void *) observe_string_cb, &setting_value);
     ASSERT_EQ(result, NIX_ERR_KEY);
 
-    result = nix_setting_get(ctx, "setting-name", value, 256);
+    result = nix_setting_get(ctx, "setting-name", (void *) observe_string_cb, &setting_value);
     ASSERT_EQ(result, NIX_OK);
-    ASSERT_STREQ("empty", value);
+    ASSERT_STREQ("empty", setting_value.c_str());
 }
 
 TEST_F(nix_api_util_context, nix_setting_set)
@@ -74,10 +79,10 @@ TEST_F(nix_api_util_context, nix_setting_set)
     result = nix_setting_set(ctx, "setting-name", "new-value");
     ASSERT_EQ(result, NIX_OK);
 
-    char value[256];
-    result = nix_setting_get(ctx, "setting-name", value, 256);
+    std::string setting_value;
+    result = nix_setting_get(ctx, "setting-name", (void *) observe_string_cb, &setting_value);
     ASSERT_EQ(result, NIX_OK);
-    ASSERT_STREQ("new-value", value);
+    ASSERT_STREQ("new-value", setting_value.c_str());
 }
 
 TEST_F(nix_api_util_context, nix_err_msg)
@@ -100,26 +105,26 @@ TEST_F(nix_api_util_context, nix_err_msg)
 
 TEST_F(nix_api_util_context, nix_err_info_msg)
 {
+    std::string err_info;
+
     // no error
-    EXPECT_THROW(nix_err_info_msg(NULL, ctx, NULL, 256), nix::Error);
+    EXPECT_THROW(nix_err_info_msg(NULL, ctx, (void *) observe_string_cb, &err_info), nix::Error);
 
     try {
         throw nix::Error("testing error");
     } catch (...) {
         nix_context_error(ctx);
     }
-    char buf[256];
-    nix_err_info_msg(nix_c_context_create(), ctx, buf, 256);
-    ASSERT_EQ(std::string(buf), "testing error");
-
-    // should overflow
-    EXPECT_THROW(nix_err_info_msg(NULL, ctx, buf, 1), nix::Error);
+    nix_err_info_msg(nix_c_context_create(), ctx, (void *) observe_string_cb, &err_info);
+    ASSERT_STREQ("testing error", err_info.c_str());
 }
 
 TEST_F(nix_api_util_context, nix_err_name)
 {
+    std::string err_name;
+
     // no error
-    EXPECT_THROW(nix_err_name(NULL, ctx, NULL, 256), nix::Error);
+    EXPECT_THROW(nix_err_name(NULL, ctx, (void *) observe_string_cb, &err_name), nix::Error);
 
     std::string err_msg_ref;
     try {
@@ -127,12 +132,8 @@ TEST_F(nix_api_util_context, nix_err_name)
     } catch (...) {
         nix_context_error(ctx);
     }
-    char err_name[32];
-    nix_err_name(nix_c_context_create(), ctx, err_name, 32);
+    nix_err_name(nix_c_context_create(), ctx, (void *) observe_string_cb, &err_name);
     ASSERT_EQ(std::string(err_name), "nix::Error");
-
-    // overflow
-    EXPECT_THROW(nix_err_name(NULL, ctx, err_name, 1), nix::Error);
 }
 
 TEST_F(nix_api_util_context, nix_err_code)
@@ -141,4 +142,5 @@ TEST_F(nix_api_util_context, nix_err_code)
     nix_set_err_msg(ctx, NIX_ERR_UNKNOWN, "unknown test error");
     ASSERT_EQ(nix_err_code(ctx), NIX_ERR_UNKNOWN);
 }
+
 }

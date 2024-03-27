@@ -119,6 +119,15 @@ typedef int nix_err;
  */
 typedef struct nix_c_context nix_c_context;
 
+/**
+ * @brief Called to get the value of a string owned by Nix.
+ *
+ * @param[in] start the string to copy.
+ * @param[in] n the string length.
+ * @param[in] user_data optional, arbitrary data, passed to the nix_observe_string when it's called.
+ */
+typedef void (*nix_observe_string)(const char * start, unsigned int n, void * user_data);
+
 // Function prototypes
 
 /**
@@ -160,14 +169,13 @@ nix_err nix_libutil_init(nix_c_context * context);
  *
  * @param[out] context optional, Stores error information
  * @param[in] key The key of the setting to retrieve.
- * @param[out] value A pointer to a buffer where the value of the setting will
- * be stored.
- * @param[in] n The size of the buffer pointed to by value.
- * @return NIX_ERR_KEY if the setting is unknown, NIX_ERR_OVERFLOW if the
- * provided buffer is too short, or NIX_OK if the setting was retrieved
+ * @param[in] callback Called with the setting value.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_observe_string
+ * @return NIX_ERR_KEY if the setting is unknown, or NIX_OK if the setting was retrieved
  * successfully.
  */
-nix_err nix_setting_get(nix_c_context * context, const char * key, char * value, int n);
+nix_err nix_setting_get(nix_c_context * context, const char * key, void * callback, void * user_data);
 
 /**
  * @brief Sets a setting in the nix global configuration.
@@ -227,12 +235,14 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, uns
  *
  * @param[out] context optional, the context to store errors in if this function
  * fails
- * @param[in] read_context the context to retrieve the error message from
- * @param[out] value The allocated area to write the error string to.
- * @param[in] n Maximum size of the returned string.
+ * @param[in] read_context the context to retrieve the error message from.
+ * @param[in] callback Called with the error message.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_observe_string
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
-nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, char * value, int n);
+nix_err
+nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data);
 
 /**
  * @brief Retrieves the error name from a context.
@@ -245,11 +255,12 @@ nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_con
  * @param context optional, the context to store errors in if this function
  * fails
  * @param[in] read_context the context to retrieve the error message from
- * @param[out] value The allocated area to write the error string to.
- * @param[in] n Maximum size of the returned string.
+ * @param[in] callback Called with the error name.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_observe_string
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
-nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, char * value, int n);
+nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data);
 
 /**
  * @brief Retrieves the most recent error code from a nix_c_context

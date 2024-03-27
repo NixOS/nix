@@ -20,16 +20,16 @@ nix_err nix_context_error(nix_c_context * context);
 /**
  * Internal use only.
  *
- * Export a std::string across the C api boundary
+ * Helper to invoke nix_observe_string
  * @param context optional, the context to store errors in if this function
  * fails
- * @param str The string to export
- * @param value The allocated area to write the string to.
- * @param n Maximum size of the returned string.
- * @return NIX_OK if there were no errors, NIX_ERR_OVERFLOW if the string length
- * exceeds `n`.
+ * @param str The string to observe
+ * @param callback Called with the observed string.
+ * @param user_data optional, arbitrary data, passed to the callback when it's called.
+ * @return NIX_OK if there were no errors.
+ * @see nix_observe_string
  */
-nix_err nix_export_std_string(nix_c_context * context, const std::string_view str, char * dest, unsigned int n);
+nix_err call_nix_observe_string(const std::string str, void * callback, void * user_data);
 
 #define NIXC_CATCH_ERRS \
     catch (...) \

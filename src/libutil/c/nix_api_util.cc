@@ -63,16 +63,17 @@ const char * nix_version_get()
 }
 
 // Implementations
-nix_err nix_setting_get(nix_c_context * context, const char * key, char * value, int n)
+
+nix_err nix_setting_get(nix_c_context * context, const char * key, void * callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         std::map<std::string, nix::AbstractConfig::SettingInfo> settings;
         nix::globalConfig.getSettings(settings);
-        if (settings.contains(key))
-            return nix_export_std_string(context, settings[key].value, value, n);
-        else {
+        if (settings.contains(key)) {
+            return call_nix_observe_string(settings[key].value, callback, user_data);
+        } else {
             return nix_set_err_msg(context, NIX_ERR_KEY, "Setting not found");
         }
     }
@@ -114,24 +115,24 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * read_con
     return nullptr;
 }
 
-nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, char * value, int n)
+nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     if (read_context->last_err_code != NIX_ERR_NIX_ERROR) {
         return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Last error was not a nix error");
     }
-    return nix_export_std_string(context, read_context->name, value, n);
+    return call_nix_observe_string(read_context->name, callback, user_data);
 }
 
-nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, char * value, int n)
+nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     if (read_context->last_err_code != NIX_ERR_NIX_ERROR) {
         return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Last error was not a nix error");
     }
-    return nix_export_std_string(context, read_context->info->msg.str(), value, n);
+    return call_nix_observe_string(read_context->info->msg.str(), callback, user_data);
 }
 
 nix_err nix_err_code(const nix_c_context * read_context)
@@ -140,12 +141,8 @@ nix_err nix_err_code(const nix_c_context * read_context)
 }
 
 // internal
-nix_err nix_export_std_string(nix_c_context * context, const std::string_view str, char * dest, unsigned int n)
+nix_err call_nix_observe_string(const std::string str, void * callback, void * user_data)
 {
-    size_t i = str.copy(dest, n - 1);
-    dest[i] = 0;
-    if (i == n - 1) {
-        return nix_set_err_msg(context, NIX_ERR_OVERFLOW, "Provided buffer too short");
-    } else
-        return NIX_OK;
+    ((nix_observe_string) callback)(str.c_str(), str.size(), user_data);
+    return NIX_OK;
 }

@@ -56,26 +56,24 @@ void nix_store_free(Store * store)
     delete store;
 }
 
-nix_err nix_store_get_uri(nix_c_context * context, Store * store, char * dest, unsigned int n)
+nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto res = store->ptr->getUri();
-        return nix_export_std_string(context, res, dest, n);
+        return call_nix_observe_string(res, callback, user_data);
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_store_get_version(nix_c_context * context, Store * store, char * dest, unsigned int n)
+nix_err nix_store_get_version(nix_c_context * context, Store * store, void * callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto res = store->ptr->getVersion();
-        if (!res)
-            res = "";
-        return nix_export_std_string(context, *res, dest, n);
+        return call_nix_observe_string(res.value_or(""), callback, user_data);
     }
     NIXC_CATCH_ERRS
 }
