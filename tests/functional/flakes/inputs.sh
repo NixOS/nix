@@ -24,7 +24,7 @@ test_subdir_self_path() {
 }
 EOF
     (
-        nix build $baseDir?dir=b-low --no-link
+        nix build $baseDir/b-low --no-link
     )
 }
 test_subdir_self_path

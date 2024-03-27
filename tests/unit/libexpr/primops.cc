@@ -3,6 +3,7 @@
 
 #include "eval-settings.hh"
 #include "memory-input-accessor.hh"
+#include "flake/flakeref.hh"
 
 #include "tests/libexpr.hh"
 
