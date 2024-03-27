@@ -10,7 +10,7 @@ libstore_LIBS = libutil
 
 libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(THREAD_LDFLAGS)
 ifdef HOST_LINUX
- libstore_LDFLAGS += -ldl
+  libstore_LDFLAGS += -ldl
 endif
 
 $(foreach file,$(libstore_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/sandbox)))
@@ -27,8 +27,12 @@ ifeq ($(HAVE_SECCOMP), 1)
   libstore_LDFLAGS += $(LIBSECCOMP_LIBS)
 endif
 
+# Not just for this library itself, but also for downstream libraries using this library
+
+INCLUDE_libstore := -I $(d) -I $(d)/build
+
 libstore_CXXFLAGS += \
- -I src/libutil -I src/libstore -I src/libstore/build \
+ $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libstore) \
  -DNIX_PREFIX=\"$(prefix)\" \
  -DNIX_STORE_DIR=\"$(storedir)\" \
  -DNIX_DATA_DIR=\"$(datadir)\" \

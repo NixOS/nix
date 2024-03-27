@@ -75,7 +75,10 @@
 # sounds so long as evaluation just takes places within short-lived
 # processes. (When the process exits, the memory is reclaimed; it is
 # only leaked *within* the process.)
-, enableGC ? true
+#
+# Temporarily disabled on Windows because the `GC_throw_bad_alloc`
+# symbol is missing during linking.
+, enableGC ? !stdenv.hostPlatform.isWindows
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
@@ -333,6 +336,12 @@ in {
   '' + lib.optionalString enableInternalAPIDocs ''
     mkdir -p ''${!outputDoc}/nix-support
     echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
+  '';
+
+  # So the check output gets links for DLLs in the out output.
+  preFixup = lib.optionalString (stdenv.hostPlatform.isWindows && builtins.elem "check" finalAttrs.outputs) ''
+    ln -s "$check/lib/"*.dll "$check/bin"
+    ln -s "$out/bin/"*.dll "$check/bin"
   '';
 
   doInstallCheck = attrs.doInstallCheck;
