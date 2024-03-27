@@ -97,12 +97,13 @@ cat > $nonFlakeDir/shebang-different-comments.sh <<EOF
 #! $(type -P env) nix
 # some comments
 // some comments
+/* some comments
 * some comments
 \ some comments
 % some comments
 @ some comments
 -- some comments
-(* some comment
+(* some comments
 #! nix --offline shell
 #! nix flake1#fooScript
 #! nix --no-write-lock-file --command cat
