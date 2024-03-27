@@ -276,9 +276,8 @@ struct GitArchiveInputScheme : InputScheme
     {
         auto [input, tarballInfo] = downloadArchive(store, _input);
 
-        #if 0
-        input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
-        #endif
+        if (experimentalFeatureSettings.isEnabled(Xp::GitHashing))
+            input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
         auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash, false);
