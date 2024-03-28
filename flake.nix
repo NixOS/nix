@@ -352,6 +352,7 @@
         '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
+        fetch-git = self.hydraJobs.tests.fetch-git;
       } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
         # Some perl dependencies are broken on i686-linux.
         # Since the support is only best-effort there, disable the perl
