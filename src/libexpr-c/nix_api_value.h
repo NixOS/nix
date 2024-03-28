@@ -360,17 +360,18 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
 /** @brief Insert bindings into a builder
  * @param[out] context Optional, stores error information
  * @param[in] list_builder ListBuilder to insert into
+ * @param[in] index index to manipulate
  * @param[in] value value to insert
  * @return error code, NIX_OK on success.
  */
-nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, Value * value);
+nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, Value * value);
 
 /** @brief Free a list builder
  *
  * Does not fail.
  * @param[in] builder the builder to free
  */
-void nix_list_builder_free(ListBuilder * builder);
+void nix_list_builder_free(ListBuilder * list_builder);
 
 /** @brief Create an attribute set from a bindings builder
  * @param[out] context Optional, stores error information

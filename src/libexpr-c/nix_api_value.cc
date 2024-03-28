@@ -263,7 +263,8 @@ Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalSta
         assert(v.type() == nix::nList);
         auto * p = v.listElems()[ix];
         nix_gc_incref(nullptr, p);
-        state->state.forceValue(*p, nix::noPos);
+        if (p != nullptr)
+            state->state.forceValue(*p, nix::noPos);
         return (Value *) p;
     }
     NIXC_CATCH_ERRS_NULL
@@ -417,7 +418,7 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto builder = CListBuilder(capacity);
+        auto builder = state->state.buildList(capacity);
         return new
 #if HAVE_BOEHMGC
             (NoGC)
@@ -427,20 +428,21 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, Value * value)
+nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        list_builder->builder.push_back((nix::Value *) value);
+        auto & e = check_value_not_null(value);
+        list_builder->builder[index] = &e;
     }
     NIXC_CATCH_ERRS
 }
 
-void nix_list_builder_free(ListBuilder * bb)
+void nix_list_builder_free(ListBuilder * list_builder)
 {
 #if HAVE_BOEHMGC
-    GC_FREE(bb);
+    GC_FREE(list_builder);
 #else
     delete bb;
 #endif
@@ -452,7 +454,7 @@ nix_err nix_make_list(nix_c_context * context, EvalState * s, ListBuilder * list
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        list_builder->builder.finish(&(s->state), &v);
+        v.mkList(list_builder->builder);
     }
     NIXC_CATCH_ERRS
 }

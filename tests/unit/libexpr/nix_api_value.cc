@@ -77,12 +77,13 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
 
     Value * intValue = nix_alloc_value(nullptr, state);
     nix_init_int(nullptr, intValue, 42);
-    nix_list_builder_insert(nullptr, builder, intValue);
+    nix_list_builder_insert(nullptr, builder, 0, intValue);
     nix_make_list(nullptr, state, builder, value);
     nix_list_builder_free(builder);
 
     ASSERT_EQ(42, nix_get_int(nullptr, nix_get_list_byidx(nullptr, value, state, 0)));
-    ASSERT_EQ(1, nix_get_list_size(nullptr, value));
+    ASSERT_EQ(nullptr, nix_get_list_byidx(nullptr, value, state, 1));
+    ASSERT_EQ(10, nix_get_list_size(nullptr, value));
 
     ASSERT_STREQ("a list", nix_get_typename(nullptr, value));
     ASSERT_EQ(NIX_TYPE_LIST, nix_get_type(nullptr, value));
