@@ -764,4 +764,32 @@ StorePath AttrCursor::forceDerivation()
     return drvPath;
 }
 
+std::string showAttrValueType(const AttrValue & attrValue)
+{
+    return std::visit(overloaded{
+        [&](const string_t & s) { return "a string"; },
+        [&](bool) { return "a boolean"; },
+        [&](int_t) { return "an integer"; },
+        [&](const std::vector<std::string> &) { return "a list of strings"; },
+        [&](const std::vector<Symbol> &) { return "an attribute set"; },
+        [&](const placeholder_t &) { return "a placeholder"; },
+        [&](const missing_t &) { return "nothing"; },
+        [&](const misc_t &) { return "an unknown value"; },
+        [&](const failed_t &) { return "an error"; },
+    }, attrValue);
+}
+
+std::string AttrCursor::showType()
+{
+    if (root->db) {
+        if (!cachedValue)
+            cachedValue = root->db->getAttr(getKey());
+        if (cachedValue) {
+            return showAttrValueType(cachedValue->second);
+        }
+    }
+    auto & v = forceValue();
+    return nix::showType(v);
+}
+
 }
