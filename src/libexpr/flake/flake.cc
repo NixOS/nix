@@ -10,6 +10,7 @@
 #include "finally.hh"
 #include "fetch-settings.hh"
 #include "value-to-json.hh"
+#include "local-fs-store.hh"
 
 namespace nix {
 
@@ -755,7 +756,17 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        auto [storePath, subdir] = state.store->toStorePath(sourcePath.path.abs());
+        // FIXME: This is a hack to support chroot stores. Remove this
+        // once we can pass a sourcePath rather than a storePath to
+        // call-flake.nix.
+        auto path = sourcePath.path.abs();
+        if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
+            auto realStoreDir = store->getRealStoreDir();
+            if (isInDir(path, realStoreDir))
+                path = store->storeDir + path.substr(realStoreDir.size());
+        }
+
+        auto [storePath, subdir] = state.store->toStorePath(path);
 
         emitTreeAttrs(
             state,
