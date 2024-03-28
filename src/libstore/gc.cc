@@ -1,6 +1,7 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
+#include "posix-fs-canonicalise.hh"
 #include "finally.hh"
 #include "unix-domain-socket.hh"
 #include "signals.hh"
@@ -781,9 +782,19 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         for (auto & path : topoSortPaths(visited)) {
             if (!dead.insert(path).second) continue;
             if (shouldDelete) {
-                invalidatePathChecked(path);
-                deleteFromStore(path.to_string());
-                referrersCache.erase(path);
+                try {
+                    invalidatePathChecked(path);
+                    deleteFromStore(path.to_string());
+                    referrersCache.erase(path);
+                } catch (PathInUse & e) {
+                    if (settings.keepGoing) {
+                        printError("warning: %s"
+                                   "Ignoring as `--keep-going` is used.",
+                                   e.msg());
+                    } else {
+                        throw;
+                    }
+                }
             }
         }
     };
