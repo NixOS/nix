@@ -22,7 +22,6 @@
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -897,21 +896,25 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 }
 
 
-void LocalStore::autoGC(bool sync)
+GcStore::~GcStore()
 {
-    static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
+    std::shared_future<void> future;
 
-    auto getAvail = [this]() -> uint64_t {
-        if (fakeFreeSpaceFile)
-            return std::stoll(readFile(*fakeFreeSpaceFile));
+    {
+        auto state(_state.lock());
+        if (state->gcRunning)
+            future = state->gcFuture;
+    }
 
-        struct statvfs st;
-        if (statvfs(realStoreDir.get().c_str(), &st))
-            throw SysError("getting filesystem info about '%s'", realStoreDir);
+    if (future.valid()) {
+        printInfo("waiting for auto-GC to finish on exit...");
+        future.get();
+    }
+}
 
-        return (uint64_t) st.f_bavail * st.f_frsize;
-    };
 
+void GcStore::doGC(bool sync)
+{
     std::shared_future<void> future;
 
     {
@@ -925,13 +928,13 @@ void LocalStore::autoGC(bool sync)
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval)) return;
+        if (now < state->lastGCCheck + std::chrono::seconds(settings.autoGCCheckInterval)) return;
 
-        auto avail = getAvail();
+        auto avail = getAvailableSpace();
 
         state->lastGCCheck = now;
 
-        if (avail >= settings.minFree || avail >= settings.maxFree) return;
+        if (avail >= settings.gcThreshold || avail >= settings.gcLimit) return;
 
         if (avail > state->availAfterGC * 0.97) return;
 
@@ -940,7 +943,7 @@ void LocalStore::autoGC(bool sync)
         std::promise<void> promise;
         future = state->gcFuture = promise.get_future().share();
 
-        std::thread([promise{std::move(promise)}, this, avail, getAvail]() mutable {
+        std::thread([promise{std::move(promise)}, this, avail]() mutable {
 
             try {
 
@@ -953,7 +956,7 @@ void LocalStore::autoGC(bool sync)
                 });
 
                 GCOptions options;
-                options.maxFreed = settings.maxFree - avail;
+                options.maxFreed = settings.gcLimit - avail;
 
                 printInfo("running auto-GC to free %d bytes", options.maxFreed);
 
@@ -961,7 +964,7 @@ void LocalStore::autoGC(bool sync)
 
                 collectGarbage(options, results);
 
-                _state.lock()->availAfterGC = getAvail();
+                _state.lock()->availAfterGC = getAvailableSpace();
 
             } catch (...) {
                 // FIXME: we could propagate the exception to the
@@ -975,6 +978,13 @@ void LocalStore::autoGC(bool sync)
  sync:
     // Wait for the future outside of the state lock.
     if (sync) future.get();
+}
+
+
+void GcStore::autoGC(bool sync)
+{
+    if (settings.autoGC)
+        doGC(sync);
 }
 
 

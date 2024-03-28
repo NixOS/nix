@@ -3,6 +3,8 @@
 
 #include "store-api.hh"
 
+#include <future>
+
 
 namespace nix {
 
@@ -101,6 +103,8 @@ struct GcStore : public virtual Store
 {
     inline static std::string operationName = "Garbage collection";
 
+    ~GcStore();
+
     /**
      * Find the roots of the garbage collector.  Each root is a pair
      * `(link, storepath)` where `link` is the path of the symlink
@@ -114,6 +118,55 @@ struct GcStore : public virtual Store
      * Perform a garbage collection.
      */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
+
+    /**
+     * Do a garbage collection that observes the policy configured by
+     * `gc-threshold`, `gc-limit`, etc.
+     */
+    void doGC(bool sync = true);
+
+    /**
+     * Perform an automatic garbage collection, if enabled.
+     */
+    void autoGC(bool sync = true);
+
+    /**
+     * Return the amount of available disk space in this store. Used
+     * by `autoGC()`.
+     */
+    virtual uint64_t getAvailableSpace()
+    {
+        return std::numeric_limits<uint64_t>::max();
+    }
+
+private:
+
+    struct State
+    {
+        /**
+         * The last time we checked whether to do an auto-GC, or an
+         * auto-GC finished.
+         */
+        std::chrono::time_point<std::chrono::steady_clock> lastGCCheck;
+
+        /**
+         * Whether auto-GC is running. If so, get gcFuture to wait for
+         * the GC to finish.
+         */
+        bool gcRunning = false;
+        std::shared_future<void> gcFuture;
+
+        /**
+         * How much disk space was available after the previous
+         * auto-GC. If the current available disk space is below
+         * minFree but not much below availAfterGC, then there is no
+         * point in starting a new GC.
+         */
+        uint64_t availAfterGC = std::numeric_limits<uint64_t>::max();
+    };
+
+    Sync<State> _state;
+
 };
 
 }
