@@ -1,5 +1,7 @@
 #include "json-utils.hh"
 #include "error.hh"
+#include "types.hh"
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -34,10 +36,71 @@ const nlohmann::json & ensureType(
 {
     if (value.type() != expectedType)
         throw Error(
-            "Expected JSON value to be of type '%s' but it is of type '%s'",
+            "Expected JSON value to be of type '%s' but it is of type '%s': %s",
             nlohmann::json(expectedType).type_name(),
-            value.type_name());
+            value.type_name(), value.dump());
 
     return value;
+}
+
+const nlohmann::json::object_t & getObject(const nlohmann::json & value)
+{
+    return ensureType(value, nlohmann::json::value_t::object).get_ref<const nlohmann::json::object_t &>();
+}
+
+const nlohmann::json::array_t & getArray(const nlohmann::json & value)
+{
+    return ensureType(value, nlohmann::json::value_t::array).get_ref<const nlohmann::json::array_t &>();
+}
+
+const nlohmann::json::string_t & getString(const nlohmann::json & value)
+{
+    return ensureType(value, nlohmann::json::value_t::string).get_ref<const nlohmann::json::string_t &>();
+}
+
+const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value)
+{
+    return ensureType(value, nlohmann::json::value_t::number_integer).get_ref<const nlohmann::json::number_integer_t &>();
+}
+
+const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value)
+{
+    return ensureType(value, nlohmann::json::value_t::boolean).get_ref<const nlohmann::json::boolean_t &>();
+}
+
+Strings getStringList(const nlohmann::json & value)
+{
+    auto jsonArray = getArray(value);
+
+    Strings stringList;
+
+    for (const auto & elem: jsonArray)
+        stringList.push_back(getString(elem));
+
+    return stringList;
+}
+
+StringMap getStringMap(const nlohmann::json & value)
+{
+    auto jsonArray = getObject(value);
+
+    StringMap stringMap;
+
+    for (const auto & [key, value]: jsonArray)
+        stringMap[getString(key)] = getString(value);
+
+    return stringMap;
+}
+
+StringSet getStringSet(const nlohmann::json & value)
+{
+    auto jsonArray = getArray(value);
+
+    StringSet stringSet;
+
+    for (const auto & elem: jsonArray)
+        stringSet.insert(getString(elem));
+
+    return stringSet;
 }
 }
