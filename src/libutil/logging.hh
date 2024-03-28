@@ -257,4 +257,6 @@ inline void warn(const std::string & fs, const Args & ... args)
 
 void writeToStderr(std::string_view s);
 
+void removeErrorPrefix(std::string & msg);
+
 }
