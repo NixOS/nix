@@ -18,9 +18,9 @@ makefiles = \
   src/libexpr/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
-  src/libutil/c/local.mk \
-  src/libstore/c/local.mk \
-  src/libexpr/c/local.mk \
+  src/libutil-c/local.mk \
+  src/libstore-c/local.mk \
+  src/libexpr-c/local.mk \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
   misc/bash/local.mk \

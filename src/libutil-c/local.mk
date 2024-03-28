@@ -6,7 +6,10 @@ libutilc_DIR := $(d)
 
 libutilc_SOURCES := $(wildcard $(d)/*.cc)
 
-libutilc_CXXFLAGS += -I src/libutil
+# Not just for this library itself, but also for downstream libraries using this library
+
+INCLUDE_libutilc := -I $(d)
+libutilc_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libutilc)
 
 libutilc_LIBS = libutil
 

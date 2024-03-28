@@ -1,4 +1,3 @@
-
 #include "config.hh"
 #include "args.hh"
 #include "nix_api_util.h"

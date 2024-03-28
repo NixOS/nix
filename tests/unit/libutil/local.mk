@@ -18,7 +18,8 @@ libutil-tests_SOURCES := $(wildcard $(d)/*.cc)
 
 libutil-tests_EXTRA_INCLUDES = \
     -I tests/unit/libutil-support \
-    $(INCLUDE_libutil)
+    $(INCLUDE_libutil) \
+    $(INCLUDE_libutilc)
 
 libutil-tests_CXXFLAGS += $(libutil-tests_EXTRA_INCLUDES)
 
