@@ -448,7 +448,7 @@ void nix_list_builder_free(ListBuilder * list_builder)
 #endif
 }
 
-nix_err nix_make_list(nix_c_context * context, EvalState * s, ListBuilder * list_builder, Value * value)
+nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, Value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;

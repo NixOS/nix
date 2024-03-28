@@ -347,7 +347,7 @@ nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue 
  * @param[out] value Nix value to modify
  * @return error code, NIX_OK on success.
  */
-nix_err nix_make_list(nix_c_context * context, EvalState * s, ListBuilder * list_builder, Value * value);
+nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, Value * value);
 
 /** @brief Create a list builder
  * @param[out] context Optional, stores error information
