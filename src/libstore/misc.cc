@@ -1,7 +1,9 @@
 #include "derivations.hh"
 #include "parsed-derivations.hh"
 #include "globals.hh"
-#include "local-store.hh"
+#ifndef _WIN32
+# include "local-store.hh"
+#endif
 #include "store-api.hh"
 #include "thread-pool.hh"
 #include "realisation.hh"

@@ -65,7 +65,10 @@ static void createOutLinks(const Path& outLink, const std::vector<BuiltPathWithR
     }
 }
 
-struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
+struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON
+#ifndef __WIN32
+, MixProfile
+#endif
 {
     Path outLink = "result";
     bool printOutputPaths = false;
@@ -158,10 +161,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             }
         }
 
+#ifndef __WIN32
         BuiltPaths buildables2;
         for (auto & b : buildables)
             buildables2.push_back(b.path);
         updateProfile(buildables2);
+#endif
     }
 };
 

@@ -1,5 +1,7 @@
 ///@file
 
+#ifndef __WIN32
+
 #include "signals.hh"
 #include "unix-domain-socket.hh"
 #include "command.hh"
@@ -586,3 +588,5 @@ struct CmdDaemon : StoreCommand
 };
 
 static auto rCmdDaemon = registerCommand2<CmdDaemon>({"daemon"});
+
+#endif

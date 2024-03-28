@@ -21,6 +21,8 @@ std::string filterANSIEscapes(std::string_view s,
     bool filterAll = false,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 
+#ifndef _WIN32
+
 /**
  * Recalculate the window size, updating a global variable. Used in the
  * `SIGWINCH` signal handler.
@@ -34,5 +36,7 @@ void updateWindowSize();
  * by `updateWindowSize()`.
  */
 std::pair<unsigned short, unsigned short> getWindowSize();
+
+#endif
 
 }

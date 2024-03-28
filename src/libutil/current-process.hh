@@ -2,7 +2,10 @@
 ///@file
 
 #include <optional>
-#include <sys/resource.h>
+
+#ifndef _WIN32
+# include <sys/resource.h>
+#endif
 
 #include "types.hh"
 
@@ -14,10 +17,12 @@ namespace nix {
  */
 unsigned int getMaxCPU();
 
+#ifndef _WIN32
 /**
  * Change the stack size.
  */
 void setStackSize(rlim_t stackSize);
+#endif
 
 /**
  * Restore the original inherited Unix process context (such as signal

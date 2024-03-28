@@ -3,8 +3,8 @@
 #include "finally.hh"
 #include "terminal.hh"
 
-#include <sys/queue.h>
 #if HAVE_LOWDOWN
+#include <sys/queue.h>
 #include <lowdown.h>
 #endif
 

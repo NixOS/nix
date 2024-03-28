@@ -4,6 +4,11 @@ nix_DIR := $(d)
 
 nix_SOURCES := \
   $(wildcard $(d)/*.cc) \
+  $(wildcard src/nix-instantiate/*.cc) \
+  $(wildcard src/nix-build/*.cc)
+
+ifdef HOST_UNIX
+nix_SOURCES += \
   $(wildcard src/build-remote/*.cc) \
   $(wildcard src/nix-build/*.cc) \
   $(wildcard src/nix-channel/*.cc) \
@@ -11,8 +16,8 @@ nix_SOURCES := \
   $(wildcard src/nix-copy-closure/*.cc) \
   $(wildcard src/nix-daemon/*.cc) \
   $(wildcard src/nix-env/*.cc) \
-  $(wildcard src/nix-instantiate/*.cc) \
-  $(wildcard src/nix-store/*.cc) \
+  $(wildcard src/nix-store/*.cc)
+endif
 
 nix_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libexpr) -I src/libmain -I src/libcmd -I doc/manual
 

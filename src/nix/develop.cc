@@ -287,7 +287,10 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     throw Error("get-env.sh failed to produce an environment");
 }
 
-struct Common : InstallableCommand, MixProfile
+struct Common : InstallableCommand
+#ifndef __WIN32
+, MixProfile
+#endif
 {
     std::set<std::string> ignoreVars{
         "BASHOPTS",
@@ -473,7 +476,9 @@ struct Common : InstallableCommand, MixProfile
 
         auto strPath = store->printStorePath(shellOutPath);
 
+#ifndef __WIN32
         updateProfile(shellOutPath);
+#endif
 
         debug("reading environment file '%s'", strPath);
 
@@ -603,7 +608,9 @@ struct CmdDevelop : Common, MixEnvironment
 
         setEnviron();
         // prevent garbage collection until shell exits
+#ifndef __WIN32
         setenv("NIX_GCROOT", gcroot.c_str(), 1);
+#endif
 
         Path shell = "bash";
 
@@ -648,6 +655,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         // Override SHELL with the one chosen for this environment.
         // This is to make sure the system shell doesn't leak into the build environment.
+#ifndef __WIN32
         setenv("SHELL", shell.c_str(), 1);
 
         // If running a phase or single command, don't want an interactive shell running after
@@ -670,6 +678,7 @@ struct CmdDevelop : Common, MixEnvironment
         }
 
         runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
+#endif
     }
 };
 

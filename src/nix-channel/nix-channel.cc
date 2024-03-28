@@ -1,4 +1,6 @@
+#ifndef __WIN32
 #include "profiles.hh"
+#endif
 #include "shared.hh"
 #include "globals.hh"
 #include "filetransfer.hh"

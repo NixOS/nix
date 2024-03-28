@@ -286,8 +286,10 @@ static void main_nix_build(int argc, char * * argv)
             left = {"default.nix"};
     }
 
+#ifndef __WIN32
     if (runEnv)
         setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
+#endif
 
     PackageInfos drvs;
 
@@ -572,8 +574,10 @@ static void main_nix_build(int argc, char * * argv)
                 "BASH=%5%; "
                 "set +e; "
                 R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && )s" +
+#ifndef __WIN32
                 (getuid() == 0 ? R"s(PS1='\n\[\033[1;31m\][nix-shell:\w]\$\[\033[0m\] '; )s"
                                : R"s(PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s") +
+#endif
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "

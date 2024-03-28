@@ -17,7 +17,6 @@
 #include "cgroup.hh"
 #include "personality.hh"
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "child.hh"
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
@@ -40,18 +39,19 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <sys/mman.h>
-#include <sched.h>
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <sys/syscall.h>
-#if HAVE_SECCOMP
-#include <seccomp.h>
-#endif
-#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
+# include <sys/ioctl.h>
+# include <net/if.h>
+# include <netinet/ip.h>
+# include <sys/mman.h>
+# include <sched.h>
+# include <sys/param.h>
+# include <sys/mount.h>
+# include <sys/syscall.h>
+# include "namespaces.hh"
+# if HAVE_SECCOMP
+#   include <seccomp.h>
+# endif
+# define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
 #if __APPLE__

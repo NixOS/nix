@@ -2,7 +2,6 @@
 
 #include "args/root.hh"
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
@@ -18,17 +17,25 @@
 #include "memory-input-accessor.hh"
 
 #include <sys/types.h>
+#ifndef __WIN32
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#endif
 #include <regex>
+
+#if __linux__
+# include "namespaces.hh"
+#endif
 
 #include <nlohmann/json.hpp>
 
+#ifndef __WIN32
 extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char * * argv);
+#endif
 
 namespace nix {
 
@@ -53,6 +60,7 @@ static bool haveProxyEnvironmentVariables()
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
 {
+#ifndef __WIN32
     struct ifaddrs * addrs;
 
     if (getifaddrs(&addrs))
@@ -76,6 +84,9 @@ static bool haveInternet()
     if (haveProxyEnvironmentVariables()) return true;
 
     return false;
+#else
+    return true;
+#endif
 }
 
 std::string programPath;
@@ -338,10 +349,12 @@ void mainWrapped(int argc, char * * argv)
 
     /* The chroot helper needs to be run before any threads have been
        started. */
+#ifndef __WIN32
     if (argc > 0 && argv[0] == chrootHelperName) {
         chrootHelper(argc, argv);
         return;
     }
+#endif
 
     initNix();
     initGC();
@@ -360,6 +373,9 @@ void mainWrapped(int argc, char * * argv)
 
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
+    auto extensionPos = programName.find_last_of(".");
+    if (extensionPos != std::string::npos)
+        programName.erase(extensionPos);
 
     if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
         programName = "build-remote";
@@ -519,9 +535,11 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+#ifndef __WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
+#endif
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

@@ -294,6 +294,7 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
+#ifndef __WIN32
 struct MixProfile : virtual StoreCommand
 {
     std::optional<Path> profile;
@@ -312,6 +313,7 @@ struct MixDefaultProfile : MixProfile
 {
     MixDefaultProfile();
 };
+#endif
 
 struct MixEnvironment : virtual Args {
 

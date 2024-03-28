@@ -1,3 +1,5 @@
+#ifndef __WIN32
+
 #include "processes.hh"
 #include "command.hh"
 #include "common-args.hh"
@@ -158,3 +160,5 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 };
 
 static auto rCmdUpgradeNix = registerCommand<CmdUpgradeNix>("upgrade-nix");
+
+#endif

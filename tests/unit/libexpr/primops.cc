@@ -90,11 +90,13 @@ namespace nix {
         ASSERT_THAT(*p->value, IsIntEq(123));
     }
 
+    #ifndef _WIN32
     TEST_F(PrimOpTest, getEnv) {
         setenv("_NIX_UNIT_TEST_ENV_VALUE", "test value", 1);
         auto v = eval("builtins.getEnv \"_NIX_UNIT_TEST_ENV_VALUE\"");
         ASSERT_THAT(v, IsStringEq("test value"));
     }
+    #endif
 
     TEST_F(PrimOpTest, seq) {
         ASSERT_THROW(eval("let x = throw \"test\"; in builtins.seq x { }"), ThrownError);
