@@ -1,0 +1,280 @@
+name: build
+
+on: [push, pull_request]
+
+jobs:
+  build-linux-gcc:
+    runs-on: Ubuntu-22.04
+    strategy:
+      matrix:
+        compiler: ['g++-12', 'g++-11', 'g++-10', 'g++-9']
+        standard: ['11', '14', '17', '20']
+        unreleased: ['ON', 'OFF']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            sudo apt-add-repository ppa:ubuntu-toolchain-r/test
+            sudo apt-get update
+            sudo apt-get install libboost-test-dev
+            sudo apt-get install language-pack-fr # test serializer w/ locale
+            sudo apt-get install ${{ matrix.compiler }}
+      - name: Configure
+        run: |
+            mkdir build && cd build
+            cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+      - name: Build
+        run: |
+            cd build && cmake --build .
+      - name: Test
+        run: |
+            cd build && ctest --output-on-failure
+  build-linux-clang:
+    runs-on: Ubuntu-22.04
+    strategy:
+      matrix:
+        compiler: ['15', '14', '13', '12', '11']
+        standard: ['11', '14', '17', '20']
+        unreleased: ['ON', 'OFF']
+        exclude:
+            - {compiler: '14', standard: '20'} # to avoid using gcc-13 libstdc++
+            - {compiler: '13', standard: '20'} # with older clang
+            - {compiler: '12', standard: '20'}
+            - {compiler: '11', standard: '20'}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            sudo apt-add-repository ppa:ubuntu-toolchain-r/test
+            sudo apt-get update
+            sudo apt-get install libboost-test-dev
+            sudo apt-get install language-pack-fr # test serializer w/ locale
+            sudo apt-get install clang-${{ matrix.compiler }}
+      - name: Configure
+        run: |
+            mkdir build && cd build
+            cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_C_COMPILER=clang-${{ matrix.compiler }} -DCMAKE_CXX_COMPILER=clang++-${{ matrix.compiler }} -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+      - name: Build
+        run: |
+            cd build && cmake --build .
+      - name: Test
+        run: |
+            cd build && ctest --output-on-failure
+
+  build-linux-old-gcc:
+    runs-on: Ubuntu-20.04
+    strategy:
+      matrix:
+        compiler: ['g++-8', 'g++-7']
+        standard: ['11', '14', '17', '20']
+        unreleased: ['ON', 'OFF']
+        exclude:
+            - {compiler: 'g++-7', standard: '20'}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            sudo apt-add-repository ppa:ubuntu-toolchain-r/test
+            sudo apt-get update
+            sudo apt-get install libboost-test-dev
+            sudo apt-get install language-pack-fr # test serializer w/ locale
+            sudo apt-get install ${{ matrix.compiler }}
+      - name: Configure
+        run: |
+            mkdir build && cd build
+            if [[ "${{ matrix.compiler }}" == "g++-8" && ( "${{ matrix.standard }}" == "17" || "${{ matrix.standard }}" == "20" ) ]] ; then
+                cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_REQUIRE_FILESYSTEM_LIBRARY=ON -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+            else
+                cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+            fi
+      - name: Build
+        run: |
+            cd build && cmake --build .
+      - name: Test
+        run: |
+            cd build && ctest --output-on-failure
+
+  build-linux-old-clang:
+    runs-on: Ubuntu-20.04
+    strategy:
+      matrix:
+        compiler: ['10', '9', '8', '7', '6.0']
+        standard: ['11', '14', '17', '20']
+        unreleased: ['ON', 'OFF']
+        exclude:
+            - {compiler: '6.0', standard: '20'}
+            - {compiler: '7',   standard: '20'}
+            - {compiler: '8',   standard: '20'}
+            - {compiler: '9',   standard: '20'}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            sudo apt-add-repository ppa:ubuntu-toolchain-r/test
+            sudo apt-get update
+            sudo apt-get install libboost-test-dev
+            sudo apt-get install language-pack-fr # test serializer w/ locale
+            sudo apt-get install clang-${{ matrix.compiler }}
+      - name: Configure
+        run: |
+            mkdir build && cd build
+            cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_C_COMPILER=clang-${{ matrix.compiler }} -DCMAKE_CXX_COMPILER=clang++-${{ matrix.compiler }} -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+      - name: Build
+        run: |
+            cd build && cmake --build .
+      - name: Test
+        run: |
+            cd build && ctest --output-on-failure
+
+#  build-osx-13-arm64:
+#    runs-on: macos-13-arm64
+#    strategy:
+#      matrix:
+#        standard: ['11', '14', '17', '20']
+#        unreleased: ['ON', 'OFF']
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v3
+#        with:
+#          submodules: true
+#      - name: Install
+#        run: |
+#            brew install boost
+#      - name: Configure
+#        run: |
+#            mkdir build && cd build
+#            cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+#      - name: Build
+#        run: |
+#            cd build && cmake --build .
+#      - name: Test
+#        run: |
+#            cd build && ctest --output-on-failure
+
+  build-osx-13:
+    runs-on: macos-13
+    strategy:
+      matrix:
+        standard: ['11', '14', '17', '20']
+        unreleased: ['ON', 'OFF']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            brew install boost
+      - name: Configure
+        run: |
+            mkdir build && cd build
+            cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+      - name: Build
+        run: |
+            cd build && cmake --build .
+      - name: Test
+        run: |
+            cd build && ctest --output-on-failure
+
+  build-osx-12:
+    runs-on: macos-12
+    strategy:
+      matrix:
+        standard: ['11', '14', '17', '20']
+        unreleased: ['ON', 'OFF']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            brew install boost
+      - name: Configure
+        run: |
+            mkdir build && cd build
+            cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+      - name: Build
+        run: |
+            cd build && cmake --build .
+      - name: Test
+        run: |
+            cd build && ctest --output-on-failure
+
+
+  build-osx-11:
+    runs-on: macos-11
+    strategy:
+      matrix:
+        standard: ['11', '14', '17', '20']
+        unreleased: ['ON', 'OFF']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            brew install boost
+      - name: Configure
+        run: |
+            mkdir build && cd build
+            cmake .. -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+      - name: Build
+        run: |
+            cd build && cmake --build .
+      - name: Test
+        run: |
+            cd build && ctest --output-on-failure
+
+  build-windows-msvc:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        standard: ['11', '14', '17', '20']
+        config: ['Release', 'Debug']
+        unreleased: ['ON', 'OFF']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install
+        run: |
+            (New-Object System.Net.WebClient).DownloadFile("https://github.com/actions/boost-versions/releases/download/1.72.0-20200608.4/boost-1.72.0-win32-msvc14.2-x86_64.tar.gz", "$env:TEMP\\boost.tar.gz")
+            7z.exe x "$env:TEMP\\boost.tar.gz" -o"$env:TEMP\\boostArchive" -y | Out-Null
+            7z.exe x "$env:TEMP\\boostArchive" -o"$env:TEMP\\boost" -y | Out-Null
+            Push-Location -Path "$env:TEMP\\boost"
+            Invoke-Expression .\\setup.ps1
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Configure
+        shell: cmd
+        run: |
+            file --mime-encoding tests/test_literals.cpp
+            mkdir build
+            cd build
+            cmake ../ -G "NMake Makefiles" -Dtoml11_BUILD_TEST=ON -DCMAKE_CXX_STANDARD=${{ matrix.standard }} -DBoost_NO_BOOST_CMAKE=ON -DBOOST_ROOT="C:\\hostedtoolcache\\windows\\Boost\\1.72.0\\x86_64" -DTOML11_USE_UNRELEASED_TOML_FEATURES=${{ matrix.unreleased }}
+      - name: Build
+        working-directory: ./build
+        run: |
+            cmake --build . --config "${{ matrix.config }}"
+      - name: Test
+        working-directory: ./build
+        run: |
+            file --mime-encoding tests/toml/tests/example.toml
+            file --mime-encoding tests/toml/tests/fruit.toml
+            file --mime-encoding tests/toml/tests/hard_example.toml
+            file --mime-encoding tests/toml/tests/hard_example_unicode.toml
+            ctest --build-config "${{ matrix.config }}" --output-on-failure
