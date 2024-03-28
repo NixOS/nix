@@ -34,8 +34,10 @@ The following flake output attributes must be derivations:
 * `defaultPackage.`*system*
 * `devShell.`*system*
 * `devShells.`*system*`.`*name*
-* `nixosConfigurations.`*name*`.config.system.build.toplevel`
 * `packages.`*system*`.`*name*
+* `nixosConfigurations.`*name*`.config.system.build.toplevel`
+* `configurations.`*system*`.`*name*`.config.system.build.toplevel` if
+  `configurations.`*system*`.`*name*`.class` is `nixos`
 
 The following flake output attributes must be [app
 definitions](./nix3-run.md):
@@ -48,6 +50,10 @@ definitions](./nix3-flake-init.md):
 
 * `defaultTemplate`
 * `templates.`*name*
+
+The following flake output attributes must be *configurations*:
+
+* `configurations.`*system*`.`*name*
 
 The following flake output attributes must be *Nixpkgs overlays*:
 
