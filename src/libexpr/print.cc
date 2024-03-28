@@ -223,7 +223,7 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_CYAN;
-        output << v.integer;
+        output << v.integer();
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -232,7 +232,7 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_CYAN;
-        output << v.fpoint;
+        output << v.fpoint();
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -241,7 +241,7 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_CYAN;
-        printLiteralBool(output, v.boolean);
+        printLiteralBool(output, v.boolean());
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -271,10 +271,9 @@ private:
 
     void printDerivation(Value & v)
     {
-        Bindings::iterator i = v.attrs->find(state.sDrvPath);
         NixStringContext context;
         std::string storePath;
-        if (i != v.attrs->end())
+        if (auto i = v.attrs()->get(state.sDrvPath))
             storePath = state.store->printStorePath(state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
 
         if (options.ansiColors)
@@ -312,7 +311,7 @@ private:
 
     void printAttrs(Value & v, size_t depth)
     {
-        if (seen && !seen->insert(v.attrs).second) {
+        if (seen && !seen->insert(v.attrs()).second) {
             printRepeated();
             return;
         }
@@ -324,7 +323,7 @@ private:
             output << "{";
 
             AttrVec sorted;
-            for (auto & i : *v.attrs)
+            for (auto & i : *v.attrs())
                 sorted.emplace_back(std::pair(state.symbols[i.name], i.value));
 
             if (options.maxAttrs == std::numeric_limits<size_t>::max())
@@ -423,18 +422,18 @@ private:
 
         if (v.isLambda()) {
             output << "lambda";
-            if (v.lambda.fun) {
-                if (v.lambda.fun->name) {
-                    output << " " << state.symbols[v.lambda.fun->name];
+            if (v.payload.lambda.fun) {
+                if (v.payload.lambda.fun->name) {
+                    output << " " << state.symbols[v.payload.lambda.fun->name];
                 }
 
                 std::ostringstream s;
-                s << state.positions[v.lambda.fun->pos];
+                s << state.positions[v.payload.lambda.fun->pos];
                 output << " @ " << filterANSIEscapes(s.str());
             }
         } else if (v.isPrimOp()) {
-            if (v.primOp)
-                output << *v.primOp;
+            if (v.primOp())
+                output << *v.primOp();
             else
                 output << "primop";
         } else if (v.isPrimOpApp()) {
@@ -480,7 +479,7 @@ private:
 
     void printExternal(Value & v)
     {
-        v.external->print(output);
+        v.external()->print(output);
     }
 
     void printUnknown()

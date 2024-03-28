@@ -258,7 +258,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
-    for (auto & i : *args[1]->attrs) {
+    for (auto & i : *args[1]->attrs()) {
         const auto & name = state.symbols[i.name];
         if (!state.store->isStorePath(name))
             state.error<EvalError>(
@@ -269,17 +269,16 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
         if (!settings.readOnlyMode)
             state.store->ensurePath(namePath);
         state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
-        auto iter = i.value->attrs->find(sPath);
-        if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, iter->pos, "while evaluating the `path` attribute of a string context"))
+
+        if (auto attr = i.value->attrs()->get(sPath)) {
+            if (state.forceBool(*attr->value, attr->pos, "while evaluating the `path` attribute of a string context"))
                 context.emplace(NixStringContextElem::Opaque {
                     .path = namePath,
                 });
         }
 
-        iter = i.value->attrs->find(sAllOutputs);
-        if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, iter->pos, "while evaluating the `allOutputs` attribute of a string context")) {
+        if (auto attr = i.value->attrs()->get(sAllOutputs)) {
+            if (state.forceBool(*attr->value, attr->pos, "while evaluating the `allOutputs` attribute of a string context")) {
                 if (!isDerivation(name)) {
                     state.error<EvalError>(
                         "tried to add all-outputs context of %s, which is not a derivation, to a string",
@@ -292,17 +291,16 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
             }
         }
 
-        iter = i.value->attrs->find(state.sOutputs);
-        if (iter != i.value->attrs->end()) {
-            state.forceList(*iter->value, iter->pos, "while evaluating the `outputs` attribute of a string context");
-            if (iter->value->listSize() && !isDerivation(name)) {
+        if (auto attr = i.value->attrs()->get(state.sOutputs)) {
+            state.forceList(*attr->value, attr->pos, "while evaluating the `outputs` attribute of a string context");
+            if (attr->value->listSize() && !isDerivation(name)) {
                 state.error<EvalError>(
                     "tried to add derivation output context of %s, which is not a derivation, to a string",
                     name
                 ).atPos(i.pos).debugThrow();
             }
-            for (auto elem : iter->value->listItems()) {
-                auto outputName = state.forceStringNoCtx(*elem, iter->pos, "while evaluating an output name within a string context");
+            for (auto elem : attr->value->listItems()) {
+                auto outputName = state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
                 context.emplace(NixStringContextElem::Built {
                     .drvPath = makeConstantStorePathRef(namePath),
                     .output = std::string { outputName },

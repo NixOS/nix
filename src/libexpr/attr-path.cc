@@ -72,10 +72,10 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
-            Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end()) {
+            auto a = v->attrs()->get(state.symbols.create(attr));
+            if (!a) {
                 std::set<std::string> attrNames;
-                for (auto & attr : *v->attrs)
+                for (auto & attr : *v->attrs())
                     attrNames.insert(state.symbols[attr.name]);
 
                 auto suggestions = Suggestions::bestMatches(attrNames, attr);

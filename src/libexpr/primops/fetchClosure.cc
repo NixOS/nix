@@ -121,7 +121,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
     std::optional<StorePathOrGap> toPath;
     std::optional<bool> inputAddressedMaybe;
 
-    for (auto & attr : *args[0]->attrs) {
+    for (auto & attr : *args[0]->attrs()) {
         const auto & attrName = state.symbols[attr.name];
         auto attrHint = [&]() -> std::string {
             return "while evaluating the '" + attrName + "' attribute passed to builtins.fetchClosure";

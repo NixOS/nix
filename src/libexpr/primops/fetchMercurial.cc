@@ -20,7 +20,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
 
     if (args[0]->type() == nAttrs) {
 
-        for (auto & attr : *args[0]->attrs) {
+        for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
                 url = state.coerceToString(attr.pos, *attr.value, context,

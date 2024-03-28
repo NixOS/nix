@@ -33,9 +33,9 @@ private:
      */
     bool failed = false;
 
-    Bindings * attrs = nullptr, * meta = nullptr;
+    const Bindings * attrs = nullptr, * meta = nullptr;
 
-    Bindings * getMeta();
+    const Bindings * getMeta();
 
     bool checkMeta(Value & v);
 
@@ -46,7 +46,7 @@ public:
     std::string attrPath;
 
     PackageInfo(EvalState & state) : state(&state) { };
-    PackageInfo(EvalState & state, std::string attrPath, Bindings * attrs);
+    PackageInfo(EvalState & state, std::string attrPath, const Bindings * attrs);
     PackageInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
     std::string queryName() const;

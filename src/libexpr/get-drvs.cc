@@ -11,7 +11,7 @@
 namespace nix {
 
 
-PackageInfo::PackageInfo(EvalState & state, std::string attrPath, Bindings * attrs)
+PackageInfo::PackageInfo(EvalState & state, std::string attrPath, const Bindings * attrs)
     : state(&state), attrs(attrs), attrPath(std::move(attrPath))
 {
 }
@@ -69,12 +69,11 @@ std::string PackageInfo::querySystem() const
 std::optional<StorePath> PackageInfo::queryDrvPath() const
 {
     if (!drvPath && attrs) {
-        Bindings::iterator i = attrs->find(state->sDrvPath);
         NixStringContext context;
-        if (i == attrs->end())
-            drvPath = {std::nullopt};
-        else
+        if (auto i = attrs->get(state->sDrvPath))
             drvPath = {state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation")};
+        else
+            drvPath = {std::nullopt};
     }
     return drvPath.value_or(std::nullopt);
 }
@@ -91,7 +90,7 @@ StorePath PackageInfo::requireDrvPath() const
 StorePath PackageInfo::queryOutPath() const
 {
     if (!outPath && attrs) {
-        Bindings::iterator i = attrs->find(state->sOutPath);
+        auto i = attrs->find(state->sOutPath);
         NixStringContext context;
         if (i != attrs->end())
             outPath = state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the output path of a derivation");
@@ -106,8 +105,8 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
 {
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
-        Bindings::iterator i;
-        if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
+        const Attr * i;
+        if (attrs && (i = attrs->get(state->sOutputs))) {
             state->forceList(*i->value, i->pos, "while evaluating the 'outputs' attribute of a derivation");
 
             /* For each output... */
@@ -116,13 +115,13 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
 
                 if (withPaths) {
                     /* Evaluate the corresponding set. */
-                    Bindings::iterator out = attrs->find(state->symbols.create(output));
-                    if (out == attrs->end()) continue; // FIXME: throw error?
+                    auto out = attrs->get(state->symbols.create(output));
+                    if (!out) continue; // FIXME: throw error?
                     state->forceAttrs(*out->value, i->pos, "while evaluating an output of a derivation");
 
                     /* And evaluate its ‘outPath’ attribute. */
-                    Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
-                    if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
+                    auto outPath = out->value->attrs()->get(state->sOutPath);
+                    if (!outPath) continue; // FIXME: throw error?
                     NixStringContext context;
                     outputs.emplace(output, state->coerceToStorePath(outPath->pos, *outPath->value, context, "while evaluating an output path of a derivation"));
                 } else
@@ -135,8 +134,8 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
     if (!onlyOutputsToInstall || !attrs)
         return outputs;
 
-    Bindings::iterator i;
-    if (attrs && (i = attrs->find(state->sOutputSpecified)) != attrs->end() && state->forceBool(*i->value, i->pos, "while evaluating the 'outputSpecified' attribute of a derivation")) {
+    const Attr * i;
+    if (attrs && (i = attrs->get(state->sOutputSpecified)) && state->forceBool(*i->value, i->pos, "while evaluating the 'outputSpecified' attribute of a derivation")) {
         Outputs result;
         auto out = outputs.find(queryOutputName());
         if (out == outputs.end())
@@ -167,21 +166,21 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
 std::string PackageInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
-        Bindings::iterator i = attrs->find(state->sOutputName);
-        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value, noPos, "while evaluating the output name of a derivation") : "";
+        auto i = attrs->get(state->sOutputName);
+        outputName = i ? state->forceStringNoCtx(*i->value, noPos, "while evaluating the output name of a derivation") : "";
     }
     return outputName;
 }
 
 
-Bindings * PackageInfo::getMeta()
+const Bindings * PackageInfo::getMeta()
 {
     if (meta) return meta;
     if (!attrs) return 0;
-    Bindings::iterator a = attrs->find(state->sMeta);
-    if (a == attrs->end()) return 0;
+    auto a = attrs->get(state->sMeta);
+    if (!a) return 0;
     state->forceAttrs(*a->value, a->pos, "while evaluating the 'meta' attribute of a derivation");
-    meta = a->value->attrs;
+    meta = a->value->attrs();
     return meta;
 }
 
@@ -205,9 +204,8 @@ bool PackageInfo::checkMeta(Value & v)
         return true;
     }
     else if (v.type() == nAttrs) {
-        Bindings::iterator i = v.attrs->find(state->sOutPath);
-        if (i != v.attrs->end()) return false;
-        for (auto & i : *v.attrs)
+        if (v.attrs()->get(state->sOutPath)) return false;
+        for (auto & i : *v.attrs())
             if (!checkMeta(*i.value)) return false;
         return true;
     }
@@ -219,8 +217,8 @@ bool PackageInfo::checkMeta(Value & v)
 Value * PackageInfo::queryMeta(const std::string & name)
 {
     if (!getMeta()) return 0;
-    Bindings::iterator a = meta->find(state->symbols.create(name));
-    if (a == meta->end() || !checkMeta(*a->value)) return 0;
+    auto a = meta->get(state->symbols.create(name));
+    if (!a || !checkMeta(*a->value)) return 0;
     return a->value;
 }
 
@@ -237,7 +235,7 @@ NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type() == nInt) return v->integer;
+    if (v->type() == nInt) return v->integer();
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
@@ -251,7 +249,7 @@ NixFloat PackageInfo::queryMetaFloat(const std::string & name, NixFloat def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type() == nFloat) return v->fpoint;
+    if (v->type() == nFloat) return v->fpoint();
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
@@ -266,7 +264,7 @@ bool PackageInfo::queryMetaBool(const std::string & name, bool def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type() == nBool) return v->boolean;
+    if (v->type() == nBool) return v->boolean();
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            Boolean meta fields. */
@@ -292,7 +290,7 @@ void PackageInfo::setMeta(const std::string & name, Value * v)
 
 
 /* Cache for already considered attrsets. */
-typedef std::set<Bindings *> Done;
+typedef std::set<const Bindings *> Done;
 
 
 /* Evaluate value `v'.  If it evaluates to a set of type `derivation',
@@ -309,9 +307,9 @@ static bool getDerivation(EvalState & state, Value & v,
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =
            derivation {...}; y = x;}'. */
-        if (!done.insert(v.attrs).second) return false;
+        if (!done.insert(v.attrs()).second) return false;
 
-        PackageInfo drv(state, attrPath, v.attrs);
+        PackageInfo drv(state, attrPath, v.attrs());
 
         drv.queryName();
 
@@ -361,14 +359,14 @@ static void getDerivations(EvalState & state, Value & vIn,
 
         /* !!! undocumented hackery to support combining channels in
            nix-env.cc. */
-        bool combineChannels = v.attrs->find(state.symbols.create("_combineChannels")) != v.attrs->end();
+        bool combineChannels = v.attrs()->get(state.symbols.create("_combineChannels"));
 
         /* Consider the attributes in sorted order to get more
            deterministic behaviour in nix-env operations (e.g. when
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        for (auto & i : v.attrs->lexicographicOrder(state.symbols)) {
+        for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
             debug("evaluating attribute '%1%'", state.symbols[i->name]);
             if (!std::regex_match(std::string(state.symbols[i->name]), attrRegex))
                 continue;
@@ -380,8 +378,8 @@ static void getDerivations(EvalState & state, Value & vIn,
                    should we recurse into it?  => Only if it has a
                    `recurseForDerivations = true' attribute. */
                 if (i->value->type() == nAttrs) {
-                    Bindings::iterator j = i->value->attrs->find(state.sRecurseForDerivations);
-                    if (j != i->value->attrs->end() && state.forceBool(*j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
+                    auto j = i->value->attrs()->get(state.sRecurseForDerivations);
+                    if (j && state.forceBool(*j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
                         getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }

@@ -387,7 +387,7 @@ Value & AttrCursor::getValue()
         if (parent) {
             auto & vParent = parent->first->getValue();
             root->state.forceAttrs(vParent, noPos, "while searching for an attribute");
-            auto attr = vParent.attrs->get(parent->second);
+            auto attr = vParent.attrs()->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
             _value = allocRootValue(attr->value);
@@ -448,9 +448,9 @@ Value & AttrCursor::forceValue()
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
         }
         else if (v.type() == nBool)
-            cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
+            cachedValue = {root->db->setBool(getKey(), v.boolean()), v.boolean()};
         else if (v.type() == nInt)
-            cachedValue = {root->db->setInt(getKey(), v.integer), int_t{v.integer}};
+            cachedValue = {root->db->setInt(getKey(), v.integer()), int_t{v.integer()}};
         else if (v.type() == nAttrs)
             ; // FIXME: do something?
         else
@@ -510,7 +510,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
         return nullptr;
         //error<TypeError>("'%s' is not an attribute set", getAttrPathStr()).debugThrow();
 
-    auto attr = v.attrs->get(name);
+    auto attr = v.attrs()->get(name);
 
     if (!attr) {
         if (root->db) {
@@ -652,7 +652,7 @@ bool AttrCursor::getBool()
     if (v.type() != nBool)
         root->state.error<TypeError>("'%s' is not a Boolean", getAttrPathStr()).debugThrow();
 
-    return v.boolean;
+    return v.boolean();
 }
 
 NixInt AttrCursor::getInt()
@@ -674,7 +674,7 @@ NixInt AttrCursor::getInt()
     if (v.type() != nInt)
         root->state.error<TypeError>("'%s' is not an integer", getAttrPathStr()).debugThrow();
 
-    return v.integer;
+    return v.integer();
 }
 
 std::vector<std::string> AttrCursor::getListOfStrings()
@@ -730,7 +730,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
         root->state.error<TypeError>("'%s' is not an attribute set", getAttrPathStr()).debugThrow();
 
     std::vector<Symbol> attrs;
-    for (auto & attr : *getValue().attrs)
+    for (auto & attr : *getValue().attrs())
         attrs.push_back(attr.name);
     std::sort(attrs.begin(), attrs.end(), [&](Symbol a, Symbol b) {
         std::string_view sa = root->state.symbols[a], sb = root->state.symbols[b];
