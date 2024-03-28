@@ -43,6 +43,8 @@ src/nix/generated-doc/files/%.md: doc/manual/src/command-ref/files/%.md
 
 src/nix/profile.cc: src/nix/profile.md src/nix/generated-doc/files/profiles.md.gen.hh
 
+src/nix/flake.cc: src/nix/call-flake-schemas.nix.gen.hh
+
 src/nix/generated-doc/help-stores.md: doc/manual/src/store/types/index.md.in
 	@mkdir -p $$(dirname $@)
 	@echo 'R"(' >> $@.tmp

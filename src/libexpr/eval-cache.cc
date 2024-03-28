@@ -349,6 +349,12 @@ Value * EvalCache::getRootValue()
 {
     if (!value) {
         debug("getting root value");
+
+        /* For testing whether the evaluation cache is
+           complete. */
+        if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
+            throw Error("not everything is cached, but evaluation is not allowed");
+
         value = allocRootValue(rootLoader());
     }
     return *value;
