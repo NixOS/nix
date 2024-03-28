@@ -47,15 +47,6 @@ struct CmdRepl : RawInstallablesCommand
 
     void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override
     {
-        if (!experimentalFeatureSettings.isEnabled(Xp::Flakes) && !(file) && rawInstallables.size() >= 1) {
-            warn("future versions of Nix will require using `--file` to load a file");
-            if (rawInstallables.size() > 1)
-                warn("more than one input file is not currently supported");
-            auto filePath = rawInstallables[0].data();
-            file = std::optional(filePath);
-            rawInstallables.front() = rawInstallables.back();
-            rawInstallables.pop_back();
-        }
         if (rawInstallables.empty() && (file.has_value() || expr.has_value())) {
             rawInstallables.push_back(".");
         }

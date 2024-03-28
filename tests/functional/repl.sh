@@ -47,6 +47,9 @@ testRepl () {
       | grep "attribute 'currentSystem' missing"
     nix repl "${nixArgs[@]}" 2>&1 <<< "builtins.currentSystem" \
       | grep "$(nix-instantiate --eval -E 'builtins.currentSystem')"
+
+    expectStderr 1 nix repl ${testDir}/simple.nix \
+      | grepQuiet -s "error: path '$testDir/simple.nix' is not a flake"
 }
 
 # Simple test, try building a drv

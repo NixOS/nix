@@ -204,16 +204,6 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/40",
     },
     {
-        .tag = Xp::ReplFlake,
-        .name = "repl-flake",
-        .description = R"(
-            *Enabled with [`flakes`](#xp-feature-flakes) since 2.19*
-
-            Allow passing [installables](@docroot@/command-ref/new-cli/nix.md#installables) to `nix repl`, making its interface consistent with the other experimental commands.
-        )",
-        .trackingUrl = "https://github.com/NixOS/nix/milestone/32",
-    },
-    {
         .tag = Xp::AutoAllocateUids,
         .name = "auto-allocate-uids",
         .description = R"(
