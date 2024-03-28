@@ -109,7 +109,7 @@ while [ $# -gt 0 ]; do
                 echo " --no-daemon: Simple, single-user installation that does not require root and is"
                 echo "              trivial to uninstall."
                 echo "              (default)"
-                echo " --cure:      Tries to fix an already existing installation."
+                echo " --fix:       Tries to fix an already existing installation."
                 echo "              It does not fix installed packages."
                 echo ""
                 echo " --yes:               Run the script non-interactively, accepting all prompts."

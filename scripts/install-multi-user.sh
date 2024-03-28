@@ -1077,7 +1077,7 @@ case "${1-}" in
     # install == same as the no-arg condition for now (but, explicit)
     ""|install)
         main;;
-    cure)
+    fix)
         export NIX_DO_NOT_VALIDATE=1
         export NIX_DO_NOT_BACKUP=1
         export NIX_DO_NOT_OVERWRITE_PROFILE=1
