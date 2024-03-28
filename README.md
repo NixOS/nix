@@ -20,7 +20,7 @@ See our [Hacking guide](https://nixos.org/manual/nix/unstable/contributing/hacki
 
 ## Contributing
 
-Check the [contributing guide](./CONTRIBUTING.md) if you want to get involved with developing Nix.
+Check the [contributing guide](./doc/CONTRIBUTING.md) if you want to get involved with developing Nix.
 
 ## Additional Resources
 
@@ -31,4 +31,4 @@ Check the [contributing guide](./CONTRIBUTING.md) if you want to get involved wi
 
 ## License
 
-Nix is released under the [LGPL v2.1](./COPYING).
+Nix is released under the [LGPL v2.1](./doc/COPYING).
