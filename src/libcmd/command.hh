@@ -169,7 +169,6 @@ struct RawInstallablesCommand : virtual Args, SourceExprCommand
 
     void run(ref<Store> store) override;
 
-    // FIXME make const after `CmdRepl`'s override is fixed up
     virtual void applyDefaultInstallables(std::vector<std::string> & rawInstallables);
 
     bool readFromStdIn = false;

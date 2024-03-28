@@ -7,7 +7,7 @@
 
 using namespace nix;
 
-struct CmdStoreGC : StoreCommand, MixDryRun
+struct CmdStoreGC : InstallablesCommand, MixDryRun
 {
     GCOptions options;
 
@@ -33,11 +33,31 @@ struct CmdStoreGC : StoreCommand, MixDryRun
           ;
     }
 
-    void run(ref<Store> store) override
+    // Don't add a default installable if none is specified so that
+    // `nix store gc` runs a full gc
+    void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override {
+    }
+
+    void run(ref<Store> store, Installables && installables) override
     {
         auto & gcStore = require<GcStore>(*store);
 
         options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
+
+        // Add the closure of the installables to the set of paths to delete.
+        // If there's no installable specified, this will leave an empty set
+        // of paths to delete, which means the whole store will be gc-ed.
+        StorePathSet closureRoots;
+        for (auto & i : installables) {
+            try {
+                auto installableOutPath = Installable::toStorePath(getEvalStore(), store, Realise::Derivation, OperateOn::Output, i);
+                if (store->isValidPath(installableOutPath)) {
+                    closureRoots.insert(installableOutPath);
+                }
+            } catch (MissingRealisation &) {
+            }
+        }
+        store->computeFSClosure(closureRoots, options.pathsToDelete);
         GCResults results;
         PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
         gcStore.collectGarbage(options, results);
