@@ -31,9 +31,13 @@ void emitTreeAttrs(
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    if (auto narHash = input.getNarHash()) {
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    } else if (auto treeHash = input.getTreeHash()) {
+        attrs.alloc("treeHash").mkString(treeHash->to_string(HashFormat::SRI, true));
+    } else
+        /* Must have either tree hash or NAR hash */
+        assert(false);
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -49,6 +53,10 @@ void emitTreeAttrs(
             auto emptyHash = Hash(HashAlgorithm::SHA1);
             attrs.alloc("rev").mkString(emptyHash.gitRev());
             attrs.alloc("shortRev").mkString(emptyHash.gitShortRev());
+        }
+
+        if (auto treeHash = input.getTreeHash()) {
+            attrs.alloc("treeHash").mkString(treeHash->gitRev());
         }
 
         if (auto revCount = input.getRevCount())

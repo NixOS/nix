@@ -57,7 +57,7 @@ bool operator == (const git_oid & oid1, const git_oid & oid2)
 
 namespace nix {
 
-struct GitInputAccessor;
+struct GitInputAccessorImpl;
 
 // Some wrapper types that ensure that the git_*_free functions get called.
 template<auto del>
@@ -334,9 +334,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 
     /**
-     * A 'GitInputAccessor' with no regard for export-ignore or any other transformations.
+     * A 'GitInputAccessorImpl' with no regard for export-ignore or any other transformations.
      */
-    ref<GitInputAccessor> getRawAccessor(const Hash & rev);
+    ref<GitInputAccessorImpl> getRawAccessor(const Hash & rev);
+
+    ref<GitInputAccessor> getPlainAccessor(const Hash & rev) override;
 
     ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
 
@@ -477,15 +479,22 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 /**
  * Raw git tree input accessor.
  */
-struct GitInputAccessor : InputAccessor
+struct GitInputAccessorImpl : GitInputAccessor
 {
     ref<GitRepoImpl> repo;
     Tree root;
 
-    GitInputAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
+    GitInputAccessorImpl(ref<GitRepoImpl> repo_, const Hash & rev)
         : repo(repo_)
         , root(peelObject<Tree>(*repo, lookupObject(*repo, hashToOID(rev)).get(), GIT_OBJECT_TREE))
     {
+    }
+
+    Hash getTreeHash() override
+    {
+        auto * oid = git_tree_id(root.get());
+        assert(oid);
+        return toHash(*oid);
     }
 
     std::string readBlob(const CanonPath & path, bool symlink)
@@ -922,17 +931,22 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 };
 
-ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
+ref<GitInputAccessorImpl> GitRepoImpl::getRawAccessor(const Hash & rev)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    return make_ref<GitInputAccessor>(self, rev);
+    return make_ref<GitInputAccessorImpl>(self, rev);
+}
+
+ref<GitInputAccessor> GitRepoImpl::getPlainAccessor(const Hash & rev)
+{
+    return getRawAccessor(rev);
 }
 
 ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 {
-    auto self = ref<GitRepoImpl>(shared_from_this());
-    ref<GitInputAccessor> rawGitAccessor = getRawAccessor(rev);
+    ref<GitInputAccessorImpl> rawGitAccessor = getRawAccessor(rev);
     if (exportIgnore) {
+        auto self = ref<GitRepoImpl>(shared_from_this());
         return make_ref<GitExportIgnoreInputAccessor>(self, rawGitAccessor, rev);
     }
     else {
