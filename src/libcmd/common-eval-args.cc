@@ -197,15 +197,16 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
     if (EvalSettings::isPseudoUrl(s)) {
         auto accessor = fetchers::downloadTarball(
             EvalSettings::resolvePseudoUrl(s)).accessor;
-        auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
-        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
+        state.registerAccessor(accessor);
+        return SourcePath(accessor);
     }
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
-        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
-        return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
+        auto storePath = flakeRef.resolve(state.store).lazyFetch(state.store).first;
+        auto [accessor, _] = flakeRef.resolve(state.store).lazyFetch(state.store);
+        return SourcePath(accessor);
     }
 
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
