@@ -1,3 +1,7 @@
+# Only execute this file once per shell.
+if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
+export __ETC_PROFILE_NIX_SOURCED=1
+
 if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Set up the per-user profile.
@@ -59,9 +63,24 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     # pick up `.nix-profile/share/man` because is it close to `.nix-profile/bin`
     # which is in the $PATH. For more info, run `manpath -d`.
     if [ -n "${MANPATH-}" ]; then
-        export MANPATH="$NIX_LINK/share/man:$MANPATH"
+        # only append once
+        case ":$MANPATH:" in
+          *:"$NIX_LINK/share/man":*)
+            ;;
+          *)
+            export MANPATH="$NIX_LINK/share/man:$MANPATH"
+            ;;
+        esac
     fi
 
-    export PATH="$NIX_LINK/bin:$PATH"
+    # only append once
+    case ":$PATH:" in
+      *:"$NIX_LINK/bin":*)
+        ;;
+      *)
+        export PATH="$NIX_LINK/bin:$PATH"
+        ;;
+    esac
+
     unset NIX_LINK NIX_LINK_NEW
 fi

@@ -224,3 +224,32 @@ EOF
         failure "This script needs a /nix volume with global permissions! This may require running sudo /usr/sbin/diskutil enableOwnership /nix."
     fi
 }
+
+# appended to shell init
+poly_extra_init_for_zshenv() {
+    cat <<'EOF'
+
+# wrap path_helper to keep it from pushing nix rightwards
+/usr/libexec/path_helper() {
+    case "$1" in
+        "-c")
+            # don't interfere if this gets invoked with -c
+            command /usr/libexec/path_helper "$@"
+            ;;
+        *)
+            (
+                # subshell to see what path_helper would do to PATH. inject a
+                # separator for splitting (saving previous PATH can duplicate
+                # entries, and people tend to see that as a smell)
+                eval "$(PATH="nixpathsep:$PATH" command /usr/libexec/path_helper "$@")"
+                local prefixed="${PATH%%:nixpathsep:*}" pushed_back="${PATH##*:nixpathsep:}"
+
+                # re-emit what path_helper would; remove function to avoid rerunning
+                echo "PATH=\"${pushed_back}:${prefixed}\"; export PATH; unset -f /usr/libexec/path_helper;"
+            )
+            ;;
+    esac
+}
+
+EOF
+}

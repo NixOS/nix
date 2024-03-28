@@ -1,6 +1,6 @@
 # Only execute this file once per shell.
 if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
-__ETC_PROFILE_NIX_SOURCED=1
+export __ETC_PROFILE_NIX_SOURCED=1
 
 NIX_LINK=$HOME/.nix-profile
 if [ -n "${XDG_STATE_HOME-}" ]; then
@@ -68,5 +68,12 @@ else
   unset -f check_nix_profiles
 fi
 
-export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
+# only append once
+case ":$PATH:" in
+  *:"$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin":*)
+    ;;
+  *)
+    export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
+    ;;
+esac
 unset NIX_LINK

@@ -33,7 +33,7 @@ readonly NIX_BUILD_GROUP_NAME="nixbld"
 readonly NIX_ROOT="/nix"
 readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
-readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
+readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshenv" "/etc/bash.bashrc" "/etc/zsh/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
@@ -853,6 +853,16 @@ EOF
     )
 }
 
+extra_shell_init() {
+    case "$1" in
+        /etc/zshenv)
+            poly_extra_init_for_zshenv;;
+        *)
+            ;;
+    esac
+}
+
+# $1 == file we're generating for
 shell_source_lines() {
     cat <<EOF
 
@@ -860,6 +870,7 @@ shell_source_lines() {
 if [ -e '$PROFILE_NIX_FILE' ]; then
   . '$PROFILE_NIX_FILE'
 fi
+$(extra_shell_init "$1")
 # End Nix
 
 EOF
@@ -878,26 +889,31 @@ end
 EOF
 }
 
+configure_one_shell_init() {
+    local profile_target="$1"
+    if [ -e "$profile_target" ]; then
+        _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
+              cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+    else
+        # try to create the file if its directory exists
+        target_dir="$(dirname "$profile_target")"
+        if [ -d "$target_dir" ]; then
+            _sudo "to create a stub $profile_target which will be updated" \
+                touch "$profile_target"
+        fi
+    fi
+
+    if [ -e "$profile_target" ]; then
+        shell_source_lines "$profile_target" \
+            | _sudo "extend your $profile_target with nix-daemon settings" \
+                    tee -a "$profile_target"
+    fi
+}
+
 configure_shell_profile() {
     task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target" ]; then
-            _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
-                  cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
-        else
-            # try to create the file if its directory exists
-            target_dir="$(dirname "$profile_target")"
-            if [ -d "$target_dir" ]; then
-                _sudo "to create a stub $profile_target which will be updated" \
-                    touch "$profile_target"
-            fi
-        fi
-
-        if [ -e "$profile_target" ]; then
-            shell_source_lines \
-                | _sudo "extend your $profile_target with nix-daemon settings" \
-                        tee -a "$profile_target"
-        fi
+        configure_one_shell_init "$profile_target"
     done
 
     task "Setting up shell profiles for Fish with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"

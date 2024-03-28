@@ -220,3 +220,7 @@ poly_create_build_user() {
 poly_prepare_to_install() {
     :
 }
+
+poly_extra_init_for_zshenv() {
+    :
+}
