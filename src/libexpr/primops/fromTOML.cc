@@ -1,6 +1,20 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 
+
+/*
+FIXME: currently, toml11 requires us to set
+the C++ version to differentiate between
+invoke_result and result_of. Fixes compilation
+on MacOS.
+
+https://stackoverflow.com/questions/75121130
+
+*/
+#ifndef __cplusplus
+    #define __cplusplus 202000L
+#endif
+
 #include "../../toml11/toml.hpp"
 
 #include <sstream>
