@@ -3859,7 +3859,7 @@ static RegisterPrimOp primop_stringLength({
     .name = "__stringLength",
     .args = {"e"},
     .doc = R"(
-      Return the length of the string *e*. If *e* is not a string,
+      Return the number of bytes of the string *e*. If *e* is not a string,
       evaluation is aborted.
     )",
     .fun = prim_stringLength,
