@@ -111,6 +111,7 @@
   - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
   - [Store Path Specification](protocols/store-path.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
+  - [Signatures](protocols/signature.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/index.md)
   - [Hacking](contributing/hacking.md)
