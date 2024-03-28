@@ -206,6 +206,7 @@ struct GitInputScheme : InputScheme
             "shallow",
             "submodules",
             "exportIgnore",
+            "treeHash",
             "lastModified",
             "revCount",
             "narHash",
@@ -601,6 +602,8 @@ struct GitInputScheme : InputScheme
 
         auto rev = *input.getRev();
 
+        auto gotTreeHash = repo->getPlainAccessor(rev)->getTreeHash();
+
         Attrs infoAttrs({
             {"rev", rev.gitRev()},
             {"lastModified", getLastModified(repoInfo, repoDir, rev)},
@@ -646,6 +649,11 @@ struct GitInputScheme : InputScheme
                 mounts.insert_or_assign(CanonPath::root, accessor);
                 accessor = makeMountedInputAccessor(std::move(mounts));
             }
+        } else {
+            /* If we don't have submodules and aren't doing export
+               ignore, then the tree hash is useful info to provide. */
+            if (experimentalFeatureSettings.isEnabled(Xp::GitHashing) && !exportIgnore)
+                input.attrs.insert_or_assign("treeHash", gotTreeHash.gitRev());
         }
 
         assert(!origRev || origRev == rev);

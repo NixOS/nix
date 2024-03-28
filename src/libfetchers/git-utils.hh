@@ -16,6 +16,16 @@ struct GitFileSystemObjectSink : FileSystemObjectSink
     virtual Hash sync() = 0;
 };
 
+/**
+ * Git Input Accessor
+ *
+ * Created from `GitRepo`. Support some additional operations.
+ */
+struct GitInputAccessor : InputAccessor
+{
+    virtual Hash getTreeHash() = 0;
+};
+
 struct GitRepo
 {
     virtual ~GitRepo()
@@ -74,6 +84,8 @@ struct GitRepo
         const std::string & base) = 0;
 
     virtual bool hasObject(const Hash & oid) = 0;
+
+    virtual ref<GitInputAccessor> getPlainAccessor(const Hash & rev) = 0;
 
     virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
 
