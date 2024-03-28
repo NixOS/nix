@@ -230,6 +230,25 @@ public:
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
     /**
+     * Called by `collectGarbage` to trace in reverse.
+     *
+     * Using this rather than `queryReferrers` directly allows us to
+     * fine-tune which referrers we consider for garbage collection;
+     * some store implementations take advantage of this.
+     */
+    virtual void queryGCReferrers(const StorePath & path, StorePathSet & referrers)
+    {
+        return queryReferrers(path, referrers);
+    }
+
+    /**
+     * Called by `collectGarbage` to recursively delete a path.
+     * The default implementation simply calls `deletePath`, but it can be
+     * overridden by stores that wish to provide their own deletion behaviour.
+     */
+    virtual void deleteStorePath(const Path & path, uint64_t & bytesFreed);
+
+    /**
      * Optimise the disk space usage of the Nix store by hard-linking
      * files with the same contents.
      */
@@ -245,6 +264,31 @@ public:
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
+protected:
+
+    /**
+     * Result of `verifyAllValidPaths`
+     */
+    struct VerificationResult {
+        /**
+         * Whether any errors were encountered
+         */
+        bool errors;
+
+        /**
+         * A set of so-far valid paths. The store objects pointed to by
+         * those paths are suitable for further validation checking.
+         */
+        StorePathSet validPaths;
+    };
+
+    /**
+     * First, unconditional step of `verifyStore`
+     */
+    virtual VerificationResult verifyAllValidPaths(RepairFlag repair);
+
+public:
+
     /**
      * Register the validity of a path, i.e., that `path` exists, that
      * the paths referenced by it exists, and in the case of an output
@@ -255,7 +299,7 @@ public:
      */
     void registerValidPath(const ValidPathInfo & info);
 
-    void registerValidPaths(const ValidPathInfos & infos);
+    virtual void registerValidPaths(const ValidPathInfos & infos);
 
     unsigned int getProtocol() override;
 
@@ -290,6 +334,11 @@ public:
 
     std::optional<std::string> getVersion() override;
 
+protected:
+
+    void verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+
 private:
 
     /**
@@ -312,9 +361,6 @@ private:
      * Delete a path from the Nix store.
      */
     void invalidatePathChecked(const StorePath & path);
-
-    void verifyPath(const StorePath & path, const StorePathSet & store,
-        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
