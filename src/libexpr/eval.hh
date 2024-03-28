@@ -70,6 +70,13 @@ struct PrimOp
     const char * doc = nullptr;
 
     /**
+     * Add a trace item, `while calling the '<name>' builtin`
+     *
+     * This is used to remove the redundant item for `builtins.addErrorContext`.
+     */
+    bool addTrace = true;
+
+    /**
      * Implementation of the primop.
      */
     PrimOpFun fun;
