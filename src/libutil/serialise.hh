@@ -424,6 +424,41 @@ Source & operator >> (Source & in, bool & b)
 Error readError(Source & source);
 
 
+template<typename T>
+inline Sink & operator << (Sink & sink, const std::optional<T> & x)
+{
+    if (!x.has_value()) {
+        sink << uint8_t{0};
+    } else {
+        sink
+            << uint8_t{1}
+            << *x;
+    }
+    return sink;
+}
+
+
+template<typename T>
+Source & operator >> (Source & in, std::optional<T> & x)
+{
+    auto tag = readNum<uint8_t>(in);
+    switch (tag) {
+        case 0:
+            x = std::nullopt;
+            break;
+        case 1: {
+            T x2;
+            in >> x2;
+            x = std::move(x2);
+            break;
+        }
+        default:
+            throw Error("Invalid optional tag from remote");
+    }
+    return in;
+}
+
+
 /**
  * An adapter that converts a std::basic_istream into a source.
  */

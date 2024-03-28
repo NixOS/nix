@@ -24,7 +24,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::VerifiedFetches);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::PluggableAuth);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -295,6 +295,22 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Enables verification of git commit signatures through the [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) built-in.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/48",
+    },
+    {
+        .tag = Xp::AuthForwarding,
+        .name = "auth-forwarding",
+        .description = R"(
+            Whether to forward authentication data from the client to the daemon.
+        )",
+        .trackingUrl = "https://github.com/NixOS/nix/pull/9857",
+    },
+    {
+        .tag = Xp::PluggableAuth,
+        .name = "pluggable-auth",
+        .description = R"(
+            Whether to support pluggable authentication via external credential helpers.
+        )",
+        .trackingUrl = "https://github.com/NixOS/nix/pull/9857",
     },
 }};
 
