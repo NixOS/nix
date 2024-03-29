@@ -5,8 +5,4 @@ issues: 10103
 prs: 10299
 ---
 
-This PR removes the repl-flake feature that was adopted to provide a migration path when changing the behavior of `nix repl`. Moving forward this command will behave more like the rest of the modern cli.
-
-- Removes any repl-flake references.
-- Removes the parts of `applyDefaultInstallables` that are no longer needed in repl.cc.
-- Fix/Add any tests.
+The `repl-flake` experimental feature has been removed. The `nix repl` command now works like the rest of the new CLI in that `nix repl {path}` now tries to load a flake at `{path}` (or fails if the `flakes` experimental feature isn't enabled).*
