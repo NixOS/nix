@@ -59,13 +59,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
         if (i != cache->end()) return i->second;
     }
 
-    std::optional<struct stat> st{std::in_place};
-    if (::lstat(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of '%s'", showPath(path));
-    }
+    auto st = nix::maybeLstat(path.c_str());
 
     auto cache(_cache.lock());
     if (cache->size() >= 16384) cache->clear();
