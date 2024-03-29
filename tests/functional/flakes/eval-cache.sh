@@ -30,11 +30,15 @@ nix flake lock "$flake1Dir"
 # FIXME `packages.$system.foo` requires three invocations of `nix build`,
 # for `foo = throw` only it'll never be cached.
 expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
-expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: cached failure of attribute '"'foo.bar'"
+expect 1 nix build "$flake1Dir#foo.bar" --no-force-errors-in-eval-cache 2>&1 | \
+    grepQuiet 'error: cached failure of attribute '"'foo.bar'"
+expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
 
 git -C "$flake1Dir" add flake.lock
 git -C "$flake1Dir" commit -m "Init"
 
 # Cache is invalidated with a new git revision
 expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
-expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: cached failure of attribute '"'foo.bar'"
+expect 1 nix build "$flake1Dir#foo.bar" --no-force-errors-in-eval-cache 2>&1 | \
+    grepQuiet 'error: cached failure of attribute '"'foo.bar'"
+expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'

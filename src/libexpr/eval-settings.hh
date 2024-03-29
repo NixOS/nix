@@ -128,6 +128,9 @@ struct EvalSettings : Config
     Setting<bool> useEvalCache{this, true, "eval-cache",
         "Whether to use the flake evaluation cache."};
 
+    Setting<bool> forceErrorsInEvalCache{this, true, "force-errors-in-eval-cache",
+        "Whether to force reevaluation of cached failures."};
+
     Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
         R"(
           If set to true, ignore exceptions inside 'tryEval' calls when evaluating nix expressions in
