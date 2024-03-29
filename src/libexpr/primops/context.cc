@@ -144,7 +144,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies({
       The original string context element must not be empty or have multiple elements, and it must not have any other type of element other than a constant or derivation deep element.
       The latter is supported so this function is idempotent.
 
-      This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-addDrvOutputDependencies).
+      This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-unsafeDiscardOutputDependency).
     )",
     .fun = prim_addDrvOutputDependencies
 });
@@ -246,7 +246,7 @@ static RegisterPrimOp primop_getContext({
 
 /* Append the given context to a given string.
 
-   See the commentary above unsafeGetContext for details of the
+   See the commentary above getContext for details of the
    context representation.
 */
 static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
