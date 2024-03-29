@@ -38,8 +38,10 @@ struct ArchiveDecompressionSource : Source
 {
     std::unique_ptr<TarArchive> archive = 0;
     Source & src;
-    ArchiveDecompressionSource(Source & src)
+    std::optional<std::string> compressionMethod;
+    ArchiveDecompressionSource(Source & src, std::optional<std::string> compressionMethod = std::nullopt)
         : src(src)
+        , compressionMethod(std::move(compressionMethod))
     {
     }
     ~ArchiveDecompressionSource() override {}
@@ -47,7 +49,7 @@ struct ArchiveDecompressionSource : Source
     {
         struct archive_entry * ae;
         if (!archive) {
-            archive = std::make_unique<TarArchive>(src, true);
+            archive = std::make_unique<TarArchive>(src, /*raw*/ true, compressionMethod);
             this->archive->check(archive_read_next_header(this->archive->archive, &ae), "failed to read header (%s)");
             if (archive_filter_count(this->archive->archive) < 2) {
                 throw CompressionError("input compression not recognized");
@@ -218,8 +220,8 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
     else if (method == "br")
         return std::make_unique<BrotliDecompressionSink>(nextSink);
     else
-        return sourceToSink([&](Source & source) {
-            auto decompressionSource = std::make_unique<ArchiveDecompressionSource>(source);
+        return sourceToSink([method, &nextSink](Source & source) {
+            auto decompressionSource = std::make_unique<ArchiveDecompressionSource>(source, method);
             decompressionSource->drainInto(nextSink);
         });
 }

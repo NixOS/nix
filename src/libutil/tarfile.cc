@@ -1,18 +1,21 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+#include "finally.hh"
 #include "serialise.hh"
 #include "tarfile.hh"
 #include "file-system.hh"
 
 namespace nix {
 
-static int callback_open(struct archive *, void * self)
+namespace {
+
+int callback_open(struct archive *, void * self)
 {
     return ARCHIVE_OK;
 }
 
-static ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer)
+ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer)
 {
     auto self = (TarArchive *) _self;
     *buffer = self->buffer.data();
@@ -27,33 +30,61 @@ static ssize_t callback_read(struct archive * archive, void * _self, const void 
     }
 }
 
-static int callback_close(struct archive *, void * self)
+int callback_close(struct archive *, void * self)
 {
     return ARCHIVE_OK;
 }
 
-void TarArchive::check(int err, const std::string & reason)
+void checkLibArchive(archive * archive, int err, const std::string & reason)
 {
     if (err == ARCHIVE_EOF)
         throw EndOfFile("reached end of archive");
     else if (err != ARCHIVE_OK)
-        throw Error(reason, archive_error_string(this->archive));
+        throw Error(reason, archive_error_string(archive));
 }
 
-TarArchive::TarArchive(Source & source, bool raw)
-    : buffer(65536)
+constexpr auto defaultBufferSize = std::size_t{65536};
+}
+
+void TarArchive::check(int err, const std::string & reason)
 {
-    this->archive = archive_read_new();
-    this->source = &source;
+    checkLibArchive(archive, err, reason);
+}
+
+/// @brief Get filter_code from its name.
+///
+/// libarchive does not provide a convenience function like archive_write_add_filter_by_name but for reading.
+/// Instead it's necessary to use this kludge to convert method -> code and
+/// then use archive_read_support_filter_by_code. Arguably this is better than
+/// hand-rolling the equivalent function that is better implemented in libarchive.
+int getArchiveFilterCodeByName(const std::string & method)
+{
+    auto * ar = archive_write_new();
+    auto cleanup = Finally{[&ar]() { checkLibArchive(ar, archive_write_close(ar), "failed to close archive: %s"); }};
+    auto err = archive_write_add_filter_by_name(ar, method.c_str());
+    checkLibArchive(ar, err, "failed to get libarchive filter by name: %s");
+    auto code = archive_filter_code(ar, 0);
+    return code;
+}
+
+TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> compression_method)
+    : archive{archive_read_new()}
+    , source{&source}
+    , buffer(defaultBufferSize)
+{
+    if (!compression_method) {
+        archive_read_support_filter_all(archive);
+    } else {
+        archive_read_support_filter_by_code(archive, getArchiveFilterCodeByName(*compression_method));
+    }
 
     if (!raw) {
-        archive_read_support_filter_all(archive);
         archive_read_support_format_all(archive);
     } else {
-        archive_read_support_filter_all(archive);
         archive_read_support_format_raw(archive);
         archive_read_support_format_empty(archive);
     }
+
     archive_read_set_option(archive, NULL, "mac-ext", NULL);
     check(
         archive_read_open(archive, (void *) this, callback_open, callback_read, callback_close),
@@ -61,9 +92,9 @@ TarArchive::TarArchive(Source & source, bool raw)
 }
 
 TarArchive::TarArchive(const Path & path)
+    : archive{archive_read_new()}
+    , buffer(defaultBufferSize)
 {
-    this->archive = archive_read_new();
-
     archive_read_support_filter_all(archive);
     archive_read_support_format_all(archive);
     archive_read_set_option(archive, NULL, "mac-ext", NULL);
