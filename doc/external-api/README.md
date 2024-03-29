@@ -41,6 +41,8 @@ Nix expression `builtins.nixVersion`.
 #include <nix_api_value.h>
 #include <stdio.h>
 
+// NOTE: This example lacks all error handling. Production code must check for
+// errors, as some return values will be undefined.
 int main() {
    nix_libexpr_init(NULL);
 
