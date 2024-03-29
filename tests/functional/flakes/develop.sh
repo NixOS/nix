@@ -65,3 +65,20 @@ EOF
 )" -ef "$BASH_INTERACTIVE_EXECUTABLE" ]]
 
 clearStore
+
+# Use a newer bash version than the current one
+cat <<EOF >$TEST_HOME/flake.nix
+{
+    inputs.nixpkgs.url = "$TEST_HOME/nixpkgs";
+    outputs = {self, nixpkgs}: {
+      packages.$system.hello = (import ./config.nix).mkDerivation {
+        name = "hello";
+        outputs = [ "out" "dev" ];
+        meta.outputsToInstall = [ "out" ];
+        buildCommand = "";
+        NIX_ENV_MIN_BASH_VERSION=99;
+      };
+    };
+}
+EOF
+expect 1 nix develop .#hello --command true
