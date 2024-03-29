@@ -158,4 +158,6 @@ in
   fetch-git = runNixOSTestFor "x86_64-linux" ./fetch-git;
 
   ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
+
+  gzip-content-encoding = runNixOSTestFor "x86_64-linux" ./gzip-content-encoding.nix;
 }
