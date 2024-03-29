@@ -2,7 +2,6 @@
 #include <cstring>
 
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "util.hh"
 #include "finally.hh"
 #include "file-system.hh"
@@ -17,6 +16,7 @@
 # include <mutex>
 # include <sys/resource.h>
 # include "cgroup.hh"
+# include "namespaces.hh"
 #endif
 
 #include <sys/mount.h>
@@ -84,7 +84,9 @@ void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();
     if (restoreMounts) {
+        #if __linux__
         restoreMountNamespace();
+        #endif
     }
 
     if (savedStackSize) {

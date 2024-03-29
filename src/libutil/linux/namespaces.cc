@@ -5,17 +5,13 @@
 #include "processes.hh"
 #include "signals.hh"
 
-#if __linux__
-# include <mutex>
-# include <sys/resource.h>
-# include "cgroup.hh"
-#endif
+#include <mutex>
+#include <sys/resource.h>
+#include "cgroup.hh"
 
 #include <sys/mount.h>
 
 namespace nix {
-
-#if __linux__
 
 bool userNamespacesSupported()
 {
@@ -101,19 +97,14 @@ bool mountAndPidNamespacesSupported()
     return res;
 }
 
-#endif
-
 
 //////////////////////////////////////////////////////////////////////
 
-#if __linux__
 static AutoCloseFD fdSavedMountNamespace;
 static AutoCloseFD fdSavedRoot;
-#endif
 
 void saveMountNamespace()
 {
-#if __linux__
     static std::once_flag done;
     std::call_once(done, []() {
         fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
@@ -122,12 +113,10 @@ void saveMountNamespace()
 
         fdSavedRoot = open("/proc/self/root", O_RDONLY);
     });
-#endif
 }
 
 void restoreMountNamespace()
 {
-#if __linux__
     try {
         auto savedCwd = absPath(".");
 
@@ -146,15 +135,12 @@ void restoreMountNamespace()
     } catch (Error & e) {
         debug(e.msg());
     }
-#endif
 }
 
 void unshareFilesystem()
 {
-#ifdef __linux__
     if (unshare(CLONE_FS) != 0 && errno != EPERM)
         throw SysError("unsharing filesystem state in download thread");
-#endif
 }
 
 }
