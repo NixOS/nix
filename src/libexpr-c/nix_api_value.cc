@@ -227,7 +227,7 @@ double nix_get_float(nix_c_context * context, const Value * value)
         assert(v.type() == nix::nFloat);
         return v.fpoint;
     }
-    NIXC_CATCH_ERRS_RES(NAN);
+    NIXC_CATCH_ERRS_RES(0.0);
 }
 
 int64_t nix_get_int(nix_c_context * context, const Value * value)

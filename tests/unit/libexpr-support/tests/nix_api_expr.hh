@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 namespace nixC {
+
 class nix_api_expr_test : public nix_api_store_test
 {
 protected:
@@ -26,4 +27,5 @@ protected:
     EvalState * state;
     Value * value;
 };
+
 }

@@ -136,8 +136,8 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp);
  * @return value, or null in case of errors
  *
  */
-
 Value * nix_alloc_value(nix_c_context * context, EvalState * state);
+
 /** @addtogroup value_manip Manipulating values
  * @brief Functions to inspect and change Nix language values, represented by Value.
  * @{
@@ -150,15 +150,14 @@ Value * nix_alloc_value(nix_c_context * context, EvalState * state);
  * @param[in] value Nix value to inspect
  * @return type of nix value
  */
-
 ValueType nix_get_type(nix_c_context * context, const Value * value);
+
 /** @brief Get type name of value as defined in the evaluator
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return type name, owned string
  * @todo way to free the result
  */
-
 const char * nix_get_typename(nix_c_context * context, const Value * value);
 
 /** @brief Get boolean value
@@ -167,6 +166,7 @@ const char * nix_get_typename(nix_c_context * context, const Value * value);
  * @return true or false, error info via context
  */
 bool nix_get_bool(nix_c_context * context, const Value * value);
+
 /** @brief Get string
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
