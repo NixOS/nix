@@ -84,6 +84,7 @@ bool isDirOrInDir(std::string_view path, std::string_view dir);
  */
 struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
+std::optional<struct stat> maybeLstat(const Path & path);
 
 /**
  * @return true iff the given path exists.
