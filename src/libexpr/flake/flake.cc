@@ -930,7 +930,15 @@ std::optional<Fingerprint> LockedFlake::getFingerprint(ref<Store> store) const
     if (lockFile.isUnlocked()) return std::nullopt;
 
     auto fingerprint = flake.lockedRef.input.getFingerprint(store);
-    if (!fingerprint) return std::nullopt;
+    if (!fingerprint) {
+        return hashString(HashAlgorithm::SHA256,
+            fmt("%s;%s;%d;%d;%s",
+                flake.path.to_string(),
+                flake.lockedRef.subdir,
+                flake.lockedRef.input.getRevCount().value_or(0),
+                flake.lockedRef.input.getLastModified().value_or(0),
+                lockFile));
+    }
 
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
