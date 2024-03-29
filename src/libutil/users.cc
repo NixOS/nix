@@ -113,4 +113,9 @@ std::string expandTilde(std::string_view path)
         return std::string(path);
 }
 
+
+bool isRootUser() {
+    return getuid() == 0;
+}
+
 }
