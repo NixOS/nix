@@ -20,16 +20,16 @@ nix_err nix_context_error(nix_c_context * context);
 /**
  * Internal use only.
  *
- * Helper to invoke nix_observe_string
+ * Helper to invoke nix_get_string_callback
  * @param context optional, the context to store errors in if this function
  * fails
  * @param str The string to observe
  * @param callback Called with the observed string.
  * @param user_data optional, arbitrary data, passed to the callback when it's called.
  * @return NIX_OK if there were no errors.
- * @see nix_observe_string
+ * @see nix_get_string_callback
  */
-nix_err call_nix_observe_string(const std::string str, void * callback, void * user_data);
+nix_err call_nix_get_string_callback(const std::string str, void * callback, void * user_data);
 
 #define NIXC_CATCH_ERRS \
     catch (...) \

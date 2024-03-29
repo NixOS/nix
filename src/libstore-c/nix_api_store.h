@@ -73,7 +73,7 @@ void nix_store_free(Store * store);
  * @param[in] store nix store reference
  * @param[in] callback Called with the URI.
  * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
- * @see nix_observe_string
+ * @see nix_get_string_callback
  * @return error code, NIX_OK on success.
  */
 nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callback, void * user_data);
@@ -133,7 +133,7 @@ nix_err nix_store_realise(
  * @param[in] store nix store reference
  * @param[in] callback Called with the version.
  * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
- * @see nix_observe_string
+ * @see nix_get_string_callback
  * @return error code, NIX_OK on success.
  */
 nix_err nix_store_get_version(nix_c_context * context, Store * store, void * callback, void * user_data);

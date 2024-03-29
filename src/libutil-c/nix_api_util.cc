@@ -72,7 +72,7 @@ nix_err nix_setting_get(nix_c_context * context, const char * key, void * callba
         std::map<std::string, nix::AbstractConfig::SettingInfo> settings;
         nix::globalConfig.getSettings(settings);
         if (settings.contains(key)) {
-            return call_nix_observe_string(settings[key].value, callback, user_data);
+            return call_nix_get_string_callback(settings[key].value, callback, user_data);
         } else {
             return nix_set_err_msg(context, NIX_ERR_KEY, "Setting not found");
         }
@@ -122,7 +122,7 @@ nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context
     if (read_context->last_err_code != NIX_ERR_NIX_ERROR) {
         return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Last error was not a nix error");
     }
-    return call_nix_observe_string(read_context->name, callback, user_data);
+    return call_nix_get_string_callback(read_context->name, callback, user_data);
 }
 
 nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data)
@@ -132,7 +132,7 @@ nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_con
     if (read_context->last_err_code != NIX_ERR_NIX_ERROR) {
         return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Last error was not a nix error");
     }
-    return call_nix_observe_string(read_context->info->msg.str(), callback, user_data);
+    return call_nix_get_string_callback(read_context->info->msg.str(), callback, user_data);
 }
 
 nix_err nix_err_code(const nix_c_context * read_context)
@@ -141,8 +141,8 @@ nix_err nix_err_code(const nix_c_context * read_context)
 }
 
 // internal
-nix_err call_nix_observe_string(const std::string str, void * callback, void * user_data)
+nix_err call_nix_get_string_callback(const std::string str, void * callback, void * user_data)
 {
-    ((nix_observe_string) callback)(str.c_str(), str.size(), user_data);
+    ((nix_get_string_callback) callback)(str.c_str(), str.size(), user_data);
     return NIX_OK;
 }

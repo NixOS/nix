@@ -124,9 +124,9 @@ typedef struct nix_c_context nix_c_context;
  *
  * @param[in] start the string to copy.
  * @param[in] n the string length.
- * @param[in] user_data optional, arbitrary data, passed to the nix_observe_string when it's called.
+ * @param[in] user_data optional, arbitrary data, passed to the nix_get_string_callback when it's called.
  */
-typedef void (*nix_observe_string)(const char * start, unsigned int n, void * user_data);
+typedef void (*nix_get_string_callback)(const char * start, unsigned int n, void * user_data);
 
 // Function prototypes
 
@@ -171,7 +171,7 @@ nix_err nix_libutil_init(nix_c_context * context);
  * @param[in] key The key of the setting to retrieve.
  * @param[in] callback Called with the setting value.
  * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
- * @see nix_observe_string
+ * @see nix_get_string_callback
  * @return NIX_ERR_KEY if the setting is unknown, or NIX_OK if the setting was retrieved
  * successfully.
  */
@@ -238,7 +238,7 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, uns
  * @param[in] read_context the context to retrieve the error message from.
  * @param[in] callback Called with the error message.
  * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
- * @see nix_observe_string
+ * @see nix_get_string_callback
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
 nix_err
@@ -257,7 +257,7 @@ nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, vo
  * @param[in] read_context the context to retrieve the error message from
  * @param[in] callback Called with the error name.
  * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
- * @see nix_observe_string
+ * @see nix_get_string_callback
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
 nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data);

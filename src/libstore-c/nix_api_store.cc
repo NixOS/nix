@@ -62,7 +62,7 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callbac
         context->last_err_code = NIX_OK;
     try {
         auto res = store->ptr->getUri();
-        return call_nix_observe_string(res, callback, user_data);
+        return call_nix_get_string_callback(res, callback, user_data);
     }
     NIXC_CATCH_ERRS
 }
@@ -73,7 +73,7 @@ nix_err nix_store_get_version(nix_c_context * context, Store * store, void * cal
         context->last_err_code = NIX_OK;
     try {
         auto res = store->ptr->getVersion();
-        return call_nix_observe_string(res.value_or(""), callback, user_data);
+        return call_nix_get_string_callback(res.value_or(""), callback, user_data);
     }
     NIXC_CATCH_ERRS
 }
