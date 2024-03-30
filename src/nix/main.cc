@@ -348,7 +348,7 @@ void mainWrapped(int argc, char * * argv)
     initGC();
 
     #if __linux__
-    if (getuid() == 0) {
+    if (isRootUser()) {
         try {
             saveMountNamespace();
             if (unshare(CLONE_NEWNS) == -1)

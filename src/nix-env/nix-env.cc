@@ -1414,7 +1414,7 @@ static int main_nix_env(int argc, char * * argv)
                 replaceSymlink(
                     defaultChannelsDir(),
                     nixExprPath + "/channels");
-                if (getuid() != 0)
+                if (!isRootUser())
                     replaceSymlink(
                         rootChannelsDir(),
                         nixExprPath + "/channels_root");
