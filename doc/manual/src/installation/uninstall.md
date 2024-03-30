@@ -1,12 +1,52 @@
 # Uninstalling Nix
 
+## Sections
+- [Single User](#single-user)
+  - [Manual Method](#manual-method)
+    - [Step 1: Restore Modified Files (if applicable)](#step-2-restore-modified-files-if-applicable)
+    - [Step 2: Delete Nix Files](#step-4-delete-nix-files)
+- [Multi User](#multi-user)
+    - [Linux](#linux)
+    - [macOS](#macos)
+
+
 ## Single User
+### If you have a [single-user installation](./installing-binary.md#single-user-installation) of Nix
+### Manual Method
 
-If you have a [single-user installation](./installing-binary.md#single-user-installation) of Nix, uninstall it by running:
+#### Step 1: Restore Modified Files (if applicable)
 
-```console
-$ rm -rf /nix
-```
+1. Nix may have modified certain files on your system. If you have created backup copies of these files before installing Nix, you can restore them. Here are the instructions for bash and zsh files:
+
+   - Bash: Nix may have modified the `/etc/bash.bashrc` or `~/.bash_profile` file. If you have created a backup of this file before installing Nix, you can restore it using the following commands:
+
+     ```bash
+     sudo cp /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
+     sudo cp ~/.bash_profile.backup-before-nix ~/.bash_profile
+     ```
+
+     Note: After restoring the file, you may need to close and reopen any bash terminal sessions to ensure they are using the restored configurations.
+
+   - Zsh: Nix may have modified the `~/.zshrc` file. If you have created a backup of this file before installing Nix, you can restore it using the following command:
+
+     ```bash
+     sudo cp ~/.zshrc.backup-before-nix ~/.zshrc
+     ```
+
+     Note: After restoring the file, you may need to close and reopen any zsh terminal sessions to ensure they are using the restored configurations.
+
+
+#### Step 2: Delete Nix Files
+
+1. Run the following command in a terminal to delete the files that Nix added to your system:
+   ```bash
+   sudo rm -rf "/etc/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.cache/nix" "$NIX_ROOT" "/nix"
+   ```
+
+You have successfully uninstalled Nix from your system. Remember to double-check the commands before executing them and ensure that you have the necessary permissions to perform the uninstallation steps.
+
+If you ever need to use Nix again in the future, you can reinstall it following the installation instructions provided by the Nix documentation.
+
 
 ## Multi User
 
