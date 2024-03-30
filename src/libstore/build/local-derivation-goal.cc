@@ -2053,13 +2053,13 @@ void LocalDerivationGoal::runChild()
                             i.first, i.second.source);
 
                     std::string path = i.first;
-                    struct stat st;
-                    if (lstat(path.c_str(), &st)) {
-                        if (i.second.optional && errno == ENOENT)
+                    auto optSt = maybeLstat(path.c_str());
+                    if (!optSt) {
+                        if (i.second.optional)
                             continue;
-                        throw SysError("getting attributes of path '%s", path);
+                        throw SysError("getting attributes of required path '%s", path);
                     }
-                    if (S_ISDIR(st.st_mode))
+                    if (S_ISDIR(optSt->st_mode))
                         sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
                     else
                         sandboxProfile += fmt("\t(literal \"%s\")\n", path);
@@ -2271,14 +2271,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             continue;
         }
 
-        struct stat st;
-        if (lstat(actualPath.c_str(), &st) == -1) {
-            if (errno == ENOENT)
-                throw BuildError(
-                    "builder for '%s' failed to produce output path for output '%s' at '%s'",
-                    worker.store.printStorePath(drvPath), outputName, actualPath);
-            throw SysError("getting attributes of path '%s'", actualPath);
-        }
+        auto optSt = maybeLstat(actualPath.c_str());
+        if (!optSt)
+            throw BuildError(
+                "builder for '%s' failed to produce output path for output '%s' at '%s'",
+                worker.store.printStorePath(drvPath), outputName, actualPath);
+        struct stat & st = *optSt;
 
 #ifndef __CYGWIN__
         /* Check that the output is not group or world writable, as
