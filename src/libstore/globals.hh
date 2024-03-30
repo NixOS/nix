@@ -794,6 +794,13 @@ public:
           can add it to `trusted-public-keys` in their `nix.conf`.
         )"};
 
+    Setting<Strings> remoteSigningPaths{
+        this, {}, "remote-signing-paths",
+        R"(
+          A whitespace-separated list of paths pointing at Nix remote signing
+          UNIX domain socket servers. These are used to sign locally-built paths.
+        )"};
+
     Setting<unsigned int> tarballTtl{
         this, 60 * 60, "tarball-ttl",
         R"(

@@ -32,6 +32,14 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
     const Setting<Path> secretKeyFile{this, "", "secret-key",
         "Path to the secret key used to sign the binary cache."};
 
+    const Setting<Path> remoteSigningPath{
+        this, {}, "remote-signing-path",
+        R"(
+          A path which is implementing the Nix remote signing protocol
+          pointing at a UNIX domain socket.
+          These are used to sign the binary cache paths.
+        )"};
+
     const Setting<Path> localNarCache{this, "", "local-nar-cache",
         "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`."};
 

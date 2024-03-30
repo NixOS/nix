@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "signature/local-keys.hh"
 
+#include <curl/curl.h>
 #include <map>
 #include <optional>
 
@@ -56,6 +57,27 @@ private:
 
     SecretKey privateKey;
     PublicKey publicKey;
+};
+
+/**
+ * Remote signer
+ *
+ * The remote signer adheres to the Nix Remote Signing API
+ */
+struct RemoteSigner : Signer
+{
+    RemoteSigner(const std::string & remoteServerPath);
+
+    std::string signDetached(std::string_view s) const override;
+
+    const PublicKey & getPublicKey() override;
+
+private:
+
+    std::optional<PublicKey> optPublicKey;
+
+    std::string serverPath;
+    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> _curl_handle;
 };
 
 }

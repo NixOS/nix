@@ -27,7 +27,10 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
     : BinaryCacheStoreConfig(params)
     , Store(params)
 {
-    if (secretKeyFile != "")
+    if (remoteSigningPath != "")
+        signer = std::make_unique<RemoteSigner>(
+            remoteSigningPath);
+    else if (secretKeyFile != "")
         signer = std::make_unique<LocalSigner>(
             SecretKey { readFile(secretKeyFile) });
 
