@@ -13,8 +13,8 @@ echo "evaluating c..."
 # outputs.
 drvPath=$(nix-instantiate multiple-outputs.nix -A c)
 #[ "$drvPath" = "$drvPath2" ]
-grep -q 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
-grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
+grepQuiet 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
+grepQuiet 'multiple-outputs-b.drv",\["out"\]' $drvPath
 
 # While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)
@@ -52,7 +52,7 @@ outPath2=$(nix-build $(nix-instantiate multiple-outputs.nix -A a.second) --no-ou
 
 # Delete one of the outputs and rebuild it.  This will cause a hash
 # rewrite.
-nix-store --delete $TEST_ROOT/result-second --ignore-liveness
+env -u NIX_REMOTE nix-store --delete $TEST_ROOT/result-second --ignore-liveness
 nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
 [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]

@@ -6,7 +6,7 @@ rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile
 
 # Test add/list/remove.
 nix-channel --add http://foo/bar xyzzy
-nix-channel --list | grep -q http://foo/bar
+nix-channel --list | grepQuiet http://foo/bar
 nix-channel --remove xyzzy
 
 [ -e $TEST_HOME/.nix-channels ]
@@ -31,8 +31,8 @@ nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
 if [ "$xmllint" != false ]; then
     $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
 fi
-grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
+grepQuiet 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies
@@ -50,8 +50,8 @@ nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
 if [ "$xmllint" != false ]; then
     $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
 fi
-grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
+grepQuiet 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies

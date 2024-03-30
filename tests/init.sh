@@ -1,8 +1,14 @@
+set -eu -o pipefail
+
 source common.sh
 
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
     chmod -R u+w "$TEST_ROOT"
+    # We would delete any daemon socket, so let's stop the daemon first.
+    if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
+        killDaemon
+    fi
     rm -rf "$TEST_ROOT"
 fi
 mkdir "$TEST_ROOT"
@@ -18,6 +24,7 @@ build-users-group =
 keep-derivations = false
 sandbox = false
 include nix.conf.extra
+trusted-users = $(whoami)
 EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF

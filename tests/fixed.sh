@@ -2,9 +2,6 @@ source common.sh
 
 clearStore
 
-export IMPURE_VAR1=foo
-export IMPURE_VAR2=bar
-
 path=$(nix-store -q $(nix-instantiate fixed.nix -A good.0))
 
 echo 'testing bad...'

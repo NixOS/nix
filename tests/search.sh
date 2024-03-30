@@ -38,6 +38,6 @@ clearCache
 ## Search expressions
 
 # Check that empty search string matches all
-nix search|grep -q foo
-nix search|grep -q bar
-nix search|grep -q hello
+nix search|grepQuiet foo
+nix search|grepQuiet bar
+nix search|grepQuiet hello
