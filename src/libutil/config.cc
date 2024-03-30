@@ -336,8 +336,14 @@ template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeatur
     for (auto & s : tokenizeString<StringSet>(str)) {
         if (auto thisXpFeature = parseExperimentalFeature(s); thisXpFeature) {
             res.insert(thisXpFeature.value());
-            if (thisXpFeature.value() == Xp::Flakes)
+            if (thisXpFeature.value() == Xp::Flakes) {
                 res.insert(Xp::FetchTree);
+                res.insert(Xp::FetchTreeGit);
+                res.insert(Xp::FetchTreeUrls);
+            } else if (thisXpFeature.value() == Xp::FetchTree) {
+                res.insert(Xp::FetchTreeGit);
+                res.insert(Xp::FetchTreeUrls);
+            }
         } else
             warn("unknown experimental feature '%s'", s);
     }

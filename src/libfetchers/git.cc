@@ -284,6 +284,11 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
+    std::optional<ExperimentalFeature> experimentalFeature() const override
+    {
+        return Xp::FetchTreeGit;
+    }
+
     void clone(const Input & input, const Path & destDir) const override
     {
         auto repoInfo = getRepoInfo(input);

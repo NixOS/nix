@@ -2,6 +2,8 @@ source common.sh
 
 clearStore
 
+disableFeature "flakes"
+
 cd "$TEST_ROOT"
 
 test_fetch_file () {
@@ -22,6 +24,7 @@ EOF
 # Make sure that `http(s)` and `file` flake inputs are properly extracted when
 # they should be, and treated as opaque files when they should be
 test_file_flake_input () {
+    enableFeatures "flakes"
     rm -fr "$TEST_ROOT/testFlake";
     mkdir "$TEST_ROOT/testFlake";
     pushd testFlake
