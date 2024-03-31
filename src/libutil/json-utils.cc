@@ -2,6 +2,7 @@
 #include "error.hh"
 #include "types.hh"
 #include <nlohmann/json_fwd.hpp>
+#include <iostream>
 
 namespace nix {
 
@@ -38,6 +39,17 @@ const nlohmann::json & valueAt(
 
     return map.at(key);
 }
+
+std::optional<nlohmann::json> getNullable(const nlohmann::json & value, const std::string & key)
+{
+    try {
+        auto & v = valueAt(value, key);
+        return v.get<nlohmann::json>();
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
 const nlohmann::json & ensureType(
     const nlohmann::json & value,
     nlohmann::json::value_type expectedType

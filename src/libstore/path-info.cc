@@ -201,7 +201,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
     res.narSize = getInteger(valueAt(json, "narSize"));
 
     try {
-        auto & references = getArray(valueAt(json, "references"));
+        auto references = getStringList(valueAt(json, "references"));
         for (auto & input : references)
             res.references.insert(store.parseStorePath(static_cast<const std::string &>
 (input)));
