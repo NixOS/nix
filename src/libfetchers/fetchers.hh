@@ -159,13 +159,25 @@ struct InputScheme
     virtual std::string_view schemeName() const = 0;
 
     /**
+     * Longform description of this scheme, for documentation purposes.
+     */
+    virtual std::string schemeDescription() const = 0;
+
+    // TODO remove these defaults
+    struct AttributeInfo {
+        const char * type = "String";
+        bool required = true;
+        const char * doc = "";
+    };
+
+    /**
      * Allowed attributes in an attribute set that is converted to an
-     * input.
+     * input, and documentation for each attribute.
      *
-     * `type` is not included from this set, because the `type` field is
+     * `type` is not included from this map, because the `type` field is
       parsed first to choose which scheme; `type` is always required.
      */
-    virtual StringSet allowedAttrs() const = 0;
+    virtual std::map<std::string, AttributeInfo> allowedAttrs() const = 0;
 
     virtual ParsedURL toURL(const Input & input) const;
 
@@ -223,7 +235,12 @@ struct InputScheme
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
 
-nlohmann::json dumpRegisterInputSchemeInfo();
+using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
+
+/**
+ * Use this for docs, not for finding a specific scheme
+ */
+const InputSchemeMap & getAllInputSchemes();
 
 struct PublicKey
 {

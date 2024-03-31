@@ -638,7 +638,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         v.mkApp(vPrimOp, vPrimOp);
         return addConstant(primOp.name, v, {
             .type = nThunk, // FIXME
-            .doc = primOp.doc,
+            .doc = primOp.doc.c_str(),
         });
     }
 
@@ -665,13 +665,14 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
     if (v.isPrimOp()) {
         auto v2 = &v;
-        if (auto * doc = v2->primOp->doc)
+        auto & doc = v2->primOp->doc;
+        if (doc != "")
             return Doc {
                 .pos = {},
                 .name = v2->primOp->name,
                 .arity = v2->primOp->arity,
                 .args = v2->primOp->args,
-                .doc = doc,
+                .doc = doc.c_str(),
             };
     }
     return {};

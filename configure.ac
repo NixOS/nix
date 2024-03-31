@@ -366,21 +366,24 @@ PKG_CHECK_MODULES([RAPIDCHECK], [rapidcheck rapidcheck_gtest])
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
 
 
+# Look for cmark library.
+PKG_CHECK_MODULES([CMARK], [libcmark], [CXXFLAGS="$CMARK_CFLAGS $CXXFLAGS"])
+
 # Look for lowdown library.
-AC_ARG_ENABLE([markdown], AS_HELP_STRING([--enable-markdown], [Enable Markdown rendering in the Nix binary (requires lowdown) [default=auto]]),
-  enable_markdown=$enableval, enable_markdown=auto)
-AS_CASE(["$enable_markdown"],
+AC_ARG_ENABLE([lowdown], AS_HELP_STRING([--enable-lowdown], [Enable Markdown rendering in the Nix binary (requires lowdown) [default=auto]]),
+  enable_lowdown=$enableval, enable_lowdown=auto)
+AS_CASE(["$enable_lowdown"],
   [yes | auto], [
     PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [
       CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"
       have_lowdown=1
       AC_DEFINE(HAVE_LOWDOWN, 1, [Whether lowdown is available and should be used for Markdown rendering.])
     ], [
-      AS_IF([test "x$enable_markdown" == "xyes"], [AC_MSG_ERROR([--enable-markdown was specified, but lowdown was not found.])])
+      AS_IF([test "x$enable_lowdown" == "xyes"], [AC_MSG_ERROR([--enable-lowdown was specified, but lowdown was not found.])])
     ])
   ],
   [no], [have_lowdown=],
-  [AC_MSG_ERROR([bad value "$enable_markdown" for --enable-markdown, must be one of: yes, no, auto])])
+  [AC_MSG_ERROR([bad value "$enable_lowdown" for --enable-lowdown, must be one of: yes, no, auto])])
 
 
 # Look for libgit2.

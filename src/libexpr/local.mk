@@ -19,7 +19,7 @@ libexpr_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers
 
 libexpr_LIBS = libutil libstore libfetchers
 
-libexpr_LDFLAGS += -lboost_context $(THREAD_LDFLAGS)
+libexpr_LDFLAGS += -lboost_context $(THREAD_LDFLAGS) $(CMARK_LIBS)
 ifdef HOST_LINUX
   libexpr_LDFLAGS += -ldl
 endif

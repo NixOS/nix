@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "cmark": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1706295831,
+        "narHash": "sha256-nEI85W8w49ZVr17ycO+7aZvcgA3U2QphNZGrfQl2mSk=",
+        "owner": "commonmark",
+        "repo": "cmark",
+        "rev": "cd37711b8a08da67ba4e21a42614b86dd8def929",
+        "type": "github"
+      },
+      "original": {
+        "owner": "commonmark",
+        "repo": "cmark",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -66,6 +82,7 @@
     },
     "root": {
       "inputs": {
+        "cmark": "cmark",
         "flake-compat": "flake-compat",
         "libgit2": "libgit2",
         "nixpkgs": "nixpkgs",

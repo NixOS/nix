@@ -39,19 +39,40 @@ struct PathInputScheme : InputScheme
         return "path";
     }
 
-    StringSet allowedAttrs() const override
+    std::string schemeDescription() const override
+    {
+        // TODO
+        return "";
+    }
+
+    std::map<std::string, AttributeInfo> allowedAttrs() const override
     {
         return {
-            "path",
+            {
+                "path",
+                {},
+            },
             /* Allow the user to pass in "fake" tree info
                attributes. This is useful for making a pinned tree work
                the same as the repository from which is exported (e.g.
                path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...).
              */
-            "rev",
-            "revCount",
-            "lastModified",
-            "narHash",
+            {
+                "rev",
+                {},
+            },
+            {
+                "revCount",
+                {},
+            },
+            {
+                "lastModified",
+                {},
+            },
+            {
+                "narHash",
+                {},
+            },
         };
     }
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
