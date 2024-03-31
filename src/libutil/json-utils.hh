@@ -24,6 +24,9 @@ const nlohmann::json & valueAt(
     const nlohmann::json & map,
     const std::string & key);
 
+const nlohmann::json & valueAt(
+    const nlohmann::json::object_t & map,
+    const std::string & key);
 /**
  * Ensure the type of a json object is what you expect, failing
  * with a Nix Error if it isn't.

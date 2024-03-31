@@ -24,11 +24,20 @@ const nlohmann::json & valueAt(
     const std::string & key)
 {
     if (!map.contains(key))
-        throw Error("Expected JSON object to contain key '%s' but it doesn't", key);
+        throw Error("Expected JSON object to contain key '%s' but it doesn't: %s", key, map.dump());
 
     return map[key];
 }
 
+const nlohmann::json & valueAt(
+    const nlohmann::json::object_t & map,
+    const std::string & key)
+{
+    if (!map.contains(key))
+        throw Error("Expected JSON object to contain key '%s' but it doesn't: %s", key, nlohmann::json(map).dump());
+
+    return map.at(key);
+}
 const nlohmann::json & ensureType(
     const nlohmann::json & value,
     nlohmann::json::value_type expectedType
