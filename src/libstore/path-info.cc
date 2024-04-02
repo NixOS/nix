@@ -196,7 +196,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
         Hash(Hash::dummy),
     };
 
-    auto json = getObject(_json);
+    auto & json = getObject(_json);
     res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
     res.narSize = getInteger(valueAt(json, "narSize"));
 

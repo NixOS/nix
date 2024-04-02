@@ -1239,15 +1239,14 @@ DerivationOutput DerivationOutput::fromJSON(
     const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
-    auto json = getObject(_json);
+    auto & json = getObject(_json);
 
     for (const auto & [key, _] : json)
         keys.insert(key);
 
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
-        std::string hashAlgoStr = json["hashAlgo"];
-        // remaining to parse, will be mutated by parsers
-        std::string_view s = hashAlgoStr;
+        auto str = getString(valueAt(json, "hashAlgo"));
+        std::string_view s = str;
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(s);
         if (method == TextIngestionMethod {})
             xpSettings.require(Xp::DynamicDerivations);
@@ -1257,7 +1256,7 @@ DerivationOutput DerivationOutput::fromJSON(
 
     if (keys == (std::set<std::string_view> { "path" })) {
         return DerivationOutput::InputAddressed {
-            .path = store.parseStorePath((std::string) json["path"]),
+            .path = store.parseStorePath(getString(valueAt(json, "path"))),
         };
     }
 
@@ -1266,10 +1265,10 @@ DerivationOutput DerivationOutput::fromJSON(
         auto dof = DerivationOutput::CAFixed {
             .ca = ContentAddress {
                 .method = std::move(method),
-                .hash = Hash::parseNonSRIUnprefixed((std::string) json["hash"], hashAlgo),
+                .hash = Hash::parseNonSRIUnprefixed(getString(valueAt(json, "hash")), hashAlgo),
             },
         };
-        if (dof.path(store, drvName, outputName) != store.parseStorePath((std::string) json["path"]))
+        if (dof.path(store, drvName, outputName) != store.parseStorePath(getString(valueAt(json, "path"))))
             throw Error("Path doesn't match derivation output");
         return dof;
     }
@@ -1363,13 +1362,12 @@ Derivation Derivation::fromJSON(
 
     Derivation res;
 
-    auto json = getObject(_json);
+    auto & json = getObject(_json);
 
     res.name = getString(valueAt(json, "name"));
 
     try {
-        auto outputsObj = getObject(valueAt(json, "outputs"));
-        for (auto & [outputName, output] : outputsObj) {
+        for (auto & [outputName, output] : getObject(valueAt(json, "outputs"))) {
             res.outputs.insert_or_assign(
                 outputName,
                 DerivationOutput::fromJSON(store, res.name, outputName, output));
@@ -1380,8 +1378,7 @@ Derivation Derivation::fromJSON(
     }
 
     try {
-        auto inputsList = getArray(valueAt(json, "inputSrcs"));
-        for (auto & input : inputsList)
+        for (auto & input : getArray(valueAt(json, "inputSrcs")))
             res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'inputSrcs'");
@@ -1399,8 +1396,7 @@ Derivation Derivation::fromJSON(
             }
             return node;
         };
-        auto inputDrvsObj = getObject(valueAt(json, "inputDrvs"));
-        for (auto & [inputDrvPath, inputOutputs] : inputDrvsObj)
+        for (auto & [inputDrvPath, inputOutputs] : getObject(valueAt(json, "inputDrvs")))
             res.inputDrvs.map[store.parseStorePath(inputDrvPath)] =
                 doInput(inputOutputs);
     } catch (Error & e) {
