@@ -16,6 +16,8 @@ let
     set -x
 
     chmod 700 .
+    # Shouldn't be able to open the root build directory
+    (! chmod 700 ..)
 
     touch foo
 
@@ -85,15 +87,15 @@ in
 
         # Wait for the build to be ready
         # This is OK because it runs as root, so we can access everything
-        machine.wait_for_file("/tmp/nix-build-open-build-dir.drv-0/syncPoint")
+        machine.wait_for_file("/tmp/nix-build-open-build-dir.drv-0/build/syncPoint")
 
         # But Alice shouldn't be able to access the build directory
-        machine.fail("su alice -c 'ls /tmp/nix-build-open-build-dir.drv-0'")
-        machine.fail("su alice -c 'touch /tmp/nix-build-open-build-dir.drv-0/bar'")
-        machine.fail("su alice -c 'cat /tmp/nix-build-open-build-dir.drv-0/foo'")
+        machine.fail("su alice -c 'ls /tmp/nix-build-open-build-dir.drv-0/build'")
+        machine.fail("su alice -c 'touch /tmp/nix-build-open-build-dir.drv-0/build/bar'")
+        machine.fail("su alice -c 'cat /tmp/nix-build-open-build-dir.drv-0/build/foo'")
 
         # Tell the user to finish the build
-        machine.succeed("echo foo > /tmp/nix-build-open-build-dir.drv-0/syncPoint")
+        machine.succeed("echo foo > /tmp/nix-build-open-build-dir.drv-0/build/syncPoint")
 
     with subtest("Being able to execute stuff as the build user doesn't give access to the build dir"):
         machine.succeed(r"""
@@ -105,16 +107,16 @@ in
               args = [ (builtins.storePath "${create-hello-world}") ];
           }' >&2 &
         """.strip())
-        machine.wait_for_file("/tmp/nix-build-innocent.drv-0/syncPoint")
+        machine.wait_for_file("/tmp/nix-build-innocent.drv-0/build/syncPoint")
 
         # The build ran as `nixbld1` (which is the only build user on the
         # machine), but a process running as `nixbld1` outside the sandbox
         # shouldn't be able to touch the build directory regardless
-        machine.fail("su nixbld1 --shell ${pkgs.busybox-sandbox-shell}/bin/sh -c 'ls /tmp/nix-build-innocent.drv-0'")
-        machine.fail("su nixbld1 --shell ${pkgs.busybox-sandbox-shell}/bin/sh -c 'echo pwned > /tmp/nix-build-innocent.drv-0/result'")
+        machine.fail("su nixbld1 --shell ${pkgs.busybox-sandbox-shell}/bin/sh -c 'ls /tmp/nix-build-innocent.drv-0/build'")
+        machine.fail("su nixbld1 --shell ${pkgs.busybox-sandbox-shell}/bin/sh -c 'echo pwned > /tmp/nix-build-innocent.drv-0/build/result'")
 
         # Finish the build
-        machine.succeed("echo foo > /tmp/nix-build-innocent.drv-0/syncPoint")
+        machine.succeed("echo foo > /tmp/nix-build-innocent.drv-0/build/syncPoint")
 
         # Check that the build was not affected
         machine.succeed(r"""
