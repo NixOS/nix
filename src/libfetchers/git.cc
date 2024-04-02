@@ -147,9 +147,11 @@ std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 {
     std::vector<PublicKey> publicKeys;
     if (attrs.contains("publicKeys")) {
-        nlohmann::json publicKeysJson = getArray(nlohmann::json::parse(getStrAttr(attrs, "publicKeys")));
-        for (auto & jsonKey : publicKeysJson) {
-            publicKeys.push_back(jsonKey);
+        auto pubKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
+        auto & pubKeys = getArray(pubKeysJson);
+
+        for (auto & key : pubKeys) {
+            publicKeys.push_back(key);
         }
     }
     if (attrs.contains("publicKey"))
