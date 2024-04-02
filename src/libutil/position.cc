@@ -29,32 +29,17 @@ std::optional<LinesOfCode> Pos::getCodeLines() const
         return std::nullopt;
 
     if (auto source = getSource()) {
-
-        std::istringstream iss(*source);
-        // count the newlines.
-        int count = 0;
-        std::string curLine;
-        int pl = line - 1;
-
+        LinesIterator lines(*source), end;
         LinesOfCode loc;
 
-        do {
-            std::getline(iss, curLine);
-            ++count;
-            if (count < pl)
-                ;
-            else if (count == pl) {
-                loc.prevLineOfCode = curLine;
-            } else if (count == pl + 1) {
-                loc.errLineOfCode = curLine;
-            } else if (count == pl + 2) {
-                loc.nextLineOfCode = curLine;
-                break;
-            }
-
-            if (!iss.good())
-                break;
-        } while (true);
+        if (line > 1)
+            std::advance(lines, line - 2);
+        if (lines != end && line > 1)
+            loc.prevLineOfCode = *lines++;
+        if (lines != end)
+            loc.errLineOfCode = *lines++;
+        if (lines != end)
+            loc.nextLineOfCode = *lines++;
 
         return loc;
     }
@@ -107,6 +92,28 @@ std::ostream & operator<<(std::ostream & str, const Pos & pos)
 {
     pos.print(str, true);
     return str;
+}
+
+void Pos::LinesIterator::bump(bool atFirst)
+{
+    if (!atFirst) {
+        pastEnd = input.empty();
+        if (!input.empty() && input[0] == '\r')
+            input.remove_prefix(1);
+        if (!input.empty() && input[0] == '\n')
+            input.remove_prefix(1);
+    }
+
+    // nix line endings are not only \n as eg std::getline assumes, but also
+    // \r\n **and \r alone**. not treating them all the same causes error
+    // reports to not match with line numbers as the parser expects them.
+    auto eol = input.find_first_of("\r\n");
+
+    if (eol > input.size())
+        eol = input.size();
+
+    curLine = input.substr(0, eol);
+    input.remove_prefix(eol);
 }
 
 }

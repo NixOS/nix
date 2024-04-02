@@ -7,11 +7,14 @@
 
 namespace nix {
 
-bool shouldANSI()
+bool isTTY()
 {
-    return isatty(STDERR_FILENO)
+    static const bool tty =
+        isatty(STDERR_FILENO)
         && getEnv("TERM").value_or("dumb") != "dumb"
         && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
+
+    return tty;
 }
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)

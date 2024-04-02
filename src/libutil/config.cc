@@ -124,7 +124,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
             auto p = absPath(tokens[1], dirOf(path));
             if (pathExists(p)) {
                 try {
-                    std::string includedContents = readFile(path);
+                    std::string includedContents = readFile(p);
                     applyConfigInner(includedContents, p, parsedContents);
                 } catch (SystemError &) {
                     // TODO: Do we actually want to ignore this? Or is it better to fail?

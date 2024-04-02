@@ -72,6 +72,13 @@ struct PrimOp
     const char * doc = nullptr;
 
     /**
+     * Add a trace item, `while calling the '<name>' builtin`
+     *
+     * This is used to remove the redundant item for `builtins.addErrorContext`.
+     */
+    bool addTrace = true;
+
+    /**
      * Implementation of the primop.
      */
     PrimOpFun fun;
@@ -187,6 +194,36 @@ public:
      * Empty list constant.
      */
     Value vEmptyList;
+
+    /**
+     * `null` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vNull;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vTrue;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    Value vFalse;
+
+    /** `"regular"` */
+    Value vStringRegular;
+    /** `"directory"` */
+    Value vStringDirectory;
+    /** `"symlink"` */
+    Value vStringSymlink;
+    /** `"unknown"` */
+    Value vStringUnknown;
 
     /**
      * The accessor for the root filesystem.
@@ -636,7 +673,16 @@ public:
         return BindingsBuilder(*this, allocBindings(capacity));
     }
 
-    void mkList(Value & v, size_t length);
+    ListBuilder buildList(size_t size)
+    {
+        return ListBuilder(*this, size);
+    }
+
+    /**
+     * Return a boolean `Value *` without allocating.
+     */
+    Value *getBool(bool b);
+
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 
@@ -683,7 +729,7 @@ public:
         const SingleDerivedPath & p,
         Value & v);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
+    void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * Print statistics, if enabled.
@@ -777,6 +823,7 @@ private:
     friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
     friend struct Value;
+    friend class ListBuilder;
 };
 
 struct DebugTraceStacker {

@@ -254,7 +254,7 @@ struct ClientSettings
                 else if (setSubstituters(settings.substituters))
                     ;
                 else
-                    debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+                    warn("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }

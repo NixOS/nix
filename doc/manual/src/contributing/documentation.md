@@ -27,10 +27,8 @@ and open `./result-doc/share/doc/nix/manual/index.html`.
 To build the manual incrementally, [enter the development shell](./hacking.md) and run:
 
 ```console
-make manual-html -j $NIX_BUILD_CORES
+make manual-html-open -j $NIX_BUILD_CORES
 ```
-
-and open `./outputs/out/share/doc/nix/manual/language/index.html`.
 
 In order to reflect changes to the [Makefile for the manual], clear all generated files before re-building:
 

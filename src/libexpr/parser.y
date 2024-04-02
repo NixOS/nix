@@ -64,6 +64,10 @@ using namespace nix;
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
 {
+    if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
+        loc->first_column = loc->last_column;
+        loc->first_line = loc->last_line;
+    }
     throw ParseError({
         .msg = HintFmt(error),
         .pos = state->positions[state->at(*loc)]
@@ -87,6 +91,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
   nix::StringToken uri;
   nix::StringToken str;
   std::vector<nix::AttrName> * attrNames;
+  std::vector<std::pair<nix::AttrName, nix::PosIdx>> * inheritAttrs;
   std::vector<std::pair<nix::PosIdx, nix::Expr *>> * string_parts;
   std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, nix::StringToken>>> * ind_string_parts;
   struct {
@@ -101,7 +106,8 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
 %type <attrs> binds
 %type <formals> formals
 %type <formal> formal
-%type <attrNames> attrs attrpath
+%type <attrNames> attrpath
+%type <inheritAttrs> attrs
 %type <string_parts> string_parts_interpolated
 %type <ind_string_parts> ind_string_parts
 %type <pathStart> path_start
@@ -322,13 +328,12 @@ binds
   : binds attrpath '=' expr ';' { $$ = $1; state->addAttr($$, std::move(*$2), $4, state->at(@2)); delete $2; }
   | binds INHERIT attrs ';'
     { $$ = $1;
-      for (auto & i : *$3) {
+      for (auto & [i, iPos] : *$3) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, state->at(@3), $$->attrs[i.symbol].pos);
-          auto pos = state->at(@3);
+              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
           $$->attrs.emplace(
               i.symbol,
-              ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, ExprAttrs::AttrDef::Kind::Inherited));
+              ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
       delete $3;
     }
@@ -338,14 +343,14 @@ binds
           $$->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
       $$->inheritFromExprs->push_back($4);
       auto from = new nix::ExprInheritFrom(state->at(@4), $$->inheritFromExprs->size() - 1);
-      for (auto & i : *$6) {
+      for (auto & [i, iPos] : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
-              state->dupAttr(i.symbol, state->at(@6), $$->attrs[i.symbol].pos);
+              state->dupAttr(i.symbol, iPos, $$->attrs[i.symbol].pos);
           $$->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
-                  new ExprSelect(CUR_POS, from, i.symbol),
-                  state->at(@6),
+                  new ExprSelect(iPos, from, i.symbol),
+                  iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
       delete $6;
@@ -354,12 +359,12 @@ binds
   ;
 
 attrs
-  : attrs attr { $$ = $1; $1->push_back(AttrName(state->symbols.create($2))); }
+  : attrs attr { $$ = $1; $1->emplace_back(AttrName(state->symbols.create($2)), state->at(@2)); }
   | attrs string_attr
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($2);
       if (str) {
-          $$->push_back(AttrName(state->symbols.create(str->s)));
+          $$->emplace_back(AttrName(state->symbols.create(str->s)), state->at(@2));
           delete str;
       } else
           throw ParseError({
@@ -367,7 +372,7 @@ attrs
               .pos = state->positions[state->at(@2)]
           });
     }
-  | { $$ = new AttrPath; }
+  | { $$ = new std::vector<std::pair<AttrName, PosIdx>>; }
   ;
 
 attrpath
@@ -446,7 +451,7 @@ Expr * parseExprFromBuf(
         .symbols = symbols,
         .positions = positions,
         .basePath = basePath,
-        .origin = {origin},
+        .origin = positions.addOrigin(origin, length),
         .rootFS = rootFS,
         .s = astSymbols,
     };

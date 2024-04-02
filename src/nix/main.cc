@@ -16,6 +16,7 @@
 #include "loggers.hh"
 #include "markdown.hh"
 #include "memory-input-accessor.hh"
+#include "terminal.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -347,7 +348,7 @@ void mainWrapped(int argc, char * * argv)
     initGC();
 
     #if __linux__
-    if (getuid() == 0) {
+    if (isRootUser()) {
         try {
             saveMountNamespace();
             if (unshare(CLONE_NEWNS) == -1)
@@ -375,7 +376,9 @@ void mainWrapped(int argc, char * * argv)
 
     setLogFormat("bar");
     settings.verboseBuild = false;
-    if (isatty(STDERR_FILENO)) {
+
+    // If on a terminal, progress will be displayed via progress bars etc. (thus verbosity=notice)
+    if (nix::isTTY()) {
         verbosity = lvlNotice;
     } else {
         verbosity = lvlInfo;

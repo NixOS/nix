@@ -28,7 +28,7 @@ else
 end
 
 # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
-if test -n "$NIX_SSH_CERT_FILE"
+if test -n "$NIX_SSL_CERT_FILE"
   : # Allow users to override the NIX_SSL_CERT_FILE
 else if test -e /etc/ssl/certs/ca-certificates.crt # NixOS, Ubuntu, Debian, Gentoo, Arch
   set --export NIX_SSL_CERT_FILE /etc/ssl/certs/ca-certificates.crt
@@ -44,7 +44,7 @@ else if test -e "$NIX_LINK/etc/ca-bundle.crt" # old cacert in Nix profile
   set --export NIX_SSL_CERT_FILE "$NIX_LINK/etc/ca-bundle.crt"
 else
   # Fall back to what is in the nix profiles, favouring whatever is defined last.
-  for i in $NIX_PROFILES
+  for i in (string split ' ' $NIX_PROFILES)
     if test -e "$i/etc/ssl/certs/ca-bundle.crt"
       set --export NIX_SSL_CERT_FILE "$i/etc/ssl/certs/ca-bundle.crt"
     end

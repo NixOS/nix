@@ -1,5 +1,5 @@
 %.gen.hh: %
-	@echo 'R"foo(' >> $@.tmp
+	@echo 'R"__NIX_STR(' >> $@.tmp
 	$(trace-gen) cat $< >> $@.tmp
-	@echo ')foo"' >> $@.tmp
+	@echo ')__NIX_STR"' >> $@.tmp
 	@mv $@.tmp $@

@@ -6,7 +6,10 @@ libutil_DIR := $(d)
 
 libutil_SOURCES := $(wildcard $(d)/*.cc $(d)/signature/*.cc)
 
-libutil_CXXFLAGS += -I src/libutil
+# Not just for this library itself, but also for downstream libraries using this library
+
+INCLUDE_libutil := -I $(d)
+libutil_CXXFLAGS += $(INCLUDE_libutil)
 
 libutil_LDFLAGS += $(THREAD_LDFLAGS) $(LIBCURL_LIBS) $(SODIUM_LIBS) $(OPENSSL_LIBS) $(LIBBROTLI_LIBS) $(LIBARCHIVE_LIBS) $(BOOST_LDFLAGS) -lboost_context
 

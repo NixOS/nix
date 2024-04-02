@@ -14,4 +14,4 @@
 src/libexpr/primops.cc @roberth
 
 # Libstore layer
-/src/libstore @thufschmitt
+/src/libstore @thufschmitt @ericson2314

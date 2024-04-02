@@ -31,7 +31,6 @@
       crossSystems = [
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
-        "x86_64-unknown-freebsd13"
         "x86_64-unknown-netbsd"
       ];
 
@@ -299,8 +298,11 @@
               ''
                 type -p nix-env
                 # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
-                time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
-                [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
+                (
+                  set -x
+                  time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+                  [[ $(sha1sum < packages | cut -c1-40) = e01b031fc9785a572a38be6bc473957e3b6faad7 ]]
+                )
                 mkdir $out
               '';
 
@@ -341,7 +343,6 @@
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
-        perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -351,6 +352,11 @@
         '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
+      } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
+        # Some perl dependencies are broken on i686-linux.
+        # Since the support is only best-effort there, disable the perl
+        # bindings
+        perlBindings = self.hydraJobs.perlBindings.${system};
       });
 
       packages = forAllSystems (system: rec {

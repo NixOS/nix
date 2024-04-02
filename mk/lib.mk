@@ -68,6 +68,7 @@ include mk/patterns.mk
 include mk/templates.mk
 include mk/cxx-big-literal.mk
 include mk/tests.mk
+include mk/compilation-database.mk
 
 
 # Include all sub-Makefiles.
@@ -96,6 +97,13 @@ $(foreach test-group, $(install-tests-groups), \
   $(foreach test, $($(test-group)-tests), \
     $(eval $(call run-test,$(test),$(install_test_init))) \
     $(eval $(test-group).test-group: $(test).test)))
+
+# Compilation database.
+$(foreach lib, $(libraries), $(eval $(call write-compile-commands,$(lib))))
+$(foreach prog, $(programs), $(eval $(call write-compile-commands,$(prog))))
+
+compile_commands.json: $(compile-commands-json-files)
+	@jq --slurp '.' $^ >$@
 
 # Include makefiles requiring built programs.
 $(foreach mf, $(makefiles-late), $(eval $(call include-sub-makefile,$(mf))))

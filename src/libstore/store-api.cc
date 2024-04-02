@@ -1307,7 +1307,7 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
         #if __linux__
         else if (!pathExists(stateDir)
             && params.empty()
-            && getuid() != 0
+            && !isRootUser()
             && !getEnv("NIX_STORE_DIR").has_value()
             && !getEnv("NIX_STATE_DIR").has_value())
         {

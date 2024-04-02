@@ -11,14 +11,15 @@
 
 namespace nix {
 
-void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint)
+void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint, TracePrint print)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .print = print });
 }
 
-void throwExceptionSelfCheck(){
+void throwExceptionSelfCheck()
+{
     // This is meant to be caught in initLibUtil()
-    throw SysError("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
+    throw Error("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -163,7 +164,7 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
     return hasPos;
 }
 
-void printTrace(
+static void printTrace(
     std::ostream & output,
     const std::string_view & indent,
     size_t & count,
@@ -379,29 +380,39 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         // A consecutive sequence of stack traces that are all in `tracesSeen`.
         std::vector<Trace> skippedTraces;
         size_t count = 0;
+        bool truncate = false;
 
         for (const auto & trace : einfo.traces) {
             if (trace.hint.str().empty()) continue;
 
             if (!showTrace && count > 3) {
-                oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
-                break;
+                truncate = true;
             }
 
-            if (tracesSeen.count(trace)) {
-                skippedTraces.push_back(trace);
-                continue;
+            if (!truncate || trace.print == TracePrint::Always) {
+
+                if (tracesSeen.count(trace)) {
+                    skippedTraces.push_back(trace);
+                    continue;
+                }
+
+                tracesSeen.insert(trace);
+
+                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+
+                count++;
+
+                printTrace(oss, ellipsisIndent, count, trace);
             }
-            tracesSeen.insert(trace);
-
-            printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
-
-            count++;
-
-            printTrace(oss, ellipsisIndent, count, trace);
         }
 
+
         printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+
+        if (truncate) {
+            oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL << "\n";
+        }
+
         oss << "\n" << prefix;
     }
 

@@ -251,6 +251,7 @@ void dumpTree(const Tree & entries, Sink & sink,
     for (auto & [name, entry] : entries) {
         auto name2 = name;
         if (entry.mode == Mode::Directory) {
+            assert(!name2.empty());
             assert(name2.back() == '/');
             name2.pop_back();
         }
