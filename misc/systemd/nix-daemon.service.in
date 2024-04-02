@@ -8,7 +8,7 @@ ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
 
 [Service]
 ExecStart=@@bindir@/nix-daemon nix-daemon --daemon
-KillMode=process
+PrivateTmp=true
 LimitNOFILE=1048576
 TasksMax=1048576
 
