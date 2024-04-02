@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
+#include "json-impls.hh"
 
 namespace nix { class Store; class StorePath; struct InputAccessor; }
 
@@ -213,8 +214,8 @@ struct PublicKey
     std::string type = "ssh-ed25519";
     std::string key;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(PublicKey, type, key)
-
 std::string publicKeys_to_string(const std::vector<PublicKey>&);
 
 }
+
+JSON_IMPL(nix::fetchers::PublicKey)

@@ -395,3 +395,22 @@ std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
 }
 
 }
+
+namespace nlohmann {
+
+nix::fetchers::PublicKey adl_serializer<nix::fetchers::PublicKey>::from_json(const json & json)
+{
+    auto & object = getObject(json);
+    auto & type = getString(optionalValueAt(object, "type").value_or("ssh-ed25519"));
+    auto & key = getString(valueAt(object, "key"));
+
+    return nix::fetchers::PublicKey { type, key };
+}
+
+void adl_serializer<nix::fetchers::PublicKey>::to_json(json & json, nix::fetchers::PublicKey t)
+{
+    json["type"] = t.type;
+    json["key"] = t.key;
+}
+
+}
