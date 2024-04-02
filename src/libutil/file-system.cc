@@ -469,6 +469,11 @@ void deletePath(const Path & path)
     deletePath(path, dummy);
 }
 
+void createDir(const Path &path, mode_t mode)
+{
+    if (mkdir(path.c_str(), mode) == -1)
+        throw SysError("creating directory '%1%'", path);
+}
 
 Paths createDirs(const Path & path)
 {
