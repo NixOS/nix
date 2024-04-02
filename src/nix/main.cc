@@ -2,7 +2,6 @@
 
 #include "args/root.hh"
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
@@ -26,6 +25,10 @@
 #include <regex>
 
 #include <nlohmann/json.hpp>
+
+#if __linux__
+# include "namespaces.hh"
+#endif
 
 extern std::string chrootHelperName;
 

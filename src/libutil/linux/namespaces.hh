@@ -26,12 +26,8 @@ void restoreMountNamespace();
  */
 void unshareFilesystem();
 
-#if __linux__
-
 bool userNamespacesSupported();
 
 bool mountAndPidNamespacesSupported();
-
-#endif
 
 }

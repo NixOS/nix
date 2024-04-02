@@ -5,6 +5,9 @@ libstore_NAME = libnixstore
 libstore_DIR := $(d)
 
 libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
+ifdef HOST_UNIX
+  libstore_SOURCES += $(wildcard $(d)/unix/*.cc)
+endif
 
 libstore_LIBS = libutil
 
@@ -30,6 +33,9 @@ endif
 # Not just for this library itself, but also for downstream libraries using this library
 
 INCLUDE_libstore := -I $(d) -I $(d)/build
+ifdef HOST_UNIX
+  INCLUDE_libstore += -I $(d)/unix
+endif
 
 libstore_CXXFLAGS += \
  $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libstore) \
