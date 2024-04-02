@@ -1245,7 +1245,7 @@ DerivationOutput DerivationOutput::fromJSON(
         keys.insert(key);
 
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
-        auto str = getString(valueAt(json, "hashAlgo"));
+        auto & str = getString(valueAt(json, "hashAlgo"));
         std::string_view s = str;
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(s);
         if (method == TextIngestionMethod {})
