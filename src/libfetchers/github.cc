@@ -294,7 +294,9 @@ struct GitArchiveInputScheme : InputScheme
            Git revision alone, we also require a NAR hash for
            locking. FIXME: in the future, we may want to require a Git
            tree hash instead of a NAR hash. */
-        return input.getRev().has_value() && input.getNarHash().has_value();
+        return input.getRev().has_value()
+            && (fetchSettings.trustTarballsFromGitForges ||
+                input.getNarHash().has_value());
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() const override
