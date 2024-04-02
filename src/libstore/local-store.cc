@@ -553,6 +553,19 @@ void LocalStore::openDB(State & state, bool create)
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "setting journal mode");
 
+    if (mode == "wal") {
+        /* persist the WAL files when the db connection is closed. This allows
+           for read-only connections without write permissions on the
+           containing directory to succeed on a closed db. Setting the
+           journal_size_limit to 2^40 bytes results in the WAL files getting
+           truncated to 0 on exit and limits the on disk size of the WAL files
+           to 2^40 bytes following a checkpoint */
+        if (sqlite3_exec(db, "pragma main.journal_size_limit = 1099511627776;", 0, 0, 0) == SQLITE_OK) {
+            int enable = 1;
+            sqlite3_file_control(db, NULL, SQLITE_FCNTL_PERSIST_WAL, &enable);
+        }
+    }
+
     /* Increase the auto-checkpoint interval to 40000 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
