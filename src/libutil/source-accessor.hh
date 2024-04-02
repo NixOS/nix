@@ -137,6 +137,15 @@ struct SourceAccessor
     void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
 
     virtual std::string showPath(const CanonPath & path);
+
+    /**
+     * System paths: `toString /foo/bar = "/foo/bar"`
+     * Virtual paths: fetched to the store
+     *
+     * In both cases, the returned string functionally identifies the path,
+     * and can still be read.
+     */
+    virtual bool toStringReturnsStorePath() const;
 };
 
 }

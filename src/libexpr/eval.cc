@@ -428,6 +428,7 @@ EvalState::EvalState(
 {
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
+    rootFS->setPathDisplay("/", "");
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
@@ -901,6 +902,11 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
 void Value::mkPath(const SourcePath & path)
 {
     mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
+}
+
+void EvalState::registerAccessor(const ref<InputAccessor> accessor)
+{
+    inputAccessors.push_back(accessor);
 }
 
 
@@ -1986,10 +1992,22 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, co
     v.mkList(list);
 }
 
+// FIXME limit recursion
+Value * resolveOutPath(EvalState & state, Value * v, const PosIdx pos)
+{
+    state.forceValue(*v, pos);
+    if (v->type() != nAttrs)
+        return v;
+    auto found = v->attrs->find(state.sOutPath);
+    if (found != v->attrs->end())
+        return resolveOutPath(state, found->value, pos);
+    return v;
+}
 
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     NixStringContext context;
+    std::shared_ptr<InputAccessor> accessor;
     std::vector<BackedStringView> s;
     size_t sSize = 0;
     NixInt n = 0;
@@ -2023,8 +2041,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     Value * vTmpP = values.data();
 
     for (auto & [i_pos, i] : *es) {
-        Value & vTmp = *vTmpP++;
-        i->eval(state, env, vTmp);
+        Value & vTmp0 = *vTmpP++;
+        i->eval(state, env, vTmp0);
+        Value & vTmp = *resolveOutPath(state, &vTmp0, i_pos);
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
@@ -2032,6 +2051,9 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            and none of the strings are allowed to have contexts. */
         if (first) {
             firstType = vTmp.type();
+            if (firstType == nPath) {
+                accessor = vTmp.path().accessor;
+            }
         }
 
         if (firstType == nInt) {
@@ -2073,7 +2095,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.error<EvalError>("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow();
-        v.mkPath(state.rootPath(CanonPath(canonPath(str()))));
+        v.mkPath({ref(accessor), CanonPath(str())});
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2323,6 +2345,8 @@ BackedStringView EvalState::coerceToString(
               v._path.path
             : copyToStore
             ? store->printStorePath(copyPathToStore(context, v.path()))
+            : v.path().accessor->toStringReturnsStorePath()
+            ? store->printStorePath(copyPathToStore(context, SourcePath(v.path().accessor, CanonPath::root))) + v.path().path.absOrEmpty()
             : std::string(v.path().path.abs());
     }
 
@@ -2435,10 +2459,15 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     if (v.type() == nPath)
         return v.path();
 
-    /* Similarly, handle __toString where the result may be a path
+    /* Similarly, handle outPath and __toString where the result may be a path
        value. */
     if (v.type() == nAttrs) {
-        auto i = v.attrs->find(sToString);
+        auto i = v.attrs->find(sOutPath);
+        if (i != v.attrs->end()) {
+            return coerceToPath(pos, *i->value, context, errorCtx);
+        }
+
+        i = v.attrs->find(sToString);
         if (i != v.attrs->end()) {
             Value v1;
             callFunction(*i->value, v, v1, pos);
@@ -2836,8 +2865,8 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
         if (!rOpt) continue;
         auto r = *rOpt;
 
-        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
+        auto res = r / suffix;
+        if (res.pathExists()) return res;
     }
 
     if (hasPrefix(path, "nix/"))
@@ -2852,20 +2881,22 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
+std::optional<SourcePath> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
     auto i = searchPathResolved.find(value);
     if (i != searchPathResolved.end()) return i->second;
 
-    std::optional<std::string> res;
+    std::optional<SourcePath> res;
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto accessor = fetchers::downloadTarball(
                 EvalSettings::resolvePseudoUrl(value)).accessor;
+            // Traditional search path lookups use the absolute path space for
+            // historical consistency.
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
-            res = { store->toRealPath(storePath) };
+            res.emplace(rootPath(CanonPath(store->toRealPath(storePath))));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -2877,28 +2908,28 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", value);
-        auto storePath = flakeRef.resolve(store).fetchTree(store).first;
-        res = { store->toRealPath(storePath) };
+        auto accessor = flakeRef.resolve(store).lazyFetch(store).first;
+        res.emplace(SourcePath(accessor));
     }
 
     else {
-        auto path = absPath(value);
+        auto path = rootPath(value);
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
-            allowPath(path);
-            if (store->isInStore(path)) {
+            allowPath(path.path.abs());
+            if (store->isInStore(path.path.abs())) {
                 try {
                     StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(path).first, closure);
+                    store->computeFSClosure(store->toStorePath(path.path.abs()).first, closure);
                     for (auto & p : closure)
                         allowPath(p);
                 } catch (InvalidPath &) { }
             }
         }
 
-        if (pathExists(path))
-            res = { path };
+        if (path.pathExists())
+            res.emplace(path);
         else {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' does not exist, ignoring", value)
