@@ -40,7 +40,15 @@ const nlohmann::json & valueAt(
     return map.at(key);
 }
 
-std::optional<nlohmann::json> getNullable(const nlohmann::json & value, const std::string & key)
+std::optional<nlohmann::json> getNullable(const nlohmann::json & value)
+{
+    if (value.is_null())
+        return std::nullopt;
+
+    return value.get<nlohmann::json>();
+}
+
+std::optional<nlohmann::json> optionalValueAt(const nlohmann::json & value, const std::string & key)
 {
     try {
         auto & v = valueAt(value, key);
@@ -91,7 +99,7 @@ const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value)
 
 Strings getStringList(const nlohmann::json & value)
 {
-    auto jsonArray = getArray(value);
+    auto & jsonArray = getArray(value);
 
     Strings stringList;
 
@@ -103,11 +111,11 @@ Strings getStringList(const nlohmann::json & value)
 
 StringMap getStringMap(const nlohmann::json & value)
 {
-    auto jsonArray = getObject(value);
+    auto & jsonObject = getObject(value);
 
     StringMap stringMap;
 
-    for (const auto & [key, value]: jsonArray)
+    for (const auto & [key, value]: jsonObject)
         stringMap[getString(key)] = getString(value);
 
     return stringMap;
@@ -115,7 +123,7 @@ StringMap getStringMap(const nlohmann::json & value)
 
 StringSet getStringSet(const nlohmann::json & value)
 {
-    auto jsonArray = getArray(value);
+    auto & jsonArray = getArray(value);
 
     StringSet stringSet;
 

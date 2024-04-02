@@ -28,7 +28,8 @@ const nlohmann::json & valueAt(
     const nlohmann::json::object_t & map,
     const std::string & key);
 
-std::optional<nlohmann::json> getNullable(const nlohmann::json & value, const std::string & key);
+std::optional<nlohmann::json> getNullable(const nlohmann::json & value);
+std::optional<nlohmann::json> optionalValueAt(const nlohmann::json & value, const std::string & key);
 
 /**
  * Ensure the type of a json object is what you expect, failing
