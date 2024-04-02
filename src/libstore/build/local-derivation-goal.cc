@@ -497,10 +497,13 @@ void LocalDerivationGoal::startBuilder()
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
 #endif
 
-    /* Create a temporary directory where the build will take
-       place. */
-    tmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
-
+    /* Create a temporary directory where the build will take place.
+     * That directory is wrapped into a restricted daemon-owned one to make sure
+     * that the builder can't open its build directory to the world.
+     * */
+    auto parentTmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    tmpDir = parentTmpDir + "/build";
+    createDir(tmpDir, 0700);
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
