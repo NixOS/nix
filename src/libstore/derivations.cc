@@ -1387,7 +1387,8 @@ Derivation Derivation::fromJSON(
 
     try {
         std::function<DerivedPathMap<StringSet>::ChildNode(const nlohmann::json &)> doInput;
-        doInput = [&](const auto & json) {
+        doInput = [&](const auto & _json) {
+            auto & json = getObject(_json);
             DerivedPathMap<StringSet>::ChildNode node;
             node.value = getStringSet(valueAt(json, "outputs"));
             for (auto & [outputId, childNode] : getObject(valueAt(json, "dynamicOutputs"))) {

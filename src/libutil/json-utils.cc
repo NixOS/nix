@@ -103,7 +103,7 @@ Strings getStringList(const nlohmann::json & value)
 
     Strings stringList;
 
-    for (const auto & elem: jsonArray)
+    for (const auto & elem : jsonArray)
         stringList.push_back(getString(elem));
 
     return stringList;
@@ -115,7 +115,7 @@ StringMap getStringMap(const nlohmann::json & value)
 
     StringMap stringMap;
 
-    for (const auto & [key, value]: jsonObject)
+    for (const auto & [key, value] : jsonObject)
         stringMap[getString(key)] = getString(value);
 
     return stringMap;
@@ -127,7 +127,7 @@ StringSet getStringSet(const nlohmann::json & value)
 
     StringSet stringSet;
 
-    for (const auto & elem: jsonArray)
+    for (const auto & elem : jsonArray)
         stringSet.insert(getString(elem));
 
     return stringSet;
