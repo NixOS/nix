@@ -3,6 +3,9 @@
 
 #include <nlohmann/json.hpp>
 #include <list>
+#include <nlohmann/json_fwd.hpp>
+
+#include "types.hh"
 
 namespace nix {
 
@@ -11,26 +14,30 @@ const nlohmann::json * get(const nlohmann::json & map, const std::string & key);
 nlohmann::json * get(nlohmann::json & map, const std::string & key);
 
 /**
- * Get the value of a json object at a key safely, failing
- * with a Nix Error if the key does not exist.
+ * Get the value of a json object at a key safely, failing with a nice
+ * error if the key does not exist.
  *
  * Use instead of nlohmann::json::at() to avoid ugly exceptions.
- *
- * _Does not check whether `map` is an object_, use `ensureType` for that.
  */
 const nlohmann::json & valueAt(
-    const nlohmann::json & map,
+    const nlohmann::json::object_t & map,
     const std::string & key);
 
+std::optional<nlohmann::json> optionalValueAt(const nlohmann::json & value, const std::string & key);
+
 /**
- * Ensure the type of a json object is what you expect, failing
- * with a Nix Error if it isn't.
- *
- * Use before type conversions and element access to avoid ugly exceptions.
+ * Downcast the json object, failing with a nice error if the conversion fails.
+ * See https://json.nlohmann.me/features/types/
  */
-const nlohmann::json & ensureType(
-    const nlohmann::json & value,
-    nlohmann::json::value_type expectedType);
+std::optional<nlohmann::json> getNullable(const nlohmann::json & value);
+const nlohmann::json::object_t & getObject(const nlohmann::json & value);
+const nlohmann::json::array_t & getArray(const nlohmann::json & value);
+const nlohmann::json::string_t & getString(const nlohmann::json & value);
+const nlohmann::json::number_integer_t & getInteger(const nlohmann::json & value);
+const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value);
+Strings getStringList(const nlohmann::json & value);
+StringMap getStringMap(const nlohmann::json & value);
+StringSet getStringSet(const nlohmann::json & value);
 
 /**
  * For `adl_serializer<std::optional<T>>` below, we need to track what

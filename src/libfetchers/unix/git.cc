@@ -147,9 +147,12 @@ std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 {
     std::vector<PublicKey> publicKeys;
     if (attrs.contains("publicKeys")) {
-        nlohmann::json publicKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
-        ensureType(publicKeysJson, nlohmann::json::value_t::array);
-        publicKeys = publicKeysJson.get<std::vector<PublicKey>>();
+        auto pubKeysJson = nlohmann::json::parse(getStrAttr(attrs, "publicKeys"));
+        auto & pubKeys = getArray(pubKeysJson);
+
+        for (auto & key : pubKeys) {
+            publicKeys.push_back(key);
+        }
     }
     if (attrs.contains("publicKey"))
         publicKeys.push_back(PublicKey{maybeGetStrAttr(attrs, "keytype").value_or("ssh-ed25519"),getStrAttr(attrs, "publicKey")});

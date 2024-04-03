@@ -49,6 +49,9 @@ perl/Makefile.config
 /src/libexpr/tests
 /tests/unit/libexpr/libnixexpr-tests
 
+# /src/libfetchers
+/tests/unit/libfetchers/libnixfetchers-tests
+
 # /src/libstore/
 *.gen.*
 /src/libstore/tests
