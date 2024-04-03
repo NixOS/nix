@@ -21,16 +21,6 @@ nlohmann::json * get(nlohmann::json & map, const std::string & key)
 }
 
 const nlohmann::json & valueAt(
-    const nlohmann::json & map,
-    const std::string & key)
-{
-    if (!map.contains(key))
-        throw Error("Expected JSON object to contain key '%s' but it doesn't: %s", key, map.dump());
-
-    return map[key];
-}
-
-const nlohmann::json & valueAt(
     const nlohmann::json::object_t & map,
     const std::string & key)
 {
@@ -38,14 +28,6 @@ const nlohmann::json & valueAt(
         throw Error("Expected JSON object to contain key '%s' but it doesn't: %s", key, nlohmann::json(map).dump());
 
     return map.at(key);
-}
-
-std::optional<nlohmann::json> getNullable(const nlohmann::json & value)
-{
-    if (value.is_null())
-        return std::nullopt;
-
-    return value.get<nlohmann::json>();
 }
 
 std::optional<nlohmann::json> optionalValueAt(const nlohmann::json & value, const std::string & key)
@@ -58,7 +40,25 @@ std::optional<nlohmann::json> optionalValueAt(const nlohmann::json & value, cons
     }
 }
 
-const nlohmann::json & ensureType(
+
+std::optional<nlohmann::json> getNullable(const nlohmann::json & value)
+{
+    if (value.is_null())
+        return std::nullopt;
+
+    return value.get<nlohmann::json>();
+}
+
+/**
+ * Ensure the type of a JSON object is what you expect, failing with a
+ * ensure type if it isn't.
+ *
+ * Use before type conversions and element access to avoid ugly
+ * exceptions, but only part of this module to define the other `get*`
+ * functions. It is too cumbersome and easy to forget to expect regular
+ * JSON code to use it directly.
+ */
+static const nlohmann::json & ensureType(
     const nlohmann::json & value,
     nlohmann::json::value_type expectedType
     )
