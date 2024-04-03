@@ -109,7 +109,7 @@ static void getAllExprs(EvalState & state,
     const SourcePath & path, StringSet & seen, BindingsBuilder & attrs)
 {
     StringSet namesSorted;
-    for (auto & [name, _] : path.readDirectory()) namesSorted.insert(name);
+    for (auto & [name, _] : path.resolveSymlinks().readDirectory()) namesSorted.insert(name);
 
     for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is
