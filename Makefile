@@ -35,7 +35,9 @@ makefiles += \
   tests/unit/libstore/local.mk \
   tests/unit/libstore-support/local.mk \
   tests/unit/libexpr/local.mk \
-  tests/unit/libexpr-support/local.mk
+  tests/unit/libexpr-support/local.mk \
+  tests/unit/libfetchers/local.mk \
+  tests/unit/libfetchers-support/local.mk
 endif
 
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)

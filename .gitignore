@@ -57,6 +57,9 @@ perl/Makefile.config
 /src/libutil/tests
 /tests/unit/libutil/libnixutil-tests
 
+# /src/libfetchers
+/tests/unit/libfetchers/libnixfetchers-tests
+
 /src/nix/nix
 
 /src/nix/generated-doc
