@@ -2,7 +2,6 @@
 #include <cstring>
 
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "util.hh"
 #include "finally.hh"
 #include "file-system.hh"
@@ -17,6 +16,7 @@
 # include <mutex>
 # include <sys/resource.h>
 # include "cgroup.hh"
+# include "namespaces.hh"
 #endif
 
 #include <sys/mount.h>
@@ -38,6 +38,11 @@ unsigned int getMaxCPU()
 
         auto cpuMax = readFile(cpuFile);
         auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+
+        if (cpuMaxParts.size() != 2) {
+            return 0;
+        }
+
         auto quota = cpuMaxParts[0];
         auto period = cpuMaxParts[1];
         if (quota != "max")
@@ -79,7 +84,9 @@ void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();
     if (restoreMounts) {
+        #if __linux__
         restoreMountNamespace();
+        #endif
     }
 
     if (savedStackSize) {

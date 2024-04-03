@@ -24,6 +24,7 @@
 , libgit2
 , libseccomp
 , libsodium
+, man
 , lowdown
 , mdbook
 , mdbook-linkcheck
@@ -74,7 +75,10 @@
 # sounds so long as evaluation just takes places within short-lived
 # processes. (When the process exits, the memory is reclaimed; it is
 # only leaked *within* the process.)
-, enableGC ? true
+#
+# Temporarily disabled on Windows because the `GC_throw_bad_alloc`
+# symbol is missing during linking.
+, enableGC ? !stdenv.hostPlatform.isWindows
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
@@ -213,6 +217,7 @@ in {
     git
     mercurial
     openssh
+    man # for testing `nix-* --help`
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
@@ -333,6 +338,12 @@ in {
     echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
 
+  # So the check output gets links for DLLs in the out output.
+  preFixup = lib.optionalString (stdenv.hostPlatform.isWindows && builtins.elem "check" finalAttrs.outputs) ''
+    ln -s "$check/lib/"*.dll "$check/bin"
+    ln -s "$out/bin/"*.dll "$check/bin"
+  '';
+
   doInstallCheck = attrs.doInstallCheck;
 
   installCheckFlags = "sysconfdir=$(out)/etc";
@@ -341,15 +352,22 @@ in {
 
   # Work around weird bug where it doesn't think there is a Makefile.
   installCheckPhase = if (!doBuild && doInstallCheck) then ''
+    runHook preInstallCheck
     mkdir -p src/nix-channel
     make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
   '' else null;
 
   # Needed for tests if we are not doing a build, but testing existing
   # built Nix.
-  preInstallCheck = lib.optionalString (! doBuild) ''
-    mkdir -p src/nix-channel
-  '';
+  preInstallCheck =
+    lib.optionalString (! doBuild) ''
+      mkdir -p src/nix-channel
+    ''
+    # See https://github.com/NixOS/nix/issues/2523
+    # Occurs often in tests since https://github.com/NixOS/nix/pull/9900
+    + lib.optionalString stdenv.hostPlatform.isDarwin ''
+      export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+    '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 

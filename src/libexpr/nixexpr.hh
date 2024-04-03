@@ -7,7 +7,6 @@
 #include "value.hh"
 #include "symbol-table.hh"
 #include "error.hh"
-#include "chunked-vector.hh"
 #include "position.hh"
 #include "eval-error.hh"
 #include "pos-idx.hh"

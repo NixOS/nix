@@ -285,7 +285,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
                 std::string line;
                 std::getline(stream,line);
-                static const std::string commentChars("#/\\%@*-");
+                static const std::string commentChars("#/\\%@*-(");
                 std::string shebangContent;
                 while (std::getline(stream,line) && !line.empty() && commentChars.find(line[0]) != std::string::npos){
                     line = chomp(line);

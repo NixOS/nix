@@ -182,7 +182,7 @@ static void fetchTree(
 
     state.checkURI(input.toURLString());
 
-    auto [storePath, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetchToStore(state.store);
 
     state.allowPath(storePath);
 

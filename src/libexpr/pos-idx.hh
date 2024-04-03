@@ -6,6 +6,7 @@ namespace nix {
 
 class PosIdx
 {
+    friend struct LazyPosAcessors;
     friend class PosTable;
 
 private:

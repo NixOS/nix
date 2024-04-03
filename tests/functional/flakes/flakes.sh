@@ -93,6 +93,24 @@ foo
 EOF
 chmod +x $nonFlakeDir/shebang-comments.sh
 
+cat > $nonFlakeDir/shebang-different-comments.sh <<EOF
+#! $(type -P env) nix
+# some comments
+// some comments
+/* some comments
+* some comments
+\ some comments
+% some comments
+@ some comments
+-- some comments
+(* some comments
+#! nix --offline shell
+#! nix flake1#fooScript
+#! nix --no-write-lock-file --command cat
+foo
+EOF
+chmod +x $nonFlakeDir/shebang-different-comments.sh
+
 cat > $nonFlakeDir/shebang-reject.sh <<EOF
 #! $(type -P env) nix
 # some comments
@@ -564,6 +582,16 @@ nix flake lock "$flake3Dir"
 nix flake update flake2/flake1 --flake "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
 
+# Test updating multiple inputs.
+nix flake lock "$flake3Dir" --override-input flake1 flake1/master/$hash1
+nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1/master/$hash1
+[[ $(jq -r .nodes.flake1.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
+
+nix flake update flake1 flake2/flake1 --flake "$flake3Dir"
+[[ $(jq -r .nodes.flake1.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+
 # Test 'nix flake metadata --json'.
 nix flake metadata "$flake3Dir" --json | jq .
 
@@ -597,6 +625,7 @@ expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock
 [[ $($nonFlakeDir/shebang.sh) = "foo" ]]
 [[ $($nonFlakeDir/shebang.sh "bar") = "foo"$'\n'"bar" ]]
 [[ $($nonFlakeDir/shebang-comments.sh ) = "foo" ]]
+[[ "$($nonFlakeDir/shebang-different-comments.sh)" = "$(cat $nonFlakeDir/shebang-different-comments.sh)" ]]
 [[ $($nonFlakeDir/shebang-inline-expr.sh baz) = "foo"$'\n'"baz" ]]
 [[ $($nonFlakeDir/shebang-file.sh baz) = "foo"$'\n'"baz" ]]
 expect 1 $nonFlakeDir/shebang-reject.sh 2>&1 | grepQuiet -F 'error: unsupported unquoted character in nix shebang: *. Use double backticks to escape?'

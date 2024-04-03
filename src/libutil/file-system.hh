@@ -84,6 +84,11 @@ bool isDirOrInDir(std::string_view path, std::string_view dir);
  */
 struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
+/**
+ * `lstat` the given path if it exists.
+ * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
+ */
+std::optional<struct stat> maybeLstat(const Path & path);
 
 /**
  * @return true iff the given path exists.
@@ -186,6 +191,13 @@ void renameFile(const Path & src, const Path & dst);
  */
 void moveFile(const Path & src, const Path & dst);
 
+/**
+ * Recursively copy the content of `oldPath` to `newPath`. If `andDelete` is
+ * `true`, then also remove `oldPath` (making this equivalent to `moveFile`, but
+ * with the guaranty that the destination will be “fresh”, with no stale inode
+ * or file descriptor pointing to it).
+ */
+void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
 
 /**
  * Automatic cleanup of resources.
@@ -227,6 +239,10 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
  */
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
+/**
+ * Return `TMPDIR`, or the default temporary directory if unset or empty.
+ */
+Path defaultTempDir();
 
 /**
  * Used in various places.

@@ -21,6 +21,7 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
+#include "fs-input-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -146,7 +147,7 @@ MixFlakeOptions::MixFlakeOptions()
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
-            lockFlags.referenceLockFilePath = lockFilePath;
+            lockFlags.referenceLockFilePath = getUnfilteredRootPath(CanonPath(absPath(lockFilePath)));
         }},
         .completer = completePath
     });
@@ -442,10 +443,10 @@ ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
-    auto fingerprint = lockedFlake->getFingerprint();
+    auto fingerprint = lockedFlake->getFingerprint(state.store);
     return make_ref<nix::eval_cache::EvalCache>(
         evalSettings.useEvalCache && evalSettings.pureEval
-            ? std::optional { std::cref(fingerprint) }
+            ? fingerprint
             : std::nullopt,
         state,
         [&state, lockedFlake]()

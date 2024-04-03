@@ -1,5 +1,4 @@
 #include "filetransfer.hh"
-#include "namespaces.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "s3.hh"
@@ -10,6 +9,10 @@
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
+#endif
+
+#if __linux__
+# include "namespaces.hh"
 #endif
 
 #include <unistd.h>
@@ -568,7 +571,9 @@ struct curlFileTransfer : public FileTransfer
             stopWorkerThread();
         });
 
+        #if __linux__
         unshareFilesystem();
+        #endif
 
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
 

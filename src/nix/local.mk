@@ -12,9 +12,19 @@ nix_SOURCES := \
   $(wildcard src/nix-daemon/*.cc) \
   $(wildcard src/nix-env/*.cc) \
   $(wildcard src/nix-instantiate/*.cc) \
-  $(wildcard src/nix-store/*.cc) \
+  $(wildcard src/nix-store/*.cc)
 
-nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libexpr -I src/libmain -I src/libcmd -I doc/manual
+ifdef HOST_UNIX
+nix_SOURCES += \
+  $(wildcard $(d)/unix/*.cc)
+endif
+
+INCLUDE_nix := -I $(d)
+ifdef HOST_UNIX
+  INCLUDE_nix += -I $(d)/unix
+endif
+
+nix_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libexpr) $(INCLUDE_libmain) -I src/libcmd -I doc/manual $(INCLUDE_nix)
 
 nix_LIBS = libexpr libmain libfetchers libstore libutil libcmd
 

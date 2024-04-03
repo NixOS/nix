@@ -435,7 +435,14 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
-    vEmptyList.mkList(0);
+    vEmptyList.mkList(buildList(0));
+    vNull.mkNull();
+    vTrue.mkBool(true);
+    vFalse.mkBool(false);
+    vStringRegular.mkString("regular");
+    vStringDirectory.mkString("directory");
+    vStringSymlink.mkString("symlink");
+    vStringUnknown.mkString("unknown");
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -762,10 +769,24 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
     return vm;
 }
 
+/**
+ * Sets `inDebugger` to true on construction and false on destruction.
+ */
+class DebuggerGuard {
+    bool & inDebugger;
+public:
+    DebuggerGuard(bool & inDebugger) : inDebugger(inDebugger) {
+        inDebugger = true;
+    }
+    ~DebuggerGuard() {
+        inDebugger = false;
+    }
+};
+
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
-    // double check we've got the debugRepl function pointer.
-    if (!debugRepl)
+    // Make sure we have a debugger to run and we're not already in a debugger.
+    if (!debugRepl || inDebugger)
         return;
 
     auto dts =
@@ -792,6 +813,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     auto se = getStaticEnv(expr);
     if (se) {
         auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
+        DebuggerGuard _guard(inDebugger);
         auto exitStatus = (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
         switch (exitStatus) {
             case ReplExitStatus::QuitAll:
@@ -908,14 +930,16 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-void EvalState::mkList(Value & v, size_t size)
+ListBuilder::ListBuilder(EvalState & state, size_t size)
+    : size(size)
+    , elems(size <= 2 ? inlineElems : (Value * *) allocBytes(size * sizeof(Value *)))
 {
-    v.mkList(size);
-    if (size > 2)
-        v.bigList.elems = (Value * *) allocBytes(size * sizeof(Value *));
-    nrListElems += size;
+    state.nrListElems += size;
 }
 
+Value * EvalState::getBool(bool b) {
+    return b ? &vTrue : &vFalse;
+}
 
 unsigned long nrThunks = 0;
 
@@ -934,12 +958,11 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 
 void EvalState::mkPos(Value & v, PosIdx p)
 {
-    auto pos = positions[p];
-    if (auto path = std::get_if<SourcePath>(&pos.origin)) {
+    auto origin = positions.originOf(p);
+    if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
         attrs.alloc(sFile).mkString(path->path.abs());
-        attrs.alloc(sLine).mkInt(pos.line);
-        attrs.alloc(sColumn).mkInt(pos.column);
+        makePositionThunks(*this, p, attrs.alloc(sLine), attrs.alloc(sColumn));
         v.mkAttrs(attrs);
     } else
         v.mkNull();
@@ -1339,9 +1362,10 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkList(v, elems.size());
-    for (auto [n, v2] : enumerate(v.listItems()))
-        const_cast<Value * &>(v2) = elems[n]->maybeThunk(state, env);
+    auto list = state.buildList(elems.size());
+    for (const auto & [n, v2] : enumerate(list))
+        v2 = elems[n]->maybeThunk(state, env);
+    v.mkList(list);
 }
 
 
@@ -1641,7 +1665,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     fn->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    if (fn->addTrace)
+                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1689,7 +1714,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    if (fn->addTrace)
+                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1931,7 +1957,7 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx)
+void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx)
 {
     nrListConcats++;
 
@@ -1949,14 +1975,15 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
         return;
     }
 
-    mkList(v, len);
-    auto out = v.listElems();
+    auto list = buildList(len);
+    auto out = list.elems;
     for (size_t n = 0, pos = 0; n < nrLists; ++n) {
         auto l = lists[n]->listSize();
         if (l)
             memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
     }
+    v.mkList(list);
 }
 
 
@@ -2762,9 +2789,12 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<Sta
 
 Expr * EvalState::parseExprFromString(std::string s_, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto s = make_ref<std::string>(std::move(s_));
-    s->append("\0\0", 2);
-    return parse(s->data(), s->size(), Pos::String{.source = s}, basePath, staticEnv);
+    // NOTE this method (and parseStdin) must take care to *fully copy* their input
+    // into their respective Pos::Origin until the parser stops overwriting its input
+    // data.
+    auto s = make_ref<std::string>(s_);
+    s_.append("\0\0", 2);
+    return parse(s_.data(), s_.size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
 
@@ -2776,12 +2806,15 @@ Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath
 
 Expr * EvalState::parseStdin()
 {
+    // NOTE this method (and parseExprFromString) must take care to *fully copy* their
+    // input into their respective Pos::Origin until the parser stops overwriting its
+    // input data.
     //Activity act(*logger, lvlTalkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    auto s = make_ref<std::string>(std::move(buffer));
-    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath("."), staticBaseEnv);
+    auto s = make_ref<std::string>(buffer);
+    return parse(buffer.data(), buffer.size(), Pos::Stdin{.source = s}, rootPath("."), staticBaseEnv);
 }
 
 

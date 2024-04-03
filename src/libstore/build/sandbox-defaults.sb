@@ -45,7 +45,7 @@ R""(
 ; allow it if the package explicitly asks for it.
 (if (param "_ALLOW_LOCAL_NETWORKING")
     (begin
-      (allow network* (local ip) (local tcp) (local udp))
+      (allow network* (remote ip "localhost:*"))
 
       ; Allow access to /etc/resolv.conf (which is a symlink to
       ; /private/var/run/resolv.conf).

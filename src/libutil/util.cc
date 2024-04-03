@@ -4,10 +4,13 @@
 #include <array>
 #include <cctype>
 #include <iostream>
-#include <grp.h>
 #include <regex>
 
 #include <sodium.h>
+
+#ifdef NDEBUG
+#error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
+#endif
 
 namespace nix {
 

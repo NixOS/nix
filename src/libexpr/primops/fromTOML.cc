@@ -38,10 +38,10 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
                 {
                     auto array = toml::get<std::vector<toml::value>>(t);
 
-                    size_t size = array.size();
-                    state.mkList(v, size);
-                    for (size_t i = 0; i < size; ++i)
-                        visit(*(v.listElems()[i] = state.allocValue()), array[i]);
+                    auto list = state.buildList(array.size());
+                    for (const auto & [n, v] : enumerate(list))
+                        visit(*(v = state.allocValue()), array[n]);
+                    v.mkList(list);
                 }
                 break;;
             case toml::value_t::boolean:

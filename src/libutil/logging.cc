@@ -37,8 +37,9 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    writeFull(STDOUT_FILENO, s);
-    writeFull(STDOUT_FILENO, "\n");
+    Descriptor standard_out = getStandardOut();
+    writeFull(standard_out, s);
+    writeFull(standard_out, "\n");
 }
 
 class SimpleLogger : public Logger
@@ -52,7 +53,7 @@ public:
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = shouldANSI();
+        tty = isTTY();
     }
 
     bool isVerbose() override {

@@ -588,7 +588,7 @@ struct GitInputScheme : InputScheme
                         repoInfo.url
                         );
             } else
-                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), HashAlgorithm::SHA1).gitRev());
+                input.attrs.insert_or_assign("rev", repo->resolveRef(ref).gitRev());
 
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
@@ -763,8 +763,6 @@ struct GitInputScheme : InputScheme
             input.getRef() || input.getRev() || !repoInfo.isLocal
             ? getAccessorFromCommit(store, repoInfo, std::move(input))
             : getAccessorFromWorkdir(store, repoInfo, std::move(input));
-
-        accessor->fingerprint = final.getFingerprint(store);
 
         return {accessor, std::move(final)};
     }
