@@ -57,16 +57,21 @@ cat > $flake1Dir/flake.nix <<EOF
 
     a13 = "\${self.drvCall.drvPath}\${self.drvCall.outPath}";
 
-    a14 = with import ./config.nix; mkDerivation {
-      name = "dot-installable";
-      outputs = [ "foo" "out" ];
-      meta.outputsToInstall = [ "out" ];
-      buildCommand = ''
-          mkdir \$foo \$out
-          echo "foo" > \$foo/file
-          echo "out" > \$out/file
-      '';
-      outputSpecified = true;
+    a14 = with import ./config.nix; let
+      top = mkDerivation {
+        name = "dot-installable";
+        outputs = [ "foo" "out" ];
+        meta.outputsToInstall = [ "out" ];
+        buildCommand = ''
+            mkdir \$foo \$out
+            echo "foo" > \$foo/file
+            echo "out" > \$out/file
+        '';
+      };
+    in top // {
+      foo = top.foo // {
+        outputSpecified = true;
+      };
     };
   };
 }
