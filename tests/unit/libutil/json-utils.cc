@@ -57,11 +57,11 @@ TEST(from_json, vectorOfOptionalInts) {
 }
 
 TEST(valueAt, simpleObject) {
-    nlohmann::json simple = nlohmann::json::parse(R"({ "hello": "world" })");
+    auto simple = R"({ "hello": "world" })"_json;
 
     ASSERT_EQ(valueAt(simple, "hello"), "world");
 
-    nlohmann::json nested = nlohmann::json::parse(R"({ "hello": { "world": "" } })");
+    auto nested = R"({ "hello": { "world": "" } })"_json;
 
     auto & nestedObject = valueAt(nested, "hello");
 
@@ -69,26 +69,26 @@ TEST(valueAt, simpleObject) {
 }
 
 TEST(valueAt, missingKey) {
-    nlohmann::json json = nlohmann::json::parse(R"({ "hello": { "nested": "world" } })");
+    auto json = R"({ "hello": { "nested": "world" } })"_json;
 
     ASSERT_THROW(valueAt(json, "foo"), Error);
 }
 
 TEST(getObject, rightAssertions) {
-    nlohmann::json simple = nlohmann::json::parse(R"({ "object": {} })");
+    auto simple = R"({ "object": {} })"_json;
 
-    ASSERT_EQ(getObject(valueAt(simple, "object")), nlohmann::json::parse("{}"));
+    ASSERT_EQ(getObject(valueAt(simple, "object")), R"({})"_json);
 
-    nlohmann::json nested = nlohmann::json::parse(R"({ "object": { "object": {} } })");
+    auto nested = R"({ "object": { "object": {} } })"_json;
 
     auto & nestedObject = getObject(valueAt(nested, "object"));
 
     ASSERT_EQ(nestedObject, nlohmann::json::parse(R"({ "object": {} })"));
-    ASSERT_EQ(getObject(valueAt(nestedObject, "object")), nlohmann::json::parse("{}"));
+    ASSERT_EQ(getObject(valueAt(nestedObject, "object")), R"({})"_json);
 }
 
 TEST(getObject, wrongAssertions) {
-    nlohmann::json json = nlohmann::json::parse(R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })");
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
     ASSERT_THROW(getObject(valueAt(json, "array")), Error);
     ASSERT_THROW(getObject(valueAt(json, "string")), Error);
@@ -97,13 +97,13 @@ TEST(getObject, wrongAssertions) {
 }
 
 TEST(getArray, rightAssertions) {
-    nlohmann::json simple = nlohmann::json::parse(R"({ "array": [] })");
+    auto simple = R"({ "array": [] })"_json;
 
-    ASSERT_EQ(getArray(valueAt(simple, "array")), nlohmann::json::parse("[]"));
+    ASSERT_EQ(getArray(valueAt(simple, "array")), R"([])"_json);
 }
 
 TEST(getArray, wrongAssertions) {
-    nlohmann::json json = nlohmann::json::parse(R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })");
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
     ASSERT_THROW(getArray(valueAt(json, "object")), Error);
     ASSERT_THROW(getArray(valueAt(json, "string")), Error);
@@ -112,13 +112,13 @@ TEST(getArray, wrongAssertions) {
 }
 
 TEST(getString, rightAssertions) {
-    nlohmann::json simple = nlohmann::json::parse(R"({ "string": "" })");
+    auto simple = R"({ "string": "" })"_json;
 
     ASSERT_EQ(getString(valueAt(simple, "string")), "");
 }
 
 TEST(getString, wrongAssertions) {
-    nlohmann::json json = nlohmann::json::parse(R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })");
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
     ASSERT_THROW(getString(valueAt(json, "object")), Error);
     ASSERT_THROW(getString(valueAt(json, "array")), Error);
@@ -127,13 +127,13 @@ TEST(getString, wrongAssertions) {
 }
 
 TEST(getInteger, rightAssertions) {
-    nlohmann::json simple = nlohmann::json::parse(R"({ "int": 0 })");
+    auto simple = R"({ "int": 0 })"_json;
 
     ASSERT_EQ(getInteger(valueAt(simple, "int")), 0);
 }
 
 TEST(getInteger, wrongAssertions) {
-    nlohmann::json json = nlohmann::json::parse(R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })");
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
     ASSERT_THROW(getInteger(valueAt(json, "object")), Error);
     ASSERT_THROW(getInteger(valueAt(json, "array")), Error);
@@ -142,13 +142,13 @@ TEST(getInteger, wrongAssertions) {
 }
 
 TEST(getBoolean, rightAssertions) {
-    nlohmann::json simple = nlohmann::json::parse(R"({ "boolean": false })");
+    auto simple = R"({ "boolean": false })"_json;
 
     ASSERT_EQ(getBoolean(valueAt(simple, "boolean")), false);
 }
 
 TEST(getBoolean, wrongAssertions) {
-    nlohmann::json json = nlohmann::json::parse(R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })");
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
     ASSERT_THROW(getBoolean(valueAt(json, "object")), Error);
     ASSERT_THROW(getBoolean(valueAt(json, "array")), Error);
