@@ -2,25 +2,12 @@
     --sidebar-width: 23em;
 }
 
-div.sidebar-scrollbox::before {
-  content: "";
-  background-image: url("./favicon.svg"), url("./Nix.svg");
-  background-position: 0 0, 6em 0;
-  background-size: 6em;
-  display: block;
-  height: 6em;
-  width: 12em;
-  background-repeat: no-repeat;
-  background-origin: content-box;
-  background-attachment: scroll;
-}
-
 h1.menu-title::before {
   content: "";
   background-image: url("./favicon.svg");
-  padding: 1.5em;
+  padding: 1.25em;
   background-position: center center;
-  background-size: 2.5em;
+  background-size: 2em;
   background-repeat: no-repeat;
 }
 
