@@ -66,4 +66,4 @@ nix-env -i dependencies-top
 [ -e $TEST_HOME/.nix-profile/foobar ]
 
 # Test evaluation through a channel symlink (#9882).
-#nix-instantiate '<foo/dependencies.nix>'
+nix-instantiate '<foo/dependencies.nix>'

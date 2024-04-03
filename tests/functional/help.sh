@@ -64,6 +64,6 @@ def recurse($prefix):
 '
 }
 
-#nix __dump-cli | subcommands | while IFS= read -r cmd; do
-#    nix $cmd --help
-#done
+nix __dump-cli | subcommands | while IFS= read -r cmd; do
+    nix $cmd --help
+done

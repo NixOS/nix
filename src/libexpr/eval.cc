@@ -2854,7 +2854,7 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
         if (!rOpt) continue;
         auto r = *rOpt;
 
-        auto res = r / CanonPath(suffix);
+        auto res = (r / CanonPath(suffix)).resolveSymlinks();
         if (res.pathExists()) return res;
     }
 
