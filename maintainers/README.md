@@ -40,7 +40,7 @@ We aim to achieve this by improving the contributor experience and attracting mo
 
 The team meets twice a week:
 
-- Discussion meeting: [Fridays 13:00-14:00 CET](https://calendar.google.com/calendar/event?eid=MHNtOGVuNWtrZXNpZHR2bW1sM3QyN2ZjaGNfMjAyMjExMjVUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
+- Discussion meeting: [Wednesdays 21:00-22:00 CET](https://www.google.com/calendar/event?eid=ZG5rZzNyajRjajducGV2NGY5aGkzYWIwdnJfMjAyNDA0MTBUMTkwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn&ctz=GMT+02:00)
 
   1. Triage issues and pull requests from the [No Status](#no-status) column (30 min)
   2. Discuss issues and pull requests from the [To discuss](#to-discuss) column (30 min).
