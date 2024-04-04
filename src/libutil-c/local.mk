@@ -13,6 +13,6 @@ libutilc_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libutilc)
 
 libutilc_LIBS = libutil
 
-libutilc_LDFLAGS += -pthread
+libutilc_LDFLAGS += $(THREAD_LDFLAGS)
 
 libutilc_FORCE_INSTALL := 1

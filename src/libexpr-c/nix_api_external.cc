@@ -1,7 +1,6 @@
 #include "attr-set.hh"
 #include "config.hh"
 #include "eval.hh"
-#include "gc/gc.h"
 #include "globals.hh"
 #include "value.hh"
 
@@ -16,8 +15,9 @@
 #include <nlohmann/json.hpp>
 
 #ifdef HAVE_BOEHMGC
-#define GC_INCLUDE_NEW 1
-#include "gc_cpp.h"
+# include "gc/gc.h"
+# define GC_INCLUDE_NEW 1
+# include "gc_cpp.h"
 #endif
 
 void nix_set_string_return(nix_string_return * str, const char * c)
