@@ -288,7 +288,7 @@ static void main_nix_build(int argc, char * * argv)
     }
 
     if (runEnv)
-        setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
+        setEnv("IN_NIX_SHELL", pure ? "pure" : "impure");
 
     PackageInfos drvs;
 

@@ -1,21 +1,12 @@
-#include "util.hh"
-#include "environment-variables.hh"
+#include <cstdlib>
 
-extern char * * environ __attribute__((weak));
+#include "environment-variables.hh"
 
 namespace nix {
 
-void clearEnv()
+int setEnv(const char * name, const char * value)
 {
-    for (auto & name : getEnv())
-        unsetenv(name.first.c_str());
-}
-
-void replaceEnv(const std::map<std::string, std::string> & newEnv)
-{
-    clearEnv();
-    for (auto & newEnvVar : newEnv)
-        setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
+    return ::setenv(name, value, 1);
 }
 
 }
