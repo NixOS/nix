@@ -1,5 +1,14 @@
 #pragma once
-///@file
+/**
+ * @file
+ *
+ * Implementation of some inline definitions for Unix signals, and also
+ * some extra Unix-only interfaces.
+ *
+ * (The only reason everything about signals isn't Unix-only is some
+ * no-op definitions are provided on Windows to avoid excess CPP in
+ * downstream code.)
+ */
 
 #include "types.hh"
 #include "error.hh"
@@ -24,22 +33,20 @@ namespace nix {
 
 /* User interruption. */
 
+namespace unix {
+
 extern std::atomic<bool> _isInterrupted;
 
 extern thread_local std::function<bool()> interruptCheck;
 
-void setInterruptThrown();
-
 void _interrupted();
 
-void inline checkInterrupt()
-{
-    if (_isInterrupted || (interruptCheck && interruptCheck()))
-        _interrupted();
-}
-
-MakeError(Interrupted, BaseError);
-
+/**
+ * Sets the signal mask. Like saveSignalMask() but for a signal set that doesn't
+ * necessarily match the current thread's mask.
+ * See saveSignalMask() to set the saved mask to the current mask.
+ */
+void setChildSignalMask(sigset_t *sigs);
 
 /**
  * Start a thread that handles various signals. Also block those signals
@@ -63,26 +70,26 @@ void saveSignalMask();
  */
 void restoreSignals();
 
-/**
- * Sets the signal mask. Like saveSignalMask() but for a signal set that doesn't
- * necessarily match the current thread's mask.
- * See saveSignalMask() to set the saved mask to the current mask.
- */
-void setChildSignalMask(sigset_t *sigs);
-
-struct InterruptCallback
-{
-    virtual ~InterruptCallback() { };
-};
-
-/**
- * Register a function that gets called on SIGINT (in a non-signal
- * context).
- */
-std::unique_ptr<InterruptCallback> createInterruptCallback(
-    std::function<void()> callback);
-
 void triggerInterrupt();
+
+}
+
+static inline void setInterrupted(bool isInterrupted)
+{
+    unix::_isInterrupted = isInterrupted;
+}
+
+static inline bool getInterrupted()
+{
+    return unix::_isInterrupted;
+}
+
+void inline checkInterrupt()
+{
+    using namespace unix;
+    if (_isInterrupted || (interruptCheck && interruptCheck()))
+        _interrupted();
+}
 
 /**
  * A RAII class that causes the current thread to receive SIGUSR1 when

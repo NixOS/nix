@@ -348,7 +348,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         auto act = (Activity *) payload;
         act->result(resFetchStatus, trim(std::string_view(str, len)));
-        return _isInterrupted ? -1 : 0;
+        return getInterrupted() ? -1 : 0;
     }
 
     static int transferProgressCallback(const git_indexer_progress * stats, void * payload)
@@ -361,7 +361,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 stats->indexed_deltas,
                 stats->total_deltas,
                 stats->received_bytes / (1024.0 * 1024.0)));
-        return _isInterrupted ? -1 : 0;
+        return getInterrupted() ? -1 : 0;
     }
 
     void fetch(

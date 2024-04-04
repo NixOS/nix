@@ -50,7 +50,7 @@ public:
                 */
                 if (count == 0) continue;
                 if (fds[0].revents & POLLHUP) {
-                    triggerInterrupt();
+                    unix::triggerInterrupt();
                     break;
                 }
                 /* This will only happen on macOS. We sleep a bit to

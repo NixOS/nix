@@ -357,7 +357,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
     if (line.empty())
         return ProcessLineResult::PromptAgain;
 
-    _isInterrupted = false;
+    setInterrupted(false);
 
     std::string command, arg;
 
