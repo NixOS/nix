@@ -44,7 +44,7 @@ SearchPath::Elem SearchPath::Elem::parse(std::string_view rawElem)
 }
 
 
-SearchPath parseSearchPath(const Strings & rawElems)
+SearchPath SearchPath::parse(const Strings & rawElems)
 {
     SearchPath res;
     for (auto & rawElem : rawElems)

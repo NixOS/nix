@@ -345,6 +345,12 @@ void initPlugins()
                 dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!handle)
                 throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
+
+            /* Older plugins use a statically initialized object to run their code.
+               Newer plugins can also export nix_plugin_entry() */
+            void (*nix_plugin_entry)() = (void (*)())dlsym(handle, "nix_plugin_entry");
+            if (nix_plugin_entry)
+                nix_plugin_entry();
         }
     }
 
@@ -403,6 +409,7 @@ void assertLibStoreInitialized() {
 }
 
 void initLibStore() {
+    if (initLibStoreDone) return;
 
     initLibUtil();
 

@@ -3404,8 +3404,11 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
            callFunction. */
         /* TODO: (layus) this is absurd. An optimisation like this
            should be outside the lambda creation */
-        if (args[0]->isPrimOp() && args[0]->primOp->fun == prim_lessThan)
-            return CompareValues(state, noPos, "while evaluating the ordering function passed to builtins.sort")(a, b);
+        if (args[0]->isPrimOp()) {
+            auto ptr = args[0]->primOp->fun.target<decltype(&prim_lessThan)>();
+            if (ptr && *ptr == prim_lessThan)
+                return CompareValues(state, noPos, "while evaluating the ordering function passed to builtins.sort")(a, b);
+        }
 
         Value * vs[] = {a, b};
         Value vBool;

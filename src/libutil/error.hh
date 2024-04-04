@@ -150,6 +150,10 @@ public:
         : err(e)
     { }
 
+    std::string message() {
+        return err.msg.str();
+    }
+
     const char * what() const noexcept override { return calcWhat().c_str(); }
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }

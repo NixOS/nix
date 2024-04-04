@@ -17,6 +17,7 @@
 #include <optional>
 #include <unordered_map>
 #include <mutex>
+#include <functional>
 
 namespace nix {
 
@@ -79,7 +80,7 @@ struct PrimOp
     /**
      * Implementation of the primop.
      */
-    PrimOpFun fun;
+    std::function<std::remove_pointer<PrimOpFun>::type> fun;
 
     /**
      * Optional experimental for this to be gated on.

@@ -20,12 +20,14 @@ libstore-tests_EXTRA_INCLUDES = \
     -I tests/unit/libstore-support \
     -I tests/unit/libutil-support \
     $(INCLUDE_libstore) \
-    $(INCLUDE_libutil)
+    $(INCLUDE_libstorec) \
+    $(INCLUDE_libutil) \
+    $(INCLUDE_libutilc)
 
 libstore-tests_CXXFLAGS += $(libstore-tests_EXTRA_INCLUDES)
 
 libstore-tests_LIBS = \
     libstore-test-support libutil-test-support \
-    libstore libutil
+    libstore libstorec libutil libutilc
 
 libstore-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
