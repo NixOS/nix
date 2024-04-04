@@ -134,7 +134,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
         unixPath.insert(unixPath.begin(), pathAdditions.begin(), pathAdditions.end());
         auto unixPathString = concatStringsSep(":", unixPath);
-        setenv("PATH", unixPathString.c_str(), 1);
+        setEnv("PATH", unixPathString.c_str());
 
         Strings args;
         for (auto & arg : command) args.push_back(arg);

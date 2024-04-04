@@ -603,7 +603,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         setEnviron();
         // prevent garbage collection until shell exits
-        setenv("NIX_GCROOT", gcroot.c_str(), 1);
+        setEnv("NIX_GCROOT", gcroot.c_str());
 
         Path shell = "bash";
 
@@ -648,7 +648,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         // Override SHELL with the one chosen for this environment.
         // This is to make sure the system shell doesn't leak into the build environment.
-        setenv("SHELL", shell.c_str(), 1);
+        setEnv("SHELL", shell.c_str());
 
         // If running a phase or single command, don't want an interactive shell running after
         // Ctrl-C, so don't pass --rcfile

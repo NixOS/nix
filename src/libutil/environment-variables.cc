@@ -32,4 +32,17 @@ std::map<std::string, std::string> getEnv()
     return env;
 }
 
+void clearEnv()
+{
+    for (auto & name : getEnv())
+        unsetenv(name.first.c_str());
+}
+
+void replaceEnv(const std::map<std::string, std::string> & newEnv)
+{
+    clearEnv();
+    for (auto & newEnvVar : newEnv)
+        setEnv(newEnvVar.first.c_str(), newEnvVar.second.c_str());
+}
+
 }
