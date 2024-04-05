@@ -14,6 +14,14 @@ outPath=$(nix-build dependencies.nix --no-out-link)
 
 nix copy --to file://$cacheDir $outPath
 
+readarray -t paths < <(nix path-info --all --json --store file://$cacheDir | jq 'keys|sort|.[]' -r)
+[[ "${#paths[@]}" -eq 3 ]]
+for path in "${paths[@]}"; do
+    [[ "$path" =~ -dependencies-input-0$ ]] \
+        || [[ "$path" =~ -dependencies-input-2$ ]] \
+        || [[ "$path" =~ -dependencies-top$ ]]
+done
+
 # Test copying build logs to the binary cache.
 expect 1 nix log --store file://$cacheDir $outPath 2>&1 | grep 'is not available'
 nix store copy-log --to file://$cacheDir $outPath
