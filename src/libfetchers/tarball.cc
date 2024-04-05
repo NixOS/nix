@@ -19,7 +19,6 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool locked,
     const Headers & headers)
 {
     // FIXME: check store
@@ -101,7 +100,7 @@ DownloadFileResult downloadFile(
             inAttrs,
             infoAttrs,
             *storePath,
-            locked);
+            false);
     }
 
     return {
@@ -306,7 +305,7 @@ struct FileInputScheme : CurlInputScheme
            the Nix store directly, since there is little deduplication
            benefit in using the Git cache for single big files like
            tarballs. */
-        auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
+        auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName());
 
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
