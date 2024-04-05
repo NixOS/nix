@@ -59,7 +59,6 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
             },
             [&](const NixStringContextElem::Opaque & o) {
                 auto ctxS = store->printStorePath(o.path);
-                res.insert_or_assign(ctxS, ctxS);
                 ensureValid(o.path);
                 if (maybePathsOut)
                     maybePathsOut->emplace(o.path);
@@ -67,7 +66,6 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
             [&](const NixStringContextElem::DrvDeep & d) {
                 /* Treat same as Opaque */
                 auto ctxS = store->printStorePath(d.drvPath);
-                res.insert_or_assign(ctxS, ctxS);
                 ensureValid(d.drvPath);
                 if (maybePathsOut)
                     maybePathsOut->emplace(d.drvPath);
