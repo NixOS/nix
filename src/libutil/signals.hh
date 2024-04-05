@@ -24,11 +24,6 @@ static inline bool getInterrupted();
 /**
  * @note Does nothing on Windows
  */
-static inline void setInterruptCheck(std::function<bool()> interruptCheck);
-
-/**
- * @note Does nothing on Windows
- */
 void setInterruptThrown();
 
 /**
