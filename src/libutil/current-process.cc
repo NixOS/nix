@@ -82,7 +82,7 @@ void setStackSize(rlim_t stackSize)
 
 void restoreProcessContext(bool restoreMounts)
 {
-    restoreSignals();
+    unix::restoreSignals();
     if (restoreMounts) {
         #if __linux__
         restoreMountNamespace();

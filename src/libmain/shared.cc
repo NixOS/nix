@@ -121,7 +121,7 @@ void initNix()
 
     initLibStore();
 
-    startSignalHandlerThread();
+    unix::startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
     struct sigaction act;

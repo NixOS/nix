@@ -258,11 +258,11 @@ struct curlFileTransfer : public FileTransfer
         int progressCallback(double dltotal, double dlnow)
         {
             try {
-              act.progress(dlnow, dltotal);
+                act.progress(dlnow, dltotal);
             } catch (nix::Interrupted &) {
-              assert(_isInterrupted);
+                assert(getInterrupted());
             }
-            return _isInterrupted;
+            return getInterrupted();
         }
 
         static int progressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
@@ -466,7 +466,7 @@ struct curlFileTransfer : public FileTransfer
                 if (errorSink)
                     response = std::move(errorSink->s);
                 auto exc =
-                    code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
+                    code == CURLE_ABORTED_BY_CALLBACK && getInterrupted()
                     ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
                     ? FileTransferError(err,
