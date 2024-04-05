@@ -28,10 +28,7 @@ makefiles = \
   misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
-  misc/upstart/local.mk \
-  doc/manual/local.mk \
-  doc/internal-api/local.mk \
-  doc/external-api/local.mk
+  misc/upstart/local.mk
 endif
 
 ifeq ($(ENABLE_UNIT_TESTS), yes)
