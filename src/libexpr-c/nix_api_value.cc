@@ -1,7 +1,6 @@
 #include "attr-set.hh"
 #include "config.hh"
 #include "eval.hh"
-#include "gc/gc.h"
 #include "globals.hh"
 #include "primops.hh"
 #include "value.hh"
@@ -13,8 +12,9 @@
 #include "nix_api_value.h"
 
 #ifdef HAVE_BOEHMGC
-#define GC_INCLUDE_NEW 1
-#include "gc_cpp.h"
+# include "gc/gc.h"
+# define GC_INCLUDE_NEW 1
+# include "gc_cpp.h"
 #endif
 
 // Helper function to throw an exception if value is null
@@ -444,7 +444,7 @@ void nix_list_builder_free(ListBuilder * list_builder)
 #if HAVE_BOEHMGC
     GC_FREE(list_builder);
 #else
-    delete bb;
+    delete list_builder;
 #endif
 }
 

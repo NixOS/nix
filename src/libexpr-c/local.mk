@@ -17,7 +17,7 @@ libexprc_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libutilc) \
 
 libexprc_LIBS = libutil libutilc libstore libstorec libexpr
 
-libexprc_LDFLAGS += -pthread
+libexprc_LDFLAGS += $(THREAD_LDFLAGS)
 
 $(eval $(call install-file-in, $(d)/nix-expr-c.pc, $(libdir)/pkgconfig, 0644))
 

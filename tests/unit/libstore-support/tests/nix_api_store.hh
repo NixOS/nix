@@ -2,6 +2,8 @@
 ///@file
 #include "tests/nix_api_util.hh"
 
+#include "file-system.hh"
+
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
 
@@ -37,8 +39,18 @@ public:
 protected:
     void init_local_store()
     {
-        auto tmpl = nix::getEnv("TMPDIR").value_or("/tmp") + "/tests_nix-store.XXXXXX";
+#ifdef _WIN32
+        // no `mkdtemp` with MinGW
+        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
+        for (size_t i = 0; true; ++i) {
+            nixDir = tmpl + std::string { i };
+            if (fs::create_directory(nixDir)) break;
+        }
+#else
+        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.XXXXXX";
         nixDir = mkdtemp((char *) tmpl.c_str());
+#endif
+
         nixStoreDir = nixDir + "/my_nix_store";
 
         // Options documented in `nix help-stores`

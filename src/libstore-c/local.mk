@@ -8,7 +8,7 @@ libstorec_SOURCES := $(wildcard $(d)/*.cc)
 
 libstorec_LIBS = libutil libstore libutilc
 
-libstorec_LDFLAGS += -pthread
+libstorec_LDFLAGS += $(THREAD_LDFLAGS)
 
 # Not just for this library itself, but also for downstream libraries using this library
 

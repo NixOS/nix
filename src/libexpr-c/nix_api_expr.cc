@@ -155,13 +155,13 @@ void nix_gc_now()
 }
 
 #else
-void nix_gc_incref(nix_c_context * context, const void *)
+nix_err nix_gc_incref(nix_c_context * context, const void *)
 {
     if (context)
         context->last_err_code = NIX_OK;
     return NIX_OK;
 }
-void nix_gc_decref(nix_c_context * context, const void *)
+nix_err nix_gc_decref(nix_c_context * context, const void *)
 {
     if (context)
         context->last_err_code = NIX_OK;
