@@ -43,9 +43,15 @@ static json pathInfoToJSON(
 
     for (auto & storePath : storePaths) {
         json jsonObject;
+        auto printedStorePath = store.printStorePath(storePath);
 
         try {
             auto info = store.queryPathInfo(storePath);
+
+            // `storePath` has the representation `<hash>-x` rather than
+            // `<hash>-<name>` in case of binary-cache stores & `--all` because we don't
+            // know the name yet until we've read the NAR info.
+            printedStorePath = store.printStorePath(info->path);
 
             jsonObject = info->toJSON(store, true, HashFormat::SRI);
 
@@ -74,7 +80,7 @@ static json pathInfoToJSON(
             jsonObject = nullptr;
         }
 
-        jsonAllObjects[store.printStorePath(storePath)] = std::move(jsonObject);
+        jsonAllObjects[printedStorePath] = std::move(jsonObject);
     }
     return jsonAllObjects;
 }
