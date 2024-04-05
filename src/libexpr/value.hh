@@ -18,6 +18,7 @@
 
 namespace nix {
 
+struct Value;
 class BindingsBuilder;
 
 
@@ -134,6 +135,34 @@ class ExternalValueBase
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
 
 
+class ListBuilder
+{
+    const size_t size;
+    Value * inlineElems[2] = {nullptr, nullptr};
+public:
+    Value * * elems;
+    ListBuilder(EvalState & state, size_t size);
+
+    ListBuilder(ListBuilder && x)
+        : size(x.size)
+        , inlineElems{x.inlineElems[0], x.inlineElems[1]}
+        , elems(size <= 2 ? inlineElems : x.elems)
+    { }
+
+    Value * & operator [](size_t n)
+    {
+        return elems[n];
+    }
+
+    typedef Value * * iterator;
+
+    iterator begin() { return &elems[0]; }
+    iterator end() { return &elems[size]; }
+
+    friend struct Value;
+};
+
+
 struct Value
 {
 private:
@@ -217,7 +246,7 @@ public:
         Bindings * attrs;
         struct {
             size_t size;
-            Value * * elems;
+            Value * const * elems;
         } bigList;
         Value * smallList[2];
         ClosureThunk thunk;
@@ -299,6 +328,7 @@ public:
     }
 
     void mkPath(const SourcePath & path);
+    void mkPath(std::string_view path);
 
     inline void mkPath(InputAccessor * accessor, const char * path)
     {
@@ -323,16 +353,20 @@ public:
 
     Value & mkAttrs(BindingsBuilder & bindings);
 
-    inline void mkList(size_t size)
+    void mkList(const ListBuilder & builder)
     {
         clearValue();
-        if (size == 1)
+        if (builder.size == 1) {
+            smallList[0] = builder.inlineElems[0];
             internalType = tList1;
-        else if (size == 2)
+        } else if (builder.size == 2) {
+            smallList[0] = builder.inlineElems[0];
+            smallList[1] = builder.inlineElems[1];
             internalType = tList2;
-        else {
+        } else {
+            bigList.size = builder.size;
+            bigList.elems = builder.elems;
             internalType = tListN;
-            bigList.size = size;
         }
     }
 
@@ -392,7 +426,7 @@ public:
         return internalType == tList1 || internalType == tList2 || internalType == tListN;
     }
 
-    Value * * listElems()
+    Value * const * listElems()
     {
         return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }

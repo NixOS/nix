@@ -6,8 +6,9 @@ git init "$repo"
 git -C "$repo" config user.email "you@example.com"
 git -C "$repo" config user.name "Your Name"
 
+# Compare Nix's and git's implementation of git hashing
 try () {
-    hash=$(nix hash path --mode git --format base16 --algo sha1 $TEST_ROOT/hash-path)
+    local hash=$(nix hash path --mode git --format base16 --algo sha1 $TEST_ROOT/hash-path)
     [[ "$hash" == "$1" ]]
 
     git -C "$repo" rm -rf hash-path || true
@@ -15,7 +16,7 @@ try () {
     git -C "$repo" add hash-path
     git -C "$repo" commit -m "x"
     git -C "$repo" status
-    hash2=$(git -C "$TEST_ROOT/scratch" rev-parse HEAD:hash-path)
+    local hash2=$(git -C "$TEST_ROOT/scratch" rev-parse HEAD:hash-path)
     [[ "$hash2" = "$1" ]]
 }
 
@@ -32,36 +33,45 @@ echo "Run Hello World" > $TEST_ROOT/hash-path/executable
 chmod +x $TEST_ROOT/hash-path/executable
 try "e5c0a11a556801a5c9dcf330ca9d7e2c572697f4"
 
-rm -rf $TEST_ROOT/dummy1
-echo Hello World! > $TEST_ROOT/dummy1
-path1=$(nix store add --mode git --hash-algo sha1 $TEST_ROOT/dummy1)
-hash1=$(nix-store -q --hash $path1)
-test "$hash1" = "sha256:1brffhvj2c0z6x8qismd43m0iy8dsgfmy10bgg9w11szway2wp9v"
+# Check Nix added object has matching git hash
+try2 () {
+    local hashPath="$1"
+    local expected="$2"
 
-rm -rf $TEST_ROOT/dummy2
-mkdir -p $TEST_ROOT/dummy2
-echo Hello World! > $TEST_ROOT/dummy2/hello
-path2=$(nix store add --mode git --hash-algo sha1 $TEST_ROOT/dummy2)
-hash2=$(nix-store -q --hash $path2)
-test "$hash2" = "sha256:1vhv7zxam7x277q0y0jcypm7hwhccbzss81vkdgf0ww5sm2am4y0"
+    local path=$(nix store add --mode git --hash-algo sha1 "$repo/$hashPath")
 
-rm -rf $TEST_ROOT/dummy3
-mkdir -p $TEST_ROOT/dummy3
-mkdir -p $TEST_ROOT/dummy3/dir
-touch $TEST_ROOT/dummy3/dir/file
-echo Hello World! > $TEST_ROOT/dummy3/dir/file
-touch $TEST_ROOT/dummy3/dir/executable
-chmod +x $TEST_ROOT/dummy3/dir/executable
-echo Run Hello World! > $TEST_ROOT/dummy3/dir/executable
-path3=$(nix store add --mode git --hash-algo sha1 $TEST_ROOT/dummy3)
-hash3=$(nix-store -q --hash $path3)
-test "$hash3" = "sha256:08y3nm3mvn9qvskqnf13lfgax5lh73krxz4fcjd5cp202ggpw9nv"
+    git -C "$repo" add "$hashPath"
+    git -C "$repo" commit -m "x"
+    git -C "$repo" status
+    local hashFromGit=$(git -C "$repo" rev-parse "HEAD:$hashPath")
+    [[ "$hashFromGit" == "$2" ]]
 
-rm -rf $TEST_ROOT/dummy3
-mkdir -p $TEST_ROOT/dummy3
-mkdir -p $TEST_ROOT/dummy3/dir
-touch $TEST_ROOT/dummy3/dir/file
-ln -s './hello/world.txt' $TEST_ROOT/dummy3/dir/symlink
-path3=$(nix store add --mode git --hash-algo sha1 $TEST_ROOT/dummy3)
-hash3=$(nix-store -q --hash $path3)
-test "$hash3" = "sha256:1dwazas8irzpar89s8k2bnp72imfw7kgg4aflhhsfnicg8h428f3"
+    local caFromNix=$(nix path-info --json "$path" | jq -r ".[] | .ca")
+    [[ "fixed:git:sha1:$(nix hash convert --to nix32 "sha1:$hashFromGit")" = "$caFromNix" ]]
+}
+
+rm -rf "$repo/dummy1"
+echo Hello World! > "$repo/dummy1"
+try2 dummy1 "980a0d5f19a64b4b30a87d4206aade58726b60e3"
+
+rm -rf "$repo/dummy2"
+mkdir -p "$repo/dummy2"
+echo Hello World! > "$repo/dummy2/hello"
+try2 dummy2 "8b8e43b937854f4083ea56777821abda2799e850"
+
+rm -rf "$repo/dummy3"
+mkdir -p "$repo/dummy3"
+mkdir -p "$repo/dummy3/dir"
+touch "$repo/dummy3/dir/file"
+echo Hello World! > "$repo/dummy3/dir/file"
+touch "$repo/dummy3/dir/executable"
+chmod +x "$repo/dummy3/dir/executable"
+echo Run Hello World! > "$repo/dummy3/dir/executable"
+try2 dummy3 "f227adfaf60d2778aabbf93df6dd061272d2dc85"
+
+rm -rf "$repo/dummy4"
+mkdir -p "$repo/dummy4"
+mkdir -p "$repo/dummy4/dir"
+touch "$repo/dummy4/dir/file"
+ln -s './hello/world.txt' "$repo/dummy4/dir/symlink"
+try2 dummy4 "06f3e789820fc488d602358f03e3a1cbf993bf33"

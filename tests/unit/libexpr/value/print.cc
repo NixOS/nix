@@ -79,11 +79,11 @@ TEST_F(ValuePrintingTests, tList)
     Value vTwo;
     vTwo.mkInt(2);
 
+    auto list = state.buildList(3);
+    list.elems[0] = &vOne;
+    list.elems[1] = &vTwo;
     Value vList;
-    state.mkList(vList, 5);
-    vList.bigList.elems[0] = &vOne;
-    vList.bigList.elems[1] = &vTwo;
-    vList.bigList.size = 3;
+    vList.mkList(list);
 
     test(vList, "[ 1 2 «nullptr» ]");
 }
@@ -249,12 +249,12 @@ TEST_F(ValuePrintingTests, depthList)
     Value vNested;
     vNested.mkAttrs(builder2.finish());
 
+    auto list = state.buildList(3);
+    list.elems[0] = &vOne;
+    list.elems[1] = &vTwo;
+    list.elems[2] = &vNested;
     Value vList;
-    state.mkList(vList, 5);
-    vList.bigList.elems[0] = &vOne;
-    vList.bigList.elems[1] = &vTwo;
-    vList.bigList.elems[2] = &vNested;
-    vList.bigList.size = 3;
+    vList.mkList(list);
 
     test(vList, "[ 1 2 { ... } ]", PrintOptions { .maxDepth = 1 });
     test(vList, "[ 1 2 { nested = { ... }; one = 1; two = 2; } ]", PrintOptions { .maxDepth = 2 });
@@ -539,11 +539,11 @@ TEST_F(ValuePrintingTests, ansiColorsList)
     Value vTwo;
     vTwo.mkInt(2);
 
+    auto list = state.buildList(3);
+    list.elems[0] = &vOne;
+    list.elems[1] = &vTwo;
     Value vList;
-    state.mkList(vList, 5);
-    vList.bigList.elems[0] = &vOne;
-    vList.bigList.elems[1] = &vTwo;
-    vList.bigList.size = 3;
+    vList.mkList(list);
 
     test(vList,
          "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_CYAN "2" ANSI_NORMAL " " ANSI_MAGENTA "«nullptr»" ANSI_NORMAL " ]",
@@ -670,11 +670,11 @@ TEST_F(ValuePrintingTests, ansiColorsListRepeated)
     Value vEmpty;
     vEmpty.mkAttrs(emptyBuilder.finish());
 
+    auto list = state.buildList(2);
+    list.elems[0] = &vEmpty;
+    list.elems[1] = &vEmpty;
     Value vList;
-    state.mkList(vList, 3);
-    vList.bigList.elems[0] = &vEmpty;
-    vList.bigList.elems[1] = &vEmpty;
-    vList.bigList.size = 2;
+    vList.mkList(list);
 
     test(vList,
          "[ { } " ANSI_MAGENTA "«repeated»" ANSI_NORMAL " ]",
@@ -690,11 +690,11 @@ TEST_F(ValuePrintingTests, listRepeated)
     Value vEmpty;
     vEmpty.mkAttrs(emptyBuilder.finish());
 
+    auto list = state.buildList(2);
+    list.elems[0] = &vEmpty;
+    list.elems[1] = &vEmpty;
     Value vList;
-    state.mkList(vList, 3);
-    vList.bigList.elems[0] = &vEmpty;
-    vList.bigList.elems[1] = &vEmpty;
-    vList.bigList.size = 2;
+    vList.mkList(list);
 
     test(vList, "[ { } «repeated» ]", PrintOptions { });
     test(vList,
@@ -750,11 +750,12 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
     Value vTwo;
     vTwo.mkInt(2);
 
+    {
+    auto list = state.buildList(2);
+    list.elems[0] = &vOne;
+    list.elems[1] = &vTwo;
     Value vList;
-    state.mkList(vList, 4);
-    vList.bigList.elems[0] = &vOne;
-    vList.bigList.elems[1] = &vTwo;
-    vList.bigList.size = 2;
+    vList.mkList(list);
 
     test(vList,
          "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«1 item elided»" ANSI_NORMAL " ]",
@@ -762,12 +763,18 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
              .ansiColors = true,
              .maxListItems = 1
          });
+    }
 
     Value vThree;
     vThree.mkInt(3);
 
-    vList.bigList.elems[2] = &vThree;
-    vList.bigList.size = 3;
+    {
+    auto list = state.buildList(3);
+    list.elems[0] = &vOne;
+    list.elems[1] = &vTwo;
+    list.elems[2] = &vThree;
+    Value vList;
+    vList.mkList(list);
 
     test(vList,
          "[ " ANSI_CYAN "1" ANSI_NORMAL " " ANSI_FAINT "«2 items elided»" ANSI_NORMAL " ]",
@@ -775,6 +782,7 @@ TEST_F(ValuePrintingTests, ansiColorsListElided)
              .ansiColors = true,
              .maxListItems = 1
          });
+    }
 }
 
 } // namespace nix

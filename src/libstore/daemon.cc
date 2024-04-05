@@ -1,5 +1,6 @@
 #include "daemon.hh"
 #include "monitor-fd.hh"
+#include "signals.hh"
 #include "worker-protocol.hh"
 #include "worker-protocol-impl.hh"
 #include "build-result.hh"
@@ -254,7 +255,7 @@ struct ClientSettings
                 else if (setSubstituters(settings.substituters))
                     ;
                 else
-                    debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+                    warn("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
@@ -1038,7 +1039,7 @@ void processConnection(
     unsigned int opCount = 0;
 
     Finally finally([&]() {
-        _isInterrupted = false;
+        setInterrupted(false);
         printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 

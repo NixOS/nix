@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include "error.hh"
 #include "json-utils.hh"
 
 namespace nix {
@@ -53,6 +54,110 @@ TEST(from_json, vectorOfOptionalInts) {
     ASSERT_TRUE(vals.at(0).has_value());
     ASSERT_EQ(*vals.at(0), 420);
     ASSERT_FALSE(vals.at(1).has_value());
+}
+
+TEST(valueAt, simpleObject) {
+    auto simple = R"({ "hello": "world" })"_json;
+
+    ASSERT_EQ(valueAt(getObject(simple), "hello"), "world");
+
+    auto nested = R"({ "hello": { "world": "" } })"_json;
+
+    auto & nestedObject = valueAt(getObject(nested), "hello");
+
+    ASSERT_EQ(valueAt(nestedObject, "world"), "");
+}
+
+TEST(valueAt, missingKey) {
+    auto json = R"({ "hello": { "nested": "world" } })"_json;
+
+    auto & obj = getObject(json);
+
+    ASSERT_THROW(valueAt(obj, "foo"), Error);
+}
+
+TEST(getObject, rightAssertions) {
+    auto simple = R"({ "object": {} })"_json;
+
+    ASSERT_EQ(getObject(valueAt(getObject(simple), "object")), (nlohmann::json::object_t {}));
+
+    auto nested = R"({ "object": { "object": {} } })"_json;
+
+    auto & nestedObject = getObject(valueAt(getObject(nested), "object"));
+
+    ASSERT_EQ(nestedObject, getObject(nlohmann::json::parse(R"({ "object": {} })")));
+    ASSERT_EQ(getObject(valueAt(getObject(nestedObject), "object")), (nlohmann::json::object_t {}));
+}
+
+TEST(getObject, wrongAssertions) {
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
+
+    auto & obj = getObject(json);
+
+    ASSERT_THROW(getObject(valueAt(obj, "array")), Error);
+    ASSERT_THROW(getObject(valueAt(obj, "string")), Error);
+    ASSERT_THROW(getObject(valueAt(obj, "int")), Error);
+    ASSERT_THROW(getObject(valueAt(obj, "boolean")), Error);
+}
+
+TEST(getArray, rightAssertions) {
+    auto simple = R"({ "array": [] })"_json;
+
+    ASSERT_EQ(getArray(valueAt(getObject(simple), "array")), (nlohmann::json::array_t {}));
+}
+
+TEST(getArray, wrongAssertions) {
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
+
+    ASSERT_THROW(getArray(valueAt(json, "object")), Error);
+    ASSERT_THROW(getArray(valueAt(json, "string")), Error);
+    ASSERT_THROW(getArray(valueAt(json, "int")), Error);
+    ASSERT_THROW(getArray(valueAt(json, "boolean")), Error);
+}
+
+TEST(getString, rightAssertions) {
+    auto simple = R"({ "string": "" })"_json;
+
+    ASSERT_EQ(getString(valueAt(getObject(simple), "string")), "");
+}
+
+TEST(getString, wrongAssertions) {
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
+
+    ASSERT_THROW(getString(valueAt(json, "object")), Error);
+    ASSERT_THROW(getString(valueAt(json, "array")), Error);
+    ASSERT_THROW(getString(valueAt(json, "int")), Error);
+    ASSERT_THROW(getString(valueAt(json, "boolean")), Error);
+}
+
+TEST(getInteger, rightAssertions) {
+    auto simple = R"({ "int": 0 })"_json;
+
+    ASSERT_EQ(getInteger(valueAt(getObject(simple), "int")), 0);
+}
+
+TEST(getInteger, wrongAssertions) {
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
+
+    ASSERT_THROW(getInteger(valueAt(json, "object")), Error);
+    ASSERT_THROW(getInteger(valueAt(json, "array")), Error);
+    ASSERT_THROW(getInteger(valueAt(json, "string")), Error);
+    ASSERT_THROW(getInteger(valueAt(json, "boolean")), Error);
+}
+
+TEST(getBoolean, rightAssertions) {
+    auto simple = R"({ "boolean": false })"_json;
+
+    ASSERT_EQ(getBoolean(valueAt(getObject(simple), "boolean")), false);
+}
+
+TEST(getBoolean, wrongAssertions) {
+    auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
+
+    ASSERT_THROW(getBoolean(valueAt(json, "object")), Error);
+    ASSERT_THROW(getBoolean(valueAt(json, "array")), Error);
+    ASSERT_THROW(getBoolean(valueAt(json, "string")), Error);
+    ASSERT_THROW(getBoolean(valueAt(json, "int")), Error);
 }
 
 } /* namespace nix */

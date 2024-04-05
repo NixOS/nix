@@ -187,13 +187,13 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             NixStringContextElem::DrvDeep { .drvPath = *storePath },
         });
         attrs.alloc(state.sName).mkString(drv.env["name"]);
-        auto & outputsVal = attrs.alloc(state.sOutputs);
-        state.mkList(outputsVal, drv.outputs.size());
 
+        auto list = state.buildList(drv.outputs.size());
         for (const auto & [i, o] : enumerate(drv.outputs)) {
             mkOutputString(state, attrs, *storePath, o);
-            (outputsVal.listElems()[i] = state.allocValue())->mkString(o.first);
+            (list[i] = state.allocValue())->mkString(o.first);
         }
+        attrs.alloc(state.sOutputs).mkList(list);
 
         auto w = state.allocValue();
         w->mkAttrs(attrs);
@@ -694,10 +694,10 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
     }
 
     /* Create the result list. */
-    state.mkList(v, res.size());
-    unsigned int n = 0;
-    for (auto & i : res)
-        v.listElems()[n++] = i;
+    auto list = state.buildList(res.size());
+    for (const auto & [n, i] : enumerate(res))
+        list[n] = i;
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_genericClosure(PrimOp {
@@ -826,7 +826,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         auto message = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.addErrorContext",
                 false, false).toOwned();
-        e.addTrace(nullptr, HintFmt(message));
+        e.addTrace(nullptr, HintFmt(message), TracePrint::Always);
         throw;
     }
 }
@@ -834,6 +834,8 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
 static RegisterPrimOp primop_addErrorContext(PrimOp {
     .name = "__addErrorContext",
     .arity = 2,
+    // The normal trace item is redundant
+    .addTrace = false,
     .fun = prim_addErrorContext,
 });
 
@@ -896,10 +898,11 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
-        attrs.alloc("success").mkBool(true);
+        attrs.insert(state.symbols.create("success"), &state.vTrue);
     } catch (AssertionError & e) {
-        attrs.alloc(state.sValue).mkBool(false);
-        attrs.alloc("success").mkBool(false);
+        // `value = false;` is unfortunate but removing it is a breaking change.
+        attrs.insert(state.sValue, &state.vFalse);
+        attrs.insert(state.symbols.create("success"), &state.vFalse);
     }
 
     // restore the debugRepl pointer if we saved it earlier.
@@ -1124,7 +1127,7 @@ drvName, Bindings * attrs, Value & v)
     bool contentAddressed = false;
     bool isImpure = false;
     std::optional<std::string> outputHash;
-    std::string outputHashAlgo;
+    std::optional<HashAlgorithm> outputHashAlgo;
     std::optional<ContentAddressMethod> ingestionMethod;
 
     StringSet outputs;
@@ -1223,7 +1226,7 @@ drvName, Bindings * attrs, Value & v)
                     else if (i->name == state.sOutputHash)
                         outputHash = state.forceStringNoCtx(*i->value, pos, context_below);
                     else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = state.forceStringNoCtx(*i->value, pos, context_below);
+                        outputHashAlgo = parseHashAlgoOpt(state.forceStringNoCtx(*i->value, pos, context_below));
                     else if (i->name == state.sOutputHashMode)
                         handleHashMode(state.forceStringNoCtx(*i->value, pos, context_below));
                     else if (i->name == state.sOutputs) {
@@ -1241,7 +1244,7 @@ drvName, Bindings * attrs, Value & v)
                     if (i->name == state.sBuilder) drv.builder = std::move(s);
                     else if (i->name == state.sSystem) drv.platform = std::move(s);
                     else if (i->name == state.sOutputHash) outputHash = std::move(s);
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = std::move(s);
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = parseHashAlgoOpt(s);
                     else if (i->name == state.sOutputHashMode) handleHashMode(s);
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
@@ -1324,7 +1327,7 @@ drvName, Bindings * attrs, Value & v)
                 "multiple outputs are not supported in fixed-output derivations"
             ).atPos(v).debugThrow();
 
-        auto h = newHashAllowEmpty(*outputHash, parseHashAlgoOpt(outputHashAlgo));
+        auto h = newHashAllowEmpty(*outputHash, outputHashAlgo);
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
@@ -1344,7 +1347,7 @@ drvName, Bindings * attrs, Value & v)
             state.error<EvalError>("derivation cannot be both content-addressed and impure")
                 .atPos(v).debugThrow();
 
-        auto ha = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
+        auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
         auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
 
         for (auto & i : outputs) {
@@ -1567,23 +1570,50 @@ static RegisterPrimOp primop_pathExists({
     .fun = prim_pathExists,
 });
 
+// Ideally, all trailing slashes should have been removed, but it's been like this for
+// almost a decade as of writing. Changing it will affect reproducibility.
+static std::string_view legacyBaseNameOf(std::string_view path)
+{
+    if (path.empty())
+        return "";
+
+    auto last = path.size() - 1;
+    if (path[last] == '/' && last > 0)
+        last -= 1;
+
+    auto pos = path.rfind('/', last);
+    if (pos == path.npos)
+        pos = 0;
+    else
+        pos += 1;
+
+    return path.substr(pos, last - pos + 1);
+}
+
 /* Return the base name of the given string, i.e., everything
    following the last slash. */
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
-    v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context,
+    v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
             false, false)), context);
 }
 
 static RegisterPrimOp primop_baseNameOf({
     .name = "baseNameOf",
-    .args = {"s"},
+    .args = {"x"},
     .doc = R"(
-      Return the *base name* of the string *s*, that is, everything
-      following the final slash in the string. This is similar to the GNU
-      `basename` command.
+      Return the *base name* of either a [path value](@docroot@/language/values.md#type-path) *x* or a string *x*, depending on which type is passed, and according to the following rules.
+
+      For a path value, the *base name* is considered to be the part of the path after the last directory separator, including any file extensions.
+      This is the simple case, as path values don't have trailing slashes.
+
+      When the argument is a string, a more involved logic applies. If the string ends with a `/`, only this one final slash is removed.
+
+      After this, the *base name* is returned as previously described, assuming `/` as the directory separator. (Note that evaluation must be platform independent.)
+
+      This is somewhat similar to the [GNU `basename`](https://www.gnu.org/software/coreutils/manual/html_node/basename-invocation.html) command, but GNU `basename` will strip any number of trailing slashes.
     )",
     .fun = prim_baseNameOf,
 });
@@ -1775,20 +1805,20 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
-static std::string_view fileTypeToString(InputAccessor::Type type)
+static Value * fileTypeToString(EvalState & state, InputAccessor::Type type)
 {
     return
-        type == InputAccessor::Type::tRegular ? "regular" :
-        type == InputAccessor::Type::tDirectory ? "directory" :
-        type == InputAccessor::Type::tSymlink ? "symlink" :
-        "unknown";
+        type == InputAccessor::Type::tRegular ? &state.vStringRegular :
+        type == InputAccessor::Type::tDirectory ? &state.vStringDirectory :
+        type == InputAccessor::Type::tSymlink ? &state.vStringSymlink :
+        &state.vStringUnknown;
 }
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
-    v.mkString(fileTypeToString(path.lstat().type));
+    v = *fileTypeToString(state, path.lstat().type);
 }
 
 static RegisterPrimOp primop_readFileType({
@@ -1819,8 +1849,8 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
     Value * readFileType = nullptr;
 
     for (auto & [name, type] : entries) {
-        auto & attr = attrs.alloc(name);
         if (!type) {
+            auto & attr = attrs.alloc(name);
             // Some filesystems or operating systems may not be able to return
             // detailed node info quickly in this case we produce a thunk to
             // query the file type lazily.
@@ -1832,7 +1862,7 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
         } else {
             // This branch of the conditional is much more likely.
             // Here we just stringize the directory entry type.
-            attr.mkString(fileTypeToString(*type));
+            attrs.insert(state.symbols.create(name), fileTypeToString(state, *type));
         }
     }
 
@@ -2193,11 +2223,8 @@ bool EvalState::callPathFilter(
     Value arg1;
     arg1.mkString(pathArg);
 
-    Value arg2;
     // assert that type is not "unknown"
-    arg2.mkString(fileTypeToString(st.type));
-
-    Value * args []{&arg1, &arg2};
+    Value * args []{&arg1, fileTypeToString(*this, st.type)};
     Value res;
     callFunction(*filterFun, 2, args, res, pos);
 
@@ -2423,14 +2450,15 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
 {
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrNames");
 
-    state.mkList(v, args[0]->attrs->size());
+    auto list = state.buildList(args[0]->attrs->size());
 
-    size_t n = 0;
-    for (auto & i : *args[0]->attrs)
-        (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
+    for (const auto & [n, i] : enumerate(*args[0]->attrs))
+        (list[n] = state.allocValue())->mkString(state.symbols[i.name]);
 
-    std::sort(v.listElems(), v.listElems() + n,
+    std::sort(list.begin(), list.end(),
               [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
+
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -2450,21 +2478,22 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value * * args,
 {
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.attrValues");
 
-    state.mkList(v, args[0]->attrs->size());
+    auto list = state.buildList(args[0]->attrs->size());
 
-    unsigned int n = 0;
-    for (auto & i : *args[0]->attrs)
-        v.listElems()[n++] = (Value *) &i;
+    for (const auto & [n, i] : enumerate(*args[0]->attrs))
+        list[n] = (Value *) &i;
 
-    std::sort(v.listElems(), v.listElems() + n,
+    std::sort(list.begin(), list.end(),
         [&](Value * v1, Value * v2) {
             std::string_view s1 = state.symbols[((Attr *) v1)->name],
                 s2 = state.symbols[((Attr *) v2)->name];
             return s1 < s2;
         });
 
-    for (unsigned int i = 0; i < n; ++i)
-        v.listElems()[i] = ((Attr *) v.listElems()[i])->value;
+    for (auto & v : list)
+        v = ((Attr *) v)->value;
+
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_attrValues({
@@ -2805,9 +2834,10 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
             res[found++] = i->value;
     }
 
-    state.mkList(v, found);
+    auto list = state.buildList(found);
     for (unsigned int n = 0; n < found; ++n)
-        v.listElems()[n] = res[n];
+        list[n] = res[n];
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_catAttrs({
@@ -2844,8 +2874,7 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * arg
 
     auto attrs = state.buildBindings(args[0]->lambda.fun->formals->formals.size());
     for (auto & i : args[0]->lambda.fun->formals->formals)
-        // !!! should optimise booleans (allocate only once)
-        attrs.alloc(i.name, i.pos).mkBool(i.def);
+        attrs.insert(i.name, state.getBool(i.def), i.pos);
     v.mkAttrs(attrs);
 }
 
@@ -2908,43 +2937,50 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
     // attribute with the merge function application. this way we need not
     // use (slightly slower) temporary storage the GC does not know about.
 
-    std::map<Symbol, std::pair<size_t, Value * *>> attrsSeen;
+    struct Item
+    {
+        size_t size = 0;
+        size_t pos = 0;
+        std::optional<ListBuilder> list;
+    };
+
+    std::map<Symbol, Item> attrsSeen;
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
-    const auto listSize = args[1]->listSize();
-    const auto listElems = args[1]->listElems();
+    const auto listItems = args[1]->listItems();
 
-    for (unsigned int n = 0; n < listSize; ++n) {
-        Value * vElem = listElems[n];
+    for (auto & vElem : listItems) {
         state.forceAttrs(*vElem, noPos, "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
         for (auto & attr : *vElem->attrs)
-            attrsSeen[attr.name].first++;
+            attrsSeen.try_emplace(attr.name).first->second.size++;
+    }
+
+    for (auto & [sym, elem] : attrsSeen)
+        elem.list.emplace(state.buildList(elem.size));
+
+    for (auto & vElem : listItems) {
+        for (auto & attr : *vElem->attrs) {
+            auto & item = attrsSeen.at(attr.name);
+            (*item.list)[item.pos++] = attr.value;
+        }
     }
 
     auto attrs = state.buildBindings(attrsSeen.size());
+
     for (auto & [sym, elem] : attrsSeen) {
-        auto & list = attrs.alloc(sym);
-        state.mkList(list, elem.first);
-        elem.second = list.listElems();
-    }
-    v.mkAttrs(attrs.alreadySorted());
-
-    for (unsigned int n = 0; n < listSize; ++n) {
-        Value * vElem = listElems[n];
-        for (auto & attr : *vElem->attrs)
-            *attrsSeen[attr.name].second++ = attr.value;
-    }
-
-    for (auto & attr : *v.attrs) {
         auto name = state.allocValue();
-        name->mkString(state.symbols[attr.name]);
+        name->mkString(state.symbols[sym]);
         auto call1 = state.allocValue();
         call1->mkApp(args[0], name);
         auto call2 = state.allocValue();
-        call2->mkApp(call1, attr.value);
-        attr.value = call2;
+        auto arg = state.allocValue();
+        arg->mkList(*elem.list);
+        call2->mkApp(call1, arg);
+        attrs.insert(sym, call2);
     }
+
+    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_zipAttrsWith({
@@ -3055,9 +3091,10 @@ static void prim_tail(EvalState & state, const PosIdx pos, Value * * args, Value
     if (args[0]->listSize() == 0)
         state.error<EvalError>("'tail' called on an empty list").atPos(pos).debugThrow();
 
-    state.mkList(v, args[0]->listSize() - 1);
-    for (unsigned int n = 0; n < v.listSize(); ++n)
-        v.listElems()[n] = args[0]->listElems()[n + 1];
+    auto list = state.buildList(args[0]->listSize() - 1);
+    for (const auto & [n, v] : enumerate(list))
+        v = args[0]->listElems()[n + 1];
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_tail({
@@ -3088,10 +3125,11 @@ static void prim_map(EvalState & state, const PosIdx pos, Value * * args, Value 
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.map");
 
-    state.mkList(v, args[1]->listSize());
-    for (unsigned int n = 0; n < v.listSize(); ++n)
-        (v.listElems()[n] = state.allocValue())->mkApp(
+    auto list = state.buildList(args[1]->listSize());
+    for (const auto & [n, v] : enumerate(list))
+        (v = state.allocValue())->mkApp(
             args[0], args[1]->listElems()[n]);
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_map({
@@ -3140,8 +3178,9 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
     if (same)
         v = *args[1];
     else {
-        state.mkList(v, k);
-        for (unsigned int n = 0; n < k; ++n) v.listElems()[n] = vs[n];
+        auto list = state.buildList(k);
+        for (const auto & [n, v] : enumerate(list)) v = vs[n];
+        v.mkList(list);
     }
 }
 
@@ -3316,12 +3355,13 @@ static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Va
     // as evaluating map without accessing any values makes little sense.
     state.forceFunction(*args[0], noPos, "while evaluating the first argument passed to builtins.genList");
 
-    state.mkList(v, len);
-    for (unsigned int n = 0; n < (unsigned int) len; ++n) {
+    auto list = state.buildList(len);
+    for (const auto & [n, v] : enumerate(list)) {
         auto arg = state.allocValue();
         arg->mkInt(n);
-        (v.listElems()[n] = state.allocValue())->mkApp(args[0], arg);
+        (v = state.allocValue())->mkApp(args[0], arg);
     }
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_genList({
@@ -3355,19 +3395,20 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.sort");
 
-    state.mkList(v, len);
-    for (unsigned int n = 0; n < len; ++n) {
-        state.forceValue(*args[1]->listElems()[n], pos);
-        v.listElems()[n] = args[1]->listElems()[n];
-    }
+    auto list = state.buildList(len);
+    for (const auto & [n, v] : enumerate(list))
+        state.forceValue(*(v = args[1]->listElems()[n]), pos);
 
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
         /* TODO: (layus) this is absurd. An optimisation like this
            should be outside the lambda creation */
-        if (args[0]->isPrimOp() && args[0]->primOp->fun == prim_lessThan)
-            return CompareValues(state, noPos, "while evaluating the ordering function passed to builtins.sort")(a, b);
+        if (args[0]->isPrimOp()) {
+            auto ptr = args[0]->primOp->fun.target<decltype(&prim_lessThan)>();
+            if (ptr && *ptr == prim_lessThan)
+                return CompareValues(state, noPos, "while evaluating the ordering function passed to builtins.sort")(a, b);
+        }
 
         Value * vs[] = {a, b};
         Value vBool;
@@ -3378,7 +3419,9 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
     /* FIXME: std::sort can segfault if the comparator is not a strict
        weak ordering. What to do? std::stable_sort() seems more
        resilient, but no guarantees... */
-    std::stable_sort(v.listElems(), v.listElems() + len, comparator);
+    std::stable_sort(list.begin(), list.end(), comparator);
+
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_sort({
@@ -3424,17 +3467,17 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value * * args, 
 
     auto attrs = state.buildBindings(2);
 
-    auto & vRight = attrs.alloc(state.sRight);
     auto rsize = right.size();
-    state.mkList(vRight, rsize);
+    auto rlist = state.buildList(rsize);
     if (rsize)
-        memcpy(vRight.listElems(), right.data(), sizeof(Value *) * rsize);
+        memcpy(rlist.elems, right.data(), sizeof(Value *) * rsize);
+    attrs.alloc(state.sRight).mkList(rlist);
 
-    auto & vWrong = attrs.alloc(state.sWrong);
     auto wsize = wrong.size();
-    state.mkList(vWrong, wsize);
+    auto wlist = state.buildList(wsize);
     if (wsize)
-        memcpy(vWrong.listElems(), wrong.data(), sizeof(Value *) * wsize);
+        memcpy(wlist.elems, wrong.data(), sizeof(Value *) * wsize);
+    attrs.alloc(state.sWrong).mkList(wlist);
 
     v.mkAttrs(attrs);
 }
@@ -3481,10 +3524,10 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value * * args, Va
     auto attrs2 = state.buildBindings(attrs.size());
 
     for (auto & i : attrs) {
-        auto & list = attrs2.alloc(i.first);
         auto size = i.second.size();
-        state.mkList(list, size);
-        memcpy(list.listElems(), i.second.data(), sizeof(Value *) * size);
+        auto list = state.buildList(size);
+        memcpy(list.elems, i.second.data(), sizeof(Value *) * size);
+        attrs2.alloc(i.first).mkList(list);
     }
 
     v.mkAttrs(attrs2.alreadySorted());
@@ -3531,14 +3574,15 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
         len += lists[n].listSize();
     }
 
-    state.mkList(v, len);
-    auto out = v.listElems();
+    auto list = state.buildList(len);
+    auto out = list.elems;
     for (unsigned int n = 0, pos = 0; n < nrLists; ++n) {
         auto l = lists[n].listSize();
         if (l)
             memcpy(out + pos, lists[n].listElems(), l * sizeof(Value *));
         pos += l;
     }
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_concatMap({
@@ -3820,7 +3864,7 @@ static RegisterPrimOp primop_stringLength({
     .name = "__stringLength",
     .args = {"e"},
     .doc = R"(
-      Return the length of the string *e*. If *e* is not a string,
+      Return the number of bytes of the string *e*. If *e* is not a string,
       evaluation is aborted.
     )",
     .fun = prim_stringLength,
@@ -3986,14 +4030,13 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         }
 
         // the first match is the whole string
-        const size_t len = match.size() - 1;
-        state.mkList(v, len);
-        for (size_t i = 0; i < len; ++i) {
-            if (!match[i+1].matched)
-                (v.listElems()[i] = state.allocValue())->mkNull();
+        auto list = state.buildList(match.size() - 1);
+        for (const auto & [i, v2] : enumerate(list))
+            if (!match[i + 1].matched)
+                v2 = &state.vNull;
             else
-                (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
-        }
+                (v2 = state.allocValue())->mkString(match[i + 1].str());
+        v.mkList(list);
 
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
@@ -4062,11 +4105,12 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
         // Any matches results are surrounded by non-matching results.
         const size_t len = std::distance(begin, end);
-        state.mkList(v, 2 * len + 1);
+        auto list = state.buildList(2 * len + 1);
         size_t idx = 0;
 
         if (len == 0) {
-            v.listElems()[idx++] = args[1];
+            list[0] = args[1];
+            v.mkList(list);
             return;
         }
 
@@ -4075,27 +4119,30 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             auto match = *i;
 
             // Add a string for non-matched characters.
-            (v.listElems()[idx++] = state.allocValue())->mkString(match.prefix().str());
+            (list[idx++] = state.allocValue())->mkString(match.prefix().str());
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
-            auto elem = v.listElems()[idx++] = state.allocValue();
 
             // Start at 1, beacause the first match is the whole string.
-            state.mkList(*elem, slen);
-            for (size_t si = 0; si < slen; ++si) {
+            auto list2 = state.buildList(slen);
+            for (const auto & [si, v2] : enumerate(list2)) {
                 if (!match[si + 1].matched)
-                    (elem->listElems()[si] = state.allocValue())->mkNull();
+                    v2 = &state.vNull;
                 else
-                    (elem->listElems()[si] = state.allocValue())->mkString(match[si + 1].str());
+                    (v2 = state.allocValue())->mkString(match[si + 1].str());
             }
+
+            (list[idx++] = state.allocValue())->mkList(list2);
 
             // Add a string for non-matched suffix characters.
             if (idx == 2 * len)
-                (v.listElems()[idx++] = state.allocValue())->mkString(match.suffix().str());
+                (list[idx++] = state.allocValue())->mkString(match.suffix().str());
         }
 
         assert(idx == 2 * len + 1);
+
+        v.mkList(list);
 
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
@@ -4316,9 +4363,10 @@ static void prim_splitVersion(EvalState & state, const PosIdx pos, Value * * arg
             break;
         components.emplace_back(component);
     }
-    state.mkList(v, components.size());
+    auto list = state.buildList(components.size());
     for (const auto & [n, component] : enumerate(components))
-        (v.listElems()[n] = state.allocValue())->mkString(std::move(component));
+        (list[n] = state.allocValue())->mkString(std::move(component));
+    v.mkList(list);
 }
 
 static RegisterPrimOp primop_splitVersion({
@@ -4411,8 +4459,7 @@ void EvalState::createBaseEnv()
         )",
     });
 
-    v.mkNull();
-    addConstant("null", v, {
+    addConstant("null", &vNull, {
         .type = nNull,
         .doc = R"(
           Primitive value.
@@ -4559,14 +4606,14 @@ void EvalState::createBaseEnv()
     });
 
     /* Add a value containing the current Nix expression search path. */
-    mkList(v, searchPath.elements.size());
-    int n = 0;
-    for (auto & i : searchPath.elements) {
+    auto list = buildList(searchPath.elements.size());
+    for (const auto & [n, i] : enumerate(searchPath.elements)) {
         auto attrs = buildBindings(2);
         attrs.alloc("path").mkString(i.path.s);
         attrs.alloc("prefix").mkString(i.prefix.s);
-        (v.listElems()[n++] = allocValue())->mkAttrs(attrs);
+        (list[n] = allocValue())->mkAttrs(attrs);
     }
+    v.mkList(list);
     addConstant("__nixPath", v, {
         .type = nList,
         .doc = R"(

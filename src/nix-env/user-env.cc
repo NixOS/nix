@@ -49,10 +49,8 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
-    Value manifest;
-    state.mkList(manifest, elems.size());
-    size_t n = 0;
-    for (auto & i : elems) {
+    auto list = state.buildList(elems.size());
+    for (const auto & [n, i] : enumerate(elems)) {
         /* Create a pseudo-derivation containing the name, system,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
@@ -72,10 +70,9 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
             attrs.alloc(state.sDrvPath).mkString(state.store->printStorePath(*drvPath));
 
         // Copy each output meant for installation.
-        auto & vOutputs = attrs.alloc(state.sOutputs);
-        state.mkList(vOutputs, outputs.size());
+        auto outputsList = state.buildList(outputs.size());
         for (const auto & [m, j] : enumerate(outputs)) {
-            (vOutputs.listElems()[m] = state.allocValue())->mkString(j.first);
+            (outputsList[m] = state.allocValue())->mkString(j.first);
             auto outputAttrs = state.buildBindings(2);
             outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(*j.second));
             attrs.alloc(j.first).mkAttrs(outputAttrs);
@@ -87,6 +84,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
             references.insert(*j.second);
         }
+        attrs.alloc(state.sOutputs).mkList(outputsList);
 
         // Copy the meta attributes.
         auto meta = state.buildBindings(metaNames.size());
@@ -98,10 +96,13 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
 
         attrs.alloc(state.sMeta).mkAttrs(meta);
 
-        (manifest.listElems()[n++] = state.allocValue())->mkAttrs(attrs);
+        (list[n] = state.allocValue())->mkAttrs(attrs);
 
         if (drvPath) references.insert(*drvPath);
     }
+
+    Value manifest;
+    manifest.mkList(list);
 
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the

@@ -3,11 +3,6 @@
 
 #include "eval.hh"
 
-#if HAVE_BOEHMGC
-#define GC_INCLUDE_NEW
-#include <gc/gc_cpp.h>
-#endif
-
 namespace nix {
 
 struct AbstractNixRepl

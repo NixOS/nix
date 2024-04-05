@@ -16,6 +16,7 @@
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
 #include "keys.hh"
+#include "users.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -223,7 +224,7 @@ LocalStore::LocalStore(const Params & params)
 
     /* Optionally, create directories and set permissions for a
        multi-user install. */
-    if (getuid() == 0 && settings.buildUsersGroup != "") {
+    if (isRootUser() && settings.buildUsersGroup != "") {
         mode_t perm = 01775;
 
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -558,6 +559,19 @@ void LocalStore::openDB(State & state, bool create)
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "setting journal mode");
 
+    if (mode == "wal") {
+        /* persist the WAL files when the db connection is closed. This allows
+           for read-only connections without write permissions on the
+           containing directory to succeed on a closed db. Setting the
+           journal_size_limit to 2^40 bytes results in the WAL files getting
+           truncated to 0 on exit and limits the on disk size of the WAL files
+           to 2^40 bytes following a checkpoint */
+        if (sqlite3_exec(db, "pragma main.journal_size_limit = 1099511627776;", 0, 0, 0) == SQLITE_OK) {
+            int enable = 1;
+            sqlite3_file_control(db, NULL, SQLITE_FCNTL_PERSIST_WAL, &enable);
+        }
+    }
+
     /* Increase the auto-checkpoint interval to 40000 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
@@ -579,7 +593,7 @@ void LocalStore::openDB(State & state, bool create)
 void LocalStore::makeStoreWritable()
 {
 #if __linux__
-    if (getuid() != 0) return;
+    if (!isRootUser()) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
     if (statvfs(realStoreDir.get().c_str(), &stat) != 0)
@@ -1588,7 +1602,7 @@ static void makeMutable(const Path & path)
 /* Upgrade from schema 6 (Nix 0.15) to schema 7 (Nix >= 1.3). */
 void LocalStore::upgradeStore7()
 {
-    if (getuid() != 0) return;
+    if (!isRootUser()) return;
     printInfo("removing immutable bits from the Nix store (this may take a while)...");
     makeMutable(realStoreDir);
 }

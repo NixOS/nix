@@ -308,7 +308,7 @@ std::string optimisticLockProfile(const Path & profile)
 Path profilesDir()
 {
     auto profileRoot =
-        (getuid() == 0)
+        isRootUser()
         ? rootProfilesDir()
         : createNixStateDir() + "/profiles";
     createDirs(profileRoot);
@@ -332,7 +332,7 @@ Path getDefaultProfile()
         // Backwards compatibiliy measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
         Path globalProfileLink = settings.nixStateDir + "/profiles/default";
-        if (getuid() == 0 && !pathExists(globalProfileLink)) {
+        if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));

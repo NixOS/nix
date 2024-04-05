@@ -68,8 +68,16 @@ done
 for i in lang/eval-fail-*.nix; do
     echo "evaluating $i (should fail)";
     i=$(basename "$i" .nix)
+    flags="$(
+        if [[ -e "lang/$i.flags" ]]; then
+            sed -e 's/#.*//' < "lang/$i.flags"
+        else
+            # note that show-trace is also set by init.sh
+            echo "--eval --strict --show-trace"
+        fi
+    )"
     if
-        expectStderr 1 nix-instantiate --eval --strict --show-trace "lang/$i.nix" \
+        expectStderr 1 nix-instantiate $flags "lang/$i.nix" \
             | sed "s!$(pwd)!/pwd!g" > "lang/$i.err"
     then
         diffAndAccept "$i" err err.exp

@@ -26,7 +26,6 @@ enum struct ExperimentalFeature
     RecursiveNix,
     NoUrlLiterals,
     FetchClosure,
-    ReplFlake,
     AutoAllocateUids,
     Cgroups,
     DaemonTrustOverride,

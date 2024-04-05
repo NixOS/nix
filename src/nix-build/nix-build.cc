@@ -24,6 +24,7 @@
 #include "common-eval-args.hh"
 #include "attr-path.hh"
 #include "legacy.hh"
+#include "users.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -287,7 +288,7 @@ static void main_nix_build(int argc, char * * argv)
     }
 
     if (runEnv)
-        setenv("IN_NIX_SHELL", pure ? "pure" : "impure", 1);
+        setEnv("IN_NIX_SHELL", pure ? "pure" : "impure");
 
     PackageInfos drvs;
 
@@ -475,8 +476,9 @@ static void main_nix_build(int argc, char * * argv)
         // Set the environment.
         auto env = getEnv();
 
-        auto tmp = getEnv("TMPDIR");
-        if (!tmp) tmp = getEnv("XDG_RUNTIME_DIR").value_or("/tmp");
+        auto tmp = getEnvNonEmpty("TMPDIR");
+        if (!tmp)
+            tmp = getEnvNonEmpty("XDG_RUNTIME_DIR").value_or("/tmp");
 
         if (pure) {
             decltype(env) newEnv;
@@ -571,8 +573,9 @@ static void main_nix_build(int argc, char * * argv)
                 "BASH=%5%; "
                 "set +e; "
                 R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && )s" +
-                (getuid() == 0 ? R"s(PS1='\n\[\033[1;31m\][nix-shell:\w]\$\[\033[0m\] '; )s"
-                               : R"s(PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s") +
+                (isRootUser()
+                    ? R"s(PS1='\n\[\033[1;31m\][nix-shell:\w]\$\[\033[0m\] '; )s"
+                    : R"s(PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s") +
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "

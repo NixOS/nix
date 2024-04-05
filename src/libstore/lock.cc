@@ -2,6 +2,7 @@
 #include "file-system.hh"
 #include "globals.hh"
 #include "pathlocks.hh"
+#include "users.hh"
 
 #include <pwd.h>
 #include <grp.h>
@@ -192,10 +193,10 @@ std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace)
 bool useBuildUsers()
 {
     #if __linux__
-    static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && getuid() == 0;
+    static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();
     return b;
     #elif __APPLE__
-    static bool b = settings.buildUsersGroup != "" && getuid() == 0;
+    static bool b = settings.buildUsersGroup != "" && isRootUser();
     return b;
     #else
     return false;

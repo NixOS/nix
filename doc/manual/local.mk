@@ -175,6 +175,16 @@ $(d)/src/SUMMARY-rl-next.md: $(d)/src/release-notes/rl-next.md
 # Generate the HTML manual.
 .PHONY: manual-html
 manual-html: $(docdir)/manual/index.html
+
+# Open the built HTML manual in the default browser.
+manual-html-open: $(docdir)/manual/index.html
+	@echo "  OPEN  " $<; \
+	  xdg-open $< \
+		  || open $< \
+			|| { \
+		echo "Could not open the manual in a browser. Please open '$<'" >&2; \
+		false; \
+		}
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.
@@ -207,7 +217,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 # `@docroot@` is to be preserved for documenting the mechanism
 # FIXME: maybe contributing guides should live right next to the code
 # instead of in the manual
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/store/types $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md $(d)/src/release-notes/rl-next.md
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/store/types $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md $(d)/src/release-notes/rl-next.md $(d)/src/figures $(d)/src/favicon.png $(d)/src/favicon.svg
 	$(trace-gen) \
 		tmp="$$(mktemp -d)"; \
 		cp -r doc/manual "$$tmp"; \

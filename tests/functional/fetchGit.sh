@@ -43,9 +43,17 @@ path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree git+file://$TEST_RO
 export _NIX_FORCE_HTTP=1
 [[ $(tail -n 1 $path0/hello) = "hello" ]]
 
+# Nuke the cache
+rm -rf $TEST_HOME/.cache/nix
+
 # Fetch the default branch.
 path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]
+
+# Fetch when the cache has packed-refs
+# Regression test of #8822
+git -C $TEST_HOME/.cache/nix/gitv3/*/ pack-refs --all
+path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
 
 # Fetch a rev from another branch
 git -C $repo checkout -b devtest
@@ -251,6 +259,7 @@ path12=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo
 
 # should fail if there is no repo
 rm -rf $repo/.git
+rm -rf $TEST_HOME/.cache/nix
 (! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # should succeed for a repo without commits

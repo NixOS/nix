@@ -2,7 +2,6 @@
 #include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
-#include "users.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
 
@@ -57,7 +56,7 @@ Settings::Settings()
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
-    buildUsersGroup = getuid() == 0 ? "nixbld" : "";
+    buildUsersGroup = isRootUser() ? "nixbld" : "";
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
@@ -346,6 +345,12 @@ void initPlugins()
                 dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!handle)
                 throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
+
+            /* Older plugins use a statically initialized object to run their code.
+               Newer plugins can also export nix_plugin_entry() */
+            void (*nix_plugin_entry)() = (void (*)())dlsym(handle, "nix_plugin_entry");
+            if (nix_plugin_entry)
+                nix_plugin_entry();
         }
     }
 
@@ -404,6 +409,7 @@ void assertLibStoreInitialized() {
 }
 
 void initLibStore() {
+    if (initLibStoreDone) return;
 
     initLibUtil();
 
@@ -415,7 +421,7 @@ void initLibStore() {
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
 #if __APPLE__
-    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
+    if (hasPrefix(defaultTempDir(), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 

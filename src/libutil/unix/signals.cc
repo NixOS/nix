@@ -8,17 +8,22 @@
 
 namespace nix {
 
-std::atomic<bool> _isInterrupted = false;
+using namespace unix;
 
+std::atomic<bool> unix::_isInterrupted = false;
+
+namespace unix {
 static thread_local bool interruptThrown = false;
-thread_local std::function<bool()> interruptCheck;
+}
+
+thread_local std::function<bool()> unix::interruptCheck;
 
 void setInterruptThrown()
 {
-    interruptThrown = true;
+    unix::interruptThrown = true;
 }
 
-void _interrupted()
+void unix::_interrupted()
 {
     /* Block user interrupts while an exception is being handled.
        Throwing an exception while another exception is being handled
@@ -65,7 +70,7 @@ static void signalHandlerThread(sigset_t set)
     }
 }
 
-void triggerInterrupt()
+void unix::triggerInterrupt()
 {
     _isInterrupted = true;
 
@@ -96,7 +101,7 @@ void triggerInterrupt()
 static sigset_t savedSignalMask;
 static bool savedSignalMaskIsSet = false;
 
-void setChildSignalMask(sigset_t * sigs)
+void unix::setChildSignalMask(sigset_t * sigs)
 {
     assert(sigs); // C style function, but think of sigs as a reference
 
@@ -115,14 +120,14 @@ void setChildSignalMask(sigset_t * sigs)
     savedSignalMaskIsSet = true;
 }
 
-void saveSignalMask() {
+void unix::saveSignalMask() {
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
         throw SysError("querying signal mask");
 
     savedSignalMaskIsSet = true;
 }
 
-void startSignalHandlerThread()
+void unix::startSignalHandlerThread()
 {
     updateWindowSize();
 
@@ -141,7 +146,7 @@ void startSignalHandlerThread()
     std::thread(signalHandlerThread, set).detach();
 }
 
-void restoreSignals()
+void unix::restoreSignals()
 {
     // If startSignalHandlerThread wasn't called, that means we're not running
     // in a proper libmain process, but a process that presumably manages its

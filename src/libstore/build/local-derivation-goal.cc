@@ -17,7 +17,6 @@
 #include "cgroup.hh"
 #include "personality.hh"
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "child.hh"
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
@@ -40,18 +39,19 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <sys/mman.h>
-#include <sched.h>
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <sys/syscall.h>
-#if HAVE_SECCOMP
-#include <seccomp.h>
-#endif
-#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
+# include <sys/ioctl.h>
+# include <net/if.h>
+# include <netinet/ip.h>
+# include <sys/mman.h>
+# include <sched.h>
+# include <sys/param.h>
+# include <sys/mount.h>
+# include <sys/syscall.h>
+# include "namespaces.hh"
+# if HAVE_SECCOMP
+#   include <seccomp.h>
+# endif
+# define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 #endif
 
 #if __APPLE__
@@ -488,7 +488,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
 
     chownToBuilder(tmpDir);
 
@@ -2053,13 +2053,13 @@ void LocalDerivationGoal::runChild()
                             i.first, i.second.source);
 
                     std::string path = i.first;
-                    struct stat st;
-                    if (lstat(path.c_str(), &st)) {
-                        if (i.second.optional && errno == ENOENT)
+                    auto optSt = maybeLstat(path.c_str());
+                    if (!optSt) {
+                        if (i.second.optional)
                             continue;
-                        throw SysError("getting attributes of path '%s", path);
+                        throw SysError("getting attributes of required path '%s", path);
                     }
-                    if (S_ISDIR(st.st_mode))
+                    if (S_ISDIR(optSt->st_mode))
                         sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
                     else
                         sandboxProfile += fmt("\t(literal \"%s\")\n", path);
@@ -2089,11 +2089,12 @@ void LocalDerivationGoal::runChild()
             bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
-               to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
-            Path globalTmpDir = canonPath(getEnvNonEmpty("TMPDIR").value_or("/tmp"), true);
+               to find temporary directories, so we want to open up a broader place for them to put their files, if needed. */
+            Path globalTmpDir = canonPath(defaultTempDir(), true);
 
             /* They don't like trailing slashes on subpath directives */
-            if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
+            while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
+                globalTmpDir.pop_back();
 
             if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
                 builder = "/usr/bin/sandbox-exec";
@@ -2270,14 +2271,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             continue;
         }
 
-        struct stat st;
-        if (lstat(actualPath.c_str(), &st) == -1) {
-            if (errno == ENOENT)
-                throw BuildError(
-                    "builder for '%s' failed to produce output path for output '%s' at '%s'",
-                    worker.store.printStorePath(drvPath), outputName, actualPath);
-            throw SysError("getting attributes of path '%s'", actualPath);
-        }
+        auto optSt = maybeLstat(actualPath.c_str());
+        if (!optSt)
+            throw BuildError(
+                "builder for '%s' failed to produce output path for output '%s' at '%s'",
+                worker.store.printStorePath(drvPath), outputName, actualPath);
+        struct stat & st = *optSt;
 
 #ifndef __CYGWIN__
         /* Check that the output is not group or world writable, as

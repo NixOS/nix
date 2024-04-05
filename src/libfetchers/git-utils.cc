@@ -21,6 +21,7 @@
 #include <git2/refs.h>
 #include <git2/remote.h>
 #include <git2/repository.h>
+#include <git2/revparse.h>
 #include <git2/status.h>
 #include <git2/submodule.h>
 #include <git2/tree.h>
@@ -199,27 +200,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     Hash resolveRef(std::string ref) override
     {
-        // Handle revisions used as refs.
-        {
-            git_oid oid;
-            if (git_oid_fromstr(&oid, ref.c_str()) == 0)
-                return toHash(oid);
-        }
-
-        // Resolve short names like 'master'.
-        Reference ref2;
-        if (!git_reference_dwim(Setter(ref2), *this, ref.c_str()))
-            ref = git_reference_name(ref2.get());
-
-        // Resolve full references like 'refs/heads/master'.
-        Reference ref3;
-        if (git_reference_lookup(Setter(ref3), *this, ref.c_str()))
+        Object object;
+        if (git_revparse_single(Setter(object), *this, ref.c_str()))
             throw Error("resolving Git reference '%s': %s", ref, git_error_last()->message);
-
-        auto oid = git_reference_target(ref3.get());
-        if (!oid)
-            throw Error("cannot get OID for Git reference '%s'", git_reference_name(ref3.get()));
-
+        auto oid = git_object_id(object.get());
         return toHash(*oid);
     }
 
@@ -364,7 +348,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         auto act = (Activity *) payload;
         act->result(resFetchStatus, trim(std::string_view(str, len)));
-        return _isInterrupted ? -1 : 0;
+        return getInterrupted() ? -1 : 0;
     }
 
     static int transferProgressCallback(const git_indexer_progress * stats, void * payload)
@@ -377,7 +361,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 stats->indexed_deltas,
                 stats->total_deltas,
                 stats->received_bytes / (1024.0 * 1024.0)));
-        return _isInterrupted ? -1 : 0;
+        return getInterrupted() ? -1 : 0;
     }
 
     void fetch(

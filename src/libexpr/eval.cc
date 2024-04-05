@@ -435,7 +435,14 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
-    vEmptyList.mkList(0);
+    vEmptyList.mkList(buildList(0));
+    vNull.mkNull();
+    vTrue.mkBool(true);
+    vFalse.mkBool(false);
+    vStringRegular.mkString("regular");
+    vStringDirectory.mkString("directory");
+    vStringSymlink.mkString("symlink");
+    vStringUnknown.mkString("unknown");
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -890,7 +897,6 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
     copyContextToValue(*this, context);
 }
 
-
 void Value::mkPath(const SourcePath & path)
 {
     mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
@@ -923,14 +929,16 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-void EvalState::mkList(Value & v, size_t size)
+ListBuilder::ListBuilder(EvalState & state, size_t size)
+    : size(size)
+    , elems(size <= 2 ? inlineElems : (Value * *) allocBytes(size * sizeof(Value *)))
 {
-    v.mkList(size);
-    if (size > 2)
-        v.bigList.elems = (Value * *) allocBytes(size * sizeof(Value *));
-    nrListElems += size;
+    state.nrListElems += size;
 }
 
+Value * EvalState::getBool(bool b) {
+    return b ? &vTrue : &vFalse;
+}
 
 unsigned long nrThunks = 0;
 
@@ -1353,9 +1361,10 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)
 {
-    state.mkList(v, elems.size());
-    for (auto [n, v2] : enumerate(v.listItems()))
-        const_cast<Value * &>(v2) = elems[n]->maybeThunk(state, env);
+    auto list = state.buildList(elems.size());
+    for (const auto & [n, v2] : enumerate(list))
+        v2 = elems[n]->maybeThunk(state, env);
+    v.mkList(list);
 }
 
 
@@ -1655,7 +1664,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     fn->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    if (fn->addTrace)
+                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1703,7 +1713,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    if (fn->addTrace)
+                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1945,7 +1956,7 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx)
+void EvalState::concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx)
 {
     nrListConcats++;
 
@@ -1963,14 +1974,15 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
         return;
     }
 
-    mkList(v, len);
-    auto out = v.listElems();
+    auto list = buildList(len);
+    auto out = list.elems;
     for (size_t n = 0, pos = 0; n < nrLists; ++n) {
         auto l = lists[n]->listSize();
         if (l)
             memcpy(out + pos, lists[n]->listElems(), l * sizeof(Value *));
         pos += l;
     }
+    v.mkList(list);
 }
 
 
