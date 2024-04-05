@@ -23,5 +23,15 @@ protected:
     }
 
     nix_c_context * ctx;
+
+    inline void assert_ctx_ok() {
+        if (nix_err_code(ctx) == NIX_OK) {
+            return;
+        }
+        unsigned int n;
+        const char * p = nix_err_msg(nullptr, ctx, &n);
+        std::string msg(p, n);
+        FAIL() << "nix_err_code(ctx) != NIX_OK, message: " << msg;
+    }
 };
 }

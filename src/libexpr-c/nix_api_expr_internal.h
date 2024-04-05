@@ -35,4 +35,10 @@ struct nix_string_context
     nix::NixStringContext & ctx;
 };
 
+struct nix_realised_string
+{
+    std::string str;
+    std::vector<StorePath> storePaths;
+};
+
 #endif // NIX_API_EXPR_INTERNAL_H

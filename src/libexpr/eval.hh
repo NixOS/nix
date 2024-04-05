@@ -733,10 +733,12 @@ public:
     bool fullGC();
 
     /**
-     * Realise the given context, and return a mapping from the placeholders
-     * used to construct the associated value to their final store path
+     * Realise the given context
+     * @param[in] context the context to realise
+     * @param[out] maybePaths if not nullptr, all built or referenced store paths will be added to this set
+     * @return a mapping from the placeholders used to construct the associated value to their final store path.
      */
-    [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
+    [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
 
     /* Call the binary path filter predicate used builtins.path etc. */
     bool callPathFilter(

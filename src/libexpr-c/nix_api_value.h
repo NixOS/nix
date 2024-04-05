@@ -9,6 +9,7 @@
  */
 
 #include "nix_api_util.h"
+#include "nix_api_store.h"
 #include "stdbool.h"
 #include "stddef.h"
 #include "stdint.h"
@@ -68,6 +69,10 @@ typedef struct PrimOp PrimOp;
  * Owned by the GC
  */
 typedef struct ExternalValue ExternalValue;
+
+/** @brief String without placeholders, and realised store paths
+ */
+typedef struct nix_realised_string nix_realised_string;
 
 /** @defgroup primops
  * @brief Create your own primops
@@ -167,7 +172,10 @@ const char * nix_get_typename(nix_c_context * context, const Value * value);
  */
 bool nix_get_bool(nix_c_context * context, const Value * value);
 
-/** @brief Get string
+/** @brief Get the raw string
+ *
+ * This may contain placeholders.
+ *
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return string
@@ -424,6 +432,56 @@ nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * builder, 
  */
 void nix_bindings_builder_free(BindingsBuilder * builder);
 /**@}*/
+
+/** @brief Realise a string context.
+ *
+ * This will
+ *  - realise the store paths referenced by the string's context, and
+ *  - perform the replacement of placeholders.
+ *  - create temporary garbage collection roots for the store paths, for
+ *    the lifetime of the current process.
+ *  - log to stderr
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] value Nix value, which must be a string
+ * @param[in] state Nix evaluator state
+ * @param[in] isIFD If true, disallow derivation outputs if setting `allow-import-from-derivation` is false.
+                    You should set this to true when this call is part of a primop.
+                    You should set this to false when building for your application's purpose.
+ * @return NULL if failed, are a new nix_realised_string, which must be freed with nix_realised_string_free
+ */
+nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * state, Value * value, bool isIFD);
+
+/** @brief Start of the string
+ * @param[in] realised_string
+ * @return pointer to the start of the string. It may not be null-terminated.
+ */
+const char * nix_realised_string_get_buffer_start(nix_realised_string * realised_string);
+
+/** @brief Length of the string
+ * @param[in] realised_string
+ * @return length of the string in bytes
+ */
+size_t nix_realised_string_get_buffer_size(nix_realised_string * realised_string);
+
+/** @brief Number of realised store paths
+ * @param[in] realised_string
+ * @return number of realised store paths that were referenced by the string via its context
+ */
+size_t nix_realised_string_get_store_path_count(nix_realised_string * realised_string);
+
+/** @brief Get a store path. The store paths are stored in an arbitrary order.
+ * @param[in] realised_string
+ * @param[in] index index of the store path, must be less than the count
+ * @return store path
+ */
+const StorePath * nix_realised_string_get_store_path(nix_realised_string * realised_string, size_t index);
+
+/** @brief Free a realised string
+ * @param[in] realised_string
+ */
+void nix_realised_string_free(nix_realised_string * realised_string);
+
 
 // cffi end
 #ifdef __cplusplus
