@@ -14,7 +14,6 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
-#include "cgroup.hh"
 #include "personality.hh"
 #include "current-process.hh"
 #include "child.hh"
@@ -52,6 +51,7 @@
 #   include <seccomp.h>
 # endif
 # define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
+# include "cgroup.hh"
 #endif
 
 #if __APPLE__

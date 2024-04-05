@@ -1,8 +1,6 @@
 #pragma once
 ///@file
 
-#if __linux__
-
 #include <chrono>
 #include <optional>
 
@@ -28,5 +26,3 @@ struct CgroupStats
 CgroupStats destroyCgroup(const Path & cgroup);
 
 }
-
-#endif
