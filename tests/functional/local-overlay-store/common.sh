@@ -1,5 +1,7 @@
 source ../common.sh
 
+export LIBMOUNT_FORCE_MOUNT2=always
+
 requireEnvironment () {
   requireSandboxSupport
   [[ $busybox =~ busybox ]] || skipTest "no busybox"
