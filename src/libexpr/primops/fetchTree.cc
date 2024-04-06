@@ -650,12 +650,14 @@ static RegisterPrimOp primop_fetchGit({
 
         The public keys against which `rev` is verified if `verifyCommit` is enabled.
         Must be given as a list of attribute sets with the following form:
+
         ```nix
         {
           key = "<public key>";
           type = "<key type>"; # optional, default: "ssh-ed25519"
         }
         ```
+
         Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
 
 
