@@ -74,6 +74,9 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     std::string pEnd = "-myname.drv";
     ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
 
+    // NOTE: .drvPath should be usually be ignored. Output paths are more versatile.
+    //       See https://github.com/NixOS/nix/issues/6507
+    //       Use e.g. nix_string_realise to realise the output.
     StorePath * drvStorePath = nix_store_parse_path(ctx, store, drvPath);
     ASSERT_EQ(true, nix_store_is_valid_path(ctx, store, drvStorePath));
 
@@ -88,11 +91,9 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath);
     ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, outStorePath));
 
-    // TODO figure out why fails.
-    // `make libexpr-tests_RUN` works, but `nix build .` enters an infinite loop
-    /* nix_store_realise(ctx, store, drvStorePath, nullptr, nullptr); */
-    /* auto is_valid_path = nix_store_is_valid_path(ctx, store, outStorePath); */
-    /* ASSERT_EQ(true, is_valid_path); */
+    nix_store_realise(ctx, store, drvStorePath, nullptr, nullptr);
+    auto is_valid_path = nix_store_is_valid_path(ctx, store, outStorePath);
+    ASSERT_EQ(true, is_valid_path);
 
     // Clean up
     nix_store_path_free(drvStorePath);

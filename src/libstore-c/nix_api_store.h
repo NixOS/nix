@@ -111,7 +111,9 @@ bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath *
 /**
  * @brief Realise a Nix store path
  *
- * Blocking, calls callback once for each realised output
+ * Blocking, calls callback once for each realised output.
+ *
+ * @note When working with expressions, consider using e.g. nix_string_realise to get the output. `.drvPath` may not be accurate or available in the future. See https://github.com/NixOS/nix/issues/6507
  *
  * @param[out] context Optional, stores error information
  * @param[in] store Nix Store reference
