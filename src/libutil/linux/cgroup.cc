@@ -1,5 +1,3 @@
-#if __linux__
-
 #include "cgroup.hh"
 #include "util.hh"
 #include "file-system.hh"
@@ -145,5 +143,3 @@ CgroupStats destroyCgroup(const Path & cgroup)
 }
 
 }
-
-#endif
