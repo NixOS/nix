@@ -6,6 +6,7 @@
 #include "nix_api_value.h"
 
 #include "tests/nix_api_expr.hh"
+#include "tests/string_callback.hh"
 
 #include "gmock/gmock.h"
 #include <gtest/gtest.h>
@@ -168,11 +169,14 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
     EXPECT_THAT(s, testing::HasSubstr("a derivation path by itself:"));
     EXPECT_THAT(s, testing::EndsWith("-not-actually-built-yet.drv\n"));
 
-    std::vector<std::string_view> names;
+    std::vector<std::string> names;
     size_t n = nix_realised_string_get_store_path_count(r);
     for (size_t i = 0; i < n; ++i) {
         const StorePath * p = nix_realised_string_get_store_path(r, i);
-        names.push_back(p->path.name());
+        ASSERT_NE(nullptr, p);
+        std::string name;
+        nix_store_path_name(p, OBSERVE_STRING(name));
+        names.push_back(name);
     }
     std::sort(names.begin(), names.end());
     ASSERT_EQ(3, names.size());

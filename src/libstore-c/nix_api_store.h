@@ -91,6 +91,15 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callbac
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
 
 /**
+ * @brief Get the path name (e.g. "name" in /nix/store/...-name)
+ *
+ * @param[in] store_path the path to get the name from
+ * @param[in] callback called with the name
+ * @param[in] user_data arbitrary data, passed to the callback when it's called.
+ */
+void nix_store_path_name(const StorePath *store_path, void * callback, void * user_data);
+
+/**
  * @brief Copy a StorePath
  *
  * @param[in] p the path to copy
