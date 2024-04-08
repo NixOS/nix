@@ -160,4 +160,6 @@ in
   fetch-git = runNixOSTestFor "x86_64-linux" ./fetch-git;
 
   ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
+
+  user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
 }
