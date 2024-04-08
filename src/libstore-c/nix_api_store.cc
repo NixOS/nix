@@ -132,3 +132,8 @@ void nix_store_path_free(StorePath * sp)
 {
     delete sp;
 }
+
+StorePath * nix_store_path_clone(const StorePath * p)
+{
+    return new StorePath{p->path};
+}

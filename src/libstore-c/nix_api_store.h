@@ -90,6 +90,14 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callbac
  */
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
 
+/**
+ * @brief Copy a StorePath
+ *
+ * @param[in] p the path to copy
+ * @return a new StorePath
+ */
+StorePath * nix_store_path_clone(const StorePath * p);
+
 /** @brief Deallocate a StorePath
  *
  * Does not fail.
