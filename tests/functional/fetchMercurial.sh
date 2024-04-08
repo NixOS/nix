@@ -1,6 +1,6 @@
 source common.sh
 
-[[ $(type -p hq) ]] || skipTest "Mercurial not installed"
+[[ $(type -p hg) ]] || skipTest "Mercurial not installed"
 
 clearStore
 
