@@ -145,9 +145,14 @@ struct CmdConfigCheck : StoreCommand
 
     void checkTrustedUser(ref<Store> store)
     {
-        auto trustedMay = store->isTrustedClient();
-        std::string_view trustedness = trustedMay ? (*trustedMay ? "trusted" : "not trusted") : "unknown trust";
-        checkInfo(fmt("You are %s by store uri: %s", trustedness, store->getUri()));
+        if (auto trustedMay = store->isTrustedClient()) {
+            std::string_view trusted = trustedMay.value()
+                ? "trusted"
+                : "not trusted";
+            checkInfo(fmt("You are %s by store uri: %s", trusted, store->getUri()));
+        } else {
+            checkInfo(fmt("Store uri: %s doesn't have a notion of trusted user", store->getUri()));
+        }
     }
 };
 

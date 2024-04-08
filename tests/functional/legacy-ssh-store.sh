@@ -6,4 +6,4 @@ store_uri="ssh://localhost?remote-store=$TEST_ROOT/other-store"
 nix --store "$store_uri" store info --json | jq -e 'has("trusted") | not'
 
 # Suppress grumpiness about multiple nixes on PATH
-(nix --store "$store_uri" doctor || true) 2>&1 | grep 'You are unknown trust'
+(nix --store "$store_uri" doctor || true) 2>&1 | grep "doesn't have a notion of trusted user"
