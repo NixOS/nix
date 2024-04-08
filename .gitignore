@@ -118,8 +118,6 @@ perl/Makefile.config
 /misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
 
-/src/resolve-system-dependencies/resolve-system-dependencies
-
 outputs/
 
 *.a
