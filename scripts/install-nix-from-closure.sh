@@ -218,6 +218,7 @@ added=
 p=
 p_sh=$NIX_LINK/etc/profile.d/nix.sh
 p_fish=$NIX_LINK/etc/profile.d/nix.fish
+p_nu=$NIX_LINK/etc/profile.d/nix.nu
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
     # Make the shell source nix.sh during login.
     for i in .bash_profile .bash_login .profile; do
@@ -256,6 +257,13 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         printf '\nif test -e %s; . %s; end # added by Nix installer\n' "$p_fish" "$p_fish" > "$fn"
         added=1
         p=${p_fish}
+    fi
+
+    if [ -d "$HOME/.config/nushell" ]; then
+        fn="$HOME/.config/nushell/env.nu"
+        printf '\nif ("%s" | path exists) { source "%s"; } # added by Nix installer\n' "$p_nu" "$p_nu" >> "$fn"
+        added=1
+        p=${p_nu}
     fi
 else
     p=${p_sh}
