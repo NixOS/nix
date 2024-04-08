@@ -162,4 +162,6 @@ in
   ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
 
   gzip-content-encoding = runNixOSTestFor "x86_64-linux" ./gzip-content-encoding.nix;
+
+  user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
 }
