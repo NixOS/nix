@@ -465,6 +465,12 @@ AutoCloseFD LocalStore::openGCLock()
 }
 
 
+void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
+{
+    deletePath(path, bytesFreed);
+}
+
+
 LocalStore::~LocalStore()
 {
     std::shared_future<void> future;
@@ -1369,40 +1375,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     printInfo("reading the Nix store...");
 
-    bool errors = false;
-
     /* Acquire the global GC lock to get a consistent snapshot of
        existing and valid paths. */
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StorePathSet validPaths;
-
-    {
-        StorePathSet storePathsInStoreDir;
-        /* Why aren't we using `queryAllValidPaths`? Because that would
-           tell us about all the paths than the database knows about. Here we
-           want to know about all the store paths in the store directory,
-           regardless of what the database thinks.
-
-           We will end up cross-referencing these two sources of truth (the
-           database and the filesystem) in the loop below, in order to catch
-           invalid states.
-         */
-        for (auto & i : readDirectory(realStoreDir)) {
-            try {
-                storePathsInStoreDir.insert({i.name});
-            } catch (BadStorePath &) { }
-        }
-
-        /* Check whether all valid paths actually exist. */
-        printInfo("checking path existence...");
-
-        StorePathSet done;
-
-        for (auto & i : queryAllValidPaths())
-            verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
-    }
+    auto [errors, validPaths] = verifyAllValidPaths(repair);
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1491,21 +1469,61 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const StorePath & path, const StorePathSet & storePathsInStoreDir,
+LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair)
+{
+    StorePathSet storePathsInStoreDir;
+    /* Why aren't we using `queryAllValidPaths`? Because that would
+       tell us about all the paths than the database knows about. Here we
+       want to know about all the store paths in the store directory,
+       regardless of what the database thinks.
+
+       We will end up cross-referencing these two sources of truth (the
+       database and the filesystem) in the loop below, in order to catch
+       invalid states.
+     */
+    for (auto & i : readDirectory(realStoreDir)) {
+        try {
+            storePathsInStoreDir.insert({i.name});
+        } catch (BadStorePath &) { }
+    }
+
+    /* Check whether all valid paths actually exist. */
+    printInfo("checking path existence...");
+
+    StorePathSet done;
+
+    auto existsInStoreDir = [&](const StorePath & storePath) {
+        return storePathsInStoreDir.count(storePath);
+    };
+
+    bool errors = false;
+    StorePathSet validPaths;
+
+    for (auto & i : queryAllValidPaths())
+        verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
+
+    return {
+        .errors = errors,
+        .validPaths = validPaths,
+    };
+}
+
+
+void LocalStore::verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
     StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
     if (!done.insert(path).second) return;
 
-    if (!storePathsInStoreDir.count(path)) {
+    if (!existsInStoreDir(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
+                verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }

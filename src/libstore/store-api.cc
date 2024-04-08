@@ -1402,6 +1402,7 @@ ref<Store> openStore(const std::string & uri_,
         params.insert(uriParams.begin(), uriParams.end());
 
         if (auto store = openFromNonUri(uri, params)) {
+            experimentalFeatureSettings.require(store->experimentalFeature());
             store->warnUnknownSettings();
             return ref<Store>(store);
         }

@@ -665,7 +665,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         results.paths.insert(path);
 
         uint64_t bytesFreed;
-        deletePath(realPath, bytesFreed);
+        deleteStorePath(realPath, bytesFreed);
+
         results.bytesFreed += bytesFreed;
 
         if (results.bytesFreed > options.maxFreed) {
@@ -752,7 +753,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 auto i = referrersCache.find(*path);
                 if (i == referrersCache.end()) {
                     StorePathSet referrers;
-                    queryReferrers(*path, referrers);
+                    queryGCReferrers(*path, referrers);
                     referrersCache.emplace(*path, std::move(referrers));
                     i = referrersCache.find(*path);
                 }
@@ -879,7 +880,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);
 
-            /* Do not accound for deleted file here. Rely on deletePath()
+            /* Do not account for deleted file here. Rely on deletePath()
                accounting.  */
         }
 

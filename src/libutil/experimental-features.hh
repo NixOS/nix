@@ -32,6 +32,7 @@ enum struct ExperimentalFeature
     DynamicDerivations,
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
+    LocalOverlayStore,
     ConfigurableImpureEnv,
     MountedSSHStore,
     VerifiedFetches,
