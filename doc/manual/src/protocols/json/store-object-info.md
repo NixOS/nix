@@ -28,9 +28,9 @@ Info about a [store object].
 
   Content address of this store object's file system object, used to compute its store path.
 
-[store path]: @docroot@/glossary.md#gloss-store-path
+[store path]: @docroot@/store/store-path.md
 [file system object]: @docroot@/store/file-system-object.md
-[Nix Archive]: @docroot@/glossary.md#gloss-nar
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
 ## Impure fields
 

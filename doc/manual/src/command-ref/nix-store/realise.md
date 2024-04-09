@@ -25,11 +25,11 @@ Each of *paths* is processed as follows:
 
 If no substitutes are available and no store derivation is given, realisation fails.
 
-[store paths]: @docroot@/glossary.md#gloss-store-path
+[store paths]: @docroot@/store/store-path.md
 [valid]: @docroot@/glossary.md#gloss-validity
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 [output paths]: @docroot@/glossary.md#gloss-output-path
-[store objects]: @docroot@/glossary.md#gloss-store-object
+[store objects]: @docroot@/store/store-object.md
 [closure]: @docroot@/glossary.md#gloss-closure
 [substituters]: @docroot@/command-ref/conf-file.md#conf-substituters
 [content-addressed derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
