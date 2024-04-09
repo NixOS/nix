@@ -52,7 +52,7 @@ The following [concept map] shows its main components (rectangles), the objects 
                                             '---------------'
 ```
 
-At the top is the [command line interface](../command-ref/command-ref.md) that drives the underlying layers.
+At the top is the [command line interface](../command-ref/index.md) that drives the underlying layers.
 
 The [Nix language](../language/index.md) evaluator transforms Nix expressions into self-contained *build plans*, which are used to derive *build results* from referenced *build inputs*.
 

@@ -25,7 +25,7 @@
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
 | Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
-| [Logical implication]                  | *bool* `->` *bool*                         | none          | 14         |
+| [Logical implication]                  | *bool* `->` *bool*                         | right         | 14         |
 
 [string]: ./values.md#type-string
 [path]: ./values.md#type-path
@@ -84,7 +84,7 @@ The `+` operator is overloaded to also work on strings and paths.
 >
 > *string* `+` *string*
 
-Concatenate two [string]s and merge their string contexts.
+Concatenate two [strings][string] and merge their string contexts.
 
 [String concatenation]: #string-concatenation
 
@@ -94,7 +94,7 @@ Concatenate two [string]s and merge their string contexts.
 >
 > *path* `+` *path*
 
-Concatenate two [path]s.
+Concatenate two [paths][path].
 The result is a path.
 
 [Path concatenation]: #path-concatenation
@@ -150,9 +150,9 @@ If an attribute name is present in both, the attribute value from the latter is 
 
 Comparison is
 
-- [arithmetic] for [number]s
-- lexicographic for [string]s and [path]s
-- item-wise lexicographic for [list]s:
+- [arithmetic] for [numbers][number]
+- lexicographic for [strings][string] and [paths][path]
+- item-wise lexicographic for [lists][list]:
   elements at the same index in both lists are compared according to their type and skipped if they are equal.
 
 All comparison operators are implemented in terms of `<`, and the following equivalencies hold:
@@ -163,12 +163,12 @@ All comparison operators are implemented in terms of `<`, and the following equi
 | *a* `>`  *b* |       *b* `<` *a*     |
 | *a* `>=` *b* | `! (` *a* `<` *b* `)` |
 
-[Comparison]: #comparison-operators
+[Comparison]: #comparison
 
 ## Equality
 
-- [Attribute sets][attribute set] and [list]s are compared recursively, and therefore are fully evaluated.
-- Comparison of [function]s always returns `false`.
+- [Attribute sets][attribute set] and [lists][list] are compared recursively, and therefore are fully evaluated.
+- Comparison of [functions][function] always returns `false`.
 - Numbers are type-compatible, see [arithmetic] operators.
 - Floating point numbers only differ up to a limited precision.
 

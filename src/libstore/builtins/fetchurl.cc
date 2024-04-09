@@ -6,7 +6,10 @@
 
 namespace nix {
 
-void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
+void builtinFetchurl(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs,
+    const std::string & netrcData)
 {
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
@@ -16,14 +19,15 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         writeFile(settings.netrcFile, netrcData, 0600);
     }
 
-    auto getAttr = [&](const std::string & name) {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
-        return i->second;
-    };
+    auto out = get(drv.outputs, "out");
+    if (!out)
+        throw Error("'builtin:fetchurl' requires an 'out' output");
 
-    Path storePath = getAttr("out");
-    auto mainUrl = getAttr("url");
+    if (!(drv.type().isFixed() || drv.type().isImpure()))
+        throw Error("'builtin:fetchurl' must be a fixed-output or impure derivation");
+
+    auto storePath = outputs.at("out");
+    auto mainUrl = drv.env.at("url");
     bool unpack = getOr(drv.env, "unpack", "") == "1";
 
     /* Note: have to use a fresh fileTransfer here because we're in
@@ -59,13 +63,12 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     };
 
     /* Try the hashed mirrors first. */
-    if (getAttr("outputHashMode") == "flat")
+    auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
+    if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
                 if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                std::optional<HashType> ht = parseHashTypeOpt(getAttr("outputHashAlgo"));
-                Hash h = newHashAllowEmpty(getAttr("outputHash"), ht);
-                fetch(hashedMirror + printHashType(h.type) + "/" + h.to_string(HashFormat::Base16, false));
+                fetch(hashedMirror + printHashAlgo(dof->ca.hash.algo) + "/" + dof->ca.hash.to_string(HashFormat::Base16, false));
                 return;
             } catch (Error & e) {
                 debug(e.what());

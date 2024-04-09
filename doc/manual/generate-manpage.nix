@@ -1,9 +1,29 @@
 let
   inherit (builtins)
-    attrNames attrValues fromJSON listToAttrs mapAttrs groupBy
-    concatStringsSep concatMap length lessThan replaceStrings sort;
-  inherit (import <nix/utils.nix>) attrsToList concatStrings optionalString filterAttrs trim squash unique;
-  showStoreDocs = import ./generate-store-info.nix;
+    attrNames
+    attrValues
+    concatMap
+    concatStringsSep
+    fromJSON
+    groupBy
+    length
+    lessThan
+    listToAttrs
+    mapAttrs
+    match
+    replaceStrings
+    sort
+    ;
+  inherit (import <nix/utils.nix>)
+    attrsToList
+    concatStrings
+    filterAttrs
+    optionalString
+    squash
+    trim
+    unique
+    ;
+  showStoreDocs = import <nix/generate-store-info.nix>;
 in
 
 inlineHTML: commandDump:
@@ -31,7 +51,7 @@ let
 
         ${maybeSubcommands}
 
-        ${maybeStoreDocs}
+        ${maybeProse}
 
         ${maybeOptions}
       '';
@@ -71,25 +91,53 @@ let
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
 
-      # FIXME: this is a hack.
-      # store parameters should not be part of command documentation to begin
-      # with, but instead be rendered on separate pages.
-      maybeStoreDocs = optionalString (details ? doc)
-        (replaceStrings [ "@stores@" ] [ (showStoreDocs inlineHTML commandInfo.stores) ] details.doc);
+      maybeProse =
+        # FIXME: this is a horrible hack to keep `nix help-stores` working.
+        let
+          help-stores = ''
+            ${index}
 
-      maybeOptions = let
-        allVisibleOptions = filterAttrs
-          (_: o: ! o.hiddenCategory)
-          (details.flags // toplevel.flags);
-      in optionalString (allVisibleOptions != {}) ''
-        # Options
+            ${allStores}
+          '';
+          index = replaceStrings
+            [ "@store-types@" "./local-store.md" "./local-daemon-store.md" ]
+            [ storesOverview "#local-store" "#local-daemon-store" ]
+            details.doc;
+          storesOverview =
+            let
+              showEntry = store:
+                "- [${store.name}](#${store.slug})";
+            in
+            concatStringsSep "\n" (map showEntry storesList) + "\n";
+          allStores = concatStringsSep "\n" (attrValues storePages);
+          storePages = listToAttrs
+            (map (s: { name = s.filename; value = s.page; }) storesList);
+          storesList = showStoreDocs {
+            storeInfo = commandInfo.stores;
+            inherit inlineHTML;
+          };
+        in
+        optionalString (details ? doc) (
+          if match ".*@store-types@.*" details.doc != null
+          then help-stores
+          else details.doc
+        );
 
-        ${showOptions inlineHTML allVisibleOptions}
+      maybeOptions =
+        let
+          allVisibleOptions = filterAttrs
+            (_: o: ! o.hiddenCategory)
+            (details.flags // toplevel.flags);
+        in
+        optionalString (allVisibleOptions != { }) ''
+          # Options
 
-        > **Note**
-        >
-        > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
-      '';
+          ${showOptions inlineHTML allVisibleOptions}
+
+          > **Note**
+          >
+          > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
+        '';
 
       showOptions = inlineHTML: allOptions:
         let
@@ -97,7 +145,7 @@ let
             ${optionalString (cat != "") "## ${cat}"}
 
             ${concatStringsSep "\n" (attrValues (mapAttrs showOption opts))}
-            '';
+          '';
           showOption = name: option:
             let
               result = trim ''

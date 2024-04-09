@@ -74,18 +74,24 @@ public:
      * Add a content-addressable store path. `dump` will be drained.
      */
     ref<const ValidPathInfo> addCAToStore(
-        Source & dump,
-        std::string_view name,
-        ContentAddressMethod caMethod,
-        HashType hashType,
-        const StorePathSet & references,
-        RepairFlag repair);
+            Source & dump,
+            std::string_view name,
+            ContentAddressMethod caMethod,
+            HashAlgorithm hashAlgo,
+            const StorePathSet & references,
+            RepairFlag repair);
 
     /**
-     * Add a content-addressable store path. Does not support references. `dump` will be drained.
+     * Add a content-addressable store path. `dump` will be drained.
      */
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -100,12 +106,6 @@ public:
         Activity & act,
         RepairFlag repair,
         CheckSigsFlag checkSigs) override;
-
-    StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override;
 
     void registerDrvOutput(const Realisation & info) override;
 
@@ -185,7 +185,7 @@ protected:
 
     friend struct ConnectionHandle;
 
-    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 

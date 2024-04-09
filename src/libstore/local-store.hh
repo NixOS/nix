@@ -7,7 +7,6 @@
 #include "store-api.hh"
 #include "indirect-root-store.hh"
 #include "sync.hh"
-#include "util.hh"
 
 #include <chrono>
 #include <future>
@@ -178,12 +177,12 @@ public:
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
-
-    StorePath addTextToStore(
+    StorePath addToStoreFromDump(
+        Source & dump,
         std::string_view name,
-        std::string_view s,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
+        HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override;
 
@@ -231,6 +230,25 @@ public:
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
     /**
+     * Called by `collectGarbage` to trace in reverse.
+     *
+     * Using this rather than `queryReferrers` directly allows us to
+     * fine-tune which referrers we consider for garbage collection;
+     * some store implementations take advantage of this.
+     */
+    virtual void queryGCReferrers(const StorePath & path, StorePathSet & referrers)
+    {
+        return queryReferrers(path, referrers);
+    }
+
+    /**
+     * Called by `collectGarbage` to recursively delete a path.
+     * The default implementation simply calls `deletePath`, but it can be
+     * overridden by stores that wish to provide their own deletion behaviour.
+     */
+    virtual void deleteStorePath(const Path & path, uint64_t & bytesFreed);
+
+    /**
      * Optimise the disk space usage of the Nix store by hard-linking
      * files with the same contents.
      */
@@ -246,6 +264,31 @@ public:
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
+protected:
+
+    /**
+     * Result of `verifyAllValidPaths`
+     */
+    struct VerificationResult {
+        /**
+         * Whether any errors were encountered
+         */
+        bool errors;
+
+        /**
+         * A set of so-far valid paths. The store objects pointed to by
+         * those paths are suitable for further validation checking.
+         */
+        StorePathSet validPaths;
+    };
+
+    /**
+     * First, unconditional step of `verifyStore`
+     */
+    virtual VerificationResult verifyAllValidPaths(RepairFlag repair);
+
+public:
+
     /**
      * Register the validity of a path, i.e., that `path` exists, that
      * the paths referenced by it exists, and in the case of an output
@@ -256,7 +299,7 @@ public:
      */
     void registerValidPath(const ValidPathInfo & info);
 
-    void registerValidPaths(const ValidPathInfos & infos);
+    virtual void registerValidPaths(const ValidPathInfos & infos);
 
     unsigned int getProtocol() override;
 
@@ -291,6 +334,11 @@ public:
 
     std::optional<std::string> getVersion() override;
 
+protected:
+
+    void verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+
 private:
 
     /**
@@ -313,9 +361,6 @@ private:
      * Delete a path from the Nix store.
      */
     void invalidatePathChecked(const StorePath & path);
-
-    void verifyPath(const StorePath & path, const StorePathSet & store,
-        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
@@ -351,19 +396,6 @@ private:
     void signPathInfo(ValidPathInfo & info);
     void signRealisation(Realisation &);
 
-    // XXX: Make a generic `Store` method
-    ContentAddress hashCAPath(
-        const ContentAddressMethod & method,
-        const HashType & hashType,
-        const StorePath & path);
-
-    ContentAddress hashCAPath(
-        const ContentAddressMethod & method,
-        const HashType & hashType,
-        const Path & path,
-        const std::string_view pathHash
-    );
-
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
     friend struct LocalDerivationGoal;
@@ -371,39 +403,5 @@ private:
     friend struct SubstitutionGoal;
     friend struct DerivationGoal;
 };
-
-
-typedef std::pair<dev_t, ino_t> Inode;
-typedef std::set<Inode> InodesSeen;
-
-
-/**
- * "Fix", or canonicalise, the meta-data of the files in a store path
- * after it has been built.  In particular:
- *
- * - the last modification date on each file is set to 1 (i.e.,
- *   00:00:01 1/1/1970 UTC)
- *
- * - the permissions are set of 444 or 555 (i.e., read-only with or
- *   without execute permission; setuid bits etc. are cleared)
- *
- * - the owner and group are set to the Nix user and group, if we're
- *   running as root.
- *
- * If uidRange is not empty, this function will throw an error if it
- * encounters files owned by a user outside of the closed interval
- * [uidRange->first, uidRange->second].
- */
-void canonicalisePathMetaData(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-    InodesSeen & inodesSeen);
-void canonicalisePathMetaData(
-    const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange);
-
-void canonicaliseTimestampAndPermissions(const Path & path);
-
-MakeError(PathInUse, Error);
 
 }

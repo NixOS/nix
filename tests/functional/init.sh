@@ -3,7 +3,7 @@ source common/vars-and-functions.sh
 
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
-    chmod -R u+w "$TEST_ROOT"
+    chmod -R u+rw "$TEST_ROOT"
     # We would delete any daemon socket, so let's stop the daemon first.
     killDaemon
     rm -rf "$TEST_ROOT"
@@ -20,7 +20,7 @@ cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 build-users-group =
 keep-derivations = false
 sandbox = false
-experimental-features = nix-command flakes
+experimental-features = nix-command
 gc-reserved-space = 0
 substituters =
 flake-registry = $TEST_ROOT/registry.json
@@ -31,6 +31,7 @@ EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
 fsync-metadata = false
+extra-experimental-features = flakes
 !include nix.conf.extra.not-there
 EOF
 

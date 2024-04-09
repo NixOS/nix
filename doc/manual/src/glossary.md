@@ -3,10 +3,10 @@
 - [derivation]{#gloss-derivation}
 
   A description of a build task. The result of a derivation is a
-  store object. Derivations are typically specified in Nix expressions
+  store object. Derivations declared in Nix expressions are specified
   using the [`derivation` primitive](./language/derivations.md). These are
   translated into low-level *store derivations* (implicitly by
-  `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
+  `nix-build`, or explicitly by `nix-instantiate`).
 
   [derivation]: #gloss-derivation
 
@@ -14,6 +14,7 @@
 
   A [derivation] represented as a `.drv` file in the [store].
   It has a [store path], like any [store object].
+  It is the [instantiated][instantiate] form of a derivation.
 
   Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
 
@@ -23,9 +24,9 @@
 
 - [instantiate]{#gloss-instantiate}, instantiation
 
-  Translate a [derivation] into a [store derivation].
+  Save an evaluated [derivation] as a [store derivation] in the Nix [store].
 
-  See [`nix-instantiate`](./command-ref/nix-instantiate.md).
+  See [`nix-instantiate`](./command-ref/nix-instantiate.md), which produces a store derivation from a Nix expression that evaluates to a derivation.
 
   [instantiate]: #gloss-instantiate
 
@@ -36,7 +37,7 @@
   This can be achieved by:
   - Fetching a pre-built [store object] from a [substituter]
   - Running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [derivation]
-  - Delegating to a [remote builder](@docroot@/advanced-topics/distributed-builds.html) and retrieving the outputs
+  - Delegating to a [remote machine](@docroot@/command-ref/conf-file.md#conf-builders) and retrieving the outputs
   <!-- TODO: link [running] to build process page, #8888 -->
 
   See [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md) for a detailed description of the algorithm.
@@ -58,23 +59,12 @@
 
 - [store]{#gloss-store}
 
-  A collection of store objects, with operations to manipulate that collection.
-  See [Nix store](./store/index.md) for details.
+  A collection of [store objects][store object], with operations to manipulate that collection.
+  See [Nix Store](./store/index.md) for details.
 
-  There are many types of stores.
-  See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md) for a complete list.
-
-  From the perspective of the location where Nix is invoked, the Nix store can be  referred to _local_ or _remote_.
-  Only a [local store]{#gloss-local-store} exposes a location in the file system of the machine where Nix is invoked that allows access to store objects, typically `/nix/store`.
-  Local stores can be used for building [derivations](#derivation).
-  See [Local Store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) for details.
+  There are many types of stores, see [Store Types](./store/types/index.md) for details.
 
   [store]: #gloss-store
-  [local store]: #gloss-local-store
-
-- [chroot store]{#gloss-chroot-store}
-
-  A [local store] whose canonical path is anything other than `/nix/store`.
 
 - [binary cache]{#gloss-binary-cache}
 
@@ -86,7 +76,7 @@
 
 - [store path]{#gloss-store-path}
 
-  The location of a [store object](@docroot@/store/index.md#store-object) in the file system, i.e., an immediate child of the Nix store directory.
+  The location of a [store object] in the file system, i.e., an immediate child of the Nix store directory.
 
   > **Example**
   >
@@ -96,7 +86,7 @@
 
   [store path]: #gloss-store-path
 
-- [file system object]{#gloss-store-object}
+- [file system object]{#gloss-file-system-object}
 
   The Nix data model for representing simplified file system data.
 
@@ -126,7 +116,7 @@
   non-[fixed-output](#gloss-fixed-output-derivation)
   derivation.
 
-- [output-addressed store object]{#gloss-output-addressed-store-object}
+- [content-addressed store object]{#gloss-content-addressed-store-object}
 
   A [store object] whose [store path] is determined by its contents.
   This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
@@ -155,6 +145,11 @@
   builder can rely on external inputs such as the network or the
   system time) but the Nix model assumes it.
 
+- [impure derivation]{#gloss-impure-derivation}
+
+  [An experimental feature](#@docroot@/contributing/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
+  so that they are always rebuilt, and their outputs not reused by subsequent calls to realise them.
+
 - [Nix database]{#gloss-nix-database}
 
   An SQlite database to track [reference]s between [store object]s.
@@ -166,11 +161,13 @@
 
 - [Nix expression]{#gloss-nix-expression}
 
-  A high-level description of software packages and compositions
-  thereof. Deploying software using Nix entails writing Nix
-  expressions for your packages. Nix expressions are translated to
-  derivations that are stored in the Nix store. These derivations can
-  then be built.
+  1. Commonly, a high-level description of software packages and compositions
+    thereof. Deploying software using Nix entails writing Nix
+    expressions for your packages. Nix expressions specify [derivations][derivation],
+    which are [instantiated][instantiate] into the Nix store as [store derivations][store derivation].
+    These derivations can then be [realised][realise] to produce [outputs][output].
+
+  2. A syntactically valid use of the [Nix language]. For example, the contents of a `.nix` file form an expression.
 
 - [reference]{#gloss-reference}
 
@@ -222,6 +219,9 @@
 
   The [store derivation] that produced an [output path].
 
+  The deriver for an output path can be queried with the `--deriver` option to
+  [`nix-store --query`](@docroot@/command-ref/nix-store/query.md).
+
 - [validity]{#gloss-validity}
 
   A store path is valid if all [store object]s in its [closure] can be read from the [store].
@@ -232,6 +232,7 @@
   - All paths in the store path's [closure] are valid.
 
   [validity]: #gloss-validity
+  [local store]: @docroot@/store/types/local-store.md
 
 - [user environment]{#gloss-user-env}
 
@@ -266,6 +267,21 @@
 
   The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
 
+- [package]{#package}
+
+  1. A software package; a collection of files and other data.
+
+  2. A [package attribute set].
+
+- [package attribute set]{#package-attribute-set}
+
+  An [attribute set](@docroot@/language/values.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
+  - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
+  - attributes that declare something about how the package is supposed to be installed or used,
+  - other metadata or arbitrary attributes.
+
+  [package attribute set]: #package-attribute-set
+
 - [string interpolation]{#gloss-string-interpolation}
 
   Expanding expressions enclosed in `${ }` within a [string], [path], or [attribute name].
@@ -282,3 +298,6 @@
   These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
 
   See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/contributing/experimental-features.md).
+
+
+[Nix language]: ./language/index.md

@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "crypto.hh"
+#include "signature/signer.hh"
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
@@ -78,6 +78,18 @@ struct UnkeyedValidPathInfo
     DECLARE_CMP(UnkeyedValidPathInfo);
 
     virtual ~UnkeyedValidPathInfo() { }
+
+    /**
+     * @param includeImpureInfo If true, variable elements such as the
+     * registration time are included.
+     */
+    virtual nlohmann::json toJSON(
+        const Store & store,
+        bool includeImpureInfo,
+        HashFormat hashFormat) const;
+    static UnkeyedValidPathInfo fromJSON(
+        const Store & store,
+        const nlohmann::json & json);
 };
 
 struct ValidPathInfo : UnkeyedValidPathInfo {
@@ -95,7 +107,7 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
      */
     std::string fingerprint(const Store & store) const;
 
-    void sign(const Store & store, const SecretKey & secretKey);
+    void sign(const Store & store, const Signer & signer);
 
     /**
      * @return The `ContentAddressWithReferences` that determines the

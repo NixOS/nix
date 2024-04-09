@@ -1,4 +1,6 @@
 #include "json-to-value.hh"
+#include "value.hh"
+#include "eval.hh"
 
 #include <variant>
 #include <nlohmann/json.hpp>
@@ -55,11 +57,10 @@ class JSONSax : nlohmann::json_sax<json> {
         ValueVector values;
         std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
-            Value & v = parent->value(state);
-            state.mkList(v, values.size());
-            for (size_t n = 0; n < values.size(); ++n) {
-                v.listElems()[n] = values[n];
-            }
+            auto list = state.buildList(values.size());
+            for (const auto & [n, v2] : enumerate(list))
+                v2 = values[n];
+            parent->value(state).mkList(list);
             return std::move(parent);
         }
         void add() override {
@@ -159,7 +160,7 @@ public:
     }
 
     bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex) {
-        throw JSONParseError(ex.what());
+        throw JSONParseError("%s", ex.what());
     }
 };
 

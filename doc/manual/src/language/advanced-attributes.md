@@ -188,9 +188,13 @@ Derivations can declare some infrequently used optional attributes.
     }
     ```
 
-    The `outputHashAlgo` attribute specifies the hash algorithm used to
-    compute the hash. It can currently be `"sha1"`, `"sha256"` or
-    `"sha512"`.
+    The `outputHash` attribute must be a string containing the hash in either hexadecimal or "nix32" encoding, or following the format for integrity metadata as defined by [SRI](https://www.w3.org/TR/SRI/).
+    The "nix32" encoding is an adaptation of base-32 encoding.
+    The [`convertHash`](@docroot@/language/builtins.md#builtins-convertHash) function shows how to convert between different encodings, and the [`nix-hash` command](../command-ref/nix-hash.md) has information about obtaining the hash for some contents, as well as converting to and from encodings.
+
+    The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
+    It can currently be `"sha1"`, `"sha256"`, `"sha512"`, or `null`.
+    `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format.
 
     The `outputHashMode` attribute determines how the hash is computed.
     It must be one of the following two values:
@@ -208,11 +212,6 @@ Derivations can declare some infrequently used optional attributes.
         (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
         this case, the output can be anything, including a directory
         tree.
-
-    The `outputHash` attribute, finally, must be a string containing
-    the hash in either hexadecimal or base-32 notation. (See the
-    [`nix-hash` command](../command-ref/nix-hash.md) for information
-    about converting to and from base-32 notation.)
 
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
     > **Warning**
@@ -257,29 +256,18 @@ Derivations can declare some infrequently used optional attributes.
     of the environment (typically, a few hundred kilobyte).
 
   - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
-    If this attribute is set to `true` and [distributed building is
-    enabled](../advanced-topics/distributed-builds.md), then, if
-    possible, the derivation will be built locally instead of forwarded
-    to a remote machine. This is appropriate for trivial builders
-    where the cost of doing a download or remote build would exceed
-    the cost of building locally.
+    If this attribute is set to `true` and [distributed building is enabled](@docroot@/command-ref/conf-file.md#conf-builders), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
+    This is useful for derivations that are cheapest to build locally.
 
   - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\
-    If this attribute is set to `false`, then Nix will always build this
-    derivation; it will not try to substitute its outputs. This is
-    useful for very trivial derivations (such as `writeText` in Nixpkgs)
-    that are cheaper to build than to substitute from a binary cache.
+    If this attribute is set to `false`, then Nix will always build this derivation (locally or remotely); it will not try to substitute its outputs.
+    This is useful for derivations that are cheaper to build than to substitute.
 
-    You may disable the effects of this attibute by enabling the
-    `always-allow-substitutes` configuration option in Nix.
+    This attribute can be ignored by setting [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) to `true`.
 
     > **Note**
     >
-    > You need to have a builder configured which satisfies the
-    > derivation’s `system` attribute, since the derivation cannot be
-    > substituted. Thus it is usually a good idea to align `system` with
-    > `builtins.currentSystem` when setting `allowSubstitutes` to
-    > `false`. For most trivial derivations this should be the case.
+    > If set to `false`, the [`builder`](./derivations.md#attr-builder) should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation

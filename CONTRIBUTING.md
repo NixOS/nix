@@ -63,11 +63,11 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
      - Functional tests – [`tests/functional/**.sh`](./tests/functional)
      - Unit tests – [`src/*/tests`](./src/)
      - Integration tests – [`tests/nixos/*`](./tests/nixos)
-   - [ ] User documentation in the [manual](..doc/manual/src)
+   - [ ] User documentation in the [manual](./doc/manual/src)
    - [ ] API documentation in header files
    - [ ] Code and comments are self-explanatory
    - [ ] Commit message explains **why** the change was made
-   - [ ] New feature or incompatible change: updated [release notes](./doc/manual/src/release-notes/rl-next.md)
+   - [ ] New feature or incompatible change: [add a release note](https://nixos.org/manual/nix/stable/contributing/hacking#add-a-release-note)
 
 7. If you need additional feedback or help to getting pull request into shape, ask other contributors using [@mentions](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#mentioning-people-and-teams).
 

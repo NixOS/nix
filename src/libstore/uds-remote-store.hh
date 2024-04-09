@@ -35,7 +35,7 @@ public:
     static std::set<std::string> uriSchemes()
     { return {"unix"}; }
 
-    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
     { return LocalFSStore::getFSAccessor(requireValidPath); }
 
     void narFromPath(const StorePath & path, Sink & sink) override

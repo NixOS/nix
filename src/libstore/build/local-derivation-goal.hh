@@ -3,6 +3,7 @@
 
 #include "derivation-goal.hh"
 #include "local-store.hh"
+#include "processes.hh"
 
 namespace nix {
 
@@ -105,7 +106,7 @@ struct LocalDerivationGoal : public DerivationGoal
     RedirectedOutputs redirectedOutputs;
 
     /**
-     * The outputs paths used during the build.
+     * The output paths used during the build.
      *
      * - Input-addressed derivations or fixed content-addressed outputs are
      *   sometimes built when some of their outputs already exist, and can not

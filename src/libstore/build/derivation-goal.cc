@@ -196,10 +196,19 @@ void DerivationGoal::loadDerivation()
        things being garbage collected while we're busy. */
     worker.evalStore.addTempRoot(drvPath);
 
-    assert(worker.evalStore.isValidPath(drvPath));
+    /* Get the derivation. It is probably in the eval store, but it might be inthe main store:
 
-    /* Get the derivation. */
-    drv = std::make_unique<Derivation>(worker.evalStore.readDerivation(drvPath));
+         - Resolved derivation are resolved against main store realisations, and so must be stored there.
+
+         - Dynamic derivations are built, and so are found in the main store.
+     */
+    for (auto * drvStore : { &worker.evalStore, &worker.store }) {
+        if (drvStore->isValidPath(drvPath)) {
+            drv = std::make_unique<Derivation>(drvStore->readDerivation(drvPath));
+            break;
+        }
+    }
+    assert(drv);
 
     haveDerivation();
 }
@@ -214,7 +223,7 @@ void DerivationGoal::haveDerivation()
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
-    if (!drv->type().isPure()) {
+    if (drv->type().isImpure()) {
         experimentalFeatureSettings.require(Xp::ImpureDerivations);
 
         for (auto & [outputName, output] : drv->outputs) {
@@ -295,7 +304,7 @@ void DerivationGoal::outputsSubstitutionTried()
 {
     trace("all outputs substituted (maybe)");
 
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
         done(BuildResult::TransientFailure, {},
@@ -388,9 +397,9 @@ void DerivationGoal::gaveUpOnSubstitution()
         for (const auto & [inputDrvPath, inputNode] : dynamic_cast<Derivation *>(drv.get())->inputDrvs.map) {
             /* Ensure that pure, non-fixed-output derivations don't
                depend on impure derivations. */
-            if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && drv->type().isPure() && !drv->type().isFixed()) {
+            if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure() && !drv->type().isFixed()) {
                 auto inputDrv = worker.evalStore.readDerivation(inputDrvPath);
-                if (!inputDrv.type().isPure())
+                if (inputDrv.type().isImpure())
                     throw Error("pure derivation '%s' depends on impure derivation '%s'",
                         worker.store.printStorePath(drvPath),
                         worker.store.printStorePath(inputDrvPath));
@@ -401,11 +410,15 @@ void DerivationGoal::gaveUpOnSubstitution()
     }
 
     /* Copy the input sources from the eval store to the build
-       store. */
+       store.
+
+       Note that some inputs might not be in the eval store because they
+       are (resolved) derivation outputs in a resolved derivation. */
     if (&worker.evalStore != &worker.store) {
         RealisedPath::Set inputSrcs;
         for (auto & i : drv->inputSrcs)
-            inputSrcs.insert(i);
+            if (worker.evalStore.isValidPath(i))
+                inputSrcs.insert(i);
         copyClosure(worker.evalStore, worker.store, inputSrcs);
     }
 
@@ -426,7 +439,7 @@ void DerivationGoal::gaveUpOnSubstitution()
 
 void DerivationGoal::repairClosure()
 {
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
 
     /* If we're repairing, we now know that our own outputs are valid.
        Now check whether the other paths in the outputs closure are
@@ -453,7 +466,7 @@ void DerivationGoal::repairClosure()
     std::map<StorePath, StorePath> outputsToDrv;
     for (auto & i : inputClosure)
         if (i.isDerivation()) {
-            auto depOutputs = worker.store.queryPartialDerivationOutputMap(i);
+            auto depOutputs = worker.store.queryPartialDerivationOutputMap(i, &worker.evalStore);
             for (auto & j : depOutputs)
                 if (j.second)
                     outputsToDrv.insert_or_assign(*j.second, i);
@@ -558,7 +571,7 @@ void DerivationGoal::inputsRealised()
                  inputDrvOutputs statefully, sometimes it gets out of sync with
                  the real source of truth (store). So we query the store
                  directly if there's a problem. */
-              attempt = fullDrv.tryResolve(worker.store);
+              attempt = fullDrv.tryResolve(worker.store, &worker.evalStore);
             }
             assert(attempt);
             Derivation drvResolved { std::move(*attempt) };
@@ -604,7 +617,13 @@ void DerivationGoal::inputsRealised()
                     return *outPath;
                 }
                 else {
-                    auto outMap = worker.evalStore.queryDerivationOutputMap(depDrvPath);
+                    auto outMap = [&]{
+                        for (auto * drvStore : { &worker.evalStore, &worker.store })
+                            if (drvStore->isValidPath(depDrvPath))
+                                return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                        assert(false);
+                    }();
+
                     auto outMapPath = outMap.find(outputName);
                     if (outMapPath == outMap.end()) {
                         throw Error(
@@ -689,7 +708,7 @@ void DerivationGoal::tryToBuild()
     if (!outputLocks.lockPaths(lockFiles, "", false)) {
         if (!actLock)
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                fmt("waiting for lock on %s", yellowtxt(showPaths(lockFiles))));
+                fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
         return;
     }
@@ -743,7 +762,7 @@ void DerivationGoal::tryToBuild()
                    the wake-up timeout expires. */
                 if (!actLock)
                     actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
-                        fmt("waiting for a machine to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
+                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
                 worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
                 return;
@@ -761,9 +780,13 @@ void DerivationGoal::tryToBuild()
 
 void DerivationGoal::tryLocalBuild() {
     throw Error(
-        "unable to build with a primary store that isn't a local store; "
-        "either pass a different '--store' or enable remote builds."
-        "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+        R"(
+        Unable to build with a primary store that isn't a local store;
+        either pass a different '--store' or enable remote builds.
+
+        For more information check 'man nix.conf' and search for '/machines'.
+        )"
+    );
 }
 
 
@@ -872,7 +895,7 @@ void runPostBuildHook(
     if (hook == "")
         return;
 
-    Activity act(logger, lvlInfo, actPostBuildHook,
+    Activity act(logger, lvlTalkative, actPostBuildHook,
             fmt("running post-build-hook '%s'", settings.postBuildHook),
             Logger::Fields{store.printStorePath(drvPath)});
     PushActivity pact(act.id);
@@ -968,7 +991,7 @@ void DerivationGoal::buildDone()
             diskFull |= cleanupDecideWhetherDiskFull();
 
             auto msg = fmt("builder for '%s' %s",
-                yellowtxt(worker.store.printStorePath(drvPath)),
+                Magenta(worker.store.printStorePath(drvPath)),
                 statusToString(status));
 
             if (!logger->isVerbose() && !logTail.empty()) {
@@ -1081,12 +1104,16 @@ void DerivationGoal::resolvedFinished()
                   worker.store.printStorePath(resolvedDrvGoal->drvPath), outputName);
             }();
 
-            if (drv->type().isPure()) {
+            if (!drv->type().isImpure()) {
                 auto newRealisation = realisation;
                 newRealisation.id = DrvOutput { initialOutput->outputHash, outputName };
                 newRealisation.signatures.clear();
-                if (!drv->type().isFixed())
-                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath);
+                if (!drv->type().isFixed()) {
+                    auto & drvStore = worker.evalStore.isValidPath(drvPath)
+                        ? worker.evalStore
+                        : worker.store;
+                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
+                }
                 signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
@@ -1317,9 +1344,26 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
                     auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
                     // ensure that logs from a builder using `ssh-ng://` as protocol
                     // are also available to `nix log`.
-                    if (s && !isWrittenToLog && logSink && (*json)["type"] == resBuildLogLine) {
-                        auto f = (*json)["fields"];
-                        (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
+                    if (s && !isWrittenToLog && logSink) {
+                        const auto type = (*json)["type"];
+                        const auto fields = (*json)["fields"];
+                        if (type == resBuildLogLine) {
+                            (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                        } else if (type == resSetPhase && ! fields.is_null()) {
+                            const auto phase = fields[0];
+                            if (! phase.is_null()) {
+                                // nixpkgs' stdenv produces lines in the log to signal
+                                // phase changes.
+                                // We want to get the same lines in case of remote builds.
+                                // The format is:
+                                //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                const auto logLine = nlohmann::json::object({
+                                    {"action", "setPhase"},
+                                    {"phase", phase}
+                                });
+                                (*logSink)("@nix " + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n");
+                            }
+                        }
                     }
                 }
                 currentHookLine.clear();
@@ -1355,34 +1399,40 @@ void DerivationGoal::flushLine()
 
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
     if (!useDerivation || drv->type().hasKnownOutputPaths()) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
             res.insert_or_assign(name, output.path(worker.store, drv->name, name));
         return res;
     } else {
-        return worker.store.queryPartialDerivationOutputMap(drvPath);
+        for (auto * drvStore : { &worker.evalStore, &worker.store })
+            if (drvStore->isValidPath(drvPath))
+                return worker.store.queryPartialDerivationOutputMap(drvPath, drvStore);
+        assert(false);
     }
 }
 
 OutputPathMap DerivationGoal::queryDerivationOutputMap()
 {
-    assert(drv->type().isPure());
+    assert(!drv->type().isImpure());
     if (!useDerivation || drv->type().hasKnownOutputPaths()) {
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
             res.insert_or_assign(name, *output.second);
         return res;
     } else {
-        return worker.store.queryDerivationOutputMap(drvPath);
+        for (auto * drvStore : { &worker.evalStore, &worker.store })
+            if (drvStore->isValidPath(drvPath))
+                return worker.store.queryDerivationOutputMap(drvPath, drvStore);
+        assert(false);
     }
 }
 
 
 std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
 {
-    if (!drv->type().isPure()) return { false, {} };
+    if (drv->type().isImpure()) return { false, {} };
 
     bool checkHash = buildMode == bmRepair;
     auto wantedOutputsLeft = std::visit(overloaded {
@@ -1474,9 +1524,10 @@ void DerivationGoal::done(
     SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
+    outputLocks.unlock();
     buildResult.status = status;
     if (ex)
-        buildResult.errorMsg = fmt("%s", normaltxt(ex->info().msg));
+        buildResult.errorMsg = fmt("%s", Uncolored(ex->info().msg));
     if (buildResult.status == BuildResult::TimedOut)
         worker.timedOut = true;
     if (buildResult.status == BuildResult::PermanentFailure)

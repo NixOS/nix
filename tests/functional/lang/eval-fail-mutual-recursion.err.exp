@@ -1,0 +1,64 @@
+error:
+       … from call site
+         at /pwd/lang/eval-fail-mutual-recursion.nix:36:3:
+           35| in
+           36|   throwAfterA true 10
+             |   ^
+           37|
+
+       … while calling 'throwAfterA'
+         at /pwd/lang/eval-fail-mutual-recursion.nix:29:26:
+           28|
+           29|   throwAfterA = recurse: n:
+             |                          ^
+           30|     if n > 0
+
+       … from call site
+         at /pwd/lang/eval-fail-mutual-recursion.nix:31:10:
+           30|     if n > 0
+           31|     then throwAfterA recurse (n - 1)
+             |          ^
+           32|     else if recurse
+
+       (19 duplicate frames omitted)
+
+       … from call site
+         at /pwd/lang/eval-fail-mutual-recursion.nix:33:10:
+           32|     else if recurse
+           33|     then throwAfterB true 10
+             |          ^
+           34|     else throw "Uh oh!";
+
+       … while calling 'throwAfterB'
+         at /pwd/lang/eval-fail-mutual-recursion.nix:22:26:
+           21| let
+           22|   throwAfterB = recurse: n:
+             |                          ^
+           23|     if n > 0
+
+       … from call site
+         at /pwd/lang/eval-fail-mutual-recursion.nix:24:10:
+           23|     if n > 0
+           24|     then throwAfterB recurse (n - 1)
+             |          ^
+           25|     else if recurse
+
+       (19 duplicate frames omitted)
+
+       … from call site
+         at /pwd/lang/eval-fail-mutual-recursion.nix:26:10:
+           25|     else if recurse
+           26|     then throwAfterA false 10
+             |          ^
+           27|     else throw "Uh oh!";
+
+       (21 duplicate frames omitted)
+
+       … while calling the 'throw' builtin
+         at /pwd/lang/eval-fail-mutual-recursion.nix:34:10:
+           33|     then throwAfterB true 10
+           34|     else throw "Uh oh!";
+             |          ^
+           35| in
+
+       error: Uh oh!

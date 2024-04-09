@@ -20,7 +20,7 @@ struct IndirectInputScheme : InputScheme
         if (path.size() == 1) {
         } else if (path.size() == 2) {
             if (std::regex_match(path[1], revRegex))
-                rev = Hash::parseAny(path[1], htSHA1);
+                rev = Hash::parseAny(path[1], HashAlgorithm::SHA1);
             else if (std::regex_match(path[1], refRegex))
                 ref = path[1];
             else
@@ -31,7 +31,7 @@ struct IndirectInputScheme : InputScheme
             ref = path[1];
             if (!std::regex_match(path[2], revRegex))
                 throw BadURL("in flake URL '%s', '%s' is not a commit hash", url.url, path[2]);
-            rev = Hash::parseAny(path[2], htSHA1);
+            rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
         } else
             throw BadURL("GitHub URL '%s' is invalid", url.url);
 
@@ -97,7 +97,7 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
     {
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
     }

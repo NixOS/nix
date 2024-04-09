@@ -1,5 +1,5 @@
 #include "progress-bar.hh"
-#include "util.hh"
+#include "terminal.hh"
 #include "sync.hh"
 #include "store-api.hh"
 #include "names.hh"
@@ -123,14 +123,18 @@ public:
     }
 
     void pause() override {
-        state_.lock()->paused = true;
-        writeToStderr("\r\e[K");
+        auto state (state_.lock());
+        state->paused = true;
+        if (state->active)
+            writeToStderr("\r\e[K");
     }
 
     void resume() override {
-        state_.lock()->paused = false;
-        writeToStderr("\r\e[K");
-        state_.lock()->haveUpdate = true;
+        auto state (state_.lock());
+        state->paused = false;
+        if (state->active)
+            writeToStderr("\r\e[K");
+        state->haveUpdate = true;
         updateCV.notify_one();
     }
 
@@ -162,9 +166,7 @@ public:
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
             draw(state);
         } else {
-            auto s2 = s + ANSI_NORMAL "\n";
-            if (!isTTY) s2 = filterANSIEscapes(s2, true);
-            writeToStderr(s2);
+            writeToStderr(filterANSIEscapes(s, !isTTY) + "\n");
         }
     }
 
@@ -340,6 +342,14 @@ public:
             state->activitiesByType[type].expected += j;
             update(*state);
         }
+
+        else if (type == resFetchStatus) {
+            auto i = state->its.find(act);
+            assert(i != state->its.end());
+            ActInfo & actInfo = *i->second;
+            actInfo.lastLine = getS(fields, 0);
+            update(*state);
+        }
     }
 
     void update(State & state)
@@ -511,7 +521,7 @@ public:
     std::optional<char> ask(std::string_view msg) override
     {
         auto state(state_.lock());
-        if (!state->active || !isatty(STDIN_FILENO)) return {};
+        if (!state->active) return {};
         std::cerr << fmt("\r\e[K%s ", msg);
         auto s = trim(readLine(STDIN_FILENO));
         if (s.size() != 1) return {};
@@ -527,7 +537,7 @@ public:
 
 Logger * makeProgressBar()
 {
-    return new ProgressBar(shouldANSI());
+    return new ProgressBar(isTTY());
 }
 
 void startProgressBar()

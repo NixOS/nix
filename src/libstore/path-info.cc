@@ -1,5 +1,8 @@
+#include <nlohmann/json.hpp>
+
 #include "path-info.hh"
 #include "store-api.hh"
+#include "json-utils.hh"
 
 namespace nix {
 
@@ -28,16 +31,16 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
         throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
     return
-        "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(HashFormat::Base32, true) + ";"
-        + std::to_string(narSize) + ";"
+            "1;" + store.printStorePath(path) + ";"
+            + narHash.to_string(HashFormat::Nix32, true) + ";"
+            + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
 
 
-void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
+void ValidPathInfo::sign(const Store & store, const Signer & signer)
 {
-    sigs.insert(secretKey.signDetached(fingerprint(store)));
+    sigs.insert(signer.signDetached(fingerprint(store)));
 }
 
 std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
@@ -142,6 +145,87 @@ ValidPathInfo::ValidPathInfo(
             };
         },
     }, std::move(ca).raw);
+}
+
+
+nlohmann::json UnkeyedValidPathInfo::toJSON(
+    const Store & store,
+    bool includeImpureInfo,
+    HashFormat hashFormat) const
+{
+    using nlohmann::json;
+
+    auto jsonObject = json::object();
+
+    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    jsonObject["narSize"] = narSize;
+
+    {
+        auto& jsonRefs = (jsonObject["references"] = json::array());
+        for (auto & ref : references)
+            jsonRefs.emplace_back(store.printStorePath(ref));
+    }
+
+    if (ca)
+        jsonObject["ca"] = renderContentAddress(ca);
+
+    if (includeImpureInfo) {
+        if (deriver)
+            jsonObject["deriver"] = store.printStorePath(*deriver);
+
+        if (registrationTime)
+            jsonObject["registrationTime"] = registrationTime;
+
+        if (ultimate)
+            jsonObject["ultimate"] = ultimate;
+
+        if (!sigs.empty()) {
+            for (auto & sig : sigs)
+                jsonObject["signatures"].push_back(sig);
+        }
+    }
+
+    return jsonObject;
+}
+
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
+    const Store & store,
+    const nlohmann::json & _json)
+{
+    UnkeyedValidPathInfo res {
+        Hash(Hash::dummy),
+    };
+
+    auto & json = getObject(_json);
+    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+    res.narSize = getInteger(valueAt(json, "narSize"));
+
+    try {
+        auto references = getStringList(valueAt(json, "references"));
+        for (auto & input : references)
+            res.references.insert(store.parseStorePath(static_cast<const std::string &>
+(input)));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'references'");
+        throw;
+    }
+
+    if (json.contains("ca"))
+        res.ca = ContentAddress::parse(getString(valueAt(json, "ca")));
+
+    if (json.contains("deriver"))
+        res.deriver = store.parseStorePath(getString(valueAt(json, "deriver")));
+
+    if (json.contains("registrationTime"))
+        res.registrationTime = getInteger(valueAt(json, "registrationTime"));
+
+    if (json.contains("ultimate"))
+        res.ultimate = getBoolean(valueAt(json, "ultimate"));
+
+    if (json.contains("signatures"))
+        res.sigs = valueAt(json, "signatures");
+
+    return res;
 }
 
 }

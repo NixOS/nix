@@ -90,7 +90,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         fragment = percentDecode(url.substr(fragmentStart+1));
     }
     if (pathEnd != std::string::npos && fragmentStart != std::string::npos) {
-        query = decodeQuery(url.substr(pathEnd+1, fragmentStart));
+        query = decodeQuery(url.substr(pathEnd+1, fragmentStart-pathEnd-1));
     }
 
     if (baseDir) {
@@ -101,6 +101,19 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         path = absPath(path, baseDir);
 
         if (isFlake) {
+
+            if (!S_ISDIR(lstat(path).st_mode)) {
+                if (baseNameOf(path) == "flake.nix") {
+                    // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
+                    warn(
+                        "Path '%s' should point at the directory containing the 'flake.nix' file, not the file itself. "
+                        "Pretending that you meant '%s'"
+                        , path, dirOf(path));
+                    path = dirOf(path);
+                } else {
+                    throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
+                }
+            }
 
             if (!allowMissing && !pathExists(path + "/flake.nix")){
                 notice("path '%s' does not contain a 'flake.nix', searching up",path);
@@ -123,9 +136,6 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 if (!found)
                     throw BadURL("could not find a flake.nix file");
             }
-
-            if (!S_ISDIR(lstat(path).st_mode))
-                throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
 
             if (!allowMissing && !pathExists(path + "/flake.nix"))
                 throw BadURL("path '%s' is not a flake (because it doesn't contain a 'flake.nix' file)", path);
@@ -190,7 +200,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
 
     static std::regex flakeRegex(
         "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)"
-        + "(?:#(" + queryRegex + "))?",
+        + "(?:#(" + fragmentRegex + "))?",
         std::regex::ECMAScript);
 
     if (std::regex_match(url, match, flakeRegex)) {
@@ -274,7 +284,7 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
 
 std::pair<StorePath, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
 {
-    auto [storePath, lockedInput] = input.fetch(store);
+    auto [storePath, lockedInput] = input.fetchToStore(store);
     return {std::move(storePath), FlakeRef(std::move(lockedInput), subdir)};
 }
 

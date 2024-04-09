@@ -116,6 +116,7 @@
   [store path]: ../glossary.md#gloss-store-path
 
   Paths can include [string interpolation] and can themselves be [interpolated in other expressions].
+
   [interpolated in other expressions]: ./string-interpolation.md#interpolated-expressions
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
@@ -154,6 +155,8 @@ the result would be a list of five elements, the fourth one being a
 function and the fifth being a set.
 
 Note that lists are only lazy in values, and they are strict in length.
+
+Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#builtins-elemAt). 
 
 ## Attribute Set
 

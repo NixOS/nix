@@ -38,7 +38,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
     if (!lockedRef.input.isLocked())
-        throw Error("lock file contains mutable lock '%s'",
+        throw Error("lock file contains unlocked input '%s'",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
 
@@ -84,8 +84,10 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
     return doFind(root, path, visited);
 }
 
-LockFile::LockFile(const nlohmann::json & json, const Path & path)
+LockFile::LockFile(std::string_view contents, std::string_view path)
 {
+    auto json = nlohmann::json::parse(contents);
+
     auto version = json.value("version", 0);
     if (version < 5 || version > 7)
         throw Error("lock file '%s' has unsupported version %d", path, version);
@@ -107,7 +109,7 @@ LockFile::LockFile(const nlohmann::json & json, const Path & path)
                 std::string inputKey = i.value();
                 auto k = nodeMap.find(inputKey);
                 if (k == nodeMap.end()) {
-                    auto nodes = json["nodes"];
+                    auto & nodes = json["nodes"];
                     auto jsonNode2 = nodes.find(inputKey);
                     if (jsonNode2 == nodes.end())
                         throw Error("lock file references missing node '%s'", inputKey);
@@ -134,10 +136,10 @@ LockFile::LockFile(const nlohmann::json & json, const Path & path)
     // a bit since we don't need to worry about cycles.
 }
 
-nlohmann::json LockFile::toJSON() const
+std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
 {
     nlohmann::json nodes;
-    std::unordered_map<std::shared_ptr<const Node>, std::string> nodeKeys;
+    KeyMap nodeKeys;
     std::unordered_set<std::string> keys;
 
     std::function<std::string(const std::string & key, ref<const Node> node)> dumpNode;
@@ -194,23 +196,18 @@ nlohmann::json LockFile::toJSON() const
     json["root"] = dumpNode("root", root);
     json["nodes"] = std::move(nodes);
 
-    return json;
+    return {json, std::move(nodeKeys)};
 }
 
-std::string LockFile::to_string() const
+std::pair<std::string, LockFile::KeyMap> LockFile::to_string() const
 {
-    return toJSON().dump(2);
-}
-
-LockFile LockFile::read(const Path & path)
-{
-    if (!pathExists(path)) return LockFile();
-    return LockFile(nlohmann::json::parse(readFile(path)), path);
+    auto [json, nodeKeys] = toJSON();
+    return {json.dump(2), std::move(nodeKeys)};
 }
 
 std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
 {
-    stream << lockFile.toJSON().dump(2);
+    stream << lockFile.toJSON().first.dump(2);
     return stream;
 }
 
@@ -243,7 +240,7 @@ std::optional<FlakeRef> LockFile::isUnlocked() const
 bool LockFile::operator ==(const LockFile & other) const
 {
     // FIXME: slow
-    return toJSON() == other.toJSON();
+    return toJSON().first == other.toJSON().first;
 }
 
 bool LockFile::operator !=(const LockFile & other) const

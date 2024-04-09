@@ -7,7 +7,7 @@ namespace nix {
 
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & from,
-    ParseSink & sink, const Path & to)
+    FileSystemObjectSink & sink, const Path & to)
 {
     auto stat = accessor.lstat(from);
 
@@ -15,20 +15,17 @@ void copyRecursive(
     case SourceAccessor::tSymlink:
     {
         sink.createSymlink(to, accessor.readLink(from));
+        break;
     }
 
     case SourceAccessor::tRegular:
     {
-        sink.createRegularFile(to);
-        if (stat.isExecutable)
-            sink.isExecutable();
-        LambdaSink sink2 {
-            [&](auto d) {
-                sink.receiveContents(d);
-            }
-        };
-        accessor.readFile(from, sink2, [&](uint64_t size) {
-            sink.preallocateContents(size);
+        sink.createRegularFile(to, [&](CreateRegularFileSink & crf) {
+            if (stat.isExecutable)
+                crf.isExecutable();
+            accessor.readFile(from, crf, [&](uint64_t size) {
+                crf.preallocateContents(size);
+            });
         });
         break;
     }
@@ -38,10 +35,11 @@ void copyRecursive(
         sink.createDirectory(to);
         for (auto & [name, _] : accessor.readDirectory(from)) {
             copyRecursive(
-                accessor, from + name,
+                accessor, from / name,
                 sink, to + "/" + name);
             break;
         }
+        break;
     }
 
     case SourceAccessor::tMisc:
@@ -71,20 +69,24 @@ void RestoreSink::createDirectory(const Path & path)
         throw SysError("creating directory '%1%'", p);
 };
 
-void RestoreSink::createRegularFile(const Path & path)
+struct RestoreRegularFile : CreateRegularFileSink {
+    AutoCloseFD fd;
+
+    void operator () (std::string_view data) override;
+    void isExecutable() override;
+    void preallocateContents(uint64_t size) override;
+};
+
+void RestoreSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
 {
     Path p = dstPath + path;
-    fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
-    if (!fd) throw SysError("creating file '%1%'", p);
+    RestoreRegularFile crf;
+    crf.fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+    if (!crf.fd) throw SysError("creating file '%1%'", p);
+    func(crf);
 }
 
-void RestoreSink::closeRegularFile()
-{
-    /* Call close explicitly to make sure the error is checked */
-    fd.close();
-}
-
-void RestoreSink::isExecutable()
+void RestoreRegularFile::isExecutable()
 {
     struct stat st;
     if (fstat(fd.get(), &st) == -1)
@@ -93,7 +95,7 @@ void RestoreSink::isExecutable()
         throw SysError("fchmod");
 }
 
-void RestoreSink::preallocateContents(uint64_t len)
+void RestoreRegularFile::preallocateContents(uint64_t len)
 {
     if (!restoreSinkSettings.preallocateContents)
         return;
@@ -111,7 +113,7 @@ void RestoreSink::preallocateContents(uint64_t len)
 #endif
 }
 
-void RestoreSink::receiveContents(std::string_view data)
+void RestoreRegularFile::operator () (std::string_view data)
 {
     writeFull(fd.get(), data);
 }
@@ -120,6 +122,34 @@ void RestoreSink::createSymlink(const Path & path, const std::string & target)
 {
     Path p = dstPath + path;
     nix::createSymlink(target, p);
+}
+
+
+void RegularFileSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+{
+    struct CRF : CreateRegularFileSink {
+        RegularFileSink & back;
+        CRF(RegularFileSink & back) : back(back) {}
+        void operator () (std::string_view data) override
+        {
+            back.sink(data);
+        }
+        void isExecutable() override {}
+    } crf { *this };
+    func(crf);
+}
+
+
+void NullFileSystemObjectSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+{
+    struct : CreateRegularFileSink {
+        void operator () (std::string_view data) override {}
+        void isExecutable() override {}
+    } crf;
+    // Even though `NullFileSystemObjectSink` doesn't do anything, it's important
+    // that we call the function, to e.g. advance the parser using this
+    // sink.
+    func(crf);
 }
 
 }

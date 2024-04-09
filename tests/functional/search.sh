@@ -17,12 +17,15 @@ clearCache
 # Multiple arguments will not exist
 (( $(nix search -f search.nix '' hello broken | wc -l) == 0 ))
 
+# No regex should return an error
+(( $(nix search -f search.nix '' | wc -l) == 0 ))
+
 ## Search expressions
 
 # Check that empty search string matches all
-nix search -f search.nix '' |grepQuiet foo
-nix search -f search.nix '' |grepQuiet bar
-nix search -f search.nix '' |grepQuiet hello
+nix search -f search.nix '' ^ | grepQuiet foo
+nix search -f search.nix '' ^ | grepQuiet bar
+nix search -f search.nix '' ^ | grepQuiet hello
 
 ## Tests for multiple regex/match highlighting
 
@@ -39,8 +42,8 @@ e=$'\x1b' # grep doesn't support \e, \033 or even \x1b
 (( $(nix search -f search.nix '' 'b' | grep -Eo "$e\[32;1mb$e\[(0|0;1)m" | wc -l) == 3 ))
 
 ## Tests for --exclude
-(( $(nix search -f search.nix -e hello | grep -c hello) == 0 ))
+(( $(nix search -f search.nix ^ -e hello | grep -c hello) == 0 ))
 
-(( $(nix search -f search.nix foo --exclude 'foo|bar' | grep -Ec 'foo|bar') == 0 ))
-(( $(nix search -f search.nix foo -e foo --exclude bar | grep -Ec 'foo|bar') == 0 ))
-[[ $(nix search -f search.nix -e bar --json | jq -c 'keys') == '["foo","hello"]' ]]
+(( $(nix search -f search.nix foo ^ --exclude 'foo|bar' | grep -Ec 'foo|bar') == 0 ))
+(( $(nix search -f search.nix foo ^ -e foo --exclude bar | grep -Ec 'foo|bar') == 0 ))
+[[ $(nix search -f search.nix '' ^ -e bar --json | jq -c 'keys') == '["foo","hello"]' ]]

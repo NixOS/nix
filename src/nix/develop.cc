@@ -8,7 +8,6 @@
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"
-#include "util.hh"
 
 #include <iterator>
 #include <memory>
@@ -224,7 +223,11 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     if (builder != "bash")
         throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
 
-    auto getEnvShPath = evalStore->addTextToStore("get-env.sh", getEnvSh, {});
+    auto getEnvShPath = ({
+        StringSource source { getEnvSh };
+        evalStore->addToStoreFromDump(
+            source, "get-env.sh", FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, {});
+    });
 
     drv.args = {store->printStorePath(getEnvShPath)};
 
@@ -294,7 +297,6 @@ struct Common : InstallableCommand, MixProfile
         "NIX_LOG_FD",
         "NIX_REMOTE",
         "PPID",
-        "SHELL",
         "SHELLOPTS",
         "SSL_CERT_FILE", // FIXME: only want to ignore /no-cert-file.crt
         "TEMP",
@@ -352,7 +354,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
 
-        out << "eval \"$shellHook\"\n";
+        out << "eval \"${shellHook:-}\"\n";
 
         auto script = out.str();
 
@@ -373,7 +375,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto builtPaths = Installable::toStorePaths(
+            auto builtPaths = Installable::toStorePathSet(
                 getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
@@ -601,7 +603,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         setEnviron();
         // prevent garbage collection until shell exits
-        setenv("NIX_GCROOT", gcroot.data(), 1);
+        setEnv("NIX_GCROOT", gcroot.c_str());
 
         Path shell = "bash";
 
@@ -628,7 +630,7 @@ struct CmdDevelop : Common, MixEnvironment
 
             bool found = false;
 
-            for (auto & path : Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
+            for (auto & path : Installable::toStorePathSet(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
                 auto s = store->printStorePath(path) + "/bin/bash";
                 if (pathExists(s)) {
                     shell = s;
@@ -643,6 +645,10 @@ struct CmdDevelop : Common, MixEnvironment
         } catch (Error &) {
             ignoreException();
         }
+
+        // Override SHELL with the one chosen for this environment.
+        // This is to make sure the system shell doesn't leak into the build environment.
+        setEnv("SHELL", shell.c_str());
 
         // If running a phase or single command, don't want an interactive shell running after
         // Ctrl-C, so don't pass --rcfile
@@ -663,7 +669,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
+        runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
     }
 };
 

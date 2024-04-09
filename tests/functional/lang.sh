@@ -23,6 +23,7 @@ nix-instantiate --trace-verbose --eval -E 'builtins.traceVerbose "Hello" 123' 2>
 nix-instantiate --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grepQuietInverse Hello
 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grepQuietInverse Hello
 expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' | grepQuiet Hello
+expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello %" (throw "Foo")' | grepQuiet 'Hello %'
 
 nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
   2>&1 | grepQuiet -E 'trace: { x = «potential infinite recursion»; }'
@@ -67,8 +68,16 @@ done
 for i in lang/eval-fail-*.nix; do
     echo "evaluating $i (should fail)";
     i=$(basename "$i" .nix)
+    flags="$(
+        if [[ -e "lang/$i.flags" ]]; then
+            sed -e 's/#.*//' < "lang/$i.flags"
+        else
+            # note that show-trace is also set by init.sh
+            echo "--eval --strict --show-trace"
+        fi
+    )"
     if
-        expectStderr 1 nix-instantiate --eval --strict --show-trace "lang/$i.nix" \
+        expectStderr 1 nix-instantiate $flags "lang/$i.nix" \
             | sed "s!$(pwd)!/pwd!g" > "lang/$i.err"
     then
         diffAndAccept "$i" err err.exp

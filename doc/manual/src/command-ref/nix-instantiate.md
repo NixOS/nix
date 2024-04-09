@@ -35,12 +35,50 @@ standard input.
 
   - `--parse`\
     Just parse the input files, and print their abstract syntax trees on
-    standard output in ATerm format.
+    standard output as a Nix expression.
 
   - `--eval`\
     Just parse and evaluate the input files, and print the resulting
     values on standard output. No instantiation of store derivations
     takes place.
+
+    > **Warning**
+    >
+    > This option produces output which can be parsed as a Nix expression which
+    > will produce a different result than the input expression when evaluated.
+    > For example, these two Nix expressions print the same result despite
+    > having different meaning:
+    >
+    > ```console
+    > $ nix-instantiate --eval --expr '{ a = {}; }'
+    > { a = <CODE>; }
+    > $ nix-instantiate --eval --expr '{ a = <CODE>; }'
+    > { a = <CODE>; }
+    > ```
+    >
+    > For human-readable output, `nix eval` (experimental) is more informative:
+    >
+    > ```console
+    > $ nix-instantiate --eval --expr 'a: a'
+    > <LAMBDA>
+    > $ nix eval --expr 'a: a'
+    > «lambda @ «string»:1:1»
+    > ```
+    >
+    > For machine-readable output, the `--xml` option produces unambiguous
+    > output:
+    >
+    > ```console
+    > $ nix-instantiate --eval --xml --expr '{ foo = <CODE>; }'
+    > <?xml version='1.0' encoding='utf-8'?>
+    > <expr>
+    >   <attrs>
+    >     <attr column="3" line="1" name="foo">
+    >       <unevaluated />
+    >     </attr>
+    >   </attrs>
+    > </expr>
+    > ```
 
   - `--find-file`\
     Look up the given files in Nix’s search path (as specified by the
@@ -61,11 +99,11 @@ standard input.
 
   - `--json`\
     When used with `--eval`, print the resulting value as an JSON
-    representation of the abstract syntax tree rather than as an ATerm.
+    representation of the abstract syntax tree rather than as a Nix expression.
 
   - `--xml`\
     When used with `--eval`, print the resulting value as an XML
-    representation of the abstract syntax tree rather than as an ATerm.
+    representation of the abstract syntax tree rather than as a Nix expression.
     The schema is the same as that used by the [`toXML`
     built-in](../language/builtins.md).
 
@@ -133,28 +171,24 @@ $ nix-instantiate --eval --xml --expr '1 + 2'
 The difference between non-strict and strict evaluation:
 
 ```console
-$ nix-instantiate --eval --xml --expr 'rec { x = "foo"; y = x; }'
-...
-  <attr name="x">
-    <string value="foo" />
-  </attr>
-  <attr name="y">
-    <unevaluated />
-  </attr>
-...
-```
+$ nix-instantiate --eval --xml --expr '{ x = {}; }'
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <attrs>
+    <attr column="3" line="1" name="x">
+      <unevaluated />
+    </attr>
+  </attrs>
+</expr>
 
-Note that `y` is left unevaluated (the XML representation doesn’t
-attempt to show non-normal forms).
-
-```console
-$ nix-instantiate --eval --xml --strict --expr 'rec { x = "foo"; y = x; }'
-...
-  <attr name="x">
-    <string value="foo" />
-  </attr>
-  <attr name="y">
-    <string value="foo" />
-  </attr>
-...
+$ nix-instantiate --eval --xml --strict --expr '{ x = {}; }'
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <attrs>
+    <attr column="3" line="1" name="x">
+      <attrs>
+      </attrs>
+    </attr>
+  </attrs>
+</expr>
 ```

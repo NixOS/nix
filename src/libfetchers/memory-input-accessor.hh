@@ -1,4 +1,5 @@
 #include "input-accessor.hh"
+#include "source-path.hh"
 
 namespace nix {
 
@@ -11,5 +12,7 @@ struct MemoryInputAccessor : InputAccessor
 };
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor();
+
+ref<InputAccessor> makeEmptyInputAccessor();
 
 }

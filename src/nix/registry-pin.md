@@ -15,10 +15,10 @@ R""(
   user   flake:nixpkgs github:NixOS/nixpkgs/925b70cd964ceaedee26fde9b19cc4c4f081196a
   ```
 
-  and `nix flake info` will say:
+  and `nix flake metadata` will say:
 
   ```console
-  # nix flake info nixpkgs
+  # nix flake metadata nixpkgs
   Resolved URL:  github:NixOS/nixpkgs/925b70cd964ceaedee26fde9b19cc4c4f081196a
   Locked URL:    github:NixOS/nixpkgs/925b70cd964ceaedee26fde9b19cc4c4f081196a
   …

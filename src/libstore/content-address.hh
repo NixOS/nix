@@ -4,6 +4,7 @@
 #include <variant>
 #include "hash.hh"
 #include "path.hh"
+#include "file-content-address.hh"
 #include "comparator.hh"
 #include "variant-wrapper.hh"
 
@@ -32,29 +33,13 @@ namespace nix {
 struct TextIngestionMethod : std::monostate { };
 
 /**
- * An enumeration of the main ways we can serialize file system
- * objects.
- */
-enum struct FileIngestionMethod : uint8_t {
-    /**
-     * Flat-file hashing. Directly ingest the contents of a single file
-     */
-    Flat = false,
-    /**
-     * Recursive (or NAR) hashing. Serializes the file-system object in Nix
-     * Archive format and ingest that
-     */
-    Recursive = true
-};
-
-/**
  * Compute the prefix to the hash algorithm which indicates how the
  * files were ingested.
  */
-std::string makeFileIngestionPrefix(FileIngestionMethod m);
+std::string_view makeFileIngestionPrefix(FileIngestionMethod m);
 
 /**
- * An enumeration of all the ways we can serialize file system objects.
+ * An enumeration of all the ways we can content-address store objects.
  *
  * Just the type of a content address. Combine with the hash itself, and
  * we have a `ContentAddress` as defined below. Combine that, in turn,
@@ -75,6 +60,20 @@ struct ContentAddressMethod
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
 
     /**
+     * Parse a content addressing method (name).
+     *
+     * The inverse of `render`.
+     */
+    static ContentAddressMethod parse(std::string_view rawCaMethod);
+
+    /**
+     * Render a content addressing method (name).
+     *
+     * The inverse of `parse`.
+     */
+    std::string_view render() const;
+
+    /**
      * Parse the prefix tag which indicates how the files
      * were ingested, with the fixed output case not prefixed for back
      * compat.
@@ -89,20 +88,28 @@ struct ContentAddressMethod
      *
      * The rough inverse of `parsePrefix()`.
      */
-    std::string renderPrefix() const;
+    std::string_view renderPrefix() const;
 
     /**
-     * Parse a content addressing method and hash type.
+     * Parse a content addressing method and hash algorithm.
      */
-    static std::pair<ContentAddressMethod, HashType> parse(std::string_view rawCaMethod);
+    static std::pair<ContentAddressMethod, HashAlgorithm> parseWithAlgo(std::string_view rawCaMethod);
 
     /**
-     * Render a content addressing method and hash type in a
+     * Render a content addressing method and hash algorithm in a
      * nicer way, prefixing both cases.
      *
      * The rough inverse of `parse()`.
      */
-    std::string render(HashType ht) const;
+    std::string renderWithAlgo(HashAlgorithm ha) const;
+
+    /**
+     * Get the underlying way to content-address file system objects.
+     *
+     * Different ways of hashing store objects may use the same method
+     * for hashing file systeme objects.
+     */
+    FileIngestionMethod getFileIngestionMethod() const;
 };
 
 
@@ -116,11 +123,11 @@ struct ContentAddressMethod
  * serialisation methods (flat file vs NAR). Thus, ‘ca’ has one of the
  * following forms:
  *
- * - ‘text:sha256:<sha256 hash of file contents>’: For paths
- *   computed by Store::makeTextPath() / Store::addTextToStore().
+ * - `TextIngestionMethod`:
+ *   ‘text:sha256:<sha256 hash of file contents>’
  *
- * - ‘fixed:<r?>:<ht>:<h>’: For paths computed by
- *   Store::makeFixedOutputPath() / Store::addToStore().
+ * - `FixedIngestionMethod`:
+ *   ‘fixed:<r?>:<hash algorithm>:<hash of file contents>’
  */
 struct ContentAddress
 {
@@ -266,11 +273,12 @@ struct ContentAddressWithReferences
      *
      * @param refs References to other store objects or oneself.
      *
-     * Do note that not all combinations are supported; `nullopt` is
-     * returns for invalid combinations.
+     * @note note that all combinations are supported. This is a
+     * *partial function* and exceptions will be thrown for invalid
+     * combinations.
      */
-    static std::optional<ContentAddressWithReferences> fromPartsOpt(
-        ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept;
+    static ContentAddressWithReferences fromParts(
+        ContentAddressMethod method, Hash hash, StoreReferences refs);
 
     ContentAddressMethod getMethod() const;
 

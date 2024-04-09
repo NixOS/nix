@@ -2,16 +2,20 @@
 ///@file
 
 #include <iostream>
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 
 #include <nlohmann/json_fwd.hpp>
 
-#include "util.hh"
+#include "types.hh"
+#include "experimental-features.hh"
 
 namespace nix {
 
-enum HashType : char;
+enum struct HashAlgorithm : char;
+enum struct HashFormat : int;
 
 class MultiCommand;
 
@@ -21,11 +25,12 @@ class AddCompletions;
 
 class Args
 {
+
 public:
 
     /**
      * Return a short one-line description of the command.
-     */
+    */
     virtual std::string description() { return ""; }
 
     virtual bool forceImpureByDefault() { return false; }
@@ -34,6 +39,16 @@ public:
      * Return documentation about this command, in Markdown format.
      */
     virtual std::string doc() { return ""; }
+
+    /**
+     * @brief Get the base directory for the command.
+     *
+     * @return Generally the working directory, but in case of a shebang
+     *         interpreter, returns the directory of the script.
+     *
+     * This only returns the correct value after parseCmdline() has run.
+     */
+    virtual Path getCommandBaseDir() const;
 
 protected:
 
@@ -140,6 +155,8 @@ protected:
      */
     using CompleterClosure = std::function<CompleterFun>;
 
+public:
+
     /**
      * Description of flags / options
      *
@@ -160,10 +177,9 @@ protected:
         CompleterClosure completer;
 
         std::optional<ExperimentalFeature> experimentalFeature;
-
-        static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
-        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
     };
+
+protected:
 
     /**
      * Index of all registered "long" flag descriptions (flags like
@@ -183,6 +199,8 @@ protected:
      */
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
 
+public:
+
     /**
      * Description of positional arguments
      *
@@ -197,6 +215,8 @@ protected:
         CompleterClosure completer;
     };
 
+protected:
+
     /**
      * Queue of expected positional argument forms.
      *
@@ -209,11 +229,11 @@ protected:
     std::list<ExpectedArg> expectedArgs;
     /**
      * List of processed positional argument forms.
-     * 
+     *
      * All items removed from `expectedArgs` are added here. After all
      * arguments were processed, this list should be exactly the same as
      * `expectedArgs` was before.
-     * 
+     *
      * This list is used to extend the lifetime of the argument forms.
      * If this is not done, some closures that reference the command
      * itself will segfault.
@@ -342,13 +362,16 @@ public:
      */
     std::optional<std::pair<std::string, ref<Command>>> command;
 
-    MultiCommand(const Commands & commands);
+    MultiCommand(std::string_view commandName, const Commands & commands);
 
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
 
     nlohmann::json toJSON() override;
+
+protected:
+    std::string commandName = "";
 };
 
 Strings argvToStrings(int argc, char * * argv);
@@ -394,5 +417,7 @@ public:
      */
     virtual void add(std::string completion, std::string description = "") = 0;
 };
+
+Strings parseShebangContent(std::string_view s);
 
 }

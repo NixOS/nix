@@ -73,7 +73,7 @@ time_t dumpPathAndGetMtime(const Path & path, Sink & sink,
  */
 void dumpString(std::string_view s, Sink & sink);
 
-void parseDump(ParseSink & sink, Source & source);
+void parseDump(FileSystemObjectSink & sink, Source & source);
 
 void restorePath(const Path & path, Source & source);
 

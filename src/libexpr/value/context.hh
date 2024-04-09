@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "util.hh"
 #include "comparator.hh"
 #include "derived-path.hh"
 #include "variant-wrapper.hh"
@@ -20,8 +19,8 @@ public:
         : Error("")
     {
         raw = raw_;
-        auto hf = hintfmt(args...);
-        err.msg = hintfmt("Bad String Context element: %1%: %2%", normaltxt(hf.str()), raw);
+        auto hf = HintFmt(args...);
+        err.msg = HintFmt("Bad String Context element: %1%: %2%", Uncolored(hf.str()), raw);
     }
 };
 

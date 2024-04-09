@@ -1,3 +1,4 @@
+#include "libfetchers/attrs.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
@@ -8,6 +9,7 @@
 #include "tarball.hh"
 #include "url.hh"
 #include "value-to-json.hh"
+#include "fetch-to-store.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -23,9 +25,7 @@ void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isLocked());
-
-    auto attrs = state.buildBindings(10);
+    auto attrs = state.buildBindings(100);
 
     state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
@@ -46,7 +46,7 @@ void emitTreeAttrs(
             attrs.alloc("shortRev").mkString(rev->gitShortRev());
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
-            auto emptyHash = Hash(htSHA1);
+            auto emptyHash = Hash(HashAlgorithm::SHA1);
             attrs.alloc("rev").mkString(emptyHash.gitRev());
             attrs.alloc("shortRev").mkString(emptyHash.gitShortRev());
         }
@@ -99,16 +99,14 @@ static void fetchTree(
 
         if (auto aType = args[0]->attrs->get(state.sType)) {
             if (type)
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unexpected attribute 'type'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "unexpected attribute 'type'"
+                ).atPos(pos).debugThrow();
             type = state.forceStringNoCtx(*aType->value, aType->pos, "while evaluating the `type` attribute passed to builtins.fetchTree");
         } else if (!type)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = state.positions[pos]
-            }));
+            state.error<EvalError>(
+                "attribute 'type' is missing in call to 'fetchTree'"
+            ).atPos(pos).debugThrow();
 
         attrs.emplace("type", type.value());
 
@@ -131,16 +129,19 @@ static void fetchTree(
                 attrs.emplace(state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
             }
             else
-                state.debugThrowLastTrace(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    state.symbols[attr.name], showType(*attr.value)));
+                state.error<TypeError>("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                    state.symbols[attr.name], showType(*attr.value)).debugThrow();
+        }
+
+        if (params.isFetchGit && !attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+            attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "attribute 'name' isn’t supported in call to 'fetchTree'"
+                ).atPos(pos).debugThrow();
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
@@ -152,13 +153,15 @@ static void fetchTree(
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
             attrs.emplace("url", fixGitURL(url));
+            if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
+                attrs.emplace("exportIgnore", Explicit<bool>{true});
+            }
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"),
-                    .errPos = state.positions[pos]
-                }));
+                state.error<EvalError>(
+                    "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
+                ).atPos(pos).debugThrow();
             input = fetchers::Input::fromURL(url);
         }
     }
@@ -166,12 +169,20 @@ static void fetchTree(
     if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isLocked())
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+    if (evalSettings.pureEval && !input.isLocked()) {
+        auto fetcher = "fetchTree";
+        if (params.isFetchGit)
+            fetcher = "fetchGit";
+
+        state.error<EvalError>(
+            "in pure evaluation mode, '%s' will not fetch unlocked input '%s'",
+            fetcher, input.to_string()
+        ).atPos(pos).debugThrow();
+    }
 
     state.checkURI(input.toURLString());
 
-    auto [storePath, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetchToStore(state.store);
 
     state.allowPath(storePath);
 
@@ -187,47 +198,218 @@ static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
     .args = {"input"},
     .doc = R"(
-      Fetch a source tree or a plain file using one of the supported backends.
-      *input* must be a [flake reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references), either in attribute set representation or in the URL-like syntax.
-      The input should be "locked", that is, it should contain a commit hash or content hash unless impure evaluation (`--impure`) is enabled.
+      Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
 
-      > **Note**
+      - the resulting fixed-output [store path](@docroot@/glossary.md#gloss-store-path)
+      - the corresponding [NAR](@docroot@/glossary.md#gloss-nar) hash
+      - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
+
+      *input* must be an attribute set with the following attributes:
+
+      - `type` (String, required)
+
+        One of the [supported source types](#source-types).
+        This determines other required and allowed input attributes.
+
+      - `narHash` (String, optional)
+
+        The `narHash` parameter can be used to substitute the source of the tree.
+        It also allows for verification of tree contents that may not be provided by the underlying transfer mechanism.
+        If `narHash` is set, the source is first looked up is the Nix store and [substituters](@docroot@/command-ref/conf-file.md#conf-substituters), and only fetched if not available.
+
+      A subset of the output attributes of `fetchTree` can be re-used for subsequent calls to `fetchTree` to produce the same result again.
+      That is, `fetchTree` is idempotent.
+
+      Downloads are cached in `$XDG_CACHE_HOME/nix`.
+      The remote source will be fetched from the network if both are true:
+      - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
+
+        > **Note**
+        >
+        > [Substituters](@docroot@/command-ref/conf-file.md#conf-substituters) are not used in fetching.
+
+      - There is no cache entry or the cache entry is older than [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
+
+      ## Source types
+
+      The following source types and associated input attributes are supported.
+
+      <!-- TODO: It would be soooo much more predictable to work with (and
+      document) if `fetchTree` was a curried call with the first paramter for
+      `type` or an attribute like `builtins.fetchTree.git`! -->
+
+      - `"file"`
+
+        Place a plain file into the Nix store.
+        This is similar to [`builtins.fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl)
+
+        - `url` (String, required)
+
+          Supported protocols:
+
+          - `https`
+
+            > **Example**
+            >
+            > ```nix
+            > fetchTree {
+            >   type = "file";
+            >   url = "https://example.com/index.html";
+            > }
+            > ```
+
+          - `http`
+
+            Insecure HTTP transfer for legacy sources.
+
+            > **Warning**
+            >
+            > HTTP performs no encryption or authentication.
+            > Use a `narHash` known in advance to ensure the output has expected contents.
+
+          - `file`
+
+            A file on the local file system.
+
+            > **Example**
+            >
+            > ```nix
+            > fetchTree {
+            >   type = "file";
+            >   url = "file:///home/eelco/nix/README.md";
+            > }
+            > ```
+
+      - `"tarball"`
+
+        Download a tar archive and extract it into the Nix store.
+        This has the same underyling implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+
+        - `url` (String, required)
+
+           > **Example**
+           >
+           > ```nix
+           > fetchTree {
+           >   type = "tarball";
+           >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
+           > }
+           > ```
+
+      - `"git"`
+
+        Fetch a Git tree and copy it to the Nix store.
+        This is similar to [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit).
+
+        - `url` (String, required)
+
+          The URL formats supported are the same as for Git itself.
+
+          > **Example**
+          >
+          > ```nix
+          > fetchTree {
+          >   type = "git";
+          >   url = "git@github.com:NixOS/nixpkgs.git";
+          > }
+          > ```
+
+          > **Note**
+          >
+          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix will only consider files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
+
+        - `ref` (String, optional)
+
+          A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
+
+          Default: `"HEAD"`
+
+        - `rev` (String, optional)
+
+          A Git revision; a commit hash.
+
+          Default: the tip of `ref`
+
+        - `shallow` (Bool, optional)
+
+          Make a shallow clone when fetching the Git tree.
+
+          Default: `false`
+
+        - `submodules` (Bool, optional)
+
+          Also fetch submodules if available.
+
+          Default: `false`
+
+        - `allRefs` (Bool, optional)
+
+          If set to `true`, always fetch the entire repository, even if the latest commit is still in the cache.
+          Otherwise, only the latest commit is fetched if it is not already cached.
+
+          Default: `false`
+
+        - `lastModified` (Integer, optional)
+
+          Unix timestamp of the fetched commit.
+
+          If set, pass through the value to the output attribute set.
+          Otherwise, generated from the fetched Git tree.
+
+        - `revCount` (Integer, optional)
+
+          Number of revisions in the history of the Git repository before the fetched commit.
+
+          If set, pass through the value to the output attribute set.
+          Otherwise, generated from the fetched Git tree.
+
+      The following input types are still subject to change:
+
+      - `"path"`
+      - `"github"`
+      - `"gitlab"`
+      - `"sourcehut"`
+      - `"mercurial"`
+
+     *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
+     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
+
+      > **Example**
       >
-      > The URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
+      > Fetch a GitHub repository using the attribute set representation:
+      >
+      > ```nix
+      > builtins.fetchTree {
+      >   type = "github";
+      >   owner = "NixOS";
+      >   repo = "nixpkgs";
+      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+      > }
+      > ```
+      >
+      > This evaluates to the following attribute set:
+      >
+      > ```nix
+      > {
+      >   lastModified = 1686503798;
+      >   lastModifiedDate = "20230611171638";
+      >   narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
+      >   outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
+      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+      >   shortRev = "ae2e6b3";
+      > }
+      > ```
 
-      Here are some examples of how to use `fetchTree`:
-
-      - Fetch a GitHub repository using the attribute set representation:
-
-          ```nix
-          builtins.fetchTree {
-            type = "github";
-            owner = "NixOS";
-            repo = "nixpkgs";
-            rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-          }
-          ```
-
-        This evaluates to the following attribute set:
-
-          ```
-          {
-            lastModified = 1686503798;
-            lastModifiedDate = "20230611171638";
-            narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
-            outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
-            rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-            shortRev = "ae2e6b3";
-          }
-          ```
-
-      - Fetch the same GitHub repository using the URL-like syntax:
-
-          ```
-          builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
-          ```
+      > **Example**
+      >
+      > Fetch the same GitHub repository using the URL-like syntax:
+      >
+      >   ```nix
+      >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
+      >   ```
     )",
     .fun = prim_fetchTree,
+    .experimentalFeature = Xp::FetchTree,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
@@ -245,21 +427,17 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
             else if (n == "sha256")
-                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), htSHA256);
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), HashAlgorithm::SHA256);
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             else
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
-                    .errPos = state.positions[attr.pos]
-                }));
+                state.error<EvalError>("unsupported argument '%s' to '%s'", n, who)
+                .atPos(pos).debugThrow();
         }
 
         if (!url)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            }));
+            state.error<EvalError>(
+                "'url' argument required").atPos(pos).debugThrow();
     } else
         url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
@@ -272,10 +450,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         name = baseNameOf(*url);
 
     if (evalSettings.pureEval && !expectedHash)
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
+        state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who).atPos(pos).debugThrow();
 
     // early exit if pinned and already in the store
-    if (expectedHash && expectedHash->type == htSHA256) {
+    if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
@@ -294,16 +472,22 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
+        ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, FetchMode::Copy, name)
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, state.store->toRealPath(storePath));
-        if (hash != *expectedHash)
-            state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                *url, expectedHash->to_string(HashFormat::Base32, true), hash.to_string(HashFormat::Base32, true)));
+            : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
+        if (hash != *expectedHash) {
+            state.error<EvalError>(
+                "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                *url,
+                expectedHash->to_string(HashFormat::Nix32, true),
+                hash.to_string(HashFormat::Nix32, true)
+            ).withExitStatus(102)
+            .debugThrow();
+        }
     }
 
     state.allowAndSetStorePathString(storePath, v);
@@ -422,9 +606,16 @@ static RegisterPrimOp primop_fetchGit({
 
         A Boolean parameter that specifies whether submodules should be checked out.
 
+      - `exportIgnore` (default: `true`)
+
+        A Boolean parameter that specifies whether `export-ignore` from `.gitattributes` should be applied.
+        This approximates part of the `git archive` behavior.
+
+        Enabling this option is not recommended because it is unknown whether the Git developers commit to the reproducibility of `export-ignore` in newer Git versions.
+
       - `shallow` (default: `false`)
 
-        A Boolean parameter that specifies whether fetching a shallow clone is allowed.
+        Make a shallow clone when fetching the Git tree.
 
       - `allRefs`
 
@@ -459,12 +650,14 @@ static RegisterPrimOp primop_fetchGit({
 
         The public keys against which `rev` is verified if `verifyCommit` is enabled.
         Must be given as a list of attribute sets with the following form:
+
         ```nix
         {
           key = "<public key>";
           type = "<key type>"; # optional, default: "ssh-ed25519"
         }
         ```
+
         Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
 
 

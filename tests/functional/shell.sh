@@ -10,6 +10,14 @@ nix shell -f shell-hello.nix hello -c hello NixOS | grep 'Hello NixOS'
 nix shell -f shell-hello.nix hello^dev -c hello2 | grep 'Hello2'
 nix shell -f shell-hello.nix 'hello^*' -c hello2 | grep 'Hello2'
 
+
+if isDaemonNewer "2.20.0pre20231220"; then
+    # Test that command line attribute ordering is reflected in the PATH
+    # https://github.com/NixOS/nix/issues/7905
+    nix shell -f shell-hello.nix hello salve-mundi -c hello | grep 'Hello World'
+    nix shell -f shell-hello.nix salve-mundi hello -c hello | grep 'Salve Mundi'
+fi
+
 requireSandboxSupport
 
 chmod -R u+w $TEST_ROOT/store0 || true

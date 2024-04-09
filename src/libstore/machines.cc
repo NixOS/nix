@@ -1,5 +1,4 @@
 #include "machines.hh"
-#include "util.hh"
 #include "globals.hh"
 #include "store-api.hh"
 
@@ -33,11 +32,19 @@ Machine::Machine(decltype(storeUri) storeUri,
     systemTypes(systemTypes),
     sshKey(sshKey),
     maxJobs(maxJobs),
-    speedFactor(std::max(1U, speedFactor)),
+    speedFactor(speedFactor == 0.0f ? 1.0f : std::move(speedFactor)),
     supportedFeatures(supportedFeatures),
     mandatoryFeatures(mandatoryFeatures),
     sshPublicHostKey(sshPublicHostKey)
-{}
+{
+    if (speedFactor < 0.0)
+        throw UsageError("speed factor must be >= 0");
+}
+
+bool Machine::systemSupported(const std::string & system) const
+{
+    return system == "builtin" || (systemTypes.count(system) > 0);
+}
 
 bool Machine::allSupported(const std::set<std::string> & features) const
 {
@@ -131,6 +138,14 @@ static Machine parseBuilderLine(const std::string & line)
         return result.value();
     };
 
+    auto parseFloatField = [&](size_t fieldIndex) {
+        const auto result = string2Int<float>(tokens[fieldIndex]);
+        if (!result) {
+            throw FormatError("bad machine specification: failed to convert column #%lu in a row: '%s' to 'float'", fieldIndex, line);
+        }
+        return result.value();
+    };
+
     auto ensureBase64 = [&](size_t fieldIndex) {
         const auto & str = tokens[fieldIndex];
         try {
@@ -146,10 +161,10 @@ static Machine parseBuilderLine(const std::string & line)
 
     return {
         tokens[0],
-        isSet(1) ? tokenizeString<std::vector<std::string>>(tokens[1], ",") : std::vector<std::string>{settings.thisSystem},
+        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : std::set<std::string>{settings.thisSystem},
         isSet(2) ? tokens[2] : "",
         isSet(3) ? parseUnsignedIntField(3) : 1U,
-        isSet(4) ? parseUnsignedIntField(4) : 1U,
+        isSet(4) ? parseFloatField(4) : 1.0f,
         isSet(5) ? tokenizeString<std::set<std::string>>(tokens[5], ",") : std::set<std::string>{},
         isSet(6) ? tokenizeString<std::set<std::string>>(tokens[6], ",") : std::set<std::string>{},
         isSet(7) ? ensureBase64(7) : ""

@@ -1,6 +1,8 @@
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "fs-input-accessor.hh"
+#include "posix-source-accessor.hh"
 
 namespace nix::fetchers {
 
@@ -84,7 +86,21 @@ struct PathInputScheme : InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const override
     {
-        writeFile((CanonPath(getAbsPath(input)) + path).abs(), contents);
+        writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
+    }
+
+    std::optional<std::string> isRelative(const Input & input) const
+    {
+        auto path = getStrAttr(input.attrs, "path");
+        if (hasPrefix(path, "/"))
+            return std::nullopt;
+        else
+            return path;
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getNarHash();
     }
 
     CanonPath getAbsPath(const Input & input) const
@@ -97,7 +113,7 @@ struct PathInputScheme : InputScheme
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
         std::string absPath;
@@ -139,7 +155,24 @@ struct PathInputScheme : InputScheme
         }
         input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
-        return {std::move(*storePath), input};
+        return {makeStorePathAccessor(store, *storePath), std::move(input)};
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (isRelative(input))
+            return std::nullopt;
+
+        /* If this path is in the Nix store, use the hash of the
+           store object and the subpath. */
+        auto path = getAbsPath(input);
+        try {
+            auto [storePath, subPath] = store->toStorePath(path.abs());
+            auto info = store->queryPathInfo(storePath);
+            return fmt("path:%s:%s", info->narHash.to_string(HashFormat::Base16, false), subPath);
+        } catch (Error &) {
+            return std::nullopt;
+        }
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() const override

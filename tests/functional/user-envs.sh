@@ -26,6 +26,7 @@ nix-env -f ./user-envs.nix -qa --json --out-path | jq -e '.[] | select(.name == 
     .outputName == "out",
     (.outputs.out | test("'$NIX_STORE_DIR'.*-0\\.1"))
 ] | all'
+nix-env -f ./user-envs.nix -qa --json --drv-path | jq -e '.[] | select(.name == "bar-0.1") | (.drvPath | test("'$NIX_STORE_DIR'.*-0\\.1\\.drv"))'
 
 # Query descriptions.
 nix-env -f ./user-envs.nix -qa '*' --description | grepQuiet silly
@@ -188,3 +189,9 @@ nix-env --set $outPath10
 [ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
 nix-env --set $drvPath10
 [ "$(nix-store -q --resolve $profiles/test)" = $outPath10 ]
+
+# Test the case where $HOME contains a symlink.
+mkdir -p $TEST_ROOT/real-home/alice/.nix-defexpr/channels
+ln -sfn $TEST_ROOT/real-home $TEST_ROOT/home
+ln -sfn $(pwd)/user-envs.nix $TEST_ROOT/home/alice/.nix-defexpr/channels/foo
+HOME=$TEST_ROOT/home/alice nix-env -i foo-0.1

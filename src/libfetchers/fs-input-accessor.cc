@@ -4,126 +4,32 @@
 
 namespace nix {
 
-struct FSInputAccessorImpl : FSInputAccessor, PosixSourceAccessor
+struct FSInputAccessor : InputAccessor, PosixSourceAccessor
 {
-    CanonPath root;
-    std::optional<std::set<CanonPath>> allowedPaths;
-    MakeNotAllowedError makeNotAllowedError;
-
-    FSInputAccessorImpl(
-        const CanonPath & root,
-        std::optional<std::set<CanonPath>> && allowedPaths,
-        MakeNotAllowedError && makeNotAllowedError)
-        : root(root)
-        , allowedPaths(std::move(allowedPaths))
-        , makeNotAllowedError(std::move(makeNotAllowedError))
-    {
-    }
-
-    void readFile(
-        const CanonPath & path,
-        Sink & sink,
-        std::function<void(uint64_t)> sizeCallback) override
-    {
-        auto absPath = makeAbsPath(path);
-        checkAllowed(absPath);
-        PosixSourceAccessor::readFile(absPath, sink, sizeCallback);
-    }
-
-    bool pathExists(const CanonPath & path) override
-    {
-        auto absPath = makeAbsPath(path);
-        return isAllowed(absPath) && PosixSourceAccessor::pathExists(absPath);
-    }
-
-    std::optional<Stat> maybeLstat(const CanonPath & path) override
-    {
-        auto absPath = makeAbsPath(path);
-        checkAllowed(absPath);
-        return PosixSourceAccessor::maybeLstat(absPath);
-    }
-
-    DirEntries readDirectory(const CanonPath & path) override
-    {
-        auto absPath = makeAbsPath(path);
-        checkAllowed(absPath);
-        DirEntries res;
-        for (auto & entry : PosixSourceAccessor::readDirectory(absPath))
-            if (isAllowed(absPath + entry.first))
-                res.emplace(entry);
-        return res;
-    }
-
-    std::string readLink(const CanonPath & path) override
-    {
-        auto absPath = makeAbsPath(path);
-        checkAllowed(absPath);
-        return PosixSourceAccessor::readLink(absPath);
-    }
-
-    CanonPath makeAbsPath(const CanonPath & path)
-    {
-        return root + path;
-    }
-
-    void checkAllowed(const CanonPath & absPath) override
-    {
-        if (!isAllowed(absPath))
-            throw makeNotAllowedError
-                ? makeNotAllowedError(absPath)
-                : RestrictedPathError("access to path '%s' is forbidden", absPath);
-    }
-
-    bool isAllowed(const CanonPath & absPath)
-    {
-        if (!absPath.isWithin(root))
-            return false;
-
-        if (allowedPaths) {
-            auto p = absPath.removePrefix(root);
-            if (!p.isAllowed(*allowedPaths))
-                return false;
-        }
-
-        return true;
-    }
-
-    void allowPath(CanonPath path) override
-    {
-        if (allowedPaths)
-            allowedPaths->insert(std::move(path));
-    }
-
-    bool hasAccessControl() override
-    {
-        return (bool) allowedPaths;
-    }
-
-    std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override
-    {
-        return makeAbsPath(path);
-    }
+    using PosixSourceAccessor::PosixSourceAccessor;
 };
 
-ref<FSInputAccessor> makeFSInputAccessor(
-    const CanonPath & root,
-    std::optional<std::set<CanonPath>> && allowedPaths,
-    MakeNotAllowedError && makeNotAllowedError)
+ref<InputAccessor> makeFSInputAccessor()
 {
-    return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths), std::move(makeNotAllowedError));
+    return make_ref<FSInputAccessor>();
 }
 
-ref<FSInputAccessor> makeStorePathAccessor(
-    ref<Store> store,
-    const StorePath & storePath,
-    MakeNotAllowedError && makeNotAllowedError)
+ref<InputAccessor> makeFSInputAccessor(std::filesystem::path root)
 {
-    return makeFSInputAccessor(CanonPath(store->toRealPath(storePath)), {}, std::move(makeNotAllowedError));
+    return make_ref<FSInputAccessor>(std::move(root));
+}
+
+ref<InputAccessor> makeStorePathAccessor(
+    ref<Store> store,
+    const StorePath & storePath)
+{
+    // FIXME: should use `store->getFSAccessor()`
+    return makeFSInputAccessor(std::filesystem::path { store->toRealPath(storePath) });
 }
 
 SourcePath getUnfilteredRootPath(CanonPath path)
 {
-    static auto rootFS = makeFSInputAccessor(CanonPath::root);
+    static auto rootFS = makeFSInputAccessor();
     return {rootFS, path};
 }
 

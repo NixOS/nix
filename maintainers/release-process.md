@@ -24,34 +24,24 @@ release:
 * In a checkout of the Nix repo, make sure you're on `master` and run
   `git pull`.
 
-* Move the contents of `doc/manual/src/release-notes/rl-next.md`
-  (except the first line) to
-  `doc/manual/src/release-notes/rl-$VERSION.md` (where `$VERSION` is
-  the contents of `.version` *without* the patch level, e.g. `2.12`
-  rather than `2.12.0`).
-
-* Add a header to `doc/manual/src/release-notes/rl-$VERSION.md` like
-
-  ```
-  # Release 2.12 (2022-12-06)
-  ```
-
-* Proof-read / edit / rearrange the release notes. Breaking changes
-  and highlights should go to the top.
-
-* Add a link to the release notes to `doc/manual/src/SUMMARY.md.in`
-  (*not* `SUMMARY.md`), e.g.
-
-  ```
-  - [Release 2.12 (2022-12-06)](release-notes/rl-2.12.md)
-  ```
-
-* Run
+* Compile the release notes by running
 
   ```console
+  $ export VERSION=X.YY
   $ git checkout -b release-notes
-  $ git add doc/manual/src/release-notes/rl-$VERSION.md
-  $ git commit -a -m 'Release notes'
+  $ ./maintainers/release-notes
+  ```
+
+  where `X.YY` is *without* the patch level, e.g. `2.12` rather than ~~`2.12.0`~~.
+
+  A commit is created.
+
+* Proof-read / edit / rearrange the release notes if needed. Breaking changes
+  and highlights should go to the top.
+
+* Push.
+
+  ```console
   $ git push --set-upstream $REMOTE release-notes
   ```
 
@@ -67,14 +57,16 @@ release:
   $ git checkout -b $VERSION-maintenance
   ```
 
-* Mark the release as stable:
+* Mark the release as official:
 
   ```console
-  $ git cherry-pick f673551e71942a52b6d7ae66af8b67140904a76a
+  $ sed -e 's/officialRelease = false;/officialRelease = true;/' -i flake.nix
   ```
 
   This removes the link to `rl-next.md` from the manual and sets
   `officialRelease = true` in `flake.nix`.
+
+* Commit
 
 * Push the release branch:
 
@@ -158,6 +150,30 @@ release:
   `rl-$VERSION.md`.
 
 ## Creating a point release
+
+* Checkout.
+
+  ```console
+  $ git checkout XX.YY-maintenance
+  ```
+
+* Determine the next patch version.
+
+  ```console
+  $ export VERSION=XX.YY.ZZ
+  ```
+
+* Update release notes.
+
+  ```console
+  $ ./maintainers/release-notes
+  ```
+
+* Push.
+
+  ```console
+  $ git push
+  ```
 
 * Wait for the desired evaluation of the maintenance jobset to finish
   building.

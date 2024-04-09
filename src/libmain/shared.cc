@@ -1,10 +1,11 @@
 #include "globals.hh"
+#include "current-process.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
-#include "util.hh"
 #include "loggers.hh"
 #include "progress-bar.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <cctype>
@@ -120,7 +121,7 @@ void initNix()
 
     initLibStore();
 
-    startSignalHandlerThread();
+    unix::startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
     struct sigaction act;
@@ -307,7 +308,7 @@ void printVersion(const std::string & programName)
 void showManPage(const std::string & name)
 {
     restoreProcessContext();
-    setenv("MANPATH", settings.nixManDir.c_str(), 1);
+    setEnv("MANPATH", settings.nixManDir.c_str());
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
 }
@@ -339,7 +340,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
         return 1;
     } catch (BaseError & e) {
         logError(e.info());
-        return e.status;
+        return e.info().status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
         return 1;
@@ -368,7 +369,7 @@ RunPager::RunPager()
         if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
-            setenv("LESS", "FRSXMK", 1);
+            setEnv("LESS", "FRSXMK");
         restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);
@@ -406,7 +407,5 @@ PrintFreed::~PrintFreed()
             results.paths.size(),
             showBytes(results.bytesFreed));
 }
-
-Exit::~Exit() { }
 
 }

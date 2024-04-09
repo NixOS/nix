@@ -2,7 +2,7 @@
 
 ## Motivation
 
-The team's main responsibility is to set a direction for the development of Nix and ensure that the code is in good shape.
+The team's main responsibility is to guide and direct the development of Nix and ensure that the code is in good shape.
 
 We aim to achieve this by improving the contributor experience and attracting more maintainers – that is, by helping other people contributing to Nix and eventually taking responsibility – in order to scale the development process to match users' needs.
 
@@ -43,7 +43,11 @@ The team meets twice a week:
 - Discussion meeting: [Fridays 13:00-14:00 CET](https://calendar.google.com/calendar/event?eid=MHNtOGVuNWtrZXNpZHR2bW1sM3QyN2ZjaGNfMjAyMjExMjVUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
 
   1. Triage issues and pull requests from the [No Status](#no-status) column (30 min)
-  2. Discuss issues and pull requests from the [To discuss](#to-discuss) column (30 min)
+  2. Discuss issues and pull requests from the [To discuss](#to-discuss) column (30 min).
+     Once a month, each team member checks the [Assigned](#assigned) column for prs/issues assigned to them, to either
+       - unblock it by providing input
+       - mark it as draft if it is blocked on the contributor
+       - escalate it back to the team by moving it to To discuss, and leaving a comment as to why the issue needs to be discussed again.
 
 - Work meeting: [Mondays 13:00-15:00 CET](https://calendar.google.com/calendar/event?eid=NTM1MG1wNGJnOGpmOTZhYms3bTB1bnY5cWxfMjAyMjExMjFUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
 

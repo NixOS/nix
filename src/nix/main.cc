@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "args/root.hh"
+#include "current-process.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
@@ -14,20 +15,44 @@
 #include "loggers.hh"
 #include "markdown.hh"
 #include "memory-input-accessor.hh"
+#include "terminal.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <regex>
 
 #include <nlohmann/json.hpp>
+
+#if __linux__
+# include "namespaces.hh"
+#endif
 
 extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char * * argv);
 
 namespace nix {
+
+static bool haveProxyEnvironmentVariables()
+{
+    static const std::vector<std::string> proxyVariables = {
+        "http_proxy",
+        "https_proxy",
+        "ftp_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "FTP_PROXY"
+    };
+    for (auto & proxyVariable: proxyVariables) {
+        if (getEnv(proxyVariable).has_value()) {
+            return true;
+        }
+    }
+    return false;
+}
 
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
@@ -52,6 +77,8 @@ static bool haveInternet()
         }
     }
 
+    if (haveProxyEnvironmentVariables()) return true;
+
     return false;
 }
 
@@ -64,7 +91,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
     bool helpRequested = false;
     bool showVersion = false;
 
-    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
+    NixArgs() : MultiCommand("", RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
         categories.clear();
         categories[catHelp] = "Help commands";
@@ -131,10 +158,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         {"ping-store", {"store", "ping"}},
         {"sign-paths", {"store", "sign"}},
         {"show-derivation", {"derivation", "show"}},
+        {"show-config", {"config", "show"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
         {"verify", {"store", "verify"}},
+        {"doctor", {"config", "check"}},
     };
 
     bool aliasUsed = false;
@@ -293,7 +322,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "help-stores.md"
+          #include "generated-doc/help-stores.md"
           ;
     }
 
@@ -322,7 +351,7 @@ void mainWrapped(int argc, char * * argv)
     initGC();
 
     #if __linux__
-    if (getuid() == 0) {
+    if (isRootUser()) {
         try {
             saveMountNamespace();
             if (unshare(CLONE_NEWNS) == -1)
@@ -350,7 +379,9 @@ void mainWrapped(int argc, char * * argv)
 
     setLogFormat("bar");
     settings.verboseBuild = false;
-    if (isatty(STDERR_FILENO)) {
+
+    // If on a terminal, progress will be displayed via progress bars etc. (thus verbosity=notice)
+    if (nix::isTTY()) {
         verbosity = lvlNotice;
     } else {
         verbosity = lvlInfo;
@@ -368,6 +399,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::Flakes,
             Xp::FetchClosure,
             Xp::DynamicDerivations,
+            Xp::FetchTree,
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
@@ -426,7 +458,9 @@ void mainWrapped(int argc, char * * argv)
     });
 
     try {
-        args.parseCmdline(argvToStrings(argc, argv));
+        auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
+        auto allowShebang = isNixCommand && argc > 1;
+        args.parseCmdline(argvToStrings(argc, argv),allowShebang);
     } catch (UsageError &) {
         if (!args.helpRequested && !args.completions) throw;
     }

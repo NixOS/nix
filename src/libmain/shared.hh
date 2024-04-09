@@ -1,12 +1,13 @@
 #pragma once
 ///@file
 
-#include "util.hh"
+#include "processes.hh"
 #include "args.hh"
 #include "args/root.hh"
 #include "common-args.hh"
 #include "path.hh"
 #include "derived-path.hh"
+#include "exit.hh"
 
 #include <signal.h>
 
@@ -14,15 +15,6 @@
 
 
 namespace nix {
-
-class Exit : public std::exception
-{
-public:
-    int status;
-    Exit() : status(0) { }
-    Exit(int status) : status(status) { }
-    virtual ~Exit();
-};
 
 int handleExceptions(const std::string & programName, std::function<void()> fun);
 

@@ -1,5 +1,8 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "input-accessor.hh"
+#include "source-path.hh"
+#include "fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -42,12 +45,8 @@ static void fixupInput(Input & input)
     // Check common attributes.
     input.getType();
     input.getRef();
-    if (input.getRev())
-        input.locked = true;
     input.getRevCount();
     input.getLastModified();
-    if (input.getNarHash())
-        input.locked = true;
 }
 
 Input Input::fromURL(const ParsedURL & url, bool requireTree)
@@ -107,6 +106,11 @@ Input Input::fromAttrs(Attrs && attrs)
     return std::move(*res);
 }
 
+std::optional<std::string> Input::getFingerprint(ref<Store> store) const
+{
+    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
+}
+
 ParsedURL Input::toURL() const
 {
     if (!scheme)
@@ -132,6 +136,11 @@ bool Input::isDirect() const
     return !scheme || scheme->isDirect(*this);
 }
 
+bool Input::isLocked() const
+{
+    return scheme && scheme->isLocked(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;
@@ -152,7 +161,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
-std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
+std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
@@ -177,46 +186,83 @@ std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
 
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
-            return scheme->fetch(store, *this);
+            auto [accessor, final] = getAccessorUnchecked(store);
+
+            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, final.getName());
+
+            auto narHash = store->queryPathInfo(storePath)->narHash;
+            final.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+
+            scheme->checkLocks(*this, final);
+
+            return {storePath, final};
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());
             throw;
         }
     }();
 
-    auto narHash = store->queryPathInfo(storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-
-    if (auto prevNarHash = getNarHash()) {
-        if (narHash != *prevNarHash)
-            throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(),
-                store->printStorePath(storePath),
-                prevNarHash->to_string(HashFormat::SRI, true),
-                narHash.to_string(HashFormat::SRI, true));
-    }
-
-    if (auto prevLastModified = getLastModified()) {
-        if (input.getLastModified() != prevLastModified)
-            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevLastModified);
-    }
-
-    if (auto prevRev = getRev()) {
-        if (input.getRev() != prevRev)
-            throw Error("'rev' attribute mismatch in input '%s', expected %s",
-                input.to_string(), prevRev->gitRev());
-    }
-
-    if (auto prevRevCount = getRevCount()) {
-        if (input.getRevCount() != prevRevCount)
-            throw Error("'revCount' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevRevCount);
-    }
-
-    input.locked = true;
-
     return {std::move(storePath), input};
+}
+
+void InputScheme::checkLocks(const Input & specified, const Input & final) const
+{
+    if (auto prevNarHash = specified.getNarHash()) {
+        if (final.getNarHash() != prevNarHash) {
+            if (final.getNarHash())
+                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
+                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true), final.getNarHash()->to_string(HashFormat::SRI, true));
+            else
+                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got none",
+                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true));
+        }
+    }
+
+    if (auto prevLastModified = specified.getLastModified()) {
+        if (final.getLastModified() != prevLastModified)
+            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
+                final.to_string(), *prevLastModified);
+    }
+
+    if (auto prevRev = specified.getRev()) {
+        if (final.getRev() != prevRev)
+            throw Error("'rev' attribute mismatch in input '%s', expected %s",
+                final.to_string(), prevRev->gitRev());
+    }
+
+    if (auto prevRevCount = specified.getRevCount()) {
+        if (final.getRevCount() != prevRevCount)
+            throw Error("'revCount' attribute mismatch in input '%s', expected %d",
+                final.to_string(), *prevRevCount);
+    }
+}
+
+std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+{
+    try {
+        auto [accessor, final] = getAccessorUnchecked(store);
+
+        scheme->checkLocks(*this, final);
+
+        return {accessor, std::move(final)};
+    } catch (Error & e) {
+        e.addTrace({}, "while fetching the input '%s'", to_string());
+        throw;
+    }
+}
+
+std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
+{
+    // FIXME: cache the accessor
+
+    if (!scheme)
+        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
+
+    auto [accessor, final] = scheme->getAccessor(store, *this);
+
+    accessor->fingerprint = scheme->getFingerprint(store, final);
+
+    return {accessor, std::move(final)};
 }
 
 Input Input::applyOverrides(
@@ -273,8 +319,8 @@ std::string Input::getType() const
 std::optional<Hash> Input::getNarHash() const
 {
     if (auto s = maybeGetStrAttr(attrs, "narHash")) {
-        auto hash = s->empty() ? Hash(htSHA256) : Hash::parseSRI(*s);
-        if (hash.type != htSHA256)
+        auto hash = s->empty() ? Hash(HashAlgorithm::SHA256) : Hash::parseSRI(*s);
+        if (hash.algo != HashAlgorithm::SHA256)
             throw UsageError("narHash must use SHA-256");
         return hash;
     }
@@ -298,7 +344,7 @@ std::optional<Hash> Input::getRev() const
         } catch (BadHash &e) {
             // Default to sha1 for backwards compatibility with existing
             // usages (e.g. `builtins.fetchTree` calls or flake inputs).
-            hash = Hash::parseAny(*s, htSHA1);
+            hash = Hash::parseAny(*s, HashAlgorithm::SHA1);
         }
     }
 

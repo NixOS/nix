@@ -1,4 +1,6 @@
 #pragma once
+///@file
+
 #include "config.hh"
 
 namespace nix {
@@ -19,11 +21,44 @@ struct EvalSettings : Config
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
         R"(
-          List of directories to be searched for `<...>` file references
+          List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
+          This setting determines the value of
+          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtin-constants.md#builtins-findFile).
 
-          In particular, outside of [pure evaluation mode](#conf-pure-eval), this determines the value of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath).
+          The default value is
+
+          ```
+          $HOME/.nix-defexpr/channels
+          nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs
+          $NIX_STATE_DIR/profiles/per-user/root/channels
+          ```
+
+          It can be overridden with the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH) or the [`-I` command line option](@docroot@/command-ref/opt-common.md#opt-I).
+
+          > **Note**
+          >
+          > If [pure evaluation](#conf-pure-eval) is enabled, `nixPath` evaluates to the empty list `[ ]`.
+        )", {}, false};
+
+    Setting<std::string> currentSystem{
+        this, "", "eval-system",
+        R"(
+          This option defines
+          [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+          in the Nix language if it is set as a non-empty string.
+          Otherwise, if it is defined as the empty string (the default), the value of the
+          [`system` ](#conf-system)
+          configuration setting is used instead.
+
+          Unlike `system`, this setting does not change what kind of derivations can be built locally.
+          This is useful for evaluating Nix code on one system to produce derivations to be built on another type of system.
         )"};
+
+    /**
+     * Implements the `eval-system` vs `system` defaulting logic
+     * described for `eval-system`.
+     */
+    const std::string & getCurrentSystem();
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
@@ -33,8 +68,6 @@ struct EvalSettings : Config
           [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath),
           or to URIs outside of
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
-
-          Also the default value for [`nix-path`](#conf-nix-path) is ignored, such that only explicitly set search path entries are taken into account.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
@@ -43,9 +76,10 @@ struct EvalSettings : Config
 
           - Restrict file system and network access to files specified by cryptographic hash
           - Disable impure constants:
-            - [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+            - [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
             - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
             - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
+            - [`builtins.storePath`](@docroot@/language/builtin-constants.md#builtins-storePath)
         )"
         };
 
@@ -66,6 +100,11 @@ struct EvalSettings : Config
           evaluation mode. For example, when set to
           `https://github.com/NixOS`, builtin functions such as `fetchGit` are
           allowed to access `https://github.com/NixOS/patchelf.git`.
+
+          Access is granted when
+          - the URI is equal to the prefix,
+          - or the URI is a subpath of the prefix,
+          - or the prefix is a URI scheme ended by a colon `:` and the URI has the same scheme.
         )"};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
@@ -97,6 +136,19 @@ struct EvalSettings : Config
 
     Setting<bool> traceVerbose{this, false, "trace-verbose",
         "Whether `builtins.traceVerbose` should trace its first argument when evaluated."};
+
+    Setting<unsigned int> maxCallDepth{this, 10000, "max-call-depth",
+        "The maximum function call depth to allow before erroring."};
+
+    Setting<bool> builtinsTraceDebugger{this, false, "debugger-on-trace",
+        R"(
+          If set to true and the `--debugger` flag is given,
+          [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace) will
+          enter the debugger like
+          [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+
+          This is useful for debugging warnings in third-party Nix code.
+        )"};
 };
 
 extern EvalSettings evalSettings;

@@ -1,14 +1,18 @@
 #include "markdown.hh"
 #include "util.hh"
 #include "finally.hh"
+#include "terminal.hh"
 
 #include <sys/queue.h>
+#if HAVE_LOWDOWN
 #include <lowdown.h>
+#endif
 
 namespace nix {
 
 std::string renderMarkdownToTerminal(std::string_view markdown)
 {
+#if HAVE_LOWDOWN
     int windowWidth = getWindowSize().second;
 
     struct lowdown_opts opts {
@@ -46,7 +50,10 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
     if (!rndr_res)
         throw Error("allocation error while rendering Markdown");
 
-    return filterANSIEscapes(std::string(buf->data, buf->size), !shouldANSI());
+    return filterANSIEscapes(std::string(buf->data, buf->size), !isTTY());
+#else
+    return std::string(markdown);
+#endif
 }
 
 }

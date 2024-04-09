@@ -1,5 +1,5 @@
 #include "globals.hh"
-#include "util.hh"
+#include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
@@ -14,12 +14,14 @@
 
 #include <nlohmann/json.hpp>
 
-#include <sodium/core.h>
-
 #ifdef __GLIBC__
-#include <gnu/lib-names.h>
-#include <nss.h>
-#include <dlfcn.h>
+# include <gnu/lib-names.h>
+# include <nss.h>
+# include <dlfcn.h>
+#endif
+
+#if __APPLE__
+# include "processes.hh"
 #endif
 
 #include "config-impl.hh"
@@ -54,7 +56,7 @@ Settings::Settings()
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
-    buildUsersGroup = getuid() == 0 ? "nixbld" : "";
+    buildUsersGroup = isRootUser() ? "nixbld" : "";
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
@@ -111,7 +113,14 @@ Settings::Settings()
 
 void loadConfFile()
 {
-    globalConfig.applyConfigFile(settings.nixConfDir + "/nix.conf");
+    auto applyConfigFile = [&](const Path & path) {
+        try {
+            std::string contents = readFile(path);
+            globalConfig.applyConfig(contents, path);
+        } catch (SystemError &) { }
+    };
+
+    applyConfigFile(settings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
@@ -119,7 +128,7 @@ void loadConfFile()
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        globalConfig.applyConfigFile(*file);
+        applyConfigFile(*file);
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
@@ -336,6 +345,12 @@ void initPlugins()
                 dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!handle)
                 throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
+
+            /* Older plugins use a statically initialized object to run their code.
+               Newer plugins can also export nix_plugin_entry() */
+            void (*nix_plugin_entry)() = (void (*)())dlsym(handle, "nix_plugin_entry");
+            if (nix_plugin_entry)
+                nix_plugin_entry();
         }
     }
 
@@ -394,11 +409,9 @@ void assertLibStoreInitialized() {
 }
 
 void initLibStore() {
+    if (initLibStoreDone) return;
 
     initLibUtil();
-
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
 
     loadConfFile();
 
@@ -408,7 +421,7 @@ void initLibStore() {
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
 #if __APPLE__
-    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
+    if (hasPrefix(defaultTempDir(), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 
