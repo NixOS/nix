@@ -190,3 +190,8 @@
   repository where the `flake.lock` file is `.gitignore`d
   [#8854](https://github.com/NixOS/nix/issues/8854)
   [#9324](https://github.com/NixOS/nix/pull/9324)
+
+- `nix copy` to a `ssh-ng` store now needs `--substitute-on-destination` (a.k.a. `-s`)
+  in order to substitute paths on the remote store instead of copying them.
+  The behavior is consistent with `nix copy` to a different kind of remote store.
+  Previously this behavior was controlled by `--builders-use-substitutes`.
