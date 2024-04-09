@@ -20,6 +20,7 @@
   - [File System Object](store/file-system-object.md)
     - [Content-Addressing File System Objects](store/file-system-object/content-address.md)
   - [Store Object](store/store-object.md)
+    - [Content-Addressing Store Objects](store/store-object/content-address.md)
   - [Store Path](store/store-path.md)
   - [Store Types](store/types/index.md)
 {{#include ./store/types/SUMMARY.md}}

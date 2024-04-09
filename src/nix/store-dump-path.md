@@ -17,7 +17,9 @@ R""(
 
 # Description
 
-This command generates a NAR file containing the serialisation of the
+This command generates a [Nix Archive (NAR)][Nix Archive] file containing the serialisation of the
 store path [*installable*](./nix.md#installables). The NAR is written to standard output.
+
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
 )""

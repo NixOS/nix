@@ -1,7 +1,9 @@
 # Content-Addressing File System Objects
 
 For many operations, Nix needs to calculate [a content addresses](@docroot@/glossary.md#gloss-content-address) of [a file system object][file system object].
-Usually this is needed as part of content addressing [store objects], since store objects always have a root file system object.
+Usually this is needed as part of
+[content addressing store objects](../store-object/content-address.md),
+since store objects always have a root file system object.
 But some command-line utilities also just work on "raw" file system objects, not part of any store object.
 
 Every content addressing scheme Nix uses ultimately involves feeding data into a [hash function](https://en.wikipedia.org/wiki/Hash_function), and getting back an opaque fixed-size digest which is deemed a content address.
@@ -17,6 +19,9 @@ In this section we describe the currently-supported methods of serialising file 
 A single file object can just be hashed by its contents.
 This is not enough information to encode the fact that the file system object is a file,
 but if we *already* know that the FSO is a single non-executable file by other means, it is sufficient.
+
+Because the hashed data is just the raw file, as is, this choice is good for compatibility with other systems.
+For example, Unix commands like `sha256sum` or `sha1sum` will produce hashes for single files that match this.
 
 ### Nix Archive (NAR) { #serial-nix-archive }
 
@@ -69,7 +74,7 @@ every non-directory object is owned by a parent directory, and the entry that re
 However, if the root object is not a directory, then we have no way of knowing which one of an executable file, non-executable file, or symlink it is supposed to be.
 
 In response to this, we have decided to treat a bare file as non-executable file.
-This is similar to do what we do with [flat serialisation](#flat), which also lacks this information.
+This is similar to do what we do with [flat serialisation](#serial-flat), which also lacks this information.
 To avoid an address collision, attempts to hash a bare executable file or symlink will result in an error (just as would happen for flat serialisation also).
 Thus, Git can encode some, but not all of Nix's "File System Objects", and this sort of content-addressing is likewise partial.
 
