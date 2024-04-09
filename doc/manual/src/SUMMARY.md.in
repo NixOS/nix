@@ -26,7 +26,6 @@
     - [File System Object](store/concrete/file-system-object.md)
     - [Store Object](store/concrete/object.md)
     - [Store Path](store/concrete/path.md)
-      - [Complete Store Path Grammar](store/concrete/path/grammar.md)
     - [Content-Addressing File System Objects](store/concrete/ca-file-system-object.md)
     - [Content-Addressing Store Objects](store/concrete/ca-object.md)
     - [Reference Scanning & Rewriting](store/concrete/reference-scanning.md)
