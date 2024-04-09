@@ -79,6 +79,14 @@ else
   unexport NIX_HARDENING_ENABLE
 endif
 
+PEDANTIC = 0
+ifeq ($(PEDANTIC), 1)
+    # Required by -fsanitize
+    BUILD_PIE_EXES = 1
+    GLOBAL_CXXFLAGS += -Werror -fsanitize=undefined
+    GLOBAL_LDFLAGS += -fsanitize=undefined
+endif
+
 include mk/platform.mk
 
 ifdef HOST_WINDOWS

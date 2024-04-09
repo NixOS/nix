@@ -6,6 +6,19 @@ else
   EXE_EXT =
 endif
 
+# Pass -fPIE if we're building dynamic libraries.
+BUILD_PIE_EXES ?= 1
+
+# Executable-specific linker flags.
+EXE_LDFLAGS :=
+
+ifeq ($(BUILD_PIE_EXES), 1)
+  ifneq ($(BUILD_SHARED_LIBS), 1)
+    $(error BUILD_PIE_EXES is only supported when BUILD_SHARED_LIBS is enabled)
+  endif
+  EXE_LDFLAGS += -pie
+endif
+
 # Build a program with symbolic name $(1).  The program is defined by
 # various variables prefixed by ‘$(1)_’:
 #
@@ -42,7 +55,7 @@ define build-program
   $$(eval $$(call create-dir, $$(_d)))
 
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	+$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	+$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$(EXE_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
   $(1)_INSTALL_DIR ?= $$(bindir)
 

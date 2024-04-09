@@ -82,6 +82,10 @@ private:
 
     std::condition_variable quitCV, updateCV;
 
+    // The default time during two progress bar updates if nothing has been
+    // happening
+    const std::chrono::milliseconds defaultUpdateTime = std::chrono::milliseconds(1000);
+
     bool printBuildLogs = false;
     bool isTTY;
 
@@ -93,7 +97,7 @@ public:
         state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
             auto state(state_.lock());
-            auto nextWakeup = std::chrono::milliseconds::max();
+            auto nextWakeup = defaultUpdateTime;
             while (state->active) {
                 if (!state->haveUpdate)
                     state.wait_for(updateCV, nextWakeup);
@@ -360,7 +364,7 @@ public:
 
     std::chrono::milliseconds draw(State & state)
     {
-        auto nextWakeup = std::chrono::milliseconds::max();
+        auto nextWakeup = defaultUpdateTime;
 
         state.haveUpdate = false;
         if (state.paused || !state.active) return nextWakeup;

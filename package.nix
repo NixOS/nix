@@ -110,6 +110,8 @@
 # Avoid setting things that would interfere with a functioning devShell
 , forDevShell ? false
 
+, pedantic ? false
+
 # Not a real argument, just the only way to approximate let-binding some
 # stuff for argument defaults.
 , __forDefaults ? {
@@ -312,7 +314,12 @@ in {
 
   enableParallelBuilding = true;
 
-  makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
+  makeFlags = "profiledir=$(out)/etc/profile.d " +
+    (if pedantic then
+      "OPTIMIZE=0 PEDANTIC=1 PRECOMPILE_HEADERS=0"
+    else
+      "PRECOMPILE_HEADERS=1"
+    );
 
   installTargets = lib.optional doBuild "install"
     ++ lib.optional enableInternalAPIDocs "internal-api-html"

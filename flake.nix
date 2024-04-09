@@ -203,6 +203,8 @@
         # Binary package for various platforms.
         build = forAllSystems (system: self.packages.${system}.nix);
 
+        pedanticBuild = forAllSystems (system: self.packages.${system}.nix-pedantic);
+
         shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
         buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
@@ -369,6 +371,7 @@
       packages = forAllSystems (system: rec {
         inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
         default = nix;
+        nix-pedantic = nix.override { pedantic = true; };
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
         dockerImage =
