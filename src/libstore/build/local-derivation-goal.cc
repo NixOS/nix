@@ -25,6 +25,7 @@
 #include <regex>
 #include <queue>
 
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -395,20 +396,30 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 static void doBind(const Path & source, const Path & target, bool optional = false) {
     debug("bind mounting '%1%' to '%2%'", source, target);
     struct stat st;
-    if (stat(source.c_str(), &st) == -1) {
+
+    auto bindMount = [&]() {
+        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+            throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+    };
+
+    if (lstat(source.c_str(), &st) == -1) {
         if (optional && errno == ENOENT)
             return;
         else
             throw SysError("getting attributes of path '%1%'", source);
     }
-    if (S_ISDIR(st.st_mode))
+    if (S_ISDIR(st.st_mode)) {
         createDirs(target);
-    else {
+        bindMount();
+    } else if (S_ISLNK(st.st_mode)) {
+        // Symlinks can (apparently) not be bind-mounted, so just copy it
+        createDirs(dirOf(target));
+        copyFile(source, target, /* andDelete */ false);
+    } else {
         createDirs(dirOf(target));
         writeFile(target, "");
+        bindMount();
     }
-    if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-        throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
 };
 #endif
 
