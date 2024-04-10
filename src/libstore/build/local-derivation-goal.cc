@@ -24,7 +24,6 @@
 #include <regex>
 #include <queue>
 
-#include <sys/stat.h>
 #include <sys/un.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -396,19 +395,21 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 #if __linux__
 static void doBind(const Path & source, const Path & target, bool optional = false) {
     debug("bind mounting '%1%' to '%2%'", source, target);
-    struct stat st;
 
     auto bindMount = [&]() {
         if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
             throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
     };
 
-    if (lstat(source.c_str(), &st) == -1) {
-        if (optional && errno == ENOENT)
+    auto maybeSt = maybeLstat(source);
+    if (!maybeSt) {
+        if (optional)
             return;
         else
             throw SysError("getting attributes of path '%1%'", source);
     }
+    auto st = *maybeSt;
+
     if (S_ISDIR(st.st_mode)) {
         createDirs(target);
         bindMount();
