@@ -23,14 +23,12 @@ DownloadFileResult downloadFile(
 {
     // FIXME: check store
 
-    auto domain = "file";
-
-    Attrs key({
+    Cache::Key key{"file", {{
         {"url", url},
         {"name", name},
-    });
+    }}};
 
-    auto cached = getCache()->lookupStorePath(domain, key, *store);
+    auto cached = getCache()->lookupStorePath(key, *store);
 
     auto useCached = [&]() -> DownloadFileResult
     {
@@ -94,9 +92,9 @@ DownloadFileResult downloadFile(
 
     /* Cache metadata for all URLs in the redirect chain. */
     for (auto & url : res.urls) {
-        key.insert_or_assign("url", url);
+        key.second.insert_or_assign("url", url);
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
-        getCache()->upsert(domain, key, *store, infoAttrs, *storePath);
+        getCache()->upsert(key, *store, infoAttrs, *storePath);
     }
 
     return {
@@ -111,12 +109,9 @@ DownloadTarballResult downloadTarball(
     const std::string & url,
     const Headers & headers)
 {
-    auto domain = "tarball";
-    Attrs cacheKey{
-        {"url", url},
-    };
+    Cache::Key cacheKey{"tarball", {{"url", url}}};
 
-    auto cached = getCache()->lookupExpired(domain, cacheKey);
+    auto cached = getCache()->lookupExpired(cacheKey);
 
     auto attrsToResult = [&](const Attrs & infoAttrs)
     {
@@ -175,8 +170,8 @@ DownloadTarballResult downloadTarball(
 
     /* Insert a cache entry for every URL in the redirect chain. */
     for (auto & url : res->urls) {
-        cacheKey.insert_or_assign("url", url);
-        getCache()->upsert(domain, cacheKey, infoAttrs);
+        cacheKey.second.insert_or_assign("url", url);
+        getCache()->upsert(cacheKey, infoAttrs);
     }
 
     // FIXME: add a cache entry for immutableUrl? That could allow

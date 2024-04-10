@@ -15,28 +15,35 @@ struct Cache
     virtual ~Cache() { }
 
     /**
-     * Add a value to the cache. The cache is an arbitrary mapping of
-     * Attrs to Attrs.
+     * A domain is a partition of the key/value cache for a particular
+     * purpose, e.g. "Git revision to revcount".
+     */
+    using Domain = std::string_view;
+
+    /**
+     * A cache key is a domain and an arbitrary set of attributes.
+     */
+    using Key = std::pair<Domain, Attrs>;
+
+    /**
+     * Add a key/value pair to the cache.
      */
     virtual void upsert(
-        std::string_view domain,
-        const Attrs & key,
+        const Key & key,
         const Attrs & value) = 0;
 
     /**
      * Look up a key with infinite TTL.
      */
     virtual std::optional<Attrs> lookup(
-        std::string_view domain,
-        const Attrs & key) = 0;
+        const Key & key) = 0;
 
     /**
      * Look up a key. Return nothing if its TTL has exceeded
      * `settings.tarballTTL`.
      */
     virtual std::optional<Attrs> lookupWithTTL(
-        std::string_view domain,
-        const Attrs & key) = 0;
+        const Key & key) = 0;
 
     struct Result
     {
@@ -49,8 +56,7 @@ struct Cache
      * exceeded `settings.tarballTTL`.
      */
     virtual std::optional<Result> lookupExpired(
-        std::string_view domain,
-        const Attrs & key) = 0;
+        const Key & key) = 0;
 
     /**
      * Insert a cache entry that has a store path associated with
@@ -58,8 +64,7 @@ struct Cache
      * associated store path is invalid.
      */
     virtual void upsert(
-        std::string_view domain,
-        Attrs key,
+        Key key,
         Store & store,
         Attrs value,
         const StorePath & storePath) = 0;
@@ -74,8 +79,7 @@ struct Cache
      * be valid, but it may be expired.
      */
     virtual std::optional<ResultWithStorePath> lookupStorePath(
-        std::string_view domain,
-        Attrs key,
+        Key key,
         Store & store) = 0;
 
     /**
@@ -83,8 +87,7 @@ struct Cache
      * has exceeded `settings.tarballTTL`.
      */
     virtual std::optional<ResultWithStorePath> lookupStorePathWithTTL(
-        std::string_view domain,
-        Attrs key,
+        Key key,
         Store & store) = 0;
 };
 

@@ -51,57 +51,53 @@ struct CacheImpl : Cache
     }
 
     void upsert(
-        std::string_view domain,
-        const Attrs & key,
+        const Key & key,
         const Attrs & value) override
     {
         _state.lock()->upsert.use()
-            (domain)
-            (attrsToJSON(key).dump())
+            (key.first)
+            (attrsToJSON(key.second).dump())
             (attrsToJSON(value).dump())
             (time(0)).exec();
     }
 
     std::optional<Attrs> lookup(
-        std::string_view domain,
-        const Attrs & key) override
+        const Key & key) override
     {
-        if (auto res = lookupExpired(domain, key))
+        if (auto res = lookupExpired(key))
             return std::move(res->value);
         return {};
     }
 
     std::optional<Attrs> lookupWithTTL(
-        std::string_view domain,
-        const Attrs & key) override
+        const Key & key) override
     {
-        if (auto res = lookupExpired(domain, key)) {
+        if (auto res = lookupExpired(key)) {
             if (!res->expired)
                 return std::move(res->value);
             debug("ignoring expired cache entry '%s:%s'",
-                domain, attrsToJSON(key).dump());
+                key.first, attrsToJSON(key.second).dump());
         }
         return {};
     }
 
     std::optional<Result> lookupExpired(
-        std::string_view domain,
-        const Attrs & key) override
+        const Key & key) override
     {
         auto state(_state.lock());
 
-        auto keyJSON = attrsToJSON(key).dump();
+        auto keyJSON = attrsToJSON(key.second).dump();
 
-        auto stmt(state->lookup.use()(domain)(keyJSON));
+        auto stmt(state->lookup.use()(key.first)(keyJSON));
         if (!stmt.next()) {
-            debug("did not find cache entry for '%s:%s'", domain, keyJSON);
+            debug("did not find cache entry for '%s:%s'", key.first, keyJSON);
             return {};
         }
 
         auto valueJSON = stmt.getStr(0);
         auto timestamp = stmt.getInt(1);
 
-        debug("using cache entry '%s:%s' -> '%s'", domain, keyJSON, valueJSON);
+        debug("using cache entry '%s:%s' -> '%s'", key.first, keyJSON, valueJSON);
 
         return Result {
             .expired = settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0),
@@ -110,29 +106,27 @@ struct CacheImpl : Cache
     }
 
     void upsert(
-        std::string_view domain,
-        Attrs key,
+        Key key,
         Store & store,
         Attrs value,
         const StorePath & storePath)
     {
         /* Add the store prefix to the cache key to handle multiple
            store prefixes. */
-        key.insert_or_assign("store", store.storeDir);
+        key.second.insert_or_assign("store", store.storeDir);
 
         value.insert_or_assign("storePath", (std::string) storePath.to_string());
 
-        upsert(domain, key, value);
+        upsert(key, value);
     }
 
     std::optional<ResultWithStorePath> lookupStorePath(
-        std::string_view domain,
-        Attrs key,
+        Key key,
         Store & store) override
     {
-        key.insert_or_assign("store", store.storeDir);
+        key.second.insert_or_assign("store", store.storeDir);
 
-        auto res = lookupExpired(domain, key);
+        auto res = lookupExpired(key);
         if (!res) return std::nullopt;
 
         auto storePathS = getStrAttr(res->value, "storePath");
@@ -143,14 +137,16 @@ struct CacheImpl : Cache
         store.addTempRoot(res2.storePath);
         if (!store.isValidPath(res2.storePath)) {
             // FIXME: we could try to substitute 'storePath'.
-            debug("ignoring disappeared cache entry '%s' -> '%s'",
-                attrsToJSON(key).dump(),
+            debug("ignoring disappeared cache entry '%s:%s' -> '%s'",
+                key.first,
+                attrsToJSON(key.second).dump(),
                 store.printStorePath(res2.storePath));
             return std::nullopt;
         }
 
-        debug("using cache entry '%s' -> '%s', '%s'",
-            attrsToJSON(key).dump(),
+        debug("using cache entry '%s:%s' -> '%s', '%s'",
+            key.first,
+            attrsToJSON(key.second).dump(),
             attrsToJSON(res2.value).dump(),
             store.printStorePath(res2.storePath));
 
@@ -158,11 +154,10 @@ struct CacheImpl : Cache
     }
 
     std::optional<ResultWithStorePath> lookupStorePathWithTTL(
-        std::string_view domain,
-        Attrs key,
+        Key key,
         Store & store) override
     {
-        auto res = lookupStorePath(domain, std::move(key), store);
+        auto res = lookupStorePath(std::move(key), store);
         return res && !res->expired ? res : std::nullopt;
     }
 };

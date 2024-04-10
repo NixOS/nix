@@ -16,17 +16,16 @@ StorePath fetchToStore(
     // FIXME: add an optimisation for the case where the accessor is
     // an FSInputAccessor pointing to a store path.
 
-    auto domain = "fetchToStore";
-    std::optional<fetchers::Attrs> cacheKey;
+    std::optional<fetchers::Cache::Key> cacheKey;
 
     if (!filter && path.accessor->fingerprint) {
-        cacheKey = fetchers::Attrs{
+        cacheKey = fetchers::Cache::Key{"fetchToStore", {
             {"name", std::string{name}},
             {"fingerprint", *path.accessor->fingerprint},
             {"method", std::string{method.render()}},
             {"path", path.path.abs()}
-        };
-        if (auto res = fetchers::getCache()->lookupStorePath(domain, *cacheKey, store)) {
+        }};
+        if (auto res = fetchers::getCache()->lookupStorePath(*cacheKey, store)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
         }
@@ -46,7 +45,7 @@ StorePath fetchToStore(
             name, *path.accessor, path.path, method, HashAlgorithm::SHA256, {}, filter2, repair);
 
     if (cacheKey && mode == FetchMode::Copy)
-        fetchers::getCache()->upsert(domain, *cacheKey, store, {}, storePath);
+        fetchers::getCache()->upsert(*cacheKey, store, {}, storePath);
 
     return storePath;
 }

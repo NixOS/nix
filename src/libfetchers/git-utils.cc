@@ -456,15 +456,14 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         auto accessor = getAccessor(treeHash, false);
 
-        auto domain = "treeHashToNarHash";
-        fetchers::Attrs cacheKey({{"treeHash", treeHash.gitRev()}});
+        fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
-        if (auto res = fetchers::getCache()->lookup(domain, cacheKey))
+        if (auto res = fetchers::getCache()->lookup(cacheKey))
             return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), HashAlgorithm::SHA256);
 
         auto narHash = accessor->hashPath(CanonPath::root);
 
-        fetchers::getCache()->upsert(domain, cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
+        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(HashFormat::SRI, true)}}));
 
         return narHash;
     }
