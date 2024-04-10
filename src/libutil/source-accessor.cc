@@ -39,9 +39,9 @@ void SourceAccessor::readFile(
 }
 
 Hash SourceAccessor::hashPath(
-        const CanonPath & path,
-        PathFilter & filter,
-        HashAlgorithm ha)
+    const CanonPath & path,
+    PathFilter & filter,
+    HashAlgorithm ha)
 {
     HashSink sink(ha);
     dumpPath(path, sink, filter);
@@ -65,6 +65,44 @@ void SourceAccessor::setPathDisplay(std::string displayPrefix, std::string displ
 std::string SourceAccessor::showPath(const CanonPath & path)
 {
     return displayPrefix + path.abs() + displaySuffix;
+}
+
+CanonPath SourceAccessor::resolveSymlinks(
+    const CanonPath & path,
+    SymlinkResolution mode)
+{
+    auto res = CanonPath::root;
+
+    int linksAllowed = 1024;
+
+    std::list<std::string> todo;
+    for (auto & c : path)
+        todo.push_back(std::string(c));
+
+    while (!todo.empty()) {
+        auto c = *todo.begin();
+        todo.pop_front();
+        if (c == "" || c == ".")
+            ;
+        else if (c == "..")
+            res.pop();
+        else {
+            res.push(c);
+            if (mode == SymlinkResolution::Full || !todo.empty()) {
+                if (auto st = maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
+                    if (!linksAllowed--)
+                        throw Error("infinite symlink recursion in path '%s'", showPath(path));
+                    auto target = readLink(res);
+                    res.pop();
+                    if (hasPrefix(target, "/"))
+                        res = CanonPath::root;
+                    todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
+                }
+            }
+        }
+    }
+
+    return res;
 }
 
 }

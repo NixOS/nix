@@ -33,6 +33,10 @@ struct LocalStoreAccessor : PosixSourceAccessor
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
+        /* Handle the case where `path` is (a parent of) the store. */
+        if (isDirOrInDir(store->storeDir, path.abs()))
+            return Stat{ .type = tDirectory };
+
         return PosixSourceAccessor::maybeLstat(toRealPath(path));
     }
 
