@@ -46,7 +46,7 @@ But if the store has a file system representation, the store directory contains 
 
 [file system objects]: ./file-system-object.md
 
-This means a store path is not just derived from the referenced store object itself, but depends on the store the store object is in.
+This means a store path is not just derived from the referenced store object itself, but depends on the store that the store object is in.
 
 > **Note**
 >
