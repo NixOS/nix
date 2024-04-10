@@ -47,10 +47,9 @@ StorePath fetchToStore(
             name, *path.accessor, path.path, method, HashAlgorithm::SHA256, {}, filter2, repair);
 
     if (cacheKey && mode == FetchMode::Copy)
-        fetchers::getCache()->add(store, *cacheKey, {}, storePath, true);
+        fetchers::getCache()->add(store, *cacheKey, {}, storePath);
 
     return storePath;
 }
-
 
 }

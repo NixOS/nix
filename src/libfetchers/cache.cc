@@ -14,7 +14,7 @@ create table if not exists Cache (
     input     text not null,
     info      text not null,
     path      text not null,
-    immutable integer not null,
+    immutable integer not null, /* obsolete */
     timestamp integer not null,
     primary key (input)
 );
@@ -45,7 +45,7 @@ struct CacheImpl : Cache
         state->db.exec(schema);
 
         state->add.create(state->db,
-            "insert or replace into Cache(input, info, path, immutable, timestamp) values (?, ?, ?, ?, ?)");
+            "insert or replace into Cache(input, info, path, immutable, timestamp) values (?, ?, ?, false, ?)");
 
         state->lookup.create(state->db,
             "select info, path, immutable, timestamp from Cache where input = ?");
@@ -59,7 +59,6 @@ struct CacheImpl : Cache
             (attrsToJSON(inAttrs).dump())
             (attrsToJSON(infoAttrs).dump())
             ("") // no path
-            (false)
             (time(0)).exec();
     }
 
@@ -109,14 +108,12 @@ struct CacheImpl : Cache
         Store & store,
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
-        const StorePath & storePath,
-        bool locked) override
+        const StorePath & storePath) override
     {
         _state.lock()->add.use()
             (attrsToJSON(inAttrs).dump())
             (attrsToJSON(infoAttrs).dump())
             (store.printStorePath(storePath))
-            (locked)
             (time(0)).exec();
     }
 

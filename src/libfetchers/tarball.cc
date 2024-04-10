@@ -99,8 +99,7 @@ DownloadFileResult downloadFile(
             *store,
             inAttrs,
             infoAttrs,
-            *storePath,
-            false);
+            *storePath);
     }
 
     return {

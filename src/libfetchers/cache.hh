@@ -53,8 +53,7 @@ struct Cache
         Store & store,
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
-        const StorePath & storePath,
-        bool locked) = 0;
+        const StorePath & storePath) = 0;
 
     virtual std::optional<std::pair<Attrs, StorePath>> lookup(
         Store & store,
