@@ -11,12 +11,11 @@ namespace nix::fetchers {
 static const char * schema = R"sql(
 
 create table if not exists Cache (
-    input     text not null,
-    info      text not null,
-    path      text not null,
-    immutable integer not null, /* obsolete */
+    domain    text not null,
+    key       text not null,
+    value     text not null,
     timestamp integer not null,
-    primary key (input)
+    primary key (domain, key)
 );
 )sql";
 
@@ -28,7 +27,7 @@ struct CacheImpl : Cache
     struct State
     {
         SQLite db;
-        SQLiteStmt add, lookup;
+        SQLiteStmt upsert, lookup;
     };
 
     Sync<State> _state;
@@ -37,133 +36,134 @@ struct CacheImpl : Cache
     {
         auto state(_state.lock());
 
-        auto dbPath = getCacheDir() + "/nix/fetcher-cache-v1.sqlite";
+        auto dbPath = getCacheDir() + "/nix/fetcher-cache-v2.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);
         state->db.isCache();
         state->db.exec(schema);
 
-        state->add.create(state->db,
-            "insert or replace into Cache(input, info, path, immutable, timestamp) values (?, ?, ?, false, ?)");
+        state->upsert.create(state->db,
+            "insert or replace into Cache(domain, key, value, timestamp) values (?, ?, ?, ?)");
 
         state->lookup.create(state->db,
-            "select info, path, immutable, timestamp from Cache where input = ?");
+            "select value, timestamp from Cache where domain = ? and key = ?");
     }
 
     void upsert(
-        const Attrs & inAttrs,
-        const Attrs & infoAttrs) override
+        std::string_view domain,
+        const Attrs & key,
+        const Attrs & value) override
     {
-        _state.lock()->add.use()
-            (attrsToJSON(inAttrs).dump())
-            (attrsToJSON(infoAttrs).dump())
-            ("") // no path
+        _state.lock()->upsert.use()
+            (domain)
+            (attrsToJSON(key).dump())
+            (attrsToJSON(value).dump())
             (time(0)).exec();
     }
 
-    std::optional<Attrs> lookup(const Attrs & inAttrs) override
+    std::optional<Attrs> lookup(
+        std::string_view domain,
+        const Attrs & key) override
     {
-        if (auto res = lookupExpired(inAttrs))
-            return std::move(res->infoAttrs);
+        if (auto res = lookupExpired(domain, key))
+            return std::move(res->value);
         return {};
     }
 
-    std::optional<Attrs> lookupWithTTL(const Attrs & inAttrs) override
+    std::optional<Attrs> lookupWithTTL(
+        std::string_view domain,
+        const Attrs & key) override
     {
-        if (auto res = lookupExpired(inAttrs)) {
+        if (auto res = lookupExpired(domain, key)) {
             if (!res->expired)
-                return std::move(res->infoAttrs);
-            debug("ignoring expired cache entry '%s'",
-                attrsToJSON(inAttrs).dump());
-        }
-        return {};
-    }
-
-    std::optional<Result2> lookupExpired(const Attrs & inAttrs) override
-    {
-        auto state(_state.lock());
-
-        auto inAttrsJSON = attrsToJSON(inAttrs).dump();
-
-        auto stmt(state->lookup.use()(inAttrsJSON));
-        if (!stmt.next()) {
-            debug("did not find cache entry for '%s'", inAttrsJSON);
-            return {};
-        }
-
-        auto infoJSON = stmt.getStr(0);
-        auto locked = stmt.getInt(2) != 0;
-        auto timestamp = stmt.getInt(3);
-
-        debug("using cache entry '%s' -> '%s'", inAttrsJSON, infoJSON);
-
-        return Result2 {
-            .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
-            .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
-        };
-    }
-
-    void add(
-        Store & store,
-        const Attrs & inAttrs,
-        const Attrs & infoAttrs,
-        const StorePath & storePath) override
-    {
-        _state.lock()->add.use()
-            (attrsToJSON(inAttrs).dump())
-            (attrsToJSON(infoAttrs).dump())
-            (store.printStorePath(storePath))
-            (time(0)).exec();
-    }
-
-    std::optional<std::pair<Attrs, StorePath>> lookup(
-        Store & store,
-        const Attrs & inAttrs) override
-    {
-        if (auto res = lookupExpired(store, inAttrs)) {
-            if (!res->expired)
-                return std::make_pair(std::move(res->infoAttrs), std::move(res->storePath));
-            debug("ignoring expired cache entry '%s'",
-                attrsToJSON(inAttrs).dump());
+                return std::move(res->value);
+            debug("ignoring expired cache entry '%s:%s'",
+                domain, attrsToJSON(key).dump());
         }
         return {};
     }
 
     std::optional<Result> lookupExpired(
-        Store & store,
-        const Attrs & inAttrs) override
+        std::string_view domain,
+        const Attrs & key) override
     {
         auto state(_state.lock());
 
-        auto inAttrsJSON = attrsToJSON(inAttrs).dump();
+        auto keyJSON = attrsToJSON(key).dump();
 
-        auto stmt(state->lookup.use()(inAttrsJSON));
+        auto stmt(state->lookup.use()(domain)(keyJSON));
         if (!stmt.next()) {
-            debug("did not find cache entry for '%s'", inAttrsJSON);
+            debug("did not find cache entry for '%s:%s'", domain, keyJSON);
             return {};
         }
 
-        auto infoJSON = stmt.getStr(0);
-        auto storePath = store.parseStorePath(stmt.getStr(1));
-        auto locked = stmt.getInt(2) != 0;
-        auto timestamp = stmt.getInt(3);
+        auto valueJSON = stmt.getStr(0);
+        auto timestamp = stmt.getInt(1);
 
-        store.addTempRoot(storePath);
-        if (!store.isValidPath(storePath)) {
+        debug("using cache entry '%s:%s' -> '%s'", domain, keyJSON, valueJSON);
+
+        return Result {
+            .expired = settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0),
+            .value = jsonToAttrs(nlohmann::json::parse(valueJSON)),
+        };
+    }
+
+    void upsert(
+        std::string_view domain,
+        Attrs key,
+        Store & store,
+        Attrs value,
+        const StorePath & storePath)
+    {
+        /* Add the store prefix to the cache key to handle multiple
+           store prefixes. */
+        key.insert_or_assign("store", store.storeDir);
+
+        value.insert_or_assign("storePath", (std::string) storePath.to_string());
+
+        upsert(domain, key, value);
+    }
+
+    std::optional<ResultWithStorePath> lookupStorePath(
+        std::string_view domain,
+        Attrs key,
+        Store & store) override
+    {
+        key.insert_or_assign("store", store.storeDir);
+
+        auto res = lookupExpired(domain, key);
+        if (!res) return std::nullopt;
+
+        auto storePathS = getStrAttr(res->value, "storePath");
+        res->value.erase("storePath");
+
+        ResultWithStorePath res2(*res, StorePath(storePathS));
+
+        store.addTempRoot(res2.storePath);
+        if (!store.isValidPath(res2.storePath)) {
             // FIXME: we could try to substitute 'storePath'.
-            debug("ignoring disappeared cache entry '%s'", inAttrsJSON);
-            return {};
+            debug("ignoring disappeared cache entry '%s' -> '%s'",
+                attrsToJSON(key).dump(),
+                store.printStorePath(res2.storePath));
+            return std::nullopt;
         }
 
         debug("using cache entry '%s' -> '%s', '%s'",
-            inAttrsJSON, infoJSON, store.printStorePath(storePath));
+            attrsToJSON(key).dump(),
+            attrsToJSON(res2.value).dump(),
+            store.printStorePath(res2.storePath));
 
-        return Result {
-            .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
-            .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
-            .storePath = std::move(storePath)
-        };
+        return res2;
+    }
+
+    std::optional<ResultWithStorePath> lookupStorePathWithTTL(
+        std::string_view domain,
+        Attrs key,
+        Store & store) override
+    {
+        auto res = lookupStorePath(domain, std::move(key), store);
+        return res && !res->expired ? res : std::nullopt;
     }
 };
 

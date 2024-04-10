@@ -225,11 +225,13 @@ struct GitArchiveInputScheme : InputScheme
 
         auto cache = getCache();
 
-        Attrs treeHashKey{{"_what", "gitRevToTreeHash"}, {"rev", rev->gitRev()}};
-        Attrs lastModifiedKey{{"_what", "gitRevToLastModified"}, {"rev", rev->gitRev()}};
+        auto treeHashDomain = "gitRevToTreeHash";
+        Attrs treeHashKey{{"rev", rev->gitRev()}};
+        auto lastModifiedDomain = "gitRevToLastModified";
+        Attrs lastModifiedKey{{"rev", rev->gitRev()}};
 
-        if (auto treeHashAttrs = cache->lookup(treeHashKey)) {
-            if (auto lastModifiedAttrs = cache->lookup(lastModifiedKey)) {
+        if (auto treeHashAttrs = cache->lookup(treeHashDomain, treeHashKey)) {
+            if (auto lastModifiedAttrs = cache->lookup(lastModifiedDomain, lastModifiedKey)) {
                 auto treeHash = getRevAttr(*treeHashAttrs, "treeHash");
                 auto lastModified = getIntAttr(*lastModifiedAttrs, "lastModified");
                 if (getTarballCache()->hasObject(treeHash))
@@ -257,8 +259,8 @@ struct GitArchiveInputScheme : InputScheme
             .lastModified = lastModified
         };
 
-        cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
-        cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});
+        cache->upsert(treeHashDomain, treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
+        cache->upsert(lastModifiedDomain, lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});
 
         #if 0
         if (upstreamTreeHash != tarballInfo.treeHash)

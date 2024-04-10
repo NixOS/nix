@@ -23,21 +23,22 @@ DownloadFileResult downloadFile(
 {
     // FIXME: check store
 
-    Attrs inAttrs({
-        {"type", "file"},
+    auto domain = "file";
+
+    Attrs key({
         {"url", url},
         {"name", name},
     });
 
-    auto cached = getCache()->lookupExpired(*store, inAttrs);
+    auto cached = getCache()->lookupStorePath(domain, key, *store);
 
     auto useCached = [&]() -> DownloadFileResult
     {
         return {
             .storePath = std::move(cached->storePath),
-            .etag = getStrAttr(cached->infoAttrs, "etag"),
-            .effectiveUrl = getStrAttr(cached->infoAttrs, "url"),
-            .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
+            .etag = getStrAttr(cached->value, "etag"),
+            .effectiveUrl = getStrAttr(cached->value, "url"),
+            .immutableUrl = maybeGetStrAttr(cached->value, "immutableUrl"),
         };
     };
 
@@ -47,7 +48,7 @@ DownloadFileResult downloadFile(
     FileTransferRequest request(url);
     request.headers = headers;
     if (cached)
-        request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
+        request.expectedETag = getStrAttr(cached->value, "etag");
     FileTransferResult res;
     try {
         res = getFileTransfer()->download(request);
@@ -93,13 +94,9 @@ DownloadFileResult downloadFile(
 
     /* Cache metadata for all URLs in the redirect chain. */
     for (auto & url : res.urls) {
-        inAttrs.insert_or_assign("url", url);
+        key.insert_or_assign("url", url);
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
-        getCache()->add(
-            *store,
-            inAttrs,
-            infoAttrs,
-            *storePath);
+        getCache()->upsert(domain, key, *store, infoAttrs, *storePath);
     }
 
     return {
@@ -114,12 +111,12 @@ DownloadTarballResult downloadTarball(
     const std::string & url,
     const Headers & headers)
 {
-    Attrs inAttrs({
-        {"_what", "tarballCache"},
+    auto domain = "tarball";
+    Attrs cacheKey{
         {"url", url},
-    });
+    };
 
-    auto cached = getCache()->lookupExpired(inAttrs);
+    auto cached = getCache()->lookupExpired(domain, cacheKey);
 
     auto attrsToResult = [&](const Attrs & infoAttrs)
     {
@@ -132,19 +129,19 @@ DownloadTarballResult downloadTarball(
         };
     };
 
-    if (cached && !getTarballCache()->hasObject(getRevAttr(cached->infoAttrs, "treeHash")))
+    if (cached && !getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
         cached.reset();
 
     if (cached && !cached->expired)
         /* We previously downloaded this tarball and it's younger than
            `tarballTtl`, so no need to check the server. */
-        return attrsToResult(cached->infoAttrs);
+        return attrsToResult(cached->value);
 
     auto _res = std::make_shared<Sync<FileTransferResult>>();
 
     auto source = sinkToSource([&](Sink & sink) {
         FileTransferRequest req(url);
-        req.expectedETag = cached ? getStrAttr(cached->infoAttrs, "etag") : "";
+        req.expectedETag = cached ? getStrAttr(cached->value, "etag") : "";
         getFileTransfer()->download(std::move(req), sink,
             [_res](FileTransferResult r)
             {
@@ -167,7 +164,7 @@ DownloadTarballResult downloadTarball(
     if (res->cached) {
         /* The server says that the previously downloaded version is
            still current. */
-        infoAttrs = cached->infoAttrs;
+        infoAttrs = cached->value;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
         infoAttrs.insert_or_assign("treeHash", parseSink->sync().gitRev());
@@ -178,8 +175,8 @@ DownloadTarballResult downloadTarball(
 
     /* Insert a cache entry for every URL in the redirect chain. */
     for (auto & url : res->urls) {
-        inAttrs.insert_or_assign("url", url);
-        getCache()->upsert(inAttrs, infoAttrs);
+        cacheKey.insert_or_assign("url", url);
+        getCache()->upsert(domain, cacheKey, infoAttrs);
     }
 
     // FIXME: add a cache entry for immutableUrl? That could allow

@@ -224,13 +224,13 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", "default");
 
-        auto revInfoCacheKey = [&](const Hash & rev)
+        auto revInfoDomain = "hgRev";
+        auto revInfoKey = [&](const Hash & rev)
         {
             if (rev.algo != HashAlgorithm::SHA1)
                 throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", rev.to_string(HashFormat::Base16, true));
 
             return Attrs{
-                {"_what", "hgRev"},
                 {"store", store->storeDir},
                 {"name", name},
                 {"rev", input.getRev()->gitRev()}
@@ -246,21 +246,21 @@ struct MercurialInputScheme : InputScheme
         };
 
         /* Check the cache for the most recent rev for this URL/ref. */
-        Attrs refToRevCacheKey{
-            {"_what", "hgRefToRev"},
+        auto refToRevDomain = "hgRefToRev";
+        Attrs refToRevKey{
             {"url", actualUrl},
             {"ref", *input.getRef()}
         };
 
         if (!input.getRev()) {
-            if (auto res = getCache()->lookupWithTTL(refToRevCacheKey))
+            if (auto res = getCache()->lookupWithTTL(refToRevDomain, refToRevKey))
                 input.attrs.insert_or_assign("rev", getRevAttr(*res, "rev").gitRev());
         }
 
         /* If we have a rev, check if we have a cached store path. */
         if (auto rev = input.getRev()) {
-            if (auto res = getCache()->lookupExpired(*store, revInfoCacheKey(*rev)))
-                return makeResult(res->infoAttrs, res->storePath);
+            if (auto res = getCache()->lookupStorePath(revInfoDomain, revInfoKey(*rev), *store))
+                return makeResult(res->value, res->storePath);
         }
 
         Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false));
@@ -309,8 +309,8 @@ struct MercurialInputScheme : InputScheme
 
         /* Now that we have the rev, check the cache again for a
            cached store path. */
-        if (auto res = getCache()->lookupExpired(*store, revInfoCacheKey(rev)))
-            return makeResult(res->infoAttrs, res->storePath);
+        if (auto res = getCache()->lookupStorePath(revInfoDomain, revInfoKey(rev), *store))
+            return makeResult(res->value, res->storePath);
 
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
@@ -327,13 +327,9 @@ struct MercurialInputScheme : InputScheme
         });
 
         if (!origRev)
-            getCache()->upsert(refToRevCacheKey, {{"rev", rev.gitRev()}});
+            getCache()->upsert(refToRevDomain, refToRevKey, {{"rev", rev.gitRev()}});
 
-        getCache()->add(
-            *store,
-            revInfoCacheKey(rev),
-            infoAttrs,
-            storePath);
+        getCache()->upsert(revInfoDomain, revInfoKey(rev), *store, infoAttrs, storePath);
 
         return makeResult(infoAttrs, std::move(storePath));
     }

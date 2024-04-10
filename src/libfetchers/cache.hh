@@ -19,56 +19,73 @@ struct Cache
      * Attrs to Attrs.
      */
     virtual void upsert(
-        const Attrs & inAttrs,
-        const Attrs & infoAttrs) = 0;
+        std::string_view domain,
+        const Attrs & key,
+        const Attrs & value) = 0;
 
     /**
      * Look up a key with infinite TTL.
      */
     virtual std::optional<Attrs> lookup(
-        const Attrs & inAttrs) = 0;
+        std::string_view domain,
+        const Attrs & key) = 0;
 
     /**
      * Look up a key. Return nothing if its TTL has exceeded
      * `settings.tarballTTL`.
      */
     virtual std::optional<Attrs> lookupWithTTL(
-        const Attrs & inAttrs) = 0;
+        std::string_view domain,
+        const Attrs & key) = 0;
 
-    struct Result2
+    struct Result
     {
         bool expired = false;
-        Attrs infoAttrs;
+        Attrs value;
     };
 
     /**
      * Look up a key. Return a bool denoting whether its TTL has
      * exceeded `settings.tarballTTL`.
      */
-    virtual std::optional<Result2> lookupExpired(
-        const Attrs & inAttrs) = 0;
+    virtual std::optional<Result> lookupExpired(
+        std::string_view domain,
+        const Attrs & key) = 0;
 
-    /* Old cache for things that have a store path. */
-    virtual void add(
+    /**
+     * Insert a cache entry that has a store path associated with
+     * it. Such cache entries are always considered stale if the
+     * associated store path is invalid.
+     */
+    virtual void upsert(
+        std::string_view domain,
+        Attrs key,
         Store & store,
-        const Attrs & inAttrs,
-        const Attrs & infoAttrs,
+        Attrs value,
         const StorePath & storePath) = 0;
 
-    virtual std::optional<std::pair<Attrs, StorePath>> lookup(
-        Store & store,
-        const Attrs & inAttrs) = 0;
-
-    struct Result
+    struct ResultWithStorePath : Result
     {
-        bool expired = false;
-        Attrs infoAttrs;
         StorePath storePath;
     };
 
-    virtual std::optional<Result> lookupExpired(
-        Store & store,
-        const Attrs & inAttrs) = 0;
+    /**
+     * Look up a store path in the cache. The returned store path will
+     * be valid, but it may be expired.
+     */
+    virtual std::optional<ResultWithStorePath> lookupStorePath(
+        std::string_view domain,
+        Attrs key,
+        Store & store) = 0;
+
+    /**
+     * Look up a store path in the cache. Return nothing if its TTL
+     * has exceeded `settings.tarballTTL`.
+     */
+    virtual std::optional<ResultWithStorePath> lookupStorePathWithTTL(
+        std::string_view domain,
+        Attrs key,
+        Store & store) = 0;
 };
 
 ref<Cache> getCache();

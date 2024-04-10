@@ -427,34 +427,36 @@ struct GitInputScheme : InputScheme
 
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitLastModified"}, {"rev", rev.gitRev()}};
+        auto domain = "gitLastModified";
+        Attrs key{{"rev", rev.gitRev()}};
 
         auto cache = getCache();
 
-        if (auto res = cache->lookup(key))
+        if (auto res = cache->lookup(domain, key))
             return getIntAttr(*res, "lastModified");
 
         auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
 
-        cache->upsert(key, Attrs{{"lastModified", lastModified}});
+        cache->upsert(domain, key, {{"lastModified", lastModified}});
 
         return lastModified;
     }
 
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitRevCount"}, {"rev", rev.gitRev()}};
+        auto domain = "gitRevCount";
+        Attrs key{{"rev", rev.gitRev()}};
 
         auto cache = getCache();
 
-        if (auto revCountAttrs = cache->lookup(key))
+        if (auto revCountAttrs = cache->lookup(domain, key))
             return getIntAttr(*revCountAttrs, "revCount");
 
         Activity act(*logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.url));
 
         auto revCount = GitRepo::openRepo(repoDir)->getRevCount(rev);
 
-        cache->upsert(key, Attrs{{"revCount", revCount}});
+        cache->upsert(domain, key, Attrs{{"revCount", revCount}});
 
         return revCount;
     }
