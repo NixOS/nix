@@ -32,6 +32,14 @@ rec {
       '';
   };
 
+  forbidden-symlink = mkDerivation {
+    name = "forbidden-symlink";
+    buildCommand =
+      ''
+        ln -s /tmp/foo/bar $out
+      '';
+  };
+
   salve-mundi = mkDerivation {
     name = "salve-mundi";
     outputs = [ "out" ];
