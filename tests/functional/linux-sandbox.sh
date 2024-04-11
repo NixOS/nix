@@ -73,3 +73,6 @@ testCert missing fixed-output "$nocert"
 
 # Cert in sandbox when ssl-cert-file is set to an existing file
 testCert present fixed-output "$cert"
+
+# Symlinks should be added in the sandbox directly and not followed
+nix-sandbox-build symlink-derivation.nix
