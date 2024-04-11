@@ -128,7 +128,19 @@ nix_err nix_store_realise(
     NIXC_CATCH_ERRS
 }
 
+void nix_store_path_name(const StorePath *store_path, void * callback, void * user_data)
+{
+    std::string_view name = store_path->path.name();
+    ((nix_get_string_callback) callback)(name.data(), name.size(), user_data);
+}
+
+
 void nix_store_path_free(StorePath * sp)
 {
     delete sp;
+}
+
+StorePath * nix_store_path_clone(const StorePath * p)
+{
+    return new StorePath{p->path};
 }

@@ -90,6 +90,23 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, void * callbac
  */
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
 
+/**
+ * @brief Get the path name (e.g. "name" in /nix/store/...-name)
+ *
+ * @param[in] store_path the path to get the name from
+ * @param[in] callback called with the name
+ * @param[in] user_data arbitrary data, passed to the callback when it's called.
+ */
+void nix_store_path_name(const StorePath *store_path, void * callback, void * user_data);
+
+/**
+ * @brief Copy a StorePath
+ *
+ * @param[in] p the path to copy
+ * @return a new StorePath
+ */
+StorePath * nix_store_path_clone(const StorePath * p);
+
 /** @brief Deallocate a StorePath
  *
  * Does not fail.
@@ -111,7 +128,9 @@ bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath *
 /**
  * @brief Realise a Nix store path
  *
- * Blocking, calls callback once for each realised output
+ * Blocking, calls callback once for each realised output.
+ *
+ * @note When working with expressions, consider using e.g. nix_string_realise to get the output. `.drvPath` may not be accurate or available in the future. See https://github.com/NixOS/nix/issues/6507
  *
  * @param[out] context Optional, stores error information
  * @param[in] store Nix Store reference

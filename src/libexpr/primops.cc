@@ -39,7 +39,7 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
-StringMap EvalState::realiseContext(const NixStringContext & context)
+StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
     StringMap res;
@@ -59,21 +59,23 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
             },
             [&](const NixStringContextElem::Opaque & o) {
                 auto ctxS = store->printStorePath(o.path);
-                res.insert_or_assign(ctxS, ctxS);
                 ensureValid(o.path);
+                if (maybePathsOut)
+                    maybePathsOut->emplace(o.path);
             },
             [&](const NixStringContextElem::DrvDeep & d) {
                 /* Treat same as Opaque */
                 auto ctxS = store->printStorePath(d.drvPath);
-                res.insert_or_assign(ctxS, ctxS);
                 ensureValid(d.drvPath);
+                if (maybePathsOut)
+                    maybePathsOut->emplace(d.drvPath);
             },
         }, c.raw);
     }
 
     if (drvs.empty()) return {};
 
-    if (!evalSettings.enableImportFromDerivation)
+    if (isIFD && !evalSettings.enableImportFromDerivation)
         error<EvalError>(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             drvs.begin()->to_string(*store)
@@ -90,6 +92,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         auto outputs = resolveDerivedPath(*buildStore, drv, &*store);
         for (auto & [outputName, outputPath] : outputs) {
             outputsToCopyAndAllow.insert(outputPath);
+            if (maybePathsOut)
+                maybePathsOut->emplace(outputPath);
 
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
@@ -106,10 +110,13 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     }
 
     if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
-    for (auto & outputPath : outputsToCopyAndAllow) {
-        /* Add the output of this derivations to the allowed
-           paths. */
-        allowPath(outputPath);
+
+    if (isIFD) {
+        for (auto & outputPath : outputsToCopyAndAllow) {
+            /* Add the output of this derivations to the allowed
+            paths. */
+            allowPath(outputPath);
+        }
     }
 
     return res;
