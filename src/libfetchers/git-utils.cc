@@ -197,6 +197,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return git_repository_is_shallow(*this);
     }
 
+    void setRemote(const std::string & name, const std::string & url) override
+    {
+        if (git_remote_set_url(*this, name.c_str(), url.c_str()))
+            throw Error("setting remote '%s' URL to '%s': %s", name, url, git_error_last()->message);
+    }
+
     Hash resolveRef(std::string ref) override
     {
         // Handle revisions used as refs.
@@ -318,9 +324,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
-    std::string resolveSubmoduleUrl(
-        const std::string & url,
-        const std::string & base) override
+    std::string resolveSubmoduleUrl(const std::string & url) override
     {
         git_buf buf = GIT_BUF_INIT;
         if (git_submodule_resolve_url(&buf, *this, url.c_str()))
@@ -328,10 +332,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         Finally cleanup = [&]() { git_buf_dispose(&buf); };
 
         std::string res(buf.ptr);
-
-        if (!hasPrefix(res, "/") && res.find("://") == res.npos)
-            res = parseURL(base + "/" + res).canonicalise().to_string();
-
         return res;
     }
 
