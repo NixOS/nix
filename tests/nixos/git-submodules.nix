@@ -46,8 +46,24 @@
       remote.wait_for_unit("sshd")
       client.succeed(f"ssh -o StrictHostKeyChecking=no {remote.name} 'echo hello world'")
 
-      remote.succeed("git init bar && git -C bar config user.email foobar@example.com && git -C bar config user.name Foobar && echo test >> bar/content && git -C bar add content && git -C bar commit -m 'Initial commit'")
-      client.succeed(f"git init foo && git -C foo config user.email foobar@example.com && git -C foo config user.name Foobar && git -C foo submodule add root@{remote.name}:/tmp/bar sub && git -C foo add sub && git -C foo commit -m 'Add submodule'")
+      remote.succeed("""
+        git init bar
+        git -C bar config user.email foobar@example.com
+        git -C bar config user.name Foobar
+        echo test >> bar/content
+        git -C bar add content
+        git -C bar commit -m 'Initial commit'
+      """)
+
+      client.succeed(f"""
+        git init foo
+        git -C foo config user.email foobar@example.com
+        git -C foo config user.name Foobar
+        git -C foo submodule add root@{remote.name}:/tmp/bar sub
+        git -C foo add sub
+        git -C foo commit -m 'Add submodule'
+      """)
+
       client.succeed("nix --flake-registry \"\" flake prefetch 'git+file:///tmp/foo?submodules=1&ref=master'")
     '';
   };
