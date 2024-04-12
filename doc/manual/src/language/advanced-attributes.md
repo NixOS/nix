@@ -303,7 +303,7 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
     the following attributes are available:
 
-    - `maxSize` defines the maximum size of the resulting [store object](../glossary.md#gloss-store-object).
+    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/glossary.md#gloss-store-object).
     - `maxClosureSize` defines the maximum size of the output's closure.
     - `ignoreSelfRefs` controls whether self-references should be considered when
       checking for allowed references/requisites.

@@ -23,7 +23,7 @@ It evaluates the Nix expressions in each of *files* (which defaults to
 derivation, a list of derivations, or a set of derivations. The paths
 of the resulting store derivations are printed on standard output.
 
-[store derivation]: ../glossary.md#gloss-store-derivation
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 If *files* is the character `-`, then a Nix expression will be read from
 standard input.
