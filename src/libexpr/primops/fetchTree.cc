@@ -473,7 +473,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     auto storePath =
         unpack
         ? fetchToStore(*state.store, fetchers::downloadTarball(*url).accessor, FetchMode::Copy, name)
-        : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
+        : fetchers::downloadFile(state.store, *url, name).storePath;
 
     if (expectedHash) {
         auto hash = unpack

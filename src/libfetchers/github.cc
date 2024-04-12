@@ -357,7 +357,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1),
@@ -431,7 +431,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
@@ -495,7 +495,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
-                downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
+                downloadFile(store, fmt("%s/HEAD", base_url), "source", headers).storePath);
             std::ifstream is(file);
             std::string line;
             getline(is, line);
@@ -511,7 +511,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
-            downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
+            downloadFile(store, fmt("%s/info/refs", base_url), "source", headers).storePath);
         std::ifstream is(file);
 
         std::string line;
