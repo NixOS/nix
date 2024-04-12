@@ -175,7 +175,11 @@ nix_err nix_libutil_init(nix_c_context * context);
  * @return NIX_ERR_KEY if the setting is unknown, or NIX_OK if the setting was retrieved
  * successfully.
  */
-nix_err nix_setting_get(nix_c_context * context, const char * key, void * callback, void * user_data);
+nix_err nix_setting_get(
+    nix_c_context * context,
+    const char * key,
+    void (*callback)(const char * start, unsigned int n, void * user_data),
+    void * user_data);
 
 /**
  * @brief Sets a setting in the nix global configuration.
@@ -241,8 +245,11 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, uns
  * @see nix_get_string_callback
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
-nix_err
-nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data);
+nix_err nix_err_info_msg(
+    nix_c_context * context,
+    const nix_c_context * read_context,
+    void (*callback)(const char * start, unsigned int n, void * user_data),
+    void * user_data);
 
 /**
  * @brief Retrieves the error name from a context.
@@ -260,7 +267,11 @@ nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, vo
  * @see nix_get_string_callback
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
-nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data);
+nix_err nix_err_name(
+    nix_c_context * context,
+    const nix_c_context * read_context,
+    void (*callback)(const char * start, unsigned int n, void * user_data),
+    void * user_data);
 
 /**
  * @brief Retrieves the most recent error code from a nix_c_context

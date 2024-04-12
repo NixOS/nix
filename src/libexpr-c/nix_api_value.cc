@@ -15,9 +15,9 @@
 #include "value/context.hh"
 
 #ifdef HAVE_BOEHMGC
-# include "gc/gc.h"
-# define GC_INCLUDE_NEW 1
-# include "gc_cpp.h"
+#include "gc/gc.h"
+#define GC_INCLUDE_NEW 1
+#include "gc_cpp.h"
 #endif
 
 // Helper function to throw an exception if value is null
@@ -537,7 +537,7 @@ nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * st
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto &v = check_value_not_null(value);
+        auto & v = check_value_not_null(value);
         nix::NixStringContext stringContext;
         auto rawStr = state->state.coerceToString(nix::noPos, v, stringContext, "while realising a string").toOwned();
         nix::StorePathSet storePaths;
@@ -547,14 +547,11 @@ nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * st
 
         // Convert to the C API StorePath type and convert to vector for index-based access
         std::vector<StorePath> vec;
-        for (auto &sp : storePaths) {
+        for (auto & sp : storePaths) {
             vec.push_back(StorePath{sp});
         }
 
-        return new nix_realised_string {
-            .str = s,
-            .storePaths = vec
-        };
+        return new nix_realised_string{.str = s, .storePaths = vec};
     }
     NIXC_CATCH_ERRS_NULL
 }
