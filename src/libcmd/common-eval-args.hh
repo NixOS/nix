@@ -23,7 +23,7 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 
     Bindings * getAutoArgs(EvalState & state);
 
-    SearchPath searchPath;
+    LookupPath lookupPath;
 
     std::optional<std::string> evalStoreUrl;
 

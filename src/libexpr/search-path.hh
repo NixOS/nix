@@ -8,17 +8,17 @@
 
 namespace nix {
 
-// Do not want the windows macro (alias to `SearchPathA`)
-#undef SearchPath
+// Do not want the windows macro (alias to `LookupPathA`)
+#undef LookupPath
 
 /**
  * A "search path" is a list of ways look for something, used with
  * `builtins.findFile` and `< >` lookup expressions.
  */
-struct SearchPath
+struct LookupPath
 {
     /**
-     * A single element of a `SearchPath`.
+     * A single element of a `LookupPath`.
      *
      * Each element is tried in succession when looking up a path. The first
      * element to completely match wins.
@@ -26,16 +26,16 @@ struct SearchPath
     struct Elem;
 
     /**
-     * The first part of a `SearchPath::Elem` pair.
+     * The first part of a `LookupPath::Elem` pair.
      *
      * Called a "prefix" because it takes the form of a prefix of a file
      * path (first `n` path components). When looking up a path, to use
-     * a `SearchPath::Elem`, its `Prefix` must match the path.
+     * a `LookupPath::Elem`, its `Prefix` must match the path.
      */
     struct Prefix;
 
     /**
-     * The second part of a `SearchPath::Elem` pair.
+     * The second part of a `LookupPath::Elem` pair.
      *
      * It is either a path or a URL (with certain restrictions / extra
      * structure).
@@ -43,7 +43,7 @@ struct SearchPath
      * If the prefix of the path we are looking up matches, we then
      * check if the rest of the path points to something that exists
      * within the directory denoted by this. If so, the
-     * `SearchPath::Elem` as a whole matches, and that *something* being
+     * `LookupPath::Elem` as a whole matches, and that *something* being
      * pointed to by the rest of the path we are looking up is the
      * result.
      */
@@ -54,24 +54,24 @@ struct SearchPath
      * when looking up. (The actual lookup entry point is in `EvalState`
      * not in this class.)
      */
-    std::list<SearchPath::Elem> elements;
+    std::list<LookupPath::Elem> elements;
 
     /**
-     * Parse a string into a `SearchPath`
+     * Parse a string into a `LookupPath`
      */
-    static SearchPath parse(const Strings & rawElems);
+    static LookupPath parse(const Strings & rawElems);
 };
 
-struct SearchPath::Prefix
+struct LookupPath::Prefix
 {
     /**
      * Underlying string
      *
-     * @todo Should we normalize this when constructing a `SearchPath::Prefix`?
+     * @todo Should we normalize this when constructing a `LookupPath::Prefix`?
      */
     std::string s;
 
-    GENERATE_CMP(SearchPath::Prefix, me->s);
+    GENERATE_CMP(LookupPath::Prefix, me->s);
 
     /**
      * If the path possibly matches this search path element, return the
@@ -82,7 +82,7 @@ struct SearchPath::Prefix
     std::optional<std::string_view> suffixIfPotentialMatch(std::string_view path) const;
 };
 
-struct SearchPath::Path
+struct LookupPath::Path
 {
     /**
      * The location of a search path item, as a path or URL.
@@ -91,21 +91,21 @@ struct SearchPath::Path
      */
     std::string s;
 
-    GENERATE_CMP(SearchPath::Path, me->s);
+    GENERATE_CMP(LookupPath::Path, me->s);
 };
 
-struct SearchPath::Elem
+struct LookupPath::Elem
 {
 
     Prefix prefix;
     Path path;
 
-    GENERATE_CMP(SearchPath::Elem, me->prefix, me->path);
+    GENERATE_CMP(LookupPath::Elem, me->prefix, me->path);
 
     /**
-     * Parse a string into a `SearchPath::Elem`
+     * Parse a string into a `LookupPath::Elem`
      */
-    static SearchPath::Elem parse(std::string_view rawElem);
+    static LookupPath::Elem parse(std::string_view rawElem);
 };
 
 }

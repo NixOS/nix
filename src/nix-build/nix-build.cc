@@ -258,7 +258,7 @@ static void main_nix_build(int argc, char * * argv)
     auto store = openStore();
     auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-    auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
+    auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, store);
     state->repair = myArgs.repair;
     if (myArgs.repair) buildMode = bmRepair;
 

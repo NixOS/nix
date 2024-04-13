@@ -193,7 +193,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
           startProgressBar();
 
         auto store = openStore();
-        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+        auto state = std::make_unique<EvalState>(myArgs.lookupPath, store);
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 

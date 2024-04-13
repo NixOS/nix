@@ -85,17 +85,17 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, Value *
     NIXC_CATCH_ERRS
 }
 
-EvalState * nix_state_create(nix_c_context * context, const char ** searchPath_c, Store * store)
+EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c, Store * store)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        nix::Strings searchPath;
-        if (searchPath_c != nullptr)
-            for (size_t i = 0; searchPath_c[i] != nullptr; i++)
-                searchPath.push_back(searchPath_c[i]);
+        nix::Strings lookupPath;
+        if (lookupPath_c != nullptr)
+            for (size_t i = 0; lookupPath_c[i] != nullptr; i++)
+                lookupPath.push_back(lookupPath_c[i]);
 
-        return new EvalState{nix::EvalState(nix::SearchPath::parse(searchPath), store->ptr)};
+        return new EvalState{nix::EvalState(nix::LookupPath::parse(lookupPath), store->ptr)};
     }
     NIXC_CATCH_ERRS_NULL
 }

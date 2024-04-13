@@ -80,14 +80,14 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
  * Run a program and return its stdout in a string (i.e., like the
  * shell backtick operator).
  */
-std::string runProgram(Path program, bool searchPath = false,
+std::string runProgram(Path program, bool lookupPath = false,
     const Strings & args = Strings(),
     const std::optional<std::string> & input = {}, bool isInteractive = false);
 
 struct RunOptions
 {
     Path program;
-    bool searchPath = true;
+    bool lookupPath = true;
     Strings args;
 #ifndef _WIN32
     std::optional<uid_t> uid;

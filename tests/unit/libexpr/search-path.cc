@@ -5,85 +5,85 @@
 
 namespace nix {
 
-TEST(SearchPathElem, parse_justPath) {
+TEST(LookupPathElem, parse_justPath) {
     ASSERT_EQ(
-        SearchPath::Elem::parse("foo"),
-        (SearchPath::Elem {
-            .prefix = SearchPath::Prefix { .s = "" },
-            .path = SearchPath::Path { .s = "foo" },
+        LookupPath::Elem::parse("foo"),
+        (LookupPath::Elem {
+            .prefix = LookupPath::Prefix { .s = "" },
+            .path = LookupPath::Path { .s = "foo" },
         }));
 }
 
-TEST(SearchPathElem, parse_emptyPrefix) {
+TEST(LookupPathElem, parse_emptyPrefix) {
     ASSERT_EQ(
-        SearchPath::Elem::parse("=foo"),
-        (SearchPath::Elem {
-            .prefix = SearchPath::Prefix { .s = "" },
-            .path = SearchPath::Path { .s = "foo" },
+        LookupPath::Elem::parse("=foo"),
+        (LookupPath::Elem {
+            .prefix = LookupPath::Prefix { .s = "" },
+            .path = LookupPath::Path { .s = "foo" },
         }));
 }
 
-TEST(SearchPathElem, parse_oneEq) {
+TEST(LookupPathElem, parse_oneEq) {
     ASSERT_EQ(
-        SearchPath::Elem::parse("foo=bar"),
-        (SearchPath::Elem {
-            .prefix = SearchPath::Prefix { .s = "foo" },
-            .path = SearchPath::Path { .s = "bar" },
+        LookupPath::Elem::parse("foo=bar"),
+        (LookupPath::Elem {
+            .prefix = LookupPath::Prefix { .s = "foo" },
+            .path = LookupPath::Path { .s = "bar" },
         }));
 }
 
-TEST(SearchPathElem, parse_twoEqs) {
+TEST(LookupPathElem, parse_twoEqs) {
     ASSERT_EQ(
-        SearchPath::Elem::parse("foo=bar=baz"),
-        (SearchPath::Elem {
-            .prefix = SearchPath::Prefix { .s = "foo" },
-            .path = SearchPath::Path { .s = "bar=baz" },
+        LookupPath::Elem::parse("foo=bar=baz"),
+        (LookupPath::Elem {
+            .prefix = LookupPath::Prefix { .s = "foo" },
+            .path = LookupPath::Path { .s = "bar=baz" },
         }));
 }
 
 
-TEST(SearchPathElem, suffixIfPotentialMatch_justPath) {
-    SearchPath::Prefix prefix { .s = "" };
+TEST(LookupPathElem, suffixIfPotentialMatch_justPath) {
+    LookupPath::Prefix prefix { .s = "" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("any/thing"), std::optional { "any/thing" });
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_misleadingPrefix1) {
-    SearchPath::Prefix prefix { .s = "foo" };
+TEST(LookupPathElem, suffixIfPotentialMatch_misleadingPrefix1) {
+    LookupPath::Prefix prefix { .s = "foo" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("fooX"), std::nullopt);
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_misleadingPrefix2) {
-    SearchPath::Prefix prefix { .s = "foo" };
+TEST(LookupPathElem, suffixIfPotentialMatch_misleadingPrefix2) {
+    LookupPath::Prefix prefix { .s = "foo" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("fooX/bar"), std::nullopt);
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_partialPrefix) {
-    SearchPath::Prefix prefix { .s = "fooX" };
+TEST(LookupPathElem, suffixIfPotentialMatch_partialPrefix) {
+    LookupPath::Prefix prefix { .s = "fooX" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("foo"), std::nullopt);
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_exactPrefix) {
-    SearchPath::Prefix prefix { .s = "foo" };
+TEST(LookupPathElem, suffixIfPotentialMatch_exactPrefix) {
+    LookupPath::Prefix prefix { .s = "foo" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("foo"), std::optional { "" });
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_multiKey) {
-    SearchPath::Prefix prefix { .s = "foo/bar" };
+TEST(LookupPathElem, suffixIfPotentialMatch_multiKey) {
+    LookupPath::Prefix prefix { .s = "foo/bar" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("foo/bar/baz"), std::optional { "baz" });
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_trailingSlash) {
-    SearchPath::Prefix prefix { .s = "foo" };
+TEST(LookupPathElem, suffixIfPotentialMatch_trailingSlash) {
+    LookupPath::Prefix prefix { .s = "foo" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("foo/"), std::optional { "" });
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_trailingDoubleSlash) {
-    SearchPath::Prefix prefix { .s = "foo" };
+TEST(LookupPathElem, suffixIfPotentialMatch_trailingDoubleSlash) {
+    LookupPath::Prefix prefix { .s = "foo" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("foo//"), std::optional { "/" });
 }
 
-TEST(SearchPathElem, suffixIfPotentialMatch_trailingPath) {
-    SearchPath::Prefix prefix { .s = "foo" };
+TEST(LookupPathElem, suffixIfPotentialMatch_trailingPath) {
+    LookupPath::Prefix prefix { .s = "foo" };
     ASSERT_EQ(prefix.suffixIfPotentialMatch("foo/bar/baz"), std::optional { "bar/baz" });
 }
 

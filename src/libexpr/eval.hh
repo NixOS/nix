@@ -162,7 +162,7 @@ struct DebugTrace {
 };
 
 // Don't want Windows function
-#undef SearchPath
+#undef LookupPath
 
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
@@ -311,9 +311,9 @@ private:
 #endif
     FileEvalCache fileEvalCache;
 
-    SearchPath searchPath;
+    LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> searchPathResolved;
+    std::map<std::string, std::optional<std::string>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -335,12 +335,12 @@ private:
 public:
 
     EvalState(
-        const SearchPath & _searchPath,
+        const LookupPath & _lookupPath,
         ref<Store> store,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    SearchPath getSearchPath() { return searchPath; }
+    LookupPath getLookupPath() { return lookupPath; }
 
     /**
      * Return a `SourcePath` that refers to `path` in the root
@@ -409,7 +409,7 @@ public:
      * Look up a file in the search path.
      */
     SourcePath findFile(const std::string_view path);
-    SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const LookupPath & lookupPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
      * Try to resolve a search path value (not the optional key part).
@@ -418,8 +418,8 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(
-        const SearchPath::Path & elem,
+    std::optional<std::string> resolveLookupPathPath(
+        const LookupPath::Path & elem,
         bool initAccessControl = false);
 
     /**
