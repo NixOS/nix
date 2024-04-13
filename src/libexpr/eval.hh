@@ -161,9 +161,6 @@ struct DebugTrace {
     bool isError;
 };
 
-// Don't want Windows function
-#undef LookupPath
-
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
