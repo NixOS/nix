@@ -15,9 +15,9 @@
 #include "value/context.hh"
 
 #ifdef HAVE_BOEHMGC
-#include "gc/gc.h"
-#define GC_INCLUDE_NEW 1
-#include "gc_cpp.h"
+# include "gc/gc.h"
+# define GC_INCLUDE_NEW 1
+# include "gc_cpp.h"
 #endif
 
 // Helper function to throw an exception if value is null
