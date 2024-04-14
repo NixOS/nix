@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "canon-path.hh"
+#include "json-impls.hh"
 #include "attrs.hh"
 #include "url.hh"
 
@@ -230,8 +231,9 @@ struct PublicKey
     std::string type = "ssh-ed25519";
     std::string key;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(PublicKey, type, key)
 
 std::string publicKeys_to_string(const std::vector<PublicKey>&);
 
 }
+
+JSON_IMPL(fetchers::PublicKey)

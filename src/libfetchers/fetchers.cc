@@ -3,6 +3,7 @@
 #include "input-accessor.hh"
 #include "source-path.hh"
 #include "fetch-to-store.hh"
+#include "json-utils.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -409,6 +410,23 @@ std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
 std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
 {
     return ((nlohmann::json) publicKeys).dump();
+}
+
+}
+
+namespace nlohmann {
+
+using namespace nix;
+
+fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
+    auto type = optionalValueAt(json, "type").value_or("ssh-ed25519");
+    auto key = valueAt(json, "key");
+    return fetchers::PublicKey { getString(type), getString(key) };
+}
+
+void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p) {
+    json["type"] = p.type;
+    json["key"] = p.key;
 }
 
 }
