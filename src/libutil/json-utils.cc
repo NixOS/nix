@@ -30,14 +30,12 @@ const nlohmann::json & valueAt(
     return map.at(key);
 }
 
-std::optional<nlohmann::json> optionalValueAt(const nlohmann::json & value, const std::string & key)
+std::optional<nlohmann::json> optionalValueAt(const nlohmann::json::object_t & map, const std::string & key)
 {
-    try {
-        auto & v = valueAt(value, key);
-        return v.get<nlohmann::json>();
-    } catch (...) {
+    if (!map.contains(key))
         return std::nullopt;
-    }
+
+    return std::optional { map.at(key) };
 }
 
 

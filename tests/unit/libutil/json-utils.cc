@@ -160,4 +160,16 @@ TEST(getBoolean, wrongAssertions) {
     ASSERT_THROW(getBoolean(valueAt(json, "int")), Error);
 }
 
+TEST(optionalValueAt, existing) {
+    auto json = R"({ "string": "ssh-rsa" })"_json;
+
+    ASSERT_EQ(optionalValueAt(json, "string"), std::optional { "ssh-rsa" });
+}
+
+TEST(optionalValueAt, empty) {
+    auto json = R"({})"_json;
+
+    ASSERT_EQ(optionalValueAt(json, "string2"), std::nullopt);
+}
+
 } /* namespace nix */
