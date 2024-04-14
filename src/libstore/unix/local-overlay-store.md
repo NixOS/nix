@@ -16,6 +16,8 @@ The parts of a local overlay store are as follows:
 
 - **Lower store**:
 
+  > Specified with the [`lower-store`](#store-experimental-local-overlay-store-lower-store) setting.
+
   This is any store implementation that includes a store directory as part of the native operating system filesystem.
   For example, this could be a [local store], [local daemon store], or even another local overlay store.
 
@@ -28,19 +30,20 @@ The parts of a local overlay store are as follows:
   The lower store must not change while it is mounted as part of an overlay store.
   To ensure it does not, you might want to mount the store directory read-only (which then requires the [read-only] parameter to be set to `true`).
 
-  Specified with the [`lower-store`](#store-experimental-local-overlay-store-lower-store) setting.
-
   - **Lower store directory**:
 
-    This is the directory used/exposed by the lower store.
+    > Specified with `lower-store.real` setting.
 
-    Specified with `lower-store.real` setting.
+    This is the directory used/exposed by the lower store.
 
     As specified above, Nix requires the local store can only grow not change in other ways.
     Linux's OverlayFS in addition imposes the further requirement that this directory cannot change at all.
     That means that, while any local overlay store exists that is using this store as a lower store, this directory must not change.
 
   - **Lower metadata source**:
+
+    > Not directly specified.
+    > A consequence of the `lower-store` setting, depending on the type of lower store chosen.
 
     This is abstract, just some way to read the metadata of lower store [store objects][store object].
     For example it could be a SQLite database (for the [local store]), or a socket connection (for the [local daemon store]).
@@ -51,18 +54,24 @@ The parts of a local overlay store are as follows:
 
 - **Upper almost-store**:
 
+  > Not directly specified.
+  > Instead the constituent parts are independently specified as described below.
+
   This is almost but not quite just a [local store].
   That is because taken in isolation, not as part of a local overlay store, by itself, it would appear corrupted.
   But combined with everything else as part of an overlay local store, it is valid.
 
   - **Upper layer directory**:
 
+    > Specified with [`upper-layer`](#store-experimental-local-overlay-store-upper-layer) setting.
+
     This contains additional [store objects][store object]
     (or, strictly speaking, their [file system objects][file system object] that the local overlay store will extend the lower store with).
 
-    Specified with [`upper-layer`](#store-experimental-local-overlay-store-upper-layer) setting.
-
   - **Upper store directory**:
+
+    > Specified with the [`real`](#store-experimental-local-overlay-store-real) setting.
+    > This the same as the base local store setting, and can also be indirectly specified with the [`root`](#store-experimental-local-overlay-store-root) setting.
 
     This contains all the store objects from each of the two directories.
 
@@ -70,16 +79,15 @@ The parts of a local overlay store are as follows:
     Nix doesn't do this itself, because it typically wouldn't have the permissions to do so, so it is the responsibility of the user to set this up first.
     Nix can, however, optionally check that that the OverlayFS mount settings appear as expected, matching Nix's own settings.
 
-    Specified with the [`real`](#store-experimental-local-overlay-store-real) setting.
-
   - **Upper SQLite database**:
+
+    > Not directly specified.
+    > The location of the database instead depends on the [`state`](#store-experimental-local-overlay-store-state) setting.
+    > It is is always `${state}/db`.
 
     This contains the metadata of all of the upper layer [store objects][store object] (everything beyond their file system objects), and also duplicate copies of some lower layer store object's metadta.
     The duplication is so the metadata for the [closure](@docroot@/glossary.md#gloss-closure) of upper layer [store objects][store object] can be found entirely within the upper layer.
     (This allows us to use the same SQL Schema as the [local store]'s SQLite database, as foreign keys in that schema enforce closure metadata to be self-contained in this way.)
-
-    The location of the database is directly specified, but depends on the [`state`](#store-experimental-local-overlay-store-state) setting.
-    It is is always `${state}/db`.
 
 [file system object]: @docroot@/store/file-system-object.md
 [store object]: @docroot@/store/store-object.md
