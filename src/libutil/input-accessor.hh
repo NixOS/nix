@@ -14,6 +14,13 @@ struct InputAccessor : virtual SourceAccessor, std::enable_shared_from_this<Inpu
     std::optional<std::string> fingerprint;
 
     /**
+     * Whether this is a store path using
+     * FileIngestionMethod::Recursive. This is used to optimize
+     * `fetchToStore()`.
+     */
+    bool isStorePath = false;
+
+    /**
      * Return the maximum last-modified time of the files in this
      * tree, if available.
      */

@@ -356,6 +356,9 @@ struct MercurialInputScheme : InputScheme
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
+        /* Optimize fetchToStore() calls on this path. */
+        accessor->isStorePath = true;
+
         return {accessor, input};
     }
 
