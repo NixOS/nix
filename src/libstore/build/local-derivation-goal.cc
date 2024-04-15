@@ -1823,11 +1823,18 @@ void LocalDerivationGoal::runChild()
                     if (pathExists(path))
                         ss.push_back(path);
 
-                if (settings.caFile != "")
-                    pathsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
+                if (settings.caFile != "" && pathExists(settings.caFile)) {
+                    Path caFile = settings.caFile;
+                    pathsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", canonPath(caFile, true), true);
+                }
             }
 
-            for (auto & i : ss) pathsInChroot.emplace(i, i);
+            for (auto & i : ss) {
+                // For backwards-compatibiliy, resolve all the symlinks in the
+                // chroot paths
+                auto canonicalPath = canonPath(i, true);
+                pathsInChroot.emplace(i, canonicalPath);
+            }
 
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
