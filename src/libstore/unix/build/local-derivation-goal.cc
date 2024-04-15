@@ -37,7 +37,7 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-# include "linux/fchmodat2-compat.hh"
+# include "fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
 # include <netinet/ip.h>
