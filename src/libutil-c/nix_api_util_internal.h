@@ -29,8 +29,7 @@ nix_err nix_context_error(nix_c_context * context);
  * @return NIX_OK if there were no errors.
  * @see nix_get_string_callback
  */
-nix_err call_nix_get_string_callback(
-    const std::string str, void (*callback)(const char * start, unsigned int n, void * user_data), void * user_data);
+nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callback callback, void * user_data);
 
 #define NIXC_CATCH_ERRS \
     catch (...) \

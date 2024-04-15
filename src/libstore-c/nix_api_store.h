@@ -76,11 +76,7 @@ void nix_store_free(Store * store);
  * @see nix_get_string_callback
  * @return error code, NIX_OK on success.
  */
-nix_err nix_store_get_uri(
-    nix_c_context * context,
-    Store * store,
-    void (*callback)(const char * start, unsigned int n, void * user_data),
-    void * user_data);
+nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
 
 // returns: owned StorePath*
 /**
@@ -101,10 +97,7 @@ StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const c
  * @param[in] callback called with the name
  * @param[in] user_data arbitrary data, passed to the callback when it's called.
  */
-void nix_store_path_name(
-    const StorePath * store_path,
-    void (*callback)(const char * start, unsigned int n, void * user_data),
-    void * user_data);
+void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data);
 
 /**
  * @brief Copy a StorePath
@@ -163,11 +156,8 @@ nix_err nix_store_realise(
  * @see nix_get_string_callback
  * @return error code, NIX_OK on success.
  */
-nix_err nix_store_get_version(
-    nix_c_context * context,
-    Store * store,
-    void (*callback)(const char * start, unsigned int n, void * user_data),
-    void * user_data);
+nix_err
+nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
 
 // cffi end
 #ifdef __cplusplus
