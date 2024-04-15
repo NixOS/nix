@@ -181,7 +181,7 @@ InstallableFlake::getCursors(EvalState & state)
     for (auto & attrPath : attrPaths) {
         debug("trying flake output attribute '%s'", attrPath);
 
-        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
+        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath), true);
         if (attr) {
             res.push_back(ref(*attr));
         } else {
