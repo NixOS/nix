@@ -8,6 +8,7 @@
 #include "local-store.hh"
 #include "finally.hh"
 #include "source-accessor.hh"
+#include "fs-input-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
 #include "build/personality.hh"
@@ -106,7 +107,8 @@ struct CmdShell : InstallablesCommand, MixEnvironment
     {
         auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
 
-        auto accessor = store->getFSAccessor();
+        auto store2 = store.dynamic_pointer_cast<LocalFSStore>();
+        auto accessor = makeFSInputAccessor(store2 ? store2->getRealStoreDir() : "/");
 
         std::unordered_set<StorePath> done;
         std::queue<StorePath> todo;
@@ -124,9 +126,11 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             if (true)
                 pathAdditions.push_back(store->printStorePath(path) + "/bin");
 
-            auto propPath = CanonPath(store->printStorePath(path)) / "nix-support" / "propagated-user-env-packages";
-            if (auto st = accessor->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(accessor->readFile(propPath)))
+            auto propPath = SourcePath(accessor,
+                CanonPath(store->printStorePath(path)) / "nix-support" / "propagated-user-env-packages")
+                .resolveSymlinks();
+            if (auto st = propPath.maybeLstat(); st && st->type == SourceAccessor::tRegular) {
+                for (auto & p : tokenizeString<Paths>(propPath.readFile()))
                     todo.push(store->parseStorePath(p));
             }
         }
