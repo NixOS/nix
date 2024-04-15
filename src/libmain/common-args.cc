@@ -2,7 +2,6 @@
 #include "args/root.hh"
 #include "globals.hh"
 #include "logging.hh"
-#include "loggers.hh"
 #include "util.hh"
 
 namespace nix {
@@ -54,14 +53,6 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
                         completions.add(s.first, fmt("Set the `%s` setting.", s.first));
             }
         }
-    });
-
-    addFlag({
-        .longName = "log-format",
-        .description = "Set the format of log output; one of `raw`, `internal-json`, `bar` or `bar-with-logs`.",
-        .category = loggingCategory,
-        .labels = {"format"},
-        .handler = {[](std::string format) { setLogFormat(format); }},
     });
 
     addFlag({

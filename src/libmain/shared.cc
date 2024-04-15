@@ -3,7 +3,6 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
-#include "loggers.hh"
 #include "progress-bar.hh"
 #include "signals.hh"
 
@@ -183,7 +182,7 @@ LegacyArgs::LegacyArgs(const std::string & programName,
         .longName = "no-build-output",
         .shortName = 'Q',
         .description = "Do not show build output.",
-        .handler = {[&]() {setLogFormat(LogFormat::raw); }},
+        .handler = {[&]() {loggerSettings.logFormat.assign(LogFormat::raw); }},
     });
 
     addFlag({

@@ -23,7 +23,16 @@ ifdef HOST_LINUX
 endif
 libutil_CXXFLAGS += $(INCLUDE_libutil)
 
-libutil_LDFLAGS += $(THREAD_LDFLAGS) $(LIBCURL_LIBS) $(SODIUM_LIBS) $(OPENSSL_LIBS) $(LIBBROTLI_LIBS) $(LIBARCHIVE_LIBS) $(BOOST_LDFLAGS) -lboost_context
+libutil_LDFLAGS += \
+	$(THREAD_LDFLAGS) \
+	$(LIBCURL_LIBS) \
+	$(SODIUM_LIBS) \
+	$(OPENSSL_LIBS) \
+	$(LIBBROTLI_LIBS) \
+	$(LIBARCHIVE_LIBS) \
+	$(BOOST_LDFLAGS) \
+	-lboost_context \
+	$(libmain_LDFLAGS)
 
 $(foreach i, $(wildcard $(d)/args/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/args, 0644)))
