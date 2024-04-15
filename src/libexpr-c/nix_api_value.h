@@ -178,10 +178,13 @@ bool nix_get_bool(nix_c_context * context, const Value * value);
  *
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
+ * @param[in] callback Called with the string value.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
  * @return string
- * @return NULL in case of error.
+ * @return error code, NIX_OK on success.
  */
-const char * nix_get_string(nix_c_context * context, const Value * value);
+nix_err
+nix_get_string(nix_c_context * context, const Value * value, nix_get_string_callback callback, void * user_data);
 
 /** @brief Get path as string
  * @param[out] context Optional, stores error information
@@ -481,7 +484,6 @@ const StorePath * nix_realised_string_get_store_path(nix_realised_string * reali
  * @param[in] realised_string
  */
 void nix_realised_string_free(nix_realised_string * realised_string);
-
 
 // cffi end
 #ifdef __cplusplus

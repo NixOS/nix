@@ -6,7 +6,9 @@
 #include "nix_api_expr_internal.h"
 #include "nix_api_value.h"
 #include "nix_api_external.h"
+
 #include "tests/nix_api_expr.hh"
+#include "tests/string_callback.hh"
 
 #include <gtest/gtest.h>
 
@@ -58,6 +60,9 @@ TEST_F(nix_api_expr_test, nix_expr_eval_external)
 
     nix_value_call(ctx, state, valueFn, value, valueResult);
 
-    ASSERT_STREQ("nix-external<MyExternalValueDesc( 42 )>", nix_get_string(nullptr, valueResult));
+    std::string string_value;
+    nix_get_string(nullptr, valueResult, OBSERVE_STRING(string_value));
+    ASSERT_STREQ("nix-external<MyExternalValueDesc( 42 )>", string_value.c_str());
 }
+
 }

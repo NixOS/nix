@@ -6,6 +6,7 @@
 #include "nix_api_value.h"
 
 #include "tests/nix_api_expr.hh"
+#include "tests/string_callback.hh"
 
 #include <cstdlib>
 #include <gtest/gtest.h>
@@ -53,13 +54,15 @@ TEST_F(nix_api_expr_test, nix_value_set_get_bool)
 
 TEST_F(nix_api_expr_test, nix_value_set_get_string)
 {
-    ASSERT_EQ(nullptr, nix_get_string(ctx, nullptr));
-    ASSERT_DEATH(nix_get_string(ctx, value), "");
+    std::string string_value;
+    ASSERT_EQ(NIX_ERR_UNKNOWN, nix_get_string(ctx, nullptr, OBSERVE_STRING(string_value)));
+    ASSERT_DEATH(nix_get_string(ctx, value, OBSERVE_STRING(string_value)), "");
 
     const char * myString = "some string";
     nix_init_string(ctx, value, myString);
 
-    ASSERT_STREQ(myString, nix_get_string(ctx, value));
+    nix_get_string(ctx, value, OBSERVE_STRING(string_value));
+    ASSERT_STREQ(myString, string_value.c_str());
     ASSERT_STREQ("a string", nix_get_typename(ctx, value));
     ASSERT_EQ(NIX_TYPE_STRING, nix_get_type(ctx, value));
 }
@@ -162,11 +165,14 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     ASSERT_EQ(false, nix_has_attr_byname(ctx, value, state, "no-value"));
 
     out_value = nix_get_attr_byname(ctx, value, state, "b");
-    ASSERT_STREQ("foo", nix_get_string(ctx, out_value));
+    std::string string_value;
+    nix_get_string(ctx, out_value, OBSERVE_STRING(string_value));
+    ASSERT_STREQ("foo", string_value.c_str());
     nix_gc_decref(nullptr, out_value);
 
     out_value = nix_get_attr_byidx(ctx, value, state, 1, out_name);
-    ASSERT_STREQ("foo", nix_get_string(ctx, out_value));
+    nix_get_string(ctx, out_value, OBSERVE_STRING(string_value));
+    ASSERT_STREQ("foo", string_value.c_str());
     ASSERT_STREQ("b", *out_name);
     nix_gc_decref(nullptr, out_value);
 
