@@ -352,7 +352,11 @@ struct MercurialInputScheme : InputScheme
 
         auto storePath = fetchToStore(store, input);
 
-        return {makeStorePathAccessor(store, storePath), input};
+        auto accessor = makeStorePathAccessor(store, storePath);
+
+        accessor->setPathDisplay("«" + input.to_string() + "»");
+
+        return {accessor, input};
     }
 
     bool isLocked(const Input & input) const override
