@@ -21,8 +21,11 @@ namespace nix {
  *
  * @param V A type to instantiate for each output. It should probably
  * should be an "optional" type so not every interior node has to have a
- * value. `* const Something` or `std::optional<Something>` would be
- * good choices for "optional" types.
+ * value. For example, the scheduler uses
+ * `DerivedPathMap<std::weak_ptr<CreateDerivationAndRealiseGoal>>` to
+ * remember which goals correspond to which outputs. `* const Something`
+ * or `std::optional<Something>` would also be good choices for
+ * "optional" types.
  */
 template<typename V>
 struct DerivedPathMap {

@@ -52,7 +52,10 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
 
 // instantiations
 
+#include "create-derivation-and-realise-goal.hh"
 namespace nix {
+
+template struct DerivedPathMap<std::weak_ptr<CreateDerivationAndRealiseGoal>>;
 
 GENERATE_CMP_EXT(
     template<>,
