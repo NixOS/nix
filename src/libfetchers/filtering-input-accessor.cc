@@ -38,7 +38,7 @@ std::string FilteringInputAccessor::readLink(const CanonPath & path)
 
 std::string FilteringInputAccessor::showPath(const CanonPath & path)
 {
-    return next->showPath(prefix / path);
+    return displayPrefix + next->showPath(prefix / path) + displaySuffix;
 }
 
 void FilteringInputAccessor::checkAccess(const CanonPath & path)

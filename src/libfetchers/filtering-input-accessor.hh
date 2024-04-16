@@ -27,7 +27,9 @@ struct FilteringInputAccessor : InputAccessor
         : next(src.accessor)
         , prefix(src.path)
         , makeNotAllowedError(std::move(makeNotAllowedError))
-    { }
+    {
+        displayPrefix.clear();
+    }
 
     std::string readFile(const CanonPath & path) override;
 

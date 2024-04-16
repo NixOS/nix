@@ -9,6 +9,8 @@ struct MountedInputAccessor : InputAccessor
     MountedInputAccessor(std::map<CanonPath, ref<InputAccessor>> _mounts)
         : mounts(std::move(_mounts))
     {
+        displayPrefix.clear();
+
         // Currently we require a root filesystem. This could be relaxed.
         assert(mounts.contains(CanonPath::root));
 
@@ -48,7 +50,7 @@ struct MountedInputAccessor : InputAccessor
     std::string showPath(const CanonPath & path) override
     {
         auto [accessor, subpath] = resolve(path);
-        return accessor->showPath(subpath);
+        return displayPrefix + accessor->showPath(subpath) + displaySuffix;
     }
 
     std::pair<ref<InputAccessor>, CanonPath> resolve(CanonPath path)
