@@ -645,6 +645,7 @@ struct GitInputScheme : InputScheme
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
 
@@ -681,6 +682,8 @@ struct GitInputScheme : InputScheme
                 exportIgnore,
                 makeNotAllowedError(repoInfo.url));
 
+        accessor->setPathDisplay(repoInfo.url);
+
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
@@ -697,6 +700,7 @@ struct GitInputScheme : InputScheme
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
 
                 /* If the submodule is dirty, mark this repo dirty as
                    well. */
