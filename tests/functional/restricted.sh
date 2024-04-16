@@ -3,15 +3,15 @@ source common.sh
 clearStore
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
-(! nix-instantiate --eval --restrict-eval ./restricted.nix)
-(! nix-instantiate --eval --restrict-eval <(echo '1 + 2'))
+expectStderr 1 nix-instantiate --eval --restrict-eval ./restricted.nix | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --eval --restrict-eval <(echo '1 + 2') | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval ./simple.nix -I src=.
 nix-instantiate --restrict-eval ./simple.nix -I src1=simple.nix -I src2=config.nix -I src3=./simple.builder.sh
 
-(! nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix')
+expectStderr 1 nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I src=../..
 
-(! nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel')
+expectStderr 1 nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel' | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel' -I src=../../src
 
 expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "forbidden in restricted mode"
@@ -20,21 +20,21 @@ nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; p
 p=$(nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval --allowed-uris "file://$(pwd)")
 cmp $p restricted.sh
 
-(! nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval)
+expectStderr 1 nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval | grepQuiet "forbidden in restricted mode"
 
-(! nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval --allowed-uris "file://$(pwd)/restricted.sh/")
+expectStderr 1 nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval --allowed-uris "file://$(pwd)/restricted.sh/" | grepQuiet "forbidden in restricted mode"
 
 nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval --allowed-uris "file://$(pwd)/restricted.sh"
 
-(! nix eval --raw --expr "builtins.fetchurl https://github.com/NixOS/patchelf/archive/master.tar.gz" --impure --restrict-eval)
-(! nix eval --raw --expr "builtins.fetchTarball https://github.com/NixOS/patchelf/archive/master.tar.gz" --impure --restrict-eval)
-(! nix eval --raw --expr "fetchGit git://github.com/NixOS/patchelf.git" --impure --restrict-eval)
+expectStderr 1 nix eval --raw --expr "builtins.fetchurl https://github.com/NixOS/patchelf/archive/master.tar.gz" --impure --restrict-eval | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix eval --raw --expr "builtins.fetchTarball https://github.com/NixOS/patchelf/archive/master.tar.gz" --impure --restrict-eval | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix eval --raw --expr "fetchGit git://github.com/NixOS/patchelf.git" --impure --restrict-eval | grepQuiet "forbidden in restricted mode"
 
 ln -sfn $(pwd)/restricted.nix $TEST_ROOT/restricted.nix
 [[ $(nix-instantiate --eval $TEST_ROOT/restricted.nix) == 3 ]]
-(! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix)
-(! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT)
-(! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I .)
+expectStderr 1 nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I . | grepQuiet "forbidden in restricted mode"
 nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT -I .
 
 [[ $(nix eval --raw --impure --restrict-eval -I . --expr 'builtins.readFile "${import ./simple.nix}/hello"') == 'Hello World!' ]]
