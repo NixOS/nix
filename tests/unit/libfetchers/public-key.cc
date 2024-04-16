@@ -1,18 +1,45 @@
 #include <gtest/gtest.h>
 #include "fetchers.hh"
 #include "json-utils.hh"
+#include <nlohmann/json.hpp>
+#include "tests/characterization.hh"
 
 namespace nix {
-    TEST(PublicKey, jsonSerialization) {
-        auto json = nlohmann::json(fetchers::PublicKey { .key = "ABCDE" });
 
-        ASSERT_EQ(json, R"({ "key": "ABCDE", "type": "ssh-ed25519" })"_json);
-    }
-    TEST(PublicKey, jsonDeserialization) {
-        auto pubKeyJson = R"({ "key": "ABCDE", "type": "ssh-ed25519" })"_json;
-        fetchers::PublicKey pubKey = pubKeyJson;
+using nlohmann::json;
 
-        ASSERT_EQ(pubKey.key, "ABCDE");
-        ASSERT_EQ(pubKey.type, "ssh-ed25519");
+class PublicKeyTest : public CharacterizationTest
+{
+    Path unitTestData = getUnitTestData() + "/public-key";
+
+public:
+    Path goldenMaster(std::string_view testStem) const override {
+        return unitTestData + "/" + testStem;
     }
+};
+
+#define TEST_JSON(FIXTURE, NAME, VAL)                                     \
+    TEST_F(FIXTURE, PublicKey_ ## NAME ## _from_json) {                   \
+        readTest(#NAME ".json", [&](const auto & encoded_) {              \
+            fetchers::PublicKey expected { VAL };                         \
+            auto got = nlohmann::json::parse(encoded_);                   \
+            ASSERT_EQ(got, expected);                                     \
+        });                                                               \
+    }                                                                     \
+                                                                          \
+    TEST_F(FIXTURE, PublicKey_ ## NAME ## _to_json) {                     \
+        writeTest(#NAME ".json", [&]() -> json {                          \
+            return nlohmann::json(fetchers::PublicKey { VAL });           \
+        }, [](const auto & file) {                                        \
+            return json::parse(readFile(file));                           \
+        }, [](const auto & file, const auto & got) {                      \
+            return writeFile(file, got.dump(2) + "\n");                   \
+        });                                                               \
+    }
+
+TEST_JSON(PublicKeyTest, simple, (fetchers::PublicKey { .type = "ssh-rsa", .key = "ABCDE" }))
+
+TEST_JSON(PublicKeyTest, defaultType, fetchers::PublicKey { .key = "ABCDE" })
+
+#undef TEST_JSON
 }
