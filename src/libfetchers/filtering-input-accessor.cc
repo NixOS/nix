@@ -15,6 +15,12 @@ bool FilteringInputAccessor::pathExists(const CanonPath & path)
     return isAllowed(path) && next->pathExists(prefix / path);
 }
 
+SourceAccessor::Stat FilteringInputAccessor::lstat(const CanonPath & path)
+{
+    checkAccess(path);
+    return next->lstat(prefix / path);
+}
+
 std::optional<InputAccessor::Stat> FilteringInputAccessor::maybeLstat(const CanonPath & path)
 {
     return isAllowed(path) ? next->maybeLstat(prefix / path) : std::nullopt;
