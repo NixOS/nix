@@ -130,7 +130,7 @@ foo + baz
 ' "3" \
     ./flake ./flake\#bar --experimental-features 'flakes'
 
-# Test the `:reload` mechansim with flakes:
+# Test the `:reload` mechanism with flakes:
 # - Eval `./flake#changingThing`
 # - Modify the flake
 # - Re-eval it
