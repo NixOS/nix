@@ -5,7 +5,7 @@
 #include <optional>
 #include <cassert>
 #include <iostream>
-#include <set>
+#include <unordered_set>
 #include <vector>
 
 namespace nix {
@@ -210,12 +210,10 @@ public:
     CanonPath operator / (std::string_view c) const;
 
     /**
-     * Check whether access to this path is allowed, which is the case
-     * if 1) `this` is within any of the `allowed` paths; or 2) any of
-     * the `allowed` paths are within `this`. (The latter condition
-     * ensures access to the parents of allowed paths.)
+     * Check whether access to this path is allowed, i.e. `this` is
+     * within any of the `allowed` paths.
      */
-    bool isAllowed(const std::set<CanonPath> & allowed) const;
+    bool isAllowed(const std::unordered_set<CanonPath> & allowed) const;
 
     /**
      * Return a representation `x` of `path` relative to `this`, i.e.

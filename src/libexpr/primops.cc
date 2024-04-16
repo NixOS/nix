@@ -1561,17 +1561,6 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
             mustBeDir ? SymlinkResolution::Full : SymlinkResolution::Ancestors;
         auto path = realisePath(state, pos, arg, symlinkResolution);
 
-        /* Backward compatibility hack to retain Nix 2.18 behaviour:
-           in pure mode, make `pathExists "/nix/store"` return
-           false. */
-        if ((evalSettings.restrictEval || evalSettings.pureEval)
-            && path.accessor == state.rootFS
-            && isDirOrInDir(state.store->storeDir, path.path.abs()))
-        {
-            v.mkBool(false);
-            return;
-        }
-
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
         v.mkBool(exists);

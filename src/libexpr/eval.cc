@@ -395,7 +395,7 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         evalSettings.restrictEval || evalSettings.pureEval
-        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {},
+        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {}, {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"

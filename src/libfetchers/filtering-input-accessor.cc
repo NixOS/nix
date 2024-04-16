@@ -1,5 +1,7 @@
 #include "filtering-input-accessor.hh"
 
+#include <unordered_set>
+
 namespace nix {
 
 std::string FilteringInputAccessor::readFile(const CanonPath & path)
@@ -15,8 +17,7 @@ bool FilteringInputAccessor::pathExists(const CanonPath & path)
 
 std::optional<InputAccessor::Stat> FilteringInputAccessor::maybeLstat(const CanonPath & path)
 {
-    checkAccess(path);
-    return next->maybeLstat(prefix / path);
+    return isAllowed(path) ? next->maybeLstat(prefix / path) : std::nullopt;
 }
 
 InputAccessor::DirEntries FilteringInputAccessor::readDirectory(const CanonPath & path)
@@ -51,33 +52,46 @@ void FilteringInputAccessor::checkAccess(const CanonPath & path)
 
 struct AllowListInputAccessorImpl : AllowListInputAccessor
 {
-    std::set<CanonPath> allowedPrefixes;
+    std::unordered_set<CanonPath> allowedPrefixes;
+    std::unordered_set<CanonPath> allowedPaths;
 
     AllowListInputAccessorImpl(
         ref<InputAccessor> next,
-        std::set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError)
         : AllowListInputAccessor(SourcePath(next), std::move(makeNotAllowedError))
         , allowedPrefixes(std::move(allowedPrefixes))
+        , allowedPaths(std::move(allowedPaths))
     { }
 
     bool isAllowed(const CanonPath & path) override
     {
-        return path.isAllowed(allowedPrefixes);
+        return allowedPaths.count(path) || path.isAllowed(allowedPrefixes);
     }
 
     void allowPrefix(CanonPath prefix) override
     {
         allowedPrefixes.insert(std::move(prefix));
     }
+
+    void allowPath(CanonPath path) override
+    {
+        allowedPaths.insert(std::move(path));
+    }
 };
 
 ref<AllowListInputAccessor> AllowListInputAccessor::create(
     ref<InputAccessor> next,
-    std::set<CanonPath> && allowedPrefixes,
+    std::unordered_set<CanonPath> && allowedPrefixes,
+    std::unordered_set<CanonPath> && allowedPaths,
     MakeNotAllowedError && makeNotAllowedError)
 {
-    return make_ref<AllowListInputAccessorImpl>(next, std::move(allowedPrefixes), std::move(makeNotAllowedError));
+    return make_ref<AllowListInputAccessorImpl>(
+        next,
+        std::move(allowedPrefixes),
+        std::move(allowedPaths),
+        std::move(makeNotAllowedError));
 }
 
 bool CachingFilteringInputAccessor::isAllowed(const CanonPath & path)

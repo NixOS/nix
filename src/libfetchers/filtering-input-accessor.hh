@@ -64,9 +64,16 @@ struct AllowListInputAccessor : public FilteringInputAccessor
      */
     virtual void allowPrefix(CanonPath prefix) = 0;
 
+    /**
+     * Grant access to a path (but not anything underneath the path,
+     * if it's a directory).
+     */
+    virtual void allowPath(CanonPath path) = 0;
+
     static ref<AllowListInputAccessor> create(
         ref<InputAccessor> next,
-        std::set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringInputAccessor::FilteringInputAccessor;

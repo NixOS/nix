@@ -89,25 +89,16 @@ CanonPath CanonPath::operator / (std::string_view c) const
     return res;
 }
 
-bool CanonPath::isAllowed(const std::set<CanonPath> & allowed) const
+bool CanonPath::isAllowed(const std::unordered_set<CanonPath> & allowed) const
 {
-    /* Check if `this` is an exact match or the parent of an
-       allowed path. */
-    auto lb = allowed.lower_bound(*this);
-    if (lb != allowed.end()) {
-        if (lb->isWithin(*this))
-            return true;
-    }
-
-    /* Check if a parent of `this` is allowed. */
     auto path = *this;
-    while (!path.isRoot()) {
-        path.pop();
+    while (true) {
         if (allowed.count(path))
             return true;
+        if (path.isRoot())
+            return false;
+        path.pop();
     }
-
-    return false;
 }
 
 std::ostream & operator << (std::ostream & stream, const CanonPath & path)
