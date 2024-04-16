@@ -44,7 +44,18 @@ let
               overrides.${key}.sourceInfo
             else
               # FIXME: remove obsolete node.info.
-              fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+              let
+                tree = 
+                  fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
+              in tree // {
+                # TODO: return the path value without fetching to the store?
+                #       removing this will improve performance, but may break
+                #       one or two flakes, that rely on
+                #       `builtins.typeOf outPath` for some reason, or perhaps
+                #       something more subtle than that, despite our conservative
+                #       choice of lazy path semantics.
+                outPath = "${tree.outPath}";
+              };
 
           subdir = overrides.${key}.dir or node.locked.dir or "";
 
