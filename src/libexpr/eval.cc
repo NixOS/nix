@@ -397,10 +397,12 @@ EvalState::EvalState(
         evalSettings.restrictEval || evalSettings.pureEval
         ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {}, {},
             [](const CanonPath & path) -> RestrictedPathError {
-                auto modeInformation = evalSettings.pureEval
-                    ? "in pure evaluation mode (use '--impure' to override)"
-                    : "in restricted mode";
-                throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+                throw RestrictedPathError(
+                    std::string("access to absolute path '%1%' is forbidden ") +
+                    (evalSettings.pureEval
+                        ? "in pure evaluation mode (use '--impure' to override)"
+                        : "in restricted mode"),
+                    path);
             }))
         : makeFSInputAccessor())
     , corepkgsFS(makeMemoryInputAccessor())
