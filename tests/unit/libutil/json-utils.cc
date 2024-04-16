@@ -169,7 +169,19 @@ TEST(optionalValueAt, existing) {
 TEST(optionalValueAt, empty) {
     auto json = R"({})"_json;
 
-    ASSERT_EQ(optionalValueAt(json, "string2"), std::nullopt);
+    ASSERT_EQ(optionalValueAt(json, "string"), std::nullopt);
+}
+
+TEST(getNullable, null) {
+    auto json = R"(null)"_json;
+
+    ASSERT_EQ(getNullable(json), std::nullopt);
+}
+
+TEST(getNullable, empty) {
+    auto json = R"({})"_json;
+
+    ASSERT_EQ(getNullable(json), std::optional { R"({})"_json });
 }
 
 } /* namespace nix */
