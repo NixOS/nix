@@ -1,7 +1,7 @@
 # Development
 
 Nix is developed on GitHub.
-Check the [contributing guide](https://github.com/NixOS/nix/blob/master/CONTRIBUTING.md) if you want to get involved.
+Check the [contributing guide](https://github.com/NixOS/nix/blob/master/doc/CONTRIBUTING.md) if you want to get involved.
 
 This chapter is a collection of guides for making changes to the code and documentation.
 

@@ -178,7 +178,7 @@ in {
           ./misc
           ./precompiled-headers.h
           ./src
-          ./COPYING
+          ./doc/COPYING
           ./scripts/local.mk
         ] ++ lib.optionals buildUnitTests [
           ./doc/manual
