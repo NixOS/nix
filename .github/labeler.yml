@@ -1,3 +1,9 @@
+"c api":
+  - changed-files:
+    - any-glob-to-any-file: "src/lib*-c/**/*"
+    - any-glob-to-any-file: "test/unit/**/nix_api_*"
+    - any-glob-to-any-file: "doc/external-api/**/*"
+
 "contributor-experience":
   - changed-files:
     - any-glob-to-any-file: "CONTRIBUTING.md"
