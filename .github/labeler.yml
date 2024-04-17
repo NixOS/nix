@@ -1,3 +1,10 @@
+"contributor-experience":
+  - changed-files:
+    - any-glob-to-any-file: "CONTRIBUTING.md"
+    - any-glob-to-any-file: ".github/ISSUE_TEMPLATE/*"
+    - any-glob-to-any-file: ".github/PULL_REQUEST_TEMPLATE.md"
+    - any-glob-to-any-file: "doc/manual/src/contributing/**"
+
 "documentation":
   - changed-files:
     - any-glob-to-any-file: "doc/manual/*"
