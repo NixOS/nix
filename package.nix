@@ -94,8 +94,8 @@
 
 # Whether to build the internal/external API docs, can be done separately from
 # everything else.
-, enableInternalAPIDocs ? false
-, enableExternalAPIDocs ? false
+, enableInternalAPIDocs ? forDevShell
+, enableExternalAPIDocs ? forDevShell
 
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
