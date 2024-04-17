@@ -223,5 +223,5 @@ or inside `nix-shell` or `nix develop`:
 
 ```
 # make external-api-html
-# xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+# xdg-open ./outputs/doc/share/doc/nix/external-api/html/index.html
 ```
