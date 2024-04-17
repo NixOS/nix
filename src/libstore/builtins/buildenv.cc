@@ -76,7 +76,11 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
-                    if (mkdir(dstFile.c_str(), 0755) == -1)
+                    if (mkdir(dstFile.c_str()
+                #ifndef _WIN32 // TODO abstract mkdir perms for Windows
+                            , 0755
+                #endif
+                            ) == -1)
                         throw SysError("creating directory '%1%'", dstFile);
                     createLinks(state, target, dstFile, state.priorities[dstFile]);
                     createLinks(state, srcFile, dstFile, priority);

@@ -666,6 +666,7 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
+#ifndef _WIN32
     Setting<bool> requireDropSupplementaryGroups{this, isRootUser(), "require-drop-supplementary-groups",
         R"(
           Following the principle of least privilege,
@@ -683,6 +684,7 @@ public:
           (since `root` usually has permissions to call setgroups)
           and `false` otherwise.
         )"};
+#endif
 
 #if __linux__
     Setting<std::string> sandboxShmSize{

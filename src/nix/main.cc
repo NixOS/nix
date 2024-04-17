@@ -16,26 +16,34 @@
 #include "markdown.hh"
 #include "memory-input-accessor.hh"
 #include "terminal.hh"
+#include "users.hh"
 
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <ifaddrs.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <regex>
-
 #include <nlohmann/json.hpp>
+
+#ifndef _WIN32
+# include <sys/socket.h>
+# include <ifaddrs.h>
+# include <netdb.h>
+# include <netinet/in.h>
+#endif
 
 #if __linux__
 # include "namespaces.hh"
 #endif
 
+#ifndef _WIN32
 extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char * * argv);
+#endif
 
 namespace nix {
 
+#ifdef _WIN32
+[[maybe_unused]]
+#endif
 static bool haveProxyEnvironmentVariables()
 {
     static const std::vector<std::string> proxyVariables = {
@@ -57,6 +65,7 @@ static bool haveProxyEnvironmentVariables()
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
 {
+#ifndef _WIN32
     struct ifaddrs * addrs;
 
     if (getifaddrs(&addrs))
@@ -80,6 +89,10 @@ static bool haveInternet()
     if (haveProxyEnvironmentVariables()) return true;
 
     return false;
+#else
+    // TODO implement on Windows
+    return true;
+#endif
 }
 
 std::string programPath;
@@ -342,10 +355,12 @@ void mainWrapped(int argc, char * * argv)
 
     /* The chroot helper needs to be run before any threads have been
        started. */
+#ifndef _WIN32
     if (argc > 0 && argv[0] == chrootHelperName) {
         chrootHelper(argc, argv);
         return;
     }
+#endif
 
     initNix();
     initGC();
@@ -364,6 +379,9 @@ void mainWrapped(int argc, char * * argv)
 
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
+    auto extensionPos = programName.find_last_of(".");
+    if (extensionPos != std::string::npos)
+        programName.erase(extensionPos);
 
     if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
         programName = "build-remote";
@@ -524,9 +542,11 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+#ifndef _WIN32 // TODO implement on Windows
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
+#endif
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

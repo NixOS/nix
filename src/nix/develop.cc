@@ -7,7 +7,10 @@
 #include "outputs-spec.hh"
 #include "derivations.hh"
 #include "progress-bar.hh"
-#include "run.hh"
+
+#ifndef _WIN32 // TODO re-enable on Windows
+# include "run.hh"
+#endif
 
 #include <iterator>
 #include <memory>
@@ -662,6 +665,9 @@ struct CmdDevelop : Common, MixEnvironment
         // This is to make sure the system shell doesn't leak into the build environment.
         setEnv("SHELL", shell.c_str());
 
+#ifdef _WIN32 // TODO re-enable on Windows
+        throw UnimplementedError("Cannot yet spawn processes on Windows");
+#else
         // If running a phase or single command, don't want an interactive shell running after
         // Ctrl-C, so don't pass --rcfile
         auto args = phase || !command.empty() ? Strings{std::string(baseNameOf(shell)), rcFilePath}
@@ -682,6 +688,7 @@ struct CmdDevelop : Common, MixEnvironment
         }
 
         runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
+#endif
     }
 };
 

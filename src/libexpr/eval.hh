@@ -161,6 +161,8 @@ struct DebugTrace {
     bool isError;
 };
 
+// Don't want Windows function
+#undef SearchPath
 
 class EvalState : public std::enable_shared_from_this<EvalState>
 {

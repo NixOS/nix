@@ -29,6 +29,7 @@
 
 namespace nix {
 
+using namespace nix::unix;
 
 static std::string gcSocketPath = "/gc-socket/socket";
 static std::string gcRootsDir = "gcroots";

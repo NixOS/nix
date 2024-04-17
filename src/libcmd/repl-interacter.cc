@@ -137,6 +137,7 @@ static constexpr const char * promptForType(ReplPromptType promptType)
 
 bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptType)
 {
+#ifndef _WIN32 // TODO use more signals.hh for this
     struct sigaction act, old;
     sigset_t savedSignalMask, set;
 
@@ -161,9 +162,12 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
     };
 
     setupSignals();
+#endif
     char * s = readline(promptForType(promptType));
     Finally doFree([&]() { free(s); });
+#ifndef _WIN32 // TODO use more signals.hh for this
     restoreSignals();
+#endif
 
     if (g_signal_received) {
         g_signal_received = 0;

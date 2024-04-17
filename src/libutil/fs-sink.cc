@@ -1,7 +1,14 @@
 #include <fcntl.h>
 
+#include "error.hh"
 #include "config.hh"
 #include "fs-sink.hh"
+
+#if _WIN32
+# include <fileapi.h>
+# include "file-path.hh"
+# include "windows-error.hh"
+#endif
 
 namespace nix {
 
@@ -65,8 +72,14 @@ static GlobalConfig::Register r1(&restoreSinkSettings);
 void RestoreSink::createDirectory(const Path & path)
 {
     Path p = dstPath + path;
-    if (mkdir(p.c_str(), 0777) == -1)
-        throw SysError("creating directory '%1%'", p);
+    if (
+#ifndef _WIN32 // TODO abstract mkdir perms for Windows
+        mkdir(p.c_str(), 0777) == -1
+#else
+        !CreateDirectoryW(pathNG(p).c_str(), NULL)
+#endif
+        )
+        throw NativeSysError("creating directory '%1%'", p);
 };
 
 struct RestoreRegularFile : CreateRegularFileSink {
@@ -81,18 +94,28 @@ void RestoreSink::createRegularFile(const Path & path, std::function<void(Create
 {
     Path p = dstPath + path;
     RestoreRegularFile crf;
-    crf.fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
-    if (!crf.fd) throw SysError("creating file '%1%'", p);
+    crf.fd =
+#ifdef _WIN32
+        CreateFileW(pathNG(path).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+#else
+        open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
+#endif
+        ;
+    if (!crf.fd) throw NativeSysError("creating file '%1%'", p);
     func(crf);
 }
 
 void RestoreRegularFile::isExecutable()
 {
+    // Windows doesn't have a notion of executable file permissions we
+    // care about here, right?
+#ifndef _WIN32
     struct stat st;
     if (fstat(fd.get(), &st) == -1)
         throw SysError("fstat");
     if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
         throw SysError("fchmod");
+#endif
 }
 
 void RestoreRegularFile::preallocateContents(uint64_t len)

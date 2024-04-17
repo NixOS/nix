@@ -52,6 +52,8 @@
 
 namespace nix {
 
+using namespace nix::unix;
+
 std::string LocalStoreConfig::doc()
 {
     return

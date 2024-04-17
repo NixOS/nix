@@ -11,6 +11,9 @@ endif
 ifdef HOST_LINUX
     libutil_SOURCES += $(wildcard $(d)/linux/*.cc)
 endif
+ifdef HOST_WINDOWS
+    libutil_SOURCES += $(wildcard $(d)/windows/*.cc)
+endif
 
 # Not just for this library itself, but also for downstream libraries using this library
 
@@ -20,6 +23,9 @@ ifdef HOST_UNIX
 endif
 ifdef HOST_LINUX
   INCLUDE_libutil += -I $(d)/linux
+endif
+ifdef HOST_WINDOWS
+  INCLUDE_libutil += -I $(d)/windows
 endif
 libutil_CXXFLAGS += $(INCLUDE_libutil)
 

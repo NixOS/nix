@@ -181,7 +181,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
                 v->mkString(arg.s);
             },
             [&](const AutoArgFile & arg) {
-                v->mkString(readFile(arg.path));
+                v->mkString(readFile(arg.path.string()));
             },
             [&](const AutoArgStdin & arg) {
                 v->mkString(readFile(STDIN_FILENO));

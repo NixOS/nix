@@ -1,5 +1,4 @@
 #include "daemon.hh"
-#include "monitor-fd.hh"
 #include "signals.hh"
 #include "worker-protocol.hh"
 #include "worker-protocol-impl.hh"
@@ -15,6 +14,10 @@
 #include "derivations.hh"
 #include "args.hh"
 #include "git.hh"
+
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
+# include "monitor-fd.hh"
+#endif
 
 namespace nix::daemon {
 
@@ -1018,7 +1021,9 @@ void processConnection(
     TrustedFlag trusted,
     RecursiveFlag recursive)
 {
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
+#endif
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
