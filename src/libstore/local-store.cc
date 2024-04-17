@@ -26,6 +26,7 @@
 #include <new>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -473,19 +474,6 @@ void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 
 LocalStore::~LocalStore()
 {
-    std::shared_future<void> future;
-
-    {
-        auto state(_state.lock());
-        if (state->gcRunning)
-            future = state->gcFuture;
-    }
-
-    if (future.valid()) {
-        printInfo("waiting for auto-GC to finish on exit...");
-        future.get();
-    }
-
     try {
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
@@ -1764,6 +1752,20 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 std::optional<std::string> LocalStore::getVersion()
 {
     return nixVersion;
+}
+
+uint64_t LocalStore::getAvailableSpace()
+{
+    static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
+
+    if (fakeFreeSpaceFile)
+        return std::stoll(readFile(*fakeFreeSpaceFile));
+
+    struct statvfs st;
+    if (statvfs(realStoreDir.get().c_str(), &st))
+        throw SysError("getting filesystem info about '%s'", realStoreDir);
+
+    return (uint64_t) st.f_bavail * st.f_frsize;
 }
 
 static RegisterStoreImplementation<LocalStore, LocalStoreConfig> regLocalStore;

@@ -7,18 +7,10 @@
 
 using namespace nix;
 
-struct CmdStoreGC : StoreCommand, MixDryRun
+struct CmdStoreGC : StoreCommand
 {
-    GCOptions options;
-
     CmdStoreGC()
     {
-        addFlag({
-            .longName = "max",
-            .description = "Stop after freeing *n* bytes of disk space.",
-            .labels = {"n"},
-            .handler = {&options.maxFreed}
-        });
     }
 
     std::string description() override
@@ -37,10 +29,7 @@ struct CmdStoreGC : StoreCommand, MixDryRun
     {
         auto & gcStore = require<GcStore>(*store);
 
-        options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
-        GCResults results;
-        PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
-        gcStore.collectGarbage(options, results);
+        gcStore.doGC(true);
     }
 };
 

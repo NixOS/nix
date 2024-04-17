@@ -116,10 +116,7 @@ T BaseSetting<T>::parse(const std::string & str) const
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
 
-    if (auto n = string2Int<T>(str))
-        return *n;
-    else
-        throw UsageError("setting '%s' has invalid value '%s'", name, str);
+    return string2IntWithUnitPrefix<T>(str);
 }
 
 template<typename T>
