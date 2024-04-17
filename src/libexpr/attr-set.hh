@@ -189,7 +189,7 @@ public:
         bindings = newBindings;
     }
 
-    friend class ExprAttrs;
+    friend struct ExprAttrs;
 };
 
 }
