@@ -94,7 +94,7 @@ struct PrimOp
     void check();
 };
 
-std::ostream & operator<<(std::ostream & output, PrimOp & primOp);
+std::ostream & operator<<(std::ostream & output, const PrimOp & primOp);
 
 /**
  * Info about a constant
@@ -642,9 +642,6 @@ public:
      */
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
-
-    Value * allocAttr(Value & vAttrs, Symbol name);
-    Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
 

@@ -161,7 +161,7 @@ bool nix_get_bool(nix_c_context * context, const Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nBool);
-        return v.boolean;
+        return v.boolean();
     }
     NIXC_CATCH_ERRS_RES(false);
 }
@@ -192,7 +192,7 @@ const char * nix_get_path_string(nix_c_context * context, const Value * value)
         // We could use v.path().to_string().c_str(), but I'm concerned this
         // crashes. Looks like .path() allocates a CanonPath with a copy of the
         // string, then it gets the underlying data from that.
-        return v._path.path;
+        return v.payload.path.path;
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -216,7 +216,7 @@ unsigned int nix_get_attrs_size(nix_c_context * context, const Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nAttrs);
-        return v.attrs->size();
+        return v.attrs()->size();
     }
     NIXC_CATCH_ERRS_RES(0);
 }
@@ -228,7 +228,7 @@ double nix_get_float(nix_c_context * context, const Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nFloat);
-        return v.fpoint;
+        return v.fpoint();
     }
     NIXC_CATCH_ERRS_RES(0.0);
 }
@@ -240,7 +240,7 @@ int64_t nix_get_int(nix_c_context * context, const Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nInt);
-        return v.integer;
+        return v.integer();
     }
     NIXC_CATCH_ERRS_RES(0);
 }
@@ -252,7 +252,7 @@ ExternalValue * nix_get_external(nix_c_context * context, Value * value)
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nExternal);
-        return (ExternalValue *) v.external;
+        return (ExternalValue *) v.external();
     }
     NIXC_CATCH_ERRS_NULL;
 }
@@ -281,7 +281,7 @@ Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalSt
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nAttrs);
         nix::Symbol s = state->state.symbols.create(name);
-        auto attr = v.attrs->get(s);
+        auto attr = v.attrs()->get(s);
         if (attr) {
             nix_gc_incref(nullptr, attr->value);
             state->state.forceValue(*attr->value, nix::noPos);
@@ -301,7 +301,7 @@ bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nAttrs);
         nix::Symbol s = state->state.symbols.create(name);
-        auto attr = v.attrs->get(s);
+        auto attr = v.attrs()->get(s);
         if (attr)
             return true;
         return false;
@@ -316,7 +316,7 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * sta
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        const nix::Attr & a = (*v.attrs)[i];
+        const nix::Attr & a = (*v.attrs())[i];
         *name = ((const std::string &) (state->state.symbols[a.name])).c_str();
         nix_gc_incref(nullptr, a.value);
         state->state.forceValue(*a.value, nix::noPos);
@@ -331,7 +331,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        const nix::Attr & a = (*v.attrs)[i];
+        const nix::Attr & a = (*v.attrs())[i];
         return ((const std::string &) (state->state.symbols[a.name])).c_str();
     }
     NIXC_CATCH_ERRS_NULL
