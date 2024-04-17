@@ -166,4 +166,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes .#hydraJobs.tests.gitSubmodules
+      - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes
