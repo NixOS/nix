@@ -14,7 +14,6 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
-#include "personality.hh"
 #include "current-process.hh"
 #include "child.hh"
 #include "unix-domain-socket.hh"
@@ -52,6 +51,7 @@
 # endif
 # define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 # include "cgroup.hh"
+# include "personality.hh"
 #endif
 
 #if __APPLE__
@@ -1957,7 +1957,9 @@ void LocalDerivationGoal::runChild()
         /* Close all other file descriptors. */
         closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
-        setPersonality(drv->platform);
+#if __linux__
+        linux::setPersonality(drv->platform);
+#endif
 
         /* Disable core dumps by default. */
         struct rlimit limit = { 0, RLIM_INFINITY };

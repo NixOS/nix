@@ -8,6 +8,9 @@ libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
 ifdef HOST_UNIX
   libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/builtins/*.cc $(d)/unix/build/*.cc)
 endif
+ifdef HOST_LINUX
+  libstore_SOURCES += $(wildcard $(d)/linux/*.cc)
+endif
 ifdef HOST_WINDOWS
   libstore_SOURCES += $(wildcard $(d)/windows/*.cc)
 endif
@@ -38,6 +41,9 @@ endif
 INCLUDE_libstore := -I $(d) -I $(d)/build
 ifdef HOST_UNIX
   INCLUDE_libstore += -I $(d)/unix
+endif
+ifdef HOST_LINUX
+  INCLUDE_libstore += -I $(d)/linux
 endif
 ifdef HOST_WINDOWS
   INCLUDE_libstore += -I $(d)/windows
