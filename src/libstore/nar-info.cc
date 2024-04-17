@@ -172,19 +172,18 @@ NarInfo NarInfo::fromJSON(
     };
 
     if (json.contains("url"))
-        res.url = ensureType(valueAt(json, "url"), value_t::string);
+        res.url = getString(valueAt(json, "url"));
 
     if (json.contains("compression"))
-        res.compression = ensureType(valueAt(json, "compression"), value_t::string);
+        res.compression = getString(valueAt(json, "compression"));
 
     if (json.contains("downloadHash"))
         res.fileHash = Hash::parseAny(
-            static_cast<const std::string &>(
-                ensureType(valueAt(json, "downloadHash"), value_t::string)),
+            getString(valueAt(json, "downloadHash")),
             std::nullopt);
 
     if (json.contains("downloadSize"))
-        res.fileSize = ensureType(valueAt(json, "downloadSize"), value_t::number_integer);
+        res.fileSize = getInteger(valueAt(json, "downloadSize"));
 
     return res;
 }

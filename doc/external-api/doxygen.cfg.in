@@ -1,0 +1,57 @@
+# Doxyfile 1.9.5
+
+# The PROJECT_NAME tag is a single word (or a sequence of words surrounded by
+# double-quotes, unless you are using Doxywizard) that should identify the
+# project for which the documentation is generated. This name is used in the
+# title of most generated pages and in a few other places.
+# The default value is: My Project.
+
+PROJECT_NAME           = "Nix"
+
+# The PROJECT_NUMBER tag can be used to enter a project or revision number. This
+# could be handy for archiving the generated documentation or if some version
+# control system is used.
+
+PROJECT_NUMBER         = @PACKAGE_VERSION@
+
+# Using the PROJECT_BRIEF tag one can provide an optional one line description
+# for a project that appears at the top of each page and should give viewer a
+# quick idea about the purpose of the project. Keep the description short.
+
+PROJECT_BRIEF          = "Nix, the purely functional package manager: C API (experimental)"
+
+# If the GENERATE_LATEX tag is set to YES, doxygen will generate LaTeX output.
+# The default value is: YES.
+
+GENERATE_LATEX         = NO
+
+# The INPUT tag is used to specify the files and/or directories that contain
+# documented source files. You may enter file names like myfile.cpp or
+# directories like /usr/src/myproject. Separate the files or directories with
+# spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
+# Note: If this tag is empty the current directory is searched.
+
+# FIXME Make this list more maintainable somehow. We could maybe generate this
+# in the Makefile, but we would need to change how `.in` files are preprocessed
+# so they can expand variables despite configure variables.
+
+INPUT                  = \
+  src/libutil-c \
+  src/libexpr-c \
+  src/libstore-c \
+  doc/external-api/README.md
+
+FILE_PATTERNS = nix_api_*.h *.md
+
+# The INCLUDE_PATH tag can be used to specify one or more directories that
+# contain include files that are not input files but should be processed by the
+# preprocessor. Note that the INCLUDE_PATH is not recursive, so the setting of
+# RECURSIVE has no effect here.
+# This tag requires that the tag SEARCH_INCLUDES is set to YES.
+
+INCLUDE_PATH           = @RAPIDCHECK_HEADERS@
+EXCLUDE_PATTERNS = *_internal.h
+GENERATE_TREEVIEW = YES
+OPTIMIZE_OUTPUT_FOR_C  = YES
+
+USE_MDFILE_AS_MAINPAGE = doc/external-api/README.md

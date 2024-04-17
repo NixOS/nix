@@ -91,7 +91,7 @@ namespace nix {
     }
 
     TEST_F(PrimOpTest, getEnv) {
-        setenv("_NIX_UNIT_TEST_ENV_VALUE", "test value", 1);
+        setEnv("_NIX_UNIT_TEST_ENV_VALUE", "test value");
         auto v = eval("builtins.getEnv \"_NIX_UNIT_TEST_ENV_VALUE\"");
         ASSERT_THAT(v, IsStringEq("test value"));
     }

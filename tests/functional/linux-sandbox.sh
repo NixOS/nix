@@ -60,7 +60,13 @@ testCert () {
 
 nocert=$TEST_ROOT/no-cert-file.pem
 cert=$TEST_ROOT/some-cert-file.pem
+symlinkcert=$TEST_ROOT/symlink-cert-file.pem
+transitivesymlinkcert=$TEST_ROOT/transitive-symlink-cert-file.pem
+symlinkDir=$TEST_ROOT/symlink-dir
 echo -n "CERT_CONTENT" > $cert
+ln -s $cert $symlinkcert
+ln -s $symlinkcert $transitivesymlinkcert
+ln -s $TEST_ROOT $symlinkDir
 
 # No cert in sandbox when not a fixed-output derivation
 testCert missing normal       "$cert"
@@ -73,3 +79,15 @@ testCert missing fixed-output "$nocert"
 
 # Cert in sandbox when ssl-cert-file is set to an existing file
 testCert present fixed-output "$cert"
+
+# Cert in sandbox when ssl-cert-file is set to a (potentially transitive) symlink to an existing file
+testCert present fixed-output "$symlinkcert"
+testCert present fixed-output "$transitivesymlinkcert"
+
+# Symlinks should be added in the sandbox directly and not followed
+nix-sandbox-build symlink-derivation.nix -A depends_on_symlink
+nix-sandbox-build symlink-derivation.nix -A test_sandbox_paths \
+    --option extra-sandbox-paths "/file=$cert" \
+    --option extra-sandbox-paths "/dir=$TEST_ROOT" \
+    --option extra-sandbox-paths "/symlinkDir=$symlinkDir" \
+    --option extra-sandbox-paths "/symlink=$symlinkcert"

@@ -124,14 +124,6 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
         diskCache->upsertNarInfo(getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
 }
 
-AutoCloseFD openFile(const Path & path)
-{
-    auto fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd)
-        throw SysError("opening file '%1%'", path);
-    return fd;
-}
-
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
     std::function<ValidPathInfo(HashResult)> mkInfo)

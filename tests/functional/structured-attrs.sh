@@ -32,4 +32,4 @@ jsonOut="$(nix print-dev-env -f structured-attrs-shell.nix --json)"
 
 test "$(<<<"$jsonOut" jq '.structuredAttrs|keys|.[]' -r)" = "$(printf ".attrs.json\n.attrs.sh")"
 
-test "$(<<<"$jsonOut" jq '.variables.out.value' -r)" = "$(<<<"$jsonOut" jq '.structuredAttrs.".attrs.json"' -r | jq -r '.outputs.out')"
+test "$(<<<"$jsonOut" jq '.variables.outputs.value.out' -r)" = "$(<<<"$jsonOut" jq '.structuredAttrs.".attrs.json"' -r | jq -r '.outputs.out')"

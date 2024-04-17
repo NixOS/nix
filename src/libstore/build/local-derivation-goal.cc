@@ -14,10 +14,8 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
-#include "cgroup.hh"
 #include "personality.hh"
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "child.hh"
 #include "unix-domain-socket.hh"
 #include "posix-fs-canonicalise.hh"
@@ -40,18 +38,20 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <sys/mman.h>
-#include <sched.h>
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <sys/syscall.h>
-#if HAVE_SECCOMP
-#include <seccomp.h>
-#endif
-#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
+# include <sys/ioctl.h>
+# include <net/if.h>
+# include <netinet/ip.h>
+# include <sys/mman.h>
+# include <sched.h>
+# include <sys/param.h>
+# include <sys/mount.h>
+# include <sys/syscall.h>
+# include "namespaces.hh"
+# if HAVE_SECCOMP
+#   include <seccomp.h>
+# endif
+# define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
+# include "cgroup.hh"
 #endif
 
 #if __APPLE__
@@ -395,21 +395,33 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 #if __linux__
 static void doBind(const Path & source, const Path & target, bool optional = false) {
     debug("bind mounting '%1%' to '%2%'", source, target);
-    struct stat st;
-    if (stat(source.c_str(), &st) == -1) {
-        if (optional && errno == ENOENT)
+
+    auto bindMount = [&]() {
+        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+            throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+    };
+
+    auto maybeSt = maybeLstat(source);
+    if (!maybeSt) {
+        if (optional)
             return;
         else
             throw SysError("getting attributes of path '%1%'", source);
     }
-    if (S_ISDIR(st.st_mode))
+    auto st = *maybeSt;
+
+    if (S_ISDIR(st.st_mode)) {
         createDirs(target);
-    else {
+        bindMount();
+    } else if (S_ISLNK(st.st_mode)) {
+        // Symlinks can (apparently) not be bind-mounted, so just copy it
+        createDirs(dirOf(target));
+        copyFile(source, target, /* andDelete */ false);
+    } else {
         createDirs(dirOf(target));
         writeFile(target, "");
+        bindMount();
     }
-    if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-        throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
 };
 #endif
 
@@ -488,7 +500,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
 
     chownToBuilder(tmpDir);
 
@@ -1811,11 +1823,18 @@ void LocalDerivationGoal::runChild()
                     if (pathExists(path))
                         ss.push_back(path);
 
-                if (settings.caFile != "")
-                    pathsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
+                if (settings.caFile != "" && pathExists(settings.caFile)) {
+                    Path caFile = settings.caFile;
+                    pathsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", canonPath(caFile, true), true);
+                }
             }
 
-            for (auto & i : ss) pathsInChroot.emplace(i, i);
+            for (auto & i : ss) {
+                // For backwards-compatibiliy, resolve all the symlinks in the
+                // chroot paths
+                auto canonicalPath = canonPath(i, true);
+                pathsInChroot.emplace(i, canonicalPath);
+            }
 
             /* Bind-mount all the directories from the "host"
                filesystem that we want in the chroot
@@ -2053,13 +2072,13 @@ void LocalDerivationGoal::runChild()
                             i.first, i.second.source);
 
                     std::string path = i.first;
-                    struct stat st;
-                    if (lstat(path.c_str(), &st)) {
-                        if (i.second.optional && errno == ENOENT)
+                    auto optSt = maybeLstat(path.c_str());
+                    if (!optSt) {
+                        if (i.second.optional)
                             continue;
-                        throw SysError("getting attributes of path '%s", path);
+                        throw SysError("getting attributes of required path '%s", path);
                     }
-                    if (S_ISDIR(st.st_mode))
+                    if (S_ISDIR(optSt->st_mode))
                         sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
                     else
                         sandboxProfile += fmt("\t(literal \"%s\")\n", path);
@@ -2089,7 +2108,7 @@ void LocalDerivationGoal::runChild()
             bool allowLocalNetworking = parsedDrv->getBoolAttr("__darwinAllowLocalNetworking");
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
-               to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
+               to find temporary directories, so we want to open up a broader place for them to put their files, if needed. */
             Path globalTmpDir = canonPath(defaultTempDir(), true);
 
             /* They don't like trailing slashes on subpath directives */
@@ -2271,14 +2290,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             continue;
         }
 
-        struct stat st;
-        if (lstat(actualPath.c_str(), &st) == -1) {
-            if (errno == ENOENT)
-                throw BuildError(
-                    "builder for '%s' failed to produce output path for output '%s' at '%s'",
-                    worker.store.printStorePath(drvPath), outputName, actualPath);
-            throw SysError("getting attributes of path '%s'", actualPath);
-        }
+        auto optSt = maybeLstat(actualPath.c_str());
+        if (!optSt)
+            throw BuildError(
+                "builder for '%s' failed to produce output path for output '%s' at '%s'",
+                worker.store.printStorePath(drvPath), outputName, actualPath);
+        struct stat & st = *optSt;
 
 #ifndef __CYGWIN__
         /* Check that the output is not group or world writable, as
@@ -2950,16 +2967,25 @@ bool LocalDerivationGoal::isReadDesc(int fd)
 
 StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
+    // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
+    // See doc/manual/src/protocols/store-path.md for details
+    // TODO: We may want to separate the responsibilities of constructing the path fingerprint and of actually doing the hashing
+    auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
     return worker.store.makeStorePath(
-        "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),
+        pathType,
+        // pass an all-zeroes hash
         Hash(HashAlgorithm::SHA256), outputPathName(drv->name, outputName));
 }
 
 
 StorePath LocalDerivationGoal::makeFallbackPath(const StorePath & path)
 {
+    // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
+    // See doc/manual/src/protocols/store-path.md for details
+    auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
     return worker.store.makeStorePath(
-        "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string()),
+        pathType,
+        // pass an all-zeroes hash
         Hash(HashAlgorithm::SHA256), path.name());
 }
 

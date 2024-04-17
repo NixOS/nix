@@ -55,4 +55,10 @@ Path createNixStateDir();
  */
 std::string expandTilde(std::string_view path);
 
+
+/**
+ * Is the current user UID 0 on Unix?
+ */
+bool isRootUser();
+
 }

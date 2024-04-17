@@ -41,7 +41,7 @@ expression to a low-level [store derivation]) and [`nix-store
 --realise`](@docroot@/command-ref/nix-store/realise.md) (to build the store
 derivation).
 
-[store derivation]: ../glossary.md#gloss-store-derivation
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 > **Warning**
 >

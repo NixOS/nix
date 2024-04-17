@@ -17,6 +17,7 @@
 #include <optional>
 #include <unordered_map>
 #include <mutex>
+#include <functional>
 
 namespace nix {
 
@@ -70,9 +71,16 @@ struct PrimOp
     const char * doc = nullptr;
 
     /**
+     * Add a trace item, `while calling the '<name>' builtin`
+     *
+     * This is used to remove the redundant item for `builtins.addErrorContext`.
+     */
+    bool addTrace = true;
+
+    /**
      * Implementation of the primop.
      */
-    PrimOpFun fun;
+    std::function<std::remove_pointer<PrimOpFun>::type> fun;
 
     /**
      * Optional experimental for this to be gated on.
@@ -722,10 +730,12 @@ public:
     bool fullGC();
 
     /**
-     * Realise the given context, and return a mapping from the placeholders
-     * used to construct the associated value to their final store path
+     * Realise the given context
+     * @param[in] context the context to realise
+     * @param[out] maybePaths if not nullptr, all built or referenced store paths will be added to this set
+     * @return a mapping from the placeholders used to construct the associated value to their final store path.
      */
-    [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
+    [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
 
     /* Call the binary path filter predicate used builtins.path etc. */
     bool callPathFilter(

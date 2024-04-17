@@ -294,7 +294,9 @@ struct GitArchiveInputScheme : InputScheme
            Git revision alone, we also require a NAR hash for
            locking. FIXME: in the future, we may want to require a Git
            tree hash instead of a NAR hash. */
-        return input.getRev().has_value() && input.getNarHash().has_value();
+        return input.getRev().has_value()
+            && (fetchSettings.trustTarballsFromGitForges ||
+                input.getNarHash().has_value());
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() const override
@@ -355,7 +357,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1),
@@ -429,7 +431,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
@@ -493,7 +495,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
-                downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
+                downloadFile(store, fmt("%s/HEAD", base_url), "source", headers).storePath);
             std::ifstream is(file);
             std::string line;
             getline(is, line);
@@ -509,7 +511,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
-            downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
+            downloadFile(store, fmt("%s/info/refs", base_url), "source", headers).storePath);
         std::ifstream is(file);
 
         std::string line;

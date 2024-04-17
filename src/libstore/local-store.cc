@@ -16,6 +16,7 @@
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
 #include "keys.hh"
+#include "users.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -223,7 +224,7 @@ LocalStore::LocalStore(const Params & params)
 
     /* Optionally, create directories and set permissions for a
        multi-user install. */
-    if (getuid() == 0 && settings.buildUsersGroup != "") {
+    if (isRootUser() && settings.buildUsersGroup != "") {
         mode_t perm = 01775;
 
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -464,6 +465,12 @@ AutoCloseFD LocalStore::openGCLock()
 }
 
 
+void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
+{
+    deletePath(path, bytesFreed);
+}
+
+
 LocalStore::~LocalStore()
 {
     std::shared_future<void> future;
@@ -552,6 +559,19 @@ void LocalStore::openDB(State & state, bool create)
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "setting journal mode");
 
+    if (mode == "wal") {
+        /* persist the WAL files when the db connection is closed. This allows
+           for read-only connections without write permissions on the
+           containing directory to succeed on a closed db. Setting the
+           journal_size_limit to 2^40 bytes results in the WAL files getting
+           truncated to 0 on exit and limits the on disk size of the WAL files
+           to 2^40 bytes following a checkpoint */
+        if (sqlite3_exec(db, "pragma main.journal_size_limit = 1099511627776;", 0, 0, 0) == SQLITE_OK) {
+            int enable = 1;
+            sqlite3_file_control(db, NULL, SQLITE_FCNTL_PERSIST_WAL, &enable);
+        }
+    }
+
     /* Increase the auto-checkpoint interval to 40000 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
@@ -573,7 +593,7 @@ void LocalStore::openDB(State & state, bool create)
 void LocalStore::makeStoreWritable()
 {
 #if __linux__
-    if (getuid() != 0) return;
+    if (!isRootUser()) return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
     if (statvfs(realStoreDir.get().c_str(), &stat) != 0)
@@ -1355,40 +1375,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     printInfo("reading the Nix store...");
 
-    bool errors = false;
-
     /* Acquire the global GC lock to get a consistent snapshot of
        existing and valid paths. */
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StorePathSet validPaths;
-
-    {
-        StorePathSet storePathsInStoreDir;
-        /* Why aren't we using `queryAllValidPaths`? Because that would
-           tell us about all the paths than the database knows about. Here we
-           want to know about all the store paths in the store directory,
-           regardless of what the database thinks.
-
-           We will end up cross-referencing these two sources of truth (the
-           database and the filesystem) in the loop below, in order to catch
-           invalid states.
-         */
-        for (auto & i : readDirectory(realStoreDir)) {
-            try {
-                storePathsInStoreDir.insert({i.name});
-            } catch (BadStorePath &) { }
-        }
-
-        /* Check whether all valid paths actually exist. */
-        printInfo("checking path existence...");
-
-        StorePathSet done;
-
-        for (auto & i : queryAllValidPaths())
-            verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
-    }
+    auto [errors, validPaths] = verifyAllValidPaths(repair);
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1477,21 +1469,61 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const StorePath & path, const StorePathSet & storePathsInStoreDir,
+LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair)
+{
+    StorePathSet storePathsInStoreDir;
+    /* Why aren't we using `queryAllValidPaths`? Because that would
+       tell us about all the paths than the database knows about. Here we
+       want to know about all the store paths in the store directory,
+       regardless of what the database thinks.
+
+       We will end up cross-referencing these two sources of truth (the
+       database and the filesystem) in the loop below, in order to catch
+       invalid states.
+     */
+    for (auto & i : readDirectory(realStoreDir)) {
+        try {
+            storePathsInStoreDir.insert({i.name});
+        } catch (BadStorePath &) { }
+    }
+
+    /* Check whether all valid paths actually exist. */
+    printInfo("checking path existence...");
+
+    StorePathSet done;
+
+    auto existsInStoreDir = [&](const StorePath & storePath) {
+        return storePathsInStoreDir.count(storePath);
+    };
+
+    bool errors = false;
+    StorePathSet validPaths;
+
+    for (auto & i : queryAllValidPaths())
+        verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
+
+    return {
+        .errors = errors,
+        .validPaths = validPaths,
+    };
+}
+
+
+void LocalStore::verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
     StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
     if (!done.insert(path).second) return;
 
-    if (!storePathsInStoreDir.count(path)) {
+    if (!existsInStoreDir(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
+                verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }
@@ -1570,7 +1602,7 @@ static void makeMutable(const Path & path)
 /* Upgrade from schema 6 (Nix 0.15) to schema 7 (Nix >= 1.3). */
 void LocalStore::upgradeStore7()
 {
-    if (getuid() != 0) return;
+    if (!isRootUser()) return;
     printInfo("removing immutable bits from the Nix store (this may take a while)...");
     makeMutable(realStoreDir);
 }

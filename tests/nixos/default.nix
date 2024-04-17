@@ -145,6 +145,8 @@ in
 
   githubFlakes = runNixOSTestFor "x86_64-linux" ./github-flakes.nix;
 
+  gitSubmodules = runNixOSTestFor "x86_64-linux" ./git-submodules.nix;
+
   sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./sourcehut-flakes.nix;
 
   tarballFlakes = runNixOSTestFor "x86_64-linux" ./tarball-flakes.nix;
@@ -158,4 +160,6 @@ in
   fetch-git = runNixOSTestFor "x86_64-linux" ./fetch-git;
 
   ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
+
+  gzip-content-encoding = runNixOSTestFor "x86_64-linux" ./gzip-content-encoding.nix;
 }

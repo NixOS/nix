@@ -151,6 +151,16 @@ namespace nix {
         ASSERT_EQ(p1, "dir");
     }
 
+    TEST(baseNameOf, trailingSlashes) {
+        auto p1 = baseNameOf("/dir//");
+        ASSERT_EQ(p1, "dir");
+    }
+
+    TEST(baseNameOf, absoluteNothingSlashNothing) {
+        auto p1 = baseNameOf("//");
+        ASSERT_EQ(p1, "");
+    }
+
     /* ----------------------------------------------------------------------------
      * isInDir
      * --------------------------------------------------------------------------*/

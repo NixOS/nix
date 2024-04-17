@@ -1138,7 +1138,7 @@ void DerivationGoal::resolvedFinished()
 
 HookReply DerivationGoal::tryBuildHook()
 {
-    if (!worker.tryBuildHook || !useDerivation) return rpDecline;
+    if (settings.buildHook.get().empty() || !worker.tryBuildHook || !useDerivation) return rpDecline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();

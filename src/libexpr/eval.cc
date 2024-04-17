@@ -892,7 +892,6 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
     mkString(s, encodeContext(context));
 }
 
-
 void Value::mkPath(const SourcePath & path)
 {
     mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
@@ -1660,7 +1659,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     fn->fun(*this, vCur.determinePos(noPos), args, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    if (fn->addTrace)
+                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 
@@ -1708,7 +1708,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
                 } catch (Error & e) {
-                    addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
+                    if (fn->addTrace)
+                        addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
 

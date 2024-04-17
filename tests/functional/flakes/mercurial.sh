@@ -1,6 +1,6 @@
 source ./common.sh
 
-[[ $(type -p hq) ]] || skipTest "Mercurial not installed"
+[[ $(type -p hg) ]] || skipTest "Mercurial not installed"
 
 flake1Dir=$TEST_ROOT/flake-hg1
 mkdir -p $flake1Dir

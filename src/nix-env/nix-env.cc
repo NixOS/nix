@@ -16,6 +16,7 @@
 #include "xml-writer.hh"
 #include "legacy.hh"
 #include "eval-settings.hh" // for defexpr
+#include "terminal.hh"
 
 #include <cerrno>
 #include <ctime>
@@ -108,7 +109,7 @@ static void getAllExprs(EvalState & state,
     const SourcePath & path, StringSet & seen, BindingsBuilder & attrs)
 {
     StringSet namesSorted;
-    for (auto & [name, _] : path.readDirectory()) namesSorted.insert(name);
+    for (auto & [name, _] : path.resolveSymlinks().readDirectory()) namesSorted.insert(name);
 
     for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is
@@ -1089,7 +1090,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
-    bool tty = isatty(STDOUT_FILENO);
+    bool tty = isTTY();
     RunPager pager;
 
     Table table;
@@ -1411,7 +1412,7 @@ static int main_nix_env(int argc, char * * argv)
                 replaceSymlink(
                     defaultChannelsDir(),
                     nixExprPath + "/channels");
-                if (getuid() != 0)
+                if (!isRootUser())
                     replaceSymlink(
                         rootChannelsDir(),
                         nixExprPath + "/channels_root");

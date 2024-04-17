@@ -121,7 +121,7 @@ void initNix()
 
     initLibStore();
 
-    startSignalHandlerThread();
+    unix::startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
     struct sigaction act;
@@ -308,7 +308,7 @@ void printVersion(const std::string & programName)
 void showManPage(const std::string & name)
 {
     restoreProcessContext();
-    setenv("MANPATH", settings.nixManDir.c_str(), 1);
+    setEnv("MANPATH", settings.nixManDir.c_str());
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
 }
@@ -369,7 +369,7 @@ RunPager::RunPager()
         if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
-            setenv("LESS", "FRSXMK", 1);
+            setEnv("LESS", "FRSXMK");
         restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);

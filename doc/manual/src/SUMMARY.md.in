@@ -110,6 +110,7 @@
     - [Derivation](protocols/json/derivation.md)
   - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
   - [Store Path Specification](protocols/store-path.md)
+  - [Nix Archive (NAR) Format](protocols/nix-archive.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/index.md)
@@ -119,7 +120,7 @@
   - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
   - [C++ style guide](contributing/cxx.md)
-- [Release Notes](release-notes/index.md)
+- [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
   - [Release 2.21 (2024-03-11)](release-notes/rl-2.21.md)
   - [Release 2.20 (2024-01-29)](release-notes/rl-2.20.md)

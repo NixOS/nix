@@ -202,7 +202,7 @@ static int main_build_remote(int argc, char * * argv)
                         else
                             drvstr = "<unknown>";
 
-                        auto error = HintFmt(errorText);
+                        auto error = HintFmt::fromFormatString(errorText);
                         error
                             % drvstr
                             % neededSystem

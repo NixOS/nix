@@ -113,7 +113,7 @@
   For example, assume you used a file path in an interpolated string during a `nix repl` session.
   Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents.
 
-  [store path]: ../glossary.md#gloss-store-path
+  [store path]: @docroot@/glossary.md#gloss-store-path
 
   Paths can include [string interpolation] and can themselves be [interpolated in other expressions].
 

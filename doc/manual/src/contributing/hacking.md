@@ -196,7 +196,7 @@ In order to facilitate this, Nix has some support for being built out of tree â€
 
 ## System type
 
-Nix uses a string with he following format to identify the *system type* or *platform* it runs on:
+Nix uses a string with the following format to identify the *system type* or *platform* it runs on:
 
 ```
 <cpu>-<os>[-<abi>]

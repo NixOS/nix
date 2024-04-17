@@ -83,7 +83,7 @@ nix_tests = \
   export.sh \
   config.sh \
   add.sh \
-  local-store.sh \
+  chroot-store.sh \
   filter-source.sh \
   misc.sh \
   dump-db.sh \

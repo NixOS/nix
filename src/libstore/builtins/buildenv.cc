@@ -64,9 +64,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
-            struct stat dstSt;
-            auto res = lstat(dstFile.c_str(), &dstSt);
-            if (res == 0) {
+            auto dstStOpt = maybeLstat(dstFile.c_str());
+            if (dstStOpt) {
+                auto & dstSt = *dstStOpt;
                 if (S_ISDIR(dstSt.st_mode)) {
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
@@ -82,14 +82,13 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
                 }
-            } else if (errno != ENOENT)
-                throw SysError("getting status of '%1%'", dstFile);
+            }
         }
 
         else {
-            struct stat dstSt;
-            auto res = lstat(dstFile.c_str(), &dstSt);
-            if (res == 0) {
+            auto dstStOpt = maybeLstat(dstFile.c_str());
+            if (dstStOpt) {
+                auto & dstSt = *dstStOpt;
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
@@ -104,8 +103,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw SysError("unlinking '%1%'", dstFile);
                 } else if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
-            } else if (errno != ENOENT)
-                throw SysError("getting status of '%1%'", dstFile);
+            }
         }
 
         createSymlink(srcFile, dstFile);

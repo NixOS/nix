@@ -39,7 +39,7 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
-StringMap EvalState::realiseContext(const NixStringContext & context)
+StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
     StringMap res;
@@ -59,21 +59,23 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
             },
             [&](const NixStringContextElem::Opaque & o) {
                 auto ctxS = store->printStorePath(o.path);
-                res.insert_or_assign(ctxS, ctxS);
                 ensureValid(o.path);
+                if (maybePathsOut)
+                    maybePathsOut->emplace(o.path);
             },
             [&](const NixStringContextElem::DrvDeep & d) {
                 /* Treat same as Opaque */
                 auto ctxS = store->printStorePath(d.drvPath);
-                res.insert_or_assign(ctxS, ctxS);
                 ensureValid(d.drvPath);
+                if (maybePathsOut)
+                    maybePathsOut->emplace(d.drvPath);
             },
         }, c.raw);
     }
 
     if (drvs.empty()) return {};
 
-    if (!evalSettings.enableImportFromDerivation)
+    if (isIFD && !evalSettings.enableImportFromDerivation)
         error<EvalError>(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             drvs.begin()->to_string(*store)
@@ -90,6 +92,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         auto outputs = resolveDerivedPath(*buildStore, drv, &*store);
         for (auto & [outputName, outputPath] : outputs) {
             outputsToCopyAndAllow.insert(outputPath);
+            if (maybePathsOut)
+                maybePathsOut->emplace(outputPath);
 
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
@@ -106,10 +110,13 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     }
 
     if (store != buildStore) copyClosure(*buildStore, *store, outputsToCopyAndAllow);
-    for (auto & outputPath : outputsToCopyAndAllow) {
-        /* Add the output of this derivations to the allowed
-           paths. */
-        allowPath(outputPath);
+
+    if (isIFD) {
+        for (auto & outputPath : outputsToCopyAndAllow) {
+            /* Add the output of this derivations to the allowed
+            paths. */
+            allowPath(outputPath);
+        }
     }
 
     return res;
@@ -826,7 +833,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         auto message = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.addErrorContext",
                 false, false).toOwned();
-        e.addTrace(nullptr, HintFmt(message));
+        e.addTrace(nullptr, HintFmt(message), TracePrint::Always);
         throw;
     }
 }
@@ -834,6 +841,8 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
 static RegisterPrimOp primop_addErrorContext(PrimOp {
     .name = "__addErrorContext",
     .arity = 2,
+    // The normal trace item is redundant
+    .addTrace = false,
     .fun = prim_addErrorContext,
 });
 
@@ -1132,7 +1141,7 @@ static void derivationStrictInternal(
     bool contentAddressed = false;
     bool isImpure = false;
     std::optional<std::string> outputHash;
-    std::string outputHashAlgo;
+    std::optional<HashAlgorithm> outputHashAlgo;
     std::optional<ContentAddressMethod> ingestionMethod;
 
     StringSet outputs;
@@ -1144,18 +1153,20 @@ static void derivationStrictInternal(
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string_view s) {
-            if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
-            else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else if (s == "git") {
-                experimentalFeatureSettings.require(Xp::GitHashing);
-                ingestionMethod = FileIngestionMethod::Git;
-            } else if (s == "text") {
-                experimentalFeatureSettings.require(Xp::DynamicDerivations);
-                ingestionMethod = TextIngestionMethod {};
-            } else
+            if (s == "recursive") {
+                // back compat, new name is "nar"
+                ingestionMethod = FileIngestionMethod::Recursive;
+            } else try {
+                ingestionMethod = ContentAddressMethod::parse(s);
+            } catch (UsageError &) {
                 state.error<EvalError>(
                     "invalid value '%s' for 'outputHashMode' attribute", s
                 ).atPos(v).debugThrow();
+            }
+            if (ingestionMethod == TextIngestionMethod {})
+                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+            if (ingestionMethod == FileIngestionMethod::Git)
+                experimentalFeatureSettings.require(Xp::GitHashing);
         };
 
         auto handleOutputs = [&](const Strings & ss) {
@@ -1231,7 +1242,7 @@ static void derivationStrictInternal(
                     else if (i->name == state.sOutputHash)
                         outputHash = state.forceStringNoCtx(*i->value, pos, context_below);
                     else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = state.forceStringNoCtx(*i->value, pos, context_below);
+                        outputHashAlgo = parseHashAlgoOpt(state.forceStringNoCtx(*i->value, pos, context_below));
                     else if (i->name == state.sOutputHashMode)
                         handleHashMode(state.forceStringNoCtx(*i->value, pos, context_below));
                     else if (i->name == state.sOutputs) {
@@ -1249,7 +1260,7 @@ static void derivationStrictInternal(
                     if (i->name == state.sBuilder) drv.builder = std::move(s);
                     else if (i->name == state.sSystem) drv.platform = std::move(s);
                     else if (i->name == state.sOutputHash) outputHash = std::move(s);
-                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = std::move(s);
+                    else if (i->name == state.sOutputHashAlgo) outputHashAlgo = parseHashAlgoOpt(s);
                     else if (i->name == state.sOutputHashMode) handleHashMode(s);
                     else if (i->name == state.sOutputs)
                         handleOutputs(tokenizeString<Strings>(s));
@@ -1332,7 +1343,7 @@ static void derivationStrictInternal(
                 "multiple outputs are not supported in fixed-output derivations"
             ).atPos(v).debugThrow();
 
-        auto h = newHashAllowEmpty(*outputHash, parseHashAlgoOpt(outputHashAlgo));
+        auto h = newHashAllowEmpty(*outputHash, outputHashAlgo);
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
@@ -1352,7 +1363,7 @@ static void derivationStrictInternal(
             state.error<EvalError>("derivation cannot be both content-addressed and impure")
                 .atPos(v).debugThrow();
 
-        auto ha = parseHashAlgoOpt(outputHashAlgo).value_or(HashAlgorithm::SHA256);
+        auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
         auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
 
         for (auto & i : outputs) {
@@ -1575,23 +1586,50 @@ static RegisterPrimOp primop_pathExists({
     .fun = prim_pathExists,
 });
 
+// Ideally, all trailing slashes should have been removed, but it's been like this for
+// almost a decade as of writing. Changing it will affect reproducibility.
+static std::string_view legacyBaseNameOf(std::string_view path)
+{
+    if (path.empty())
+        return "";
+
+    auto last = path.size() - 1;
+    if (path[last] == '/' && last > 0)
+        last -= 1;
+
+    auto pos = path.rfind('/', last);
+    if (pos == path.npos)
+        pos = 0;
+    else
+        pos += 1;
+
+    return path.substr(pos, last - pos + 1);
+}
+
 /* Return the base name of the given string, i.e., everything
    following the last slash. */
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
-    v.mkString(baseNameOf(*state.coerceToString(pos, *args[0], context,
+    v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
             false, false)), context);
 }
 
 static RegisterPrimOp primop_baseNameOf({
     .name = "baseNameOf",
-    .args = {"s"},
+    .args = {"x"},
     .doc = R"(
-      Return the *base name* of the string *s*, that is, everything
-      following the final slash in the string. This is similar to the GNU
-      `basename` command.
+      Return the *base name* of either a [path value](@docroot@/language/values.md#type-path) *x* or a string *x*, depending on which type is passed, and according to the following rules.
+
+      For a path value, the *base name* is considered to be the part of the path after the last directory separator, including any file extensions.
+      This is the simple case, as path values don't have trailing slashes.
+
+      When the argument is a string, a more involved logic applies. If the string ends with a `/`, only this one final slash is removed.
+
+      After this, the *base name* is returned as previously described, assuming `/` as the directory separator. (Note that evaluation must be platform independent.)
+
+      This is somewhat similar to the [GNU `basename`](https://www.gnu.org/software/coreutils/manual/html_node/basename-invocation.html) command, but GNU `basename` will strip any number of trailing slashes.
     )",
     .fun = prim_baseNameOf,
 });
@@ -1893,11 +1931,13 @@ static RegisterPrimOp primop_outputOf({
       *`derivation reference`* must be a string that may contain a regular store path to a derivation, or may be a placeholder reference. If the derivation is produced by a derivation, you must explicitly select `drv.outPath`.
       This primop can be chained arbitrarily deeply.
       For instance,
+
       ```nix
       builtins.outputOf
         (builtins.outputOf myDrv "out")
         "out"
       ```
+
       will return a placeholder for the output of the output of `myDrv`.
 
       This primop corresponds to the `^` sigil for derivable paths, e.g. as part of installable syntax on the command line.
@@ -3379,10 +3419,11 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value * * args, Value
     auto comparator = [&](Value * a, Value * b) {
         /* Optimization: if the comparator is lessThan, bypass
            callFunction. */
-        /* TODO: (layus) this is absurd. An optimisation like this
-           should be outside the lambda creation */
-        if (args[0]->isPrimOp() && args[0]->primOp()->fun == prim_lessThan)
-            return CompareValues(state, noPos, "while evaluating the ordering function passed to builtins.sort")(a, b);
+        if (args[0]->isPrimOp()) {
+            auto ptr = args[0]->primOp()->fun.target<decltype(&prim_lessThan)>();
+            if (ptr && *ptr == prim_lessThan)
+                return CompareValues(state, noPos, "while evaluating the ordering function passed to builtins.sort")(a, b);
+        }
 
         Value * vs[] = {a, b};
         Value vBool;
@@ -3838,7 +3879,7 @@ static RegisterPrimOp primop_stringLength({
     .name = "__stringLength",
     .args = {"e"},
     .doc = R"(
-      Return the length of the string *e*. If *e* is not a string,
+      Return the number of bytes of the string *e*. If *e* is not a string,
       evaluation is aborted.
     )",
     .fun = prim_stringLength,

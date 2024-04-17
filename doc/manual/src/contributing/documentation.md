@@ -27,10 +27,8 @@ and open `./result-doc/share/doc/nix/manual/index.html`.
 To build the manual incrementally, [enter the development shell](./hacking.md) and run:
 
 ```console
-make manual-html -j $NIX_BUILD_CORES
+make manual-html-open -j $NIX_BUILD_CORES
 ```
-
-and open `./outputs/doc/share/doc/nix/manual/language/index.html`.
 
 In order to reflect changes to the [Makefile for the manual], clear all generated files before re-building:
 
@@ -207,4 +205,23 @@ or inside `nix-shell` or `nix develop`:
 ```
 # make internal-api-html
 # xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+```
+
+## C API documentation (experimental)
+
+[C API documentation] is available online.
+You can also build and view it yourself:
+
+[C API documentation]: https://hydra.nixos.org/job/nix/master/external-api-docs/latest/download-by-type/doc/external-api-docs
+
+```console
+# nix build .#hydraJobs.external-api-docs
+# xdg-open ./result/share/doc/nix/external-api/html/index.html
+```
+
+or inside `nix-shell` or `nix develop`:
+
+```
+# make external-api-html
+# xdg-open ./outputs/doc/share/doc/nix/external-api/html/index.html
 ```

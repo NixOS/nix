@@ -19,13 +19,15 @@ libstore-tests_SOURCES := $(wildcard $(d)/*.cc)
 libstore-tests_EXTRA_INCLUDES = \
     -I tests/unit/libstore-support \
     -I tests/unit/libutil-support \
-    -I src/libstore \
-    -I src/libutil
+    $(INCLUDE_libstore) \
+    $(INCLUDE_libstorec) \
+    $(INCLUDE_libutil) \
+    $(INCLUDE_libutilc)
 
 libstore-tests_CXXFLAGS += $(libstore-tests_EXTRA_INCLUDES)
 
 libstore-tests_LIBS = \
     libstore-test-support libutil-test-support \
-    libstore libutil
+    libstore libstorec libutil libutilc
 
 libstore-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)

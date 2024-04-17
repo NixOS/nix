@@ -18,7 +18,9 @@ makefiles = \
   src/libexpr/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
-  src/resolve-system-dependencies/local.mk \
+  src/libutil-c/local.mk \
+  src/libstore-c/local.mk \
+  src/libexpr-c/local.mk \
   scripts/local.mk \
   misc/bash/local.mk \
   misc/fish/local.mk \
@@ -34,6 +36,7 @@ makefiles += \
   tests/unit/libutil-support/local.mk \
   tests/unit/libstore/local.mk \
   tests/unit/libstore-support/local.mk \
+  tests/unit/libfetchers/local.mk \
   tests/unit/libexpr/local.mk \
   tests/unit/libexpr-support/local.mk
 endif
@@ -44,6 +47,7 @@ makefiles += \
   tests/functional/ca/local.mk \
   tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \
+  tests/functional/local-overlay-store/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
 endif
@@ -57,6 +61,10 @@ endif
 
 ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
 makefiles-late += doc/internal-api/local.mk
+endif
+
+ifeq ($(ENABLE_EXTERNAL_API_DOCS), yes)
+makefiles-late += doc/external-api/local.mk
 endif
 
 # Miscellaneous global Flags
@@ -121,5 +129,12 @@ ifneq ($(ENABLE_INTERNAL_API_DOCS), yes)
 .PHONY: internal-api-html
 internal-api-html:
 	@echo "Internal API docs are disabled. Configure with '--enable-internal-api-docs', or avoid calling 'make internal-api-html'."
+	@exit 1
+endif
+
+ifneq ($(ENABLE_EXTERNAL_API_DOCS), yes)
+.PHONY: external-api-html
+external-api-html:
+	@echo "External API docs are disabled. Configure with '--enable-external-api-docs', or avoid calling 'make external-api-html'."
 	@exit 1
 endif

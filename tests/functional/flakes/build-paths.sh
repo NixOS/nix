@@ -56,6 +56,23 @@ cat > $flake1Dir/flake.nix <<EOF
     a12 = self.drvCall.outPath;
 
     a13 = "\${self.drvCall.drvPath}\${self.drvCall.outPath}";
+
+    a14 = with import ./config.nix; let
+      top = mkDerivation {
+        name = "dot-installable";
+        outputs = [ "foo" "out" ];
+        meta.outputsToInstall = [ "out" ];
+        buildCommand = ''
+            mkdir \$foo \$out
+            echo "foo" > \$foo/file
+            echo "out" > \$out/file
+        '';
+      };
+    in top // {
+      foo = top.foo // {
+        outputSpecified = true;
+      };
+    };
   };
 }
 EOF
@@ -94,3 +111,10 @@ nix build --json --out-link $TEST_ROOT/result $flake1Dir#a12
 
 expectStderr 1 nix build --impure --json --out-link $TEST_ROOT/result $flake1Dir#a13 \
   | grepQuiet "has 2 entries in its context. It should only have exactly one entry"
+
+# Test accessing output in installables with `.` (foobarbaz.<output>)
+nix build --json --no-link $flake1Dir#a14.foo | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*dot-installable.drv")) and
+    (.outputs | keys == ["foo"]))
+'
