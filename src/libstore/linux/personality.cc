@@ -1,18 +1,15 @@
 #include "personality.hh"
 #include "globals.hh"
 
-#if __linux__
 #include <sys/utsname.h>
 #include <sys/personality.h>
-#endif
 
 #include <cstring>
 
-namespace nix {
+namespace nix::linux {
 
 void setPersonality(std::string_view system)
 {
-#if __linux__
         /* Change the personality to 32-bit if we're doing an
            i686-linux build on an x86_64-linux machine. */
         struct utsname utsbuf;
@@ -39,7 +36,6 @@ void setPersonality(std::string_view system)
            determinism. */
         int cur = personality(0xffffffff);
         if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
-#endif
 }
 
 }
