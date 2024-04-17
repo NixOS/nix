@@ -177,6 +177,8 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     auto path = realisePath(state, pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
+// FIXME: corruption?
+#if 0
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
         if (!state.store->isStorePath(path2))
@@ -217,7 +219,9 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
         state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
     }
 
-    else {
+    else
+#endif
+    {
         if (!vScope)
             state.evalFile(path, v);
         else {

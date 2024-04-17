@@ -17,23 +17,22 @@
 
 namespace nix {
 
-void emitTreeAttrs(
+static void emitTreeAttrs(
     EvalState & state,
-    const StorePath & storePath,
     const fetchers::Input & input,
     Value & v,
+    std::function<void(Value &)> setOutPath,
     bool emptyRevFallback,
     bool forceDirty)
 {
     auto attrs = state.buildBindings(100);
 
-    state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
+    setOutPath(attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    if (auto narHash = input.getNarHash())
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(
@@ -72,10 +71,28 @@ void emitTreeAttrs(
     v.mkAttrs(attrs);
 }
 
+void emitTreeAttrs(
+    EvalState & state,
+    const SourcePath & storePath,
+    const fetchers::Input & input,
+    Value & v,
+    bool emptyRevFallback,
+    bool forceDirty)
+{
+    emitTreeAttrs(state, input, v,
+        [&](Value & vOutPath) {
+            state.registerAccessor(storePath.accessor);
+            vOutPath.mkPath(storePath);
+        },
+        emptyRevFallback,
+        forceDirty);
+}
+
 struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
     bool isFetchGit = false;
+    bool returnPath = true; // whether to return a SourcePath instead of a StorePath
 };
 
 static void fetchTree(
@@ -112,7 +129,9 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
+
             state.forceValue(*attr.value, attr.pos);
+
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(state.symbols[attr.name],
@@ -182,11 +201,31 @@ static void fetchTree(
 
     state.checkURI(input.toURLString());
 
-    auto [storePath, input2] = input.fetchToStore(state.store);
+    if (params.returnPath) {
+        // Clang16+: change to `auto [accessor, input2] =`
+        auto pair = input.getAccessor(state.store);
+        auto & accessor = pair.first;
+        auto & input2 = pair.second;
 
-    state.allowPath(storePath);
+        emitTreeAttrs(state, input2, v,
+            [&](Value & vOutPath) {
+                state.registerAccessor(accessor);
+                vOutPath.mkPath(SourcePath { accessor, CanonPath::root });
+            },
+            params.emptyRevFallback, false);
+    } else {
+        auto pair = input.fetchToStore(state.store);
+        auto & storePath = pair.first;
+        auto & input2 = pair.second;
 
-    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
+        state.allowPath(storePath);
+
+        emitTreeAttrs(state, input2, v,
+            [&](Value & vOutPath) {
+                state.mkStorePathString(storePath, vOutPath);
+            },
+            params.emptyRevFallback, false);
+    }
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -565,7 +604,8 @@ static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, V
         FetchTreeParams {
             .emptyRevFallback = true,
             .allowNameArgument = true,
-            .isFetchGit = true
+            .isFetchGit = true,
+            .returnPath = false,
         });
 }
 
