@@ -32,23 +32,18 @@ static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
 
 
 static void showAttrs(EvalState & state, bool strict, bool location,
-    Bindings & attrs, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen)
+    const Bindings & attrs, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen)
 {
     StringSet names;
 
-    for (auto & i : attrs)
-        names.emplace(state.symbols[i.name]);
-
-    for (auto & i : names) {
-        Attr & a(*attrs.find(state.symbols.create(i)));
-
+    for (auto & a : attrs.lexicographicOrder(state.symbols)) {
         XMLAttrs xmlAttrs;
-        xmlAttrs["name"] = i;
-        if (location && a.pos) posToXML(state, xmlAttrs, state.positions[a.pos]);
+        xmlAttrs["name"] = state.symbols[a->name];
+        if (location && a->pos) posToXML(state, xmlAttrs, state.positions[a->pos]);
 
         XMLOpenElement _(doc, "attr", xmlAttrs);
         printValueAsXML(state, strict, location,
-            *a.value, doc, context, drvsSeen, a.pos);
+            *a->value, doc, context, drvsSeen, a->pos);
     }
 }
 
@@ -64,11 +59,11 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
     switch (v.type()) {
 
         case nInt:
-            doc.writeEmptyElement("int", singletonAttrs("value", fmt("%1%", v.integer)));
+            doc.writeEmptyElement("int", singletonAttrs("value", fmt("%1%", v.integer())));
             break;
 
         case nBool:
-            doc.writeEmptyElement("bool", singletonAttrs("value", v.boolean ? "true" : "false"));
+            doc.writeEmptyElement("bool", singletonAttrs("value", v.boolean() ? "true" : "false"));
             break;
 
         case nString:
@@ -89,18 +84,14 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             if (state.isDerivation(v)) {
                 XMLAttrs xmlAttrs;
 
-                Bindings::iterator a = v.attrs->find(state.symbols.create("derivation"));
-
                 Path drvPath;
-                a = v.attrs->find(state.sDrvPath);
-                if (a != v.attrs->end()) {
+                if (auto a = v.attrs()->get(state.sDrvPath)) {
                     if (strict) state.forceValue(*a->value, a->pos);
                     if (a->value->type() == nString)
                         xmlAttrs["drvPath"] = drvPath = a->value->c_str();
                 }
 
-                a = v.attrs->find(state.sOutPath);
-                if (a != v.attrs->end()) {
+                if (auto a = v.attrs()->get(state.sOutPath)) {
                     if (strict) state.forceValue(*a->value, a->pos);
                     if (a->value->type() == nString)
                         xmlAttrs["outPath"] = a->value->c_str();
@@ -109,14 +100,14 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 XMLOpenElement _(doc, "derivation", xmlAttrs);
 
                 if (drvPath != "" && drvsSeen.insert(drvPath).second)
-                    showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
+                    showAttrs(state, strict, location, *v.attrs(), doc, context, drvsSeen);
                 else
                     doc.writeEmptyElement("repeated");
             }
 
             else {
                 XMLOpenElement _(doc, "attrs");
-                showAttrs(state, strict, location, *v.attrs, doc, context, drvsSeen);
+                showAttrs(state, strict, location, *v.attrs(), doc, context, drvsSeen);
             }
 
             break;
@@ -135,28 +126,28 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 break;
             }
             XMLAttrs xmlAttrs;
-            if (location) posToXML(state, xmlAttrs, state.positions[v.lambda.fun->pos]);
+            if (location) posToXML(state, xmlAttrs, state.positions[v.payload.lambda.fun->pos]);
             XMLOpenElement _(doc, "function", xmlAttrs);
 
-            if (v.lambda.fun->hasFormals()) {
+            if (v.payload.lambda.fun->hasFormals()) {
                 XMLAttrs attrs;
-                if (v.lambda.fun->arg) attrs["name"] = state.symbols[v.lambda.fun->arg];
-                if (v.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
+                if (v.payload.lambda.fun->arg) attrs["name"] = state.symbols[v.payload.lambda.fun->arg];
+                if (v.payload.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
                 XMLOpenElement _(doc, "attrspat", attrs);
-                for (auto & i : v.lambda.fun->formals->lexicographicOrder(state.symbols))
+                for (auto & i : v.payload.lambda.fun->formals->lexicographicOrder(state.symbols))
                     doc.writeEmptyElement("attr", singletonAttrs("name", state.symbols[i.name]));
             } else
-                doc.writeEmptyElement("varpat", singletonAttrs("name", state.symbols[v.lambda.fun->arg]));
+                doc.writeEmptyElement("varpat", singletonAttrs("name", state.symbols[v.payload.lambda.fun->arg]));
 
             break;
         }
 
         case nExternal:
-            v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen, pos);
+            v.external()->printValueAsXML(state, strict, location, doc, context, drvsSeen, pos);
             break;
 
         case nFloat:
-            doc.writeEmptyElement("float", singletonAttrs("value", fmt("%1%", v.fpoint)));
+            doc.writeEmptyElement("float", singletonAttrs("value", fmt("%1%", v.fpoint())));
             break;
 
         case nThunk:

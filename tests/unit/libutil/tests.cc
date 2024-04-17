@@ -151,6 +151,16 @@ namespace nix {
         ASSERT_EQ(p1, "dir");
     }
 
+    TEST(baseNameOf, trailingSlashes) {
+        auto p1 = baseNameOf("/dir//");
+        ASSERT_EQ(p1, "dir");
+    }
+
+    TEST(baseNameOf, absoluteNothingSlashNothing) {
+        auto p1 = baseNameOf("//");
+        ASSERT_EQ(p1, "");
+    }
+
     /* ----------------------------------------------------------------------------
      * isInDir
      * --------------------------------------------------------------------------*/
@@ -411,6 +421,7 @@ namespace nix {
         ASSERT_EQ(string2Int<int>("-100"), -100);
     }
 
+#ifndef _WIN32 // TODO re-enable on Windows, once we can start processes
     /* ----------------------------------------------------------------------------
      * statusOk
      * --------------------------------------------------------------------------*/
@@ -419,6 +430,7 @@ namespace nix {
         ASSERT_EQ(statusOk(0), true);
         ASSERT_EQ(statusOk(1), false);
     }
+#endif
 
 
     /* ----------------------------------------------------------------------------

@@ -9,7 +9,9 @@
 #include <fstream>
 #include <string>
 #include <regex>
-#include <glob.h>
+#ifndef _WIN32
+# include <glob.h>
+#endif
 
 namespace nix {
 
@@ -285,7 +287,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
                 std::string line;
                 std::getline(stream,line);
-                static const std::string commentChars("#/\\%@*-");
+                static const std::string commentChars("#/\\%@*-(");
                 std::string shebangContent;
                 while (std::getline(stream,line) && !line.empty() && commentChars.find(line[0]) != std::string::npos){
                     line = chomp(line);
@@ -547,6 +549,7 @@ nlohmann::json Args::toJSON()
 static void _completePath(AddCompletions & completions, std::string_view prefix, bool onlyDirs)
 {
     completions.setType(Completions::Type::Filenames);
+    #ifndef _WIN32 // TODO implement globbing completions on Windows
     glob_t globbuf;
     int flags = GLOB_NOESCAPE;
     #ifdef GLOB_ONLYDIR
@@ -564,6 +567,7 @@ static void _completePath(AddCompletions & completions, std::string_view prefix,
         }
     }
     globfree(&globbuf);
+    #endif
 }
 
 void Args::completePath(AddCompletions & completions, size_t, std::string_view prefix)

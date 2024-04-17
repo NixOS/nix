@@ -25,6 +25,7 @@ namespace nix {
 struct Sink;
 struct Source;
 
+#ifndef _WIN32
 class Pid
 {
     pid_t pid = -1;
@@ -43,13 +44,16 @@ public:
     void setKillSignal(int signal);
     pid_t release();
 };
+#endif
 
 
+#ifndef _WIN32
 /**
  * Kill all processes running under the specified uid by sending them
  * a SIGKILL.
  */
 void killUser(uid_t uid);
+#endif
 
 
 /**
@@ -68,8 +72,9 @@ struct ProcessOptions
     int cloneFlags = 0;
 };
 
+#ifndef _WIN32
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
-
+#endif
 
 /**
  * Run a program and return its stdout in a string (i.e., like the
@@ -84,8 +89,10 @@ struct RunOptions
     Path program;
     bool searchPath = true;
     Strings args;
+#ifndef _WIN32
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
+#endif
     std::optional<Path> chdir;
     std::optional<std::map<std::string, std::string>> environment;
     std::optional<std::string> input;
@@ -111,6 +118,7 @@ public:
     { }
 };
 
+#ifndef _WIN32
 
 /**
  * Convert the exit status of a child as returned by wait() into an
@@ -119,5 +127,7 @@ public:
 std::string statusToString(int status);
 
 bool statusOk(int status);
+
+#endif
 
 }

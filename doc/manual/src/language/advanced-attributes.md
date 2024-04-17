@@ -188,9 +188,13 @@ Derivations can declare some infrequently used optional attributes.
     }
     ```
 
-    The `outputHashAlgo` attribute specifies the hash algorithm used to
-    compute the hash. It can currently be `"sha1"`, `"sha256"` or
-    `"sha512"`.
+    The `outputHash` attribute must be a string containing the hash in either hexadecimal or "nix32" encoding, or following the format for integrity metadata as defined by [SRI](https://www.w3.org/TR/SRI/).
+    The "nix32" encoding is an adaptation of base-32 encoding.
+    The [`convertHash`](@docroot@/language/builtins.md#builtins-convertHash) function shows how to convert between different encodings, and the [`nix-hash` command](../command-ref/nix-hash.md) has information about obtaining the hash for some contents, as well as converting to and from encodings.
+
+    The `outputHashAlgo` attribute specifies the hash algorithm used to compute the hash.
+    It can currently be `"sha1"`, `"sha256"`, `"sha512"`, or `null`.
+    `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format.
 
     The `outputHashMode` attribute determines how the hash is computed.
     It must be one of the following two values:
@@ -203,16 +207,16 @@ Derivations can declare some infrequently used optional attributes.
 
         This is the default.
 
-      - `"recursive"`\
-        The hash is computed over the NAR archive dump of the output
+      - `"recursive"` or `"nar"`\
+        The hash is computed over the [NAR archive](@docroot@/glossary.md#gloss-nar) dump of the output
         (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
         this case, the output can be anything, including a directory
         tree.
 
-    The `outputHash` attribute, finally, must be a string containing
-    the hash in either hexadecimal or base-32 notation. (See the
-    [`nix-hash` command](../command-ref/nix-hash.md) for information
-    about converting to and from base-32 notation.)
+    `"recursive"` is the traditional way of indicating this,
+    and is supported since 2005 (virtually the entire history of Nix).
+    `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
+    however support for it is only added in Nix version 2.21.
 
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
     > **Warning**
@@ -299,7 +303,7 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
     the following attributes are available:
 
-    - `maxSize` defines the maximum size of the resulting [store object](../glossary.md#gloss-store-object).
+    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/glossary.md#gloss-store-object).
     - `maxClosureSize` defines the maximum size of the output's closure.
     - `ignoreSelfRefs` controls whether self-references should be considered when
       checking for allowed references/requisites.

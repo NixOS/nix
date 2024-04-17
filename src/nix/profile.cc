@@ -479,55 +479,151 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     }
 };
 
-class MixProfileElementMatchers : virtual Args
+struct Matcher
 {
-    std::vector<std::string> _matchers;
+    virtual ~Matcher() { }
+    virtual std::string getTitle() = 0;
+    virtual bool matches(const std::string & name, const ProfileElement & element) = 0;
+};
+
+struct RegexMatcher final : public Matcher
+{
+    std::regex regex;
+    std::string pattern;
+
+    RegexMatcher(const std::string & pattern) : regex(pattern, std::regex::extended | std::regex::icase), pattern(pattern)
+    { }
+
+    std::string getTitle() override
+    {
+        return fmt("Regex '%s'", pattern);
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        return std::regex_match(element.identifier(), regex);
+    }
+};
+
+struct StorePathMatcher final : public Matcher
+{
+    nix::StorePath storePath;
+
+    StorePathMatcher(const nix::StorePath & storePath) : storePath(storePath)
+    { }
+
+    std::string getTitle() override
+    {
+        return fmt("Store path '%s'", storePath.to_string());
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        return element.storePaths.count(storePath);
+    }
+};
+
+struct NameMatcher final : public Matcher
+{
+    std::string name;
+
+    NameMatcher(const std::string & name) : name(name)
+    { }
+
+    std::string getTitle() override
+    {
+        return fmt("Package name '%s'", name);
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        return name == this->name;
+    }
+};
+
+struct AllMatcher final : public Matcher
+{
+    std::string getTitle() override
+    {
+        return "--all";
+    }
+
+    bool matches(const std::string & name, const ProfileElement & element) override
+    {
+        return true;
+    }
+};
+
+AllMatcher all;
+
+class MixProfileElementMatchers : virtual Args, virtual StoreCommand
+{
+    std::vector<ref<Matcher>> _matchers;
 
 public:
 
     MixProfileElementMatchers()
     {
-        expectArgs("elements", &_matchers);
+        addFlag({
+            .longName = "all",
+            .description = "Match all packages in the profile.",
+            .handler = {[this]() {
+                _matchers.push_back(ref<AllMatcher>(std::shared_ptr<AllMatcher>(&all, [](AllMatcher*) {})));
+            }},
+        });
+        addFlag({
+            .longName = "regex",
+            .description = "A regular expression to match one or more packages in the profile.",
+            .labels = {"pattern"},
+            .handler = {[this](std::string arg) {
+                _matchers.push_back(make_ref<RegexMatcher>(arg));
+            }},
+        });
+        expectArgs({
+            .label = "elements",
+            .optional = true,
+            .handler = {[this](std::vector<std::string> args) {
+                for (auto & arg : args) {
+                    if (auto n = string2Int<size_t>(arg)) {
+                        throw Error("'nix profile' no longer supports indices ('%d')", *n);
+                    } else if (getStore()->isStorePath(arg)) {
+                        _matchers.push_back(make_ref<StorePathMatcher>(getStore()->parseStorePath(arg)));
+                    } else {
+                        _matchers.push_back(make_ref<NameMatcher>(arg));
+                    }
+                }
+            }}
+        });
     }
 
-    struct RegexPattern {
-        std::string pattern;
-        std::regex  reg;
-    };
-    typedef std::variant<Path, RegexPattern> Matcher;
-
-    std::vector<Matcher> getMatchers(ref<Store> store)
-    {
-        std::vector<Matcher> res;
-
-        for (auto & s : _matchers) {
-            if (auto n = string2Int<size_t>(s))
-                throw Error("'nix profile' no longer supports indices ('%d')", *n);
-            else if (store->isStorePath(s))
-                res.push_back(s);
-            else
-                res.push_back(RegexPattern{s,std::regex(s, std::regex::extended | std::regex::icase)});
+    std::set<std::string> getMatchingElementNames(ProfileManifest & manifest) {
+        if (_matchers.empty()) {
+            throw UsageError("No packages specified.");
         }
 
-        return res;
-    }
+        if (std::find_if(_matchers.begin(), _matchers.end(), [](const ref<Matcher> & m) { return m.dynamic_pointer_cast<AllMatcher>(); }) != _matchers.end() && _matchers.size() > 1) {
+            throw UsageError("--all cannot be used with package names or regular expressions.");
+        }
 
-    bool matches(
-        const Store & store,
-        const std::string & name,
-        const ProfileElement & element,
-        const std::vector<Matcher> & matchers)
-    {
-        for (auto & matcher : matchers) {
-            if (auto path = std::get_if<Path>(&matcher)) {
-                if (element.storePaths.count(store.parseStorePath(*path))) return true;
-            } else if (auto regex = std::get_if<RegexPattern>(&matcher)) {
-                if (std::regex_match(name, regex->reg))
-                    return true;
+        if (manifest.elements.empty()) {
+            warn("There are no packages in the profile.");
+            return {};
+        }
+
+        std::set<std::string> result;
+        for (auto & matcher : _matchers) {
+            bool foundMatch = false;
+            for (auto & [name, element] : manifest.elements) {
+                if (matcher->matches(name, element)) {
+                    result.insert(name);
+                    foundMatch = true;
+                }
+            }
+            if (!foundMatch) {
+                warn("%s does not match any packages in the profile.", matcher->getTitle());
             }
         }
-
-        return false;
+        return result;
     }
 };
 
@@ -549,16 +645,19 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
     {
         ProfileManifest oldManifest(*getEvalState(), *profile);
 
-        auto matchers = getMatchers(store);
+        ProfileManifest newManifest = oldManifest;
 
-        ProfileManifest newManifest;
+        auto matchingElementNames = getMatchingElementNames(oldManifest);
 
-        for (auto & [name, element] : oldManifest.elements) {
-            if (!matches(*store, name, element, matchers)) {
-                newManifest.elements.insert_or_assign(name, std::move(element));
-            } else {
-                notice("removing '%s'", element.identifier());
-            }
+        if (matchingElementNames.empty()) {
+            warn ("No packages to remove. Use 'nix profile list' to see the current profile.");
+            return;
+        }
+
+        for (auto & name : matchingElementNames) {
+            auto & element = oldManifest.elements[name];
+            notice("removing '%s'", element.identifier());
+            newManifest.elements.erase(name);
         }
 
         auto removedCount = oldManifest.elements.size() - newManifest.elements.size();
@@ -566,16 +665,6 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
             removedCount,
             newManifest.elements.size());
 
-        if (removedCount == 0) {
-            for (auto matcher: matchers) {
-                if (const Path * path = std::get_if<Path>(&matcher)) {
-                    warn("'%s' does not match any paths", *path);
-                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)) {
-                    warn("'%s' does not match any packages", regex->pattern);
-                }
-            }
-            warn ("Use 'nix profile list' to see the current profile.");
-        }
         updateProfile(newManifest.build(store));
     }
 };
@@ -598,20 +687,20 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        auto matchers = getMatchers(store);
-
         Installables installables;
         std::vector<ProfileElement *> elems;
 
-        auto matchedCount = 0;
         auto upgradedCount = 0;
 
-        for (auto & [name, element] : manifest.elements) {
-            if (!matches(*store, name, element, matchers)) {
-                continue;
-            }
+        auto matchingElementNames = getMatchingElementNames(manifest);
 
-            matchedCount++;
+        if (matchingElementNames.empty()) {
+            warn("No packages to upgrade. Use 'nix profile list' to see the current profile.");
+            return;
+        }
+
+        for (auto & name : matchingElementNames) {
+            auto & element = manifest.elements[name];
 
             if (!element.source) {
                 warn(
@@ -650,7 +739,9 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
             assert(infop);
             auto & info = *infop;
 
-            if (element.source->lockedRef == info.flake.lockedRef) continue;
+            if (info.flake.lockedRef.input.isLocked()
+                && element.source->lockedRef == info.flake.lockedRef)
+                continue;
 
             printInfo("upgrading '%s' from flake '%s' to '%s'",
                 element.source->attrPath, element.source->lockedRef, info.flake.lockedRef);
@@ -667,18 +758,8 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         }
 
         if (upgradedCount == 0) {
-            if (matchedCount == 0) {
-                for (auto & matcher : matchers) {
-                    if (const Path * path = std::get_if<Path>(&matcher)) {
-                        warn("'%s' does not match any paths", *path);
-                    } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)) {
-                        warn("'%s' does not match any packages", regex->pattern);
-                    }
-                }
-            } else {
-                warn("Found some packages but none of them could be upgraded.");
-            }
-            warn ("Use 'nix profile list' to see the current profile.");
+            warn("Found some packages but none of them could be upgraded.");
+            return;
         }
 
         auto builtPaths = builtPathsPerInstallable(

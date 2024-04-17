@@ -20,7 +20,7 @@ R""(
 
 * To copy the log for a specific [store derivation] via SSH:
 
-  [store derivation]: ../../glossary.md#gloss-store-derivation
+  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
   ```console
   # nix store copy-log --to ssh-ng://machine /nix/store/ilgm50plpmcgjhcp33z6n4qbnpqfhxym-glibc-2.33-59.drv

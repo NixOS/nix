@@ -4,7 +4,6 @@
 #include <array>
 #include <cctype>
 #include <iostream>
-#include <grp.h>
 #include <regex>
 
 #include <sodium.h>

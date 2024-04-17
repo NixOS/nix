@@ -7,6 +7,8 @@ clean-files += $(buildprefix)Makefile.config
 
 # List makefiles
 
+include mk/platform.mk
+
 ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
   mk/precompiled-headers.mk \
@@ -18,7 +20,12 @@ makefiles = \
   src/libexpr/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
-  src/resolve-system-dependencies/local.mk \
+  src/libutil-c/local.mk \
+  src/libstore-c/local.mk \
+  src/libexpr-c/local.mk
+
+ifdef HOST_UNIX
+makefiles += \
   scripts/local.mk \
   misc/bash/local.mk \
   misc/fish/local.mk \
@@ -27,6 +34,7 @@ makefiles = \
   misc/launchd/local.mk \
   misc/upstart/local.mk
 endif
+endif
 
 ifeq ($(ENABLE_UNIT_TESTS), yes)
 makefiles += \
@@ -34,18 +42,22 @@ makefiles += \
   tests/unit/libutil-support/local.mk \
   tests/unit/libstore/local.mk \
   tests/unit/libstore-support/local.mk \
+  tests/unit/libfetchers/local.mk \
   tests/unit/libexpr/local.mk \
   tests/unit/libexpr-support/local.mk
 endif
 
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
+ifdef HOST_UNIX
 makefiles += \
   tests/functional/local.mk \
   tests/functional/ca/local.mk \
   tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \
+  tests/functional/local-overlay-store/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
+endif
 endif
 
 # Some makefiles require access to built programs and must be included late.
@@ -59,6 +71,10 @@ ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
 makefiles-late += doc/internal-api/local.mk
 endif
 
+ifeq ($(ENABLE_EXTERNAL_API_DOCS), yes)
+makefiles-late += doc/external-api/local.mk
+endif
+
 # Miscellaneous global Flags
 
 OPTIMIZE = 1
@@ -70,8 +86,6 @@ else
   GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
   unexport NIX_HARDENING_ENABLE
 endif
-
-include mk/platform.mk
 
 ifdef HOST_WINDOWS
   # Windows DLLs are stricter about symbol visibility than Unix shared
@@ -121,5 +135,12 @@ ifneq ($(ENABLE_INTERNAL_API_DOCS), yes)
 .PHONY: internal-api-html
 internal-api-html:
 	@echo "Internal API docs are disabled. Configure with '--enable-internal-api-docs', or avoid calling 'make internal-api-html'."
+	@exit 1
+endif
+
+ifneq ($(ENABLE_EXTERNAL_API_DOCS), yes)
+.PHONY: external-api-html
+external-api-html:
+	@echo "External API docs are disabled. Configure with '--enable-external-api-docs', or avoid calling 'make external-api-html'."
 	@exit 1
 endif

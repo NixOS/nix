@@ -1,5 +1,5 @@
 #include "daemon.hh"
-#include "monitor-fd.hh"
+#include "signals.hh"
 #include "worker-protocol.hh"
 #include "worker-protocol-impl.hh"
 #include "build-result.hh"
@@ -18,6 +18,10 @@
 #include "auth-tunnel.hh"
 
 #include <sys/socket.h>
+
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
+# include "monitor-fd.hh"
+#endif
 
 namespace nix::daemon {
 
@@ -258,7 +262,7 @@ struct ClientSettings
                 else if (setSubstituters(settings.substituters))
                     ;
                 else
-                    debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+                    warn("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
@@ -1058,7 +1062,9 @@ void processConnection(
     TrustedFlag trusted,
     RecursiveFlag recursive)
 {
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
+#endif
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
@@ -1079,7 +1085,7 @@ void processConnection(
     unsigned int opCount = 0;
 
     Finally finally([&]() {
-        _isInterrupted = false;
+        setInterrupted(false);
         printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 

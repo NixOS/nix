@@ -3,6 +3,7 @@
 #include "input-accessor.hh"
 #include "source-path.hh"
 #include "fetch-to-store.hh"
+#include "json-utils.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -161,7 +162,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
-std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
+std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
@@ -186,54 +187,83 @@ std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
 
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
-            return scheme->fetch(store, *this);
+            auto [accessor, final] = getAccessorUnchecked(store);
+
+            auto storePath = nix::fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, final.getName());
+
+            auto narHash = store->queryPathInfo(storePath)->narHash;
+            final.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+
+            scheme->checkLocks(*this, final);
+
+            return {storePath, final};
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());
             throw;
         }
     }();
 
-    auto narHash = store->queryPathInfo(storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-
-    if (auto prevNarHash = getNarHash()) {
-        if (narHash != *prevNarHash)
-            throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(),
-                store->printStorePath(storePath),
-                prevNarHash->to_string(HashFormat::SRI, true),
-                narHash.to_string(HashFormat::SRI, true));
-    }
-
-    if (auto prevLastModified = getLastModified()) {
-        if (input.getLastModified() != prevLastModified)
-            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevLastModified);
-    }
-
-    if (auto prevRev = getRev()) {
-        if (input.getRev() != prevRev)
-            throw Error("'rev' attribute mismatch in input '%s', expected %s",
-                input.to_string(), prevRev->gitRev());
-    }
-
-    if (auto prevRevCount = getRevCount()) {
-        if (input.getRevCount() != prevRevCount)
-            throw Error("'revCount' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevRevCount);
-    }
-
     return {std::move(storePath), input};
+}
+
+void InputScheme::checkLocks(const Input & specified, const Input & final) const
+{
+    if (auto prevNarHash = specified.getNarHash()) {
+        if (final.getNarHash() != prevNarHash) {
+            if (final.getNarHash())
+                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
+                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true), final.getNarHash()->to_string(HashFormat::SRI, true));
+            else
+                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got none",
+                    specified.to_string(), prevNarHash->to_string(HashFormat::SRI, true));
+        }
+    }
+
+    if (auto prevLastModified = specified.getLastModified()) {
+        if (final.getLastModified() != prevLastModified)
+            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
+                final.to_string(), *prevLastModified);
+    }
+
+    if (auto prevRev = specified.getRev()) {
+        if (final.getRev() != prevRev)
+            throw Error("'rev' attribute mismatch in input '%s', expected %s",
+                final.to_string(), prevRev->gitRev());
+    }
+
+    if (auto prevRevCount = specified.getRevCount()) {
+        if (final.getRevCount() != prevRevCount)
+            throw Error("'revCount' attribute mismatch in input '%s', expected %d",
+                final.to_string(), *prevRevCount);
+    }
 }
 
 std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
     try {
-        return scheme->getAccessor(store, *this);
+        auto [accessor, final] = getAccessorUnchecked(store);
+
+        scheme->checkLocks(*this, final);
+
+        return {accessor, std::move(final)};
     } catch (Error & e) {
         e.addTrace({}, "while fetching the input '%s'", to_string());
         throw;
     }
+}
+
+std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
+{
+    // FIXME: cache the accessor
+
+    if (!scheme)
+        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
+
+    auto [accessor, final] = scheme->getAccessor(store, *this);
+
+    accessor->fingerprint = scheme->getFingerprint(store, final);
+
+    return {accessor, std::move(final)};
 }
 
 Input Input::applyOverrides(
@@ -372,18 +402,6 @@ void InputScheme::clone(const Input & input, const Path & destDir) const
     throw Error("do not know how to clone input '%s'", input.to_string());
 }
 
-std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
-{
-    auto [accessor, input2] = getAccessor(store, input);
-    auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy, input2.getName());
-    return {storePath, input2};
-}
-
-std::pair<ref<InputAccessor>, Input> InputScheme::getAccessor(ref<Store> store, const Input & input) const
-{
-    throw UnimplementedError("InputScheme must implement fetch() or getAccessor()");
-}
-
 std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
 {
     return {};
@@ -392,6 +410,23 @@ std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
 std::string publicKeys_to_string(const std::vector<PublicKey>& publicKeys)
 {
     return ((nlohmann::json) publicKeys).dump();
+}
+
+}
+
+namespace nlohmann {
+
+using namespace nix;
+
+fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
+    auto type = optionalValueAt(json, "type").value_or("ssh-ed25519");
+    auto key = valueAt(json, "key");
+    return fetchers::PublicKey { getString(type), getString(key) };
+}
+
+void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p) {
+    json["type"] = p.type;
+    json["key"] = p.key;
 }
 
 }

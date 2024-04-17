@@ -223,7 +223,7 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_CYAN;
-        output << v.integer;
+        output << v.integer();
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -232,7 +232,7 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_CYAN;
-        output << v.fpoint;
+        output << v.fpoint();
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -241,7 +241,7 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_CYAN;
-        printLiteralBool(output, v.boolean);
+        printLiteralBool(output, v.boolean());
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -271,25 +271,20 @@ private:
 
     void printDerivation(Value & v)
     {
-        try {
-            Bindings::iterator i = v.attrs->find(state.sDrvPath);
-            NixStringContext context;
-            std::string storePath;
-            if (i != v.attrs->end())
-                storePath = state.store->printStorePath(state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
+        NixStringContext context;
+        std::string storePath;
+        if (auto i = v.attrs()->get(state.sDrvPath))
+            storePath = state.store->printStorePath(state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
 
-            if (options.ansiColors)
-                output << ANSI_GREEN;
-            output << "«derivation";
-            if (!storePath.empty()) {
-                output << " " << storePath;
-            }
-            output << "»";
-            if (options.ansiColors)
-                output << ANSI_NORMAL;
-        } catch (Error & e) {
-            printError_(e);
+        if (options.ansiColors)
+            output << ANSI_GREEN;
+        output << "«derivation";
+        if (!storePath.empty()) {
+            output << " " << storePath;
         }
+        output << "»";
+        if (options.ansiColors)
+            output << ANSI_NORMAL;
     }
 
     bool shouldPrettyPrintAttrs(AttrVec & v)
@@ -316,7 +311,7 @@ private:
 
     void printAttrs(Value & v, size_t depth)
     {
-        if (seen && !seen->insert(v.attrs).second) {
+        if (seen && !seen->insert(v.attrs()).second) {
             printRepeated();
             return;
         }
@@ -328,7 +323,7 @@ private:
             output << "{";
 
             AttrVec sorted;
-            for (auto & i : *v.attrs)
+            for (auto & i : *v.attrs())
                 sorted.emplace_back(std::pair(state.symbols[i.name], i.value));
 
             if (options.maxAttrs == std::numeric_limits<size_t>::max())
@@ -427,18 +422,18 @@ private:
 
         if (v.isLambda()) {
             output << "lambda";
-            if (v.lambda.fun) {
-                if (v.lambda.fun->name) {
-                    output << " " << state.symbols[v.lambda.fun->name];
+            if (v.payload.lambda.fun) {
+                if (v.payload.lambda.fun->name) {
+                    output << " " << state.symbols[v.payload.lambda.fun->name];
                 }
 
                 std::ostringstream s;
-                s << state.positions[v.lambda.fun->pos];
+                s << state.positions[v.payload.lambda.fun->pos];
                 output << " @ " << filterANSIEscapes(s.str());
             }
         } else if (v.isPrimOp()) {
-            if (v.primOp)
-                output << *v.primOp;
+            if (v.primOp())
+                output << *v.primOp();
             else
                 output << "primop";
         } else if (v.isPrimOpApp()) {
@@ -484,7 +479,7 @@ private:
 
     void printExternal(Value & v)
     {
-        v.external->print(output);
+        v.external()->print(output);
     }
 
     void printUnknown()
@@ -510,64 +505,68 @@ private:
         output.flush();
         checkInterrupt();
 
-        if (options.force) {
-            try {
+        try {
+            if (options.force) {
                 state.forceValue(v, v.determinePos(noPos));
-            } catch (Error & e) {
-                printError_(e);
-                return;
             }
-        }
 
-        switch (v.type()) {
+            switch (v.type()) {
 
-        case nInt:
-            printInt(v);
-            break;
+            case nInt:
+                printInt(v);
+                break;
 
-        case nFloat:
-            printFloat(v);
-            break;
+            case nFloat:
+                printFloat(v);
+                break;
 
-        case nBool:
-            printBool(v);
-            break;
+            case nBool:
+                printBool(v);
+                break;
 
-        case nString:
-            printString(v);
-            break;
+            case nString:
+                printString(v);
+                break;
 
-        case nPath:
-            printPath(v);
-            break;
+            case nPath:
+                printPath(v);
+                break;
 
-        case nNull:
-            printNull();
-            break;
+            case nNull:
+                printNull();
+                break;
 
-        case nAttrs:
-            printAttrs(v, depth);
-            break;
+            case nAttrs:
+                printAttrs(v, depth);
+                break;
 
-        case nList:
-            printList(v, depth);
-            break;
+            case nList:
+                printList(v, depth);
+                break;
 
-        case nFunction:
-            printFunction(v);
-            break;
+            case nFunction:
+                printFunction(v);
+                break;
 
-        case nThunk:
-            printThunk(v);
-            break;
+            case nThunk:
+                printThunk(v);
+                break;
 
-        case nExternal:
-            printExternal(v);
-            break;
+            case nExternal:
+                printExternal(v);
+                break;
 
-        default:
-            printUnknown();
-            break;
+            default:
+                printUnknown();
+                break;
+            }
+        } catch (Error & e) {
+            if (options.errors == ErrorPrintBehavior::Throw
+                || (options.errors == ErrorPrintBehavior::ThrowTopLevel
+                    && depth == 0)) {
+                throw;
+            }
+            printError_(e);
         }
     }
 

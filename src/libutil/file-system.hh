@@ -14,6 +14,9 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#ifdef _WIN32
+# include <windef.h>
+#endif
 #include <signal.h>
 
 #include <boost/lexical_cast.hpp>
@@ -29,6 +32,17 @@
 #define DT_REG 1
 #define DT_LNK 2
 #define DT_DIR 3
+#endif
+
+/**
+ * Polyfill for MinGW
+ *
+ * Windows does in fact support symlinks, but the C runtime interfaces predate this.
+ *
+ * @todo get rid of this, and stop using `stat` when we want `lstat` too.
+ */
+#ifndef S_ISLNK
+# define S_ISLNK(m) false
 #endif
 
 namespace nix {
@@ -84,6 +98,11 @@ bool isDirOrInDir(std::string_view path, std::string_view dir);
  */
 struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
+/**
+ * `lstat` the given path if it exists.
+ * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
+ */
+std::optional<struct stat> maybeLstat(const Path & path);
 
 /**
  * @return true iff the given path exists.
@@ -186,6 +205,13 @@ void renameFile(const Path & src, const Path & dst);
  */
 void moveFile(const Path & src, const Path & dst);
 
+/**
+ * Recursively copy the content of `oldPath` to `newPath`. If `andDelete` is
+ * `true`, then also remove `oldPath` (making this equivalent to `moveFile`, but
+ * with the guaranty that the destination will be “fresh”, with no stale inode
+ * or file descriptor pointing to it).
+ */
+void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
 
 /**
  * Automatic cleanup of resources.
@@ -227,6 +253,10 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
  */
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
+/**
+ * Return `TMPDIR`, or the default temporary directory if unset or empty.
+ */
+Path defaultTempDir();
 
 /**
  * Used in various places.

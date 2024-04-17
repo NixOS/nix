@@ -28,12 +28,12 @@ void Expr::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprInt::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << v.integer;
+    str << v.integer();
 }
 
 void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << v.fpoint;
+    str << v.fpoint();
 }
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
@@ -149,7 +149,10 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
     if (hasFormals()) {
         str << "{ ";
         bool first = true;
-        for (auto & i : formals->formals) {
+        // the natural Symbol ordering is by creation time, which can lead to the
+        // same expression being printed in two different ways depending on its
+        // context. always use lexicographic ordering to avoid this.
+        for (auto & i : formals->lexicographicOrder(symbols)) {
             if (first) first = false; else str << ", ";
             str << symbols[i.name];
             if (i.def) {
@@ -576,6 +579,39 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
         ? concatStrings("'", state.symbols[name], "'")
         : "anonymous function");
     return fmt("%1% at %2%", id, state.positions[pos]);
+}
+
+
+
+/* Position table. */
+
+Pos PosTable::operator[](PosIdx p) const
+{
+    auto origin = resolve(p);
+    if (!origin)
+        return {};
+
+    const auto offset = origin->offsetOf(p);
+
+    Pos result{0, 0, origin->origin};
+    auto lines = this->lines.lock();
+    auto linesForInput = (*lines)[origin->offset];
+
+    if (linesForInput.empty()) {
+        auto source = result.getSource().value_or("");
+        const char * begin = source.data();
+        for (Pos::LinesIterator it(source), end; it != end; it++)
+            linesForInput.push_back(it->data() - begin);
+        if (linesForInput.empty())
+            linesForInput.push_back(0);
+    }
+    // as above: the first line starts at byte 0 and is always present
+    auto lineStartOffset = std::prev(
+        std::upper_bound(linesForInput.begin(), linesForInput.end(), offset));
+
+    result.line = 1 + (lineStartOffset - linesForInput.begin());
+    result.column = 1 + (offset - *lineStartOffset);
+    return result;
 }
 
 

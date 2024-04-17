@@ -289,7 +289,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
             state->autoCallFunction(*autoArgs, v1, v2);
 
             if (v2.type() == nAttrs) {
-                for (auto & i : *v2.attrs) {
+                for (auto & i : *v2.attrs()) {
                     std::string name = state->symbols[i.name];
                     if (name.find(searchWord) == 0) {
                         if (prefix_ == "")
@@ -443,10 +443,10 @@ ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
-    auto fingerprint = lockedFlake->getFingerprint();
+    auto fingerprint = lockedFlake->getFingerprint(state.store);
     return make_ref<nix::eval_cache::EvalCache>(
         evalSettings.useEvalCache && evalSettings.pureEval
-            ? std::optional { std::cref(fingerprint) }
+            ? fingerprint
             : std::nullopt,
         state,
         [&state, lockedFlake]()
@@ -461,7 +461,7 @@ ref<eval_cache::EvalCache> openEvalCache(
 
             state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
-            auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
+            auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
             assert(aOutputs);
 
             return aOutputs->value;

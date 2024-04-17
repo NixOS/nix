@@ -5,8 +5,13 @@ libmain_NAME = libnixmain
 libmain_DIR := $(d)
 
 libmain_SOURCES := $(wildcard $(d)/*.cc)
+ifdef HOST_UNIX
+  libmain_SOURCES += $(wildcard $(d)/unix/*.cc)
+endif
 
-libmain_CXXFLAGS += -I src/libutil -I src/libstore
+INCLUDE_libmain := -I $(d)
+
+libmain_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libmain)
 
 libmain_LDFLAGS += $(OPENSSL_LIBS)
 

@@ -10,6 +10,7 @@
 #include "finally.hh"
 #include "fetch-settings.hh"
 #include "value-to-json.hh"
+#include "local-fs-store.hh"
 
 namespace nix {
 
@@ -111,7 +112,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
     fetchers::Attrs attrs;
     std::optional<std::string> url;
 
-    for (nix::Attr attr : *(value->attrs)) {
+    for (auto & attr : *value->attrs()) {
         try {
             if (attr.name == sUrl) {
                 expectType(state, nString, *attr.value, attr.pos);
@@ -119,7 +120,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 attrs.emplace("url", *url);
             } else if (attr.name == sFlake) {
                 expectType(state, nBool, *attr.value, attr.pos);
-                input.isFlake = attr.value->boolean;
+                input.isFlake = attr.value->boolean();
             } else if (attr.name == sInputs) {
                 input.overrides = parseFlakeInputs(state, attr.value, attr.pos, baseDir, lockRootPath);
             } else if (attr.name == sFollows) {
@@ -136,10 +137,10 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         attrs.emplace(state.symbols[attr.name], attr.value->c_str());
                         break;
                     case nBool:
-                        attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean });
+                        attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean() });
                         break;
                     case nInt:
-                        attrs.emplace(state.symbols[attr.name], (long unsigned int) attr.value->integer);
+                        attrs.emplace(state.symbols[attr.name], (long unsigned int) attr.value->integer());
                         break;
                     default:
                         if (attr.name == state.symbols.create("publicKeys")) {
@@ -189,7 +190,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
 
     expectType(state, nAttrs, *value, pos);
 
-    for (nix::Attr & inputAttr : *(*value).attrs) {
+    for (auto & inputAttr : *value->attrs()) {
         inputs.emplace(state.symbols[inputAttr.name],
             parseFlakeInput(state,
                 state.symbols[inputAttr.name],
@@ -212,10 +213,9 @@ static Flake readFlake(
 {
     auto flakePath = rootDir / CanonPath(resolvedRef.subdir) / "flake.nix";
 
+    // NOTE evalFile forces vInfo to be an attrset because mustBeTrivial is true.
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
-
-    expectType(state, nAttrs, vInfo, state.positions.add(Pos::Origin(rootDir), 1, 1));
 
     Flake flake {
         .originalRef = originalRef,
@@ -224,23 +224,23 @@ static Flake readFlake(
         .path = flakePath,
     };
 
-    if (auto description = vInfo.attrs->get(state.sDescription)) {
+    if (auto description = vInfo.attrs()->get(state.sDescription)) {
         expectType(state, nString, *description->value, description->pos);
         flake.description = description->value->c_str();
     }
 
     auto sInputs = state.symbols.create("inputs");
 
-    if (auto inputs = vInfo.attrs->get(sInputs))
+    if (auto inputs = vInfo.attrs()->get(sInputs))
         flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, flakePath.parent().path.abs(), lockRootPath); // FIXME
 
     auto sOutputs = state.symbols.create("outputs");
 
-    if (auto outputs = vInfo.attrs->get(sOutputs)) {
+    if (auto outputs = vInfo.attrs()->get(sOutputs)) {
         expectType(state, nFunction, *outputs->value, outputs->pos);
 
-        if (outputs->value->isLambda() && outputs->value->lambda.fun->hasFormals()) {
-            for (auto & formal : outputs->value->lambda.fun->formals->formals) {
+        if (outputs->value->isLambda() && outputs->value->payload.lambda.fun->hasFormals()) {
+            for (auto & formal : outputs->value->payload.lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(state.symbols[formal.name], FlakeInput {
                         .ref = parseFlakeRef(state.symbols[formal.name])
@@ -253,10 +253,10 @@ static Flake readFlake(
 
     auto sNixConfig = state.symbols.create("nixConfig");
 
-    if (auto nixConfig = vInfo.attrs->get(sNixConfig)) {
+    if (auto nixConfig = vInfo.attrs()->get(sNixConfig)) {
         expectType(state, nAttrs, *nixConfig->value, nixConfig->pos);
 
-        for (auto & setting : *nixConfig->value->attrs) {
+        for (auto & setting : *nixConfig->value->attrs()) {
             forceTrivialValue(state, *setting.value, setting.pos);
             if (setting.value->type() == nString)
                 flake.config.settings.emplace(
@@ -292,7 +292,7 @@ static Flake readFlake(
         }
     }
 
-    for (auto & attr : *vInfo.attrs) {
+    for (auto & attr : *vInfo.attrs()) {
         if (attr.name != state.sDescription &&
             attr.name != sInputs &&
             attr.name != sOutputs &&
@@ -756,7 +756,17 @@ void callFlake(EvalState & state,
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        auto [storePath, subdir] = state.store->toStorePath(sourcePath.path.abs());
+        // FIXME: This is a hack to support chroot stores. Remove this
+        // once we can pass a sourcePath rather than a storePath to
+        // call-flake.nix.
+        auto path = sourcePath.path.abs();
+        if (auto store = state.store.dynamic_pointer_cast<LocalFSStore>()) {
+            auto realStoreDir = store->getRealStoreDir();
+            if (isInDir(path, realStoreDir))
+                path = store->storeDir + path.substr(realStoreDir.size());
+        }
+
+        auto [storePath, subdir] = state.store->toStorePath(path);
 
         emitTreeAttrs(
             state,
@@ -858,10 +868,13 @@ static RegisterPrimOp r3({
       Parse a flake reference, and return its exploded form.
 
       For example:
+
       ```nix
       builtins.parseFlakeRef "github:NixOS/nixpkgs/23.05?dir=lib"
       ```
+
       evaluates to:
+
       ```nix
       { dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github"; }
       ```
@@ -880,17 +893,17 @@ static void prim_flakeRefToString(
     state.forceAttrs(*args[0], noPos,
         "while evaluating the argument passed to builtins.flakeRefToString");
     fetchers::Attrs attrs;
-    for (const auto & attr : *args[0]->attrs) {
+    for (const auto & attr : *args[0]->attrs()) {
         auto t = attr.value->type();
         if (t == nInt) {
             attrs.emplace(state.symbols[attr.name],
-                          (uint64_t) attr.value->integer);
+                (uint64_t) attr.value->integer());
         } else if (t == nBool) {
             attrs.emplace(state.symbols[attr.name],
-                          Explicit<bool> { attr.value->boolean });
+                Explicit<bool> { attr.value->boolean() });
         } else if (t == nString) {
             attrs.emplace(state.symbols[attr.name],
-                          std::string(attr.value->string_view()));
+                std::string(attr.value->string_view()));
         } else {
             state.error<EvalError>(
                 "flake reference attribute sets may only contain integers, Booleans, "
@@ -910,12 +923,15 @@ static RegisterPrimOp r4({
       Convert a flake reference from attribute set format to URL format.
 
       For example:
+
       ```nix
       builtins.flakeRefToString {
         dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github";
       }
       ```
+
       evaluates to
+
       ```nix
       "github:NixOS/nixpkgs/23.05?dir=lib"
       ```
@@ -926,18 +942,17 @@ static RegisterPrimOp r4({
 
 }
 
-Fingerprint LockedFlake::getFingerprint() const
+std::optional<Fingerprint> LockedFlake::getFingerprint(ref<Store> store) const
 {
+    if (lockFile.isUnlocked()) return std::nullopt;
+
+    auto fingerprint = flake.lockedRef.input.getFingerprint(store);
+    if (!fingerprint) return std::nullopt;
+
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
-    return hashString(HashAlgorithm::SHA256,
-        fmt("%s;%s;%d;%d;%s",
-            flake.path.to_string(),
-            flake.lockedRef.subdir,
-            flake.lockedRef.input.getRevCount().value_or(0),
-            flake.lockedRef.input.getLastModified().value_or(0),
-            lockFile));
+    return hashString(HashAlgorithm::SHA256, fmt("%s;%s;%s", *fingerprint, flake.lockedRef.subdir, lockFile));
 }
 
 Flake::~Flake() { }

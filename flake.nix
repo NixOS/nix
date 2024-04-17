@@ -31,14 +31,7 @@
       crossSystems = [
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
-        "x86_64-unknown-freebsd13"
         "x86_64-unknown-netbsd"
-      ];
-
-      # Nix doesn't yet build on this platform, so we put it in a
-      # separate list. We just use this for `devShells` and
-      # `nixpkgsFor`, which this depends on.
-      shellCrossSystems = crossSystems ++ [
         "x86_64-w64-mingw32"
       ];
 
@@ -84,7 +77,7 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
-          cross = lib.genAttrs shellCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
       installScriptFor = tarballs:
@@ -286,6 +279,13 @@
           enableInternalAPIDocs = true;
         };
 
+        # API docs for Nix's C bindings.
+        external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+          inherit fileset;
+          doBuild = false;
+          enableExternalAPIDocs = true;
+        };
+
         # System tests.
         tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
 
@@ -299,8 +299,11 @@
               ''
                 type -p nix-env
                 # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
-                time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
-                [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
+                (
+                  set -x
+                  time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+                  [[ $(sha1sum < packages | cut -c1-40) = e01b031fc9785a572a38be6bc473957e3b6faad7 ]]
+                )
                 mkdir $out
               '';
 
@@ -341,7 +344,6 @@
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
-        perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -351,6 +353,11 @@
         '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
+      } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
+        # Some perl dependencies are broken on i686-linux.
+        # Since the support is only best-effort there, disable the perl
+        # bindings
+        perlBindings = self.hydraJobs.perlBindings.${system};
       });
 
       packages = forAllSystems (system: rec {
@@ -413,8 +420,8 @@
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
             (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
-              (makeShells "static" nixpkgsFor.${system}.static)) //
-              (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+              (makeShells "static" nixpkgsFor.${system}.static) //
+              (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv))) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }

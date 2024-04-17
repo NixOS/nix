@@ -20,7 +20,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
 
     if (args[0]->type() == nAttrs) {
 
-        for (auto & attr : *args[0]->attrs) {
+        for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
                 url = state.coerceToString(attr.pos, *attr.value, context,
@@ -64,8 +64,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
-    // FIXME: use name
-    auto [storePath, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetchToStore(state.store);
 
     auto attrs2 = state.buildBindings(8);
     state.mkStorePathString(storePath, attrs2.alloc(state.sOutPath));

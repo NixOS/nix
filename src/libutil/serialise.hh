@@ -119,18 +119,18 @@ protected:
  */
 struct FdSink : BufferedSink
 {
-    int fd;
+    Descriptor fd;
     size_t written = 0;
 
-    FdSink() : fd(-1) { }
-    FdSink(int fd) : fd(fd) { }
+    FdSink() : fd(INVALID_DESCRIPTOR) { }
+    FdSink(Descriptor fd) : fd(fd) { }
     FdSink(FdSink&&) = default;
 
     FdSink & operator=(FdSink && s)
     {
         flush();
         fd = s.fd;
-        s.fd = -1;
+        s.fd = INVALID_DESCRIPTOR;
         written = s.written;
         return *this;
     }
@@ -151,18 +151,18 @@ private:
  */
 struct FdSource : BufferedSource
 {
-    int fd;
+    Descriptor fd;
     size_t read = 0;
     BackedStringView endOfFileError{"unexpected end-of-file"};
 
-    FdSource() : fd(-1) { }
-    FdSource(int fd) : fd(fd) { }
+    FdSource() : fd(INVALID_DESCRIPTOR) { }
+    FdSource(Descriptor fd) : fd(fd) { }
     FdSource(FdSource &&) = default;
 
     FdSource & operator=(FdSource && s)
     {
         fd = s.fd;
-        s.fd = -1;
+        s.fd = INVALID_DESCRIPTOR;
         read = s.read;
         return *this;
     }

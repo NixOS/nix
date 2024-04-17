@@ -49,6 +49,9 @@ perl/Makefile.config
 /src/libexpr/tests
 /tests/unit/libexpr/libnixexpr-tests
 
+# /src/libfetchers
+/tests/unit/libfetchers/libnixfetchers-tests
+
 # /src/libstore/
 *.gen.*
 /src/libstore/tests
@@ -115,8 +118,6 @@ perl/Makefile.config
 /misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
 
-/src/resolve-system-dependencies/resolve-system-dependencies
-
 outputs/
 
 *.a
@@ -142,6 +143,7 @@ GTAGS
 
 # auto-generated compilation database
 compile_commands.json
+*.compile_commands.json
 
 nix-rust/target
 

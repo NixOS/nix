@@ -204,16 +204,6 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/40",
     },
     {
-        .tag = Xp::ReplFlake,
-        .name = "repl-flake",
-        .description = R"(
-            *Enabled with [`flakes`](#xp-feature-flakes) since 2.19*
-
-            Allow passing [installables](@docroot@/command-ref/new-cli/nix.md#installables) to `nix repl`, making its interface consistent with the other experimental commands.
-        )",
-        .trackingUrl = "https://github.com/NixOS/nix/milestone/32",
-    },
-    {
         .tag = Xp::AutoAllocateUids,
         .name = "auto-allocate-uids",
         .description = R"(
@@ -271,6 +261,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Allow the use of the `read-only` parameter in [local store](@docroot@/store/types/local-store.md) URIs.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/46",
+    },
+    {
+        .tag = Xp::LocalOverlayStore,
+        .name = "local-overlay-store",
+        .description = R"(
+            Allow the use of [local overlay store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-overlay-store).
+        )",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/50",
     },
     {
         .tag = Xp::ConfigurableImpureEnv,

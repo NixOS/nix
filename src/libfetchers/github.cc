@@ -98,6 +98,10 @@ struct GitArchiveInputScheme : InputScheme
         if (ref) input.attrs.insert_or_assign("ref", *ref);
         if (host_url) input.attrs.insert_or_assign("host", *host_url);
 
+        auto narHash = url.query.find("narHash");
+        if (narHash != url.query.end())
+            input.attrs.insert_or_assign("narHash", narHash->second);
+
         return input;
     }
 
@@ -111,6 +115,7 @@ struct GitArchiveInputScheme : InputScheme
             "narHash",
             "lastModified",
             "host",
+            "treeHash",
         };
     }
 
@@ -134,10 +139,13 @@ struct GitArchiveInputScheme : InputScheme
         assert(!(ref && rev));
         if (ref) path += "/" + *ref;
         if (rev) path += "/" + rev->to_string(HashFormat::Base16, false);
-        return ParsedURL {
+        auto url = ParsedURL {
             .scheme = std::string { schemeName() },
             .path = path,
         };
+        if (auto narHash = input.getNarHash())
+            url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+        return url;
     }
 
     Input applyOverrides(
@@ -268,14 +276,14 @@ struct GitArchiveInputScheme : InputScheme
     {
         auto [input, tarballInfo] = downloadArchive(store, _input);
 
+        #if 0
         input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
+        #endif
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
         auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash, false);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
-
-        accessor->fingerprint = input.getFingerprint(store);
 
         return {accessor, input};
     }
@@ -286,7 +294,9 @@ struct GitArchiveInputScheme : InputScheme
            Git revision alone, we also require a NAR hash for
            locking. FIXME: in the future, we may want to require a Git
            tree hash instead of a NAR hash. */
-        return input.getRev().has_value() && input.getNarHash().has_value();
+        return input.getRev().has_value()
+            && (fetchSettings.trustTarballsFromGitForges ||
+                input.getNarHash().has_value());
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() const override
@@ -347,7 +357,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1),
@@ -421,7 +431,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
@@ -485,7 +495,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
-                downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
+                downloadFile(store, fmt("%s/HEAD", base_url), "source", headers).storePath);
             std::ifstream is(file);
             std::string line;
             getline(is, line);
@@ -501,7 +511,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
-            downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
+            downloadFile(store, fmt("%s/info/refs", base_url), "source", headers).storePath);
         std::ifstream is(file);
 
         std::string line;
