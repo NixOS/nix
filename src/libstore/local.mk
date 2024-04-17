@@ -36,6 +36,9 @@ INCLUDE_libstore := -I $(d) -I $(d)/build
 ifdef HOST_UNIX
   INCLUDE_libstore += -I $(d)/unix
 endif
+ifdef HOST_WINDOWS
+  INCLUDE_libstore += -I $(d)/windows
+endif
 
 libstore_CXXFLAGS += \
  $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libstore) \
