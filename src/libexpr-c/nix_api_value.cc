@@ -15,9 +15,9 @@
 #include "value/context.hh"
 
 #ifdef HAVE_BOEHMGC
-# include "gc/gc.h"
-# define GC_INCLUDE_NEW 1
-# include "gc_cpp.h"
+#  include "gc/gc.h"
+#  define GC_INCLUDE_NEW 1
+#  include "gc_cpp.h"
 #endif
 
 // Helper function to throw an exception if value is null
@@ -166,16 +166,16 @@ bool nix_get_bool(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_RES(false);
 }
 
-const char * nix_get_string(nix_c_context * context, const Value * value)
+nix_err nix_get_string(nix_c_context * context, const Value * value, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
         assert(v.type() == nix::nString);
-        return v.c_str();
+        call_nix_get_string_callback(v.c_str(), callback, user_data);
     }
-    NIXC_CATCH_ERRS_NULL
+    NIXC_CATCH_ERRS
 }
 
 const char * nix_get_path_string(nix_c_context * context, const Value * value)

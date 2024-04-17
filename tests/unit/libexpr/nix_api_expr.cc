@@ -17,9 +17,10 @@ TEST_F(nix_api_expr_test, nix_expr_eval_from_string)
 {
     nix_expr_eval_from_string(nullptr, state, "builtins.nixVersion", ".", value);
     nix_value_force(nullptr, state, value);
-    auto result = nix_get_string(nullptr, value);
+    std::string result;
+    nix_get_string(nullptr, value, OBSERVE_STRING(result));
 
-    ASSERT_STREQ(PACKAGE_VERSION, result);
+    ASSERT_STREQ(PACKAGE_VERSION, result.c_str());
 }
 
 TEST_F(nix_api_expr_test, nix_expr_eval_add_numbers)
@@ -47,7 +48,8 @@ TEST_F(nix_api_expr_test, nix_expr_eval_drv)
     nix_value_call(ctx, stateResult, valueFn, value, valueResult);
     ASSERT_EQ(NIX_TYPE_STRING, nix_get_type(nullptr, valueResult));
 
-    std::string p = nix_get_string(nullptr, valueResult);
+    std::string p;
+    nix_get_string(nullptr, valueResult, OBSERVE_STRING(p));
     std::string pEnd = "-myname";
     ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
 
@@ -69,7 +71,8 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     nix_expr_eval_from_string(nullptr, state, expr, ".", value);
 
     Value * drvPathValue = nix_get_attr_byname(nullptr, value, state, "drvPath");
-    const char * drvPath = nix_get_string(nullptr, drvPathValue);
+    std::string drvPath;
+    nix_get_string(nullptr, drvPathValue, OBSERVE_STRING(drvPath));
 
     std::string p = drvPath;
     std::string pEnd = "-myname.drv";
@@ -78,18 +81,19 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     // NOTE: .drvPath should be usually be ignored. Output paths are more versatile.
     //       See https://github.com/NixOS/nix/issues/6507
     //       Use e.g. nix_string_realise to realise the output.
-    StorePath * drvStorePath = nix_store_parse_path(ctx, store, drvPath);
+    StorePath * drvStorePath = nix_store_parse_path(ctx, store, drvPath.c_str());
     ASSERT_EQ(true, nix_store_is_valid_path(ctx, store, drvStorePath));
 
     Value * outPathValue = nix_get_attr_byname(ctx, value, state, "outPath");
-    const char * outPath = nix_get_string(ctx, outPathValue);
+    std::string outPath;
+    nix_get_string(ctx, outPathValue, OBSERVE_STRING(outPath));
 
     p = outPath;
     pEnd = "-myname";
     ASSERT_EQ(pEnd, p.substr(p.size() - pEnd.size()));
     ASSERT_EQ(true, drvStorePath->path.isDerivation());
 
-    StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath);
+    StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath.c_str());
     ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, outStorePath));
 
     nix_store_realise(ctx, store, drvStorePath, nullptr, nullptr);
@@ -142,7 +146,7 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
                     }}
             a path: ${builtins.toFile "just-a-file" "ooh file good"}
             a derivation path by itself: ${
-                builtins.unsafeDiscardOutputDependency 
+                builtins.unsafeDiscardOutputDependency
                     (derivation {
                         name = "not-actually-built-yet";
                         system = builtins.currentSystem;
