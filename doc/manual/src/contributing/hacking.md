@@ -273,6 +273,29 @@ Configure your editor to use the `clangd` from the `.#native-clangStdenvPackages
 > Some other editors (e.g. Emacs, Vim) need a plugin to support LSP servers in general (e.g. [lsp-mode](https://github.com/emacs-lsp/lsp-mode) for Emacs and [vim-lsp](https://github.com/prabirshrestha/vim-lsp) for vim).
 > Editor-specific setup is typically opinionated, so we will not cover it here in more detail.
 
+## Formatting and pre-commit
+
+You may run the formatters as a one-off using:
+
+```console
+make format
+```
+
+If you'd like to run the formatters before every commit, install the hooks:
+
+```
+pre-commit-hooks-install
+```
+
+This installs [pre-commit](https://pre-commit.com) using [cachix/git-hooks.nix](https://github.com/cachix/git-hooks.nix).
+
+When making a commit, pay attention to the console output.
+If it fails, run `git add --patch` to approve the suggestions _and commit again_.
+
+To refresh the config, do the following:
+- if you use `make format`: stop and start your `nix develop` shell.
+- if you use the pre-commit hook: stop and start, and run `pre-commit-hooks-install` again.
+
 ## Add a release note
 
 `doc/manual/rl-next` contains release notes entries for all unreleased changes.
