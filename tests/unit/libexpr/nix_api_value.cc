@@ -8,6 +8,7 @@
 #include "tests/nix_api_expr.hh"
 #include "tests/string_callback.hh"
 
+#include "gmock/gmock.h"
 #include <cstdlib>
 #include <gtest/gtest.h>
 
@@ -185,6 +186,129 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     nix_gc_decref(ctx, intValue);
     nix_gc_decref(ctx, stringValue);
     free(out_name);
+}
+
+TEST_F(nix_api_expr_test, nix_value_init)
+{
+    // Setup
+
+    // two = 2;
+    // f = a: a * a;
+
+    Value * two = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, two, 2);
+
+    Value * f = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(
+        ctx, state, R"(
+        a: a * a
+    )",
+        "<test>", f);
+
+    // Test
+
+    // r = f two;
+
+    Value * r = nix_alloc_value(ctx, state);
+    nix_init_apply(ctx, r, f, two);
+    assert_ctx_ok();
+
+    ValueType t = nix_get_type(ctx, r);
+    assert_ctx_ok();
+
+    ASSERT_EQ(t, NIX_TYPE_THUNK);
+
+    nix_value_force(ctx, state, r);
+
+    t = nix_get_type(ctx, r);
+    assert_ctx_ok();
+
+    ASSERT_EQ(t, NIX_TYPE_INT);
+
+    int n = nix_get_int(ctx, r);
+    assert_ctx_ok();
+
+    ASSERT_EQ(n, 4);
+
+    // Clean up
+    nix_gc_decref(ctx, two);
+    nix_gc_decref(ctx, f);
+    nix_gc_decref(ctx, r);
+}
+
+TEST_F(nix_api_expr_test, nix_value_init_apply_error)
+{
+    Value * some_string = nix_alloc_value(ctx, state);
+    nix_init_string(ctx, some_string, "some string");
+    assert_ctx_ok();
+
+    Value * v = nix_alloc_value(ctx, state);
+    nix_init_apply(ctx, v, some_string, some_string);
+    assert_ctx_ok();
+
+    // All ok. Call has not been evaluated yet.
+
+    // Evaluate it
+    nix_value_force(ctx, state, v);
+    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(ctx->last_err.value(), testing::HasSubstr("attempt to call something which is not a function but"));
+
+    // Clean up
+    nix_gc_decref(ctx, some_string);
+    nix_gc_decref(ctx, v);
+}
+
+TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
+{
+    // f is a lazy function: it does not evaluate its argument before returning its return value
+    // g is a helper to produce e
+    // e is a thunk that throws an exception
+    //
+    // r = f e
+    // r should not throw an exception, because e is not evaluated
+
+    Value * f = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(
+        ctx, state, R"(
+        a: { foo = a; }
+    )",
+        "<test>", f);
+    assert_ctx_ok();
+
+    Value * e = nix_alloc_value(ctx, state);
+    {
+        Value * g = nix_alloc_value(ctx, state);
+        nix_expr_eval_from_string(
+            ctx, state, R"(
+            _ignore: throw "error message for test case nix_value_init_apply_lazy_arg"
+        )",
+            "<test>", g);
+        assert_ctx_ok();
+
+        nix_init_apply(ctx, e, g, g);
+        assert_ctx_ok();
+        nix_gc_decref(ctx, g);
+    }
+
+    Value * r = nix_alloc_value(ctx, state);
+    nix_init_apply(ctx, r, f, e);
+    assert_ctx_ok();
+
+    nix_value_force(ctx, state, r);
+    assert_ctx_ok();
+
+    auto n = nix_get_attrs_size(ctx, r);
+    assert_ctx_ok();
+    ASSERT_EQ(1, n);
+
+    // nix_get_attr_byname isn't lazy (it could have been) so it will throw the exception
+    Value * foo = nix_get_attr_byname(ctx, r, state, "foo");
+    ASSERT_EQ(nullptr, foo);
+    ASSERT_THAT(ctx->last_err.value(), testing::HasSubstr("error message for test case nix_value_init_apply_lazy_arg"));
+
+    // Clean up
+    nix_gc_decref(ctx, f);
+    nix_gc_decref(ctx, e);
 }
 
 }

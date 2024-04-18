@@ -404,6 +404,19 @@ nix_err nix_init_null(nix_c_context * context, Value * value)
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_init_apply(nix_c_context * context, Value * value, Value * fn, Value * arg)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto & v = check_value_not_null(value);
+        auto & f = check_value_not_null(fn);
+        auto & a = check_value_not_null(arg);
+        v.mkApp(&f, &a);
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue * val)
 {
     if (context)

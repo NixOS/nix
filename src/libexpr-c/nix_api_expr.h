@@ -93,6 +93,8 @@ nix_err nix_expr_eval_from_string(
  * @param[in] arg The argument to pass to the function.
  * @param[out] value The result of the function call.
  * @return NIX_OK if the function call was successful, an error code otherwise.
+ * @see nix_init_apply() for a similar function that does not performs the call immediately, but stores it as a thunk.
+ *      Note the different argument order.
  */
 nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, Value * arg, Value * value);
 

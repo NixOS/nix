@@ -342,8 +342,24 @@ nix_err nix_init_int(nix_c_context * context, Value * value, int64_t i);
  * @param[out] value Nix value to modify
  * @return error code, NIX_OK on success.
  */
-
 nix_err nix_init_null(nix_c_context * context, Value * value);
+
+/** @brief Set the value to a thunk that will perform a function application when needed.
+ *
+ * Thunks may be put into attribute sets and lists to perform some computation lazily; on demand.
+ * However, note that in some places, a thunk must not be returned, such as in the return value of a PrimOp.
+ * In such cases, you may use nix_value_call() instead (but note the different argument order).
+ *
+ * @param[out] context Optional, stores error information
+ * @param[out] value Nix value to modify
+ * @param[in] fn function to call
+ * @param[in] arg argument to pass
+ * @return error code, NIX_OK on successful initialization.
+ * @see nix_value_call() for a similar function that performs the call immediately and only stores the return value.
+ *      Note the different argument order.
+ */
+nix_err nix_init_apply(nix_c_context * context, Value * value, Value * fn, Value * arg);
+
 /** @brief Set an external value
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
@@ -421,7 +437,7 @@ BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState *
 /** @brief Insert bindings into a builder
  * @param[out] context Optional, stores error information
  * @param[in] builder BindingsBuilder to insert into
- * @param[in] name attribute name, copied into the symbol store
+ * @param[in] name attribute name, only used for the duration of the call.
  * @param[in] value value to give the binding
  * @return error code, NIX_OK on success.
  */
