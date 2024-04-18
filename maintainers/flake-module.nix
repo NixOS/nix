@@ -11,7 +11,7 @@
     pre-commit.settings = {
       hooks = {
         clang-format.enable = true;
-        nixpkgs-fmt.enable = true;
+        # TODO: nixfmt, https://github.com/NixOS/nixfmt/issues/153
       };
 
       excludes = [
@@ -25,23 +25,9 @@
         ''^doc/manual/theme/highlight\.js$''
 
         # We haven't applied formatting to these files yet
-        ''^doc/manual/generate-manpage\.nix$''
-        ''^doc/manual/generate-settings\.nix$''
-        ''^doc/manual/generate-store-info\.nix$''
-        ''^doc/manual/generate-xp-features-shortlist\.nix$''
         ''^doc/manual/redirects\.js$''
         ''^doc/manual/theme/highlight\.js$''
-        ''^doc/manual/utils\.nix$''
-        ''^docker\.nix$''
-        ''^flake\.nix$''
-        ''^maintainers/flake-module\.nix$''
-        ''^maintainers/flake-module\.nix$''
-        ''^misc/changelog-d\.cabal\.nix$''
-        ''^misc/changelog-d\.nix$''
-        ''^package\.nix$''
-        ''^perl/default\.nix$''
         ''^precompiled-headers\.h$''
-        ''^scripts/installer\.nix$''
         ''^src/build-remote/build-remote\.cc$''
         ''^src/libcmd/built-path\.cc$''
         ''^src/libcmd/built-path\.hh$''
@@ -81,8 +67,6 @@
         ''^src/libexpr/eval-settings\.hh$''
         ''^src/libexpr/eval\.cc$''
         ''^src/libexpr/eval\.hh$''
-        ''^src/libexpr/fetchurl\.nix$''
-        ''^src/libexpr/flake/call-flake\.nix$''
         ''^src/libexpr/flake/config\.cc$''
         ''^src/libexpr/flake/flake\.cc$''
         ''^src/libexpr/flake/flake\.hh$''
@@ -95,7 +79,6 @@
         ''^src/libexpr/gc-small-vector\.hh$''
         ''^src/libexpr/get-drvs\.cc$''
         ''^src/libexpr/get-drvs\.hh$''
-        ''^src/libexpr/imported-drv-to-derivation\.nix$''
         ''^src/libexpr/json-to-value\.cc$''
         ''^src/libexpr/nixexpr\.cc$''
         ''^src/libexpr/nixexpr\.hh$''
@@ -104,7 +87,6 @@
         ''^src/libexpr/primops\.cc$''
         ''^src/libexpr/primops\.hh$''
         ''^src/libexpr/primops/context\.cc$''
-        ''^src/libexpr/primops/derivation\.nix$''
         ''^src/libexpr/primops/fetchClosure\.cc$''
         ''^src/libexpr/primops/fetchMercurial\.cc$''
         ''^src/libexpr/primops/fetchTree\.cc$''
