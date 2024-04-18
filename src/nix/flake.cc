@@ -457,8 +457,8 @@ struct CmdFlakeCheck : FlakeCommand
                 auto body = dynamic_cast<ExprLambda *>(v.payload.lambda.fun->body);
                 if (!body
                     || body->hasFormals()
-                    || !argHasName(body->arg, "prev"))
-                    throw Error("overlay does not take an argument named 'prev'");
+                    || !(argHasName(body->arg, "prev")) || argHasName(body->arg, "previous"))
+                    throw Error("overlay does not take an argument named 'prev' or 'previous'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
