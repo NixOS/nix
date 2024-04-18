@@ -167,7 +167,10 @@ or for Nix with the [`flakes`] and [`nix-command`] experimental features enabled
 $ nix build .#packages.aarch64-linux.default
 ```
 
-Cross-compiled builds are available for ARMv6 (`armv6l-linux`), ARMv7 (`armv7l-linux`) and RISC-V (`riscv64-linux`).
+Cross-compiled builds are available for:
+- `armv6l-linux`
+- `armv7l-linux`
+- `riscv64-linux`
 Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootstrap Nix on unsupported platforms.
 
 ### Building for multiple platforms at once
