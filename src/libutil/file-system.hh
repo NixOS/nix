@@ -118,6 +118,11 @@ bool pathAccessible(const Path & path);
 Path readLink(const Path & path);
 
 /**
+ * Open a `Descriptor` with read-only access to the given directory.
+ */
+Descriptor openDirectory(const std::filesystem::path & path);
+
+/**
  * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
  */

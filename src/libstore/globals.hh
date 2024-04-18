@@ -424,8 +424,10 @@ public:
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
+#ifndef _WIN32
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
+#endif
 
     Setting<bool> useSubstitutes{
         this, true, "substitute",

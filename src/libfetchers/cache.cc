@@ -109,7 +109,7 @@ struct CacheImpl : Cache
         Key key,
         Store & store,
         Attrs value,
-        const StorePath & storePath)
+        const StorePath & storePath) override
     {
         /* Add the store prefix to the cache key to handle multiple
            store prefixes. */
