@@ -17,13 +17,13 @@ struct Source;
 /**
  * Operating System capability
  */
-typedef
+using Descriptor =
 #if _WIN32
     HANDLE
 #else
     int
 #endif
-    Descriptor;
+    ;
 
 const Descriptor INVALID_DESCRIPTOR =
 #if _WIN32
@@ -41,7 +41,7 @@ const Descriptor INVALID_DESCRIPTOR =
 static inline Descriptor toDescriptor(int fd)
 {
 #ifdef _WIN32
-    return (HANDLE) _get_osfhandle(fd);
+    return reinterpret_cast<HANDLE>(_get_osfhandle(fd));
 #else
     return fd;
 #endif
@@ -56,7 +56,7 @@ static inline Descriptor toDescriptor(int fd)
 static inline int fromDescriptorReadOnly(Descriptor fd)
 {
 #ifdef _WIN32
-    return _open_osfhandle((intptr_t) fd, _O_RDONLY);
+    return _open_osfhandle(reinterpret_cast<intptr_t>(fd), _O_RDONLY);
 #else
     return fd;
 #endif
