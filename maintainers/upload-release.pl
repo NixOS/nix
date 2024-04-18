@@ -172,7 +172,7 @@ eval {
 };
 warn "$@" if $@;
 eval {
-    downloadFile("binaryTarballCross.x86_64-linux.riscv64-linux-gnu", "1");
+    downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
 };
 warn "$@" if $@;
 downloadFile("installerScript", "1");
