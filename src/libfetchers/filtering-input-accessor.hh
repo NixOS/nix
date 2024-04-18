@@ -62,13 +62,13 @@ struct FilteringInputAccessor : InputAccessor
 struct AllowListInputAccessor : public FilteringInputAccessor
 {
     /**
-     * Grant access to the specified prefix.
+     * Grant access to the specified prefix, i.e. the path *and* its
+     * children.
      */
     virtual void allowPrefix(CanonPath prefix) = 0;
 
     /**
-     * Grant access to a path (but not anything underneath the path,
-     * if it's a directory).
+     * Grant access to a path but not its children.
      */
     virtual void allowPath(CanonPath path) = 0;
 
