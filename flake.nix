@@ -430,6 +430,7 @@
         let
           modular = devFlake.getSystem stdenv.buildPlatform.system;
         in {
+          pname = "shell-for-" + attrs.pname;
           installFlags = "sysconfdir=$(out)/etc";
           shellHook = ''
             PATH=$prefix/bin:$PATH
