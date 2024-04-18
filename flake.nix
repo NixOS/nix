@@ -441,6 +441,9 @@
             XDG_DATA_DIRS+=:$out/share
           '';
 
+          # We use this shell with the local checkout, not unpackPhase.
+          src = null;
+
           env = {
             # For `make format`, to work without installing pre-commit
             _NIX_PRE_COMMIT_HOOKS_CONFIG =
