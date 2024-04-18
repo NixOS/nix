@@ -23,6 +23,7 @@ class BindingsBuilder;
 
 
 typedef enum {
+    tUnset,
     tInt = 1,
     tBool,
     tString,
@@ -166,7 +167,7 @@ public:
 struct Value
 {
 private:
-    InternalType internalType;
+    InternalType internalType = tUnset;
 
     friend std::string showType(const Value & v);
 
@@ -270,6 +271,7 @@ public:
     inline ValueType type(bool invalidIsThunk = false) const
     {
         switch (internalType) {
+            case tUnset: break;
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
@@ -292,6 +294,11 @@ public:
     {
         payload = newPayload;
         internalType = newType;
+    }
+
+    inline bool isInitialized()
+    {
+        return internalType != tUnset;
     }
 
     inline void mkInt(NixInt n)
