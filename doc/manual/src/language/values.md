@@ -97,7 +97,7 @@
   Paths are the preferred type for referring to local files.
   This is thanks to the following properties:
   - Path values are always in a canonical form, so that you are relieved from trailing slashes, `.` and `..`.
-  - Path literals are automatically resolved relative to the location of the Nix expression file that contains them.
+  - Path literals are automatically resolved [relative to the file](@docroot@/glossary.md#gloss-base-directory).
   - Path values are automatically copied into the Nix store when used in a string interpolation or concatenation.
   - Tooling can recognize path literals and provide additional features, such as autocompletion, refactoring automation and jump-to-file.
 
