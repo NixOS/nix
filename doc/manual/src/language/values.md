@@ -92,39 +92,48 @@
 
 - <a id="type-path" href="#type-path">Path</a>
 
-  *Paths*, e.g., `/bin/sh` or `./builder.sh`. A path must contain at
-  least one slash to be recognised as such. For instance, `builder.sh`
-  is not a path: it's parsed as an expression that selects the
-  attribute `sh` from the variable `builder`. If the file name is
-  relative, i.e., if it does not begin with a slash, it is made
-  absolute at parse time relative to the [base directory](@docroot@/glossary.md#gloss-base-directory).
-  For instance, if a Nix expression in
-  `/foo/bar/bla.nix` refers to `../xyzzy/fnord.nix`, the absolute path
-  is `/foo/xyzzy/fnord.nix`.
+  *Paths* are distinct from strings and can be expressed by path literals such as `./builder.sh`.
 
-  If the first component of a path is a `~`, it is interpreted as if
-  the rest of the path were relative to the user's home directory.
-  e.g. `~/foo` would be equivalent to `/home/edolstra/foo` for a user
-  whose home directory is `/home/edolstra`.
+  Paths are the preferred type for referring to local files.
+  This is thanks to the following properties:
+  - Path values are always in a canonical form, so that you are relieved from trailing slashes, `.` and `..`.
+  - Path literals are automatically resolved relative to the location of the Nix expression file that contains them.
+  - Path values are automatically copied into the Nix store when used in a string interpolation or concatenation.
+  - Tooling can recognize path literals and provide additional features, such as autocompletion, refactoring automation and jump-to-file.
 
-  For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` in the base directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
+  A path literal must contain at least one slash to be recognised as such.
+  For instance, `builder.sh` is not a path:
+  it's parsed as an expression that selects the attribute `sh` from the variable `builder`.
 
-  Note that the Nix language assumes that all input files will remain _unchanged_ while  evaluating a Nix expression.
+  Path literals may also refer to absolute paths by starting with a slash.
+  This is generally not recommended, because it makes the expression less portable.
+  In the case where a path literal is translated into an absolute path string for a configuration file, it is recommended to just use strings.
+  This avoids some confusion about whether files at that location will be used during evaluation,
+  and it avoids unintentional situations where some function might try to copy everything at the location into the store.
+
+  If the first component of a path is a `~`, it is interpreted such that the rest of the path were relative to the user's home directory.
+  For example, `~/foo` would be equivalent to `/home/edolstra/foo` for a user whose home directory is `/home/edolstra`.
+  Path literals that start with `~` are not allowed in [pure](@docroot@/command-ref/conf-file.md#conf-pure-eval) evaluation.
+
+  Paths can be used in [string interpolation] and string concatenation.
+  For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` from the same directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
+
+  Note that the Nix language assumes that all input files will remain _unchanged_ while evaluating a Nix expression.
   For example, assume you used a file path in an interpolated string during a `nix repl` session.
-  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents.
+  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents. Use `:r` to reset the repl as needed.
 
   [store path]: @docroot@/glossary.md#gloss-store-path
 
-  Paths can include [string interpolation] and can themselves be [interpolated in other expressions].
+  Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 
-  [interpolated in other expressions]: ./string-interpolation.md#interpolated-expressions
+  [interpolated into other expressions]: ./string-interpolation.md#interpolated-expressions
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
 
-  `a.${foo}/b.${bar}` is a syntactically valid division operation.
+  `a.${foo}/b.${bar}` is a syntactically valid number division operation.
   `./a.${foo}/b.${bar}` is a path.
 
-  [Lookup paths](./constructs/lookup-path.md) such as `<nixpkgs>` resolve to path values.
+  [Lookup path](./constructs/lookup-path.md) literals such as `<nixpkgs>` also resolve to path values.
 
 - <a id="type-boolean" href="#type-boolean">Boolean</a>
 
