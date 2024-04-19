@@ -10,6 +10,9 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 
     Path cacheUri;
 
+    const Setting<bool> negotiate{this, false, "negotiate",
+        "Whether to do kerberos negotiate when talking to the http binary cache."};
+
     const std::string name() override
     {
         return "HTTP Binary Cache Store";

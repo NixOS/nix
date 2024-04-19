@@ -320,7 +320,7 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
             #endif
             #if LIBCURL_VERSION_NUM >= 0x072f00
-            if (fileTransferSettings.enableHttp2)
+            if (fileTransferSettings.enableHttp2 && !request.negotiate)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             else
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
@@ -355,6 +355,12 @@ struct curlFileTransfer : public FileTransfer
             } else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
+            }
+
+            if (request.negotiate) {
+                curl_easy_setopt(req, CURLOPT_HTTPAUTH, CURLAUTH_NEGOTIATE);
+                curl_easy_setopt(req, CURLOPT_USERNAME, "");
+                curl_easy_setopt(req, CURLOPT_PASSWORD, "");
             }
 
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransferSettings.connectTimeout.get());

@@ -64,6 +64,7 @@ struct FileTransferRequest
     std::string expectedETag;
     bool verifyTLS = true;
     bool head = false;
+    bool negotiate = false;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = 250;
     ActivityId parentAct;
