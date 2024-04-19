@@ -83,7 +83,7 @@ This information is not intrinsic to the store object, but about how it is store
 
 ## Computed closure fields
 
-These fields are not stored at all, but computed by traverising the other other fields across all the store objects in a [closure].
+These fields are not stored at all, but computed by traversing the other fields across all the store objects in a [closure].
 
 * `closureSize`:
 

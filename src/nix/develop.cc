@@ -7,7 +7,10 @@
 #include "outputs-spec.hh"
 #include "derivations.hh"
 #include "progress-bar.hh"
-#include "run.hh"
+
+#ifndef _WIN32 // TODO re-enable on Windows
+# include "run.hh"
+#endif
 
 #include <iterator>
 #include <memory>
@@ -175,6 +178,14 @@ struct BuildEnvironment
             return str->value;
         else
             throw Error("bash variable is not a string");
+    }
+
+    static Associative getAssociative(const Value & value)
+    {
+        if (auto assoc = std::get_if<Associative>(&value))
+            return *assoc;
+        else
+            throw Error("bash variable is not an associative array");
     }
 
     static Array getStrings(const Value & value)
@@ -362,13 +373,17 @@ struct Common : InstallableCommand, MixProfile
         auto outputs = buildEnvironment.vars.find("outputs");
         assert(outputs != buildEnvironment.vars.end());
 
-        // FIXME: properly unquote 'outputs'.
         StringMap rewrites;
-        for (auto & outputName : BuildEnvironment::getStrings(outputs->second)) {
-            auto from = buildEnvironment.vars.find(outputName);
-            assert(from != buildEnvironment.vars.end());
-            // FIXME: unquote
-            rewrites.insert({BuildEnvironment::getString(from->second), outputsDir + "/" + outputName});
+        if (buildEnvironment.providesStructuredAttrs()) {
+            for (auto & [outputName, from] : BuildEnvironment::getAssociative(outputs->second)) {
+                rewrites.insert({from, outputsDir + "/" + outputName});
+            }
+        } else {
+            for (auto & outputName : BuildEnvironment::getStrings(outputs->second)) {
+                auto from = buildEnvironment.vars.find(outputName);
+                assert(from != buildEnvironment.vars.end());
+                rewrites.insert({BuildEnvironment::getString(from->second), outputsDir + "/" + outputName});
+            }
         }
 
         /* Substitute redirects. */
@@ -603,7 +618,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         setEnviron();
         // prevent garbage collection until shell exits
-        setenv("NIX_GCROOT", gcroot.c_str(), 1);
+        setEnv("NIX_GCROOT", gcroot.c_str());
 
         Path shell = "bash";
 
@@ -648,8 +663,11 @@ struct CmdDevelop : Common, MixEnvironment
 
         // Override SHELL with the one chosen for this environment.
         // This is to make sure the system shell doesn't leak into the build environment.
-        setenv("SHELL", shell.c_str(), 1);
+        setEnv("SHELL", shell.c_str());
 
+#ifdef _WIN32 // TODO re-enable on Windows
+        throw UnimplementedError("Cannot yet spawn processes on Windows");
+#else
         // If running a phase or single command, don't want an interactive shell running after
         // Ctrl-C, so don't pass --rcfile
         auto args = phase || !command.empty() ? Strings{std::string(baseNameOf(shell)), rcFilePath}
@@ -671,6 +689,7 @@ struct CmdDevelop : Common, MixEnvironment
         }
 
         runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
+#endif
     }
 };
 

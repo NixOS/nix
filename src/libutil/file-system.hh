@@ -14,6 +14,9 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#ifdef _WIN32
+# include <windef.h>
+#endif
 #include <signal.h>
 
 #include <boost/lexical_cast.hpp>
@@ -29,6 +32,17 @@
 #define DT_REG 1
 #define DT_LNK 2
 #define DT_DIR 3
+#endif
+
+/**
+ * Polyfill for MinGW
+ *
+ * Windows does in fact support symlinks, but the C runtime interfaces predate this.
+ *
+ * @todo get rid of this, and stop using `stat` when we want `lstat` too.
+ */
+#ifndef S_ISLNK
+# define S_ISLNK(m) false
 #endif
 
 namespace nix {

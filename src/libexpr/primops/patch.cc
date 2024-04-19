@@ -11,7 +11,7 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
     state.forceAttrs(*args[0], pos,
         "while evaluating the first argument to 'builtins.patch'");
 
-    for (auto & attr : *args[0]->attrs) {
+    for (auto & attr : *args[0]->attrs()) {
         std::string_view n(state.symbols[attr.name]);
 
         auto check = [&]()

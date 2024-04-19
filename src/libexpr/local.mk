@@ -15,7 +15,7 @@ libexpr_SOURCES := \
 
 INCLUDE_libexpr := -I $(d)
 
-libexpr_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) -I src/libmain $(INCLUDE_libexpr)
+libexpr_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libmain) $(INCLUDE_libexpr)
 
 libexpr_LIBS = libutil libstore libfetchers
 

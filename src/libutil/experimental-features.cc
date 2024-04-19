@@ -263,6 +263,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/46",
     },
     {
+        .tag = Xp::LocalOverlayStore,
+        .name = "local-overlay-store",
+        .description = R"(
+            Allow the use of [local overlay store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-overlay-store).
+        )",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/50",
+    },
+    {
         .tag = Xp::ConfigurableImpureEnv,
         .name = "configurable-impure-env",
         .description = R"(

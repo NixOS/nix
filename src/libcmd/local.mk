@@ -6,7 +6,7 @@ libcmd_DIR := $(d)
 
 libcmd_SOURCES := $(wildcard $(d)/*.cc)
 
-libcmd_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libexpr) -I src/libmain
+libcmd_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libexpr) $(INCLUDE_libmain)
 
 libcmd_LDFLAGS = $(EDITLINE_LIBS) $(LOWDOWN_LIBS) $(THREAD_LDFLAGS)
 

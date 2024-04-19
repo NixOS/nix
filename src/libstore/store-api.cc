@@ -13,13 +13,16 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "git.hh"
-#include "remote-store.hh"
 #include "posix-source-accessor.hh"
 // FIXME this should not be here, see TODO below on
 // `addMultipleToStore`.
 #include "worker-protocol.hh"
 #include "signals.hh"
 #include "users.hh"
+
+#ifndef _WIN32
+# include "remote-store.hh"
+#endif
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -131,12 +134,12 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
             throw Error("fixed output derivation '%s' is not allowed to refer to other store paths.\nYou may need to use the 'unsafeDiscardReferences' derivation attribute, see the manual for more details.",
                 name);
         }
-        return makeStorePath("output:out",
-            hashString(HashAlgorithm::SHA256,
-                "fixed:out:"
+        // make a unique digest based on the parameters for creating this store object
+        auto payload = "fixed:out:"
                 + makeFileIngestionPrefix(info.method)
-                + info.hash.to_string(HashFormat::Base16, true) + ":"),
-            name);
+                + info.hash.to_string(HashFormat::Base16, true) + ":";
+        auto digest = hashString(HashAlgorithm::SHA256, payload);
+        return makeStorePath("output:out", digest, name);
     }
 }
 
@@ -1266,9 +1269,10 @@ Derivation Store::readInvalidDerivation(const StorePath & drvPath)
 
 }
 
-
-#include "local-store.hh"
-#include "uds-remote-store.hh"
+#ifndef _WIN32
+# include "local-store.hh"
+# include "uds-remote-store.hh"
+#endif
 
 
 namespace nix {
@@ -1286,6 +1290,9 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
     return {uri, params};
 }
 
+#ifdef _WIN32 // Unused on Windows because the next `#ifndef`
+[[maybe_unused]]
+#endif
 static bool isNonUriPath(const std::string & spec)
 {
     return
@@ -1298,6 +1305,9 @@ static bool isNonUriPath(const std::string & spec)
 
 std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
+    // TODO reenable on Windows once we have `LocalStore` and
+    // `UDSRemoteStore`.
+    #ifndef _WIN32
     if (uri == "" || uri == "auto") {
         auto stateDir = getOr(params, "state", settings.nixStateDir);
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
@@ -1342,6 +1352,9 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
     } else {
         return nullptr;
     }
+    #else
+    return nullptr;
+    #endif
 }
 
 // The `parseURL` function supports both IPv6 URIs as defined in
@@ -1402,6 +1415,7 @@ ref<Store> openStore(const std::string & uri_,
         params.insert(uriParams.begin(), uriParams.end());
 
         if (auto store = openFromNonUri(uri, params)) {
+            experimentalFeatureSettings.require(store->experimentalFeature());
             store->warnUnknownSettings();
             return ref<Store>(store);
         }

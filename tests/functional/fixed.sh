@@ -61,3 +61,7 @@ out3=$(nix-store --add-fixed --recursive sha256 $TEST_ROOT/fixed)
 
 out4=$(nix-store --print-fixed-path --recursive sha256 "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik" fixed)
 [ "$out" = "$out4" ]
+
+# Can use `outputHashMode = "nar";` instead of `"recursive"` now.
+clearStore
+nix-build fixed.nix -A nar-not-recursive --no-out-link

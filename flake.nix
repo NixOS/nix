@@ -31,13 +31,8 @@
       crossSystems = [
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
+        "riscv64-unknown-linux-gnu"
         "x86_64-unknown-netbsd"
-      ];
-
-      # Nix doesn't yet build on this platform, so we put it in a
-      # separate list. We just use this for `devShells` and
-      # `nixpkgsFor`, which this depends on.
-      shellCrossSystems = crossSystems ++ [
         "x86_64-w64-mingw32"
       ];
 
@@ -83,7 +78,7 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
-          cross = lib.genAttrs shellCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
       installScriptFor = tarballs:
@@ -259,6 +254,7 @@
           # Cross
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
         ];
         installerScriptForGHA = installScriptFor [
           # Native
@@ -267,6 +263,7 @@
           # Cross
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
         ];
 
         # docker image with Nix inside
@@ -283,6 +280,13 @@
           inherit fileset;
           doBuild = false;
           enableInternalAPIDocs = true;
+        };
+
+        # API docs for Nix's C bindings.
+        external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+          inherit fileset;
+          doBuild = false;
+          enableExternalAPIDocs = true;
         };
 
         # System tests.
@@ -419,8 +423,8 @@
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
             (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
-              (makeShells "static" nixpkgsFor.${system}.static)) //
-              (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+              (makeShells "static" nixpkgsFor.${system}.static) //
+              (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv))) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }

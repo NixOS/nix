@@ -171,6 +171,10 @@ eval {
     downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
 };
 warn "$@" if $@;
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
+};
+warn "$@" if $@;
 downloadFile("installerScript", "1");
 
 # Upload docker images to dockerhub.

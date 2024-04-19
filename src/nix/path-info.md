@@ -70,7 +70,7 @@ R""(
 
 * Print the path of the [store derivation] produced by `nixpkgs#hello`:
 
-  [store derivation]: ../../glossary.md#gloss-store-derivation
+  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
   ```console
   # nix path-info --derivation nixpkgs#hello

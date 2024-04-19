@@ -290,7 +290,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             e->eval(*state, *env, v);
             state->forceAttrs(v, noPos, "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
-            for (auto & i : *v.attrs) {
+            for (auto & i : *v.attrs()) {
                 std::string_view name = state->symbols[i.name];
                 if (name.substr(0, cur2.size()) != cur2) continue;
                 completions.insert(concatStrings(prev, expr, ".", name));
@@ -357,7 +357,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
     if (line.empty())
         return ProcessLineResult::PromptAgain;
 
-    _isInterrupted = false;
+    setInterrupted(false);
 
     std::string command, arg;
 
@@ -490,7 +490,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
-                auto pos = state->positions[v.lambda.fun->pos];
+                auto pos = state->positions[v.payload.lambda.fun->pos];
                 if (auto path = std::get_if<SourcePath>(&pos.origin))
                     return {*path, pos.line};
                 else
@@ -742,17 +742,17 @@ void NixRepl::loadFiles()
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); }, "while evaluating an attribute set to be merged in the global scope");
-    if (displ + attrs.attrs->size() >= envSize)
+    if (displ + attrs.attrs()->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
-    for (auto & i : *attrs.attrs) {
+    for (auto & i : *attrs.attrs()) {
         staticEnv->vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
         varNames.emplace(state->symbols[i.name]);
     }
     staticEnv->sort();
     staticEnv->deduplicate();
-    notice("Added %1% variables.", attrs.attrs->size());
+    notice("Added %1% variables.", attrs.attrs()->size());
 }
 
 

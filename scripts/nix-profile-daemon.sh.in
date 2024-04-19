@@ -69,4 +69,4 @@ else
 fi
 
 export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
-unset NIX_LINK
+unset NIX_LINK NIX_LINK_NEW

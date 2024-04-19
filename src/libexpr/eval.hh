@@ -17,6 +17,7 @@
 #include <optional>
 #include <unordered_map>
 #include <mutex>
+#include <functional>
 
 namespace nix {
 
@@ -81,7 +82,7 @@ struct PrimOp
     /**
      * Implementation of the primop.
      */
-    PrimOpFun fun;
+    std::function<std::remove_pointer<PrimOpFun>::type> fun;
 
     /**
      * Optional experimental for this to be gated on.
@@ -95,7 +96,7 @@ struct PrimOp
     void check();
 };
 
-std::ostream & operator<<(std::ostream & output, PrimOp & primOp);
+std::ostream & operator<<(std::ostream & output, const PrimOp & primOp);
 
 /**
  * Info about a constant
@@ -162,6 +163,8 @@ struct DebugTrace {
     bool isError;
 };
 
+// Don't want Windows function
+#undef SearchPath
 
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
@@ -663,9 +666,6 @@ public:
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
-    Value * allocAttr(Value & vAttrs, Symbol name);
-    Value * allocAttr(Value & vAttrs, std::string_view name);
-
     Bindings * allocBindings(size_t capacity);
 
     BindingsBuilder buildBindings(size_t capacity)
@@ -753,10 +753,12 @@ public:
     bool fullGC();
 
     /**
-     * Realise the given context, and return a mapping from the placeholders
-     * used to construct the associated value to their final store path
+     * Realise the given context
+     * @param[in] context the context to realise
+     * @param[out] maybePaths if not nullptr, all built or referenced store paths will be added to this set
+     * @return a mapping from the placeholders used to construct the associated value to their final store path.
      */
-    [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
+    [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
 
     /* Call the binary path filter predicate used builtins.path etc. */
     bool callPathFilter(

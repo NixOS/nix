@@ -2,7 +2,6 @@
 #include <cstring>
 
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "util.hh"
 #include "finally.hh"
 #include "file-system.hh"
@@ -17,9 +16,12 @@
 # include <mutex>
 # include <sys/resource.h>
 # include "cgroup.hh"
+# include "namespaces.hh"
 #endif
 
-#include <sys/mount.h>
+#ifndef _WIN32
+# include <sys/mount.h>
+#endif
 
 namespace nix {
 
@@ -57,6 +59,7 @@ unsigned int getMaxCPU()
 //////////////////////////////////////////////////////////////////////
 
 
+#ifndef _WIN32
 rlim_t savedStackSize = 0;
 
 void setStackSize(rlim_t stackSize)
@@ -79,14 +82,20 @@ void setStackSize(rlim_t stackSize)
         }
     }
 }
+#endif
 
 void restoreProcessContext(bool restoreMounts)
 {
-    restoreSignals();
+    #ifndef _WIN32
+    unix::restoreSignals();
+    #endif
     if (restoreMounts) {
+        #if __linux__
         restoreMountNamespace();
+        #endif
     }
 
+    #ifndef _WIN32
     if (savedStackSize) {
         struct rlimit limit;
         if (getrlimit(RLIMIT_STACK, &limit) == 0) {
@@ -94,6 +103,7 @@ void restoreProcessContext(bool restoreMounts)
             setrlimit(RLIMIT_STACK, &limit);
         }
     }
+    #endif
 }
 
 

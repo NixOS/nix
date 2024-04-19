@@ -24,7 +24,10 @@ ref<InputAccessor> makeStorePathAccessor(
     const StorePath & storePath)
 {
     // FIXME: should use `store->getFSAccessor()`
-    return makeFSInputAccessor(std::filesystem::path { store->toRealPath(storePath) });
+    auto root = std::filesystem::path { store->toRealPath(storePath) };
+    auto accessor = makeFSInputAccessor(root);
+    accessor->setPathDisplay(root.string());
+    return accessor;
 }
 
 SourcePath getUnfilteredRootPath(CanonPath path)

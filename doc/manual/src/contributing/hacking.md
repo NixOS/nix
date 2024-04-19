@@ -144,6 +144,7 @@ Nix can be built for various platforms, as specified in [`flake.nix`]:
 - `aarch64-darwin`
 - `armv6l-linux`
 - `armv7l-linux`
+- `riscv64-linux`
 
 In order to build Nix for a different platform than the one you're currently
 on, you need a way for your current Nix installation to build code for that
@@ -166,7 +167,10 @@ or for Nix with the [`flakes`] and [`nix-command`] experimental features enabled
 $ nix build .#packages.aarch64-linux.default
 ```
 
-Cross-compiled builds are available for ARMv6 (`armv6l-linux`) and ARMv7 (`armv7l-linux`).
+Cross-compiled builds are available for:
+- `armv6l-linux`
+- `armv7l-linux`
+- `riscv64-linux`
 Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootstrap Nix on unsupported platforms.
 
 ### Building for multiple platforms at once
@@ -196,7 +200,7 @@ In order to facilitate this, Nix has some support for being built out of tree â€
 
 ## System type
 
-Nix uses a string with he following format to identify the *system type* or *platform* it runs on:
+Nix uses a string with the following format to identify the *system type* or *platform* it runs on:
 
 ```
 <cpu>-<os>[-<abi>]
