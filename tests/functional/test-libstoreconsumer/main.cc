@@ -15,8 +15,7 @@ int main (int argc, char **argv)
 
         std::string drvPath = argv[1];
 
-        // This small program is a test, so we do not want user config to interfere.
-        initLibStore(false);
+        initLibStore();
 
         auto store = nix::openStore();
 
