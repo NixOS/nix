@@ -444,12 +444,10 @@ ref<eval_cache::EvalCache> openEvalCache(
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
     auto fingerprint = lockedFlake->getFingerprint(state.store);
-    return make_ref<nix::eval_cache::EvalCache>(
-        evalSettings.useEvalCache && evalSettings.pureEval
-            ? fingerprint
-            : std::nullopt,
-        state,
-        [&state, lockedFlake]()
+    auto hash = evalSettings.useEvalCache && evalSettings.pureEval
+        ? fingerprint
+        : std::nullopt;
+    auto rootLoader = [&state, lockedFlake]()
         {
             /* For testing whether the evaluation cache is
                complete. */
@@ -465,7 +463,17 @@ ref<eval_cache::EvalCache> openEvalCache(
             assert(aOutputs);
 
             return aOutputs->value;
-        });
+        };
+
+    if (hash) {
+        auto search = state.evalCaches.find(hash.value());
+        if (search == state.evalCaches.end()) {
+            search = state.evalCaches.emplace(hash.value(), make_ref<nix::eval_cache::EvalCache>(hash, state, rootLoader)).first;
+        }
+        return search->second;
+    } else {
+        return make_ref<nix::eval_cache::EvalCache>(hash, state, rootLoader);
+    }
 }
 
 Installables SourceExprCommand::parseInstallables(
