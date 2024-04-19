@@ -20,106 +20,172 @@ create table if not exists Attributes (
 
 struct AttrDb
 {
-    std::atomic_bool failed{false};
-
     const StoreDirConfig & cfg;
 
-    struct State
+    class State
     {
+        public:
         SQLite db;
-        SQLiteStmt insertAttribute;
-        SQLiteStmt insertAttributeWithContext;
-        SQLiteStmt queryAttribute;
-        SQLiteStmt queryAttributes;
-        std::unique_ptr<SQLiteTxn> txn;
+
+        private:
+        SQLiteStmt _upsertAttribute;
+        SQLiteStmt _insertAttribute;
+        SQLiteStmt _queryAttribute;
+        SQLiteStmt _queryAttributes;
+        SymbolTable & symbols;
+
+
+        public:
+        State(SymbolTable & symbols): symbols(symbols) { };
+        State(State && state): symbols(state.symbols) { };
+
+        void initDb(nix::Path & dbPath) {
+            db = SQLite(dbPath);
+            db.isCache();
+            db.exec(schema);
+
+            _upsertAttribute.create(db, R"(
+                insert into Attributes(parent, name, type, value, context) values (?1, ?2, ?3, ?4, ?5)
+                on conflict do update set type = excluded.type, value = excluded.value, context = excluded.context
+                returning rowid )");
+
+            _insertAttribute.create(db,
+                "insert or ignore into Attributes(parent, name, type, value, context) values (?, ?, ?, ?, ?)");
+
+            _queryAttribute.create(db,
+                "select rowid, type, value, context from Attributes where parent = ? and name = ?");
+
+            _queryAttributes.create(db,
+                "select name from Attributes where parent = ?");
+        }
+
+        template <typename T>
+        void ensureAttribute(AttrKey key, AttrType type, T value, bool not_null = true) {
+            AttrId parentId(key.first);
+            std::string_view attrName(symbols[key.second]);
+
+            _insertAttribute.use()(parentId)(attrName)(type)(value, not_null)(0, false).exec();
+        }
+
+        template <typename T>
+        AttrId upsertAttribute(
+                AttrKey key,
+                AttrType type,
+                T value,
+                bool not_null = true,
+                std::string_view context = "",
+                bool hasContext = false)
+        {
+            AttrId parentId(key.first);
+            std::string_view attrName(symbols[key.second]);
+
+            auto query(_upsertAttribute.use()(parentId)(attrName)(type)(value, not_null)(context, hasContext));
+            query.next();
+            return query.getInt(0);
+        }
+
+        std::vector<Symbol> queryAttributes(AttrId rowId) {
+            std::vector<Symbol> attrs;
+            auto queryAttributes(_queryAttributes.use()(rowId));
+            while (queryAttributes.next())
+                attrs.emplace_back(symbols.create(queryAttributes.getStr(0)));
+            return attrs;
+        }
+
+        std::optional<std::pair<AttrId, AttrValue>> queryAttribute(AttrKey key)
+        {
+            auto queryAttribute(_queryAttribute.use()(key.first)(symbols[key.second]));
+            if (!queryAttribute.next()) return {};
+
+            auto rowId = (AttrId) queryAttribute.getInt(0);
+            auto type = (AttrType) queryAttribute.getInt(1);
+
+            switch (type) {
+                case AttrType::Placeholder:
+                    return {{rowId, placeholder_t()}};
+                case AttrType::FullAttrs: {
+                    // FIXME: expensive, should separate this out.
+                    return {{rowId, queryAttributes(rowId)}};
+                }
+                case AttrType::String: {
+                    NixStringContext context;
+                    if (!queryAttribute.isNull(3))
+                        for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
+                            context.insert(NixStringContextElem::parse(s));
+                    return {{rowId, string_t{queryAttribute.getStr(2), context}}};
+                }
+                case AttrType::Bool:
+                    return {{rowId, queryAttribute.getInt(2) != 0}};
+                case AttrType::Int:
+                    return {{rowId, int_t{queryAttribute.getInt(2)}}};
+                case AttrType::ListOfStrings:
+                    return {{rowId, tokenizeString<std::vector<std::string>>(queryAttribute.getStr(2), "\t")}};
+                case AttrType::Missing:
+                    return {{rowId, missing_t()}};
+                case AttrType::Misc:
+                    return {{rowId, misc_t()}};
+                case AttrType::Failed:
+                    return {{rowId, failed_t()}};
+                default:
+                    throw Error("unexpected type in evaluation cache");
+            }
+        }
     };
 
-    std::unique_ptr<Sync<State>> _state;
+    typedef Sync<State>::Lock StateLock;
 
-    SymbolTable & symbols;
+    std::unique_ptr<Sync<State>> _state;
 
     AttrDb(
         const StoreDirConfig & cfg,
         const Hash & fingerprint,
         SymbolTable & symbols)
         : cfg(cfg)
-        , _state(std::make_unique<Sync<State>>())
-        , symbols(symbols)
+        , _state(std::make_unique<Sync<State>>(std::move(State(symbols))))
     {
-        auto state(_state->lock());
-
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v5";
+        // v1: ???
+        // v2: ???
+        // v3: ???
+        // v4: ???
+        // v5: ???
+        // v6: changed db.isCache() to use WAL journaling.
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v6";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
 
-        state->db = SQLite(dbPath);
-        state->db.isCache();
-        state->db.exec(schema);
-
-        state->insertAttribute.create(state->db,
-            "insert or replace into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
-
-        state->insertAttributeWithContext.create(state->db,
-            "insert or replace into Attributes(parent, name, type, value, context) values (?, ?, ?, ?, ?)");
-
-        state->queryAttribute.create(state->db,
-            "select rowid, type, value, context from Attributes where parent = ? and name = ?");
-
-        state->queryAttributes.create(state->db,
-            "select name from Attributes where parent = ?");
-
-        state->txn = std::make_unique<SQLiteTxn>(state->db);
-    }
-
-    ~AttrDb()
-    {
-        try {
-            auto state(_state->lock());
-            if (!failed)
-                state->txn->commit();
-            state->txn.reset();
-        } catch (...) {
-            ignoreException();
-        }
+        _state->lock()->initDb(dbPath);
     }
 
     template<typename F>
     AttrId doSQLite(F && fun)
     {
-        if (failed) return 0;
+        StateLock state(_state->lock());
         try {
-            return fun();
+            return retrySQLite<AttrId>([&]() {
+                SQLiteTxn transaction(state->db);
+                AttrId res = fun(state);
+                transaction.commit();
+                return res;
+            });
         } catch (SQLiteError &) {
-            ignoreException();
-            failed = true;
+            ignoreException(lvlDebug);
             return 0;
         }
     }
 
-    AttrId setAttrs(
-        AttrKey key,
-        const std::vector<Symbol> & attrs)
+    AttrId setAttrs(AttrKey key, const std::vector<Symbol> & attrs)
     {
-        return doSQLite([&]()
+        return doSQLite([&](StateLock & state)
         {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::FullAttrs)
-                (0, false).exec();
-
-            AttrId rowId = state->db.getLastInsertedRowId();
+            AttrId rowId = state->upsertAttribute(key, AttrType::FullAttrs, 0, false);
             assert(rowId);
 
-            for (auto & attr : attrs)
-                state->insertAttribute.use()
-                    (rowId)
-                    (symbols[attr])
-                    (AttrType::Placeholder)
-                    (0, false).exec();
+            for (auto & attr : attrs) {
+                // Rationale: ensure that it exists, but do not overwrite
+                // computed values with placeholders
+                state->ensureAttribute({rowId, attr}, AttrType::Placeholder, 0, false);
+            }
 
             return rowId;
         });
@@ -130,196 +196,75 @@ struct AttrDb
         std::string_view s,
         const char * * context = nullptr)
     {
-        return doSQLite([&]()
+        return doSQLite([&](StateLock & state)
         {
-            auto state(_state->lock());
-
             if (context) {
                 std::string ctx;
                 for (const char * * p = context; *p; ++p) {
                     if (p != context) ctx.push_back(' ');
                     ctx.append(*p);
                 }
-                state->insertAttributeWithContext.use()
-                    (key.first)
-                    (symbols[key.second])
-                    (AttrType::String)
-                    (s)
-                    (ctx).exec();
+                return state->upsertAttribute(key, AttrType::String, s, true, ctx, true);
             } else {
-                state->insertAttribute.use()
-                    (key.first)
-                    (symbols[key.second])
-                    (AttrType::String)
-                (s).exec();
+                return state->upsertAttribute(key, AttrType::String, s);
             }
-
-            return state->db.getLastInsertedRowId();
         });
     }
 
-    AttrId setBool(
-        AttrKey key,
-        bool b)
-    {
-        return doSQLite([&]()
-        {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::Bool)
-                (b ? 1 : 0).exec();
-
-            return state->db.getLastInsertedRowId();
+    AttrId setBool(AttrKey key, bool b) {
+        return doSQLite([&](StateLock & state) {
+            return state->upsertAttribute(key, AttrType::Bool, b ? 1 : 0);
         });
     }
 
-    AttrId setInt(
-        AttrKey key,
-        int n)
-    {
-        return doSQLite([&]()
-        {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::Int)
-                (n).exec();
-
-            return state->db.getLastInsertedRowId();
+    AttrId setInt(AttrKey key, int n) {
+        return doSQLite([&](StateLock & state) {
+            return state->upsertAttribute(key, AttrType::Int, n);
         });
     }
 
-    AttrId setListOfStrings(
-        AttrKey key,
-        const std::vector<std::string> & l)
-    {
-        return doSQLite([&]()
+    AttrId setListOfStrings(AttrKey key, const std::vector<std::string> & l) {
+        return doSQLite([&](StateLock & state)
         {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::ListOfStrings)
-                (concatStringsSep("\t", l)).exec();
-
-            return state->db.getLastInsertedRowId();
+            return state->upsertAttribute(
+                    key,
+                    AttrType::ListOfStrings,
+                    concatStringsSep("\t", l));
         });
     }
 
-    AttrId setPlaceholder(AttrKey key)
-    {
-        return doSQLite([&]()
-        {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::Placeholder)
-                (0, false).exec();
-
-            return state->db.getLastInsertedRowId();
+    AttrId setPlaceholder(AttrKey key) {
+        return doSQLite([&](StateLock & state) {
+            return state->upsertAttribute(key, AttrType::Placeholder, 0, false);
         });
     }
 
-    AttrId setMissing(AttrKey key)
-    {
-        return doSQLite([&]()
-        {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::Missing)
-                (0, false).exec();
-
-            return state->db.getLastInsertedRowId();
+    AttrId setMissing(AttrKey key) {
+        return doSQLite([&](StateLock & state) {
+            return state->upsertAttribute(key, AttrType::Missing, 0, false);
         });
     }
 
-    AttrId setMisc(AttrKey key)
-    {
-        return doSQLite([&]()
-        {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::Misc)
-                (0, false).exec();
-
-            return state->db.getLastInsertedRowId();
+    AttrId setMisc(AttrKey key) {
+        return doSQLite([&](StateLock & state) {
+            return state->upsertAttribute(key, AttrType::Misc, 0, false);
         });
     }
 
-    AttrId setFailed(AttrKey key)
-    {
-        return doSQLite([&]()
-        {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
-                (key.first)
-                (symbols[key.second])
-                (AttrType::Failed)
-                (0, false).exec();
-
-            return state->db.getLastInsertedRowId();
+    AttrId setFailed(AttrKey key) {
+        return doSQLite([&](StateLock & state) {
+            return state->upsertAttribute(key, AttrType::Failed, 0, false);
         });
     }
 
     std::optional<std::pair<AttrId, AttrValue>> getAttr(AttrKey key)
     {
+        // Not using doSqlite because 1. it only returns AttrId; and 2. this is
+        // only a single query, automatically wrapped in a transaction anyway.
         auto state(_state->lock());
-
-        auto queryAttribute(state->queryAttribute.use()(key.first)(symbols[key.second]));
-        if (!queryAttribute.next()) return {};
-
-        auto rowId = (AttrId) queryAttribute.getInt(0);
-        auto type = (AttrType) queryAttribute.getInt(1);
-
-        switch (type) {
-            case AttrType::Placeholder:
-                return {{rowId, placeholder_t()}};
-            case AttrType::FullAttrs: {
-                // FIXME: expensive, should separate this out.
-                std::vector<Symbol> attrs;
-                auto queryAttributes(state->queryAttributes.use()(rowId));
-                while (queryAttributes.next())
-                    attrs.emplace_back(symbols.create(queryAttributes.getStr(0)));
-                return {{rowId, attrs}};
-            }
-            case AttrType::String: {
-                NixStringContext context;
-                if (!queryAttribute.isNull(3))
-                    for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
-                        context.insert(NixStringContextElem::parse(s));
-                return {{rowId, string_t{queryAttribute.getStr(2), context}}};
-            }
-            case AttrType::Bool:
-                return {{rowId, queryAttribute.getInt(2) != 0}};
-            case AttrType::Int:
-                return {{rowId, int_t{queryAttribute.getInt(2)}}};
-            case AttrType::ListOfStrings:
-                return {{rowId, tokenizeString<std::vector<std::string>>(queryAttribute.getStr(2), "\t")}};
-            case AttrType::Missing:
-                return {{rowId, missing_t()}};
-            case AttrType::Misc:
-                return {{rowId, misc_t()}};
-            case AttrType::Failed:
-                return {{rowId, failed_t()}};
-            default:
-                throw Error("unexpected type in evaluation cache");
-        }
+        return state->queryAttribute(key);
     }
+
 };
 
 static std::shared_ptr<AttrDb> makeAttrDb(
