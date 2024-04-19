@@ -1176,7 +1176,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 // If we don't recognize it, it's probably content
                 return true;
             } catch (EvalError & e) {
-                // Some attrs may contain errors, eg. legacyPackages of
+                // Some attrs may contain errors, e.g. legacyPackages of
                 // nixpkgs. We still want to recurse into it, instead of
                 // skipping it at all.
                 return true;
