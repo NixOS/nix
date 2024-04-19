@@ -215,6 +215,9 @@
 
   [output path]: #gloss-output-path
 
+- [output closure]{#gloss-output-closure}\
+  The [closure] of an [output path]. It only contains what is [reachable] from the output.
+
 - [deriver]{#gloss-deriver}
 
   The [store derivation] that produced an [output path].
