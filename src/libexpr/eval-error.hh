@@ -43,7 +43,6 @@ MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, EvalError);
 MakeError(MissingArgumentError, EvalError);
-MakeError(CachedEvalError, EvalError);
 MakeError(InfiniteRecursionError, EvalError);
 
 struct InvalidPathError : public EvalError

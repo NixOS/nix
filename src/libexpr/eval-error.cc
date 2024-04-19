@@ -99,7 +99,6 @@ template class EvalErrorBuilder<TypeError>;
 template class EvalErrorBuilder<UndefinedVarError>;
 template class EvalErrorBuilder<MissingArgumentError>;
 template class EvalErrorBuilder<InfiniteRecursionError>;
-template class EvalErrorBuilder<CachedEvalError>;
 template class EvalErrorBuilder<InvalidPathError>;
 
 }
