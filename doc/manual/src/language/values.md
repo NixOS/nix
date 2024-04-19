@@ -94,11 +94,10 @@
 
   *Paths* are distinct from strings and can be expressed by path literals such as `./builder.sh`.
 
-  Paths are the preferred type for referring to local files.
-  This is thanks to the following properties:
-  - Path values are always in a canonical form, so that you are relieved from trailing slashes, `.` and `..`.
-  - Path literals are automatically resolved [relative to the file](@docroot@/glossary.md#gloss-base-directory).
-  - Path values are automatically copied into the Nix store when used in a string interpolation or concatenation.
+  Paths are suitable for referring to local files, and are often preferable over strings.
+  - Path values do not contain trailing slashes, `.` and `..`, as they are resolved when evaluating a path literal.
+  - Path literals are automatically resolved relative to their [base directory](@docroot@/glossary.md#gloss-base-directory).
+  - The files referred to by path values are automatically copied into the Nix store when used in a string interpolation or concatenation.
   - Tooling can recognize path literals and provide additional features, such as autocompletion, refactoring automation and jump-to-file.
 
   A path literal must contain at least one slash to be recognised as such.
@@ -106,10 +105,13 @@
   it's parsed as an expression that selects the attribute `sh` from the variable `builder`.
 
   Path literals may also refer to absolute paths by starting with a slash.
-  This is generally not recommended, because it makes the expression less portable.
-  In the case where a path literal is translated into an absolute path string for a configuration file, it is recommended to just use strings.
-  This avoids some confusion about whether files at that location will be used during evaluation,
-  and it avoids unintentional situations where some function might try to copy everything at the location into the store.
+
+  > **Note**
+  >
+  > Absolute paths make expressions less portable.
+  > In the case where a function translates a path literal into an absolute path string for a configuration file, it is recommended to write a string literal instead.
+  > This avoids some confusion about whether files at that location will be used during evaluation.
+  > It also avoids unintentional situations where some function might try to copy everything at the location into the store.
 
   If the first component of a path is a `~`, it is interpreted such that the rest of the path were relative to the user's home directory.
   For example, `~/foo` would be equivalent to `/home/edolstra/foo` for a user whose home directory is `/home/edolstra`.
