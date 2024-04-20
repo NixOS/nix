@@ -14,11 +14,16 @@
 
 namespace nixC {
 
-TEST_F(nix_api_expr_test, nix_value_set_get_int)
+TEST_F(nix_api_expr_test, nix_value_get_int_invalid)
 {
     ASSERT_EQ(0, nix_get_int(ctx, nullptr));
-    ASSERT_DEATH(nix_get_int(ctx, value), "");
+    assert_ctx_err();
+    ASSERT_EQ(0, nix_get_int(ctx, value));
+    assert_ctx_err();
+}
 
+TEST_F(nix_api_expr_test, nix_value_set_get_int)
+{
     int myInt = 1;
     nix_init_int(ctx, value, myInt);
 
@@ -27,11 +32,16 @@ TEST_F(nix_api_expr_test, nix_value_set_get_int)
     ASSERT_EQ(NIX_TYPE_INT, nix_get_type(ctx, value));
 }
 
-TEST_F(nix_api_expr_test, nix_value_set_get_float)
+TEST_F(nix_api_expr_test, nix_value_set_get_float_invalid)
 {
     ASSERT_FLOAT_EQ(0.0, nix_get_float(ctx, nullptr));
-    ASSERT_DEATH(nix_get_float(ctx, value), "");
+    assert_ctx_err();
+    ASSERT_FLOAT_EQ(0.0, nix_get_float(ctx, value));
+    assert_ctx_err();
+}
 
+TEST_F(nix_api_expr_test, nix_value_set_get_float)
+{
     float myDouble = 1.0;
     nix_init_float(ctx, value, myDouble);
 
@@ -40,11 +50,16 @@ TEST_F(nix_api_expr_test, nix_value_set_get_float)
     ASSERT_EQ(NIX_TYPE_FLOAT, nix_get_type(ctx, value));
 }
 
-TEST_F(nix_api_expr_test, nix_value_set_get_bool)
+TEST_F(nix_api_expr_test, nix_value_set_get_bool_invalid)
 {
     ASSERT_EQ(false, nix_get_bool(ctx, nullptr));
-    ASSERT_DEATH(nix_get_bool(ctx, value), "");
+    assert_ctx_err();
+    ASSERT_EQ(false, nix_get_bool(ctx, value));
+    assert_ctx_err();
+}
 
+TEST_F(nix_api_expr_test, nix_value_set_get_bool)
+{
     bool myBool = true;
     nix_init_bool(ctx, value, myBool);
 
@@ -53,12 +68,18 @@ TEST_F(nix_api_expr_test, nix_value_set_get_bool)
     ASSERT_EQ(NIX_TYPE_BOOL, nix_get_type(ctx, value));
 }
 
-TEST_F(nix_api_expr_test, nix_value_set_get_string)
+TEST_F(nix_api_expr_test, nix_value_set_get_string_invalid)
 {
     std::string string_value;
     ASSERT_EQ(NIX_ERR_UNKNOWN, nix_get_string(ctx, nullptr, OBSERVE_STRING(string_value)));
-    ASSERT_DEATH(nix_get_string(ctx, value, OBSERVE_STRING(string_value)), "");
+    assert_ctx_err();
+    ASSERT_EQ(NIX_ERR_UNKNOWN, nix_get_string(ctx, value, OBSERVE_STRING(string_value)));
+    assert_ctx_err();
+}
 
+TEST_F(nix_api_expr_test, nix_value_set_get_string)
+{
+    std::string string_value;
     const char * myString = "some string";
     nix_init_string(ctx, value, myString);
 
@@ -68,21 +89,29 @@ TEST_F(nix_api_expr_test, nix_value_set_get_string)
     ASSERT_EQ(NIX_TYPE_STRING, nix_get_type(ctx, value));
 }
 
+TEST_F(nix_api_expr_test, nix_value_set_get_null_invalid)
+{
+    ASSERT_EQ(NULL, nix_get_typename(ctx, value));
+    assert_ctx_err();
+}
+
 TEST_F(nix_api_expr_test, nix_value_set_get_null)
 {
-    ASSERT_DEATH(nix_get_typename(ctx, value), "");
-
     nix_init_null(ctx, value);
 
     ASSERT_STREQ("null", nix_get_typename(ctx, value));
     ASSERT_EQ(NIX_TYPE_NULL, nix_get_type(ctx, value));
 }
 
-TEST_F(nix_api_expr_test, nix_value_set_get_path)
+TEST_F(nix_api_expr_test, nix_value_set_get_path_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_path_string(ctx, nullptr));
-    ASSERT_DEATH(nix_get_path_string(ctx, value), "");
-
+    assert_ctx_err();
+    ASSERT_EQ(nullptr, nix_get_path_string(ctx, value));
+    assert_ctx_err();
+}
+TEST_F(nix_api_expr_test, nix_value_set_get_path)
+{
     const char * p = "/nix/store/40s0qmrfb45vlh6610rk29ym318dswdr-myname";
     nix_init_path_string(ctx, state, value, p);
 
@@ -91,14 +120,21 @@ TEST_F(nix_api_expr_test, nix_value_set_get_path)
     ASSERT_EQ(NIX_TYPE_PATH, nix_get_type(ctx, value));
 }
 
-TEST_F(nix_api_expr_test, nix_build_and_init_list)
+TEST_F(nix_api_expr_test, nix_build_and_init_list_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, nullptr, state, 0));
+    assert_ctx_err();
     ASSERT_EQ(0, nix_get_list_size(ctx, nullptr));
+    assert_ctx_err();
 
-    ASSERT_DEATH(nix_get_list_byidx(ctx, value, state, 0), "");
-    ASSERT_DEATH(nix_get_list_size(ctx, value), "");
+    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, 0));
+    assert_ctx_err();
+    ASSERT_EQ(0, nix_get_list_size(ctx, value));
+    assert_ctx_err();
+}
 
+TEST_F(nix_api_expr_test, nix_build_and_init_list)
+{
     int size = 10;
     ListBuilder * builder = nix_make_list_builder(ctx, state, size);
 
@@ -119,20 +155,33 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
     nix_gc_decref(ctx, intValue);
 }
 
-TEST_F(nix_api_expr_test, nix_build_and_init_attr)
+TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_attr_byname(ctx, nullptr, state, 0));
+    assert_ctx_err();
     ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, nullptr, state, 0, nullptr));
+    assert_ctx_err();
     ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, nullptr, state, 0));
+    assert_ctx_err();
     ASSERT_EQ(0, nix_get_attrs_size(ctx, nullptr));
+    assert_ctx_err();
     ASSERT_EQ(false, nix_has_attr_byname(ctx, nullptr, state, "no-value"));
+    assert_ctx_err();
 
-    ASSERT_DEATH(nix_get_attr_byname(ctx, value, state, 0), "");
-    ASSERT_DEATH(nix_get_attr_byidx(ctx, value, state, 0, nullptr), "");
-    ASSERT_DEATH(nix_get_attr_name_byidx(ctx, value, state, 0), "");
-    ASSERT_DEATH(nix_get_attrs_size(ctx, value), "");
-    ASSERT_DEATH(nix_has_attr_byname(ctx, value, state, "no-value"), "");
+    ASSERT_EQ(nullptr, nix_get_attr_byname(ctx, value, state, 0));
+    assert_ctx_err();
+    ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, value, state, 0, nullptr));
+    assert_ctx_err();
+    ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, 0));
+    assert_ctx_err();
+    ASSERT_EQ(0, nix_get_attrs_size(ctx, value));
+    assert_ctx_err();
+    ASSERT_EQ(false, nix_has_attr_byname(ctx, value, state, "no-value"));
+    assert_ctx_err();
+}
 
+TEST_F(nix_api_expr_test, nix_build_and_init_attr)
+{
     int size = 10;
     const char ** out_name = (const char **) malloc(sizeof(char *));
 
