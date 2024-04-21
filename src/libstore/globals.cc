@@ -427,12 +427,13 @@ void assertLibStoreInitialized() {
     };
 }
 
-void initLibStore() {
+void initLibStore(bool loadConfig) {
     if (initLibStoreDone) return;
 
     initLibUtil();
 
-    loadConfFile();
+    if (loadConfig)
+        loadConfFile();
 
     preloadNSS();
 
