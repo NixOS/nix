@@ -343,7 +343,7 @@ void initGC()
 }
 
 EvalState::EvalState(
-    const SearchPath & _searchPath,
+    const LookupPath & _lookupPath,
     ref<Store> store,
     std::shared_ptr<Store> buildStore)
     : sWith(symbols.create("<with>"))
@@ -448,16 +448,16 @@ EvalState::EvalState(
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
-        for (auto & i : _searchPath.elements)
-            searchPath.elements.emplace_back(SearchPath::Elem {i});
+        for (auto & i : _lookupPath.elements)
+            lookupPath.elements.emplace_back(LookupPath::Elem {i});
         for (auto & i : evalSettings.nixPath.get())
-            searchPath.elements.emplace_back(SearchPath::Elem::parse(i));
+            lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
     }
 
     /* Allow access to all paths in the search path. */
     if (rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
-        for (auto & i : searchPath.elements)
-            resolveSearchPathPath(i.path, true);
+        for (auto & i : lookupPath.elements)
+            resolveLookupPathPath(i.path, true);
 
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
@@ -2820,19 +2820,19 @@ Expr * EvalState::parseStdin()
 
 SourcePath EvalState::findFile(const std::string_view path)
 {
-    return findFile(searchPath, path);
+    return findFile(lookupPath, path);
 }
 
 
-SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos)
+SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_view path, const PosIdx pos)
 {
-    for (auto & i : searchPath.elements) {
+    for (auto & i : lookupPath.elements) {
         auto suffixOpt = i.prefix.suffixIfPotentialMatch(path);
 
         if (!suffixOpt) continue;
         auto suffix = *suffixOpt;
 
-        auto rOpt = resolveSearchPathPath(i.path);
+        auto rOpt = resolveLookupPathPath(i.path);
         if (!rOpt) continue;
         auto r = *rOpt;
 
@@ -2852,11 +2852,11 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
 }
 
 
-std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
+std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
-    auto i = searchPathResolved.find(value);
-    if (i != searchPathResolved.end()) return i->second;
+    auto i = lookupPathResolved.find(value);
+    if (i != lookupPathResolved.end()) return i->second;
 
     std::optional<std::string> res;
 
@@ -2912,7 +2912,7 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
     else
         debug("failed to resolve search path element '%s'", value);
 
-    searchPathResolved.emplace(value, res);
+    lookupPathResolved.emplace(value, res);
     return res;
 }
 

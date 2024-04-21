@@ -687,7 +687,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
+        runProgramInStore(store, UseLookupPath::Use, shell, args, buildEnvironment.getSystem());
 #endif
     }
 };

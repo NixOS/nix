@@ -77,7 +77,7 @@ void handleDiffHook(
         try {
             auto diffRes = runProgram(RunOptions {
                 .program = diffHook,
-                .searchPath = true,
+                .lookupPath = true,
                 .args = {tryA, tryB, drvPath, tmpDir},
                 .uid = uid,
                 .gid = gid,

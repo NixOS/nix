@@ -385,7 +385,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         runProgram(RunOptions {
             .program = "git",
-            .searchPath = true,
+            .lookupPath = true,
             // FIXME: git stderr messes up our progress indicator, so
             // we're using --quiet for now. Should process its stderr.
             .args = gitArgs,

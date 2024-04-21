@@ -24,7 +24,7 @@ static RunOptions hgOptions(const Strings & args)
 
     return {
         .program = "hg",
-        .searchPath = true,
+        .lookupPath = true,
         .args = args,
         .environment = env
     };
