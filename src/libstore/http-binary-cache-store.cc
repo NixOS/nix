@@ -1,4 +1,5 @@
 #include "binary-cache-store.hh"
+#include "http-binary-cache-store.hh"
 #include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
@@ -8,11 +9,37 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
+HttpAuthMethod parseHttpAuthMethod(const std::string &str) {
+    static const std::map<std::string, HttpAuthMethod> map = {
+        {"none", HttpAuthMethod::NONE},
+        {"basic", HttpAuthMethod::BASIC},
+        {"digest", HttpAuthMethod::DIGEST},
+        {"negotiate", HttpAuthMethod::NEGOTIATE},
+        {"ntlm", HttpAuthMethod::NTLM},
+        {"bearer", HttpAuthMethod::BEARER},
+        {"any", HttpAuthMethod::ANY},
+        {"anysafe", HttpAuthMethod::ANYSAFE}};
+    auto it = map.find(str);
+    if (it == map.end()) {
+       throw UsageError("option authmethod has invalid value '%s'", str);
+    }
+    return it->second;
+}
+
 struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
     const std::string name() override { return "HTTP Binary Cache Store"; }
+
+    const Setting<std::string> authmethod{this, "basic", "authmethod",
+        R"(
+          libcurl auth method to use (`none`, `basic`, `digest`, `bearer`, `negotiate`, `ntlm`, `any`, or `anysafe`).
+          See https://curl.se/libcurl/c/CURLOPT_HTTPAUTH.html for more info.
+        )"};
+
+    const Setting<std::string> bearer_token{this, "", "bearer-token",
+        "Bearer token to use for authentication. Requires `authmethod` to be set to `bearer`."};
 
     std::string doc() override
     {
@@ -149,11 +176,13 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        return FileTransferRequest(
+        auto request = FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
             ? path
             : cacheUri + "/" + path);
-
+        request.authmethod = parseHttpAuthMethod(authmethod);
+        request.bearer_token = bearer_token;
+        return request;
     }
 
     void getFile(const std::string & path, Sink & sink) override
