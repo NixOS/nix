@@ -8,7 +8,11 @@ namespace nix {
 class PathLocks
 {
 private:
+#ifndef _WIN32
     typedef std::pair<int, Path> FDPair;
+#else
+    typedef std::pair<HANDLE, Path> FDPair;
+#endif
     std::list<FDPair> fds;
     bool deletePaths;
 

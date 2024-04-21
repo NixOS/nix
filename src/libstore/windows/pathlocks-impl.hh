@@ -3,7 +3,7 @@
 ///
 #include "file-descriptor.hh"
 
-namespace nix::unix {
+namespace nix {
 
 /**
  * Open (possibly create) a lock file and return the file descriptor.
@@ -15,23 +15,23 @@ AutoCloseFD openLockFile(const Path & path, bool create);
 /**
  * Delete an open lock file.
  */
-void deleteLockFile(const Path & path, int fd);
+void deleteLockFile(const Path & path, HANDLE handle);
 
 enum LockType { ltRead, ltWrite, ltNone };
 
-bool lockFile(int fd, LockType lockType, bool wait);
+bool lockFile(HANDLE handle, LockType lockType, bool wait);
 
 struct FdLock
 {
-    int fd;
+    HANDLE handle;
     bool acquired = false;
 
-    FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg);
+    FdLock(HANDLE handle, LockType lockType, bool wait, std::string_view waitMsg);
 
     ~FdLock()
     {
         if (acquired)
-            lockFile(fd, ltNone, false);
+            lockFile(handle, ltNone, false);
     }
 };
 
