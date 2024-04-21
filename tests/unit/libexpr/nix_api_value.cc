@@ -34,18 +34,18 @@ TEST_F(nix_api_expr_test, nix_value_set_get_int)
 
 TEST_F(nix_api_expr_test, nix_value_set_get_float_invalid)
 {
-    ASSERT_FLOAT_EQ(0.0, nix_get_float(ctx, nullptr));
+    ASSERT_DOUBLE_EQ(0.0, nix_get_float(ctx, nullptr));
     assert_ctx_err();
-    ASSERT_FLOAT_EQ(0.0, nix_get_float(ctx, value));
+    ASSERT_DOUBLE_EQ(0.0, nix_get_float(ctx, value));
     assert_ctx_err();
 }
 
 TEST_F(nix_api_expr_test, nix_value_set_get_float)
 {
-    float myDouble = 1.0;
+    double myDouble = 1.0;
     nix_init_float(ctx, value, myDouble);
 
-    ASSERT_FLOAT_EQ(myDouble, nix_get_float(ctx, value));
+    ASSERT_DOUBLE_EQ(myDouble, nix_get_float(ctx, value));
     ASSERT_STREQ("a float", nix_get_typename(ctx, value));
     ASSERT_EQ(NIX_TYPE_FLOAT, nix_get_type(ctx, value));
 }
