@@ -61,7 +61,6 @@ TEST_F(nix_api_expr_test, nix_expr_eval_drv)
     nix_state_free(stateResult);
 }
 
-#if 0
 TEST_F(nix_api_expr_test, nix_build_drv)
 {
     auto expr = R"(derivation { name = "myname";
@@ -105,7 +104,6 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     nix_store_path_free(drvStorePath);
     nix_store_path_free(outStorePath);
 }
-#endif
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_value)
 {
@@ -118,7 +116,6 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_value)
     ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("cannot coerce")));
 }
 
-#if 0
 TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
 {
     auto expr = R"(
@@ -135,9 +132,7 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
     ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
     ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("failed with exit code 1")));
 }
-#endif
 
-#if 0
 TEST_F(nix_api_expr_test, nix_expr_realise_context)
 {
     // TODO (ca-derivations): add a content-addressed derivation output, which produces a placeholder
@@ -195,6 +190,5 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
 
     nix_realised_string_free(r);
 }
-#endif
 
 } // namespace nixC
