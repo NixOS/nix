@@ -41,7 +41,7 @@ public:
     virtual std::string doc() { return ""; }
 
     /**
-     * @brief Get the base directory for the command.
+     * @brief Get the [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory) for the command.
      *
      * @return Generally the working directory, but in case of a shebang
      *         interpreter, returns the directory of the script.

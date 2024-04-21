@@ -97,8 +97,8 @@
   is not a path: it's parsed as an expression that selects the
   attribute `sh` from the variable `builder`. If the file name is
   relative, i.e., if it does not begin with a slash, it is made
-  absolute at parse time relative to the directory of the Nix
-  expression that contained it. For instance, if a Nix expression in
+  absolute at parse time relative to the [base directory](@docroot@/glossary.md#gloss-base-directory).
+  For instance, if a Nix expression in
   `/foo/bar/bla.nix` refers to `../xyzzy/fnord.nix`, the absolute path
   is `/foo/xyzzy/fnord.nix`.
 
@@ -107,7 +107,7 @@
   e.g. `~/foo` would be equivalent to `/home/edolstra/foo` for a user
   whose home directory is `/home/edolstra`.
 
-  For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` in the current directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
+  For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` in the base directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
 
   Note that the Nix language assumes that all input files will remain _unchanged_ while  evaluating a Nix expression.
   For example, assume you used a file path in an interpolated string during a `nix repl` session.
