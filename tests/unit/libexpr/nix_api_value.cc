@@ -367,4 +367,17 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
     nix_gc_decref(ctx, e);
 }
 
+TEST_F(nix_api_expr_test, nix_copy_value)
+{
+    Value * source = nix_alloc_value(ctx, state);
+
+    nix_init_int(ctx, source, 42);
+    nix_copy_value(ctx, value, source);
+
+    ASSERT_EQ(42, nix_get_int(ctx, value));
+
+    // Clean up
+    nix_gc_decref(ctx, source);
+}
+
 }

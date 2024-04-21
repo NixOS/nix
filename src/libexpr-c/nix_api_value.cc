@@ -513,7 +513,7 @@ nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * p)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_copy_value(nix_c_context * context, Value * value, Value * source)
+nix_err nix_copy_value(nix_c_context * context, Value * value, const Value * source)
 {
     if (context)
         context->last_err_code = NIX_OK;
