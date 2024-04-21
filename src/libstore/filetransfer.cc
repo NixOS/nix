@@ -320,7 +320,9 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
             #endif
             #if LIBCURL_VERSION_NUM >= 0x072f00
-            if (fileTransferSettings.enableHttp2)
+            // Our writeCallbackWrapper does not support rewinding which breaks
+            // negotiate/kerberos auth over http/2.
+            if (fileTransferSettings.enableHttp2 && request.authmethod != HttpAuthMethod::NEGOTIATE)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             else
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
@@ -355,6 +357,14 @@ struct curlFileTransfer : public FileTransfer
             } else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
+            }
+
+            curl_easy_setopt(req, CURLOPT_HTTPAUTH, request.authmethod);
+            if (request.authmethod != HttpAuthMethod::NEGOTIATE) {
+                curl_easy_setopt(req, CURLOPT_USERNAME, "");
+                curl_easy_setopt(req, CURLOPT_PASSWORD, "");
+            } else if (request.authmethod != HttpAuthMethod::BEARER) {
+                curl_easy_setopt(req, CURLOPT_XOAUTH2_BEARER, request.bearer_token.c_str());
             }
 
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransferSettings.connectTimeout.get());

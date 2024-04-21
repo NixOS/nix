@@ -72,6 +72,7 @@ mkMesonDerivation (finalAttrs: {
   propagatedBuildInputs = [
     nix-util
     nlohmann_json
+    curl
   ];
 
   preConfigure =
