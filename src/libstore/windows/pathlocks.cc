@@ -7,8 +7,6 @@
 #include <windows.h>
 #include "windows-error.hh"
 
-#define BUFSIZE MAX_PATH
-
 namespace nix {
 
 void deleteLockFile(const Path & path, HANDLE handle) {
@@ -37,8 +35,6 @@ void PathLocks::unlock()
 
 AutoCloseFD openLockFile(const Path & path, bool create)
 {
-  std::wstring temp = std::wstring(path.begin(), path.end());
-  LPCWSTR path_new = temp.c_str();
   AutoCloseFD handle = CreateFileA(path.c_str(),
           GENERIC_READ | GENERIC_WRITE,
           FILE_SHARE_READ | FILE_SHARE_WRITE,
