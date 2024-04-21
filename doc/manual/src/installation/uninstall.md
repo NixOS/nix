@@ -7,6 +7,7 @@ If you have a [single-user installation](./installing-binary.md#single-user-inst
 ```console
 $ rm -rf /nix
 ```
+You might also want to manually remove reference to Nix from your `~/.profile`.
 
 ## Multi User
 
