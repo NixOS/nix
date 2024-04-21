@@ -113,7 +113,7 @@ static void sigHandler(int signo) { }
 #endif
 
 
-void initNix()
+void initNix(bool loadConfig)
 {
     /* Turn on buffering for cerr. */
 #if HAVE_PUBSETBUF
@@ -121,7 +121,7 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-    initLibStore();
+    initLibStore(loadConfig);
 
 #ifndef _WIN32
     unix::startSignalHandlerThread();

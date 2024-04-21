@@ -36,6 +36,13 @@ typedef struct StorePath StorePath;
 nix_err nix_libstore_init(nix_c_context * context);
 
 /**
+ * @brief Like nix_libstore_init, but does not load the Nix configuration.
+ *
+ * This is useful when external configuration is not desired, such as when running unit tests.
+ */
+nix_err nix_libstore_init_no_load_config(nix_c_context * context);
+
+/**
  * @brief Loads the plugins specified in Nix's plugin-files setting.
  *
  * Call this once, after calling your desired init functions and setting
