@@ -56,7 +56,7 @@ struct AttrDb
                 "select rowid, type, value, context from Attributes where parent = ? and name = ?");
 
             _queryAttributes.create(db,
-                "select name from Attributes where parent = ?");
+                "select name from Attributes where parent = ? and type <> " + std::to_string(AttrType::Missing));
         }
 
         template <typename T>
