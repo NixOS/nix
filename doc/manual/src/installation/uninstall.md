@@ -117,8 +117,7 @@ which you may remove.
    sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
    ```
 
-   This gets rid of any data Nix may have created except for the store which is
-   removed next.
+   This gets rid of any data Nix may have created except for the store, which is removed next.
 
 7. Remove the Nix Store volume:
 
@@ -126,31 +125,26 @@ which you may remove.
    sudo diskutil apfs deleteVolume /nix
    ```
 
-   This will remove the Nix Store volume and everything that was added to the
-   store.
+   This will remove the Nix Store volume and everything that was added to the store.
 
-   If the output indicates that the command couldn't remove the volume, you should
-   make sure you don't have an _unmounted_ Nix Store volume. Look for a
-   "Nix Store" volume in the output of the following command:
+   If the output indicates that the command couldn't remove the volume, you should make sure you don't have an _unmounted_ Nix Store volume.
+   Look for a "Nix Store" volume in the output of the following command:
 
    ```console
    diskutil list
    ```
 
-   If you _do_ see a "Nix Store" volume, delete it by re-running the diskutil
-   deleteVolume command, but replace `/nix` with the store volume's `diskXsY`
-   identifier.
+   If you _do_ find a "Nix Store" volume, delete it by running `diskutil deleteVolume` with the store volume's `diskXsY` identifier.
 
 > **Note**
 >
-> After you complete the steps here, you will still have an empty `/nix`
-> directory. This is an expected sign of a successful uninstall. The empty
-> `/nix` directory will disappear the next time you reboot.
+> After you complete the steps here, you will still have an empty `/nix` directory.
+> This is an expected sign of a successful uninstall.
+> The empty `/nix` directory will disappear the next time you reboot.
 >
-> You do not have to reboot to finish uninstalling Nix. The uninstall is
-> complete. macOS (Catalina+) directly controls root directories and its
-> read-only root will prevent you from manually deleting the empty `/nix`
-> mountpoint.
+> You do not have to reboot to finish uninstalling Nix.
+> The uninstall is complete.
+> macOS (Catalina+) directly controls root directories, and its read-only root will prevent you from manually deleting the empty `/nix` mountpoint.
 
 ## Single User
 
