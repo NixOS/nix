@@ -7,7 +7,7 @@ If you have a [single-user installation](./installing-binary.md#single-user-inst
 ```console
 $ rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile
 ```
-You might also want to manually remove reference to Nix from your `~/.profile`.
+You might also want to manually remove references to Nix from your `~/.profile`.
 
 ## Multi User
 
