@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: ["ghcr.io/cirruslabs/ubuntu-runner-arm64:22.04-md", "ghcr.io/cirruslabs/ubuntu-runner-amd64:22.04-md", "ghcr.io/cirruslabs/macos-runner:sonoma"]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -54,7 +54,7 @@ jobs:
   installer:
     needs: [tests, check_secrets]
     if: github.event_name == 'push' && needs.check_secrets.outputs.cachix == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ghcr.io/cirruslabs/ubuntu-runner-amd64:22.04-md
     outputs:
       installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
     steps:
@@ -79,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: ["ghcr.io/cirruslabs/ubuntu-runner-arm64:22.04-md", "ghcr.io/cirruslabs/ubuntu-runner-amd64:22.04-md", "ghcr.io/cirruslabs/macos-runner:sonoma"]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -161,7 +161,7 @@ jobs:
         docker push $IMAGE_ID:master
 
   vm_tests:
-    runs-on: ubuntu-22.04
+    runs-on: ghcr.io/cirruslabs/ubuntu-runner-amd64:22.04
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
