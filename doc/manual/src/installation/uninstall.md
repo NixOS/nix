@@ -43,7 +43,15 @@ which you may remove.
 
 ### macOS
 
-1. Edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
+1. If system-wide shell initialisation files haven't been altered since installing Nix, use the backups made by the installer:
+
+   ```console
+   sudo mv /etc/zshrc.backup-before-nix /etc/zshrc
+   sudo mv /etc/bashrc.backup-before-nix /etc/bashrc
+   sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
+   ```
+
+   Otherwise, edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing `nix-daemon.sh`, which should look like this:
 
    ```bash
    # Nix
@@ -52,18 +60,6 @@ which you may remove.
    fi
    # End Nix
    ```
-
-   If these files haven't been altered since installing Nix you can simply put
-   the backups back in place:
-
-   ```console
-   sudo mv /etc/zshrc.backup-before-nix /etc/zshrc
-   sudo mv /etc/bashrc.backup-before-nix /etc/bashrc
-   sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
-   ```
-
-   This will stop shells from sourcing the file and bringing everything you
-   installed using Nix in scope.
 
 2. Stop and remove the Nix daemon services:
 
@@ -74,8 +70,7 @@ which you may remove.
    sudo rm /Library/LaunchDaemons/org.nixos.darwin-store.plist
    ```
 
-   This stops the Nix daemon and prevents it from being started next time you
-   boot the system.
+   This stops the Nix daemon and prevents it from being started next time you boot the system.
 
 3. Remove the `nixbld` group and the `_nixbuildN` users:
 
