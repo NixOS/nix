@@ -38,6 +38,7 @@ std::string drainFD(Descriptor fd, bool block, const size_t reserveSize)
 
 //////////////////////////////////////////////////////////////////////
 
+
 AutoCloseFD::AutoCloseFD() : fd{INVALID_DESCRIPTOR} {}
 
 
