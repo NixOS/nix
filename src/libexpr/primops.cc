@@ -1043,6 +1043,43 @@ static RegisterPrimOp primop_trace({
     .fun = prim_trace,
 });
 
+static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    if (args[0]->type() == nString)
+        printMsg(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " %1%", args[0]->string_view());
+    else
+        printMsg(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " %1%", ValuePrinter(state, *args[0]));
+
+    if (evalSettings.builtinsAbortOnWarn) {
+        state.error<Abort>("aborting to reveal stack trace of warning, as abort-on-warn is set").debugThrow();
+    }
+    if ((evalSettings.builtinsTraceDebugger || evalSettings.builtinsDebuggerOnWarn) && state.debugRepl && !state.debugTraces.empty()) {
+        const DebugTrace & last = state.debugTraces.front();
+        state.runDebugRepl(nullptr, last.env, last.expr);
+    }
+    state.forceValue(*args[1], pos);
+    v = *args[1];
+}
+
+static RegisterPrimOp primop_warn({
+    .name = "__warn",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Evaluate *e1*, which must be a string and print iton standard error as a warning.
+      Then return *e2*.
+      This function is useful for non-critical situations where attention is advisable.
+
+      If the
+      [`debugger-on-trace`](@docroot@/command-ref/conf-file.md#conf-debugger-on-trace)
+      or [`debugger-on-warn`](@docroot@/command-ref/conf-file.md#conf-debugger-on-warn)
+      option is set to `true` and the `--debugger` flag is given, the
+      interactive debugger will be started when `warn` is called (like
+      [`break`](@docroot@/language/builtins.md#builtins-break)).
+    )",
+    .fun = prim_warn,
+});
+
 
 /* Takes two arguments and evaluates to the second one. Used as the
  * builtins.traceVerbose implementation when --trace-verbose is not enabled

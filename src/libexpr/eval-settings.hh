@@ -158,12 +158,38 @@ struct EvalSettings : Config
 
     Setting<bool> builtinsTraceDebugger{this, false, "debugger-on-trace",
         R"(
-          If set to true and the `--debugger` flag is given,
-          [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace) will
-          enter the debugger like
-          [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+          If set to true and the `--debugger` flag is given, the following functions
+          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+
+          * [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace)
+          * [`builtins.traceVerbose`](@docroot@/language/builtins.md#builtins-traceVerbose)
+            if [`trace-verbose`](#conf-trace-verbose) is set to true.
+          * [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn)
 
           This is useful for debugging warnings in third-party Nix code.
+        )"};
+
+    Setting<bool> builtinsDebuggerOnWarn{this, false, "debugger-on-warn",
+        R"(
+          If set to true and the `--debugger` flag is given, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn)
+          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+
+          This is useful for debugging warnings in third-party Nix code.
+
+          Use [`debugger-on-trace`](#conf-debugger-on-trace) to also enter the debugger on legacy warnings that are logged with [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace).
+        )"};
+
+    Setting<bool> builtinsAbortOnWarn{this, false, "abort-on-warn",
+        R"(
+          If set to true, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn) will throw an error when logging a warning.
+
+          This will give you a stack trace that leads to the location of the warning.
+
+          This is useful for finding information about warnings in third-party Nix code when you can not start the interactive debugger, such as when Nix is called from a non-interactive script. See [`debugger-on-warn`](#conf-debugger-on-warn).
+
+          Currently, a stack trace can only be produced when the debugger is enabled, or when evaluation is aborted.
+
+          This option can be enabled by setting `NIX_ABORT_ON_WARN=1` in the environment.
         )"};
 };
 
