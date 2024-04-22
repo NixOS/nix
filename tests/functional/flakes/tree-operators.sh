@@ -9,25 +9,25 @@ pwd=$(pwd)
 cat > $flake1Dir/flake.nix <<EOF
 {
   inputs.docs = {
-    url = "path://$pwd/../../../doc";
+    url = "path://$pwd/..";
     flake = false;
   };
 
   outputs = { self, docs }: with import ./lib.nix; {
 
-    mdOnly = builtins.filterPath {
+    shOnly = builtins.filterPath {
       path = docs;
       filter =
         path: type:
-        (type != "regular" || hasSuffix ".md" path);
+        (type != "regular" || hasSuffix ".sh" path);
     };
 
-    noReleaseNotes = builtins.filterPath {
-      path = self.mdOnly + "/manual";
+    lang = builtins.filterPath {
+      path = self.shOnly + "/lang";
       filter =
         path: type:
-        assert !hasPrefix "/manual" path;
-        (builtins.baseNameOf path != "release-notes");
+        assert !hasPrefix "/lang" path;
+        (builtins.baseNameOf path != "readDir");
     };
 
   };
@@ -36,13 +36,10 @@ EOF
 
 cp ../lang/lib.nix $flake1Dir/
 
-nix build --out-link $TEST_ROOT/result $flake1Dir#mdOnly
-[[ -e $TEST_ROOT/result/manual/src/quick-start.md ]]
-[[ -e $TEST_ROOT/result/manual/src/release-notes ]]
-(! find $TEST_ROOT/result/ -type f | grep -v '.md$')
-find $TEST_ROOT/result/ -type f | grep release-notes
+nix build --out-link $TEST_ROOT/result $flake1Dir#shOnly
+[[ -e $TEST_ROOT/result/flakes/tree-operators.sh ]]
+(! find $TEST_ROOT/result/ -type f | grep -v '.sh$')
 
-nix build --out-link $TEST_ROOT/result $flake1Dir#noReleaseNotes
-[[ -e $TEST_ROOT/result/src/quick-start.md ]]
-(! [[ -e $TEST_ROOT/result/src/release-notes ]])
-(! find $TEST_ROOT/result/ -type f | grep release-notes)
+nix build --out-link $TEST_ROOT/result $flake1Dir#lang
+[[ -e $TEST_ROOT/result/framework.sh ]]
+(! [[ -e $TEST_ROOT/result/readDir ]])
