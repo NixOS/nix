@@ -173,7 +173,13 @@
             boost
             lowdown-nix
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp]
+          ++ lib.optionals stdenv.isLinux [(libseccomp.overrideAttrs (_: rec {
+            version = "2.5.5";
+            src = fetchurl {
+              url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
+              hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
+            };
+          }))]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 

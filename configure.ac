@@ -252,6 +252,17 @@ case "$host_os" in
                         [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
       have_seccomp=1
       AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
+      AC_COMPILE_IFELSE([
+        AC_LANG_SOURCE([[
+          #include <seccomp.h>
+          #ifndef __SNR_fchmodat2
+          # error "Missing support for fchmodat2"
+          #endif
+        ]])
+      ], [], [
+        echo "libseccomp is missing __SNR_fchmodat2. Please provide libseccomp 2.5.5 or later"
+        exit 1
+      ])
     else
       have_seccomp=
     fi
