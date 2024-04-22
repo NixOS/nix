@@ -8,12 +8,36 @@ permissions: read-all
 
 jobs:
 
+  setup_github_env:
+    permissions:
+      contents: none
+    name: Check Cachix and Docker secrets present for installer tests
+    runs-on: ubuntu-latest
+    outputs:
+      cachix: ${{ steps.secret.outputs.cachix }}
+      docker: ${{ steps.secret.outputs.docker }}
+      runners: ${{ steps.secret.outputs.runners }}
+    steps:
+      - name: Check for secrets
+        id: secret
+        env:
+          _CACHIX_SECRETS: ${{ secrets.CACHIX_SIGNING_KEY }}${{ secrets.CACHIX_AUTH_TOKEN }}
+          _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "::set-output name=cachix::${{ env._CACHIX_SECRETS != '' }}"
+          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
+          if [[ ${{ github.repository }} == "NixOS/nix" ]]; then
+              echo 'runners=["ghcr.io/cirruslabs/ubuntu-runner-arm64:22.04-md", "ghcr.io/cirruslabs/ubuntu-runner-amd64:22.04-md", "ghcr.io/cirruslabs/macos-runner:sonoma"]' >> "$GITHUB_OUTPUT"
+          else
+              echo 'runners=["ubuntu-latest", "macos-latest"]' >> "$GITHUB_OUTPUT"
+          fi
+
   tests:
-    needs: [check_secrets]
+    needs: [setup_github_env]
     strategy:
       fail-fast: false
       matrix:
-        os: ["ghcr.io/cirruslabs/ubuntu-runner-arm64:22.04-md", "ghcr.io/cirruslabs/ubuntu-runner-amd64:22.04-md", "ghcr.io/cirruslabs/macos-runner:sonoma"]
+        os: ${{ fromJSON(needs.setup_github_env.outputs.runners) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -26,34 +50,16 @@ jobs:
         extra_nix_config: "sandbox = true"
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v14
-      if: needs.check_secrets.outputs.cachix == 'true'
+      if: needs.setup_github_env.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix --experimental-features 'nix-command flakes' flake check -L
 
-  check_secrets:
-    permissions:
-      contents: none
-    name: Check Cachix and Docker secrets present for installer tests
-    runs-on: ubuntu-latest
-    outputs:
-      cachix: ${{ steps.secret.outputs.cachix }}
-      docker: ${{ steps.secret.outputs.docker }}
-    steps:
-      - name: Check for secrets
-        id: secret
-        env:
-          _CACHIX_SECRETS: ${{ secrets.CACHIX_SIGNING_KEY }}${{ secrets.CACHIX_AUTH_TOKEN }}
-          _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          echo "::set-output name=cachix::${{ env._CACHIX_SECRETS != '' }}"
-          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
-
   installer:
-    needs: [tests, check_secrets]
-    if: github.event_name == 'push' && needs.check_secrets.outputs.cachix == 'true'
+    needs: [tests, setup_github_env]
+    if: github.event_name == 'push' && needs.setup_github_env.outputs.cachix == 'true'
     runs-on: ghcr.io/cirruslabs/ubuntu-runner-amd64:22.04-md
     outputs:
       installerURL: ${{ steps.prepare-installer.outputs.installerURL }}
@@ -74,8 +80,8 @@ jobs:
       run: scripts/prepare-installer-for-github-actions
 
   installer_test:
-    needs: [installer, check_secrets]
-    if: github.event_name == 'push' && needs.check_secrets.outputs.cachix == 'true'
+    needs: [installer, setup_github_env]
+    if: github.event_name == 'push' && needs.setup_github_env.outputs.cachix == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -100,15 +106,15 @@ jobs:
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
   docker_push_image:
-    needs: [check_secrets, tests]
+    needs: [setup_github_env, tests]
     permissions:
       contents: read
       packages: write
     if: >-
       github.event_name == 'push' &&
       github.ref_name == 'master' &&
-      needs.check_secrets.outputs.cachix == 'true' &&
-      needs.check_secrets.outputs.docker == 'true'
+      needs.setup_github_env.outputs.cachix == 'true' &&
+      needs.setup_github_env.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -120,7 +126,7 @@ jobs:
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#default.version | tr -d \")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v14
-      if: needs.check_secrets.outputs.cachix == 'true'
+      if: needs.setup_github_env.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
