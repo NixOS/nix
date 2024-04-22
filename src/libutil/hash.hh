@@ -11,9 +11,10 @@ namespace nix {
 MakeError(BadHash, Error);
 
 
-enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512 };
+enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512, BLAKE3 };
 
 
+const int blake3HashSize = 32;
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
 const int sha256HashSize = 32;

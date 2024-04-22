@@ -6,6 +6,7 @@
 , autoreconfHook
 , aws-sdk-cpp
 , boehmgc
+, blake3-src
 , buildPackages
 , nlohmann_json
 , bison
@@ -203,6 +204,9 @@ in {
 
   VERSION_SUFFIX = versionSuffix;
 
+  # Export the BLAKE3 source location so we can access it from the make files.
+  NIX_BLAKE3_SRC = blake3-src;
+
   outputs = [ "out" ]
     ++ lib.optional doBuild "dev"
     # If we are doing just build or just docs, the one thing will use
@@ -233,6 +237,7 @@ in {
   ;
 
   buildInputs = lib.optionals doBuild [
+    blake3-src
     boost
     brotli
     bzip2

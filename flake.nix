@@ -181,6 +181,26 @@
 
           changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
 
+          blake3-src-nix = final.stdenv.mkDerivation rec {
+            pname = "blake3-src-nix";
+            version = "1.5.1";
+            src = final.fetchzip {
+              url = "https://github.com/BLAKE3-team/BLAKE3/archive/refs/tags/${version}.tar.gz";
+              hash = "sha512-fEdcjMJiqFkeXL91L95kmvl8fTo8LrGnFuT5NLLa+zFkDo4OalpepHTbi/goD1m8aNVzGwhmfnscOzeKv+gMRg==";
+            };
+            phases = [ "unpackPhase" "installPhase" ];
+            installPhase = ''
+              mkdir -p $out
+              cp -a ${src}/* $out
+            '';
+            meta = {
+              description = "The BLAKE3 source code";
+              homepage = "https://github.com/BLAKE3-team/BLAKE3";
+              license = lib.licenses.asl20;
+              platforms = lib.platforms.all;
+            };
+          };
+
           nix =
             let
               officialRelease = false;
@@ -199,6 +219,7 @@
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+              blake3-src = final.blake3-src-nix;
             } // {
               # this is a proper separate downstream package, but put
               # here also for back compat reasons.
