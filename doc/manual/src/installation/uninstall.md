@@ -96,10 +96,20 @@ which you may remove.
 
    This will prevent automatic mounting of the Nix Store volume.
 
-5. Edit `/etc/synthetic.conf` to remove the `nix` line. If this is the only
-   line in the file you can remove it entirely, `sudo rm /etc/synthetic.conf`.
-   This will prevent the creation of the empty `/nix` directory to provide a
-   mountpoint for the Nix Store volume.
+5. Edit `/etc/synthetic.conf` to remove the `nix` line.
+   If this is the only line in the file you can remove it entirely:
+
+   ```bash
+   if [ -f /etc/synthetic.conf ]; then
+     if [ "$(cat /etc/synthetic.conf)" = "nix" ]; then
+       sudo rm /etc/synthetic.conf
+     else
+       sudo vi /etc/synthetic.conf
+     fi
+   fi
+   ```
+
+   This will prevent the creation of the empty `/nix` directory to provide a mountpoint for the Nix Store volume.
 
 6. Remove the files Nix added to your system:
 
