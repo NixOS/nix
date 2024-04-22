@@ -5,6 +5,22 @@
 
 namespace nix {
 
+/**
+ * Open (possibly create) a lock file and return the file descriptor.
+ * -1 is returned if create is false and the lock could not be opened
+ * because it doesn't exist.  Any other error throws an exception.
+ */
+AutoCloseFD openLockFile(const Path & path, bool create);
+
+/**
+ * Delete an open lock file.
+ */
+void deleteLockFile(const Path & path, Descriptor desc);
+
+enum LockType { ltRead, ltWrite, ltNone };
+
+bool lockFile(Descriptor desc, LockType lockType, bool wait);
+
 class PathLocks
 {
 private:
@@ -23,23 +39,6 @@ public:
     void unlock();
     void setDeletion(bool deletePaths);
 };
-
-
-/**
- * Open (possibly create) a lock file and return the file descriptor.
- * -1 is returned if create is false and the lock could not be opened
- * because it doesn't exist.  Any other error throws an exception.
- */
-AutoCloseFD openLockFile(const Path & path, bool create);
-
-/**
- * Delete an open lock file.
- */
-void deleteLockFile(const Path & path, Descriptor desc);
-
-enum LockType { ltRead, ltWrite, ltNone };
-
-bool lockFile(Descriptor desc, LockType lockType, bool wait);
 
 struct FdLock
 {
