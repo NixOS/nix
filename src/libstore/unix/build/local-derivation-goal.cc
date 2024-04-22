@@ -37,7 +37,6 @@
 
 /* Includes required for chroot support. */
 #if __linux__
-# include "fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
 # include <netinet/ip.h>
@@ -1671,10 +1670,6 @@ void setupSeccomp()
             throw SysError("unable to add seccomp rule");
 
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmodat), 1,
-                SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
-            throw SysError("unable to add seccomp rule");
-
-        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), NIX_SYSCALL_FCHMODAT2, 1,
                 SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
             throw SysError("unable to add seccomp rule");
     }
