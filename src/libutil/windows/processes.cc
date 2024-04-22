@@ -28,7 +28,7 @@
 
 namespace nix {
 
-std::string runProgram(Path program, bool searchPath, const Strings & args,
+std::string runProgram(Path program, bool lookupPath, const Strings & args,
     const std::optional<std::string> & input, bool isInteractive)
 {
     throw UnimplementedError("Cannot shell out to git on Windows yet");

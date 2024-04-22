@@ -78,7 +78,7 @@ struct CmdRepl : RawInstallablesCommand
             return values;
         };
         auto repl = AbstractNixRepl::create(
-            searchPath,
+            lookupPath,
             openStore(),
             state,
             getValues

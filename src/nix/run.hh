@@ -5,13 +5,13 @@
 
 namespace nix {
 
-enum struct UseSearchPath {
+enum struct UseLookupPath {
     Use,
     DontUse
 };
 
 void runProgramInStore(ref<Store> store,
-    UseSearchPath useSearchPath,
+    UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,
     std::optional<std::string_view> system = std::nullopt);

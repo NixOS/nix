@@ -295,6 +295,25 @@
   [path]: ./language/values.md#type-path
   [attribute name]: ./language/values.md#attribute-set
 
+- [base directory]{#gloss-base-directory}
+
+  The location from which relative paths are resolved.
+
+  - For expressions in a file, the base directory is the directory containing that file.
+    This is analogous to the directory of a [base URL](https://datatracker.ietf.org/doc/html/rfc1808#section-3.3).
+    <!-- which is sufficient for resolving non-empty URLs -->
+
+  <!--
+    The wording here may look awkward, but it's for these reasons:
+      * "with --expr": it's a flag, and not an option with an accompanying value
+      * "written in": the expression itself must be written as an argument,
+        whereas the more natural "passed as an argument" allows an interpretation
+        where the expression could be passed by file name.
+    -->
+  - For expressions written in command line arguments with [`--expr`](@docroot@/command-ref/opt-common.html#opt-expr), the base directory is the current working directory.
+
+  [base directory]: #gloss-base-directory
+
 - [experimental feature]{#gloss-experimental-feature}
 
   Not yet stabilized functionality guarded by named experimental feature flags.

@@ -1725,7 +1725,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.findFile");
 
-    SearchPath searchPath;
+    LookupPath lookupPath;
 
     for (auto v2 : args[0]->listItems()) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.findFile");
@@ -1753,15 +1753,15 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
             ).atPos(pos).debugThrow();
         }
 
-        searchPath.elements.emplace_back(SearchPath::Elem {
-            .prefix = SearchPath::Prefix { .s = prefix },
-            .path = SearchPath::Path { .s = path },
+        lookupPath.elements.emplace_back(LookupPath::Elem {
+            .prefix = LookupPath::Prefix { .s = prefix },
+            .path = LookupPath::Path { .s = path },
         });
     }
 
     auto path = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.findFile");
 
-    v.mkPath(state.findFile(searchPath, path, pos));
+    v.mkPath(state.findFile(lookupPath, path, pos));
 }
 
 static RegisterPrimOp primop_findFile(PrimOp {
@@ -4642,8 +4642,8 @@ void EvalState::createBaseEnv()
     });
 
     /* Add a value containing the current Nix expression search path. */
-    auto list = buildList(searchPath.elements.size());
-    for (const auto & [n, i] : enumerate(searchPath.elements)) {
+    auto list = buildList(lookupPath.elements.size());
+    for (const auto & [n, i] : enumerate(lookupPath.elements)) {
         auto attrs = buildBindings(2);
         attrs.alloc("path").mkString(i.path.s);
         attrs.alloc("prefix").mkString(i.prefix.s);

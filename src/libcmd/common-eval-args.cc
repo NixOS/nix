@@ -126,7 +126,7 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) {
-            searchPath.elements.emplace_back(SearchPath::Elem::parse(s));
+            lookupPath.elements.emplace_back(LookupPath::Elem::parse(s));
         }}
     });
 

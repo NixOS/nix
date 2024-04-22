@@ -22,7 +22,6 @@
 #include "experimental-features.hh"
 
 using namespace nix;
-using namespace nix::unix;
 using std::cin;
 
 static void handleAlarm(int sig) {
