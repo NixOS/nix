@@ -9,7 +9,7 @@
 
 namespace nix {
 
-void deleteLockFile(const Path & path, HANDLE handle) {
+void deleteLockFile(const Path & path, Descriptor desc) {
 
   int exit = DeleteFileA(path.c_str());
   if (exit == 0)
@@ -35,41 +35,41 @@ void PathLocks::unlock()
 
 AutoCloseFD openLockFile(const Path & path, bool create)
 {
-  AutoCloseFD handle = CreateFileA(path.c_str(),
+  AutoCloseFD desc = CreateFileA(path.c_str(),
           GENERIC_READ | GENERIC_WRITE,
           FILE_SHARE_READ | FILE_SHARE_WRITE,
           NULL,
           create ? OPEN_ALWAYS : OPEN_EXISTING,
           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_POSIX_SEMANTICS,
           NULL);
-  if (handle.get() == INVALID_HANDLE_VALUE)
+  if (desc.get() == INVALID_HANDLE_VALUE)
       warn("%s: %s", path, std::to_string(GetLastError()));
 
-  return handle;
+  return desc;
 }
 
-bool lockFile(HANDLE handle, LockType lockType, bool wait) {
+bool lockFile(Descriptor desc, LockType lockType, bool wait) {
     switch(lockType) {
         case ltNone: {
             OVERLAPPED ov = { 0 };
-            if (!UnlockFileEx(handle, 0, 2, 0, &ov)) {
-                WinError winError("Failed to unlock file handle %s", handle);
+            if (!UnlockFileEx(desc, 0, 2, 0, &ov)) {
+                WinError winError("Failed to unlock file desc %s", desc);
                 throw winError;
             }
             return true;
         }
         case ltRead: {
             OVERLAPPED ov = { 0 };
-            if (!LockFileEx(handle, wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
-                WinError winError("Failed to lock file handle %s", handle);
+            if (!LockFileEx(desc, wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
+                WinError winError("Failed to lock file desc %s", desc);
                 if (winError.lastError == ERROR_LOCK_VIOLATION)
                     return false;
                 throw winError;
             }
 
             ov.Offset = 1;
-            if (!UnlockFileEx(handle, 0, 1, 0, &ov)) {
-                WinError winError("Failed to unlock file handle %s", handle);
+            if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
+                WinError winError("Failed to unlock file desc %s", desc);
                 if (winError.lastError != ERROR_NOT_LOCKED)
                     throw winError;
             }
@@ -78,16 +78,16 @@ bool lockFile(HANDLE handle, LockType lockType, bool wait) {
         case ltWrite: {
             OVERLAPPED ov = { 0 };
             ov.Offset = 1;
-            if (!LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY), 0, 1, 0, &ov)) {
-                WinError winError("Failed to lock file handle %s", handle);
+            if (!LockFileEx(desc, LOCKFILE_EXCLUSIVE_LOCK | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY), 0, 1, 0, &ov)) {
+                WinError winError("Failed to lock file desc %s", desc);
                 if (winError.lastError == ERROR_LOCK_VIOLATION)
                     return false;
                 throw winError;
             }
 
             ov.Offset = 0;
-            if (!UnlockFileEx(handle, 0, 1, 0, &ov)) {
-                WinError winError("Failed to unlock file handle %s", handle);
+            if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
+                WinError winError("Failed to unlock file desc %s", desc);
                 if (winError.lastError != ERROR_NOT_LOCKED)
                     throw winError;
             }
@@ -136,16 +136,16 @@ bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bo
     return true;
 }
 
-FdLock::FdLock(HANDLE handle, LockType lockType, bool wait, std::string_view waitMsg)
-  : handle(handle)
+FdLock::FdLock(Descriptor desc, LockType lockType, bool wait, std::string_view waitMsg)
+  : desc(desc)
 {
   if (wait) {
-      if (!lockFile(handle, lockType, false)) {
+      if (!lockFile(desc, lockType, false)) {
         printInfo("%s", waitMsg);
-        acquired = lockFile(handle, lockType, true);
+        acquired = lockFile(desc, lockType, true);
       }
   } else
-      acquired = lockFile(handle, lockType, false);
+      acquired = lockFile(desc, lockType, false);
 }
 
 }

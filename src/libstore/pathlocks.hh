@@ -8,11 +8,7 @@ namespace nix {
 class PathLocks
 {
 private:
-#ifndef _WIN32
-    typedef std::pair<int, Path> FDPair;
-#else
-    typedef std::pair<HANDLE, Path> FDPair;
-#endif
+    typedef std::pair<Descriptor, Path> FDPair;
     std::list<FDPair> fds;
     bool deletePaths;
 
@@ -28,6 +24,35 @@ public:
     void setDeletion(bool deletePaths);
 };
 
-}
 
-#include "pathlocks-impl.hh"
+/**
+ * Open (possibly create) a lock file and return the file descriptor.
+ * -1 is returned if create is false and the lock could not be opened
+ * because it doesn't exist.  Any other error throws an exception.
+ */
+AutoCloseFD openLockFile(const Path & path, bool create);
+
+/**
+ * Delete an open lock file.
+ */
+void deleteLockFile(const Path & path, Descriptor desc);
+
+enum LockType { ltRead, ltWrite, ltNone };
+
+bool lockFile(Descriptor desc, LockType lockType, bool wait);
+
+struct FdLock
+{
+    Descriptor desc;
+    bool acquired = false;
+
+    FdLock(Descriptor desc, LockType lockType, bool wait, std::string_view waitMsg);
+
+    ~FdLock()
+    {
+        if (acquired)
+            lockFile(desc, ltNone, false);
+    }
+};
+
+}
