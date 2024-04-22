@@ -639,6 +639,8 @@ struct GitInputScheme : InputScheme
                     attrs.insert_or_assign("ref", submodule.branch);
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+                attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
@@ -690,6 +692,9 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", submodulePath.abs());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+                attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                // TODO: fall back to getAccessorFromCommit-like fetch when submodules aren't checked out
+                // attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
 
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
