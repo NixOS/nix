@@ -81,11 +81,20 @@ which you may remove.
 
    This will remove all the build users that no longer serve a purpose.
 
-4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store
-   volume on `/nix`, which looks like
-   `UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners` or
-   `LABEL=Nix\040Store /nix apfs rw,nobrowse`. This will prevent automatic
-   mounting of the Nix Store volume.
+4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store volume on `/nix`, which looks like
+
+   ```
+   UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners
+   ```
+   or
+
+   ```
+   LABEL=Nix\040Store /nix apfs rw,nobrowse
+   ```
+
+   by setting the cursor on the respective line using the error keys, and pressing `dd`, and then `:wq` to save the file.
+
+   This will prevent automatic mounting of the Nix Store volume.
 
 5. Edit `/etc/synthetic.conf` to remove the `nix` line. If this is the only
    line in the file you can remove it entirely, `sudo rm /etc/synthetic.conf`.
