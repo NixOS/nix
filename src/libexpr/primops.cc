@@ -1046,10 +1046,20 @@ static RegisterPrimOp primop_trace({
 static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    if (args[0]->type() == nString)
-        printMsg(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " %1%", args[0]->string_view());
-    else
-        printMsg(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " %1%", ValuePrinter(state, *args[0]));
+
+    {
+        BaseError msg(args[0]->type() == nString
+                ? std::string(args[0]->string_view())
+                : ({
+                    std::stringstream s;
+                    s << ValuePrinter(state, *args[0]);
+                    s.str();
+                }));
+        msg.atPos(state.positions[pos]);
+        auto info = msg.info();
+        info.level = lvlWarn;
+        logWarning(info);
+    }
 
     if (evalSettings.builtinsAbortOnWarn) {
         state.error<Abort>("aborting to reveal stack trace of warning, as abort-on-warn is set").debugThrow();
