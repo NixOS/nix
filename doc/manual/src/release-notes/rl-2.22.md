@@ -4,7 +4,7 @@
 
 - Remove experimental repl-flake [#10103](https://github.com/NixOS/nix/issues/10103) [#10299](https://github.com/NixOS/nix/pull/10299)
 
-  The `repl-flake` experimental feature has been removed. The `nix repl` command now works like the rest of the new CLI in that `nix repl {path}` now tries to load a flake at `{path}` (or fails if the `flakes` experimental feature isn't enabled).*
+  The `repl-flake` experimental feature has been removed. The `nix repl` command now works like the rest of the new CLI in that `nix repl {path}` now tries to load a flake at `{path}` (or fails if the `flakes` experimental feature isn't enabled).
 
 ### Other changes
 
