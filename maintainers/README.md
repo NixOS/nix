@@ -49,8 +49,7 @@ The team meets twice a week:
        - mark it as draft if it is blocked on the contributor
        - escalate it back to the team by moving it to To discuss, and leaving a comment as to why the issue needs to be discussed again.
 
-- Work meeting: [Mondays 13:00-15:00 CET](https://calendar.google.com/calendar/event?eid=NTM1MG1wNGJnOGpmOTZhYms3bTB1bnY5cWxfMjAyMjExMjFUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
-
+- Work meeting: [Mondays 12:00-14:00 UTC](https://jitsi.lassul.us/nix-maintainers)
   1. Code review on pull requests from [In review](#in-review).
   2. Other chores and tasks.
 
