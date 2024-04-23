@@ -32,7 +32,3 @@ error:
        (19997 duplicate frames omitted)
 
        error: stack overflow; max-call-depth exceeded
-       at /pwd/lang/eval-fail-infinite-recursion-lambda.nix:1:14:
-            1| (x: x x) (x: x x)
-             |              ^
-            2|

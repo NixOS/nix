@@ -149,15 +149,18 @@ static bool printUnknownLocations = getEnv("_NIX_EVAL_SHOW_UNKNOWN_LOCATIONS").h
  *
  * @return true if a position was printed.
  */
-static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<Pos> & pos) {
+static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<Pos> & pos, std::shared_ptr<Pos> & lastPrintedPos) {
     bool hasPos = pos && *pos;
-    if (hasPos) {
+    if (hasPos && lastPrintedPos && *pos == *lastPrintedPos) {
+        return true;
+    } else if (hasPos) {
         oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
 
         if (auto loc = pos->getCodeLines()) {
             printCodeLines(oss, "", *pos, *loc);
             oss << "\n";
         }
+        lastPrintedPos = *pos;
     } else if (printUnknownLocations) {
         oss << "\n" << indent << ANSI_BLUE << "at " ANSI_RED << "UNKNOWN LOCATION" << ANSI_NORMAL << "\n";
     }
@@ -168,11 +171,12 @@ static void printTrace(
     std::ostream & output,
     const std::string_view & indent,
     size_t & count,
-    const Trace & trace)
+    const Trace & trace,
+    std::shared_ptr<Pos> & lastPrintedPos)
 {
     output << "\n" << "… " << trace.hint.str() << "\n";
 
-    if (printPosMaybe(output, indent, trace.pos))
+    if (printPosMaybe(output, indent, trace.pos, lastPrintedPos))
         count++;
 }
 
@@ -181,14 +185,15 @@ void printSkippedTracesMaybe(
     const std::string_view & indent,
     size_t & count,
     std::vector<Trace> & skippedTraces,
-    std::set<Trace> tracesSeen)
+    std::set<Trace> tracesSeen,
+    std::shared_ptr<Pos> & lastPrintedPos)
 {
     if (skippedTraces.size() > 0) {
         // If we only skipped a few frames, print them out normally;
         // messages like "1 duplicate frames omitted" aren't helpful.
         if (skippedTraces.size() <= 5) {
             for (auto & trace : skippedTraces) {
-                printTrace(output, indent, count, trace);
+                printTrace(output, indent, count, trace, lastPrintedPos);
             }
         } else {
             output << "\n" << ANSI_WARNING "(" << skippedTraces.size() << " duplicate frames omitted)" ANSI_NORMAL << "\n";
@@ -373,6 +378,8 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     // prepended to each element of the trace
     auto ellipsisIndent = "  ";
 
+    std::shared_ptr<Pos> lastPrintedPos;
+
     if (!einfo.traces.empty()) {
         // Stack traces seen since we last printed a chunk of `duplicate frames
         // omitted`.
@@ -398,16 +405,16 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
                 tracesSeen.insert(trace);
 
-                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen, lastPrintedPos);
 
                 count++;
 
-                printTrace(oss, ellipsisIndent, count, trace);
+                printTrace(oss, ellipsisIndent, count, trace, lastPrintedPos);
             }
         }
 
 
-        printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+        printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen, lastPrintedPos);
 
         if (truncate) {
             oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL << "\n";
@@ -418,7 +425,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     oss << einfo.msg << "\n";
 
-    printPosMaybe(oss, "", einfo.pos);
+    printPosMaybe(oss, "", einfo.pos, lastPrintedPos);
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {
