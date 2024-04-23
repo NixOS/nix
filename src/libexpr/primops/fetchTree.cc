@@ -31,9 +31,8 @@ void emitTreeAttrs(
 
     // FIXME: support arbitrary input attributes.
 
-    auto narHash = input.getNarHash();
-    assert(narHash);
-    attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+    if (auto narHash = input.getNarHash())
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(

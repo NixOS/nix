@@ -31,11 +31,6 @@ struct Input
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
 
-    /**
-     * path of the parent of this input, used for relative path resolution
-     */
-    std::optional<Path> parent;
-
 public:
     /**
      * Create an `Input` from a URL.
@@ -72,6 +67,12 @@ public:
      * one that contains a commit hash or content hash.
      */
     bool isLocked() const;
+
+    /**
+     * Only for relative path flakes, i.e. 'path:./foo', returns the
+     * relative path, i.e. './foo'.
+     */
+    std::optional<std::string> isRelative() const;
 
     bool operator ==(const Input & other) const;
 
@@ -220,6 +221,9 @@ struct InputScheme
      * if there is a mismatch.
      */
     virtual void checkLocks(const Input & specified, const Input & final) const;
+
+    virtual std::optional<std::string> isRelative(const Input & input) const
+    { return std::nullopt; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
