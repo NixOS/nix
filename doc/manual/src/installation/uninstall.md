@@ -148,7 +148,7 @@ which you may remove.
 
 ## Single User
 
-To remove [single-user installation](./installing-binary.md#single-user-installation) of Nix, run:
+To remove a [single-user installation](./installing-binary.md#single-user-installation) of Nix, run:
 
 ```console
 $ rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile
