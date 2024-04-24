@@ -109,7 +109,7 @@ which you may remove.
    fi
    ```
 
-   This will prevent the creation of the empty `/nix` directory to provide a mountpoint for the Nix Store volume.
+   This will prevent the creation of the empty `/nix` directory.
 
 6. Remove the files Nix added to your system:
 
