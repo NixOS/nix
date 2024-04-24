@@ -443,9 +443,8 @@ ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
-    auto fingerprint = lockedFlake->getFingerprint(state.store);
-    auto hash = evalSettings.useEvalCache && evalSettings.pureEval
-        ? fingerprint
+    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
+        ? lockedFlake->getFingerprint(state.store)
         : std::nullopt;
     auto rootLoader = [&state, lockedFlake]()
         {
@@ -472,7 +471,7 @@ ref<eval_cache::EvalCache> openEvalCache(
         }
         return search->second;
     } else {
-        return make_ref<nix::eval_cache::EvalCache>(hash, state, rootLoader);
+        return make_ref<nix::eval_cache::EvalCache>(std::nullopt, state, rootLoader);
     }
 }
 
