@@ -1,4 +1,5 @@
 #include "machines.hh"
+#include "build-capability.hh"
 #include "globals.hh"
 #include "store-api.hh"
 
@@ -7,12 +8,12 @@
 namespace nix {
 
 Machine::Machine(decltype(storeUri) storeUri,
-    decltype(systemTypes) systemTypes,
+     std::set<std::string> systemTypes,
     decltype(sshKey) sshKey,
-    decltype(maxJobs) maxJobs,
-    decltype(speedFactor) speedFactor,
-    decltype(supportedFeatures) supportedFeatures,
-    decltype(mandatoryFeatures) mandatoryFeatures,
+    unsigned int maxJobs,
+    float speedFactor,
+    std::set<std::string> supportedFeatures,
+    std::set<std::string> mandatoryFeatures,
     decltype(sshPublicHostKey) sshPublicHostKey) :
     storeUri(
         // Backwards compatibility: if the URI is schemeless, is not a path,
@@ -29,37 +30,81 @@ Machine::Machine(decltype(storeUri) storeUri,
         || hasPrefix(storeUri, "?")
         ? storeUri
         : "ssh://" + storeUri),
-    systemTypes(systemTypes),
     sshKey(sshKey),
-    maxJobs(maxJobs),
-    speedFactor(speedFactor == 0.0f ? 1.0f : std::move(speedFactor)),
-    supportedFeatures(supportedFeatures),
-    mandatoryFeatures(mandatoryFeatures),
     sshPublicHostKey(sshPublicHostKey)
 {
     if (speedFactor < 0.0)
         throw UsageError("speed factor must be >= 0");
+
+    for (const auto & system : systemTypes) {
+        SchedulableCapability * cap =
+            &capabilities.emplace_back(SchedulableCapability {
+                .capability = BuildCapability {
+                    .system = system,
+                    .supportedFeatures = supportedFeatures,
+                    .mandatoryFeatures = mandatoryFeatures
+                },
+                .maxJobs = maxJobs,
+                .isLocal = false,
+                .speedFactor = speedFactor
+            });
+        capabilitiesBySystem[system].push_back(cap);
+    }
+}
+
+bool Machine::canBuild(const Schedulable & schedulable) const
+{
+    auto system = schedulable.getSystem();
+
+    if (system == "builtin") {
+        // Buildable on any system.
+        return std::any_of(capabilities.begin(), capabilities.end(),
+            [&](const SchedulableCapability & sc) {
+                return sc.capability.canBuild(schedulable);
+            });
+    }
+
+    auto it = capabilitiesBySystem.find(std::string(system));
+    if (it == capabilitiesBySystem.end())
+        return false;
+
+    auto & capsList = it->second;
+
+    return std::any_of(capsList.cbegin(), capsList.cend(),
+        [&](const SchedulableCapability * sc) {
+            return sc->capability.canBuild(schedulable);
+        });
 }
 
 bool Machine::systemSupported(const std::string & system) const
 {
-    return system == "builtin" || (systemTypes.count(system) > 0);
+    return system == "builtin" || capabilitiesBySystem.contains(system);
 }
 
 bool Machine::allSupported(const std::set<std::string> & features) const
 {
-    return std::all_of(features.begin(), features.end(),
-        [&](const std::string & feature) {
-            return supportedFeatures.count(feature) ||
-                mandatoryFeatures.count(feature);
+    // We need to use any_of because this method doesn't know the `system`.
+    // This is not accurate; hence the deprecation.
+    return std::any_of(capabilities.begin(), capabilities.end(),
+        [&](const SchedulableCapability & sc) {
+            return std::all_of(features.begin(), features.end(),
+                [&](const std::string & feature) {
+                    return sc.capability.supportedFeatures.count(feature) ||
+                        sc.capability.mandatoryFeatures.count(feature);
+                });
         });
 }
 
 bool Machine::mandatoryMet(const std::set<std::string> & features) const
 {
-    return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(),
-        [&](const std::string & feature) {
-            return features.count(feature);
+    // We need to use any_of because this method doesn't know the `system`.
+    // This is not accurate; hence the deprecation.
+    return std::any_of(capabilities.begin(), capabilities.end(),
+        [&](const SchedulableCapability & sc) {
+            return std::all_of(sc.capability.mandatoryFeatures.begin(), sc.capability.mandatoryFeatures.end(),
+                [&](const std::string & feature) {
+                    return features.count(feature);
+                });
         });
 }
 
@@ -79,15 +124,16 @@ ref<Store> Machine::openStore() const
     }
 
     {
-        auto & fs = storeParams["system-features"];
-        auto append = [&](auto feats) {
-            for (auto & f : feats) {
-                if (fs.size() > 0) fs += ' ';
-                fs += f;
-            }
-        };
-        append(supportedFeatures);
-        append(mandatoryFeatures);
+        // FIXME
+        // auto & fs = storeParams["system-features"];
+        // auto append = [&](auto feats) {
+        //     for (auto & f : feats) {
+        //         if (fs.size() > 0) fs += ' ';
+        //         fs += f;
+        //     }
+        // };
+        // append(supportedFeatures);
+        // append(mandatoryFeatures);
     }
 
     return nix::openStore(storeUri, storeParams);
