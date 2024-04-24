@@ -111,7 +111,7 @@ which you may remove.
 
    This will prevent the creation of the empty `/nix` directory.
 
-6. Remove the files Nix added to your system:
+6. Remove the files Nix added to your system, except for the store:
 
    ```console
    sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
