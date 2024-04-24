@@ -1045,16 +1045,12 @@ static RegisterPrimOp primop_trace({
 
 static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    state.forceValue(*args[0], pos);
+    // We only accept a string argument for now. The use case for pretty printing a value is covered by `trace`.
+    // By rejecting non-strings we allow future versions to add more features without breaking existing code.
+    auto msgStr = state.forceString(*args[0], pos, "while evaluating the first argument; the message passed to builtins.warn");
 
     {
-        BaseError msg(args[0]->type() == nString
-                ? std::string(args[0]->string_view())
-                : ({
-                    std::stringstream s;
-                    s << ValuePrinter(state, *args[0]);
-                    s.str();
-                }));
+        BaseError msg(std::string{msgStr});
         msg.atPos(state.positions[pos]);
         auto info = msg.info();
         info.level = lvlWarn;
