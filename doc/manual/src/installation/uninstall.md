@@ -117,7 +117,6 @@ which you may remove.
    sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
    ```
 
-   This gets rid of any data Nix may have created except for the store, which is removed next.
 
 7. Remove the Nix Store volume:
 
