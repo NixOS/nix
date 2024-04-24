@@ -176,3 +176,23 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes
+
+  flake_regressions:
+    needs: vm_tests
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout nix
+        uses: actions/checkout@v4
+      - name: Checkout flake-regressions
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions
+          path: flake-regressions
+      - name: Checkout flake-regressions-data
+        uses: actions/checkout@v4
+        with:
+          repository: DeterminateSystems/flake-regressions-data
+          path: flake-regressions/tests
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix build --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH scripts/flake-regressions.sh
