@@ -464,10 +464,10 @@ ref<eval_cache::EvalCache> openEvalCache(
             return aOutputs->value;
         };
 
-    if (hash) {
-        auto search = state.evalCaches.find(hash.value());
+    if (fingerprint) {
+        auto search = state.evalCaches.find(fingerprint.value());
         if (search == state.evalCaches.end()) {
-            search = state.evalCaches.emplace(hash.value(), make_ref<nix::eval_cache::EvalCache>(hash, state, rootLoader)).first;
+            search = state.evalCaches.emplace(fingerprint.value(), make_ref<nix::eval_cache::EvalCache>(fingerprint, state, rootLoader)).first;
         }
         return search->second;
     } else {
