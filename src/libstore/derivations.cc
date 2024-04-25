@@ -1008,6 +1008,27 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
         out << i.first << i.second;
 }
 
+void BasicDerivation::applyRewrites(const StringMap & rewrites)
+{
+    if (rewrites.empty()) return;
+
+    debug("rewriting the derivation");
+
+    for (auto & rewrite : rewrites)
+        debug("rewriting %s as %s", rewrite.first, rewrite.second);
+
+    builder = rewriteStrings(builder, rewrites);
+    for (auto & arg : args)
+        arg = rewriteStrings(arg, rewrites);
+
+    StringPairs newEnv;
+    for (auto & envVar : env) {
+        auto envName = rewriteStrings(envVar.first, rewrites);
+        auto envValue = rewriteStrings(envVar.second, rewrites);
+        newEnv.emplace(envName, envValue);
+    }
+    env = std::move(newEnv);
+}
 
 std::string hashPlaceholder(const OutputNameView outputName)
 {
@@ -1015,29 +1036,9 @@ std::string hashPlaceholder(const OutputNameView outputName)
     return "/" + hashString(HashAlgorithm::SHA256, concatStrings("nix-output:", outputName)).to_string(HashFormat::Nix32, false);
 }
 
-
-
-
 static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
 {
-    debug("Rewriting the derivation");
-
-    for (auto & rewrite : rewrites) {
-        debug("rewriting %s as %s", rewrite.first, rewrite.second);
-    }
-
-    drv.builder = rewriteStrings(drv.builder, rewrites);
-    for (auto & arg : drv.args) {
-        arg = rewriteStrings(arg, rewrites);
-    }
-
-    StringPairs newEnv;
-    for (auto & envVar : drv.env) {
-        auto envName = rewriteStrings(envVar.first, rewrites);
-        auto envValue = rewriteStrings(envVar.second, rewrites);
-        newEnv.emplace(envName, envValue);
-    }
-    drv.env = newEnv;
+    drv.applyRewrites(rewrites);
 
     auto hashModulo = hashDerivationModulo(store, Derivation(drv), true);
     for (auto & [outputName, output] : drv.outputs) {
