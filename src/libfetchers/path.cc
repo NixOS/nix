@@ -152,7 +152,9 @@ struct PathInputScheme : InputScheme
             return {makeStorePathAccessor(store, *storePath), std::move(input2)};
 
         } else {
-            return {makeFSInputAccessor(std::filesystem::path(absPath.abs())), std::move(input2)};
+            auto accessor = makeFSInputAccessor(std::filesystem::path(absPath.abs()));
+            accessor->setPathDisplay(absPath.abs());
+            return {accessor, std::move(input2)};
         }
     }
 
