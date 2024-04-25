@@ -425,7 +425,7 @@ EvalState::EvalState(
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #endif
-    , virtualPathMarker(settings.nixStore + "/virtual00000000000000000")
+    , virtualPathMarker(settings.nixStore + "/lazylazy0000000000000000")
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
@@ -971,6 +971,20 @@ void EvalState::mkStorePathString(const StorePath & p, Value & v)
         store->printStorePath(p),
         NixStringContext {
             NixStringContextElem::Opaque { .path = p },
+        });
+}
+
+
+void EvalState::mkPathString(Value & v, const SourcePath & path)
+{
+    assert(path.path.isRoot());
+
+    auto s = encodePath(path);
+
+    v.mkString(
+        s,
+        NixStringContext {
+            NixStringContextElem::InputAccessor { .accessor = path.accessor->number },
         });
 }
 
@@ -2499,6 +2513,14 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
         [&](NixStringContextElem::Built && b) -> SingleDerivedPath {
             return std::move(b);
         },
+        [&](NixStringContextElem::InputAccessor && a) -> SingleDerivedPath {
+            auto accessor = inputAccessors.find(a.accessor);
+            assert(accessor != inputAccessors.end());
+            return SingleDerivedPath::Opaque(fetchToStore(
+                *store,
+                {accessor->second},
+                settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy));
+        },
     }, ((NixStringContextElem &&) *context.begin()).raw);
     return {
         std::move(derivedPath),
@@ -2510,6 +2532,7 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
 SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
 {
     auto [derivedPath, s_] = coerceToSingleDerivedPathUnchecked(pos, v, errorCtx);
+    #if 0 // FIXME
     auto s = s_;
     auto sExpected = mkSingleDerivedPathStringRaw(derivedPath);
     if (s != sExpected) {
@@ -2530,6 +2553,7 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
             }
         }, derivedPath.raw());
     }
+    #endif
     return derivedPath;
 }
 

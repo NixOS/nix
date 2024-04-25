@@ -57,6 +57,11 @@ NixStringContextElem NixStringContextElem::parse(
             .drvPath = StorePath { s.substr(1) },
         };
     }
+    case '@': {
+        return NixStringContextElem::InputAccessor {
+            .accessor = (size_t) std::stoi(std::string(s.substr(1)))
+        };
+    }
     default: {
         // Ensure no '!'
         if (s.find("!") != std::string_view::npos) {
@@ -99,6 +104,10 @@ std::string NixStringContextElem::to_string() const
         [&](const NixStringContextElem::DrvDeep & d) {
             res += '=';
             res += d.drvPath.to_string();
+        },
+        [&](const NixStringContextElem::InputAccessor & a) {
+            res += '@';
+            res += std::to_string(a.accessor);
         },
     }, raw);
 

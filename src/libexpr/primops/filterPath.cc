@@ -19,36 +19,35 @@ struct FilterPathInputAccessor : CachingFilteringInputAccessor
 
     bool isAllowedUncached(const CanonPath & path) override
     {
-        if (!path.isRoot() && !isAllowed(*path.parent())) return false;
+        if (!path.isRoot() && !isAllowed(*path.parent()))
+            return false;
         // Note that unlike 'builtins.{path,filterSource}', we don't
         // pass the prefix to the filter function.
         return state.callPathFilter(filterFun, {next, prefix / path}, path.abs(), pos);
     }
-
 };
 
-static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value & v)
+static void prim_filterPath(EvalState & state, PosIdx pos, Value ** args, Value & v)
 {
     std::optional<SourcePath> path;
     Value * filterFun = nullptr;
     NixStringContext context;
 
-    state.forceAttrs(*args[0], pos,
-        "while evaluating the first argument to 'builtins.filterPath'");
+    state.forceAttrs(*args[0], pos, "while evaluating the first argument to 'builtins.filterPath'");
 
     for (auto & attr : *args[0]->attrs()) {
         auto n = state.symbols[attr.name];
         if (n == "path")
-            path.emplace(state.coerceToPath(attr.pos, *attr.value, context,
-                    "while evaluating the 'path' attribute passed to 'builtins.filterPath'"));
+            path.emplace(state.coerceToPath(
+                attr.pos, *attr.value, context,
+                "while evaluating the 'path' attribute passed to 'builtins.filterPath'"));
         else if (n == "filter") {
             state.forceValue(*attr.value, pos);
             filterFun = attr.value;
-        }
-        else
-            state.error<EvalError>(
-                "unsupported argument '%1%' to 'filterPath'", state.symbols[attr.name])
-                .atPos(attr.pos).debugThrow();
+        } else
+            state.error<EvalError>("unsupported argument '%1%' to 'filterPath'", state.symbols[attr.name])
+                .atPos(attr.pos)
+                .debugThrow();
     }
 
     if (!path)
@@ -57,10 +56,13 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value
     if (!filterFun)
         state.error<EvalError>("'filter' required").atPos(pos).debugThrow();
 
+// FIXME: do we even care if the path has a context?
+#if 0
     if (!context.empty())
         state.error<EvalError>(
-            "'path' argument to 'filterPath' cannot have a context")
+            "'path' argument '%s' to 'filterPath' cannot have a context", *path)
             .atPos(pos).debugThrow();
+#endif
 
     auto accessor = make_ref<FilterPathInputAccessor>(state, pos, *path, filterFun);
 

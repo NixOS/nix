@@ -73,6 +73,9 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                 if (maybePathsOut)
                     maybePathsOut->emplace(d.drvPath);
             },
+            [&](const NixStringContextElem::InputAccessor & a) {
+                assert(false); // FIXME
+            }
         }, c.raw);
     }
 
@@ -1297,6 +1300,8 @@ static void derivationStrictInternal(
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
+    StringMap rewrites;
+
     for (auto & c : context) {
         std::visit(overloaded {
             /* Since this allows the builder to gain access to every
@@ -1321,8 +1326,25 @@ static void derivationStrictInternal(
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
             },
+            [&](const NixStringContextElem::InputAccessor & a) {
+                /* Copy a virtual path (from encodePath()) to the
+                   store. */
+                auto accessor = state.inputAccessors.find(a.accessor);
+                assert(accessor != state.inputAccessors.end());
+                SourcePath path{accessor->second};
+                auto storePath = fetchToStore(
+                    *state.store,
+                    path,
+                    settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy);
+                printError("lazily copied '%s' -> '%s'", path, state.store->printStorePath(storePath));
+                rewrites.emplace(fmt("lazylazy0000000000000000%08d", a.accessor), storePath.hashPart());
+                drv.inputSrcs.insert(storePath);
+            }
         }, c.raw);
     }
+
+    /* Rewrite virtual paths (from encodePath()) to real store paths. */
+    drv.applyRewrites(rewrites);
 
     /* Do we have all required attributes? */
     if (drv.builder == "")

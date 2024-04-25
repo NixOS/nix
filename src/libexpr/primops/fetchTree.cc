@@ -81,7 +81,7 @@ void emitTreeAttrs(
 {
     emitTreeAttrs(state, input, v,
         [&](Value & vOutPath) {
-            vOutPath.mkPath(path);
+            state.mkPathString(vOutPath, path);
         },
         emptyRevFallback,
         forceDirty);
@@ -217,7 +217,7 @@ static void fetchTree(
 
         emitTreeAttrs(
             state, input2, v,
-            [&, storePath(storePath)](Value & vOutPath) {
+            [&](Value & vOutPath) {
                 state.mkStorePathString(storePath, vOutPath);
             },
             params.emptyRevFallback,

@@ -26,8 +26,8 @@ std::string EvalState::encodePath(const SourcePath & path)
        eventually. So print a warning about use of an encoded path in
        decodePath(). */
     return path.accessor == ref<InputAccessor>(rootFS)
-        ? path.path.abs()
-        : fmt("%s%08x-source%s", virtualPathMarker, path.accessor->number, path.path.absOrEmpty());
+               ? path.path.abs()
+               : fmt("%s%08d-source%s", virtualPathMarker, path.accessor->number, path.path.absOrEmpty());
 }
 
 SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
@@ -36,21 +36,20 @@ SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
         error<EvalError>("string '%s' doesn't represent an absolute path", s).atPos(pos).debugThrow();
 
     if (hasPrefix(s, virtualPathMarker)) {
-        auto fail = [s, pos, this]() {
-            error<Abort>("cannot decode virtual path '%s'", s).atPos(pos).debugThrow();
-        };
+        auto fail = [s, pos, this]() { error<Abort>("cannot decode virtual path '%s'", s).atPos(pos).debugThrow(); };
 
         s = s.substr(virtualPathMarker.size());
 
         try {
             auto slash = s.find('/');
-            size_t number = std::stoi(std::string(s.substr(0, slash)), nullptr, 16);
+            size_t number = std::stoi(std::string(s.substr(0, slash)), nullptr, 10);
             s = slash == s.npos ? "" : s.substr(slash);
 
             auto accessor = inputAccessors.find(number);
-            if (accessor == inputAccessors.end()) fail();
+            if (accessor == inputAccessors.end())
+                fail();
 
-            SourcePath path {accessor->second, CanonPath(s)};
+            SourcePath path{accessor->second, CanonPath(s)};
 
             return path;
         } catch (std::invalid_argument & e) {
@@ -77,7 +76,8 @@ std::string EvalState::decodePaths(std::string_view s)
         res.append(s.substr(pos, m - pos));
 
         auto end = s.find_first_of(" \n\r\t'\"’:", m);
-        if (end == s.npos) end = s.size();
+        if (end == s.npos)
+            end = s.size();
 
         try {
             auto path = decodePath(s.substr(m, end - m), noPos);
