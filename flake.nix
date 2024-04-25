@@ -179,6 +179,14 @@
             ];
           });
 
+          libseccomp-nix = final.libseccomp.overrideAttrs (_: rec {
+            version = "2.5.5";
+            src = final.fetchurl {
+              url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
+              hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
+            };
+          });
+
           changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
 
           nix =
@@ -198,6 +206,7 @@
               officialRelease = false;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
+              libseccomp = final.libseccomp-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
             } // {
               # this is a proper separate downstream package, but put
