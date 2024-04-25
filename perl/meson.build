@@ -138,15 +138,23 @@ nix_perl_store_dep_list = [
 
 # # build
 # #-------------------------------------------------
-subdir('lib/Nix')
+lib_dir = join_paths('lib', 'Nix')
+subdir(lib_dir)
 
 if get_option('tests').enabled()
+  yath_rc_conf = configuration_data()
+  yath_rc_conf.set('lib_dir', lib_dir)
+  yath_rc = configure_file(
+    output : '.yath.rc',
+    input : '.yath.rc.in',
+    configuration : yath_rc_conf,
+  )
   subdir('t')
   test(
     'nix-perl-test',
     yath,
-    args : [
-      '-I=@0@'.format( join_paths( meson.current_build_dir(), 'lib', 'Nix') ),
-    ],
+    args : ['test'],
+    workdir : meson.current_build_dir(),
+    depends : [nix_perl_store_lib],
   )
 endif

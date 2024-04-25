@@ -26,7 +26,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
       ./meson.build
       ./meson_options.txt
     ] ++ lib.optionals finalAttrs.doCheck [
-      ./.yath.rc
+      ./.yath.rc.in
       ./t
     ]);
   };
