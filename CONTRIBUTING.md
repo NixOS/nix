@@ -27,6 +27,8 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 1. Search for related issues that cover what you're going to work on.
    It could help to mention there that you will work on the issue.
 
+   We strongly recommend first-time contributors not to propose new features but rather fix tightly-scoped problems in order to build trust and a working relationship with maintainers.
+
    Issues labeled [good first issue](https://github.com/NixOS/nix/labels/good%20first%20issue) should be relatively easy to fix and are likely to get merged quickly.
    Pull requests addressing issues labeled [idea approved](https://github.com/NixOS/nix/labels/idea%20approved) or [RFC](https://github.com/NixOS/nix/labels/RFC) are especially welcomed by maintainers and will receive prioritised review.
 
