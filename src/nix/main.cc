@@ -50,9 +50,11 @@ static bool haveProxyEnvironmentVariables()
         "http_proxy",
         "https_proxy",
         "ftp_proxy",
+        "all_proxy",
         "HTTP_PROXY",
         "HTTPS_PROXY",
-        "FTP_PROXY"
+        "FTP_PROXY",
+        "ALL_PROXY"
     };
     for (auto & proxyVariable: proxyVariables) {
         if (getEnv(proxyVariable).has_value()) {

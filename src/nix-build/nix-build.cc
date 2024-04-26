@@ -121,7 +121,8 @@ static void main_nix_build(int argc, char * * argv)
         "HOME", "XDG_RUNTIME_DIR", "USER", "LOGNAME", "DISPLAY",
         "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "PATH", "TERM", "IN_NIX_SHELL",
         "NIX_SHELL_PRESERVE_PROMPT", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL",
-        "http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"
+        "http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy",
+        "HTTP_PROXY", "HTTPS_PROXY", "FTP_PROXY", "ALL_PROXY", "NO_PROXY"
     };
 
     Strings args;
