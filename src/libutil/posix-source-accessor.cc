@@ -47,7 +47,7 @@ void PosixSourceAccessor::readFile(
 
     auto ap = makeAbsPath(path);
 
-    AutoCloseFD fd = toDescriptor(open(ap.string().c_str(), O_RDONLY
+    AutoCloseFD fd = Descriptor::fromFileDescriptor(open(ap.string().c_str(), O_RDONLY
     #ifndef _WIN32
         | O_NOFOLLOW | O_CLOEXEC
     #endif
@@ -56,7 +56,7 @@ void PosixSourceAccessor::readFile(
         throw SysError("opening file '%1%'", ap.string());
 
     struct stat st;
-    if (fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
+    if (fstat(toFileDescriptorReadOnly(fd.get()), &st) == -1)
         throw SysError("statting file");
 
     sizeCallback(st.st_size);
@@ -66,7 +66,7 @@ void PosixSourceAccessor::readFile(
     std::array<unsigned char, 64 * 1024> buf;
     while (left) {
         checkInterrupt();
-        ssize_t rd = read(fromDescriptorReadOnly(fd.get()), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
+        ssize_t rd = read(toFileDescriptorReadOnly(fd.get()), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading from file '%s'", showPath(path));

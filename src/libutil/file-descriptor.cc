@@ -39,7 +39,7 @@ std::string drainFD(Descriptor fd, bool block, const size_t reserveSize)
 //////////////////////////////////////////////////////////////////////
 
 
-AutoCloseFD::AutoCloseFD() : fd{INVALID_DESCRIPTOR} {}
+AutoCloseFD::AutoCloseFD() : fd{Descriptor::invalid} {}
 
 
 AutoCloseFD::AutoCloseFD(Descriptor fd) : fd{fd} {}
@@ -47,7 +47,7 @@ AutoCloseFD::AutoCloseFD(Descriptor fd) : fd{fd} {}
 
 AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
 {
-    that.fd = INVALID_DESCRIPTOR;
+    that.fd = Descriptor::invalid;
 }
 
 
@@ -55,7 +55,7 @@ AutoCloseFD & AutoCloseFD::operator =(AutoCloseFD && that)
 {
     close();
     fd = that.fd;
-    that.fd = INVALID_DESCRIPTOR;
+    that.fd = Descriptor::invalid;
     return *this;
 }
 
@@ -78,7 +78,7 @@ Descriptor AutoCloseFD::get() const
 
 void AutoCloseFD::close()
 {
-    if (fd != INVALID_DESCRIPTOR) {
+    if (fd != Descriptor::invalid) {
         if(
 #ifdef _WIN32
            ::CloseHandle(fd)
@@ -88,13 +88,13 @@ void AutoCloseFD::close()
            == -1)
             /* This should never happen. */
             throw NativeSysError("closing file descriptor %1%", fd);
-        fd = INVALID_DESCRIPTOR;
+        fd = Descriptor::invalid;
     }
 }
 
 void AutoCloseFD::fsync()
 {
-    if (fd != INVALID_DESCRIPTOR) {
+    if (fd != Descriptor::invalid) {
         int result;
         result =
 #ifdef _WIN32
@@ -113,14 +113,14 @@ void AutoCloseFD::fsync()
 
 AutoCloseFD::operator bool() const
 {
-    return fd != INVALID_DESCRIPTOR;
+    return fd != Descriptor::invalid;
 }
 
 
 Descriptor AutoCloseFD::release()
 {
     Descriptor oldFD = fd;
-    fd = INVALID_DESCRIPTOR;
+    fd = Descriptor::invalid;
     return oldFD;
 }
 

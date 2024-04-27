@@ -71,7 +71,7 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
             auto narAccessor = makeLazyNarAccessor(listing,
                 [cacheFile](uint64_t offset, uint64_t length) {
 
-                    AutoCloseFD fd = toDescriptor(open(cacheFile.c_str(), O_RDONLY
+                    AutoCloseFD fd = Descriptor::fromFileDescriptor(open(cacheFile.c_str(), O_RDONLY
                     #ifndef _WIN32
                         | O_CLOEXEC
                     #endif
@@ -79,7 +79,7 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
                     if (!fd)
                         throw SysError("opening NAR cache file '%s'", cacheFile);
 
-                    if (lseek(fromDescriptorReadOnly(fd.get()), offset, SEEK_SET) != (off_t) offset)
+                    if (lseek(toFileDescriptorReadOnly(fd.get()), offset, SEEK_SET) != (off_t) offset)
                         throw SysError("seeking in '%s'", cacheFile);
 
                     std::string buf(length, 0);
