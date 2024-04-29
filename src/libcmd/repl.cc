@@ -506,6 +506,10 @@ ProcessLineResult NixRepl::processLine(std::string line)
         auto editor = args.front();
         args.pop_front();
 
+        // avoid garbling the editor with the progress bar
+        logger->pause();
+        Finally resume([&]() { logger->resume(); });
+
         // runProgram redirects stdout to a StringSink,
         // using runProgram2 to allow editors to display their UI
         runProgram2(RunOptions { .program = editor, .lookupPath = true, .args = args });
