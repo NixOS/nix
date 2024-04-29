@@ -402,7 +402,35 @@ establishes the same scope as
 let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...
 ```
 
+Variables coming from outer `with` expressions *are* shadowed:
+
+```nix
+with { a = "outer"; };
+with { a = "inner"; };
+a
+```
+
+Does evaluate to `"inner"`.
+
 ## Comments
 
 Comments can be single-line, started with a `#` character, or
 inline/multi-line, enclosed within `/* ... */`.
+
+`#` comments last until the end of the line.
+
+`/*` comments run until the next occurrence of `*/`; this cannot be escaped.
+
+## Scoping rules
+
+Nix has constructs with
+
+* dynamic scope
+  * [`with`](#with-expressions)
+* static scope
+  * [`let`](#let-expressions)
+  * [`inherit`](#inheriting-attributes)
+  * function arguments
+
+Static scope takes precedence over dynamic scope.
+See [`with`](#with-expressions) for a detailed example.
