@@ -59,9 +59,13 @@ These are command line arguments that represent something that can be realised i
 The following types of installable are supported by most commands:
 
 - [Flake output attribute](#flake-output-attribute) (experimental)
+  - This is the default
 - [Store path](#store-path)
+  - This is assumed if the argument is a Nix store path or a symlink to a Nix store path
 - [Nix file](#nix-file), optionally qualified by an attribute path
+  - Specified with `--file`/`-f`
 - [Nix expression](#nix-expression), optionally qualified by an attribute path
+  - Specified with `--expr`/`-E`
 
 For most commands, if no installable is specified, `.` is assumed.
 That is, Nix will operate on the default flake output attribute of the flake in the current directory.
