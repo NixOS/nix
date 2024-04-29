@@ -182,9 +182,10 @@ that contains programs, and a `dev` output that provides development
 artifacts like C/C++ header files. The outputs on which `nix` commands
 operate are determined as follows:
 
-* You can explicitly specify the desired outputs using the syntax
-  *installable*`^`*output1*`,`*...*`,`*outputN*. For example, you can
-  obtain the `dev` and `static` outputs of the `glibc` package:
+* You can explicitly specify the desired outputs using the syntax *installable*`^`*output1*`,`*...*`,`*outputN* — that is, a caret followed immediately by a comma-separated list of derivation outputs to select.
+  For installables specified as [Flake output attributes](#flake-output-attribute) or [Store paths](#store-path), the output is specified in the same argument:
+
+  For example, you can obtain the `dev` and `static` outputs of the `glibc` package:
 
   ```console
   # nix build 'nixpkgs#glibc^dev,static'
@@ -197,6 +198,19 @@ operate are determined as follows:
   ```console
   # nix build '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^dev,static'
   …
+  ```
+
+  For `-e`/`--expr` and `-f`/`--file`, the derivation output is specified as part of the attribute path:
+
+  ```console
+  $ nix build -f '<nixpkgs>' 'glibc^dev,static'
+  $ nix build --impure -E 'import <nixpkgs> { }' 'glibc^dev,static'
+  ```
+
+  This syntax is the same even if the actual attribute path is empty:
+
+  ```console
+  $ nix build -E 'let pkgs = import <nixpkgs> { }; in pkgs.glibc' '^dev,static'
   ```
 
 * You can also specify that *all* outputs should be used using the
