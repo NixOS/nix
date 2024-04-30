@@ -36,6 +36,9 @@ struct SourcePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemoryInputAccessor;
+namespace eval_cache {
+    class EvalCache;
+}
 
 
 /**
@@ -287,6 +290,11 @@ public:
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
         return *new EvalErrorBuilder<T>(*this, args...);
     }
+
+    /**
+     * A cache for evaluation caches, so as to reuse the same root value if possible
+     */
+    std::map<const Hash, ref<eval_cache::EvalCache>> evalCaches;
 
 private:
 

@@ -1,4 +1,5 @@
 { lib
+, fetchurl
 , stdenv
 , releaseTools
 , autoconf-archive

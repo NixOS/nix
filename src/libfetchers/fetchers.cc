@@ -383,9 +383,13 @@ namespace nlohmann {
 using namespace nix;
 
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
-    auto type = optionalValueAt(json, "type").value_or("ssh-ed25519");
-    auto key = valueAt(json, "key");
-    return fetchers::PublicKey { getString(type), getString(key) };
+    fetchers::PublicKey res = {  };
+    if (auto type = optionalValueAt(json, "type"))
+        res.type = getString(*type);
+
+    res.key = getString(valueAt(json, "key"));
+
+    return res;
 }
 
 void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p) {

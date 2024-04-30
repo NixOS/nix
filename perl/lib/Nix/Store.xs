@@ -1,4 +1,4 @@
-#include "config.h"
+#include "nix/config.h"
 
 #include "EXTERN.h"
 #include "perl.h"

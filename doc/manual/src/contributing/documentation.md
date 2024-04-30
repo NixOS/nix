@@ -207,8 +207,9 @@ or inside `nix-shell` or `nix develop`:
 # xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
 ```
 
-## C API documentation (experimental)
+## C API documentation
 
+Note that the C API is not yet stable.
 [C API documentation] is available online.
 You can also build and view it yourself:
 

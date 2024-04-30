@@ -112,6 +112,7 @@
   - [Store Path Specification](protocols/store-path.md)
   - [Nix Archive (NAR) Format](protocols/nix-archive.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
+- [C API](c-api.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/index.md)
   - [Hacking](contributing/hacking.md)
@@ -122,6 +123,7 @@
   - [C++ style guide](contributing/cxx.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.22 (2024-04-23)](release-notes/rl-2.22.md)
   - [Release 2.21 (2024-03-11)](release-notes/rl-2.21.md)
   - [Release 2.20 (2024-01-29)](release-notes/rl-2.20.md)
   - [Release 2.19 (2023-11-17)](release-notes/rl-2.19.md)

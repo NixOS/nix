@@ -170,3 +170,45 @@ pathWithSubmodules=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = 
 
 [[ -e $pathWithoutExportIgnore/exclude-from-root ]]
 [[ -e $pathWithoutExportIgnore/sub/exclude-from-sub ]]
+
+test_submodule_nested() {
+  local repoA=$TEST_ROOT/submodule_nested/a
+  local repoB=$TEST_ROOT/submodule_nested/b
+  local repoC=$TEST_ROOT/submodule_nested/c
+
+  rm -rf $repoA $repoB $repoC $TEST_HOME/.cache/nix
+
+  initGitRepo $repoC
+  touch $repoC/inside-c
+  git -C $repoC add inside-c
+  addGitContent $repoC
+
+  initGitRepo $repoB
+  git -C $repoB submodule add $repoC c
+  git -C $repoB add c
+  addGitContent $repoB
+
+  initGitRepo $repoA
+  git -C $repoA submodule add $repoB b
+  git -C $repoA add b
+  addGitContent $repoA
+
+
+  # Check non-worktree fetch
+  local rev=$(git -C $repoA rev-parse HEAD)
+  out=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repoA\"; rev = \"$rev\"; submodules = true; }).outPath")
+  test -e $out/b/c/inside-c
+  test -e $out/content
+  test -e $out/b/content
+  test -e $out/b/c/content
+  local nonWorktree=$out
+
+  # Check worktree based fetch
+  # TODO: make it work without git submodule update
+  git -C $repoA submodule update --init --recursive
+  out=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repoA\"; submodules = true; }).outPath")
+  find $out
+  [[ $out == $nonWorktree ]] || { find $out; false; }
+
+}
+test_submodule_nested
