@@ -54,6 +54,7 @@ struct PathInputScheme : InputScheme
             "narHash",
         };
     }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         getStrAttr(attrs, "path");
