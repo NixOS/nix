@@ -2431,7 +2431,16 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
                 *store,
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
-                path.baseName(),
+                /* For backwards compatibility, if the path is the
+                   root of a tree, we need to construct a
+                   "double-copied" store path like
+                   /nix/store/<hash1>-<hash2>-source. We don't need to
+                   materialize /nix/store/<hash2>-source
+                   though. Still, this requires reading/hashing the
+                   path twice. */
+                path.path.isRoot()
+                ? store->computeStorePath("source", *path.accessor, path.path).first.to_string()
+                : path.baseName(),
                 FileIngestionMethod::Recursive,
                 nullptr,
                 repair);
