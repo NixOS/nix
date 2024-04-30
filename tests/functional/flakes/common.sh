@@ -21,6 +21,8 @@ writeSimpleFlake() {
 
     # To test "nix flake init".
     legacyPackages.$system.hello = import ./simple.nix;
+
+    parent = builtins.dirOf ./.;
   };
 }
 EOF

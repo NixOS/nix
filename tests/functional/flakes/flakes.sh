@@ -231,6 +231,9 @@ nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"$flake1Dir\").pack
 # 'getFlake' on a locked flakeref should succeed even in pure mode.
 nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").packages.$system.default"
 
+# Regression test for dirOf on the root of the flake.
+[[ $(nix eval --json flake1#parent) = \""$NIX_STORE_DIR"\" ]]
+
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-registries)
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-use-registries)
