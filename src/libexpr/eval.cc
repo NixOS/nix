@@ -957,7 +957,7 @@ void EvalState::mkPos(Value & v, PosIdx p)
     auto origin = positions.originOf(p);
     if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(encodePath(*path));
+        attrs.alloc(sFile).mkString(encodePath(*path)); // FIXME
         makePositionThunks(*this, p, attrs.alloc(sLine), attrs.alloc(sColumn));
         v.mkAttrs(attrs);
     } else
@@ -977,12 +977,8 @@ void EvalState::mkStorePathString(const StorePath & p, Value & v)
 
 void EvalState::mkPathString(Value & v, const SourcePath & path)
 {
-    assert(path.path.isRoot());
-
-    auto s = encodePath(path);
-
     v.mkString(
-        s,
+        encodePath(path),
         NixStringContext {
             NixStringContextElem::InputAccessor { .accessor = path.accessor->number },
         });

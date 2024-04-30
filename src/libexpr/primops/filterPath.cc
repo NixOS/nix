@@ -23,7 +23,7 @@ struct FilterPathInputAccessor : CachingFilteringInputAccessor
             return false;
         // Note that unlike 'builtins.{path,filterSource}', we don't
         // pass the prefix to the filter function.
-        return state.callPathFilter(filterFun, {next, prefix / path}, path.abs(), pos);
+        return state.callPathFilter(filterFun, {next, prefix / path}, pos);
     }
 };
 
