@@ -1648,7 +1648,6 @@ static std::string_view legacyBaseNameOf(std::string_view path)
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
-    // FIXME: handle roots of source trees (should return "<hash>-source").
     v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
             false, false)), context);
