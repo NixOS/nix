@@ -1336,7 +1336,7 @@ static void derivationStrictInternal(
                     *state.store,
                     path,
                     settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy);
-                printError("lazily copied '%s' -> '%s'", path, state.store->printStorePath(storePath));
+                debug("lazily copied '%s' -> '%s'", path, state.store->printStorePath(storePath));
                 rewrites.emplace(fmt("lazylazy0000000000000000%08d", a.accessor), storePath.hashPart());
                 drv.inputSrcs.insert(storePath);
             }
