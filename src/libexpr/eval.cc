@@ -260,7 +260,12 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     } else {
         Value nameValue;
         name.expr->eval(state, env, nameValue);
-        state.forceStringNoCtx(nameValue, name.expr->getPos(), "while evaluating an attribute name");
+        // FIXME: should use forceStringNoCtx(). However, that
+        // requires us to make builtins.substring more precise about
+        // propagating contexts. E.g. `builtins.substring 44 (-1)
+        // "${./src}"` should not have a context (at least not a
+        // `InputAccessor` context).
+        state.forceString(nameValue, name.expr->getPos(), "while evaluating an attribute name");
         return state.symbols.create(nameValue.string_view());
     }
 }
@@ -2453,8 +2458,12 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     }
 
     /* Handle path values directly, without coercing to a string. */
-    if (v.type() == nPath)
-        return v.path();
+    if (v.type() == nPath) {
+        auto path = v.path();
+        return path.accessor == rootFS
+            ? decodePath(path.path.abs())
+            : path;
+    }
 
     /* Similarly, handle __toString where the result may be a path
        value. */

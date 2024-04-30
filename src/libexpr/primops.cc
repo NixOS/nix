@@ -1648,6 +1648,7 @@ static std::string_view legacyBaseNameOf(std::string_view path)
 static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     NixStringContext context;
+    // FIXME: handle roots of source trees (should return "<hash>-source").
     v.mkString(legacyBaseNameOf(*state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to builtins.baseNameOf",
             false, false)), context);
@@ -1672,14 +1673,19 @@ static RegisterPrimOp primop_baseNameOf({
 });
 
 /* Return the directory of the given path, i.e., everything before the
-   last slash.  Return either a path or a string depending on the type
-   of the argument. */
+   last slash. Return either a path or a string depending on the type
+   of the argument. For backwards compatibility, the parent of a tree
+   other than rootFS is the store directory. */
 static void prim_dirOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nPath) {
         auto path = args[0]->path();
-        v.mkPath(path.path.isRoot() ? path : path.parent());
+        v.mkPath(path.path.isRoot()
+            ? path.accessor != state.rootFS
+            ? SourcePath{state.rootFS, CanonPath(state.store->storeDir)}
+            : SourcePath{state.rootFS}
+            : path.parent());
     } else {
         NixStringContext context;
         auto path = state.coerceToString(pos, *args[0], context,
