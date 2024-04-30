@@ -23,6 +23,8 @@ writeSimpleFlake() {
     legacyPackages.$system.hello = import ./simple.nix;
 
     parent = builtins.dirOf ./.;
+
+    baseName = builtins.baseNameOf ./.;
   };
 }
 EOF
