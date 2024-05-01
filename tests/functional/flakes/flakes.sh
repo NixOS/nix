@@ -235,7 +235,12 @@ nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"git+file://$flake1
 [[ $(nix eval --json flake1#parent) = \""$NIX_STORE_DIR"\" ]]
 
 # Regression test for baseNameOf on the root of the flake.
-[[ $(nix eval --raw flake1#baseName) =~ ^[a-z0-9]*-source$ ]]
+[[ $(nix eval --raw flake1#baseName) =~ ^[a-z0-9]+-source$ ]]
+
+# Test that the root of a tree returns a path named /nix/store/<hash1>-<hash2>-source.
+# This behavior is *not* desired, but has existed for a while.
+# Issue #10627 what to do about it.
+[[ $(nix eval --raw flake1#root) =~ ^.*/[a-z0-9]+-[a-z0-9]+-source$ ]]
 
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-registries)
