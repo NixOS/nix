@@ -20,7 +20,7 @@
 #  include "gc_cpp.h"
 #endif
 
-// Helper function to throw an exception if value is null
+// Internal helper functions to check [in] and [out] `Value *` parameters
 static const nix::Value & check_value_not_null(const Value * value)
 {
     if (!value) {
@@ -35,6 +35,33 @@ static nix::Value & check_value_not_null(Value * value)
         throw std::runtime_error("Value is null");
     }
     return *((nix::Value *) value);
+}
+
+static const nix::Value & check_value_in(const Value * value)
+{
+    auto & v = check_value_not_null(value);
+    if (!v.isValid()) {
+        throw std::runtime_error("Uninitialized Value");
+    }
+    return v;
+}
+
+static nix::Value & check_value_in(Value * value)
+{
+    auto & v = check_value_not_null(value);
+    if (!v.isValid()) {
+        throw std::runtime_error("Uninitialized Value");
+    }
+    return v;
+}
+
+static nix::Value & check_value_out(Value * value)
+{
+    auto & v = check_value_not_null(value);
+    if (v.isValid()) {
+        throw std::runtime_error("Value already initialized. Variables are immutable");
+    }
+    return v;
 }
 
 /**
@@ -111,7 +138,7 @@ ValueType nix_get_type(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         using namespace nix;
         switch (v.type()) {
         case nThunk:
@@ -147,7 +174,7 @@ const char * nix_get_typename(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         auto s = nix::showType(v);
         return strdup(s.c_str());
     }
@@ -159,7 +186,7 @@ bool nix_get_bool(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nBool);
         return v.boolean();
     }
@@ -171,7 +198,7 @@ nix_err nix_get_string(nix_c_context * context, const Value * value, nix_get_str
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nString);
         call_nix_get_string_callback(v.c_str(), callback, user_data);
     }
@@ -183,7 +210,7 @@ const char * nix_get_path_string(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nPath);
         // NOTE (from @yorickvP)
         // v._path.path should work but may not be how Eelco intended it.
@@ -202,7 +229,7 @@ unsigned int nix_get_list_size(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nList);
         return v.listSize();
     }
@@ -214,7 +241,7 @@ unsigned int nix_get_attrs_size(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nAttrs);
         return v.attrs()->size();
     }
@@ -226,7 +253,7 @@ double nix_get_float(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nFloat);
         return v.fpoint();
     }
@@ -238,7 +265,7 @@ int64_t nix_get_int(nix_c_context * context, const Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nInt);
         return v.integer();
     }
@@ -250,7 +277,7 @@ ExternalValue * nix_get_external(nix_c_context * context, Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         assert(v.type() == nix::nExternal);
         return (ExternalValue *) v.external();
     }
@@ -262,7 +289,7 @@ Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalSta
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nList);
         auto * p = v.listElems()[ix];
         nix_gc_incref(nullptr, p);
@@ -278,7 +305,7 @@ Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalSt
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nAttrs);
         nix::Symbol s = state->state.symbols.create(name);
         auto attr = v.attrs()->get(s);
@@ -298,7 +325,7 @@ bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nAttrs);
         nix::Symbol s = state->state.symbols.create(name);
         auto attr = v.attrs()->get(s);
@@ -315,7 +342,7 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * sta
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         const nix::Attr & a = (*v.attrs())[i];
         *name = ((const std::string &) (state->state.symbols[a.name])).c_str();
         nix_gc_incref(nullptr, a.value);
@@ -330,7 +357,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         const nix::Attr & a = (*v.attrs())[i];
         return ((const std::string &) (state->state.symbols[a.name])).c_str();
     }
@@ -342,7 +369,7 @@ nix_err nix_init_bool(nix_c_context * context, Value * value, bool b)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkBool(b);
     }
     NIXC_CATCH_ERRS
@@ -354,7 +381,7 @@ nix_err nix_init_string(nix_c_context * context, Value * value, const char * str
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkString(std::string_view(str));
     }
     NIXC_CATCH_ERRS
@@ -365,7 +392,7 @@ nix_err nix_init_path_string(nix_c_context * context, EvalState * s, Value * val
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkPath(s->state.rootPath(nix::CanonPath(str)));
     }
     NIXC_CATCH_ERRS
@@ -376,7 +403,7 @@ nix_err nix_init_float(nix_c_context * context, Value * value, double d)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkFloat(d);
     }
     NIXC_CATCH_ERRS
@@ -387,7 +414,7 @@ nix_err nix_init_int(nix_c_context * context, Value * value, int64_t i)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkInt(i);
     }
     NIXC_CATCH_ERRS
@@ -398,7 +425,7 @@ nix_err nix_init_null(nix_c_context * context, Value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkNull();
     }
     NIXC_CATCH_ERRS
@@ -422,7 +449,7 @@ nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue 
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         auto r = (nix::ExternalValueBase *) val;
         v.mkExternal(r);
     }
@@ -469,7 +496,7 @@ nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, Value
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkList(list_builder->builder);
     }
     NIXC_CATCH_ERRS
@@ -480,19 +507,19 @@ nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * p)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkPrimOp((nix::PrimOp *) p);
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_copy_value(nix_c_context * context, Value * value, Value * source)
+nix_err nix_copy_value(nix_c_context * context, Value * value, const Value * source)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
-        auto & s = check_value_not_null(source);
+        auto & v = check_value_out(value);
+        auto & s = check_value_in(source);
         v = s;
     }
     NIXC_CATCH_ERRS
@@ -503,7 +530,7 @@ nix_err nix_make_attrs(nix_c_context * context, Value * value, BindingsBuilder *
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_out(value);
         v.mkAttrs(b->builder);
     }
     NIXC_CATCH_ERRS
@@ -550,7 +577,7 @@ nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * st
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_not_null(value);
+        auto & v = check_value_in(value);
         nix::NixStringContext stringContext;
         auto rawStr = state->state.coerceToString(nix::noPos, v, stringContext, "while realising a string").toOwned();
         nix::StorePathSet storePaths;
