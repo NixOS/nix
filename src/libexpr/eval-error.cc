@@ -73,12 +73,7 @@ EvalErrorBuilder<T>::addTrace(PosIdx pos, std::string_view formatString, const A
 template<class T>
 void EvalErrorBuilder<T>::debugThrow()
 {
-    if (error.state.debugRepl && !error.state.debugTraces.empty()) {
-        const DebugTrace & last = error.state.debugTraces.front();
-        const Env * env = &last.env;
-        const Expr * expr = &last.expr;
-        error.state.runDebugRepl(&error, *env, *expr);
-    }
+    error.state.runDebugRepl(&error);
 
     // `EvalState` is the only class that can construct an `EvalErrorBuilder`,
     // and it does so in dynamic storage. This is the final method called on

@@ -780,15 +780,14 @@ static RegisterPrimOp primop_break({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        if (state.debugRepl && !state.debugTraces.empty()) {
+        if (state.canDebug()) {
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
                 .msg = HintFmt("breakpoint reached"),
                 .pos = state.positions[pos],
             });
 
-            auto & dt = state.debugTraces.front();
-            state.runDebugRepl(&error, dt.env, dt.expr);
+            state.runDebugRepl(&error);
         }
 
         // Return the value we were passed.
@@ -1018,9 +1017,8 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
         printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
-    if (evalSettings.builtinsTraceDebugger && state.debugRepl && !state.debugTraces.empty()) {
-        const DebugTrace & last = state.debugTraces.front();
-        state.runDebugRepl(nullptr, last.env, last.expr);
+    if (evalSettings.builtinsTraceDebugger) {
+        state.runDebugRepl(nullptr);
     }
     state.forceValue(*args[1], pos);
     v = *args[1];
@@ -1060,9 +1058,8 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value
     if (evalSettings.builtinsAbortOnWarn) {
         state.error<Abort>("aborting to reveal stack trace of warning, as abort-on-warn is set").debugThrow();
     }
-    if ((evalSettings.builtinsTraceDebugger || evalSettings.builtinsDebuggerOnWarn) && state.debugRepl && !state.debugTraces.empty()) {
-        const DebugTrace & last = state.debugTraces.front();
-        state.runDebugRepl(nullptr, last.env, last.expr);
+    if (evalSettings.builtinsTraceDebugger || evalSettings.builtinsDebuggerOnWarn) {
+        state.runDebugRepl(nullptr);
     }
     state.forceValue(*args[1], pos);
     v = *args[1];
