@@ -20,4 +20,3 @@ extern const StringSet networkProxyVariables;
 bool haveNetworkProxyConnection();
 
 }
-

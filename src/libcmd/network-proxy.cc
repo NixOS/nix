@@ -7,9 +7,7 @@
 
 namespace nix {
 
-static const StringSet lowercaseVariables {
-    "http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"
-};
+static const StringSet lowercaseVariables{"http_proxy", "https_proxy", "ftp_proxy", "all_proxy", "no_proxy"};
 
 static StringSet getAllVariables()
 {
@@ -24,12 +22,11 @@ const StringSet networkProxyVariables = getAllVariables();
 
 static StringSet getExcludingNoProxyVariables()
 {
-    static const StringSet excludeVariables {"no_proxy", "NO_PROXY"};
+    static const StringSet excludeVariables{"no_proxy", "NO_PROXY"};
     StringSet variables;
     std::set_difference(
-            networkProxyVariables.begin(), networkProxyVariables.end(),
-            excludeVariables.begin(), excludeVariables.end(),
-            std::inserter(variables, variables.begin()));
+        networkProxyVariables.begin(), networkProxyVariables.end(), excludeVariables.begin(), excludeVariables.end(),
+        std::inserter(variables, variables.begin()));
     return variables;
 }
 
@@ -46,4 +43,3 @@ bool haveNetworkProxyConnection()
 }
 
 }
-
