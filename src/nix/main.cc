@@ -17,7 +17,6 @@
 #include "memory-input-accessor.hh"
 #include "terminal.hh"
 #include "users.hh"
-#include "network-proxy.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -47,7 +46,17 @@ namespace nix {
 #endif
 static bool haveProxyEnvironmentVariables()
 {
-    for (auto & proxyVariable : networkProxyVariables) {
+    static const std::vector<std::string> proxyVariables = {
+        "http_proxy",
+        "https_proxy",
+        "ftp_proxy",
+        "all_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "FTP_PROXY",
+        "ALL_PROXY"
+    };
+    for (auto & proxyVariable: proxyVariables) {
         if (getEnv(proxyVariable).has_value()) {
             return true;
         }
