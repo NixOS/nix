@@ -37,6 +37,9 @@ public:
     Sync(const T & data) : data(data) { }
     Sync(T && data) noexcept : data(std::move(data)) { }
 
+    template< class... Args>
+    Sync(Args &&... args) : data(std::forward<decltype(args)>(args)...) { }
+
     class Lock
     {
     private:

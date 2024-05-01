@@ -7,6 +7,8 @@
 
 namespace nix {
 
+struct AuthTunnel;
+
 struct LocalDerivationGoal : public DerivationGoal
 {
     LocalStore & getLocalStore();
@@ -150,6 +152,12 @@ struct LocalDerivationGoal : public DerivationGoal
      * Realisations that were added via recursive Nix calls.
      */
     std::set<DrvOutput> addedDrvOutputs;
+
+    /**
+     * State for tunneling authentication requests between the child
+     * (currently just `builtin:fetchurl`) and the parent.
+     */
+    std::shared_ptr<AuthTunnel> authTunnel;
 
     /**
      * Recursive Nix calls are only allowed to build or realize paths

@@ -435,7 +435,7 @@ StringSet StoreConfig::getDefaultSystemFeatures()
 
 Store::Store(const Params & params)
     : StoreConfig(params)
-    , state({(size_t) pathInfoCacheSize})
+    , state({.pathInfoCache{(size_t) pathInfoCacheSize}})
 {
     assertLibStoreInitialized();
 }

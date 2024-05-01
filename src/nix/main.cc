@@ -17,6 +17,7 @@
 #include "memory-input-accessor.hh"
 #include "terminal.hh"
 #include "users.hh"
+#include "auth.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -404,6 +405,10 @@ void mainWrapped(int argc, char * * argv)
     } else {
         verbosity = lvlInfo;
     }
+
+    // FIXME: this is a hack to work around the fact that nixConfDir
+    // is defined in libstore. Should move that to libutil.
+    auth::authSettings.netrcFile.setDefault(fmt("%s/%s", settings.nixConfDir, "netrc"));
 
     NixArgs args;
 
