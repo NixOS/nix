@@ -30,11 +30,11 @@ static StringSet getExcludingNoProxyVariables()
     return variables;
 }
 
-static const StringSet ExcludingNoProxyVariables = getExcludingNoProxyVariables();
+static const StringSet excludingNoProxyVariables = getExcludingNoProxyVariables();
 
 bool haveNetworkProxyConnection()
 {
-    for (const auto & variable : ExcludingNoProxyVariables) {
+    for (const auto & variable : excludingNoProxyVariables) {
         if (getEnv(variable).has_value()) {
             return true;
         }
