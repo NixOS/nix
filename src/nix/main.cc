@@ -42,10 +42,6 @@ void chrootHelper(int argc, char * * argv);
 
 namespace nix {
 
-#ifdef _WIN32
-[[maybe_unused]]
-#endif
-
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
 {

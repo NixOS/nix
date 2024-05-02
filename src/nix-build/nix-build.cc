@@ -121,7 +121,7 @@ static void main_nix_build(int argc, char * * argv)
     std::set<std::string> keepVars{
         "HOME", "XDG_RUNTIME_DIR", "USER", "LOGNAME", "DISPLAY",
         "WAYLAND_DISPLAY", "WAYLAND_SOCKET", "PATH", "TERM", "IN_NIX_SHELL",
-        "NIX_SHELL_PRESERVE_PROMPT", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL"
+        "NIX_SHELL_PRESERVE_PROMPT", "TZ", "PAGER", "NIX_BUILD_SHELL", "SHLVL",
     };
     keepVars.insert(networkProxyVariables.begin(), networkProxyVariables.end());
 
