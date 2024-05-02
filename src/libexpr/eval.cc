@@ -50,6 +50,7 @@
 
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
+#include <gc/gc_allocator.h>
 
 #include <boost/coroutine2/coroutine.hpp>
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
@@ -342,6 +343,8 @@ void initGC()
     gcInitialised = true;
 }
 
+static constexpr size_t BASE_ENV_SIZE = 128;
+
 EvalState::EvalState(
     const LookupPath & _lookupPath,
     ref<Store> store,
@@ -424,8 +427,11 @@ EvalState::EvalState(
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
+    , baseEnv(**baseEnvP)
+#else
+    , baseEnv(allocEnv(BASE_ENV_SIZE))
 #endif
-    , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
     corepkgsFS->setPathDisplay("<nix", ">");
