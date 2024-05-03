@@ -248,7 +248,9 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> stor
 
     auto [accessor, final] = scheme->getAccessor(store, *this);
 
-    accessor->fingerprint = scheme->getFingerprint(store, final);
+    if (!accessor->fingerprint)
+        // FIXME: remove getFingerprint()?
+        accessor->fingerprint = scheme->getFingerprint(store, final);
 
     return {accessor, std::move(final)};
 }

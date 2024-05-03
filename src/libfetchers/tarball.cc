@@ -352,8 +352,11 @@ struct TarballInputScheme : CurlInputScheme
         if (result.lastModified && !input.attrs.contains("lastModified"))
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
-        input.attrs.insert_or_assign("narHash",
-            getTarballCache()->treeHashToNarHash(result.treeHash).to_string(HashFormat::SRI, true));
+        auto narHash = getTarballCache()->treeHashToNarHash(result.treeHash).to_string(HashFormat::SRI, true);
+
+        input.attrs.insert_or_assign("narHash", narHash);
+
+        result.accessor->fingerprint = narHash;
 
         return {result.accessor, input};
     }
