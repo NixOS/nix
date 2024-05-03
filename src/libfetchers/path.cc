@@ -1,8 +1,7 @@
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "archive.hh"
-#include "fs-input-accessor.hh"
-#include "posix-source-accessor.hh"
+#include "store-path-accessor.hh"
 
 namespace nix::fetchers {
 

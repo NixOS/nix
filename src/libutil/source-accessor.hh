@@ -194,4 +194,14 @@ ref<SourceAccessor> makeEmptySourceAccessor();
  */
 MakeError(RestrictedPathError, Error);
 
+/**
+ * Return an accessor for the root filesystem.
+ */
+ref<SourceAccessor> makeFSSourceAccessor();
+
+/**
+ * Return an accessor for the filesystem rooted at `root`.
+ */
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
+
 }

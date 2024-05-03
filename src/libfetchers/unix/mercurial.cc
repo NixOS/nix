@@ -6,8 +6,7 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
-#include "fs-input-accessor.hh"
-#include "posix-source-accessor.hh"
+#include "store-path-accessor.hh"
 #include "fetch-settings.hh"
 
 #include <sys/time.h>
@@ -211,10 +210,9 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                PosixSourceAccessor accessor;
                 auto storePath = store->addToStore(
                     input.getName(),
-                    accessor, CanonPath { actualPath },
+                    *makeFSSourceAccessor(), CanonPath { actualPath },
                     FileIngestionMethod::Recursive, HashAlgorithm::SHA256, {},
                     filter);
 
@@ -320,8 +318,7 @@ struct MercurialInputScheme : InputScheme
 
         deletePath(tmpDir + "/.hg_archival.txt");
 
-        PosixSourceAccessor accessor;
-        auto storePath = store->addToStore(name, accessor, CanonPath { tmpDir });
+        auto storePath = store->addToStore(name, *makeFSSourceAccessor(), CanonPath { tmpDir });
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},

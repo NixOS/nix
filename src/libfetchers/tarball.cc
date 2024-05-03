@@ -8,8 +8,7 @@
 #include "tarfile.hh"
 #include "types.hh"
 #include "split.hh"
-#include "posix-source-accessor.hh"
-#include "fs-input-accessor.hh"
+#include "store-path-accessor.hh"
 #include "store-api.hh"
 #include "git-utils.hh"
 

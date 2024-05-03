@@ -1,5 +1,4 @@
 #include "git-utils.hh"
-#include "fs-input-accessor.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -948,7 +947,7 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool export
         wd.files.empty()
         ? makeEmptySourceAccessor()
         : AllowListInputAccessor::create(
-            makeFSInputAccessor(path),
+            makeFSSourceAccessor(path),
             std::set<CanonPath> { wd.files },
             std::move(makeNotAllowedError)).cast<SourceAccessor>();
     if (exportIgnore)

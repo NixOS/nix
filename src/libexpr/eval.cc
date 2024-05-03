@@ -15,7 +15,6 @@
 #include "function-trace.hh"
 #include "profiles.hh"
 #include "print.hh"
-#include "fs-input-accessor.hh"
 #include "filtering-input-accessor.hh"
 #include "memory-source-accessor.hh"
 #include "signals.hh"
@@ -400,14 +399,14 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         evalSettings.restrictEval || evalSettings.pureEval
-        ? ref<SourceAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {},
+        ? ref<SourceAccessor>(AllowListInputAccessor::create(makeFSSourceAccessor(), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
-        : makeFSInputAccessor())
+        : makeFSSourceAccessor())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(

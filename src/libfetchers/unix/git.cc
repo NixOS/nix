@@ -9,7 +9,6 @@
 #include "pathlocks.hh"
 #include "processes.hh"
 #include "git.hh"
-#include "fs-input-accessor.hh"
 #include "mounted-input-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
