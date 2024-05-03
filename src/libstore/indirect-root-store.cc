@@ -15,15 +15,15 @@ void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
     renameFile(tempLink, link);
 }
 
-
 Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
     Path gcRoot(canonPath(_gcRoot));
 
     if (isInStore(gcRoot))
         throw Error(
-                "creating a garbage collector root (%1%) in the Nix store is forbidden "
-                "(are you running nix-build inside the store?)", gcRoot);
+            "creating a garbage collector root (%1%) in the Nix store is forbidden "
+            "(are you running nix-build inside the store?)",
+            gcRoot);
 
     /* Register this root with the garbage collector, if it's
        running. This should be superfluous since the caller should

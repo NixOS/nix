@@ -5,7 +5,7 @@
 #include "file-descriptor.hh"
 
 #ifdef _WIN32
-# include <winsock2.h>
+#  include <winsock2.h>
 #endif
 #include <unistd.h>
 
@@ -20,7 +20,6 @@ AutoCloseFD createUnixDomainSocket();
  * Create a Unix domain socket in listen mode.
  */
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
-
 
 /**
  * Often we want to use `Descriptor`, but Windows makes a slightly
@@ -39,7 +38,7 @@ using Socket =
 /**
  * Windows gives this a different name
  */
-# define SHUT_WR SD_SEND
+#  define SHUT_WR SD_SEND
 #endif
 
 /**
@@ -69,7 +68,6 @@ static inline Descriptor fromSocket(Socket fd)
     return fd;
 #endif
 }
-
 
 /**
  * Bind a Unix domain socket to a path.
