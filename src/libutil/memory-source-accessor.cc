@@ -108,7 +108,7 @@ std::string MemorySourceAccessor::readLink(const CanonPath & path)
         throw Error("file '%s' is not a symbolic link", path);
 }
 
-CanonPath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
+SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
 {
     auto * f = open(path, File { File::Regular {} });
     if (!f)
@@ -118,7 +118,7 @@ CanonPath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
     else
         throw Error("file '%s' is not a regular file", path);
 
-    return path;
+    return SourcePath{ref(shared_from_this()), path};
 }
 
 
@@ -182,6 +182,12 @@ void MemorySink::createSymlink(const Path & path, const std::string & target)
         s->target = target;
     else
         throw Error("file '%s' is not a symbolic link", path);
+}
+
+ref<SourceAccessor> makeEmptySourceAccessor()
+{
+    static auto empty = make_ref<MemorySourceAccessor>().cast<SourceAccessor>();
+    return empty;
 }
 
 }

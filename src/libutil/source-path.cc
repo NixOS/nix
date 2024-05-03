@@ -18,13 +18,13 @@ std::string SourcePath::readFile() const
 bool SourcePath::pathExists() const
 { return accessor->pathExists(path); }
 
-InputAccessor::Stat SourcePath::lstat() const
+SourceAccessor::Stat SourcePath::lstat() const
 { return accessor->lstat(path); }
 
-std::optional<InputAccessor::Stat> SourcePath::maybeLstat() const
+std::optional<SourceAccessor::Stat> SourcePath::maybeLstat() const
 { return accessor->maybeLstat(path); }
 
-InputAccessor::DirEntries SourcePath::readDirectory() const
+SourceAccessor::DirEntries SourcePath::readDirectory() const
 { return accessor->readDirectory(path); }
 
 std::string SourcePath::readLink() const

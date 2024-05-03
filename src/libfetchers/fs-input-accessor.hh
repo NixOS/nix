@@ -1,6 +1,5 @@
 #pragma once
 
-#include "input-accessor.hh"
 #include "source-path.hh"
 
 namespace nix {
@@ -8,11 +7,11 @@ namespace nix {
 class StorePath;
 class Store;
 
-ref<InputAccessor> makeFSInputAccessor();
+ref<SourceAccessor> makeFSInputAccessor();
 
-ref<InputAccessor> makeFSInputAccessor(std::filesystem::path root);
+ref<SourceAccessor> makeFSInputAccessor(std::filesystem::path root);
 
-ref<InputAccessor> makeStorePathAccessor(
+ref<SourceAccessor> makeStorePathAccessor(
     ref<Store> store,
     const StorePath & storePath);
 

@@ -1828,12 +1828,12 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
-static Value * fileTypeToString(EvalState & state, InputAccessor::Type type)
+static Value * fileTypeToString(EvalState & state, SourceAccessor::Type type)
 {
     return
-        type == InputAccessor::Type::tRegular ? &state.vStringRegular :
-        type == InputAccessor::Type::tDirectory ? &state.vStringDirectory :
-        type == InputAccessor::Type::tSymlink ? &state.vStringSymlink :
+        type == SourceAccessor::Type::tRegular ? &state.vStringRegular :
+        type == SourceAccessor::Type::tDirectory ? &state.vStringDirectory :
+        type == SourceAccessor::Type::tSymlink ? &state.vStringSymlink :
         &state.vStringUnknown;
 }
 

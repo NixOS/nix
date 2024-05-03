@@ -1,8 +1,5 @@
 #include "git-utils.hh"
 #include "fs-input-accessor.hh"
-#include "input-accessor.hh"
-#include "filtering-input-accessor.hh"
-#include "memory-input-accessor.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -338,9 +335,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      */
     ref<GitInputAccessor> getRawAccessor(const Hash & rev);
 
-    ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
+    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
 
-    ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
+    ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
     ref<GitFileSystemObjectSink> getFileSystemObjectSink() override;
 
@@ -477,7 +474,7 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 /**
  * Raw git tree input accessor.
  */
-struct GitInputAccessor : InputAccessor
+struct GitInputAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
     Tree root;
@@ -710,7 +707,7 @@ struct GitExportIgnoreInputAccessor : CachingFilteringInputAccessor {
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 
-    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<InputAccessor> next, std::optional<Hash> rev)
+    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev)
         : CachingFilteringInputAccessor(next, [&](const CanonPath & path) {
             return RestrictedPathError(fmt("'%s' does not exist because it was fetched with exportIgnore enabled", path));
         })
@@ -928,7 +925,7 @@ ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
     return make_ref<GitInputAccessor>(self, rev);
 }
 
-ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
+ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitInputAccessor> rawGitAccessor = getRawAccessor(rev);
@@ -940,20 +937,20 @@ ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
     }
 }
 
-ref<InputAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
+ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     /* In case of an empty workdir, return an empty in-memory tree. We
        cannot use AllowListInputAccessor because it would return an
        error for the root (and we can't add the root to the allow-list
        since that would allow access to all its children). */
-    ref<InputAccessor> fileAccessor =
+    ref<SourceAccessor> fileAccessor =
         wd.files.empty()
-        ? makeEmptyInputAccessor()
+        ? makeEmptySourceAccessor()
         : AllowListInputAccessor::create(
             makeFSInputAccessor(path),
             std::set<CanonPath> { wd.files },
-            std::move(makeNotAllowedError)).cast<InputAccessor>();
+            std::move(makeNotAllowedError)).cast<SourceAccessor>();
     if (exportIgnore)
         return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor, std::nullopt);
     else

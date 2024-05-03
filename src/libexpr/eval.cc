@@ -17,7 +17,7 @@
 #include "print.hh"
 #include "fs-input-accessor.hh"
 #include "filtering-input-accessor.hh"
-#include "memory-input-accessor.hh"
+#include "memory-source-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
 #include "url.hh"
@@ -400,7 +400,7 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         evalSettings.restrictEval || evalSettings.pureEval
-        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {},
+        ? ref<SourceAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
@@ -408,8 +408,8 @@ EvalState::EvalState(
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
         : makeFSInputAccessor())
-    , corepkgsFS(makeMemoryInputAccessor())
-    , internalFS(makeMemoryInputAccessor())
+    , corepkgsFS(make_ref<MemorySourceAccessor>())
+    , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
         CanonPath("derivation-internal.nix"),
         #include "primops/derivation.nix.gen.hh"
@@ -2766,12 +2766,12 @@ SourcePath resolveExprPath(SourcePath path)
         if (++followCount >= maxFollow)
             throw Error("too many symbolic links encountered while traversing the path '%s'", path);
         auto p = path.parent().resolveSymlinks() / path.baseName();
-        if (p.lstat().type != InputAccessor::tSymlink) break;
+        if (p.lstat().type != SourceAccessor::tSymlink) break;
         path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path.resolveSymlinks().lstat().type == InputAccessor::tDirectory)
+    if (path.resolveSymlinks().lstat().type == SourceAccessor::tDirectory)
         return path / "default.nix";
 
     return path;

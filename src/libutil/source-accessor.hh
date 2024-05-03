@@ -35,7 +35,7 @@ enum class SymlinkResolution {
  * filesystem-like entities (such as the real filesystem, tarballs or
  * Git repositories).
  */
-struct SourceAccessor
+struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 {
     const size_t number;
 
@@ -168,6 +168,30 @@ struct SourceAccessor
     CanonPath resolveSymlinks(
         const CanonPath & path,
         SymlinkResolution mode = SymlinkResolution::Full);
+
+    /**
+     * A string that uniquely represents the contents of this
+     * accessor. This is used for caching lookups (see `fetchToStore()`).
+     */
+    std::optional<std::string> fingerprint;
+
+    /**
+     * Return the maximum last-modified time of the files in this
+     * tree, if available.
+     */
+    virtual std::optional<time_t> getLastModified()
+    { return std::nullopt; }
 };
+
+/**
+ * Return a source accessor that contains only an empty root directory.
+ */
+ref<SourceAccessor> makeEmptySourceAccessor();
+
+/**
+ * Exception thrown when accessing a filtered path (see
+ * `FilteringInputAccessor`).
+ */
+MakeError(RestrictedPathError, Error);
 
 }

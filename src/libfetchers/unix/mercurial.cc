@@ -346,7 +346,7 @@ struct MercurialInputScheme : InputScheme
         return makeResult(infoAttrs, std::move(storePath));
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
 

@@ -4,22 +4,17 @@
 
 namespace nix {
 
-struct FSInputAccessor : InputAccessor, PosixSourceAccessor
+ref<SourceAccessor> makeFSInputAccessor()
 {
-    using PosixSourceAccessor::PosixSourceAccessor;
-};
-
-ref<InputAccessor> makeFSInputAccessor()
-{
-    return make_ref<FSInputAccessor>();
+    return make_ref<PosixSourceAccessor>();
 }
 
-ref<InputAccessor> makeFSInputAccessor(std::filesystem::path root)
+ref<SourceAccessor> makeFSInputAccessor(std::filesystem::path root)
 {
-    return make_ref<FSInputAccessor>(std::move(root));
+    return make_ref<PosixSourceAccessor>(std::move(root));
 }
 
-ref<InputAccessor> makeStorePathAccessor(
+ref<SourceAccessor> makeStorePathAccessor(
     ref<Store> store,
     const StorePath & storePath)
 {
