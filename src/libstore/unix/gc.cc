@@ -35,51 +35,11 @@ static std::string gcSocketPath = "/gc-socket/socket";
 static std::string gcRootsDir = "gcroots";
 
 
-static void makeSymlink(const Path & link, const Path & target)
-{
-    /* Create directories up to `gcRoot'. */
-    createDirs(dirOf(link));
-
-    /* Create the new symlink. */
-    Path tempLink = fmt("%1%.tmp-%2%-%3%", link, getpid(), random());
-    createSymlink(target, tempLink);
-
-    /* Atomically replace the old one. */
-    renameFile(tempLink, link);
-}
-
-
 void LocalStore::addIndirectRoot(const Path & path)
 {
     std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
-}
-
-
-Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
-{
-    Path gcRoot(canonPath(_gcRoot));
-
-    if (isInStore(gcRoot))
-        throw Error(
-                "creating a garbage collector root (%1%) in the Nix store is forbidden "
-                "(are you running nix-build inside the store?)", gcRoot);
-
-    /* Register this root with the garbage collector, if it's
-       running. This should be superfluous since the caller should
-       have registered this root yet, but let's be on the safe
-       side. */
-    addTempRoot(storePath);
-
-    /* Don't clobber the link if it already exists and doesn't
-       point to the Nix store. */
-    if (pathExists(gcRoot) && (!isLink(gcRoot) || !isInStore(readLink(gcRoot))))
-        throw Error("cannot create symlink '%1%'; already exists", gcRoot);
-    makeSymlink(gcRoot, printStorePath(storePath));
-    addIndirectRoot(gcRoot);
-
-    return gcRoot;
 }
 
 

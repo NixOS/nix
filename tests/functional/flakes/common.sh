@@ -25,6 +25,8 @@ writeSimpleFlake() {
     parent = builtins.dirOf ./.;
 
     baseName = builtins.baseNameOf ./.;
+
+    root = ./.;
   };
 }
 EOF

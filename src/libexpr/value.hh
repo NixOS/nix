@@ -23,6 +23,7 @@ class BindingsBuilder;
 
 
 typedef enum {
+    tUninitialized = 0,
     tInt = 1,
     tBool,
     tString,
@@ -166,7 +167,7 @@ public:
 struct Value
 {
 private:
-    InternalType internalType;
+    InternalType internalType = tUninitialized;
 
     friend std::string showType(const Value & v);
 
@@ -270,6 +271,7 @@ public:
     inline ValueType type(bool invalidIsThunk = false) const
     {
         switch (internalType) {
+            case tUninitialized: break;
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
@@ -292,6 +294,16 @@ public:
     {
         payload = newPayload;
         internalType = newType;
+    }
+
+    /**
+     * A value becomes valid when it is initialized. We don't use this
+     * in the evaluator; only in the bindings, where the slight extra
+     * cost is warranted because of inexperienced callers.
+     */
+    inline bool isValid() const
+    {
+        return internalType != tUninitialized;
     }
 
     inline void mkInt(NixInt n)

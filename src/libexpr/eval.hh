@@ -368,8 +368,6 @@ public:
     /* Decode a path encoded by `encodePath()`. */
     SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
 
-    const std::string virtualPathMarker;
-
     /* Decode all virtual paths in a string, i.e. all
        /nix/store/virtual000... substrings are replaced by the
        corresponding input accessor. */
@@ -570,6 +568,11 @@ public:
      */
     SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
 
+#if HAVE_BOEHMGC
+    /** A GC root for the baseEnv reference. */
+    std::shared_ptr<Env *> baseEnvP;
+#endif
+
 public:
 
     /**
@@ -590,6 +593,8 @@ public:
      * here too.
      */
     std::vector<std::pair<std::string, Constant>> constantInfos;
+
+    const std::string virtualPathMarker;
 
 private:
 
