@@ -55,7 +55,7 @@ FlakeRef parseFlakeRef(
 {
     auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing, isFlake);
     if (fragment != "")
-        throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
+        throw FlakeRefError("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
 }
 
@@ -78,19 +78,25 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     std::string path = url;
     std::string fragment = "";
     std::map<std::string, std::string> query;
-    auto pathEnd = url.find_first_of("#?");
-    auto fragmentStart = pathEnd;
-    if (pathEnd != std::string::npos && url[pathEnd] == '?') {
-        fragmentStart = url.find("#");
-    }
+    auto pathEnd = url.find_first_of("?#");
     if (pathEnd != std::string::npos) {
+        // There's something (either a query string or a fragment) in addition
+        // to the path
         path = url.substr(0, pathEnd);
-    }
-    if (fragmentStart != std::string::npos) {
-        fragment = percentDecode(url.substr(fragmentStart+1));
-    }
-    if (pathEnd != std::string::npos && fragmentStart != std::string::npos) {
-        query = decodeQuery(url.substr(pathEnd+1, fragmentStart-pathEnd-1));
+        std::string non_path_part = url.substr(pathEnd + 1);
+        if (url[pathEnd] == '#') {
+            // Not query, just a fragment
+            fragment = percentDecode(non_path_part);
+        } else {
+            // We have a query, and maybe a fragment too
+            auto fragmentStart = non_path_part.find("#");
+            if (fragmentStart != std::string::npos) {
+                query = decodeQuery(non_path_part.substr(0, fragmentStart));
+                fragment = percentDecode(non_path_part.substr(fragmentStart+1));
+            } else {
+                query = decodeQuery(non_path_part);
+            }
+        }
     }
 
     if (baseDir) {
@@ -126,10 +132,10 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         found = true;
                         break;
                     } else if (pathExists(path + "/.git"))
-                        throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
+                        throw FlakeRefError("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
                     else {
                         if (lstat(path).st_dev != device)
-                            throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
+                            throw FlakeRefError("unable to find a flake before encountering filesystem boundary at '%s'", path);
                     }
                     path = dirOf(path);
                 }
@@ -158,7 +164,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
                     if (subdir != "") {
                         if (parsedURL.query.count("dir"))
-                            throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
+                            throw FlakeRefError("flake URL '%s' has an inconsistent 'dir' parameter", url);
                         parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
@@ -181,11 +187,16 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         path = canonPath(path + "/" + getOr(query, "dir", ""));
     }
 
-    fetchers::Attrs attrs;
-    attrs.insert_or_assign("type", "path");
-    attrs.insert_or_assign("path", path);
+    auto parsedURL = ParsedURL{
+        .url = url,
+        .base = url,
+        .scheme = "path",
+        .authority = "",
+        .path = path,
+        .query = query,
+    };
 
-    return std::make_pair(FlakeRef(fetchers::Input::fromAttrs(std::move(attrs)), ""), fragment);
+    return std::make_pair(FlakeRef(fetchers::Input::fromURL(parsedURL), getOr(parsedURL.query, "dir", "")), fragment);
 };
 
 

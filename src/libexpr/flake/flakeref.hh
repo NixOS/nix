@@ -15,6 +15,8 @@ class Store;
 
 typedef std::string FlakeId;
 
+MakeError(FlakeRefError, Error);
+
 /**
  * A flake reference specifies how to fetch a flake or raw source
  * (e.g. from a Git repository).  It is created from a URL-like syntax
