@@ -169,7 +169,7 @@ jobs:
       - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes
 
   flake_regressions:
-    #needs: vm_tests
+    needs: vm_tests
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout nix
