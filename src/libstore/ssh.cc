@@ -108,8 +108,8 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(
     }, options);
 
 
-    in.readSide = INVALID_DESCRIPTOR;
-    out.writeSide = INVALID_DESCRIPTOR;
+    in.readSide = Descriptor::invalid;
+    out.writeSide = Descriptor::invalid;
 
     // Wait for the SSH connection to be established,
     // So that we don't overwrite the password prompt with our progress bar.
@@ -140,7 +140,7 @@ Path SSHMaster::startMaster()
 
     auto state(state_.lock());
 
-    if (state->sshMaster != INVALID_DESCRIPTOR) return state->socketPath;
+    if (state->sshMaster != Descriptor::invalid) return state->socketPath;
 
     state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
 
@@ -173,7 +173,7 @@ Path SSHMaster::startMaster()
         throw SysError("unable to execute '%s'", args.front());
     }, options);
 
-    out.writeSide = INVALID_DESCRIPTOR;
+    out.writeSide = Descriptor::invalid;
 
     std::string reply;
     try {

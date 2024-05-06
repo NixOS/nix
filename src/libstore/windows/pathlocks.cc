@@ -121,7 +121,7 @@ bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bo
             debug("lock aquired on '%1%'", lockPath);
 
             struct _stat st;
-            if (_fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
+            if (_fstat(toFileDescriptorReadOnly(fd.get()), &st) == -1)
                 throw SysError("statting lock file '%1%'", lockPath);
             if (st.st_size != 0)
                 debug("open lock file '%1%' has become stale", lockPath);

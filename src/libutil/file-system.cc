@@ -288,7 +288,7 @@ unsigned char getFileType(const Path & path)
 
 std::string readFile(const Path & path)
 {
-    AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY
+    AutoCloseFD fd = Descriptor::fromFileDescriptor(open(path.c_str(), O_RDONLY
 // TODO
 #ifndef _WIN32
        | O_CLOEXEC
@@ -302,7 +302,7 @@ std::string readFile(const Path & path)
 
 void readFile(const Path & path, Sink & sink)
 {
-    AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY
+    AutoCloseFD fd = Descriptor::fromFileDescriptor(open(path.c_str(), O_RDONLY
 // TODO
 #ifndef _WIN32
        | O_CLOEXEC
@@ -316,7 +316,7 @@ void readFile(const Path & path, Sink & sink)
 
 void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 {
-    AutoCloseFD fd = toDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
+    AutoCloseFD fd = Descriptor::fromFileDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
 // TODO
 #ifndef _WIN32
        | O_CLOEXEC
@@ -341,7 +341,7 @@ void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 
 void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 {
-    AutoCloseFD fd = toDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
+    AutoCloseFD fd = Descriptor::fromFileDescriptor(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
 // TODO
 #ifndef _WIN32
        | O_CLOEXEC
@@ -373,7 +373,7 @@ void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 
 void syncParent(const Path & path)
 {
-    AutoCloseFD fd = toDescriptor(open(dirOf(path).c_str(), O_RDONLY, 0));
+    AutoCloseFD fd = Descriptor::fromFileDescriptor(open(dirOf(path).c_str(), O_RDONLY, 0));
     if (!fd)
         throw SysError("opening file '%1%'", path);
     fd.fsync();
@@ -453,7 +453,7 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
     if (dir == "")
         dir = "/";
 
-    AutoCloseFD dirfd = toDescriptor(open(dir.c_str(), O_RDONLY));
+    AutoCloseFD dirfd = Descriptor::fromFileDescriptor(open(dir.c_str(), O_RDONLY));
     if (!dirfd) {
         if (errno == ENOENT) return;
         throw SysError("opening directory '%1%'", path);
@@ -600,7 +600,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     Path tmpl(defaultTempDir() + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
     // FIXME: use O_TMPFILE.
-    AutoCloseFD fd = toDescriptor(mkstemp((char *) tmpl.c_str()));
+    AutoCloseFD fd = Descriptor::fromFileDescriptor(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
 #ifndef _WIN32

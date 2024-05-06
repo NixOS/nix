@@ -17,50 +17,70 @@ struct Source;
 /**
  * Operating System capability
  */
-using Descriptor =
+struct Descriptor {
+
+    /**
+     * Underlying operating-system-specific type
+     */
 #if _WIN32
     HANDLE
 #else
     int
 #endif
-    ;
+        raw;
 
-const Descriptor INVALID_DESCRIPTOR =
+    auto operator<=>(const Descriptor &) const = default;
+
+    /**
+     * A descriptor that is always invalid, regardless of the state of
+     * opened resources. It is useful as a [sentinel
+     * value](https://en.wikipedia.org/wiki/Sentinel_value).
+     */
+    const static Descriptor invalid;
+
+    /**
+     * Convert a native `Descriptor` to a POSIX file descriptor
+     *
+     * This is a no-op except on Windows.
+     */
+    [[gnu::always_inline]]
+    static inline Descriptor fromFileDescriptor(int fd)
+    {
+        return {
+            .raw =
+#ifdef _WIN32
+                reinterpret_cast<HANDLE>(_get_osfhandle(fd.raw));
+#else
+                fd
+#endif
+        };
+    }
+
+    /**
+     * Convert a POSIX file descriptor to a native `Descriptor` in read-only
+     * mode.
+     *
+     * This is a no-op except on Windows.
+     */
+    [[gnu::always_inline]]
+    inline int toFileDescriptorReadOnly()
+    {
+#ifdef _WIN32
+        return _open_osfhandle(reinterpret_cast<intptr_t>(raw), _O_RDONLY);
+#else
+        return raw;
+#endif
+    }
+};
+
+constexpr Descriptor Descriptor::invalid = {
+    .raw =
 #if _WIN32
-    INVALID_HANDLE_VALUE
+        INVALID_HANDLE_VALUE
 #else
-    -1
+        -1
 #endif
-    ;
-
-/**
- * Convert a native `Descriptor` to a POSIX file descriptor
- *
- * This is a no-op except on Windows.
- */
-static inline Descriptor toDescriptor(int fd)
-{
-#ifdef _WIN32
-    return reinterpret_cast<HANDLE>(_get_osfhandle(fd));
-#else
-    return fd;
-#endif
-}
-
-/**
- * Convert a POSIX file descriptor to a native `Descriptor` in read-only
- * mode.
- *
- * This is a no-op except on Windows.
- */
-static inline int fromDescriptorReadOnly(Descriptor fd)
-{
-#ifdef _WIN32
-    return _open_osfhandle(reinterpret_cast<intptr_t>(fd), _O_RDONLY);
-#else
-    return fd;
-#endif
-}
+};
 
 /**
  * Read the contents of a resource into a string.
@@ -103,11 +123,14 @@ void drainFD(
 
 [[gnu::always_inline]]
 inline Descriptor getStandardOut() {
+    return {
+        .raw =
 #ifndef _WIN32
-    return STDOUT_FILENO;
+            STDOUT_FILENO
 #else
-    return GetStdHandle(STD_OUTPUT_HANDLE);
+            GetStdHandle(STD_OUTPUT_HANDLE)
 #endif
+    };
 }
 
 /**
