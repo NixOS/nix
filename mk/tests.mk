@@ -12,8 +12,8 @@ endef
 
 define run-test
 
-  $(eval $(call run-bash,$1.test,$1 $(test-deps),mk/run-test.sh $1 $2))
-  $(eval $(call run-bash,$1.test-debug,$1 $(test-deps),mk/debug-test.sh $1 $2))
+  $(eval $(call run-bash,$1.test,$1 $(test-deps),mk/run-test.sh $1))
+  $(eval $(call run-bash,$1.test-debug,$1 $(test-deps),mk/debug-test.sh $1))
 
 endef
 

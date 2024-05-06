@@ -1,3 +1,5 @@
+# NOTE: instances of @variable@ are substituted as defined in /mk/templates.mk
+
 set -eu -o pipefail
 
 if [[ -z "${COMMON_VARS_AND_FUNCTIONS_SH_SOURCED-}" ]]; then
@@ -34,7 +36,6 @@ unset XDG_DATA_HOME
 unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
-mkdir -p $TEST_HOME
 
 export PATH=@bindir@:$PATH
 if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then

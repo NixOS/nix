@@ -1,6 +1,3 @@
-# Don't start the daemon
-source common/vars-and-functions.sh
-
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
     chmod -R u+rw "$TEST_ROOT"
@@ -8,7 +5,8 @@ if test -d "$TEST_ROOT"; then
     killDaemon
     rm -rf "$TEST_ROOT"
 fi
-mkdir "$TEST_ROOT"
+mkdir -p "$TEST_ROOT"
+mkdir "$TEST_HOME"
 
 mkdir "$NIX_STORE_DIR"
 mkdir "$NIX_LOCALSTATE_DIR"
@@ -36,7 +34,7 @@ extra-experimental-features = flakes
 EOF
 
 # Initialise the database.
+# The flag itself does nothing, but running the command touches the store
 nix-store --init
-
-# Did anything happen?
+# Sanity check
 test -e "$NIX_STATE_DIR"/db/db.sqlite
