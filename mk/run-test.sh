@@ -23,9 +23,9 @@ fi
 
 run_test () {
     if [ -n "$init" ]; then
-        (init_test 2>/dev/null > /dev/null)
+        (run "$init" 2>/dev/null > /dev/null)
     fi
-    log="$(run_test_proper 2>&1)" && status=0 || status=$?
+    log="$(run "$test" 2>&1)" && status=0 || status=$?
 }
 
 run_test
