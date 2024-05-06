@@ -123,6 +123,10 @@ nix_tests = \
   toString-path.sh \
   read-only-store.sh \
   nested-sandboxing.sh
+  impure-env.sh \
+  debugger.sh \
+  extra-sandbox-profile.sh \
+  help.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
