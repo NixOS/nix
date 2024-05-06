@@ -296,7 +296,7 @@ static Flake getFlake(
     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
     if (!patches.empty())
-        accessor = makePatchingInputAccessor(accessor, patches);
+        accessor = makePatchingSourceAccessor(accessor, patches);
 
     state.registerAccessor(accessor);
 

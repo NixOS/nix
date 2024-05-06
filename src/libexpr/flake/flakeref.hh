@@ -63,7 +63,7 @@ struct FlakeRef
 
     static FlakeRef fromAttrs(const fetchers::Attrs & attrs);
 
-    std::pair<ref<InputAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
 };
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);

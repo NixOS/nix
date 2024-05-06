@@ -3,40 +3,38 @@
 
 namespace nix {
 
-static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_patch(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     std::vector<std::string> patches;
     std::optional<SourcePath> src;
 
-    state.forceAttrs(*args[0], pos,
-        "while evaluating the first argument to 'builtins.patch'");
+    state.forceAttrs(*args[0], pos, "while evaluating the first argument to 'builtins.patch'");
 
     for (auto & attr : *args[0]->attrs()) {
         std::string_view n(state.symbols[attr.name]);
 
-        auto check = [&]()
-        {
+        auto check = [&]() {
             if (!patches.empty())
-                state.error<EvalError>(
-                    "'builtins.patch' does not support both 'patches' and 'patchFiles'")
-                    .atPos(attr.pos).debugThrow();
+                state.error<EvalError>("'builtins.patch' does not support both 'patches' and 'patchFiles'")
+                    .atPos(attr.pos)
+                    .debugThrow();
         };
 
         if (n == "src") {
             NixStringContext context;
-            src.emplace(state.coerceToPath(pos, *attr.value, context,
-                    "while evaluating the 'src' attribute passed to 'builtins.patch'"));
+            src.emplace(state.coerceToPath(
+                pos, *attr.value, context, "while evaluating the 'src' attribute passed to 'builtins.patch'"));
         }
 
         else if (n == "patchFiles") {
             check();
-            state.forceList(*attr.value, attr.pos,
-                "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
+            state.forceList(
+                *attr.value, attr.pos, "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
             for (auto elem : attr.value->listItems()) {
                 // FIXME: use realisePath
                 NixStringContext context;
-                auto patchFile = state.coerceToPath(attr.pos, *elem, context,
-                    "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
+                auto patchFile = state.coerceToPath(
+                    attr.pos, *elem, context, "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
                 patches.push_back(patchFile.readFile());
             }
         }
@@ -50,20 +48,18 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
         }
 
         else
-            state.error<EvalError>(
-                "attribute '%s' isn't supported in call to 'builtins.patch'", n)
-                .atPos(pos).debugThrow();
+            state.error<EvalError>("attribute '%s' isn't supported in call to 'builtins.patch'", n)
+                .atPos(pos)
+                .debugThrow();
     }
 
     if (!src)
-        state.error<EvalError>(
-            "attribute 'src' is missing in call to 'builtins.patch'")
-            .atPos(pos).debugThrow();
+        state.error<EvalError>("attribute 'src' is missing in call to 'builtins.patch'").atPos(pos).debugThrow();
 
     if (!src->path.isRoot())
         throw UnimplementedError("applying patches to a non-root path ('%s') is not yet supported", src->path);
 
-    auto accessor = makePatchingInputAccessor(src->accessor, patches);
+    auto accessor = makePatchingSourceAccessor(src->accessor, patches);
 
     state.registerAccessor(accessor);
 

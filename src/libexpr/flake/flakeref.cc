@@ -289,7 +289,7 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
         fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
-std::pair<ref<InputAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) const
+std::pair<ref<SourceAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) const
 {
     auto [accessor, lockedInput] = input.getAccessor(store);
     return {accessor, FlakeRef(std::move(lockedInput), subdir)};

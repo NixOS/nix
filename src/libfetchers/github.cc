@@ -7,7 +7,6 @@
 #include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
-#include "input-accessor.hh"
 #include "tarball.hh"
 #include "tarfile.hh"
 #include "git-utils.hh"
@@ -292,7 +291,7 @@ struct GitArchiveInputScheme : InputScheme
         return {std::move(input), tarballInfo};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto [input, tarballInfo] = downloadArchive(store, _input);
 

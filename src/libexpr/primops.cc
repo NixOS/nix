@@ -15,7 +15,6 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
-#include "fs-input-accessor.hh"
 #include "fetch-to-store.hh"
 
 #include <boost/container/small_vector.hpp>
@@ -1330,8 +1329,8 @@ static void derivationStrictInternal(
             [&](const NixStringContextElem::InputAccessor & a) {
                 /* Copy a virtual path (from encodePath()) to the
                    store. */
-                auto accessor = state.inputAccessors.find(a.accessor);
-                assert(accessor != state.inputAccessors.end());
+                auto accessor = state.sourceAccessors.find(a.accessor);
+                assert(accessor != state.sourceAccessors.end());
                 SourcePath path{accessor->second};
                 auto storePath = fetchToStore(
                     *state.store,
@@ -1873,12 +1872,12 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
-static Value * fileTypeToString(EvalState & state, InputAccessor::Type type)
+static Value * fileTypeToString(EvalState & state, SourceAccessor::Type type)
 {
     return
-        type == InputAccessor::Type::tRegular ? &state.vStringRegular :
-        type == InputAccessor::Type::tDirectory ? &state.vStringDirectory :
-        type == InputAccessor::Type::tSymlink ? &state.vStringSymlink :
+        type == SourceAccessor::Type::tRegular ? &state.vStringRegular :
+        type == SourceAccessor::Type::tDirectory ? &state.vStringDirectory :
+        type == SourceAccessor::Type::tSymlink ? &state.vStringSymlink :
         &state.vStringUnknown;
 }
 

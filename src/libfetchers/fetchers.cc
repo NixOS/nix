@@ -1,6 +1,5 @@
 #include "fetchers.hh"
 #include "store-api.hh"
-#include "input-accessor.hh"
 #include "source-path.hh"
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
@@ -220,7 +219,7 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
     }
 }
 
-std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
     // FIXME: cache the accessor
 
@@ -239,7 +238,7 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
     }
 }
 
-std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
 {
     // FIXME: cache the accessor
 

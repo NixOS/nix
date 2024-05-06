@@ -14,9 +14,9 @@ SourcePath EvalState::rootPath(PathView path)
     return {rootFS, CanonPath(absPath(path))};
 }
 
-void EvalState::registerAccessor(ref<InputAccessor> accessor)
+void EvalState::registerAccessor(ref<SourceAccessor> accessor)
 {
-    inputAccessors.emplace(accessor->number, accessor);
+    sourceAccessors.emplace(accessor->number, accessor);
 }
 
 std::string EvalState::encodePath(const SourcePath & path)
@@ -26,7 +26,7 @@ std::string EvalState::encodePath(const SourcePath & path)
        to /nix/store/virtual000...<N>) and we should deprecate it
        eventually. So print a warning about use of an encoded path in
        decodePath(). */
-    return path.accessor == ref<InputAccessor>(rootFS)
+    return path.accessor == ref<SourceAccessor>(rootFS)
                ? path.path.abs()
                : fmt("%s%08d-source%s", virtualPathMarker, path.accessor->number, path.path.absOrEmpty());
 }
@@ -46,8 +46,8 @@ SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
             size_t number = std::stoi(std::string(s.substr(0, slash)), nullptr, 10);
             s = slash == s.npos ? "" : s.substr(slash);
 
-            auto accessor = inputAccessors.find(number);
-            if (accessor == inputAccessors.end())
+            auto accessor = sourceAccessors.find(number);
+            if (accessor == sourceAccessors.end())
                 fail();
 
             SourcePath path{accessor->second, CanonPath(s)};
@@ -116,8 +116,8 @@ std::string EvalState::rewriteVirtualPaths(std::string_view s, PosIdx pos)
         try {
             size_t number = std::stoi(std::string(s.substr(m + 24, 8)), nullptr, 10); // FIXME
 
-            auto accessor = inputAccessors.find(number);
-            assert(accessor != inputAccessors.end()); // FIXME
+            auto accessor = sourceAccessors.find(number);
+            assert(accessor != sourceAccessors.end()); // FIXME
 
             warn(
                 "derivation at %s has an attribute that refers to source tree '%s' without context; this does not work correctly",

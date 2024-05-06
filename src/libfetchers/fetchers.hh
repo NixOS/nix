@@ -11,7 +11,7 @@
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 
-namespace nix { class Store; class StorePath; struct InputAccessor; }
+namespace nix { class Store; class StorePath; struct SourceAccessor; }
 
 namespace nix::fetchers {
 
@@ -85,15 +85,15 @@ public:
     std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
 
     /**
-     * Return an InputAccessor that allows access to files in the
+     * Return a `SourceAccessor` that allows access to files in the
      * input without copying it to the store. Also return a possibly
      * unlocked input.
      */
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store) const;
 
 private:
 
-    std::pair<ref<InputAccessor>, Input> getAccessorUnchecked(ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, Input> getAccessorUnchecked(ref<Store> store) const;
 
 public:
 
@@ -180,7 +180,7 @@ struct InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
-    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const = 0;
+    virtual std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const = 0;
 
     /**
      * Is this `InputScheme` part of an experimental feature?

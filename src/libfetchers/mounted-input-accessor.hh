@@ -1,9 +1,9 @@
 #pragma once
 
-#include "input-accessor.hh"
+#include "source-accessor.hh"
 
 namespace nix {
 
-ref<InputAccessor> makeMountedInputAccessor(std::map<CanonPath, ref<InputAccessor>> mounts);
+ref<SourceAccessor> makeMountedInputAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts);
 
 }

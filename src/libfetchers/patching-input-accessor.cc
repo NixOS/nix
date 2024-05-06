@@ -1,18 +1,16 @@
-#include "input-accessor.hh"
+#include "patching-input-accessor.hh"
 #include "processes.hh"
 
 namespace nix {
 
 // TODO: handle file creation / deletion.
-struct PatchingInputAccessor : InputAccessor
+struct PatchingSourceAccessor : SourceAccessor
 {
-    ref<InputAccessor> next;
+    ref<SourceAccessor> next;
 
     std::map<CanonPath, std::vector<std::string>> patchesPerFile;
 
-    PatchingInputAccessor(
-        ref<InputAccessor> next,
-        const std::vector<std::string> & patches)
+    PatchingSourceAccessor(ref<SourceAccessor> next, const std::vector<std::string> & patches)
         : next(next)
     {
         /* Extract the patches for each file. */
@@ -21,13 +19,14 @@ struct PatchingInputAccessor : InputAccessor
             std::string_view start;
             std::string_view fileName;
 
-            auto flush = [&]()
-            {
-                if (start.empty()) return;
+            auto flush = [&]() {
+                if (start.empty())
+                    return;
                 auto contents = start.substr(0, p.data() - start.data());
                 start = "";
                 auto slash = fileName.find('/');
-                if (slash == fileName.npos) return;
+                if (slash == fileName.npos)
+                    return;
                 fileName = fileName.substr(slash);
                 auto end = fileName.find('\t');
                 if (end != fileName.npos)
@@ -47,13 +46,8 @@ struct PatchingInputAccessor : InputAccessor
                 }
 
                 if (!start.empty()) {
-                    if (!(hasPrefix(line, "+++ ")
-                            || hasPrefix(line, "@@")
-                            || hasPrefix(line, "+")
-                            || hasPrefix(line, "-")
-                            || hasPrefix(line, " ")
-                            || line.empty()))
-                    {
+                    if (!(hasPrefix(line, "+++ ") || hasPrefix(line, "@@") || hasPrefix(line, "+")
+                          || hasPrefix(line, "-") || hasPrefix(line, " ") || line.empty())) {
                         flush();
                     }
                 }
@@ -110,11 +104,9 @@ struct PatchingInputAccessor : InputAccessor
     }
 };
 
-ref<InputAccessor> makePatchingInputAccessor(
-    ref<InputAccessor> next,
-    const std::vector<std::string> & patches)
+ref<SourceAccessor> makePatchingSourceAccessor(ref<SourceAccessor> next, const std::vector<std::string> & patches)
 {
-    return make_ref<PatchingInputAccessor>(next, patches);
+    return make_ref<PatchingSourceAccessor>(next, patches);
 }
 
 }

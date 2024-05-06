@@ -41,7 +41,7 @@ Expr * parseExprFromBuf(
     const SourcePath & basePath,
     SymbolTable & symbols,
     PosTable & positions,
-    const ref<InputAccessor> rootFS,
+    const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols);
 
 }
@@ -443,7 +443,7 @@ Expr * parseExprFromBuf(
     const SourcePath & basePath,
     SymbolTable & symbols,
     PosTable & positions,
-    const ref<InputAccessor> rootFS,
+    const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols)
 {
     yyscan_t scanner;

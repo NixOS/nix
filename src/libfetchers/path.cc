@@ -1,8 +1,7 @@
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "archive.hh"
-#include "fs-input-accessor.hh"
-#include "posix-source-accessor.hh"
+#include "store-path-accessor.hh"
 
 namespace nix::fetchers {
 
@@ -119,7 +118,7 @@ struct PathInputScheme : InputScheme
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
     {
         auto absPath = getAbsPath(input);
         auto input2(input);
@@ -131,8 +130,7 @@ struct PathInputScheme : InputScheme
 
             if (!storePath || storePath->name() != input.getName() || !store->isValidPath(*storePath)) {
                 Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
-                PosixSourceAccessor accessor;
-                storePath = store->addToStore(input.getName(), accessor, absPath);
+                storePath = store->addToStore(input.getName(), *makeFSSourceAccessor(), absPath);
                 auto narHash = store->queryPathInfo(*storePath)->narHash;
                 input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
             } else
@@ -152,7 +150,7 @@ struct PathInputScheme : InputScheme
             return {makeStorePathAccessor(store, *storePath), std::move(input2)};
 
         } else {
-            auto accessor = makeFSInputAccessor(std::filesystem::path(absPath.abs()));
+            auto accessor = makeFSSourceAccessor(std::filesystem::path(absPath.abs()));
             accessor->setPathDisplay(absPath.abs());
             return {accessor, std::move(input2)};
         }

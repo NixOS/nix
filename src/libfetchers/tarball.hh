@@ -8,7 +8,7 @@
 
 namespace nix {
 class Store;
-struct InputAccessor;
+struct SourceAccessor;
 }
 
 namespace nix::fetchers {
@@ -32,7 +32,7 @@ struct DownloadTarballResult
     Hash treeHash;
     time_t lastModified;
     std::optional<std::string> immutableUrl;
-    ref<InputAccessor> accessor;
+    ref<SourceAccessor> accessor;
 };
 
 /**

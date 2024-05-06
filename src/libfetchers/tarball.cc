@@ -8,8 +8,7 @@
 #include "tarfile.hh"
 #include "types.hh"
 #include "split.hh"
-#include "posix-source-accessor.hh"
-#include "fs-input-accessor.hh"
+#include "store-path-accessor.hh"
 #include "store-api.hh"
 #include "git-utils.hh"
 
@@ -297,7 +296,7 @@ struct FileInputScheme : CurlInputScheme
                 : (!requireTree && !hasTarballExtension(url.path)));
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto input(_input);
 
@@ -332,7 +331,7 @@ struct TarballInputScheme : CurlInputScheme
                 : (requireTree || hasTarballExtension(url.path)));
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto input(_input);
 

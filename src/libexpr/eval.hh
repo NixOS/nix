@@ -9,7 +9,7 @@
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
-#include "input-accessor.hh"
+#include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
 
@@ -35,7 +35,7 @@ struct DerivedPath;
 struct SourcePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
-struct MemoryInputAccessor;
+struct MemorySourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
@@ -231,26 +231,26 @@ public:
     /**
      * The accessor for the root filesystem.
      */
-    const ref<InputAccessor> rootFS;
+    const ref<SourceAccessor> rootFS;
 
     /**
      * The in-memory filesystem for <nix/...> paths.
      */
-    const ref<MemoryInputAccessor> corepkgsFS;
+    const ref<MemorySourceAccessor> corepkgsFS;
 
     /**
      * In-memory filesystem for internal, non-user-callable Nix
      * expressions like call-flake.nix.
      */
-    const ref<MemoryInputAccessor> internalFS;
+    const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
 
     const SourcePath callFlakeInternal;
 
-    /* A map keyed by InputAccessor::number that keeps input accessors
+    /* A map keyed by SourceAccessor::number that keeps input accessors
        alive. */
-    std::unordered_map<size_t, ref<InputAccessor>> inputAccessors;
+    std::unordered_map<size_t, ref<SourceAccessor>> sourceAccessors;
 
     /**
      * Store used to materialise .drv files.
@@ -359,7 +359,7 @@ public:
      */
     SourcePath rootPath(CanonPath path);
 
-    void registerAccessor(ref<InputAccessor> accessor);
+    void registerAccessor(ref<SourceAccessor> accessor);
 
     /* Convert a path to a string representation of the format
        `/nix/store/virtual000...<accessor-number>/<path>`. */

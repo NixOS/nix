@@ -1,6 +1,5 @@
 #pragma once
 
-#include "input-accessor.hh"
 #include "source-path.hh"
 
 namespace nix {
@@ -17,9 +16,9 @@ typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowe
  * control. Subclasses should override `isAllowed()` to implement an
  * access control policy. The error message is customized at construction.
  */
-struct FilteringInputAccessor : InputAccessor
+struct FilteringInputAccessor : SourceAccessor
 {
-    ref<InputAccessor> next;
+    ref<SourceAccessor> next;
     CanonPath prefix;
     MakeNotAllowedError makeNotAllowedError;
 
@@ -67,7 +66,7 @@ struct AllowListInputAccessor : public FilteringInputAccessor
     virtual void allowPrefix(CanonPath prefix) = 0;
 
     static ref<AllowListInputAccessor> create(
-        ref<InputAccessor> next,
+        ref<SourceAccessor> next,
         std::set<CanonPath> && allowedPrefixes,
         MakeNotAllowedError && makeNotAllowedError);
 

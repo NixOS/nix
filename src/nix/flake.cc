@@ -858,9 +858,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 auto from2 = from / name;
                 auto to2 = to / name;
                 auto st = from2.lstat();
-                if (st.type == InputAccessor::tDirectory)
+                if (st.type == SourceAccessor::tDirectory)
                     copyDir(from2, to2);
-                else if (st.type == InputAccessor::tRegular) {
+                else if (st.type == SourceAccessor::tRegular) {
                     auto contents = from2.readFile();
                     if (pathExists(to2.abs())) {
                         auto contents2 = readFile(to2.abs());
@@ -874,7 +874,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     } else
                         writeFile(to2.abs(), contents);
                 }
-                else if (st.type == InputAccessor::tSymlink) {
+                else if (st.type == SourceAccessor::tSymlink) {
                     auto target = from2.readLink();
                     if (pathExists(to2.abs())) {
                         if (readLink(to2.abs()) != target) {
