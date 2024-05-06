@@ -1,6 +1,6 @@
 #pragma once
 
-#include "filtering-input-accessor.hh"
+#include "filtering-source-accessor.hh"
 #include "fs-sink.hh"
 
 namespace nix {

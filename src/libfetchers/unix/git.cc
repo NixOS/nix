@@ -9,7 +9,7 @@
 #include "pathlocks.hh"
 #include "processes.hh"
 #include "git.hh"
-#include "mounted-input-accessor.hh"
+#include "mounted-source-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
@@ -419,7 +419,7 @@ struct GitInputScheme : InputScheme
 
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitLastModified"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitLastModified", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 
@@ -428,14 +428,14 @@ struct GitInputScheme : InputScheme
 
         auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
 
-        cache->upsert(key, Attrs{{"lastModified", lastModified}});
+        cache->upsert(key, {{"lastModified", lastModified}});
 
         return lastModified;
     }
 
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitRevCount"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 
@@ -645,7 +645,7 @@ struct GitInputScheme : InputScheme
 
             if (!mounts.empty()) {
                 mounts.insert_or_assign(CanonPath::root, accessor);
-                accessor = makeMountedInputAccessor(std::move(mounts));
+                accessor = makeMountedSourceAccessor(std::move(mounts));
             }
         }
 
@@ -708,7 +708,7 @@ struct GitInputScheme : InputScheme
             }
 
             mounts.insert_or_assign(CanonPath::root, accessor);
-            accessor = makeMountedInputAccessor(std::move(mounts));
+            accessor = makeMountedSourceAccessor(std::move(mounts));
         }
 
         if (!repoInfo.workdirInfo.isDirty) {

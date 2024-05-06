@@ -1,16 +1,16 @@
 #include "primops.hh"
-#include "filtering-input-accessor.hh"
+#include "filtering-source-accessor.hh"
 
 namespace nix {
 
-struct FilterPathInputAccessor : CachingFilteringInputAccessor
+struct FilterPathSourceAccessor : CachingFilteringSourceAccessor
 {
     EvalState & state;
     PosIdx pos;
     Value * filterFun;
 
-    FilterPathInputAccessor(EvalState & state, PosIdx pos, const SourcePath & src, Value * filterFun)
-        : CachingFilteringInputAccessor(src, {})
+    FilterPathSourceAccessor(EvalState & state, PosIdx pos, const SourcePath & src, Value * filterFun)
+        : CachingFilteringSourceAccessor(src, {})
         , state(state)
         , pos(pos)
         , filterFun(filterFun)
@@ -64,7 +64,7 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value ** args, Value 
             .atPos(pos).debugThrow();
 #endif
 
-    auto accessor = make_ref<FilterPathInputAccessor>(state, pos, *path, filterFun);
+    auto accessor = make_ref<FilterPathSourceAccessor>(state, pos, *path, filterFun);
 
     state.registerAccessor(accessor);
 

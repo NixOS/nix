@@ -72,7 +72,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                 if (maybePathsOut)
                     maybePathsOut->emplace(d.drvPath);
             },
-            [&](const NixStringContextElem::InputAccessor & a) {
+            [&](const NixStringContextElem::SourceAccessor & a) {
                 assert(false); // FIXME
             }
         }, c.raw);
@@ -1326,7 +1326,7 @@ static void derivationStrictInternal(
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
             },
-            [&](const NixStringContextElem::InputAccessor & a) {
+            [&](const NixStringContextElem::SourceAccessor & a) {
                 /* Copy a virtual path (from encodePath()) to the
                    store. */
                 auto accessor = state.sourceAccessors.find(a.accessor);
@@ -2388,7 +2388,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         state,
         pos,
         path.path.isRoot()
-        ? state.store->computeStorePath("source", *path.accessor, path.path).first.to_string()
+        ? state.store->computeStorePath("source", path).first.to_string()
         : path.baseName(),
         path,
         args[0],

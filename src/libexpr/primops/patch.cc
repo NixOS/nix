@@ -1,5 +1,5 @@
 #include "primops.hh"
-#include "patching-input-accessor.hh"
+#include "patching-source-accessor.hh"
 
 namespace nix {
 

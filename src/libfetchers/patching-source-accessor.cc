@@ -1,4 +1,4 @@
-#include "patching-input-accessor.hh"
+#include "patching-source-accessor.hh"
 #include "processes.hh"
 
 namespace nix {

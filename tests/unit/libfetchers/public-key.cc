@@ -22,7 +22,7 @@ public:
     TEST_F(FIXTURE, PublicKey_ ## NAME ## _from_json) {                   \
         readTest(#NAME ".json", [&](const auto & encoded_) {              \
             fetchers::PublicKey expected { VAL };                         \
-            auto got = nlohmann::json::parse(encoded_);                   \
+            fetchers::PublicKey got = nlohmann::json::parse(encoded_);    \
             ASSERT_EQ(got, expected);                                     \
         });                                                               \
     }                                                                     \
@@ -47,7 +47,7 @@ TEST_F(PublicKeyTest, PublicKey_noRoundTrip_from_json) {
     readTest("noRoundTrip.json", [&](const auto & encoded_) {
         fetchers::PublicKey expected = { .type = "ssh-ed25519", .key = "ABCDE" };
         fetchers::PublicKey got = nlohmann::json::parse(encoded_);
-        ASSERT_EQ(got, nlohmann::json(expected));
+        ASSERT_EQ(got, expected);
     });
 }
 

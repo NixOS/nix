@@ -127,7 +127,7 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                 /* Reuse original item because we want this to be idempotent. */
                 return std::move(c);
             },
-            [&](const NixStringContextElem::InputAccessor & c) -> NixStringContextElem::DrvDeep {
+            [&](const NixStringContextElem::SourceAccessor & c) -> NixStringContextElem::DrvDeep {
                 abort(); // FIXME
             },
         }, context.begin()->raw) }),
@@ -196,7 +196,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             [&](NixStringContextElem::Opaque && o) {
                 contextInfos[std::move(o.path)].path = true;
             },
-            [&](NixStringContextElem::InputAccessor && a) {
+            [&](NixStringContextElem::SourceAccessor && a) {
                 abort(); // FIXME
             },
         }, ((NixStringContextElem &&) i).raw);

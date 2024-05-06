@@ -605,7 +605,7 @@ string_t AttrCursor::getStringWithContext()
                         [&](const NixStringContextElem::Opaque & o) -> const StorePath & {
                             return o.path;
                         },
-                        [&](const NixStringContextElem::InputAccessor & a) -> const StorePath & {
+                        [&](const NixStringContextElem::SourceAccessor & a) -> const StorePath & {
                             assert(false); // FIXME
                         },
                     }, c.raw);

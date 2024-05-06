@@ -134,6 +134,7 @@ nix_tests = \
   nested-sandboxing.sh \
   impure-env.sh \
   debugger.sh \
+  extra-sandbox-profile.sh \
   help.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)

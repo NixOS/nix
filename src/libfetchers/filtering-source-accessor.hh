@@ -12,17 +12,17 @@ namespace nix {
 typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
 
 /**
- * An abstract wrapping `InputAccessor` that performs access
+ * An abstract wrapping `SourceAccessor` that performs access
  * control. Subclasses should override `isAllowed()` to implement an
  * access control policy. The error message is customized at construction.
  */
-struct FilteringInputAccessor : SourceAccessor
+struct FilteringSourceAccessor : SourceAccessor
 {
     ref<SourceAccessor> next;
     CanonPath prefix;
     MakeNotAllowedError makeNotAllowedError;
 
-    FilteringInputAccessor(const SourcePath & src, MakeNotAllowedError && makeNotAllowedError)
+    FilteringSourceAccessor(const SourcePath & src, MakeNotAllowedError && makeNotAllowedError)
         : next(src.accessor)
         , prefix(src.path)
         , makeNotAllowedError(std::move(makeNotAllowedError))
@@ -55,32 +55,32 @@ struct FilteringInputAccessor : SourceAccessor
 };
 
 /**
- * A wrapping `InputAccessor` that checks paths against a set of
+ * A wrapping `SourceAccessor` that checks paths against a set of
  * allowed prefixes.
  */
-struct AllowListInputAccessor : public FilteringInputAccessor
+struct AllowListSourceAccessor : public FilteringSourceAccessor
 {
     /**
      * Grant access to the specified prefix.
      */
     virtual void allowPrefix(CanonPath prefix) = 0;
 
-    static ref<AllowListInputAccessor> create(
+    static ref<AllowListSourceAccessor> create(
         ref<SourceAccessor> next,
         std::set<CanonPath> && allowedPrefixes,
         MakeNotAllowedError && makeNotAllowedError);
 
-    using FilteringInputAccessor::FilteringInputAccessor;
+    using FilteringSourceAccessor::FilteringSourceAccessor;
 };
 
 /**
- * A wrapping `InputAccessor` mix-in where `isAllowed()` caches the result of virtual `isAllowedUncached()`.
+ * A wrapping `SourceAccessor` mix-in where `isAllowed()` caches the result of virtual `isAllowedUncached()`.
  */
-struct CachingFilteringInputAccessor : FilteringInputAccessor
+struct CachingFilteringSourceAccessor : FilteringSourceAccessor
 {
     std::map<CanonPath, bool> cache;
 
-    using FilteringInputAccessor::FilteringInputAccessor;
+    using FilteringSourceAccessor::FilteringSourceAccessor;
 
     bool isAllowed(const CanonPath & path) override;
 

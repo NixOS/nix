@@ -124,7 +124,7 @@ std::string EvalState::rewriteVirtualPaths(std::string_view s, PosIdx pos)
                 positions[pos], accessor->second->showPath(CanonPath::root));
 
             // FIXME: cache this.
-            res.append(store->computeStorePath("source", *accessor->second, CanonPath::root).first.hashPart());
+            res.append(store->computeStorePath("source", {accessor->second}).first.hashPart());
         } catch (...) {
             ignoreException();
             res.append(s.substr(m, end - m));

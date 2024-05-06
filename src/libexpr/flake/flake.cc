@@ -11,7 +11,7 @@
 #include "fetch-settings.hh"
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
-#include "patching-input-accessor.hh"
+#include "patching-source-accessor.hh"
 
 namespace nix {
 

@@ -130,7 +130,7 @@ struct PathInputScheme : InputScheme
 
             if (!storePath || storePath->name() != input.getName() || !store->isValidPath(*storePath)) {
                 Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
-                storePath = store->addToStore(input.getName(), *makeFSSourceAccessor(), absPath);
+                storePath = store->addToStore(input.getName(), {getFSSourceAccessor(), absPath});
                 auto narHash = store->queryPathInfo(*storePath)->narHash;
                 input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
             } else

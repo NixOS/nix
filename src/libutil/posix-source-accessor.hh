@@ -4,6 +4,8 @@
 
 namespace nix {
 
+struct SourcePath;
+
 /**
  * A source accessor that uses the Unix filesystem.
  */
@@ -53,7 +55,7 @@ struct PosixSourceAccessor : virtual SourceAccessor
      * and
      * [`std::filesystem::path::relative_path`](https://en.cppreference.com/w/cpp/filesystem/path/relative_path).
      */
-    static std::pair<PosixSourceAccessor, CanonPath> createAtRoot(const std::filesystem::path & path);
+    static SourcePath createAtRoot(const std::filesystem::path & path);
 
 private:
 

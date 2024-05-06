@@ -15,7 +15,7 @@
 #include "function-trace.hh"
 #include "profiles.hh"
 #include "print.hh"
-#include "filtering-input-accessor.hh"
+#include "filtering-source-accessor.hh"
 #include "memory-source-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
@@ -264,7 +264,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
         // requires us to make builtins.substring more precise about
         // propagating contexts. E.g. `builtins.substring 44 (-1)
         // "${./src}"` should not have a context (at least not a
-        // `InputAccessor` context).
+        // `SourceAccessor` context).
         state.forceString(nameValue, name.expr->getPos(), "while evaluating an attribute name");
         return state.symbols.create(nameValue.string_view());
     }
@@ -404,14 +404,14 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         evalSettings.restrictEval || evalSettings.pureEval
-        ? ref<SourceAccessor>(AllowListInputAccessor::create(makeFSSourceAccessor(), {},
+        ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
-        : makeFSSourceAccessor())
+        : getFSSourceAccessor())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
@@ -466,7 +466,7 @@ EvalState::EvalState(
     }
 
     /* Allow access to all paths in the search path. */
-    if (rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+    if (rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         for (auto & i : lookupPath.elements)
             resolveLookupPathPath(i.path, true);
 
@@ -486,13 +486,13 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         rootFS2->allowPrefix(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
 }
 
@@ -546,13 +546,13 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri.substr(7)));
         return;
     }
@@ -990,7 +990,7 @@ void EvalState::mkPathString(Value & v, const SourcePath & path)
     v.mkString(
         encodePath(path),
         NixStringContext {
-            NixStringContextElem::InputAccessor { .accessor = path.accessor->number },
+            NixStringContextElem::SourceAccessor { .accessor = path.accessor->number },
         });
 }
 
@@ -2439,7 +2439,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
                    though. Still, this requires reading/hashing the
                    path twice. */
                 path.path.isRoot()
-                ? store->computeStorePath("source", *path.accessor, path.path).first.to_string()
+                ? store->computeStorePath("source", path).first.to_string()
                 : path.baseName(),
                 FileIngestionMethod::Recursive,
                 nullptr,
@@ -2527,7 +2527,7 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
         [&](NixStringContextElem::Built && b) -> SingleDerivedPath {
             return std::move(b);
         },
-        [&](NixStringContextElem::InputAccessor && a) -> SingleDerivedPath {
+        [&](NixStringContextElem::SourceAccessor && a) -> SingleDerivedPath {
             auto accessor = sourceAccessors.find(a.accessor);
             assert(accessor != sourceAccessors.end());
             return SingleDerivedPath::Opaque(fetchToStore(

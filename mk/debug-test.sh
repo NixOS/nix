@@ -9,6 +9,6 @@ dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$dir/common-test.sh"
 
 if [ -n "$init" ]; then
-    (init_test)
+    (run "$init" 2>/dev/null > /dev/null)
 fi
-run_test_proper
+run "$test"

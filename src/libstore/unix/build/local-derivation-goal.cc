@@ -177,6 +177,10 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 
 void LocalDerivationGoal::tryLocalBuild()
 {
+#if __APPLE__
+    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
+#endif
+
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         state = &DerivationGoal::tryToBuild;
@@ -494,10 +498,6 @@ void LocalDerivationGoal::startBuilder()
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
             concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
-
-#if __APPLE__
-    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
-#endif
 
     /* Create a temporary directory where the build will take
        place. */
@@ -1306,8 +1306,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
 
     StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & srcPath,
+        const SourcePath & srcPath,
         ContentAddressMethod method,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
@@ -2485,7 +2484,6 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
             auto got = [&]{
-                PosixSourceAccessor accessor;
                 auto fim = outputHash.method.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
@@ -2494,15 +2492,15 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
-                        accessor, CanonPath { actualPath },
+                        {getFSSourceAccessor(), CanonPath(actualPath)},
                         caSink,
                         (FileSerialisationMethod) fim);
                     return caSink.finish().first;
                 }
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(
-                        outputHash.hashAlgo, accessor,
-                        CanonPath { tmpDir + "/tmp" }).hash;
+                        outputHash.hashAlgo,
+                        {getFSSourceAccessor(), CanonPath(tmpDir + "/tmp")}).hash;
                 }
                 }
                 assert(false);
@@ -2529,9 +2527,8 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             }
 
             {
-                PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
-                    accessor, CanonPath { actualPath },
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
                     FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
@@ -2553,9 +2550,8 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput(outputRewrites);
-                PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
-                    accessor, CanonPath { actualPath },
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
                     FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
