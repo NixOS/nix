@@ -13,13 +13,13 @@ bool FilteringInputAccessor::pathExists(const CanonPath & path)
     return isAllowed(path) && next->pathExists(prefix / path);
 }
 
-std::optional<InputAccessor::Stat> FilteringInputAccessor::maybeLstat(const CanonPath & path)
+std::optional<SourceAccessor::Stat> FilteringInputAccessor::maybeLstat(const CanonPath & path)
 {
     checkAccess(path);
     return next->maybeLstat(prefix / path);
 }
 
-InputAccessor::DirEntries FilteringInputAccessor::readDirectory(const CanonPath & path)
+SourceAccessor::DirEntries FilteringInputAccessor::readDirectory(const CanonPath & path)
 {
     checkAccess(path);
     DirEntries entries;
@@ -54,7 +54,7 @@ struct AllowListInputAccessorImpl : AllowListInputAccessor
     std::set<CanonPath> allowedPrefixes;
 
     AllowListInputAccessorImpl(
-        ref<InputAccessor> next,
+        ref<SourceAccessor> next,
         std::set<CanonPath> && allowedPrefixes,
         MakeNotAllowedError && makeNotAllowedError)
         : AllowListInputAccessor(SourcePath(next), std::move(makeNotAllowedError))
@@ -73,7 +73,7 @@ struct AllowListInputAccessorImpl : AllowListInputAccessor
 };
 
 ref<AllowListInputAccessor> AllowListInputAccessor::create(
-    ref<InputAccessor> next,
+    ref<SourceAccessor> next,
     std::set<CanonPath> && allowedPrefixes,
     MakeNotAllowedError && makeNotAllowedError)
 {

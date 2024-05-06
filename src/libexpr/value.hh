@@ -7,7 +7,6 @@
 
 #include "symbol-table.hh"
 #include "value/context.hh"
-#include "input-accessor.hh"
 #include "source-path.hh"
 #include "print-options.hh"
 
@@ -217,7 +216,7 @@ public:
     };
 
     struct Path {
-        InputAccessor * accessor;
+        SourceAccessor * accessor;
         const char * path;
     };
 
@@ -335,7 +334,7 @@ public:
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
 
-    inline void mkPath(InputAccessor * accessor, const char * path)
+    inline void mkPath(SourceAccessor * accessor, const char * path)
     {
         finishValue(tPath, { .path = { .accessor = accessor, .path = path } });
     }

@@ -94,11 +94,11 @@ static bool parseInstallSourceOptions(Globals & globals,
 }
 
 
-static bool isNixExpr(const SourcePath & path, struct InputAccessor::Stat & st)
+static bool isNixExpr(const SourcePath & path, struct SourceAccessor::Stat & st)
 {
     return
-        st.type == InputAccessor::tRegular
-        || (st.type == InputAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
+        st.type == SourceAccessor::tRegular
+        || (st.type == SourceAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
 }
 
 
@@ -119,14 +119,14 @@ static void getAllExprs(EvalState & state,
 
         auto path2 = (path / i).resolveSymlinks();
 
-        InputAccessor::Stat st;
+        SourceAccessor::Stat st;
         try {
             st = path2.lstat();
         } catch (Error &) {
             continue; // ignore dangling symlinks in ~/.nix-defexpr
         }
 
-        if (isNixExpr(path2, st) && (st.type != InputAccessor::tRegular || hasSuffix(path2.baseName(), ".nix"))) {
+        if (isNixExpr(path2, st) && (st.type != SourceAccessor::tRegular || hasSuffix(path2.baseName(), ".nix"))) {
             /* Strip off the `.nix' filename suffix (if applicable),
                otherwise the attribute cannot be selected with the
                `-A' option.  Useful if you want to stick a Nix
@@ -149,7 +149,7 @@ static void getAllExprs(EvalState & state,
                 throw Error("too many Nix expressions in directory '%1%'", path);
             attrs.alloc(attrName).mkApp(&state.getBuiltin("import"), vArg);
         }
-        else if (st.type == InputAccessor::tDirectory)
+        else if (st.type == SourceAccessor::tDirectory)
             /* `path2' is a directory (with no default.nix in it);
                recurse into it. */
             getAllExprs(state, path2, seen, attrs);
@@ -171,7 +171,7 @@ static void loadSourceExpr(EvalState & state, const SourcePath & path, Value & v
        set flat, not nested, to make it easier for a user to have a
        ~/.nix-defexpr directory that includes some system-wide
        directory). */
-    else if (st.type == InputAccessor::tDirectory) {
+    else if (st.type == SourceAccessor::tDirectory) {
         auto attrs = state.buildBindings(maxAttrs);
         attrs.insert(state.symbols.create("_combineChannels"), &state.vEmptyList);
         StringSet seen;

@@ -14,7 +14,7 @@ StorePath fetchToStore(
     RepairFlag repair)
 {
     // FIXME: add an optimisation for the case where the accessor is
-    // an FSInputAccessor pointing to a store path.
+    // a `PosixSourceAccessor` pointing to a store path.
 
     std::optional<fetchers::Attrs> cacheKey;
 

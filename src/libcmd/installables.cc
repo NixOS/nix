@@ -21,7 +21,6 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
-#include "fs-input-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -147,7 +146,7 @@ MixFlakeOptions::MixFlakeOptions()
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
-            lockFlags.referenceLockFilePath = getUnfilteredRootPath(CanonPath(absPath(lockFilePath)));
+            lockFlags.referenceLockFilePath = {makeFSSourceAccessor(), CanonPath(absPath(lockFilePath))};
         }},
         .completer = completePath
     });

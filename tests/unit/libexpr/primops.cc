@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "eval-settings.hh"
-#include "memory-input-accessor.hh"
+#include "memory-source-accessor.hh"
 
 #include "tests/libexpr.hh"
 
