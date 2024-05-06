@@ -19,6 +19,7 @@ nix_tests = \
   flakes/flake-in-submodule.sh \
   flakes/tree-operators.sh \
   flakes/patch.sh \
+  flakes/lazy-trees.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
