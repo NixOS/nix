@@ -16,7 +16,7 @@ struct Cache
 
     /**
      * A domain is a partition of the key/value cache for a particular
-     * purpose, e.g. "Git revision to revcount".
+     * purpose, e.g. git revision to revcount.
      */
     using Domain = std::string_view;
 
