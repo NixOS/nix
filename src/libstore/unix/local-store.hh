@@ -377,7 +377,7 @@ private:
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    std::pair<Path, AutoCloseFD> createTempDirInStore();
+    std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 
     typedef std::unordered_set<ino_t> InodeHash;
 

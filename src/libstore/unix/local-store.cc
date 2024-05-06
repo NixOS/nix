@@ -1220,8 +1220,8 @@ StorePath LocalStore::addToStoreFromDump(
     }
 
     std::unique_ptr<AutoDelete> delTempDir;
-    Path tempPath;
-    Path tempDir;
+    std::filesystem::path tempPath;
+    std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
 
     bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
@@ -1237,9 +1237,9 @@ StorePath LocalStore::addToStoreFromDump(
 
         std::tie(tempDir, tempDirFd) = createTempDirInStore();
         delTempDir = std::make_unique<AutoDelete>(tempDir);
-        tempPath = tempDir + "/x";
+        tempPath = tempDir / "x";
 
-        restorePath(tempPath, bothSource, dumpMethod);
+        restorePath(tempPath.string(), bothSource, dumpMethod);
 
         dumpBuffer.reset();
         dump = {};
@@ -1247,14 +1247,14 @@ StorePath LocalStore::addToStoreFromDump(
 
     auto [dumpHash, size] = hashSink->finish();
 
-    PosixSourceAccessor accessor;
+    PosixSourceAccessor accessor { std::filesystem::path { tempPath } };
 
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
         methodsMatch
             ? dumpHash
             : hashPath(
-                accessor, CanonPath { tempPath },
+                accessor, CanonPath::root,
                 hashMethod.getFileIngestionMethod(), hashAlgo),
         {
             .others = references,
@@ -1297,7 +1297,7 @@ StorePath LocalStore::addToStoreFromDump(
                 }
             } else {
                 /* Move the temporary path we restored above. */
-                moveFile(tempPath, realPath);
+                moveFile(tempPath.string(), realPath);
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1332,9 +1332,9 @@ StorePath LocalStore::addToStoreFromDump(
 
 /* Create a temporary directory in the store that won't be
    garbage-collected until the returned FD is closed. */
-std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
+std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    Path tmpDirFn;
+    std::filesystem::path tmpDirFn;
     AutoCloseFD tmpDirFd;
     bool lockedByUs = false;
     do {
@@ -1347,7 +1347,7 @@ std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
             continue;
         }
         lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
-    } while (!pathExists(tmpDirFn) || !lockedByUs);
+    } while (!pathExists(tmpDirFn.string()) || !lockedByUs);
     return {tmpDirFn, std::move(tmpDirFd)};
 }
 

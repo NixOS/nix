@@ -49,4 +49,13 @@ std::optional<PathNG> maybePathNG(PathView path);
 
 PathNG pathNG(PathView path);
 
+/**
+ * Create string literals with the native character width of paths
+ */
+#ifndef _WIN32
+# define PATHNG_LITERAL(s) s
+#else
+# define PATHNG_LITERAL(s) L ## s
+#endif
+
 }

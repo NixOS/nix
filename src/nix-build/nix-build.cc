@@ -170,7 +170,7 @@ static void main_nix_build(int argc, char * * argv)
             ; // obsolete
 
         else if (*arg == "--no-out-link" || *arg == "--no-link")
-            outLink = (Path) tmpDir + "/result";
+            outLink = (tmpDir.path() / "result").string();
 
         else if (*arg == "--attr" || *arg == "-A")
             attrPaths.push_back(getArg(*arg, arg, end));
@@ -503,7 +503,7 @@ static void main_nix_build(int argc, char * * argv)
             if (passAsFile.count(var.first)) {
                 keepTmp = true;
                 auto fn = ".attr-" + std::to_string(fileNr++);
-                Path p = (Path) tmpDir + "/" + fn;
+                Path p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
                 env[var.first + "Path"] = p;
             } else
@@ -535,10 +535,10 @@ static void main_nix_build(int argc, char * * argv)
                 auto json = structAttrs.value();
                 structuredAttrsRC = writeStructuredAttrsShell(json);
 
-                auto attrsJSON = (Path) tmpDir + "/.attrs.json";
+                auto attrsJSON = (tmpDir.path() / ".attrs.json").string();
                 writeFile(attrsJSON, json.dump());
 
-                auto attrsSH = (Path) tmpDir + "/.attrs.sh";
+                auto attrsSH = (tmpDir.path() / ".attrs.sh").string();
                 writeFile(attrsSH, structuredAttrsRC);
 
                 env["NIX_ATTRS_SH_FILE"] = attrsSH;
@@ -551,7 +551,7 @@ static void main_nix_build(int argc, char * * argv)
            convenience, source $stdenv/setup to setup additional
            environment variables and shell functions.  Also don't
            lose the current $PATH directories. */
-        auto rcfile = (Path) tmpDir + "/rc";
+        auto rcfile = (tmpDir.path() / "rc").string();
         std::string rc = fmt(
                 R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; }; )"s +
                 (keepTmp ?
@@ -582,7 +582,7 @@ static void main_nix_build(int argc, char * * argv)
                 "unset TZ; %6%"
                 "shopt -s execfail;"
                 "%7%",
-                shellEscape(tmpDir),
+                shellEscape(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
                 shellEscape(dirOf(*shell)),

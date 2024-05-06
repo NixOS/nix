@@ -9,6 +9,7 @@
 #include "error.hh"
 #include "logging.hh"
 #include "file-descriptor.hh"
+#include "file-path.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -28,10 +29,10 @@
 #include <optional>
 
 #ifndef HAVE_STRUCT_DIRENT_D_TYPE
-#define DT_UNKNOWN 0
-#define DT_REG 1
-#define DT_LNK 2
-#define DT_DIR 3
+# define DT_UNKNOWN 0
+# define DT_REG 1
+# define DT_LNK 2
+# define DT_DIR 3
 #endif
 
 /**
@@ -170,9 +171,9 @@ void syncParent(const Path & path);
  * recursively. It's not an error if the path does not exist. The
  * second variant returns the number of bytes and blocks freed.
  */
-void deletePath(const Path & path);
+void deletePath(const PathNG & path);
 
-void deletePath(const Path & path, uint64_t & bytesFreed);
+void deletePath(const PathNG & path, uint64_t & bytesFreed);
 
 /**
  * Create a directory and all its parents, if necessary.  Returns the
@@ -218,17 +219,23 @@ void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
  */
 class AutoDelete
 {
-    Path path;
+    PathNG _path;
     bool del;
     bool recursive;
 public:
     AutoDelete();
-    AutoDelete(const Path & p, bool recursive = true);
+    AutoDelete(const PathNG & p, bool recursive = true);
     ~AutoDelete();
+
     void cancel();
-    void reset(const Path & p, bool recursive = true);
-    operator Path() const { return path; }
-    operator PathView() const { return path; }
+
+    void reset(const PathNG & p, bool recursive = true);
+
+    const PathNG & path() const { return _path; }
+    PathViewNG view() const { return _path; }
+
+    operator const PathNG & () const { return _path; }
+    operator PathViewNG () const { return _path; }
 };
 
 
