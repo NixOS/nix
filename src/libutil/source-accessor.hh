@@ -190,7 +190,7 @@ ref<SourceAccessor> makeEmptySourceAccessor();
 
 /**
  * Exception thrown when accessing a filtered path (see
- * `FilteringInputAccessor`).
+ * `FilteringSourceAccessor`).
  */
 MakeError(RestrictedPathError, Error);
 

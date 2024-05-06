@@ -53,7 +53,7 @@ bool operator == (const git_oid & oid1, const git_oid & oid2)
 
 namespace nix {
 
-struct GitInputAccessor;
+struct GitSourceAccessor;
 
 // Some wrapper types that ensure that the git_*_free functions get called.
 template<auto del>
@@ -330,9 +330,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 
     /**
-     * A 'GitInputAccessor' with no regard for export-ignore or any other transformations.
+     * A 'GitSourceAccessor' with no regard for export-ignore or any other transformations.
      */
-    ref<GitInputAccessor> getRawAccessor(const Hash & rev);
+    ref<GitSourceAccessor> getRawAccessor(const Hash & rev);
 
     ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
 
@@ -473,12 +473,12 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 /**
  * Raw git tree input accessor.
  */
-struct GitInputAccessor : SourceAccessor
+struct GitSourceAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
     Tree root;
 
-    GitInputAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
+    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
         : repo(repo_)
         , root(peelObject<Tree>(*repo, lookupObject(*repo, hashToOID(rev)).get(), GIT_OBJECT_TREE))
     {
@@ -702,12 +702,12 @@ struct GitInputAccessor : SourceAccessor
     }
 };
 
-struct GitExportIgnoreInputAccessor : CachingFilteringInputAccessor {
+struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor {
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 
-    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev)
-        : CachingFilteringInputAccessor(next, [&](const CanonPath & path) {
+    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev)
+        : CachingFilteringSourceAccessor(next, [&](const CanonPath & path) {
             return RestrictedPathError(fmt("'%s' does not exist because it was fetched with exportIgnore enabled", path));
         })
         , repo(repo)
@@ -918,18 +918,18 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 };
 
-ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
+ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    return make_ref<GitInputAccessor>(self, rev);
+    return make_ref<GitSourceAccessor>(self, rev);
 }
 
 ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    ref<GitInputAccessor> rawGitAccessor = getRawAccessor(rev);
+    ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev);
     if (exportIgnore) {
-        return make_ref<GitExportIgnoreInputAccessor>(self, rawGitAccessor, rev);
+        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
     }
     else {
         return rawGitAccessor;
@@ -940,18 +940,18 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool export
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     /* In case of an empty workdir, return an empty in-memory tree. We
-       cannot use AllowListInputAccessor because it would return an
+       cannot use AllowListSourceAccessor because it would return an
        error for the root (and we can't add the root to the allow-list
        since that would allow access to all its children). */
     ref<SourceAccessor> fileAccessor =
         wd.files.empty()
         ? makeEmptySourceAccessor()
-        : AllowListInputAccessor::create(
+        : AllowListSourceAccessor::create(
             makeFSSourceAccessor(path),
             std::set<CanonPath> { wd.files },
             std::move(makeNotAllowedError)).cast<SourceAccessor>();
     if (exportIgnore)
-        return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor, std::nullopt);
+        return make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
     else
         return fileAccessor;
 }

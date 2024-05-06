@@ -1,12 +1,12 @@
-#include "mounted-input-accessor.hh"
+#include "mounted-source-accessor.hh"
 
 namespace nix {
 
-struct MountedInputAccessor : SourceAccessor
+struct MountedSourceAccessor : SourceAccessor
 {
     std::map<CanonPath, ref<SourceAccessor>> mounts;
 
-    MountedInputAccessor(std::map<CanonPath, ref<SourceAccessor>> _mounts)
+    MountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> _mounts)
         : mounts(std::move(_mounts))
     {
         displayPrefix.clear();
@@ -71,9 +71,9 @@ struct MountedInputAccessor : SourceAccessor
     }
 };
 
-ref<SourceAccessor> makeMountedInputAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
+ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
 {
-    return make_ref<MountedInputAccessor>(std::move(mounts));
+    return make_ref<MountedSourceAccessor>(std::move(mounts));
 }
 
 }
