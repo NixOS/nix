@@ -1,12 +1,12 @@
-#include "mounted-input-accessor.hh"
+#include "mounted-source-accessor.hh"
 
 namespace nix {
 
-struct MountedInputAccessor : InputAccessor
+struct MountedSourceAccessor : SourceAccessor
 {
-    std::map<CanonPath, ref<InputAccessor>> mounts;
+    std::map<CanonPath, ref<SourceAccessor>> mounts;
 
-    MountedInputAccessor(std::map<CanonPath, ref<InputAccessor>> _mounts)
+    MountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> _mounts)
         : mounts(std::move(_mounts))
     {
         displayPrefix.clear();
@@ -53,7 +53,7 @@ struct MountedInputAccessor : InputAccessor
         return displayPrefix + accessor->showPath(subpath) + displaySuffix;
     }
 
-    std::pair<ref<InputAccessor>, CanonPath> resolve(CanonPath path)
+    std::pair<ref<SourceAccessor>, CanonPath> resolve(CanonPath path)
     {
         // Find the nearest parent of `path` that is a mount point.
         std::vector<std::string> subpath;
@@ -71,9 +71,9 @@ struct MountedInputAccessor : InputAccessor
     }
 };
 
-ref<InputAccessor> makeMountedInputAccessor(std::map<CanonPath, ref<InputAccessor>> mounts)
+ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
 {
-    return make_ref<MountedInputAccessor>(std::move(mounts));
+    return make_ref<MountedSourceAccessor>(std::move(mounts));
 }
 
 }

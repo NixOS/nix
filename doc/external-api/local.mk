@@ -1,4 +1,4 @@
-$(docdir)/external-api/html/index.html $(docdir)/external-api/latex: $(d)/doxygen.cfg
+$(docdir)/external-api/html/index.html $(docdir)/external-api/latex: $(d)/doxygen.cfg src/lib*-c/*.h
 	mkdir -p $(docdir)/external-api
 	{ cat $< ; echo "OUTPUT_DIRECTORY=$(docdir)/external-api" ; } | doxygen -
 

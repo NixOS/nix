@@ -9,8 +9,7 @@
 #include "pathlocks.hh"
 #include "processes.hh"
 #include "git.hh"
-#include "fs-input-accessor.hh"
-#include "mounted-input-accessor.hh"
+#include "mounted-source-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
@@ -495,7 +494,7 @@ struct GitInputScheme : InputScheme
         }
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessorFromCommit(
+    std::pair<ref<SourceAccessor>, Input> getAccessorFromCommit(
         ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
@@ -629,7 +628,7 @@ struct GitInputScheme : InputScheme
            input accessor consisting of the accessor for the top-level
            repo and the accessors for the submodules. */
         if (getSubmodulesAttr(input)) {
-            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+            std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
                 auto resolved = repo->resolveSubmoduleUrl(submodule.url);
@@ -653,7 +652,7 @@ struct GitInputScheme : InputScheme
 
             if (!mounts.empty()) {
                 mounts.insert_or_assign(CanonPath::root, accessor);
-                accessor = makeMountedInputAccessor(std::move(mounts));
+                accessor = makeMountedSourceAccessor(std::move(mounts));
             }
         }
 
@@ -665,7 +664,7 @@ struct GitInputScheme : InputScheme
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
+    std::pair<ref<SourceAccessor>, Input> getAccessorFromWorkdir(
         ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
@@ -679,7 +678,7 @@ struct GitInputScheme : InputScheme
 
         auto exportIgnore = getExportIgnoreAttr(input);
 
-        ref<InputAccessor> accessor =
+        ref<SourceAccessor> accessor =
             repo->getAccessor(repoInfo.workdirInfo,
                 exportIgnore,
                 makeNotAllowedError(repoInfo.url));
@@ -690,7 +689,7 @@ struct GitInputScheme : InputScheme
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
         if (getSubmodulesAttr(input) && !repoInfo.workdirInfo.submodules.empty()) {
-            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+            std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {
                 auto submodulePath = CanonPath(repoInfo.url) / submodule.path;
@@ -716,7 +715,7 @@ struct GitInputScheme : InputScheme
             }
 
             mounts.insert_or_assign(CanonPath::root, accessor);
-            accessor = makeMountedInputAccessor(std::move(mounts));
+            accessor = makeMountedSourceAccessor(std::move(mounts));
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
@@ -755,7 +754,7 @@ struct GitInputScheme : InputScheme
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
 

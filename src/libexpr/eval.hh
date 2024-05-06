@@ -9,7 +9,7 @@
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
-#include "input-accessor.hh"
+#include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
 
@@ -33,7 +33,10 @@ class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
-struct MemoryInputAccessor;
+struct MemorySourceAccessor;
+namespace eval_cache {
+    class EvalCache;
+}
 
 
 /**
@@ -226,18 +229,18 @@ public:
     /**
      * The accessor for the root filesystem.
      */
-    const ref<InputAccessor> rootFS;
+    const ref<SourceAccessor> rootFS;
 
     /**
      * The in-memory filesystem for <nix/...> paths.
      */
-    const ref<MemoryInputAccessor> corepkgsFS;
+    const ref<MemorySourceAccessor> corepkgsFS;
 
     /**
      * In-memory filesystem for internal, non-user-callable Nix
      * expressions like call-flake.nix.
      */
-    const ref<MemoryInputAccessor> internalFS;
+    const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
 
@@ -281,6 +284,11 @@ public:
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
         return *new EvalErrorBuilder<T>(*this, args...);
     }
+
+    /**
+     * A cache for evaluation caches, so as to reuse the same root value if possible
+     */
+    std::map<const Hash, ref<eval_cache::EvalCache>> evalCaches;
 
 private:
 
@@ -538,6 +546,11 @@ public:
      * we ensure the string corresponds to it.
      */
     SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
+
+#if HAVE_BOEHMGC
+    /** A GC root for the baseEnv reference. */
+    std::shared_ptr<Env *> baseEnvP;
+#endif
 
 public:
 

@@ -2,16 +2,20 @@
 #include "unix-domain-socket.hh"
 #include "worker-protocol.hh"
 
+#include <cstring>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <cstring>
-
+#ifdef _WIN32
+# include <winsock2.h>
+# include <afunix.h>
+#else
+# include <sys/socket.h>
+# include <sys/un.h>
+#endif
 
 namespace nix {
 
@@ -57,7 +61,7 @@ std::string UDSRemoteStore::getUri()
 
 void UDSRemoteStore::Connection::closeWrite()
 {
-    shutdown(fd.get(), SHUT_WR);
+    shutdown(toSocket(fd.get()), SHUT_WR);
 }
 
 
@@ -68,7 +72,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     /* Connect to a daemon that does the privileged work for us. */
     conn->fd = createUnixDomainSocket();
 
-    nix::connect(conn->fd.get(), path ? *path : settings.nixDaemonSocketFile);
+    nix::connect(toSocket(conn->fd.get()), path ? *path : settings.nixDaemonSocketFile);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();

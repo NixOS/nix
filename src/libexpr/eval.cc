@@ -15,9 +15,8 @@
 #include "function-trace.hh"
 #include "profiles.hh"
 #include "print.hh"
-#include "fs-input-accessor.hh"
-#include "filtering-input-accessor.hh"
-#include "memory-input-accessor.hh"
+#include "filtering-source-accessor.hh"
+#include "memory-source-accessor.hh"
 #include "signals.hh"
 #include "gc-small-vector.hh"
 #include "url.hh"
@@ -50,6 +49,7 @@
 
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
+#include <gc/gc_allocator.h>
 
 #include <boost/coroutine2/coroutine.hpp>
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
@@ -342,6 +342,8 @@ void initGC()
     gcInitialised = true;
 }
 
+static constexpr size_t BASE_ENV_SIZE = 128;
+
 EvalState::EvalState(
     const LookupPath & _lookupPath,
     ref<Store> store,
@@ -397,16 +399,16 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         evalSettings.restrictEval || evalSettings.pureEval
-        ? ref<InputAccessor>(AllowListInputAccessor::create(makeFSInputAccessor(), {},
+        ? ref<SourceAccessor>(AllowListSourceAccessor::create(makeFSSourceAccessor(), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
-        : makeFSInputAccessor())
-    , corepkgsFS(makeMemoryInputAccessor())
-    , internalFS(makeMemoryInputAccessor())
+        : makeFSSourceAccessor())
+    , corepkgsFS(make_ref<MemorySourceAccessor>())
+    , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
         CanonPath("derivation-internal.nix"),
         #include "primops/derivation.nix.gen.hh"
@@ -424,8 +426,11 @@ EvalState::EvalState(
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
+    , baseEnv(**baseEnvP)
+#else
+    , baseEnv(allocEnv(BASE_ENV_SIZE))
 #endif
-    , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
     corepkgsFS->setPathDisplay("<nix", ">");
@@ -455,7 +460,7 @@ EvalState::EvalState(
     }
 
     /* Allow access to all paths in the search path. */
-    if (rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+    if (rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         for (auto & i : lookupPath.elements)
             resolveLookupPathPath(i.path, true);
 
@@ -475,13 +480,13 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         rootFS2->allowPrefix(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
 }
 
@@ -535,13 +540,13 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListInputAccessor>())
+        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri.substr(7)));
         return;
     }
@@ -2760,12 +2765,12 @@ SourcePath resolveExprPath(SourcePath path)
         if (++followCount >= maxFollow)
             throw Error("too many symbolic links encountered while traversing the path '%s'", path);
         auto p = path.parent().resolveSymlinks() / path.baseName();
-        if (p.lstat().type != InputAccessor::tSymlink) break;
+        if (p.lstat().type != SourceAccessor::tSymlink) break;
         path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path.resolveSymlinks().lstat().type == InputAccessor::tDirectory)
+    if (path.resolveSymlinks().lstat().type == SourceAccessor::tDirectory)
         return path / "default.nix";
 
     return path;

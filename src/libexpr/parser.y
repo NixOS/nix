@@ -41,7 +41,7 @@ Expr * parseExprFromBuf(
     const SourcePath & basePath,
     SymbolTable & symbols,
     PosTable & positions,
-    const ref<InputAccessor> rootFS,
+    const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols);
 
 }
@@ -291,7 +291,7 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(ref<InputAccessor>(state->rootFS), std::move(path));
+    $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
   }
   | HPATH {
     if (evalSettings.pureEval) {
@@ -301,7 +301,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(ref<InputAccessor>(state->rootFS), std::move(path));
+    $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
   }
   ;
 
@@ -430,7 +430,7 @@ Expr * parseExprFromBuf(
     const SourcePath & basePath,
     SymbolTable & symbols,
     PosTable & positions,
-    const ref<InputAccessor> rootFS,
+    const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols)
 {
     yyscan_t scanner;

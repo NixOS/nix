@@ -42,4 +42,13 @@ TEST_JSON(PublicKeyTest, simple, (fetchers::PublicKey { .type = "ssh-rsa", .key 
 TEST_JSON(PublicKeyTest, defaultType, fetchers::PublicKey { .key = "ABCDE" })
 
 #undef TEST_JSON
+
+TEST_F(PublicKeyTest, PublicKey_noRoundTrip_from_json) {
+    readTest("noRoundTrip.json", [&](const auto & encoded_) {
+        fetchers::PublicKey expected = { .type = "ssh-ed25519", .key = "ABCDE" };
+        fetchers::PublicKey got = nlohmann::json::parse(encoded_);
+        ASSERT_EQ(got, nlohmann::json(expected));
+    });
+}
+
 }

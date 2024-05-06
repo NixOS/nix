@@ -1,4 +1,4 @@
-$(docdir)/internal-api/html/index.html $(docdir)/internal-api/latex: $(d)/doxygen.cfg
+$(docdir)/internal-api/html/index.html $(docdir)/internal-api/latex: $(d)/doxygen.cfg src/**/*.hh
 	mkdir -p $(docdir)/internal-api
 	{ cat $< ; echo "OUTPUT_DIRECTORY=$(docdir)/internal-api" ; } | doxygen -
 
