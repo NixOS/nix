@@ -60,7 +60,7 @@ SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
         return {rootFS, CanonPath(s)};
 }
 
-std::string EvalState::decodePaths(std::string_view s)
+std::string EvalState::prettyPrintPaths(std::string_view s)
 {
     std::string res;
 

@@ -1025,7 +1025,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", state.decodePaths(args[0]->string_view()));
+        printError("trace: %1%", state.prettyPrintPaths(args[0]->string_view()));
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
     if (evalSettings.builtinsTraceDebugger && state.debugRepl && !state.debugTraces.empty()) {

@@ -368,10 +368,10 @@ public:
     /* Decode a path encoded by `encodePath()`. */
     SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
 
-    /* Decode all virtual paths in a string, i.e. all
-       /nix/store/virtual000... substrings are replaced by the
-       corresponding input accessor. */
-    std::string decodePaths(std::string_view s);
+    /* Replace all virtual paths (i.e. `/nix/store/lazylazy...`) in a
+       string by a pretty-printed rendition of the corresponding input
+       accessor (e.g. `«github:NixOS/nix/<rev>»`). */
+    std::string prettyPrintPaths(std::string_view s);
 
     /**
      * Variant which accepts relative paths too.
