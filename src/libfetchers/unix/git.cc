@@ -9,7 +9,7 @@
 #include "pathlocks.hh"
 #include "processes.hh"
 #include "git.hh"
-#include "mounted-input-accessor.hh"
+#include "mounted-source-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
@@ -652,7 +652,7 @@ struct GitInputScheme : InputScheme
 
             if (!mounts.empty()) {
                 mounts.insert_or_assign(CanonPath::root, accessor);
-                accessor = makeMountedInputAccessor(std::move(mounts));
+                accessor = makeMountedSourceAccessor(std::move(mounts));
             }
         }
 
@@ -715,7 +715,7 @@ struct GitInputScheme : InputScheme
             }
 
             mounts.insert_or_assign(CanonPath::root, accessor);
-            accessor = makeMountedInputAccessor(std::move(mounts));
+            accessor = makeMountedSourceAccessor(std::move(mounts));
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
