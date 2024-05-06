@@ -2044,11 +2044,6 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         Value * vTmp = vTmpP++;
         i->eval(state, env, *vTmp);
 
-        if (vTmp->type() == nAttrs) {
-            if (auto j = vTmp->attrs()->get(state.sOutPath))
-                vTmp = j->value;
-        }
-
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
            since paths are copied when they are used in a derivation),
