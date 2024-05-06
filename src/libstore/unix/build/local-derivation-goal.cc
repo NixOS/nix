@@ -2492,7 +2492,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
-                        {makeFSSourceAccessor(), CanonPath(actualPath)},
+                        {getFSSourceAccessor(), CanonPath(actualPath)},
                         caSink,
                         (FileSerialisationMethod) fim);
                     return caSink.finish().first;
@@ -2500,7 +2500,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(
                         outputHash.hashAlgo,
-                        {makeFSSourceAccessor(), CanonPath(tmpDir + "/tmp")}).hash;
+                        {getFSSourceAccessor(), CanonPath(tmpDir + "/tmp")}).hash;
                 }
                 }
                 assert(false);
@@ -2528,7 +2528,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
             {
                 HashResult narHashAndSize = hashPath(
-                    {makeFSSourceAccessor(), CanonPath(actualPath)},
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
                     FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
@@ -2551,7 +2551,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput(outputRewrites);
                 HashResult narHashAndSize = hashPath(
-                    {makeFSSourceAccessor(), CanonPath(actualPath)},
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
                     FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;

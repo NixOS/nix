@@ -167,7 +167,7 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     }
 }
 
-ref<SourceAccessor> makeFSSourceAccessor()
+ref<SourceAccessor> getFSSourceAccessor()
 {
     static auto rootFS = make_ref<PosixSourceAccessor>();
     return rootFS;

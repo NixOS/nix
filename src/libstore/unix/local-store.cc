@@ -1252,7 +1252,7 @@ StorePath LocalStore::addToStoreFromDump(
         methodsMatch
             ? dumpHash
             : hashPath(
-                {makeFSSourceAccessor(), CanonPath(tempPath)},
+                {getFSSourceAccessor(), CanonPath(tempPath)},
                 hashMethod.getFileIngestionMethod(), hashAlgo),
         {
             .others = references,
@@ -1392,7 +1392,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             Path linkPath = linksDir + "/" + link.name;
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
-                {makeFSSourceAccessor(), CanonPath(linkPath)},
+                {getFSSourceAccessor(), CanonPath(linkPath)},
                 FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
