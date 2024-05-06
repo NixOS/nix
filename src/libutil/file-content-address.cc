@@ -1,6 +1,7 @@
 #include "file-content-address.hh"
 #include "archive.hh"
 #include "git.hh"
+#include "source-path.hh"
 
 namespace nix {
 
@@ -68,17 +69,17 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method)
 
 
 void dumpPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     Sink & sink,
     FileSerialisationMethod method,
     PathFilter & filter)
 {
     switch (method) {
     case FileSerialisationMethod::Flat:
-        accessor.readFile(path, sink);
+        path.readFile(sink);
         break;
     case FileSerialisationMethod::Recursive:
-        accessor.dumpPath(path, sink, filter);
+        path.dumpPath(sink, filter);
         break;
     }
 }
@@ -101,27 +102,27 @@ void restorePath(
 
 
 HashResult hashPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     FileSerialisationMethod method, HashAlgorithm ha,
     PathFilter & filter)
 {
     HashSink sink { ha };
-    dumpPath(accessor, path, sink, method, filter);
+    dumpPath(path, sink, method, filter);
     return sink.finish();
 }
 
 
 Hash hashPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     FileIngestionMethod method, HashAlgorithm ht,
     PathFilter & filter)
 {
     switch (method) {
     case FileIngestionMethod::Flat:
     case FileIngestionMethod::Recursive:
-        return hashPath(accessor, path, (FileSerialisationMethod) method, ht, filter).first;
+        return hashPath(path, (FileSerialisationMethod) method, ht, filter).first;
     case FileIngestionMethod::Git:
-        return git::dumpHash(ht, accessor, path, filter).hash;
+        return git::dumpHash(ht, path, filter).hash;
     }
     assert(false);
 }

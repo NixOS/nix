@@ -42,9 +42,9 @@ StorePath fetchToStore(
     auto storePath =
         mode == FetchMode::DryRun
         ? store.computeStorePath(
-            name, *path.accessor, path.path, method, HashAlgorithm::SHA256, {}, filter2).first
+            name, path, method, HashAlgorithm::SHA256, {}, filter2).first
         : store.addToStore(
-            name, *path.accessor, path.path, method, HashAlgorithm::SHA256, {}, filter2, repair);
+            name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
 
     if (cacheKey && mode == FetchMode::Copy)
         fetchers::getCache()->add(store, *cacheKey, {}, storePath, true);

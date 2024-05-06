@@ -41,6 +41,11 @@ struct SourcePath
      */
     std::string readFile() const;
 
+    void readFile(
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){}) const
+    { return accessor->readFile(path, sink, sizeCallback); }
+
     /**
      * Return whether this `SourcePath` denotes a file (of any type)
      * that exists

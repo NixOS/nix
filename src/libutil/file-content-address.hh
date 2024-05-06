@@ -7,6 +7,8 @@
 
 namespace nix {
 
+struct SourcePath;
+
 /**
  * An enumeration of the ways we can serialize file system
  * objects.
@@ -45,7 +47,7 @@ std::string_view renderFileSerialisationMethod(FileSerialisationMethod method);
  * Dump a serialization of the given file system object.
  */
 void dumpPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     Sink & sink,
     FileSerialisationMethod method,
     PathFilter & filter = defaultPathFilter);
@@ -72,7 +74,7 @@ void restorePath(
  * ```
  */
 HashResult hashPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     FileSerialisationMethod method, HashAlgorithm ha,
     PathFilter & filter = defaultPathFilter);
 
@@ -138,7 +140,7 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method);
  * useful defined for a merkle format.
  */
 Hash hashPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     FileIngestionMethod method, HashAlgorithm ha,
     PathFilter & filter = defaultPathFilter);
 

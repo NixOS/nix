@@ -442,8 +442,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 
 StorePath BinaryCacheStore::addToStore(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & path,
+    const SourcePath & path,
     ContentAddressMethod method,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
@@ -454,10 +453,10 @@ StorePath BinaryCacheStore::addToStore(
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
+    auto h = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
 
     auto source = sinkToSource([&](Sink & sink) {
-        accessor.dumpPath(path, sink, filter);
+        path.dumpPath(sink, filter);
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {

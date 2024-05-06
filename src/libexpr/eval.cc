@@ -399,14 +399,14 @@ EvalState::EvalState(
     , emptyBindings(0)
     , rootFS(
         evalSettings.restrictEval || evalSettings.pureEval
-        ? ref<SourceAccessor>(AllowListSourceAccessor::create(makeFSSourceAccessor(), {},
+        ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {},
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
-        : makeFSSourceAccessor())
+        : getFSSourceAccessor())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
