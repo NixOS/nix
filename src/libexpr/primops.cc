@@ -817,7 +817,8 @@ static RegisterPrimOp primop_abort({
         NixStringContext context;
         auto s = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to 'builtins.abort'").toOwned();
-        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).debugThrow();
+        state.error<Abort>("evaluation aborted with the following error message: '%1%'",
+            state.prettyPrintPaths(s)).debugThrow();
     }
 });
 
@@ -836,7 +837,7 @@ static RegisterPrimOp primop_throw({
       NixStringContext context;
       auto s = state.coerceToString(pos, *args[0], context,
               "while evaluating the error message passed to 'builtin.throw'").toOwned();
-      state.error<ThrownError>(s).debugThrow();
+      state.error<ThrownError>(state.prettyPrintPaths(s)).debugThrow();
     }
 });
 
@@ -850,7 +851,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         auto message = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to 'builtins.addErrorContext'",
                 false, false).toOwned();
-        e.addTrace(nullptr, HintFmt(message), TracePrint::Always);
+        e.addTrace(nullptr, HintFmt(state.prettyPrintPaths(message)), TracePrint::Always);
         throw;
     }
 }
