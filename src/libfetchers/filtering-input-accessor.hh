@@ -35,6 +35,8 @@ struct FilteringInputAccessor : InputAccessor
 
     bool pathExists(const CanonPath & path) override;
 
+    Stat lstat(const CanonPath & path) override;
+
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
     DirEntries readDirectory(const CanonPath & path) override;
@@ -62,13 +64,20 @@ struct FilteringInputAccessor : InputAccessor
 struct AllowListInputAccessor : public FilteringInputAccessor
 {
     /**
-     * Grant access to the specified prefix.
+     * Grant access to the specified prefix, i.e. the path *and* its
+     * children.
      */
     virtual void allowPrefix(CanonPath prefix) = 0;
 
+    /**
+     * Grant access to a path but not its children.
+     */
+    virtual void allowPath(CanonPath path) = 0;
+
     static ref<AllowListInputAccessor> create(
         ref<InputAccessor> next,
-        std::set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPrefixes,
+        std::unordered_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringInputAccessor::FilteringInputAccessor;

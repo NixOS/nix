@@ -111,7 +111,7 @@ struct SourceAccessor
         std::optional<uint64_t> narOffset;
     };
 
-    Stat lstat(const CanonPath & path);
+    virtual Stat lstat(const CanonPath & path);
 
     virtual std::optional<Stat> maybeLstat(const CanonPath & path) = 0;
 
