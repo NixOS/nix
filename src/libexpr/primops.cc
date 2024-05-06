@@ -1347,6 +1347,14 @@ static void derivationStrictInternal(
     /* Rewrite virtual paths (from encodePath()) to real store paths. */
     drv.applyRewrites(rewrites);
 
+    /* For backward compatibility, rewrite virtual paths without
+       context (e.g. passing `toString ./foo`) to store paths that
+       don't exist. This is a bug in user code (since those strings
+       don't have a context, so aren't accessible from a sandbox) but
+       we don't want to change evaluation results.  */
+    for (auto & [name, value] : drv.env)
+        value = state.rewriteVirtualPaths(value, pos);
+
     /* Do we have all required attributes? */
     if (drv.builder == "")
         state.error<EvalError>("required attribute 'builder' missing")
@@ -2471,13 +2479,13 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
             state.error<EvalError>(
-                "unsupported argument '%1%' to 'addPath'",
+                "unsupported argument '%1%' to 'builtins.path'",
                 state.symbols[attr.name]
             ).atPos(attr.pos).debugThrow();
     }
     if (!path)
         state.error<EvalError>(
-            "missing required 'path' attribute in the first argument to builtins.path"
+            "missing required 'path' attribute in the first argument to 'builtins.path'"
         ).atPos(pos).debugThrow();
     if (name.empty())
         name = path->baseName();

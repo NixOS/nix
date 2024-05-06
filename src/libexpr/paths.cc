@@ -1,5 +1,6 @@
 #include "eval.hh"
 #include "util.hh"
+#include "store-api.hh"
 
 namespace nix {
 
@@ -64,16 +65,16 @@ std::string EvalState::prettyPrintPaths(std::string_view s)
 {
     std::string res;
 
-    size_t pos = 0;
+    size_t p = 0;
 
     while (true) {
-        auto m = s.find(virtualPathMarker, pos);
+        auto m = s.find(virtualPathMarker, p);
         if (m == s.npos) {
-            res.append(s.substr(pos));
+            res.append(s.substr(p));
             return res;
         }
 
-        res.append(s.substr(pos, m - pos));
+        res.append(s.substr(p, m - p));
 
         auto end = s.find_first_of(" \n\r\t'\"’:", m);
         if (end == s.npos)
@@ -83,11 +84,53 @@ std::string EvalState::prettyPrintPaths(std::string_view s)
             auto path = decodePath(s.substr(m, end - m), noPos);
             res.append(path.to_string());
         } catch (...) {
-            throw;
-            res.append(s.substr(pos, end - m));
+            res.append(s.substr(m, end - m));
         }
 
-        pos = end;
+        p = end;
+    }
+}
+
+std::string EvalState::rewriteVirtualPaths(std::string_view s, PosIdx pos)
+{
+    std::string res;
+
+    size_t p = 0;
+
+    while (true) {
+        auto m = s.find("lazylazy0000000000000000", p); // FIXME
+        if (m == s.npos) {
+            res.append(s.substr(p));
+            return res;
+        }
+
+        res.append(s.substr(p, m - p));
+
+        auto end = m + StorePath::HashLen;
+
+        if (end > s.size()) {
+            res.append(s.substr(m));
+            return res;
+        }
+
+        try {
+            size_t number = std::stoi(std::string(s.substr(m + 24, 8)), nullptr, 10); // FIXME
+
+            auto accessor = inputAccessors.find(number);
+            assert(accessor != inputAccessors.end()); // FIXME
+
+            warn(
+                "derivation at %s has an attribute that refers to source tree '%s' without context; this does not work correctly",
+                positions[pos], accessor->second->showPath(CanonPath::root));
+
+            // FIXME: cache this.
+            res.append(store->computeStorePath("source", *accessor->second, CanonPath::root).first.hashPart());
+        } catch (...) {
+            ignoreException();
+            res.append(s.substr(m, end - m));
+        }
+
+        p = end;
     }
 }
 

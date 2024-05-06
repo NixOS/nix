@@ -368,6 +368,12 @@ public:
     /* Decode a path encoded by `encodePath()`. */
     SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
 
+    /* Rewrite virtual paths to store paths without actually
+       materializing those store paths. This is a backward
+       compatibility hack to make buggy derivation attributes like
+       `tostring ./bla` produce the same evaluation result. */
+    std::string rewriteVirtualPaths(std::string_view s, PosIdx pos);
+
     /* Replace all virtual paths (i.e. `/nix/store/lazylazy...`) in a
        string by a pretty-printed rendition of the corresponding input
        accessor (e.g. `«github:NixOS/nix/<rev>»`). */
