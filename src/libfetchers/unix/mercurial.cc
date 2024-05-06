@@ -212,7 +212,7 @@ struct MercurialInputScheme : InputScheme
 
                 auto storePath = store->addToStore(
                     input.getName(),
-                    *makeFSSourceAccessor(), CanonPath { actualPath },
+                    {makeFSSourceAccessor(), CanonPath(actualPath)},
                     FileIngestionMethod::Recursive, HashAlgorithm::SHA256, {},
                     filter);
 
@@ -318,7 +318,7 @@ struct MercurialInputScheme : InputScheme
 
         deletePath(tmpDir + "/.hg_archival.txt");
 
-        auto storePath = store->addToStore(name, *makeFSSourceAccessor(), CanonPath { tmpDir });
+        auto storePath = store->addToStore(name, {makeFSSourceAccessor(), CanonPath(tmpDir)});
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},

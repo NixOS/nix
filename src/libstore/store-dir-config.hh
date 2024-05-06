@@ -13,6 +13,8 @@
 
 namespace nix {
 
+struct SourcePath;
+
 MakeError(BadStorePath, Error);
 
 struct StoreDirConfig : public Config
@@ -94,8 +96,7 @@ struct StoreDirConfig : public Config
      */
     std::pair<StorePath, Hash> computeStorePath(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & path,
+        const SourcePath & path,
         ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = {},

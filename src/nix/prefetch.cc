@@ -125,9 +125,8 @@ std::tuple<StorePath, Hash> prefetchFile(
         Activity act(*logger, lvlChatty, actUnknown,
             fmt("adding '%s' to the store", url));
 
-        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(tmpFile);
         auto info = store->addToStoreSlow(
-            *name, accessor, canonPath,
+            *name, PosixSourceAccessor::createAtRoot(tmpFile),
             ingestionMethod, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);

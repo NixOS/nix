@@ -1132,12 +1132,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                             specified.hash.algo,
                             std::string { info.path.hashPart() },
                         };
-                        dumpPath(*accessor, path, caSink, (FileSerialisationMethod) fim);
+                        dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
                         h = caSink.finish().first;
                         break;
                     }
                     case FileIngestionMethod::Git:
-                        h = git::dumpHash(specified.hash.algo, *accessor, path).hash;
+                        h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
                         break;
                     }
                     ContentAddress {
@@ -1247,14 +1247,12 @@ StorePath LocalStore::addToStoreFromDump(
 
     auto [dumpHash, size] = hashSink->finish();
 
-    PosixSourceAccessor accessor;
-
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
         methodsMatch
             ? dumpHash
             : hashPath(
-                accessor, CanonPath { tempPath },
+                {makeFSSourceAccessor(), CanonPath(tempPath)},
                 hashMethod.getFileIngestionMethod(), hashAlgo),
         {
             .others = references,
@@ -1394,7 +1392,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             Path linkPath = linksDir + "/" + link.name;
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
-                accessor, CanonPath { linkPath },
+                {makeFSSourceAccessor(), CanonPath(linkPath)},
                 FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",

@@ -1,4 +1,5 @@
 #include "posix-source-accessor.hh"
+#include "source-path.hh"
 #include "signals.hh"
 #include "sync.hh"
 
@@ -17,11 +18,11 @@ PosixSourceAccessor::PosixSourceAccessor()
     : PosixSourceAccessor(std::filesystem::path {})
 { }
 
-std::pair<PosixSourceAccessor, CanonPath> PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
+SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
     std::filesystem::path path2 = absPath(path.string());
     return {
-        PosixSourceAccessor { path2.root_path() },
+        make_ref<PosixSourceAccessor>(path2.root_path()),
         CanonPath { path2.relative_path().string() },
     };
 }
