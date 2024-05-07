@@ -228,16 +228,14 @@ bool isLink(const Path & path)
 }
 
 
-DirEntries readDirectory(const Path & path)
+std::vector<std::filesystem::directory_entry> readDirectory(const Path & path)
 {
-    DirEntries entries;
+    std::vector<std::filesystem::directory_entry> entries;
     entries.reserve(64);
 
     for (auto & entry : fs::directory_iterator{path}) {
         checkInterrupt();
-        entries.emplace_back(
-            entry.path().filename().string(),
-            entry.symlink_status().type());
+        entries.push_back(std::move(entry));
     }
 
     return entries;

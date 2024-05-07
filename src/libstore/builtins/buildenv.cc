@@ -17,7 +17,7 @@ struct State
 /* For each activated package, create symlinks */
 static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
 {
-    DirEntries srcFiles;
+    std::vector<std::filesystem::directory_entry> srcFiles;
 
     try {
         srcFiles = readDirectory(srcDir);
@@ -30,11 +30,12 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
     }
 
     for (const auto & ent : srcFiles) {
-        if (ent.name[0] == '.')
+        auto name = ent.path().filename();
+        if (name.string()[0] == '.')
             /* not matched by glob */
             continue;
-        auto srcFile = srcDir + "/" + ent.name;
-        auto dstFile = dstDir + "/" + ent.name;
+        auto srcFile = (std::filesystem::path{srcDir} / name).string();
+        auto dstFile = (std::filesystem::path{dstDir} / name).string();
 
         struct stat srcSt;
         try {

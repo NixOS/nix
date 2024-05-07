@@ -1388,15 +1388,16 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         printInfo("checking link hashes...");
 
         for (auto & link : readDirectory(linksDir)) {
-            printMsg(lvlTalkative, "checking contents of '%s'", link.name);
-            Path linkPath = linksDir + "/" + link.name;
+            auto name = link.path().filename();
+            printMsg(lvlTalkative, "checking contents of '%s'", name);
+            Path linkPath = linksDir / name;
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 {getFSSourceAccessor(), CanonPath(linkPath)},
                 FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
-            if (hash != link.name) {
+            if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
-                    linkPath, link.name, hash);
+                    linkPath, name, hash);
                 if (repair) {
                     if (unlink(linkPath.c_str()) == 0)
                         printInfo("removed link '%s'", linkPath);
@@ -1483,7 +1484,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
      */
     for (auto & i : readDirectory(realStoreDir)) {
         try {
-            storePathsInStoreDir.insert({i.name});
+            storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }
     }
 

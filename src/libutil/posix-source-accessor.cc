@@ -138,14 +138,14 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
         // additional file types are allowed.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
-        switch (entry.type) {
+        switch (entry.symlink_status().type()) {
         case std::filesystem::file_type::regular: type = Type::tRegular; break;
         case std::filesystem::file_type::symlink: type = Type::tSymlink; break;
         case std::filesystem::file_type::directory: type = Type::tDirectory; break;
         default: type = tMisc;
         }
 #pragma GCC diagnostic pop
-        res.emplace(entry.name, type);
+        res.emplace(entry.path().filename().string(), type);
     }
     return res;
 }

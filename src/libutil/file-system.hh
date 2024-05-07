@@ -122,17 +122,7 @@ bool isLink(const Path & path);
  * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
  */
-struct DirEntry
-{
-    std::string name;
-    std::filesystem::file_type type;
-    DirEntry(std::string name, std::filesystem::file_type type)
-        : name(std::move(name)), type(type) { }
-};
-
-typedef std::vector<DirEntry> DirEntries;
-
-DirEntries readDirectory(const Path & path);
+std::vector<std::filesystem::directory_entry> readDirectory(const Path & path);
 
 std::filesystem::file_type getFileType(const Path & path);
 

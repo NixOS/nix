@@ -160,14 +160,15 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : readDirectory(tempRootsDir)) {
-        if (i.name[0] == '.') {
+        auto name = i.path().filename().string();
+        if (name[0] == '.') {
             // Ignore hidden files. Some package managers (notably portage) create
             // those to keep the directory alive.
             continue;
         }
-        Path path = tempRootsDir + "/" + i.name;
+        Path path = i.path();
 
-        pid_t pid = std::stoi(i.name);
+        pid_t pid = std::stoi(name);
 
         debug("reading temporary root file '%1%'", path);
         AutoCloseFD fd(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666));
@@ -222,7 +223,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 
         if (type == std::filesystem::file_type::directory) {
             for (auto & i : readDirectory(path))
-                findRoots(path + "/" + i.name, i.type, roots);
+                findRoots(i.path().string(), i.symlink_status().type(), roots);
         }
 
         else if (type == std::filesystem::file_type::symlink) {

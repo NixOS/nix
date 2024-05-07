@@ -30,8 +30,8 @@ void removeOldGenerations(std::string dir)
     for (auto & i : readDirectory(dir)) {
         checkInterrupt();
 
-        auto path = dir + "/" + i.name;
-        auto type = i.type == std::filesystem::file_type::unknown ? getFileType(path) : i.type;
+        auto path = i.path().string();
+        auto type = i.symlink_status().type();
 
         if (type == std::filesystem::file_type::symlink && canWrite) {
             std::string link;

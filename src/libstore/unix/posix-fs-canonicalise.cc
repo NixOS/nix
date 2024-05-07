@@ -136,9 +136,9 @@ static void canonicalisePathMetaData_(
     }
 
     if (S_ISDIR(st.st_mode)) {
-        DirEntries entries = readDirectory(path);
+        std::vector<std::filesystem::directory_entry> entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, uidRange, inodesSeen);
+            canonicalisePathMetaData_(i.path().string(), uidRange, inodesSeen);
     }
 }
 
