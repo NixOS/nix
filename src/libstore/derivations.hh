@@ -284,7 +284,12 @@ struct BasicDerivation
      */
     StorePathSet inputSrcs;
     std::string platform;
-    Path builder;
+    /**
+     * This is a path, but we don't want to use `std::filesystem::path`,
+     * because it might not be for the same OS (or OS with the same type
+     * of native paths) as (this) Nix is built for.
+     */
+    std::string builder;
     Strings args;
     StringPairs env;
     std::string name;

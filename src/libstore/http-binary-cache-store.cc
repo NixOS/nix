@@ -26,7 +26,7 @@ class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public v
 {
 private:
 
-    Path cacheUri;
+    std::string cacheUri;
 
     struct State
     {
@@ -40,7 +40,7 @@ public:
 
     HttpBinaryCacheStore(
         std::string_view scheme,
-        PathView _cacheUri,
+        std::string_view _cacheUri,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)

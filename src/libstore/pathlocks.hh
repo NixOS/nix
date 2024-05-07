@@ -2,6 +2,7 @@
 ///@file
 
 #include "file-descriptor.hh"
+#include "file-path.hh"
 
 namespace nix {
 

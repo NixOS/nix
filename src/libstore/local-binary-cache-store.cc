@@ -49,7 +49,7 @@ public:
 
     std::string getUri() override
     {
-        return "file://" + binaryCacheDir;
+        return "file://" + binaryCacheDir.native();
     }
 
     static std::set<std::string> uriSchemes();
@@ -62,7 +62,7 @@ protected:
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
-        auto path2 = binaryCacheDir + "/" + path;
+        auto path2 = binaryCacheDir / path;
         static std::atomic<int> counter{0};
         Path tmp = fmt("%s.tmp.%d.%d", path2, getpid(), ++counter);
         AutoDelete del(tmp, false);
@@ -75,7 +75,7 @@ protected:
     void getFile(const std::string & path, Sink & sink) override
     {
         try {
-            readFile(binaryCacheDir + "/" + path, sink);
+            readFile(binaryCacheDir / path, sink);
         } catch (SysError & e) {
             if (e.errNo == ENOENT)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
@@ -93,7 +93,7 @@ protected:
                 !hasSuffix(name, ".narinfo"))
                 continue;
             paths.insert(parseStorePath(
-                    storeDir + "/" + name.substr(0, name.size() - 8)
+                    storeDir / name.substr(0, name.size() - 8)
                     + "-" + MissingName));
         }
 
@@ -108,17 +108,17 @@ protected:
 
 void LocalBinaryCacheStore::init()
 {
-    createDirs(binaryCacheDir + "/nar");
-    createDirs(binaryCacheDir + "/" + realisationsPrefix);
+    createDirs(binaryCacheDir / "nar");
+    createDirs(binaryCacheDir / realisationsPrefix);
     if (writeDebugInfo)
-        createDirs(binaryCacheDir + "/debuginfo");
-    createDirs(binaryCacheDir + "/log");
+        createDirs(binaryCacheDir / "debuginfo");
+    createDirs(binaryCacheDir / "log");
     BinaryCacheStore::init();
 }
 
 bool LocalBinaryCacheStore::fileExists(const std::string & path)
 {
-    return pathExists(binaryCacheDir + "/" + path);
+    return pathExists(binaryCacheDir / path);
 }
 
 std::set<std::string> LocalBinaryCacheStore::uriSchemes()

@@ -41,13 +41,14 @@ protected:
     {
 #ifdef _WIN32
         // no `mkdtemp` with MinGW
-        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
+        auto tmpl = nix::defaultTempDir() / "tests_nix-store.";
         for (size_t i = 0; true; ++i) {
-            nixDir = tmpl + std::string { i };
+            auto nixDir = tmpl;
+            nixDir += std::string { i };
             if (fs::create_directory(nixDir)) break;
         }
 #else
-        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.XXXXXX";
+        auto tmpl = nix::defaultTempDir() / "tests_nix-store.XXXXXX";
         nixDir = mkdtemp((char *) tmpl.c_str());
 #endif
 

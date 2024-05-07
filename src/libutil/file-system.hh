@@ -65,25 +65,25 @@ Path canonPath(PathView path, bool resolveSymlinks = false);
  * immediate child thereof (e.g., `/foo`), this means `/`
  * is returned.
  */
-Path dirOf(const PathView path);
+Path dirOf(PathView path);
 
 /**
  * @return the base name of the given canonical path, i.e., everything
  * following the final `/` (trailing slashes are removed).
  */
-std::string_view baseNameOf(std::string_view path);
+PathView baseNameOf(PathView path);
 
 /**
  * Check whether 'path' is a descendant of 'dir'. Both paths must be
  * canonicalized.
  */
-bool isInDir(std::string_view path, std::string_view dir);
+bool isInDir(PathView path, PathView dir);
 
 /**
  * Check whether 'path' is equal to 'dir' or a descendant of
  * 'dir'. Both paths must be canonicalized.
  */
-bool isDirOrInDir(std::string_view path, std::string_view dir);
+bool isDirOrInDir(PathView path, PathView dir);
 
 /**
  * Get status of `path`.
@@ -154,7 +154,7 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 Paths createDirs(const Path & path);
 inline Paths createDirs(PathView path)
 {
-    return createDirs(Path(path));
+    return createDirs(Path{Path::string_type{path}});
 }
 
 /**
@@ -202,10 +202,10 @@ public:
     void reset(const std::filesystem::path & p, bool recursive = true);
 
     const std::filesystem::path & path() const { return _path; }
-    PathViewNG view() const { return _path; }
+    PathView view() const { return _path; }
 
     operator const std::filesystem::path & () const { return _path; }
-    operator PathViewNG () const { return _path; }
+    operator PathView () const { return _path; }
 };
 
 
@@ -238,7 +238,7 @@ Path defaultTempDir();
 /**
  * Used in various places.
  */
-typedef std::function<bool(const Path & path)> PathFilter;
+typedef std::function<bool(PathView path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 

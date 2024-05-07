@@ -187,11 +187,11 @@ LocalStore::LocalStore(const Params & params)
     , LocalStoreConfig(params)
     , Store(params)
     , LocalFSStore(params)
-    , dbDir(stateDir + "/db")
-    , linksDir(realStoreDir + "/.links")
-    , reservedPath(dbDir + "/reserved")
-    , schemaPath(dbDir + "/schema")
-    , tempRootsDir(stateDir + "/temproots")
+    , dbDir(stateDir / "db")
+    , linksDir(realStoreDir / ".links")
+    , reservedPath(dbDir / "reserved")
+    , schemaPath(dbDir / "schema")
+    , tempRootsDir(stateDir / "temproots")
     , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
     , locksHeld(tokenizeString<PathSet>(getEnv("NIX_HELD_LOCKS").value_or("")))
 {
@@ -206,17 +206,17 @@ LocalStore::LocalStore(const Params & params)
         makeStoreWritable();
     }
     createDirs(linksDir);
-    Path profilesDir = stateDir + "/profiles";
+    Path profilesDir = stateDir / "profiles";
     createDirs(profilesDir);
     createDirs(tempRootsDir);
     createDirs(dbDir);
-    Path gcRootsDir = stateDir + "/gcroots";
+    Path gcRootsDir = stateDir / "gcroots";
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
-        createSymlink(profilesDir, gcRootsDir + "/profiles");
+        createSymlink(profilesDir, gcRootsDir / "profiles");
     }
 
-    for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
+    for (auto & perUserDir : {profilesDir / "per-user", gcRootsDir / "per-user"}) {
         createDirs(perUserDir);
         if (!readOnly) {
             if (chmod(perUserDir.c_str(), 0755) == -1)
@@ -299,7 +299,7 @@ LocalStore::LocalStore(const Params & params)
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
     if (!readOnly) {
-        Path globalLockPath = dbDir + "/big-lock";
+        Path globalLockPath = dbDir / "big-lock";
         globalLock = openLockFile(globalLockPath.c_str(), true);
     }
 
@@ -384,7 +384,7 @@ LocalStore::LocalStore(const Params & params)
 
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         if (!readOnly) {
-            migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+            migrateCASchema(state->db, dbDir / "ca-schema", globalLock);
         } else {
             throw Error("need to migrate to content-addressed schema, but this cannot be done in read-only mode");
         }
@@ -482,7 +482,7 @@ LocalStore::LocalStore(
 
 AutoCloseFD LocalStore::openGCLock()
 {
-    Path fnGCLock = stateDir + "/gc.lock";
+    Path fnGCLock = stateDir / "gc.lock";
     auto fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT
 #ifndef _WIN32
         | O_CLOEXEC
@@ -546,7 +546,7 @@ void LocalStore::openDB(State & state, bool create)
         throw SysError("Nix database directory '%1%' is not writable", dbDir);
 
     /* Open the Nix database. */
-    std::string dbPath = dbDir + "/db.sqlite";
+    std::string dbPath = dbDir / "db.sqlite";
     auto & db(state.db);
     auto openMode = readOnly ? SQLiteOpenMode::Immutable
                   : create ? SQLiteOpenMode::Normal
@@ -940,7 +940,7 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
 {
     if (hashPart.size() != StorePath::HashLen) throw Error("invalid hash part");
 
-    Path prefix = storeDir + "/" + hashPart;
+    auto prefix = (storeDir / hashPart).string();
 
     return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state.lock());
@@ -1603,7 +1603,7 @@ static void makeMutable(const Path & path)
 
     if (S_ISDIR(st.st_mode)) {
         for (auto & i : readDirectory(path))
-            makeMutable(path + "/" + i.name);
+            makeMutable(i.path());
     }
 
     /* The O_NOFOLLOW is important to prevent us from changing the

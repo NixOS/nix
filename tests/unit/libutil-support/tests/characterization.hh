@@ -35,7 +35,7 @@ protected:
      * While the "golden master" for this characterization test is
      * located. It should not be shared with any other test.
      */
-    virtual Path goldenMaster(PathView testStem) const = 0;
+    virtual Path goldenMaster(std::string_view testStem) const = 0;
 
 public:
     /**
@@ -44,7 +44,7 @@ public:
      * @param test hook that takes the contents of the file and does the
      * actual work
      */
-    void readTest(PathView testStem, auto && test)
+    void readTest(std::string_view testStem, auto && test)
     {
         auto file = goldenMaster(testStem);
 
@@ -68,7 +68,7 @@ public:
      * actual work
      */
     void writeTest(
-        PathView testStem, auto && test, auto && readFile2, auto && writeFile2)
+        std::string_view testStem, auto && test, auto && readFile2, auto && writeFile2)
     {
         auto file = goldenMaster(testStem);
 
@@ -92,7 +92,7 @@ public:
     /**
      * Specialize to `std::string`
      */
-    void writeTest(PathView testStem, auto && test)
+    void writeTest(std::string_view testStem, auto && test)
     {
         writeTest(
             testStem, test,

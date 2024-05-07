@@ -8,6 +8,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include "types.hh"
+#include "file-path.hh"
 #include "experimental-features.hh"
 
 namespace nix {
@@ -350,7 +351,7 @@ public:
 
     Path parse(const std::string & str) const override;
 
-    Path operator +(const char * p) const { return value + p; }
+    Path operator /(PathView p) const { return value / p.native(); }
 
     void operator =(const Path & v) { this->assign(v); }
 };

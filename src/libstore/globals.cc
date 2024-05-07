@@ -84,7 +84,9 @@ Settings::Settings()
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)
-    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
+    sandboxPaths = std::set {
+        Path { "/bin/sh=" SANDBOX_SHELL }
+    };
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
@@ -154,7 +156,7 @@ std::vector<Path> getUserConfigFiles()
     // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
     auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
     if (nixConfFiles.has_value()) {
-        return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
+        return tokenizeString<std::vector<Path>>(nixConfFiles.value(), ":");
     }
 
     // Use the paths specified by the XDG spec

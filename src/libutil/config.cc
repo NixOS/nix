@@ -264,6 +264,29 @@ template<> std::string BaseSetting<std::optional<std::string>>::to_string() cons
     return value ? *value : "";
 }
 
+template<> Path BaseSetting<Path>::parse(const std::string & str) const
+{
+    return str;
+}
+
+template<> std::string BaseSetting<Path>::to_string() const
+{
+    return value;
+}
+
+template<> std::optional<Path> BaseSetting<std::optional<Path>>::parse(const std::string & str) const
+{
+    if (str == "")
+        return std::nullopt;
+    else
+        return { str };
+}
+
+template<> std::string BaseSetting<std::optional<Path>>::to_string() const
+{
+    return value ? *value : "";
+}
+
 template<> bool BaseSetting<bool>::parse(const std::string & str) const
 {
     if (str == "true" || str == "yes" || str == "1")
@@ -330,6 +353,53 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
+template<> Paths BaseSetting<Paths>::parse(const std::string & str) const
+{
+    return tokenizeString<Paths>(str);
+}
+
+template<> void BaseSetting<Paths>::appendOrSet(Paths newValue, bool append)
+{
+    if (!append) value.clear();
+    value.insert(value.end(), std::make_move_iterator(newValue.begin()),
+                              std::make_move_iterator(newValue.end()));
+}
+
+template<> std::string BaseSetting<Paths>::to_string() const
+{
+    std::string s;
+    for (auto & i : value) {
+        if (s.size() != 0) s += " ";
+        s += i.string();
+    }
+    return s;
+    // TODO use `concatStringsSep` again.
+    // return concatStringsSep(" ", value);
+}
+
+template<> PathSet BaseSetting<PathSet>::parse(const std::string & str) const
+{
+    return tokenizeString<PathSet>(str);
+}
+
+template<> void BaseSetting<PathSet>::appendOrSet(PathSet newValue, bool append)
+{
+    if (!append) value.clear();
+    value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+}
+
+template<> std::string BaseSetting<PathSet>::to_string() const
+{
+    std::string s;
+    for (auto & i : value) {
+        if (s.size() != 0) s += " ";
+        s += i.string();
+    }
+    return s;
+    // TODO use `concatStringsSep` again.
+    // return concatStringsSep(" ", value);
+}
+
 template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeature>>::parse(const std::string & str) const
 {
     std::set<ExperimentalFeature> res;
@@ -393,6 +463,8 @@ template class BaseSetting<std::string>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
+template class BaseSetting<Path>;
+template class BaseSetting<Paths>;
 template class BaseSetting<std::set<ExperimentalFeature>>;
 
 static Path parsePath(const AbstractSetting & s, const std::string & str)

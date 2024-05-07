@@ -308,7 +308,8 @@ static void main_nix_build(int argc, char * * argv)
                     absolute = canonPath(absPath(i), true);
                 } catch (Error & e) {};
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
-                if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
+                if (evalStore->isStorePath(PathView { path })
+                    && hasSuffix(path, ".drv"))
                     drvs.push_back(PackageInfo(*state, evalStore, absolute));
                 else
                     /* If we're in a #! script, interpret filenames
@@ -317,7 +318,7 @@ static void main_nix_build(int argc, char * * argv)
                         state->parseExprFromFile(
                             resolveExprPath(
                                 lookupFileArg(*state,
-                                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i))));
+                                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : Path { i }))));
             }
         }
 

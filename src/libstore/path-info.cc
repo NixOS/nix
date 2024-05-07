@@ -30,11 +30,15 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
     if (narSize == 0)
         throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
             store.printStorePath(path));
+
+    StringSet refs;
+    for (auto & i : references) refs.insert(store.printStorePath(i));
+
     return
             "1;" + store.printStorePath(path) + ";"
             + narHash.to_string(HashFormat::Nix32, true) + ";"
             + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(references));
+        + concatStringsSep(",", refs);
 }
 
 

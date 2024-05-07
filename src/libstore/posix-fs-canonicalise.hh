@@ -6,6 +6,7 @@
 
 #include "types.hh"
 #include "error.hh"
+#include "file-path.hh"
 
 namespace nix {
 

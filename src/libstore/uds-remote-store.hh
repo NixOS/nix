@@ -30,7 +30,7 @@ public:
     UDSRemoteStore(const Params & params);
     UDSRemoteStore(
         std::string_view scheme,
-        PathView path,
+        std::string_view path,
         const Params & params);
 
     std::string getUri() override;
@@ -63,7 +63,7 @@ private:
     };
 
     ref<RemoteStore::Connection> openConnection() override;
-    std::optional<std::string> path;
+    std::optional<Path> path;
 };
 
 }

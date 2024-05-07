@@ -7,6 +7,8 @@
 
 #include "types.hh"
 
+#include "file-path.hh"
+
 namespace nix {
 
 const nlohmann::json * get(const nlohmann::json & map, const std::string & key);
@@ -61,6 +63,9 @@ struct json_avoids_null<bool> : std::true_type {};
 
 template<>
 struct json_avoids_null<std::string> : std::true_type {};
+
+template<>
+struct json_avoids_null<Path> : std::true_type {};
 
 template<typename T>
 struct json_avoids_null<std::vector<T>> : std::true_type {};

@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "types.hh"
+#include "file-path.hh"
 
 #ifndef _WIN32
 # include <sys/types.h>

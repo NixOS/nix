@@ -4,7 +4,7 @@
 #include <chrono>
 #include <optional>
 
-#include "types.hh"
+#include "file-path.hh"
 
 namespace nix {
 

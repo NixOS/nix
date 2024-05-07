@@ -30,7 +30,7 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
-PathFilter defaultPathFilter = [](const Path &) { return true; };
+PathFilter defaultPathFilter = [](PathView) { return true; };
 
 
 void SourceAccessor::dumpPath(
@@ -165,14 +165,14 @@ struct CaseInsensitiveCompare
 };
 
 
-static void parse(FileSystemObjectSink & sink, Source & source, const Path & path)
+static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path)
 {
     std::string s;
 
     s = readString(source);
     if (s != "(") throw badArchive("expected open tag");
 
-    std::map<Path, int, CaseInsensitiveCompare> names;
+    std::map<std::string, int, CaseInsensitiveCompare> names;
 
     auto getString = [&]() {
         checkInterrupt();
@@ -246,7 +246,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const Path & pat
                                 }
                             } else if (s == "node") {
                                 if (name.empty()) throw badArchive("entry name missing");
-                                parse(sink, source, path + "/" + name);
+                                parse(sink, source, path / name);
                             } else
                                 throw badArchive("unknown field " + s);
                         }
@@ -290,11 +290,11 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     }
     if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
-    parse(sink, source, "");
+    parse(sink, source, CanonPath::root);
 }
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(const std::filesystem::path & path, Source & source)
 {
     RestoreSink sink;
     sink.dstPath = path;

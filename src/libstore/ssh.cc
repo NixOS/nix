@@ -8,7 +8,7 @@ namespace nix {
 
 SSHMaster::SSHMaster(
     std::string_view host,
-    std::string_view keyFile,
+    PathView keyFile,
     std::string_view sshPublicHostKey,
     bool useMaster, bool compress, Descriptor logFD)
     : host(host)
@@ -38,7 +38,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
         std::filesystem::path fileName = state->tmpDir->path() / "host-key";
         auto p = host.rfind("@");
         std::string thost = p != std::string::npos ? std::string(host, p + 1) : host;
-        writeFile(fileName.string(), thost + " " + base64Decode(sshPublicHostKey) + "\n");
+        writeFile(fileName, thost + " " + base64Decode(sshPublicHostKey) + "\n");
         args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName.string()});
     }
     if (compress)

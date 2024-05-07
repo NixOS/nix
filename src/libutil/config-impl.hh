@@ -28,6 +28,14 @@ template<> struct BaseSetting<StringMap>::trait
 {
     static constexpr bool appendable = true;
 };
+template<> struct BaseSetting<Paths>::trait
+{
+    static constexpr bool appendable = true;
+};
+template<> struct BaseSetting<PathSet>::trait
+{
+    static constexpr bool appendable = true;
+};
 template<> struct BaseSetting<std::set<ExperimentalFeature>>::trait
 {
     static constexpr bool appendable = true;
@@ -48,6 +56,8 @@ bool BaseSetting<T>::isAppendable()
 template<> void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append);
 template<> void BaseSetting<StringSet>::appendOrSet(StringSet newValue, bool append);
 template<> void BaseSetting<StringMap>::appendOrSet(StringMap newValue, bool append);
+template<> void BaseSetting<Paths>::appendOrSet(Paths newValue, bool append);
+template<> void BaseSetting<PathSet>::appendOrSet(PathSet newValue, bool append);
 template<> void BaseSetting<std::set<ExperimentalFeature>>::appendOrSet(std::set<ExperimentalFeature> newValue, bool append);
 
 template<typename T>
@@ -109,6 +119,10 @@ DECLARE_CONFIG_SERIALISER(bool)
 DECLARE_CONFIG_SERIALISER(Strings)
 DECLARE_CONFIG_SERIALISER(StringSet)
 DECLARE_CONFIG_SERIALISER(StringMap)
+DECLARE_CONFIG_SERIALISER(Path)
+DECLARE_CONFIG_SERIALISER(std::optional<Path>)
+DECLARE_CONFIG_SERIALISER(Paths)
+DECLARE_CONFIG_SERIALISER(PathSet)
 DECLARE_CONFIG_SERIALISER(std::set<ExperimentalFeature>)
 
 template<typename T>

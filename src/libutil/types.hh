@@ -18,14 +18,6 @@ typedef std::set<std::string> StringSet;
 typedef std::map<std::string, std::string> StringMap;
 typedef std::map<std::string, std::string> StringPairs;
 
-/**
- * Paths are just strings.
- */
-typedef std::string Path;
-typedef std::string_view PathView;
-typedef std::list<Path> Paths;
-typedef std::set<Path> PathSet;
-
 typedef std::vector<std::pair<std::string, std::string>> Headers;
 
 /**

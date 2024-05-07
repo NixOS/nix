@@ -124,7 +124,7 @@ SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents
 
 using File = MemorySourceAccessor::File;
 
-void MemorySink::createDirectory(const Path & path)
+void MemorySink::createDirectory(const CanonPath & path)
 {
     auto * f = dst.open(CanonPath{path}, File { File::Directory { } });
     if (!f)
@@ -146,7 +146,7 @@ struct CreateMemoryRegularFile : CreateRegularFileSink {
     void preallocateContents(uint64_t size) override;
 };
 
-void MemorySink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void MemorySink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     auto * f = dst.open(CanonPath{path}, File { File::Regular {} });
     if (!f)
@@ -173,7 +173,7 @@ void CreateMemoryRegularFile::operator () (std::string_view data)
     regularFile.contents += data;
 }
 
-void MemorySink::createSymlink(const Path & path, const std::string & target)
+void MemorySink::createSymlink(const CanonPath & path, const std::string & target)
 {
     auto * f = dst.open(CanonPath{path}, File { File::Symlink { } });
     if (!f)

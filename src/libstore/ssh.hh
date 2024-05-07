@@ -13,7 +13,7 @@ private:
 
     const std::string host;
     bool fakeSSH;
-    const std::string keyFile;
+    const Path keyFile;
     const std::string sshPublicHostKey;
     const bool useMaster;
     const bool compress;
@@ -41,9 +41,11 @@ public:
 
     SSHMaster(
         std::string_view host,
-        std::string_view keyFile,
+        PathView keyFile,
         std::string_view sshPublicHostKey,
-        bool useMaster, bool compress, Descriptor logFD = INVALID_DESCRIPTOR);
+        bool useMaster,
+        bool compress,
+        Descriptor logFD = INVALID_DESCRIPTOR);
 
     struct Connection
     {

@@ -98,7 +98,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                         try {
                             if (name == "." || name == "..")
                                 throw Error("invalid file name '%s'", name);
-                            recurse(*attr.value, attr.pos, concatStrings(path, "/", name));
+                            recurse(*attr.value, attr.pos, path / name);
                         } catch (Error & e) {
                             e.addTrace(
                                 state->positions[attr.pos],

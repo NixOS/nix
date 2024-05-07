@@ -62,7 +62,7 @@ SQLite::SQLite(const Path & path, SQLiteOpenMode mode)
     bool immutable = mode == SQLiteOpenMode::Immutable;
     int flags = immutable ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
     if (mode == SQLiteOpenMode::Normal) flags |= SQLITE_OPEN_CREATE;
-    auto uri = "file:" + percentEncode(path) + "?immutable=" + (immutable ? "1" : "0");
+    auto uri = "file:" + percentEncode(path.native()) + "?immutable=" + (immutable ? "1" : "0");
     int ret = sqlite3_open_v2(uri.c_str(), &db, SQLITE_OPEN_URI | flags, vfs);
     if (ret != SQLITE_OK) {
         const char * err = sqlite3_errstr(ret);

@@ -41,19 +41,19 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 
 UDSRemoteStore::UDSRemoteStore(
     std::string_view scheme,
-    PathView socket_path,
+    std::string_view socket_path,
     const Params & params)
     : UDSRemoteStore(params)
 {
     if (!socket_path.empty())
-        path.emplace(socket_path);
+        path.emplace(Path { socket_path });
 }
 
 
 std::string UDSRemoteStore::getUri()
 {
     if (path) {
-        return std::string("unix://") + *path;
+        return std::string { "unix://" } + path->native();
     } else {
         // unix:// with no path also works. Change what we return?
         return "daemon";
@@ -88,7 +88,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 void UDSRemoteStore::addIndirectRoot(const Path & path)
 {
     auto conn(getConnection());
-    conn->to << WorkerProto::Op::AddIndirectRoot << path;
+    conn->to << WorkerProto::Op::AddIndirectRoot << path.string();
     conn.processStderr();
     readInt(conn->from);
 }

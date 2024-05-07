@@ -173,9 +173,12 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         int r = archive_read_next_header(archive.archive, &entry);
         if (r == ARCHIVE_EOF)
             break;
-        auto path = archive_entry_pathname(entry);
-        if (!path)
+
+        auto * path_raw = archive_entry_pathname(entry);
+        if (!path_raw)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
+        CanonPath path { std::string_view { path_raw } };
+
         if (r == ARCHIVE_WARN)
             warn(archive_error_string(archive.archive));
         else

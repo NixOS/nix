@@ -16,17 +16,17 @@ struct LocalFSStoreConfig : virtual StoreConfig
         "Directory prefixed to all other paths."};
 
     const PathSetting stateDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
+        rootDir.get() ? *rootDir.get() / "nix/var/nix" : settings.nixStateDir,
         "state",
         "Directory where Nix will store state."};
 
     const PathSetting logDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
+        rootDir.get() ? *rootDir.get() / "nix/var/log/nix" : settings.nixLogDir,
         "log",
         "directory where Nix will store log files."};
 
     const PathSetting realStoreDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real",
+        rootDir.get() ? *rootDir.get() / "nix/store" : storeDir, "real",
         "Physical path of the Nix store."};
 };
 
@@ -66,7 +66,7 @@ public:
     Path toRealPath(const Path & storePath) override
     {
         assert(isInStore(storePath));
-        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
+        return getRealStoreDir() / Path::string_type { storePath, storeDir.native().size() + 1 };
     }
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;

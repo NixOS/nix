@@ -107,7 +107,7 @@ static void update(const StringSet & channelNames)
             // no need to update this channel, reuse the existing store path
             Path symlink = profile + "/" + name;
             Path storepath = dirOf(readLink(symlink));
-            exprs.push_back("f: rec { name = \"" + cname + "\"; type = \"derivation\"; outputs = [\"out\"]; system = \"builtin\"; outPath = builtins.storePath \"" + storepath + "\"; out = { inherit outPath; };}");
+            exprs.push_back("f: rec { name = \"" + cname + "\"; type = \"derivation\"; outputs = [\"out\"]; system = \"builtin\"; outPath = builtins.storePath \"" + storepath.native() + "\"; out = { inherit outPath; };}");
         } else {
             // We want to download the url to a file to see if it's a tarball while also checking if we
             // got redirected in the process, so that we can grab the various parts of a nix channel
@@ -117,9 +117,9 @@ static void update(const StringSet & channelNames)
             url = result.effectiveUrl;
 
             bool unpacked = false;
-            if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
-                runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import " + unpackChannelPath +
-                            "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
+            if (std::regex_search(filename.string(), std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
+                runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import " + unpackChannelPath.string() +
+                            "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename.string() + "\"; }" });
                 unpacked = true;
             }
 
@@ -139,7 +139,7 @@ static void update(const StringSet & channelNames)
     // Unpack the channel tarballs into the Nix store and install them
     // into the channels profile.
     std::cerr << "unpacking " << exprs.size() << " channels...\n";
-    Strings envArgs{ "--profile", profile, "--file", unpackChannelPath, "--install", "--remove-all", "--from-expression" };
+    Strings envArgs{ "--profile", profile, "--file", unpackChannelPath.string(), "--install", "--remove-all", "--from-expression" };
     for (auto & expr : exprs)
         envArgs.push_back(std::move(expr));
     envArgs.push_back("--quiet");

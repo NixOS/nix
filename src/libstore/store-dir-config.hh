@@ -43,15 +43,6 @@ struct StoreDirConfig : public Config
     std::string printStorePath(const StorePath & path) const;
 
     /**
-     * Deprecated
-     *
-     * \todo remove
-     */
-    StorePathSet parseStorePathSet(const PathSet & paths) const;
-
-    PathSet printStorePathSet(const StorePathSet & path) const;
-
-    /**
      * Display a set of paths in human-readable form (i.e., between quotes
      * and separated by commas).
      */
@@ -67,13 +58,13 @@ struct StoreDirConfig : public Config
      * @return true if ‘path’ is a store path, i.e. a direct child of the
      * Nix store.
      */
-    bool isStorePath(std::string_view path) const;
+    bool isStorePath(PathView path) const;
 
     /**
      * Split a path like /nix/store/<hash>-<name>/<bla> into
      * /nix/store/<hash>-<name> and /<bla>.
      */
-    std::pair<StorePath, Path> toStorePath(PathView path) const;
+    std::pair<StorePath, CanonPath> toStorePath(PathView path) const;
 
     /**
      * Constructs a unique store path name.

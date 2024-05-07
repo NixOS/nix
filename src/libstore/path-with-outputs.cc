@@ -95,7 +95,7 @@ StorePathWithOutputs parsePathWithOutputs(const StoreDirConfig & store, std::str
 StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathWithOutputs)
 {
     auto [path, outputs] = parsePathWithOutputs(pathWithOutputs);
-    return StorePathWithOutputs { store.followLinksToStorePath(path), std::move(outputs) };
+    return StorePathWithOutputs { store.followLinksToStorePath(PathView{path}), std::move(outputs) };
 }
 
 }

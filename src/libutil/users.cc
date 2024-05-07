@@ -7,42 +7,48 @@ namespace nix {
 
 Path getCacheDir()
 {
-    auto cacheDir = getEnv("XDG_CACHE_HOME");
-    return cacheDir ? *cacheDir : getHome() + "/.cache";
+    std::optional<Path> cacheDir = getEnv("XDG_CACHE_HOME");
+    return cacheDir ? *cacheDir : getHome() / ".cache";
 }
 
 
 Path getConfigDir()
 {
-    auto configDir = getEnv("XDG_CONFIG_HOME");
-    return configDir ? *configDir : getHome() + "/.config";
+    std::optional<Path> configDir = getEnv("XDG_CONFIG_HOME");
+    return configDir ? *configDir : getHome() / ".config";
 }
 
 std::vector<Path> getConfigDirs()
 {
     Path configHome = getConfigDir();
-    auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
-    std::vector<Path> result = tokenizeString<std::vector<std::string>>(configDirs, ":");
-    result.insert(result.begin(), configHome);
+    Path::string_type configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
+
+    auto split = tokenizeString<std::vector<Path::string_type>>(configDirs, ":");
+    split.insert(split.begin(), configHome);
+
+    std::vector<Path> result;
+    for (auto && p : std::move(split))
+        result.emplace_back(Path{std::move(p)});
+
     return result;
 }
 
 
 Path getDataDir()
 {
-    auto dataDir = getEnv("XDG_DATA_HOME");
-    return dataDir ? *dataDir : getHome() + "/.local/share";
+    std::optional<Path> dataDir = getEnv("XDG_DATA_HOME");
+    return dataDir ? *dataDir : getHome() / ".local/share";
 }
 
 Path getStateDir()
 {
-    auto stateDir = getEnv("XDG_STATE_HOME");
-    return stateDir ? *stateDir : getHome() + "/.local/state";
+    std::optional<Path> stateDir = getEnv("XDG_STATE_HOME");
+    return stateDir ? *stateDir : getHome() / ".local/state";
 }
 
 Path createNixStateDir()
 {
-    Path dir = getStateDir() + "/nix";
+    Path dir = getStateDir() / "nix";
     createDirs(dir);
     return dir;
 }

@@ -95,28 +95,14 @@ std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view pa
     }
 }
 
-bool StoreDirConfig::isStorePath(std::string_view path) const
+bool StoreDirConfig::isStorePath(PathView path) const
 {
     return (bool) maybeParseStorePath(path);
-}
-
-StorePathSet StoreDirConfig::parseStorePathSet(const PathSet & paths) const
-{
-    StorePathSet res;
-    for (auto & i : paths) res.insert(parseStorePath(i));
-    return res;
 }
 
 std::string StoreDirConfig::printStorePath(const StorePath & path) const
 {
     return (storeDir + "/").append(path.to_string());
-}
-
-PathSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
-{
-    PathSet res;
-    for (auto & i : paths) res.insert(printStorePath(i));
-    return res;
 }
 
 }

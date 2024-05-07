@@ -41,6 +41,6 @@ private:
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
-SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir = nullptr);
+SourcePath lookupFileArg(EvalState & state, PathView s, const Path * baseDir = nullptr);
 
 }

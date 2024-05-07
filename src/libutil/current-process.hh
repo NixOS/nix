@@ -7,7 +7,7 @@
 # include <sys/resource.h>
 #endif
 
-#include "types.hh"
+#include "file-path.hh"
 
 namespace nix {
 

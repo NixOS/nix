@@ -421,7 +421,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 .program = "git",
                 .args = {
                     "-c",
-                    "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
+                    "gpg.ssh.allowedSignersFile=" + allowedSignersFile.string(),
                     "-C", path.string(),
                     "verify-commit",
                     rev.gitRev()

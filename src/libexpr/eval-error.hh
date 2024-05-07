@@ -4,6 +4,7 @@
 
 #include "error.hh"
 #include "pos-idx.hh"
+#include "file-path.hh"
 
 namespace nix {
 

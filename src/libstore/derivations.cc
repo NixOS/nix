@@ -440,7 +440,8 @@ Derivation parseDerivation(
         expect(str, ")");
     }
 
-    expect(str, ","); drv.inputSrcs = store.parseStorePathSet(parseStrings(str, true));
+    expect(str, ",");
+    for (auto & i : parseStrings(str, true)) drv.inputSrcs.insert(i);
     expect(str, ","); drv.platform = parseString(str).toOwned();
     expect(str, ","); drv.builder = parseString(str).toOwned();
 

@@ -192,7 +192,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir)
+SourcePath lookupFileArg(EvalState & state, PathView s, const Path * baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto accessor = fetchers::downloadTarball(

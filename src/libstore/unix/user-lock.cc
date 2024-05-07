@@ -50,7 +50,7 @@ struct SimpleUserLock : UserLock
     static std::unique_ptr<UserLock> acquire()
     {
         assert(settings.buildUsersGroup != "");
-        createDirs(settings.nixStateDir + "/userpool");
+        createDirs(settings.nixStateDir / "userpool");
 
         /* Get the members of the build-users-group. */
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -139,14 +139,14 @@ struct AutoUserLock : UserLock
         assert((uint64_t) settings.startId + (uint64_t) settings.uidCount <= std::numeric_limits<uid_t>::max());
         assert(nrIds <= maxIdsPerBuild);
 
-        createDirs(settings.nixStateDir + "/userpool2");
+        createDirs(settings.nixStateDir / "userpool2");
 
         size_t nrSlots = settings.uidCount / maxIdsPerBuild;
 
         for (size_t i = 0; i < nrSlots; i++) {
             debug("trying user slot '%d'", i);
 
-            createDirs(settings.nixStateDir + "/userpool2");
+            createDirs(settings.nixStateDir / "userpool2");
 
             auto fnUserLock = fmt("%s/userpool2/slot-%d", settings.nixStateDir, i);
 

@@ -681,7 +681,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto & localFSStore = require<LocalFSStore>(*store);
         localFSStore.addPermRoot(storePath, gcRoot);
         logger->stopWork();
-        to << gcRoot;
+        to << gcRoot.string();
         break;
     }
 

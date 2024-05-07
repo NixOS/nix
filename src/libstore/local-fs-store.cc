@@ -19,7 +19,8 @@ struct LocalStoreAccessor : PosixSourceAccessor
     bool requireValidPath;
 
     LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
-        : store(store)
+        : PosixSourceAccessor(store->getRealStoreDir())
+        , store(store)
         , requireValidPath(requireValidPath)
     { }
 
@@ -28,7 +29,7 @@ struct LocalStoreAccessor : PosixSourceAccessor
         auto [storePath, rest] = store->toStorePath(path.abs());
         if (requireValidPath && !store->isValidPath(storePath))
             throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-        return CanonPath(store->getRealStoreDir()) / storePath.to_string() / CanonPath(rest);
+        return CanonPath(storePath.to_string()) / rest;
     }
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override
@@ -70,7 +71,7 @@ void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
 {
     if (!isValidPath(path))
         throw Error("path '%s' is not valid", printStorePath(path));
-    dumpPath(getRealStoreDir() + std::string(printStorePath(path), storeDir.size()), sink);
+    dumpPath(getRealStoreDir() / path.to_string(), sink);
 }
 
 const std::string LocalFSStore::drvsLogDir = "drvs";

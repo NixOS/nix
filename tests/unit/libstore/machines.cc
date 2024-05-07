@@ -138,7 +138,7 @@ TEST(machines, getMachinesWithCorrectFileReference) {
     auto path = absPath(getUnitTestData() + "/machines/valid");
     ASSERT_TRUE(pathExists(path));
 
-    auto actual = Machine::parseConfig({}, "@" + path);
+    auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(3));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));

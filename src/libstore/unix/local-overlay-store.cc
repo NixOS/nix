@@ -15,7 +15,7 @@ std::string LocalOverlayStoreConfig::doc()
 }
 
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) {
-    return upperLayer + "/" + path.to_string();
+    return upperLayer.get() / path.to_string();
 }
 
 LocalOverlayStore::LocalOverlayStore(const Params & params)
@@ -32,7 +32,7 @@ LocalOverlayStore::LocalOverlayStore(const Params & params)
         std::smatch match;
         std::string mountInfo;
         auto mounts = readFile("/proc/self/mounts");
-        auto regex = std::regex(R"((^|\n)overlay )" + realStoreDir.get() + R"( .*(\n|$))");
+        auto regex = std::regex(R"((^|\n)overlay )" + realStoreDir.get().string() + R"( .*(\n|$))");
 
         // Mount points can be stacked, so there might be multiple matching entries.
         // Loop until the last match, which will be the current state of the mount point.
@@ -41,8 +41,8 @@ LocalOverlayStore::LocalOverlayStore(const Params & params)
             mounts = match.suffix();
         }
 
-        auto checkOption = [&](std::string option, std::string value) {
-            return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value + "( |,)"));
+        auto checkOption = [&](std::string option, std::filesystem::path value) {
+            return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value.string() + "( |,)"));
         };
 
         auto expectedLowerDir = lowerStore->realStoreDir.get();
@@ -201,13 +201,13 @@ void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & re
 
 void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 {
-    auto mergedDir = realStoreDir.get() + "/";
-    if (path.substr(0, mergedDir.length()) != mergedDir) {
+    auto mergedDir = realStoreDir.get().native() + "/";
+    if (path.native().substr(0, mergedDir.length()) != mergedDir) {
         warn("local-overlay: unexpected gc path '%s' ", path);
         return;
     }
 
-    StorePath storePath = {path.substr(mergedDir.length())};
+    StorePath storePath = {path.native().substr(mergedDir.length())};
     auto upperPath = toUpperPath(storePath);
 
     if (pathExists(upperPath)) {
@@ -257,7 +257,7 @@ LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag
     StorePathSet done;
 
     auto existsInStoreDir = [&](const StorePath & storePath) {
-        return pathExists(realStoreDir.get() + "/" + storePath.to_string());
+        return pathExists(realStoreDir.get() / storePath.to_string());
     };
 
     bool errors = false;
@@ -280,7 +280,7 @@ void LocalOverlayStore::remountIfNecessary()
     if (remountHook.get().empty()) {
         warn("'%s' needs remounting, set remount-hook to do this automatically", realStoreDir.get());
     } else {
-        runProgram(remountHook, false, {realStoreDir});
+        runProgram(remountHook, false, {realStoreDir.get().string()});
     }
 
     _remountRequired = false;

@@ -18,6 +18,7 @@
 #include "worker-protocol.hh"
 #include "signals.hh"
 #include "users.hh"
+#include "file-path-impl.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -32,21 +33,21 @@ bool StoreDirConfig::isInStore(PathView path) const
 }
 
 
-std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
+std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
-    auto slash = path.find('/', storeDir.size() + 1);
-    if (slash == Path::npos)
-        return {parseStorePath(path), ""};
+    auto slash = NativePathTrait::findPathSep(path, storeDir.native().size() + 1);
+    if (slash == path.npos)
+        return {parseStorePath(path), CanonPath::root};
     else
-        return {parseStorePath(path.substr(0, slash)), (Path) path.substr(slash)};
+        return {parseStorePath(path.substr(0, slash)), CanonPath{path.substr(slash)}};
 }
 
 
-Path Store::followLinksToStore(std::string_view _path) const
+Path Store::followLinksToStore(PathView _path) const
 {
-    Path path = absPath(std::string(_path));
+    Path path = absPath(_path);
     while (!isInStore(path)) {
         if (!std::filesystem::is_symlink(path)) break;
         auto target = readLink(path);
@@ -58,7 +59,7 @@ Path Store::followLinksToStore(std::string_view _path) const
 }
 
 
-StorePath Store::followLinksToStorePath(std::string_view path) const
+StorePath Store::followLinksToStorePath(PathView path) const
 {
     return toStorePath(followLinksToStore(path)).first;
 }
@@ -79,7 +80,7 @@ StorePath StoreDirConfig::makeStorePath(std::string_view type,
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     auto s = std::string(type) + ":" + std::string(hash)
-        + ":" + storeDir + ":" + std::string(name);
+        + ":" + storeDir.string() + ":" + std::string(name);
     auto h = compressHash(hashString(HashAlgorithm::SHA256, s), 20);
     return StorePath(h, name);
 }
@@ -1201,7 +1202,13 @@ std::string StoreDirConfig::showPaths(const StorePathSet & paths)
 
 std::string showPaths(const PathSet & paths)
 {
-    return concatStringsSep(", ", quoteStrings(paths));
+    std::string s;
+    for (auto & i : paths) {
+        if (s.size() != 0) s += ", ";
+        s += "'" + i.string() + "'";
+    }
+    return s;
+    //return concatStringsSep(", ", quoteStrings(paths));
 }
 
 

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "error.hh"
+#include "file-path.hh"
 
 struct sqlite3;
 struct sqlite3_stmt;

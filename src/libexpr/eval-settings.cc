@@ -58,7 +58,7 @@ Strings EvalSettings::getDefaultNixPath()
             if (s.empty()) {
                 res.push_back(p);
             } else {
-                res.push_back(s + "=" + p);
+                res.push_back(s + "=" + p.native());
             }
         }
     };

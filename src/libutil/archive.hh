@@ -8,7 +8,6 @@
 
 namespace nix {
 
-
 /**
  * dumpPath creates a Nix archive of the specified path.
  *
@@ -75,7 +74,7 @@ void dumpString(std::string_view s, Sink & sink);
 
 void parseDump(FileSystemObjectSink & sink, Source & source);
 
-void restorePath(const Path & path, Source & source);
+void restorePath(const std::filesystem::path & path, Source & source);
 
 /**
  * Read a NAR from 'source' and write it to 'sink'.

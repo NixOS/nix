@@ -10,41 +10,40 @@ namespace nix {
 
 /**
  * Paths are just `std::filesystem::path`s.
- *
- * @todo drop `NG` suffix and replace the ones in `types.hh`.
  */
-typedef std::list<std::filesystem::path> PathsNG;
-typedef std::set<std::filesystem::path> PathSetNG;
+typedef std::filesystem::path Path;
+typedef std::list<Path> Paths;
+typedef std::set<Path> PathSet;
 
 /**
  * Stop gap until `std::filesystem::path_view` from P1030R6 exists in a
  * future C++ standard.
  *
- * @todo drop `NG` suffix and replace the one in `types.hh`.
+ * @todo drop `` suffix and replace the one in `types.hh`.
  */
-struct PathViewNG : std::basic_string_view<std::filesystem::path::value_type>
+struct PathView : std::basic_string_view<Path::value_type>
 {
-    using string_view = std::basic_string_view<std::filesystem::path::value_type>;
+    using string_view = std::basic_string_view<Path::value_type>;
 
     using string_view::string_view;
 
-    PathViewNG(const std::filesystem::path & path)
-        : std::basic_string_view<std::filesystem::path::value_type>(path.native())
+    PathView(const Path & path)
+        : std::basic_string_view<Path::value_type>(path.native())
     { }
 
-    PathViewNG(const std::filesystem::path::string_type & path)
-        : std::basic_string_view<std::filesystem::path::value_type>(path)
+    PathView(const Path::string_type & path)
+        : std::basic_string_view<Path::value_type>(path)
     { }
 
     const string_view & native() const { return *this; }
     string_view & native() { return *this; }
 };
 
-std::string os_string_to_string(PathViewNG::string_view path);
+std::string os_string_to_string(PathView::string_view path);
 
-std::filesystem::path::string_type string_to_os_string(std::string_view s);
+Path::string_type string_to_os_string(std::string_view s);
 
-std::optional<std::filesystem::path> maybePath(PathView path);
+std::optional<Path> maybePath(PathView path);
 
 std::filesystem::path pathNG(PathView path);
 

@@ -208,7 +208,10 @@ public:
             };
 
             {
-                auto r(state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority));
+                auto r {
+                    state->insertCache.use()
+                        (uri)(time(0))(storeDir.native())(wantMassQuery)(priority)
+                };
                 if (!r.next()) { abort(); }
                 ret.id = (int) r.getInt(0);
             }

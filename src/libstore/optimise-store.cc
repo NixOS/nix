@@ -28,7 +28,7 @@ static void makeWritable(const Path & path)
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const PathView path) : path(path) { }
+    MakeReadOnly(const Path & path) : path(path) { }
     ~MakeReadOnly()
     {
         try {
@@ -112,7 +112,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(act, stats, path + "/" + i, inodeHash, repair);
+            optimisePath_(act, stats, path / i, inodeHash, repair);
         return;
     }
 
@@ -149,7 +149,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        the contents of the target (which may not even exist). */
     Hash hash = ({
         hashPath(
-            {make_ref<PosixSourceAccessor>(), CanonPath(path)},
+            PosixSourceAccessor::createAtRoot(path),
             FileSerialisationMethod::Recursive, HashAlgorithm::SHA256).first;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
@@ -283,7 +283,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
+            optimisePath_(&act, stats, realStoreDir / std::string(i.to_string()), inodeHash, NoRepair);
         }
         done++;
         act.progress(done, paths.size());

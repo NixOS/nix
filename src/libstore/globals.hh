@@ -276,7 +276,7 @@ public:
         )"};
 
     Setting<std::string> builders{
-        this, "@" + nixConfDir + "/machines", "builders",
+        this, "@" + (nixConfDir / "machines").native(), "builders",
         R"(
           A semicolon- or newline-separated list of build machines.
 
@@ -1038,8 +1038,8 @@ public:
           Nix to use for downloads.
         )"};
 
-    Setting<std::string> netrcFile{
-        this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
+     PathSetting netrcFile{
+        this, nixConfDir/ "netrc", "netrc-file",
         R"(
           If set to an absolute path to a `netrc` file, Nix will use the HTTP
           authentication credentials in this file when trying to download from
@@ -1063,7 +1063,7 @@ public:
           > `.netrc`.
         )"};
 
-    Setting<Path> caFile{
+    PathSetting caFile{
         this, getDefaultSSLCertFile(), "ssl-cert-file",
         R"(
           The path of a file containing CA certificates used to

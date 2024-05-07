@@ -97,7 +97,7 @@ struct WindowsPathTrait
  */
 using NativePathTrait =
 #ifdef _WIN32
-    WindowsPathTrait<char>
+    WindowsPathTrait<std::wchar_t>
 #else
     UnixPathTrait
 #endif

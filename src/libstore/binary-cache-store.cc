@@ -43,7 +43,7 @@ void BinaryCacheStore::init()
 
     auto cacheInfo = getFile(cacheInfoFile);
     if (!cacheInfo) {
-        upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
+        upsertFile(cacheInfoFile, "StoreDir: " + storeDir.string() + "\n", "text/x-nix-cache-info");
     } else {
         for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
             size_t colon= line.find(':');
