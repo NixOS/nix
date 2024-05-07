@@ -336,8 +336,8 @@ struct Common : InstallableCommand, MixProfile
     std::string makeRcScript(
         ref<Store> store,
         const BuildEnvironment & buildEnvironment,
-        const PathNG & tmpDir,
-        const PathNG & outputsDir = PathNG { absPath(".") } / "outputs")
+        const std::filesystem::path & tmpDir,
+        const std::filesystem::path & outputsDir = std::filesystem::path { absPath(".") } / "outputs")
     {
         // A list of colon-separated environment variables that should be
         // prepended to, rather than overwritten, in order to keep the shell usable.
@@ -441,7 +441,7 @@ struct Common : InstallableCommand, MixProfile
         const std::string & content,
         StringMap & rewrites,
         const BuildEnvironment & buildEnvironment,
-        const PathNG & tmpDir)
+        const std::filesystem::path & tmpDir)
     {
         auto targetFilePath = tmpDir / PATHNG_LITERAL(".attrs.");
         targetFilePath += ext;

@@ -228,9 +228,9 @@ bool isLink(const Path & path)
 }
 
 
-std::vector<std::filesystem::directory_entry> readDirectory(const Path & path)
+std::vector<fs::directory_entry> readDirectory(const Path & path)
 {
-    std::vector<std::filesystem::directory_entry> entries;
+    std::vector<fs::directory_entry> entries;
     entries.reserve(64);
 
     for (auto & entry : fs::directory_iterator{path}) {
@@ -342,7 +342,7 @@ void syncParent(const Path & path)
 }
 
 
-static void _deletePath(Descriptor parentfd, const PathNG & path, uint64_t & bytesFreed)
+static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & bytesFreed)
 {
 #ifndef _WIN32
     checkInterrupt();
@@ -416,7 +416,7 @@ static void _deletePath(Descriptor parentfd, const PathNG & path, uint64_t & byt
 #endif
 }
 
-static void _deletePath(const PathNG & path, uint64_t & bytesFreed)
+static void _deletePath(const fs::path & path, uint64_t & bytesFreed)
 {
     Path dir = dirOf(path.string());
     if (dir == "")
@@ -432,7 +432,7 @@ static void _deletePath(const PathNG & path, uint64_t & bytesFreed)
 }
 
 
-void deletePath(const PathNG & path)
+void deletePath(const fs::path & path)
 {
     uint64_t dummy;
     deletePath(path, dummy);
@@ -466,7 +466,7 @@ Paths createDirs(const Path & path)
 }
 
 
-void deletePath(const PathNG & path, uint64_t & bytesFreed)
+void deletePath(const fs::path & path, uint64_t & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
     bytesFreed = 0;
@@ -478,7 +478,7 @@ void deletePath(const PathNG & path, uint64_t & bytesFreed)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const PathNG & p, bool recursive) : _path(p)
+AutoDelete::AutoDelete(const fs::path & p, bool recursive) : _path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -504,7 +504,7 @@ void AutoDelete::cancel()
     del = false;
 }
 
-void AutoDelete::reset(const PathNG & p, bool recursive) {
+void AutoDelete::reset(const fs::path & p, bool recursive) {
     _path = p;
     this->recursive = recursive;
     del = true;

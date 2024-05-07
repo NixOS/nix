@@ -87,7 +87,7 @@ std::tuple<StorePath, Hash> prefetchFile(
     if (!storePath) {
 
         AutoDelete tmpDir(createTempDir(), true);
-        PathNG tmpFile = tmpDir.path() / "tmp";
+        std::filesystem::path tmpFile = tmpDir.path() / "tmp";
 
         /* Download the file. */
         {
