@@ -117,7 +117,7 @@ std::tuple<StorePath, Hash> prefetchFile(
                that as the top-level. */
             auto entries = readDirectory(unpacked);
             if (entries.size() == 1)
-                tmpFile = unpacked + "/" + entries[0].name;
+                tmpFile = entries[0].path().string();
             else
                 tmpFile = unpacked;
         }

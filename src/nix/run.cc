@@ -249,8 +249,8 @@ void chrootHelper(int argc, char * * argv)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
         for (auto entry : readDirectory("/")) {
-            auto src = "/" + entry.name;
-            Path dst = tmpDir + "/" + entry.name;
+            auto src = entry.path().string();
+            Path dst = tmpDir + "/" + entry.path().filename().string();
             if (pathExists(dst)) continue;
             auto st = lstat(src);
             if (S_ISDIR(st.st_mode)) {
