@@ -256,6 +256,14 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 
     }
 
+    catch (std::filesystem::filesystem_error & e) {
+        /* We only ignore permanent failures. */
+        if (e.code() == std::errc::permission_denied || e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::not_a_directory)
+            printInfo("cannot read potential root '%1%'", path);
+        else
+            throw;
+    }
+
     catch (SysError & e) {
         /* We only ignore permanent failures. */
         if (e.errNo == EACCES || e.errNo == ENOENT || e.errNo == ENOTDIR)

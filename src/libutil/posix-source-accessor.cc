@@ -133,18 +133,31 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
     assertNoSymlinks(path);
     DirEntries res;
     for (auto & entry : nix::readDirectory(makeAbsPath(path).string())) {
-        std::optional<Type> type;
-        // cannot exhaustively enumerate because implementation-specific
-        // additional file types are allowed.
+        auto type = [&]() -> std::optional<Type> {
+            std::filesystem::file_type nativeType;
+            try {
+                nativeType = entry.symlink_status().type();
+            } catch (std::filesystem::filesystem_error & e) {
+                // We cannot always stat the child. (Ideally there is no
+                // stat because the native directory entry has the type
+                // already, but this isn't always the case.)
+                if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
+                    return std::nullopt;
+                else throw;
+            }
+
+            // cannot exhaustively enumerate because implementation-specific
+            // additional file types are allowed.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
-        switch (entry.symlink_status().type()) {
-        case std::filesystem::file_type::regular: type = Type::tRegular; break;
-        case std::filesystem::file_type::symlink: type = Type::tSymlink; break;
-        case std::filesystem::file_type::directory: type = Type::tDirectory; break;
-        default: type = tMisc;
-        }
+            switch (nativeType) {
+            case std::filesystem::file_type::regular: return Type::tRegular; break;
+            case std::filesystem::file_type::symlink: return Type::tSymlink; break;
+            case std::filesystem::file_type::directory: return Type::tDirectory; break;
+            default: return tMisc;
+            }
 #pragma GCC diagnostic pop
+        }();
         res.emplace(entry.path().filename().string(), type);
     }
     return res;
