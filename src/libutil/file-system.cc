@@ -228,9 +228,9 @@ bool isLink(const Path & path)
 }
 
 
-std::vector<std::filesystem::directory_entry> readDirectory(const Path & path)
+std::vector<fs::directory_entry> readDirectory(const Path & path)
 {
-    std::vector<std::filesystem::directory_entry> entries;
+    std::vector<fs::directory_entry> entries;
     entries.reserve(64);
 
     for (auto & entry : fs::directory_iterator{path}) {
@@ -342,12 +342,12 @@ void syncParent(const Path & path)
 }
 
 
-static void _deletePath(Descriptor parentfd, const Path & path, uint64_t & bytesFreed)
+static void _deletePath(Descriptor parentfd, const fs::path & path, uint64_t & bytesFreed)
 {
 #ifndef _WIN32
     checkInterrupt();
 
-    std::string name(baseNameOf(path));
+    std::string name(baseNameOf(path.native()));
 
     struct stat st;
     if (fstatat(parentfd, name.c_str(), &st,
@@ -416,9 +416,9 @@ static void _deletePath(Descriptor parentfd, const Path & path, uint64_t & bytes
 #endif
 }
 
-static void _deletePath(const Path & path, uint64_t & bytesFreed)
+static void _deletePath(const fs::path & path, uint64_t & bytesFreed)
 {
-    Path dir = dirOf(path);
+    Path dir = dirOf(path.string());
     if (dir == "")
         dir = "/";
 
@@ -432,7 +432,7 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
 }
 
 
-void deletePath(const Path & path)
+void deletePath(const fs::path & path)
 {
     uint64_t dummy;
     deletePath(path, dummy);
@@ -466,7 +466,7 @@ Paths createDirs(const Path & path)
 }
 
 
-void deletePath(const Path & path, uint64_t & bytesFreed)
+void deletePath(const fs::path & path, uint64_t & bytesFreed)
 {
     //Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
     bytesFreed = 0;
@@ -478,7 +478,7 @@ void deletePath(const Path & path, uint64_t & bytesFreed)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const std::string & p, bool recursive) : path(p)
+AutoDelete::AutoDelete(const fs::path & p, bool recursive) : _path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -489,10 +489,9 @@ AutoDelete::~AutoDelete()
     try {
         if (del) {
             if (recursive)
-                deletePath(path);
+                deletePath(_path);
             else {
-                if (remove(path.c_str()) == -1)
-                    throw SysError("cannot unlink '%1%'", path);
+                fs::remove(_path);
             }
         }
     } catch (...) {
@@ -505,8 +504,8 @@ void AutoDelete::cancel()
     del = false;
 }
 
-void AutoDelete::reset(const Path & p, bool recursive) {
-    path = p;
+void AutoDelete::reset(const fs::path & p, bool recursive) {
+    _path = p;
     this->recursive = recursive;
     del = true;
 }
