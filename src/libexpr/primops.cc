@@ -1056,7 +1056,8 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value
     }
 
     if (evalSettings.builtinsAbortOnWarn) {
-        state.error<Abort>("aborting to reveal stack trace of warning, as abort-on-warn is set").debugThrow();
+        // Not an EvalError or subclass, which would cause the error to be stored in the eval cache.
+        state.error<Error>("aborting to reveal stack trace of warning, as abort-on-warn is set").debugThrow();
     }
     if (evalSettings.builtinsTraceDebugger || evalSettings.builtinsDebuggerOnWarn) {
         state.runDebugRepl(nullptr);
