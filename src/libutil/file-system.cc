@@ -120,10 +120,10 @@ Path canonPath(PathView path, bool resolveSymlinks)
 
 Path dirOf(const PathView path)
 {
-    Path::size_type pos = path.rfind('/');
+    Path::size_type pos = NativePathTrait::rfindPathSep(path);
     if (pos == path.npos)
         return ".";
-    return pos == 0 ? "/" : Path(path, 0, pos);
+    return fs::path{path}.parent_path().string();
 }
 
 
@@ -217,72 +217,36 @@ bool pathAccessible(const Path & path)
 
 Path readLink(const Path & path)
 {
-#ifndef _WIN32
     checkInterrupt();
-    std::vector<char> buf;
-    for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
-        buf.resize(bufSize);
-        ssize_t rlSize = readlink(path.c_str(), buf.data(), bufSize);
-        if (rlSize == -1)
-            if (errno == EINVAL)
-                throw Error("'%1%' is not a symlink", path);
-            else
-                throw SysError("reading symbolic link '%1%'", path);
-        else if (rlSize < bufSize)
-            return std::string(buf.data(), rlSize);
-    }
-#else
-    // TODO modern Windows does in fact support symlinks
-    throw UnimplementedError("reading symbolic link '%1%'", path);
-#endif
+    return fs::read_symlink(path).string();
 }
 
 
 bool isLink(const Path & path)
 {
-    return getFileType(path) == DT_LNK;
+    return getFileType(path) == fs::file_type::symlink;
 }
 
 
-DirEntries readDirectory(DIR *dir, const Path & path)
+DirEntries readDirectory(const Path & path)
 {
     DirEntries entries;
     entries.reserve(64);
 
-    struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) { /* sic */
+    for (auto & entry : fs::directory_iterator{path}) {
         checkInterrupt();
-        std::string name = dirent->d_name;
-        if (name == "." || name == "..") continue;
-        entries.emplace_back(name, dirent->d_ino,
-#ifdef HAVE_STRUCT_DIRENT_D_TYPE
-            dirent->d_type
-#else
-            DT_UNKNOWN
-#endif
-        );
+        entries.emplace_back(
+            entry.path().filename().string(),
+            entry.symlink_status().type());
     }
-    if (errno) throw SysError("reading directory '%1%'", path);
 
     return entries;
 }
 
-DirEntries readDirectory(const Path & path)
+
+fs::file_type getFileType(const Path & path)
 {
-    AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError("opening directory '%1%'", path);
-
-    return readDirectory(dir.get(), path);
-}
-
-
-unsigned char getFileType(const Path & path)
-{
-    struct stat st = lstat(path);
-    if (S_ISDIR(st.st_mode)) return DT_DIR;
-    if (S_ISLNK(st.st_mode)) return DT_LNK;
-    if (S_ISREG(st.st_mode)) return DT_REG;
-    return DT_UNKNOWN;
+    return fs::symlink_status(path).type();
 }
 
 
@@ -432,8 +396,15 @@ static void _deletePath(Descriptor parentfd, const Path & path, uint64_t & bytes
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
             throw SysError("opening directory '%1%'", path);
-        for (auto & i : readDirectory(dir.get(), path))
-            _deletePath(dirfd(dir.get()), path + "/" + i.name, bytesFreed);
+
+        struct dirent * dirent;
+        while (errno = 0, dirent = readdir(dir.get())) { /* sic */
+            checkInterrupt();
+            std::string childName = dirent->d_name;
+            if (childName == "." || childName == "..") continue;
+            _deletePath(dirfd(dir.get()), path + "/" + childName, bytesFreed);
+        }
+        if (errno) throw SysError("reading directory '%1%'", path);
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
@@ -611,13 +582,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 
 void createSymlink(const Path & target, const Path & link)
 {
-#ifndef _WIN32
-    if (symlink(target.c_str(), link.c_str()))
-        throw SysError("creating symlink from '%1%' to '%2%'", link, target);
-#else
-    // TODO modern Windows does in fact support symlinks
-    throw UnimplementedError("createSymlink");
-#endif
+    fs::create_symlink(target, link);
 }
 
 void replaceSymlink(const Path & target, const Path & link)
@@ -627,8 +592,8 @@ void replaceSymlink(const Path & target, const Path & link)
 
         try {
             createSymlink(target, tmp);
-        } catch (SysError & e) {
-            if (e.errNo == EEXIST) continue;
+        } catch (fs::filesystem_error & e) {
+            if (e.code() == std::errc::file_exists) continue;
             throw;
         }
 

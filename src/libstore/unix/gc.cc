@@ -203,7 +203,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 }
 
 
-void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
+void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, Roots & roots)
 {
     auto foundRoot = [&](const Path & path, const Path & target) {
         try {
@@ -217,15 +217,15 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 
     try {
 
-        if (type == DT_UNKNOWN)
+        if (type == std::filesystem::file_type::unknown)
             type = getFileType(path);
 
-        if (type == DT_DIR) {
+        if (type == std::filesystem::file_type::directory) {
             for (auto & i : readDirectory(path))
                 findRoots(path + "/" + i.name, i.type, roots);
         }
 
-        else if (type == DT_LNK) {
+        else if (type == std::filesystem::file_type::symlink) {
             Path target = readLink(path);
             if (isInStore(target))
                 foundRoot(path, target);
@@ -247,7 +247,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
             }
         }
 
-        else if (type == DT_REG) {
+        else if (type == std::filesystem::file_type::regular) {
             auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path)));
             if (storePath && isValidPath(*storePath))
                 roots[std::move(*storePath)].emplace(path);
@@ -268,8 +268,8 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
-    findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
+    findRoots(stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
+    findRoots(stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to

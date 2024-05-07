@@ -264,6 +264,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
                     completions.insert(prev + dir + "/" + entry.name);
             }
         } catch (Error &) {
+        } catch (std::filesystem::filesystem_error &) {
         }
     } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */

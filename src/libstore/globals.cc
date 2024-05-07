@@ -348,8 +348,8 @@ void initPlugins()
             auto ents = readDirectory(pluginFile);
             for (const auto & ent : ents)
                 pluginFiles.emplace_back(pluginFile + "/" + ent.name);
-        } catch (SysError & e) {
-            if (e.errNo != ENOTDIR)
+        } catch (std::filesystem::filesystem_error & e) {
+            if (e.code() != std::errc::not_a_directory)
                 throw;
             pluginFiles.emplace_back(pluginFile);
         }

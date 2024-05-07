@@ -338,6 +338,8 @@ Path getDefaultProfile()
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {
         return profileLink;
+    } catch (std::filesystem::filesystem_error &) {
+        return profileLink;
     }
 }
 

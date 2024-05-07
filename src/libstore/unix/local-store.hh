@@ -371,7 +371,7 @@ private:
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
-    void findRoots(const Path & path, unsigned char type, Roots & roots);
+    void findRoots(const Path & path, std::filesystem::file_type type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 

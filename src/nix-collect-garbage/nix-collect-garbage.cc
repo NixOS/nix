@@ -31,14 +31,14 @@ void removeOldGenerations(std::string dir)
         checkInterrupt();
 
         auto path = dir + "/" + i.name;
-        auto type = i.type == DT_UNKNOWN ? getFileType(path) : i.type;
+        auto type = i.type == std::filesystem::file_type::unknown ? getFileType(path) : i.type;
 
-        if (type == DT_LNK && canWrite) {
+        if (type == std::filesystem::file_type::symlink && canWrite) {
             std::string link;
             try {
                 link = readLink(path);
-            } catch (SysError & e) {
-                if (e.errNo == ENOENT) continue;
+            } catch (std::filesystem::filesystem_error & e) {
+                if (e.code() == std::errc::no_such_file_or_directory) continue;
                 throw;
             }
             if (link.find("link") != std::string::npos) {
@@ -49,7 +49,7 @@ void removeOldGenerations(std::string dir)
                 } else
                     deleteOldGenerations(path, dryRun);
             }
-        } else if (type == DT_DIR) {
+        } else if (type == std::filesystem::file_type::directory) {
             removeOldGenerations(path);
         }
     }

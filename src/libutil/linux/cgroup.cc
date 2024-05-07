@@ -65,7 +65,7 @@ static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
     /* Otherwise, manually kill every process in the subcgroups and
        this cgroup. */
     for (auto & entry : readDirectory(cgroup)) {
-        if (entry.type != DT_DIR) continue;
+        if (entry.type != std::filesystem::file_type::directory) continue;
         destroyCgroup(cgroup + "/" + entry.name, false);
     }
 

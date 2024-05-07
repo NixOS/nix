@@ -134,13 +134,17 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
     DirEntries res;
     for (auto & entry : nix::readDirectory(makeAbsPath(path).string())) {
         std::optional<Type> type;
+        // cannot exhaustively enumerate because implementation-specific
+        // additional file types are allowed.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
         switch (entry.type) {
-        case DT_REG: type = Type::tRegular; break;
-    #ifndef _WIN32
-        case DT_LNK: type = Type::tSymlink; break;
-    #endif
-        case DT_DIR: type = Type::tDirectory; break;
+        case std::filesystem::file_type::regular: type = Type::tRegular; break;
+        case std::filesystem::file_type::symlink: type = Type::tSymlink; break;
+        case std::filesystem::file_type::directory: type = Type::tDirectory; break;
+        default: type = tMisc;
         }
+#pragma GCC diagnostic pop
         res.emplace(entry.name, type);
     }
     return res;
