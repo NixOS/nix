@@ -426,7 +426,7 @@ struct GitInputScheme : InputScheme
 
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitLastModified"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitLastModified", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 
@@ -435,14 +435,14 @@ struct GitInputScheme : InputScheme
 
         auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
 
-        cache->upsert(key, Attrs{{"lastModified", lastModified}});
+        cache->upsert(key, {{"lastModified", lastModified}});
 
         return lastModified;
     }
 
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitRevCount"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 

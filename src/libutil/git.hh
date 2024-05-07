@@ -8,7 +8,7 @@
 #include "types.hh"
 #include "serialise.hh"
 #include "hash.hh"
-#include "source-accessor.hh"
+#include "source-path.hh"
 #include "fs-sink.hh"
 
 namespace nix::git {
@@ -125,7 +125,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type);
  * Given a `Hash`, return a `SourceAccessor` and `CanonPath` pointing to
  * the file system object with that path.
  */
-using RestoreHook = std::pair<SourceAccessor *, CanonPath>(Hash);
+using RestoreHook = SourcePath(Hash);
 
 /**
  * Wrapper around `parse` and `RestoreSink`
@@ -157,10 +157,10 @@ void dumpTree(
  * Note that if the child is a directory, its child in must also be so
  * processed in order to compute this information.
  */
-using DumpHook = TreeEntry(const CanonPath & path);
+using DumpHook = TreeEntry(const SourcePath & path);
 
 Mode dump(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     Sink & sink,
     std::function<DumpHook> hook,
     PathFilter & filter = defaultPathFilter,
@@ -172,9 +172,9 @@ Mode dump(
  * A smaller wrapper around `dump`.
  */
 TreeEntry dumpHash(
-            HashAlgorithm ha,
-            SourceAccessor & accessor, const CanonPath & path,
-            PathFilter & filter = defaultPathFilter);
+    HashAlgorithm ha,
+    const SourcePath & path,
+    PathFilter & filter = defaultPathFilter);
 
 /**
  * A line from the output of `git ls-remote --symref`.

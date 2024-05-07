@@ -133,8 +133,7 @@ public:
 
     StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & srcPath,
+        const SourcePath & path,
         ContentAddressMethod method,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,

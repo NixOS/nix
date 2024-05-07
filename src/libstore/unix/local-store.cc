@@ -1132,12 +1132,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                             specified.hash.algo,
                             std::string { info.path.hashPart() },
                         };
-                        dumpPath(*accessor, path, caSink, (FileSerialisationMethod) fim);
+                        dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
                         h = caSink.finish().first;
                         break;
                     }
                     case FileIngestionMethod::Git:
-                        h = git::dumpHash(specified.hash.algo, *accessor, path).hash;
+                        h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
                         break;
                     }
                     ContentAddress {
@@ -1247,14 +1247,12 @@ StorePath LocalStore::addToStoreFromDump(
 
     auto [dumpHash, size] = hashSink->finish();
 
-    PosixSourceAccessor accessor { std::filesystem::path { tempPath } };
-
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
         methodsMatch
             ? dumpHash
             : hashPath(
-                accessor, CanonPath::root,
+                PosixSourceAccessor::createAtRoot(tempPath),
                 hashMethod.getFileIngestionMethod(), hashAlgo),
         {
             .others = references,
@@ -1390,15 +1388,16 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         printInfo("checking link hashes...");
 
         for (auto & link : readDirectory(linksDir)) {
-            printMsg(lvlTalkative, "checking contents of '%s'", link.name);
-            Path linkPath = linksDir + "/" + link.name;
+            auto name = link.path().filename();
+            printMsg(lvlTalkative, "checking contents of '%s'", name);
+            Path linkPath = linksDir / name;
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
-                accessor, CanonPath { linkPath },
+                {getFSSourceAccessor(), CanonPath(linkPath)},
                 FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
-            if (hash != link.name) {
+            if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
-                    linkPath, link.name, hash);
+                    linkPath, name, hash);
                 if (repair) {
                     if (unlink(linkPath.c_str()) == 0)
                         printInfo("removed link '%s'", linkPath);
@@ -1485,7 +1484,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
      */
     for (auto & i : readDirectory(realStoreDir)) {
         try {
-            storePathsInStoreDir.insert({i.name});
+            storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }
     }
 

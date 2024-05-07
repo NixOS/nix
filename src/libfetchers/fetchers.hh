@@ -230,6 +230,8 @@ struct PublicKey
 {
     std::string type = "ssh-ed25519";
     std::string key;
+
+    auto operator <=>(const PublicKey &) const = default;
 };
 
 std::string publicKeys_to_string(const std::vector<PublicKey>&);

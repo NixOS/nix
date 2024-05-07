@@ -148,9 +148,8 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = ({
-        PosixSourceAccessor accessor;
         hashPath(
-            accessor, CanonPath { path },
+            {make_ref<PosixSourceAccessor>(), CanonPath(path)},
             FileSerialisationMethod::Recursive, HashAlgorithm::SHA256).first;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
@@ -163,9 +162,8 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
         auto stLink = lstat(linkPath);
         if (st.st_size != stLink.st_size
             || (repair && hash != ({
-                PosixSourceAccessor accessor;
                 hashPath(
-                    accessor, CanonPath { linkPath },
+                    {make_ref<PosixSourceAccessor>(), CanonPath(linkPath)},
                     FileSerialisationMethod::Recursive, HashAlgorithm::SHA256).first;
            })))
         {

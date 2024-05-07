@@ -260,10 +260,12 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
             for (auto & entry : readDirectory(dir == "" ? "/" : dir)) {
-                if (entry.name[0] != '.' && hasPrefix(entry.name, prefix2))
-                    completions.insert(prev + dir + "/" + entry.name);
+                auto name = entry.path().filename().string();
+                if (name[0] != '.' && hasPrefix(name, prefix2))
+                    completions.insert(prev + entry.path().string());
             }
         } catch (Error &) {
+        } catch (std::filesystem::filesystem_error &) {
         }
     } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */

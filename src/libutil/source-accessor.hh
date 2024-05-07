@@ -197,10 +197,13 @@ MakeError(RestrictedPathError, Error);
 /**
  * Return an accessor for the root filesystem.
  */
-ref<SourceAccessor> makeFSSourceAccessor();
+ref<SourceAccessor> getFSSourceAccessor();
 
 /**
- * Return an accessor for the filesystem rooted at `root`.
+ * Construct an accessor for the filesystem rooted at `root`. Note
+ * that it is not possible to escape `root` by appending `..` path
+ * elements, and that absolute symlinks are resolved relative to
+ * `root`.
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
 

@@ -439,8 +439,7 @@ public:
      */
     virtual StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & path,
+        const SourcePath & path,
         ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
@@ -454,8 +453,7 @@ public:
      */
     ValidPathInfo addToStoreSlow(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & path,
+        const SourcePath & path,
         ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),

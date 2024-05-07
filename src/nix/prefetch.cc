@@ -117,7 +117,7 @@ std::tuple<StorePath, Hash> prefetchFile(
                that as the top-level. */
             auto entries = readDirectory(unpacked);
             if (entries.size() == 1)
-                tmpFile = PathNG { unpacked } / entries[0].name;
+                tmpFile = entries[0].path();
             else
                 tmpFile = unpacked;
         }
@@ -125,9 +125,8 @@ std::tuple<StorePath, Hash> prefetchFile(
         Activity act(*logger, lvlChatty, actUnknown,
             fmt("adding '%s' to the store", url));
 
-        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(tmpFile);
         auto info = store->addToStoreSlow(
-            *name, accessor, canonPath,
+            *name, PosixSourceAccessor::createAtRoot(tmpFile),
             ingestionMethod, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);

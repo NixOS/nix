@@ -867,8 +867,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             createDirs(to);
 
             for (auto & entry : readDirectory(from)) {
-                auto from2 = from + "/" + entry.name;
-                auto to2 = to + "/" + entry.name;
+                auto from2 = entry.path().string();
+                auto to2 = to + "/" + entry.path().filename().string();
                 auto st = lstat(from2);
                 if (S_ISDIR(st.st_mode))
                     copyDir(from2, to2);

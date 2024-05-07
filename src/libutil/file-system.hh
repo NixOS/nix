@@ -28,13 +28,6 @@
 #include <sstream>
 #include <optional>
 
-#ifndef HAVE_STRUCT_DIRENT_D_TYPE
-# define DT_UNKNOWN 0
-# define DT_REG 1
-# define DT_LNK 2
-# define DT_DIR 3
-#endif
-
 /**
  * Polyfill for MinGW
  *
@@ -130,23 +123,9 @@ bool isLink(const Path & path);
  * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
  */
-struct DirEntry
-{
-    std::string name;
-    ino_t ino;
-    /**
-     * one of DT_*
-     */
-    unsigned char type;
-    DirEntry(std::string name, ino_t ino, unsigned char type)
-        : name(std::move(name)), ino(ino), type(type) { }
-};
+std::vector<std::filesystem::directory_entry> readDirectory(const Path & path);
 
-typedef std::vector<DirEntry> DirEntries;
-
-DirEntries readDirectory(const Path & path);
-
-unsigned char getFileType(const Path & path);
+std::filesystem::file_type getFileType(const Path & path);
 
 /**
  * Read the contents of a file into a string.

@@ -84,11 +84,12 @@ protected:
         StorePathSet paths;
 
         for (auto & entry : readDirectory(binaryCacheDir)) {
-            if (entry.name.size() != 40 ||
-                !hasSuffix(entry.name, ".narinfo"))
+            auto name = entry.path().filename().string();
+            if (name.size() != 40 ||
+                !hasSuffix(name, ".narinfo"))
                 continue;
             paths.insert(parseStorePath(
-                    storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)
+                    storeDir + "/" + name.substr(0, name.size() - 8)
                     + "-" + MissingName));
         }
 
