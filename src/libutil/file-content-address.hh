@@ -132,14 +132,15 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method);
 
 /**
  * Compute the hash of the given file system object according to the
- * given method.
+ * given method, and for some ingestion methods, the size of the
+ * serialisation.
  *
  * Unlike the other `hashPath`, this works on an arbitrary
  * `FileIngestionMethod` instead of `FileSerialisationMethod`, but
- * doesn't return the size as this is this is not a both simple and
+ * may not return the size as this is this is not a both simple and
  * useful defined for a merkle format.
  */
-Hash hashPath(
+std::pair<Hash, std::optional<uint64_t>> hashPath(
     const SourcePath & path,
     FileIngestionMethod method, HashAlgorithm ha,
     PathFilter & filter = defaultPathFilter);

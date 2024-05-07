@@ -112,17 +112,19 @@ HashResult hashPath(
 }
 
 
-Hash hashPath(
+std::pair<Hash, std::optional<uint64_t>> hashPath(
     const SourcePath & path,
     FileIngestionMethod method, HashAlgorithm ht,
     PathFilter & filter)
 {
     switch (method) {
     case FileIngestionMethod::Flat:
-    case FileIngestionMethod::Recursive:
-        return hashPath(path, (FileSerialisationMethod) method, ht, filter).first;
+    case FileIngestionMethod::Recursive: {
+        auto res = hashPath(path, (FileSerialisationMethod) method, ht, filter);
+        return {res.first, {res.second}};
+    }
     case FileIngestionMethod::Git:
-        return git::dumpHash(ht, path, filter).hash;
+        return {git::dumpHash(ht, path, filter).hash, std::nullopt};
     }
     assert(false);
 }

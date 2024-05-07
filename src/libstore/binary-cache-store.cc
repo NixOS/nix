@@ -453,7 +453,7 @@ StorePath BinaryCacheStore::addToStore(
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    auto h = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
+    auto h = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter).first;
 
     auto source = sinkToSource([&](Sink & sink) {
         path.dumpPath(sink, filter);

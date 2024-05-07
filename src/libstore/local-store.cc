@@ -1272,7 +1272,7 @@ StorePath LocalStore::addToStoreFromDump(
             ? dumpHash
             : hashPath(
                 PosixSourceAccessor::createAtRoot(tempPath),
-                hashMethod.getFileIngestionMethod(), hashAlgo),
+                hashMethod.getFileIngestionMethod(), hashAlgo).first,
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1412,7 +1412,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 PosixSourceAccessor::createAtRoot(link.path()),
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     link.path(), name, hash);
