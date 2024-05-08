@@ -402,7 +402,36 @@ establishes the same scope as
 let a = 1; in let a = 2; in let a = 3; in let a = 4; in ...
 ```
 
+Variables coming from outer `with` expressions *are* shadowed:
+
+```nix
+with { a = "outer"; };
+with { a = "inner"; };
+a
+```
+
+Does evaluate to `"inner"`.
+
 ## Comments
 
 Comments can be single-line, started with a `#` character, or
 inline/multi-line, enclosed within `/* ... */`.
+
+`#` comments last until the end of the line.
+
+`/*` comments run until the next occurrence of `*/`; this cannot be escaped.
+
+## Scoping rules
+
+Nix is [statically scoped](https://en.wikipedia.org/wiki/Scope_(computer_science)#Lexical_scope), but with multiple scopes and shadowing rules.
+
+* primary scope --- explicitly-bound variables
+  * [`let`](#let-expressions)
+  * [`inherit`](#inheriting-attributes)
+  * function arguments
+
+* secondary scope --- implicitly-bound variables
+  * [`with`](#with-expressions)
+  
+Primary scope takes precedence over secondary scope.
+See [`with`](#with-expressions) for a detailed example.
