@@ -1,13 +1,14 @@
 #pragma once
 ///@file
 
+#include "worker.hh"
 #include "store-api.hh"
 #include "goal.hh"
 #include "muxable-pipe.hh"
+#include <coroutine>
+#include <future>
 
 namespace nix {
-
-class Worker;
 
 struct PathSubstitutionGoal : public Goal
 {
@@ -68,15 +69,74 @@ struct PathSubstitutionGoal : public Goal
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
-    typedef void (PathSubstitutionGoal::*GoalState)();
-    GoalState state;
+
+    /*
+     * Suspend our goal and wait until we get work()-ed again.
+     */
+    struct SuspendGoal {};
+    struct SuspendGoalAwaiter {
+        PathSubstitutionGoal& goal;
+        explicit SuspendGoalAwaiter(PathSubstitutionGoal& goal) : goal(goal) {}
+        bool await_ready() noexcept { return false; };
+        void await_suspend(std::coroutine_handle<>) noexcept;
+        void await_resume() noexcept {};
+    };
+    struct Done {};
+    struct Co {
+        struct promise_type;
+        using handle_type = std::coroutine_handle<promise_type>;
+        handle_type handle;
+        explicit Co(handle_type handle) : handle(handle) {
+            assert(handle);
+        };
+        Co(const Co&) = delete;
+        Co &operator=(const Co&) = delete;
+        Co &operator=(Co&&) = delete;
+        Co(Co&& rhs);
+        ~Co();
+
+        struct promise_type {
+            std::coroutine_handle<> continuation;
+            PathSubstitutionGoal& goal;
+
+            promise_type(PathSubstitutionGoal& goal) : goal(goal) {};
+
+            struct final_awaiter {
+                bool await_ready() noexcept { return false; };;
+                std::coroutine_handle<> await_suspend(std::coroutine_handle<promise_type>) noexcept;
+                void await_resume() noexcept { assert(false); };
+            };
+            Co get_return_object();
+            std::suspend_always initial_suspend() { return {}; };
+            final_awaiter final_suspend() noexcept { return {}; };
+            // Same as returning void, but makes it clear that we're done.
+            // Should ideally call `done` rather than `done` giving you a `Done`.
+            // `final_suspend` will be called after this (since we're returning),
+            // and that will give us a `final_awaiter`, which will stop the coroutine
+            // from executing since `exitCode != ecBusy`.
+            void return_value(Done) {
+                assert(goal.exitCode != ecBusy);
+            }
+            void return_value(Co&&);
+            void unhandled_exception() { throw; };
+
+            inline Co&& await_transform(Co&& co) { return static_cast<Co&&>(co); }
+            inline SuspendGoalAwaiter await_transform(SuspendGoal) { return SuspendGoalAwaiter(goal); };
+        };
+
+        bool await_ready() { return false; };
+        std::coroutine_handle<> await_suspend(std::coroutine_handle<Co::promise_type> handle);
+        void await_resume() {};
+    };
+    Co top_co;
+    std::coroutine_handle<> cur_co;
 
     /**
      * Content address for recomputing store path
      */
     std::optional<ContentAddress> ca;
 
-    void done(
+    Done done(
         ExitCode result,
         BuildResult::Status status,
         std::optional<std::string> errorMsg = {});
@@ -101,12 +161,12 @@ public:
     /**
      * The states.
      */
-    void init();
-    void tryNext();
-    void gotInfo();
-    void referencesValid();
-    void tryToRun();
-    void finished();
+    Co init();
+    Co tryNext();
+    Co gotInfo();
+    Co referencesValid();
+    Co tryToRun();
+    Co finished();
 
     /**
      * Callback used by the worker to write to the log.
