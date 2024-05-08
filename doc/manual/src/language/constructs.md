@@ -423,14 +423,15 @@ inline/multi-line, enclosed within `/* ... */`.
 
 ## Scoping rules
 
-Nix has constructs with
+Nix is [statically scoped](https://en.wikipedia.org/wiki/Scope_(computer_science)#Lexical_scope), but with multiple scopes and shadowing rules.
 
-* dynamic scope
-  * [`with`](#with-expressions)
-* static scope
+* primary scope --- explicitly-bound variables
   * [`let`](#let-expressions)
   * [`inherit`](#inheriting-attributes)
   * function arguments
 
-Static scope takes precedence over dynamic scope.
+* secondary scope --- implicitly-bound variables
+  * [`with`](#with-expressions)
+  
+Primary scope takes precedence over secondary scope.
 See [`with`](#with-expressions) for a detailed example.
