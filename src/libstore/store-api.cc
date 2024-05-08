@@ -54,7 +54,7 @@ Path Store::followLinksToStore(std::string_view _path) const
 {
     Path path = absPath(std::string(_path));
     while (!isInStore(path)) {
-        if (!isLink(path)) break;
+        if (!std::filesystem::is_symlink(path)) break;
         auto target = readLink(path);
         path = absPath(target, dirOf(path));
     }
