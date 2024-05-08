@@ -50,7 +50,7 @@ The arguments *args* map to store paths in a number of possible ways:
     Show the attribute paths of available packages with [`nix-env --query`](./query.md):
 
     ```console
-    nix-env --query --available --attr-path`
+    nix-env --query --available --attr-path
     ```
 
   - If `--from-profile` *path* is given, *args* is a set of names
