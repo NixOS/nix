@@ -160,14 +160,15 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : readDirectory(tempRootsDir)) {
-        if (i.name[0] == '.') {
+        auto name = i.path().filename().string();
+        if (name[0] == '.') {
             // Ignore hidden files. Some package managers (notably portage) create
             // those to keep the directory alive.
             continue;
         }
-        Path path = tempRootsDir + "/" + i.name;
+        Path path = i.path();
 
-        pid_t pid = std::stoi(i.name);
+        pid_t pid = std::stoi(name);
 
         debug("reading temporary root file '%1%'", path);
         AutoCloseFD fd(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666));
@@ -203,7 +204,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 }
 
 
-void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
+void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, Roots & roots)
 {
     auto foundRoot = [&](const Path & path, const Path & target) {
         try {
@@ -217,15 +218,15 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 
     try {
 
-        if (type == DT_UNKNOWN)
+        if (type == std::filesystem::file_type::unknown)
             type = getFileType(path);
 
-        if (type == DT_DIR) {
+        if (type == std::filesystem::file_type::directory) {
             for (auto & i : readDirectory(path))
-                findRoots(path + "/" + i.name, i.type, roots);
+                findRoots(i.path().string(), i.symlink_status().type(), roots);
         }
 
-        else if (type == DT_LNK) {
+        else if (type == std::filesystem::file_type::symlink) {
             Path target = readLink(path);
             if (isInStore(target))
                 foundRoot(path, target);
@@ -247,12 +248,20 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
             }
         }
 
-        else if (type == DT_REG) {
+        else if (type == std::filesystem::file_type::regular) {
             auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path)));
             if (storePath && isValidPath(*storePath))
                 roots[std::move(*storePath)].emplace(path);
         }
 
+    }
+
+    catch (std::filesystem::filesystem_error & e) {
+        /* We only ignore permanent failures. */
+        if (e.code() == std::errc::permission_denied || e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::not_a_directory)
+            printInfo("cannot read potential root '%1%'", path);
+        else
+            throw;
     }
 
     catch (SysError & e) {
@@ -268,8 +277,8 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(stateDir + "/" + gcRootsDir, DT_UNKNOWN, roots);
-    findRoots(stateDir + "/profiles", DT_UNKNOWN, roots);
+    findRoots(stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
+    findRoots(stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to

@@ -108,7 +108,7 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
     {
     }
 
-    const std::string name() override { return "Experimental SSH Store with filesytem mounted"; }
+    const std::string name() override { return "Experimental SSH Store with filesystem mounted"; }
 
     std::string doc() override
     {

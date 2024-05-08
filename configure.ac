@@ -63,7 +63,6 @@ AC_SYS_LARGEFILE
 
 
 # Solaris-specific stuff.
-AC_STRUCT_DIRENT_D_TYPE
 case "$host_os" in
   solaris*)
     # Solaris requires -lsocket -lnsl for network functions

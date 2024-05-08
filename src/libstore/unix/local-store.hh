@@ -371,13 +371,13 @@ private:
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
-    void findRoots(const Path & path, unsigned char type, Roots & roots);
+    void findRoots(const Path & path, std::filesystem::file_type type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    std::pair<Path, AutoCloseFD> createTempDirInStore();
+    std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 
     typedef std::unordered_set<ino_t> InodeHash;
 
