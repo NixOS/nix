@@ -14,8 +14,11 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos,
 
 static RegisterPrimOp primop_unsafeDiscardStringContext({
     .name = "__unsafeDiscardStringContext",
-    .arity = 1,
-    .fun = prim_unsafeDiscardStringContext
+    .args = {"s"},
+    .fun = prim_unsafeDiscardStringContext,
+    .doc = R"(
+        Discard the [string context](@docroot@/language/string-context.md) from a value that can be coerced to a string.
+    )",
 });
 
 

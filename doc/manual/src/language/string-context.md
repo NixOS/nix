@@ -20,17 +20,58 @@ Then the Nix language implicitly does that bookkeeping to efficiently obtain the
 >
 > String contexts are *not* explicitly manipulated in idiomatic Nix language code.
 
-Strings with non-empty contexts are only concatenated and eventually passed to [`builtins.derivation`](./derivations.md).
-Plain strings with empty contexts are the only ones to be inspected, e.g. using comparison with [the equality operator (`==`)](./operators#equality).
-
 String context elements come in different forms:
 
 - [deriving path]{#string-context-element-derived-path}
 
   A string context element of this type is a [deriving path](@docroot@/glossary.md#gloss-deriving-path).
-  They can be one of the varieties *constant* or *output*, which correspond to the types of deriving path.
+  They can be either of type [constant](#string-context-constant) or [output](#string-context-output), which correspond to the types of deriving paths.
 
-  <!-- put the two sections with examples here as a list with anchors on the items -->
+  - [Constant string context elements]{#string-context-constant}
+
+    > **Example**
+    >
+    > [`builtins.storePath`] creates a string with a single constant string context element:
+    >
+    > ```nix
+    > builtins.getContext (builtins.storePath "/nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10")
+    > ```
+    > evaluates to
+    > ```nix
+    > {
+    >   "/nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10" = {
+    >     path = true;
+    >   };
+    > }
+    > ```
+
+    [deriving path]: @docroot@/glossary.md#gloss-deriving-path
+    [store path]: @docroot@/glossary.md#gloss-store-path
+    [`builtins.storePath`]: ./builtins.md#builtins-storePath
+
+  - [Output string context elements]{#string-context-output}
+
+    > **Example**
+    >
+    > The behavior of string contexts are best demonstrated with a built-in function that is still experimental: [`builtins.outputOf`].
+    > This example will *not* work with stable Nix!
+    >
+    > ```nix
+    > builtins.getContext
+    >   (builtins.outputOf
+    >     (builtins.storePath "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv")
+    >     "out")
+    > ```
+    > evaluates to
+    > ```nix
+    > {
+    >   "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv" = {
+    >     outputs = [ "out" ];
+    >   };
+    > }
+    > ```
+
+    [`builtins.outputOf`]: ./builtins.md#builtins-outputOf
 
 - [*derivation deep*]{#string-context-element-derivation-deep}
 
@@ -38,6 +79,28 @@ String context elements come in different forms:
   [`exportReferencesGraph` derivation attribute](./advanced-attributes.html#adv-attr-exportReferencesGraph).
   A *derivation deep* string context element is a derivation path, and refers to both its outputs and the entire build closure of that derivation:
   all its outputs, all the other derivations the given derivation depends on, and all the outputs of those.
+
+  > **Example**
+  >
+  > The best way to illustrate *derivation deep* string contexts is with [`builtins.addDrvOutputDependencies`].
+  > Take a regular constant string context element pointing to a derivation, and transform it into a "Derivation deep" string context element.
+  >
+  > ```nix
+  > builtins.getContext
+  >   (builtins.addDrvOutputDependencies
+  >     (builtins.storePath "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv"))
+  > ```
+  > evaluates to
+  > ```nix
+  > {
+  >   "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv" = {
+  >     allOutputs = true;
+  >   };
+  > }
+  > ```
+
+  [`builtins.addDrvOutputDependencies`]: ./builtins.md#builtins-addDrvOutputDependencies
+  [`builtins.unsafeDiscardOutputDependency`]: ./builtins.md#builtins-unsafeDiscardOutputDependency
 
 ## Inspecting string contexts
 
@@ -52,7 +115,7 @@ It creates an [attribute set] representing the string context, which can be insp
 
 ## Clearing string contexts
 
-[`buitins.unsafeDiscardStringContext`](./builtins.md#) will make a copy of a string, but with an empty string context.
+[`buitins.unsafeDiscardStringContext`](./builtins.md#builtins-unsafeDiscardStringContext) will make a copy of a string, but with an empty string context.
 The returned string can be used in more ways, e.g. by operators that require the string context to be empty.
 The requirement to explicitly discard the string context in such use cases helps ensure that string context elements are not lost by mistake.
 The "unsafe" marker is only there to remind that Nix normally guarantees that dependencies are tracked, whereas the returned string has lost them.
@@ -69,75 +132,3 @@ A string with arbitrary contexts can be made like this:
 3. Combine it with a base string and repeated [`builtins.appendContext`] calls.
 
 [`builtins.appendContext`]: ./builtins.md#builtins-appendContext
-
-### Constant string context elements
-
-A constant string context element is a constant [deriving path];
-a constant deriving path is a [store path].
-[`builtins.storePath`] creates a string with a single constant string context element:
-
-> **Example**
->
-> ```nix
-> builtins.getContext (builtins.storePath "/nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10")
-> ```
-> evaluates to
-> ```nix
-> {
->   "/nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10" = {
->     path = true;
->   };
-> }
-> ```
-
-[deriving path]: @docroot@/glossary.md#gloss-deriving-path
-[store path]: @docroot@/glossary.md#gloss-store-path
-[`builtins.storePath`]: ./builtins.md#builtins-storePath
-
-### Output string context elements
-
-> **Example**
->
-> This is best illustrated with a built-in function that is still experimental: [`builtins.ouputOf`].
-> This example will *not* work with stable Nix!
->
-> ```nix
-> builtins.getContext
->   (builtins.outputOf
->     (builtins.storePath "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv")
->     "out")
-> ```
-> evaluates to
-> ```nix
-> {
->   "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv" = {
->     outputs = [ "out" ];
->   };
-> }
-> ```
-
-[`builtins.outputOf`]: ./builtins.md#builtins-outputOf
-
-### "Derivation deep" string context elements
-
-The best way to illustrate this is with [`builtins.addDrvOutputDependencies`].
-We take a regular constant string context element pointing to a derivation, and transform it into a "Derivation deep" string context element.
-
-> **Example**
->
-> ```nix
-> builtins.getContext
->   (builtins.addDrvOutputDependencies
->     (builtins.storePath "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv"))
-> ```
-> evaluates to
-> ```nix
-> {
->   "/nix/store/fvchh9cvcr7kdla6n860hshchsba305w-hello-2.12.drv" = {
->     allOutputs = true;
->   };
-> }
-> ```
-
-[`builtins.addDrvOutputDependencies`]: ./builtins.md#builtins-addDrvOutputDependencies
-[`builtins.unsafeDiscardOutputDependency`]: ./builtins.md#builtins-unsafeDiscardOutputDependency
