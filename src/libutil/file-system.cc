@@ -94,7 +94,7 @@ Path canonPath(PathView path, bool resolveSymlinks)
         path,
         [&followCount, &temp, maxFollow, resolveSymlinks]
         (std::string & result, std::string_view & remaining) {
-            if (resolveSymlinks && isLink(result)) {
+            if (resolveSymlinks && std::filesystem::is_symlink(result)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%0%'", remaining);
                 remaining = (temp = concatStrings(readLink(result), remaining));
@@ -219,12 +219,6 @@ Path readLink(const Path & path)
 {
     checkInterrupt();
     return fs::read_symlink(path).string();
-}
-
-
-bool isLink(const Path & path)
-{
-    return getFileType(path) == fs::file_type::symlink;
 }
 
 

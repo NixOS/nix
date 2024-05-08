@@ -121,7 +121,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Path profileDir = dirOf(where);
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
-        while (canonPath(profileDir).find("/profiles/") == std::string::npos && isLink(profileDir))
+        while (canonPath(profileDir).find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
             profileDir = readLink(profileDir);
 
         printInfo("found profile '%s'", profileDir);

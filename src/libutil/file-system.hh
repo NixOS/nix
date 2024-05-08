@@ -117,8 +117,6 @@ bool pathAccessible(const Path & path);
  */
 Path readLink(const Path & path);
 
-bool isLink(const Path & path);
-
 /**
  * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
