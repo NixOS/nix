@@ -218,6 +218,17 @@
 - [output closure]{#gloss-output-closure}\
   The [closure] of an [output path]. It only contains what is [reachable] from the output.
 
+- [deriving path]{#gloss-deriving-path}
+
+  Deriving paths are a way to refer to [store objects][store object] that ar not yet [realised][realise].
+  This is necessary because, in general and particularly for [content-addressed derivations][content-addressed derivation], the [output path] of an [output] is not known in advance.
+  There are two forms:
+
+  - *constant*: just a [store path]
+    It can be made [valid][validity] by copying it into the store: from the evaluator, command line interface or another store.
+
+  - *output*: a pair of a [store path] to a [derivation] and an [output] name.
+
 - [deriver]{#gloss-deriver}
 
   The [store derivation] that produced an [output path].
