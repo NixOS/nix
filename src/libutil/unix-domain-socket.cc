@@ -1,24 +1,31 @@
 #include "file-system.hh"
-#include "processes.hh"
 #include "unix-domain-socket.hh"
 #include "util.hh"
 
-#include <sys/socket.h>
-#include <sys/un.h>
+#ifdef _WIN32
+# include <winsock2.h>
+# include <afunix.h>
+#else
+# include <sys/socket.h>
+# include <sys/un.h>
+# include "processes.hh"
+#endif
 #include <unistd.h>
 
 namespace nix {
 
 AutoCloseFD createUnixDomainSocket()
 {
-    AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
+    AutoCloseFD fdSocket = toDescriptor(socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
         | SOCK_CLOEXEC
         #endif
-        , 0);
+        , 0));
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
+#ifndef _WIN32
     closeOnExec(fdSocket.get());
+#endif
     return fdSocket;
 }
 
@@ -32,16 +39,15 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
-    if (listen(fdSocket.get(), 100) == -1)
+    if (listen(toSocket(fdSocket.get()), 100) == -1)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;
 }
 
-
 static void bindConnectProcHelper(
     std::string_view operationName, auto && operation,
-    int fd, const std::string & path)
+    Socket fd, const std::string & path)
 {
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
@@ -54,6 +60,9 @@ static void bindConnectProcHelper(
     auto * psaddr = reinterpret_cast<struct sockaddr *>(&addr);
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
+#ifdef _WIN32
+        throw Error("cannot %s to socket at '%s': path is too long", operationName, path);
+#else
         Pipe pipe;
         pipe.create();
         Pid pid = startProcess([&] {
@@ -83,6 +92,7 @@ static void bindConnectProcHelper(
             errno = *errNo;
             throw SysError("cannot %s to socket at '%s'", operationName, path);
         }
+#endif
     } else {
         memcpy(addr.sun_path, path.c_str(), path.size() + 1);
         if (operation(fd, psaddr, sizeof(addr)) == -1)
@@ -91,7 +101,7 @@ static void bindConnectProcHelper(
 }
 
 
-void bind(int fd, const std::string & path)
+void bind(Socket fd, const std::string & path)
 {
     unlink(path.c_str());
 
@@ -99,7 +109,7 @@ void bind(int fd, const std::string & path)
 }
 
 
-void connect(int fd, const std::string & path)
+void connect(Socket fd, const std::string & path)
 {
     bindConnectProcHelper("connect", ::connect, fd, path);
 }

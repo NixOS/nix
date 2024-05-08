@@ -49,7 +49,7 @@ struct CmdFmt : SourceExprCommand {
             }
         }
 
-        runProgramInStore(store, UseSearchPath::DontUse, app.program, programArgs);
+        runProgramInStore(store, UseLookupPath::DontUse, app.program, programArgs);
     };
 };
 

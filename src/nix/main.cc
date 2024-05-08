@@ -14,9 +14,10 @@
 #include "finally.hh"
 #include "loggers.hh"
 #include "markdown.hh"
-#include "memory-input-accessor.hh"
+#include "memory-source-accessor.hh"
 #include "terminal.hh"
 #include "users.hh"
+#include "network-proxy.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -40,27 +41,6 @@ void chrootHelper(int argc, char * * argv);
 #endif
 
 namespace nix {
-
-#ifdef _WIN32
-[[maybe_unused]]
-#endif
-static bool haveProxyEnvironmentVariables()
-{
-    static const std::vector<std::string> proxyVariables = {
-        "http_proxy",
-        "https_proxy",
-        "ftp_proxy",
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "FTP_PROXY"
-    };
-    for (auto & proxyVariable: proxyVariables) {
-        if (getEnv(proxyVariable).has_value()) {
-            return true;
-        }
-    }
-    return false;
-}
 
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
@@ -86,7 +66,7 @@ static bool haveInternet()
         }
     }
 
-    if (haveProxyEnvironmentVariables()) return true;
+    if (haveNetworkProxyConnection()) return true;
 
     return false;
 #else

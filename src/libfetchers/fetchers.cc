@@ -1,6 +1,5 @@
 #include "fetchers.hh"
 #include "store-api.hh"
-#include "input-accessor.hh"
 #include "source-path.hh"
 #include "fetch-to-store.hh"
 #include "json-utils.hh"
@@ -238,7 +237,7 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
     }
 }
 
-std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
     try {
         auto [accessor, final] = getAccessorUnchecked(store);
@@ -252,7 +251,7 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
     }
 }
 
-std::pair<ref<InputAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> store) const
 {
     // FIXME: cache the accessor
 
@@ -419,9 +418,13 @@ namespace nlohmann {
 using namespace nix;
 
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
-    auto type = optionalValueAt(json, "type").value_or("ssh-ed25519");
-    auto key = valueAt(json, "key");
-    return fetchers::PublicKey { getString(type), getString(key) };
+    fetchers::PublicKey res = {  };
+    if (auto type = optionalValueAt(json, "type"))
+        res.type = getString(*type);
+
+    res.key = getString(valueAt(json, "key"));
+
+    return res;
 }
 
 void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p) {

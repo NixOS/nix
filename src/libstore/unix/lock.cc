@@ -9,8 +9,6 @@
 
 namespace nix {
 
-using namespace nix::unix;
-
 #if __linux__
 
 static std::vector<gid_t> get_group_list(const char *username, gid_t group_id)

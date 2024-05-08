@@ -11,7 +11,7 @@ namespace nix {
 class LibStoreTest : public virtual ::testing::Test {
     public:
         static void SetUpTestSuite() {
-            initLibStore();
+            initLibStore(false);
         }
 
     protected:

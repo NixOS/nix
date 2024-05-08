@@ -1,8 +1,7 @@
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "archive.hh"
-#include "fs-input-accessor.hh"
-#include "posix-source-accessor.hh"
+#include "store-path-accessor.hh"
 
 namespace nix::fetchers {
 
@@ -54,6 +53,7 @@ struct PathInputScheme : InputScheme
             "narHash",
         };
     }
+
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         getStrAttr(attrs, "path");
@@ -113,7 +113,7 @@ struct PathInputScheme : InputScheme
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
         std::string absPath;

@@ -184,7 +184,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs) {
         auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         cout << fmt("%s\n", store->printStorePath(store->addToStore(
-            std::string(baseNameOf(i)), accessor, canonPath)));
+            std::string(baseNameOf(i)), {accessor, canonPath})));
     }
 }
 
@@ -209,8 +209,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
         auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(i);
         std::cout << fmt("%s\n", store->printStorePath(store->addToStoreSlow(
             baseNameOf(i),
-            accessor,
-            canonPath,
+            {accessor, canonPath},
             method,
             hashAlgo).path));
     }
@@ -562,8 +561,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 #endif
             if (!hashGiven) {
                 HashResult hash = hashPath(
-                    *store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) },
-
+                    {store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) }},
                     FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;

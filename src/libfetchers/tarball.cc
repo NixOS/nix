@@ -8,8 +8,7 @@
 #include "tarfile.hh"
 #include "types.hh"
 #include "split.hh"
-#include "posix-source-accessor.hh"
-#include "fs-input-accessor.hh"
+#include "store-path-accessor.hh"
 #include "store-api.hh"
 #include "git-utils.hh"
 
@@ -23,21 +22,20 @@ DownloadFileResult downloadFile(
 {
     // FIXME: check store
 
-    Attrs inAttrs({
-        {"type", "file"},
+    Cache::Key key{"file", {{
         {"url", url},
         {"name", name},
-    });
+    }}};
 
-    auto cached = getCache()->lookupExpired(*store, inAttrs);
+    auto cached = getCache()->lookupStorePath(key, *store);
 
     auto useCached = [&]() -> DownloadFileResult
     {
         return {
             .storePath = std::move(cached->storePath),
-            .etag = getStrAttr(cached->infoAttrs, "etag"),
-            .effectiveUrl = getStrAttr(cached->infoAttrs, "url"),
-            .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
+            .etag = getStrAttr(cached->value, "etag"),
+            .effectiveUrl = getStrAttr(cached->value, "url"),
+            .immutableUrl = maybeGetStrAttr(cached->value, "immutableUrl"),
         };
     };
 
@@ -47,7 +45,7 @@ DownloadFileResult downloadFile(
     FileTransferRequest request(url);
     request.headers = headers;
     if (cached)
-        request.expectedETag = getStrAttr(cached->infoAttrs, "etag");
+        request.expectedETag = getStrAttr(cached->value, "etag");
     FileTransferResult res;
     try {
         res = getFileTransfer()->download(request);
@@ -93,14 +91,9 @@ DownloadFileResult downloadFile(
 
     /* Cache metadata for all URLs in the redirect chain. */
     for (auto & url : res.urls) {
-        inAttrs.insert_or_assign("url", url);
+        key.second.insert_or_assign("url", url);
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
-        getCache()->add(
-            *store,
-            inAttrs,
-            infoAttrs,
-            *storePath,
-            false);
+        getCache()->upsert(key, *store, infoAttrs, *storePath);
     }
 
     return {
@@ -115,12 +108,9 @@ DownloadTarballResult downloadTarball(
     const std::string & url,
     const Headers & headers)
 {
-    Attrs inAttrs({
-        {"_what", "tarballCache"},
-        {"url", url},
-    });
+    Cache::Key cacheKey{"tarball", {{"url", url}}};
 
-    auto cached = getCache()->lookupExpired(inAttrs);
+    auto cached = getCache()->lookupExpired(cacheKey);
 
     auto attrsToResult = [&](const Attrs & infoAttrs)
     {
@@ -133,19 +123,19 @@ DownloadTarballResult downloadTarball(
         };
     };
 
-    if (cached && !getTarballCache()->hasObject(getRevAttr(cached->infoAttrs, "treeHash")))
+    if (cached && !getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
         cached.reset();
 
     if (cached && !cached->expired)
         /* We previously downloaded this tarball and it's younger than
            `tarballTtl`, so no need to check the server. */
-        return attrsToResult(cached->infoAttrs);
+        return attrsToResult(cached->value);
 
     auto _res = std::make_shared<Sync<FileTransferResult>>();
 
     auto source = sinkToSource([&](Sink & sink) {
         FileTransferRequest req(url);
-        req.expectedETag = cached ? getStrAttr(cached->infoAttrs, "etag") : "";
+        req.expectedETag = cached ? getStrAttr(cached->value, "etag") : "";
         getFileTransfer()->download(std::move(req), sink,
             [_res](FileTransferResult r)
             {
@@ -168,7 +158,7 @@ DownloadTarballResult downloadTarball(
     if (res->cached) {
         /* The server says that the previously downloaded version is
            still current. */
-        infoAttrs = cached->infoAttrs;
+        infoAttrs = cached->value;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
         infoAttrs.insert_or_assign("treeHash", parseSink->sync().gitRev());
@@ -179,8 +169,8 @@ DownloadTarballResult downloadTarball(
 
     /* Insert a cache entry for every URL in the redirect chain. */
     for (auto & url : res->urls) {
-        inAttrs.insert_or_assign("url", url);
-        getCache()->upsert(inAttrs, infoAttrs);
+        cacheKey.second.insert_or_assign("url", url);
+        getCache()->upsert(cacheKey, infoAttrs);
     }
 
     // FIXME: add a cache entry for immutableUrl? That could allow
@@ -297,7 +287,7 @@ struct FileInputScheme : CurlInputScheme
                 : (!requireTree && !hasTarballExtension(url.path)));
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto input(_input);
 
@@ -332,7 +322,7 @@ struct TarballInputScheme : CurlInputScheme
                 : (requireTree || hasTarballExtension(url.path)));
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto input(_input);
 

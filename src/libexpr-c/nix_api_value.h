@@ -422,7 +422,7 @@ nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * op);
  * @param[in] source value to copy from
  * @return error code, NIX_OK on success.
  */
-nix_err nix_copy_value(nix_c_context * context, Value * value, Value * source);
+nix_err nix_copy_value(nix_c_context * context, Value * value, const Value * source);
 /**@}*/
 
 /** @brief Create a bindings builder

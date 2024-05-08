@@ -343,13 +343,13 @@ void initPlugins()
 {
     assert(!settings.pluginFiles.pluginsLoaded);
     for (const auto & pluginFile : settings.pluginFiles.get()) {
-        Paths pluginFiles;
+        std::vector<std::filesystem::path> pluginFiles;
         try {
             auto ents = readDirectory(pluginFile);
             for (const auto & ent : ents)
-                pluginFiles.emplace_back(pluginFile + "/" + ent.name);
-        } catch (SysError & e) {
-            if (e.errNo != ENOTDIR)
+                pluginFiles.emplace_back(ent.path());
+        } catch (std::filesystem::filesystem_error & e) {
+            if (e.code() != std::errc::not_a_directory)
                 throw;
             pluginFiles.emplace_back(pluginFile);
         }
@@ -427,12 +427,13 @@ void assertLibStoreInitialized() {
     };
 }
 
-void initLibStore() {
+void initLibStore(bool loadConfig) {
     if (initLibStoreDone) return;
 
     initLibUtil();
 
-    loadConfFile();
+    if (loadConfig)
+        loadConfFile();
 
     preloadNSS();
 

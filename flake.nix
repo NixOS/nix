@@ -8,7 +8,19 @@
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+  # dev tooling
+  inputs.flake-parts.url = "github:hercules-ci/flake-parts";
+  inputs.pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+  # work around https://github.com/NixOS/nix/issues/7730
+  inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+  inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.pre-commit-hooks.inputs.nixpkgs-stable.follows = "nixpkgs";
+  # work around 7730 and https://github.com/NixOS/nix/issues/7807
+  inputs.pre-commit-hooks.inputs.flake-compat.follows = "";
+  inputs.pre-commit-hooks.inputs.gitignore.follows = "";
+
+  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+
 
     let
       inherit (nixpkgs) lib;
@@ -56,6 +68,17 @@
               value = f stdenvName;
             })
             stdenvs);
+
+
+      # We don't apply flake-parts to the whole flake so that non-development attributes
+      # load without fetching any development inputs.
+      devFlake = inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+        imports = [ ./maintainers/flake-module.nix ];
+        systems = lib.subtractLists crossSystems systems;
+        perSystem = { system, ... }: {
+          _module.args.pkgs = nixpkgsFor.${system}.native;
+        };
+      };
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
@@ -156,6 +179,14 @@
             ];
           });
 
+          libseccomp-nix = final.libseccomp.overrideAttrs (_: rec {
+            version = "2.5.5";
+            src = final.fetchurl {
+              url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
+              hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
+            };
+          });
+
           changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
 
           nix =
@@ -175,6 +206,7 @@
               officialRelease = false;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
+              libseccomp = final.libseccomp-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
             } // {
               # this is a proper separate downstream package, but put
@@ -185,6 +217,13 @@
           nix-perl-bindings = final.callPackage ./perl {
             inherit fileset stdenv;
           };
+
+          # See https://github.com/NixOS/nixpkgs/pull/214409
+          # Remove when fixed in this flake's nixpkgs
+          pre-commit =
+            if prev.stdenv.hostPlatform.system == "i686-linux"
+            then (prev.pre-commit.override (o: { dotnet-sdk = ""; })).overridePythonAttrs (o: { doCheck = false; })
+            else prev.pre-commit;
 
         };
 
@@ -361,7 +400,8 @@
         # Since the support is only best-effort there, disable the perl
         # bindings
         perlBindings = self.hydraJobs.perlBindings.${system};
-      });
+      } // devFlake.checks.${system} or {}
+      );
 
       packages = forAllSystems (system: rec {
         inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
@@ -396,7 +436,11 @@
           stdenvs)));
 
       devShells = let
-        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs: {
+        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
+        let
+          modular = devFlake.getSystem stdenv.buildPlatform.system;
+        in {
+          pname = "shell-for-" + attrs.pname;
           installFlags = "sysconfdir=$(out)/etc";
           shellHook = ''
             PATH=$prefix/bin:$PATH
@@ -407,7 +451,21 @@
             XDG_DATA_DIRS+=:$out/share
           '';
 
+          # We use this shell with the local checkout, not unpackPhase.
+          src = null;
+
+          env = {
+            # For `make format`, to work without installing pre-commit
+            _NIX_PRE_COMMIT_HOOKS_CONFIG =
+              "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
+          };
+
           nativeBuildInputs = attrs.nativeBuildInputs or []
+            ++ [
+              modular.pre-commit.settings.package
+              (pkgs.writeScriptBin "pre-commit-hooks-install"
+                modular.pre-commit.settings.installationScript)
+            ]
             # TODO: Remove the darwin check once
             # https://github.com/NixOS/nixpkgs/pull/291814 is available
             ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear

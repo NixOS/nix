@@ -9,6 +9,7 @@
 #include "error.hh"
 #include "logging.hh"
 #include "file-descriptor.hh"
+#include "file-path.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -26,13 +27,6 @@
 #include <map>
 #include <sstream>
 #include <optional>
-
-#ifndef HAVE_STRUCT_DIRENT_D_TYPE
-#define DT_UNKNOWN 0
-#define DT_REG 1
-#define DT_LNK 2
-#define DT_DIR 3
-#endif
 
 /**
  * Polyfill for MinGW
@@ -129,23 +123,9 @@ bool isLink(const Path & path);
  * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
  */
-struct DirEntry
-{
-    std::string name;
-    ino_t ino;
-    /**
-     * one of DT_*
-     */
-    unsigned char type;
-    DirEntry(std::string name, ino_t ino, unsigned char type)
-        : name(std::move(name)), ino(ino), type(type) { }
-};
+std::vector<std::filesystem::directory_entry> readDirectory(const Path & path);
 
-typedef std::vector<DirEntry> DirEntries;
-
-DirEntries readDirectory(const Path & path);
-
-unsigned char getFileType(const Path & path);
+std::filesystem::file_type getFileType(const Path & path);
 
 /**
  * Read the contents of a file into a string.
@@ -170,9 +150,9 @@ void syncParent(const Path & path);
  * recursively. It's not an error if the path does not exist. The
  * second variant returns the number of bytes and blocks freed.
  */
-void deletePath(const Path & path);
+void deletePath(const std::filesystem::path & path);
 
-void deletePath(const Path & path, uint64_t & bytesFreed);
+void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 
 /**
  * Create a directory and all its parents, if necessary.  Returns the
@@ -218,17 +198,23 @@ void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
  */
 class AutoDelete
 {
-    Path path;
+    std::filesystem::path _path;
     bool del;
     bool recursive;
 public:
     AutoDelete();
-    AutoDelete(const Path & p, bool recursive = true);
+    AutoDelete(const std::filesystem::path & p, bool recursive = true);
     ~AutoDelete();
+
     void cancel();
-    void reset(const Path & p, bool recursive = true);
-    operator Path() const { return path; }
-    operator PathView() const { return path; }
+
+    void reset(const std::filesystem::path & p, bool recursive = true);
+
+    const std::filesystem::path & path() const { return _path; }
+    PathViewNG view() const { return _path; }
+
+    operator const std::filesystem::path & () const { return _path; }
+    operator PathViewNG () const { return _path; }
 };
 
 

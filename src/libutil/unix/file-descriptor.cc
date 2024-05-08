@@ -125,7 +125,7 @@ void closeMostFDs(const std::set<int> & exceptions)
 #if __linux__
     try {
         for (auto & s : readDirectory("/proc/self/fd")) {
-            auto fd = std::stoi(s.name);
+            auto fd = std::stoi(s.path().filename());
             if (!exceptions.count(fd)) {
                 debug("closing leaked FD %d", fd);
                 close(fd);
@@ -133,6 +133,7 @@ void closeMostFDs(const std::set<int> & exceptions)
         }
         return;
     } catch (SysError &) {
+    } catch (std::filesystem::filesystem_error &) {
     }
 #endif
 

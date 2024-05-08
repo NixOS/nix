@@ -35,7 +35,7 @@ enum class SymlinkResolution {
  * filesystem-like entities (such as the real filesystem, tarballs or
  * Git repositories).
  */
-struct SourceAccessor
+struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 {
     const size_t number;
 
@@ -168,6 +168,50 @@ struct SourceAccessor
     CanonPath resolveSymlinks(
         const CanonPath & path,
         SymlinkResolution mode = SymlinkResolution::Full);
+
+    /**
+     * A string that uniquely represents the contents of this
+     * accessor. This is used for caching lookups (see `fetchToStore()`).
+     */
+    std::optional<std::string> fingerprint;
+
+    /**
+     * Return the maximum last-modified time of the files in this
+     * tree, if available.
+     */
+    virtual std::optional<time_t> getLastModified()
+    { return std::nullopt; }
+
+    /**
+     * Whether this is a store path using
+     * FileIngestionMethod::Recursive. This is used to optimize
+     * `fetchToStore()`.
+     */
+    bool isStorePath = false;
 };
+
+/**
+ * Return a source accessor that contains only an empty root directory.
+ */
+ref<SourceAccessor> makeEmptySourceAccessor();
+
+/**
+ * Exception thrown when accessing a filtered path (see
+ * `FilteringSourceAccessor`).
+ */
+MakeError(RestrictedPathError, Error);
+
+/**
+ * Return an accessor for the root filesystem.
+ */
+ref<SourceAccessor> getFSSourceAccessor();
+
+/**
+ * Construct an accessor for the filesystem rooted at `root`. Note
+ * that it is not possible to escape `root` by appending `..` path
+ * elements, and that absolute symlinks are resolved relative to
+ * `root`.
+ */
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
 
 }

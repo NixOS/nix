@@ -1132,12 +1132,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                             specified.hash.algo,
                             std::string { info.path.hashPart() },
                         };
-                        dumpPath(*accessor, path, caSink, (FileSerialisationMethod) fim);
+                        dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
                         h = caSink.finish().first;
                         break;
                     }
                     case FileIngestionMethod::Git:
-                        h = git::dumpHash(specified.hash.algo, *accessor, path).hash;
+                        h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
                         break;
                     }
                     ContentAddress {
@@ -1220,8 +1220,8 @@ StorePath LocalStore::addToStoreFromDump(
     }
 
     std::unique_ptr<AutoDelete> delTempDir;
-    Path tempPath;
-    Path tempDir;
+    std::filesystem::path tempPath;
+    std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
 
     bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
@@ -1237,9 +1237,9 @@ StorePath LocalStore::addToStoreFromDump(
 
         std::tie(tempDir, tempDirFd) = createTempDirInStore();
         delTempDir = std::make_unique<AutoDelete>(tempDir);
-        tempPath = tempDir + "/x";
+        tempPath = tempDir / "x";
 
-        restorePath(tempPath, bothSource, dumpMethod);
+        restorePath(tempPath.string(), bothSource, dumpMethod);
 
         dumpBuffer.reset();
         dump = {};
@@ -1247,14 +1247,12 @@ StorePath LocalStore::addToStoreFromDump(
 
     auto [dumpHash, size] = hashSink->finish();
 
-    PosixSourceAccessor accessor;
-
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
         methodsMatch
             ? dumpHash
             : hashPath(
-                accessor, CanonPath { tempPath },
+                PosixSourceAccessor::createAtRoot(tempPath),
                 hashMethod.getFileIngestionMethod(), hashAlgo),
         {
             .others = references,
@@ -1297,7 +1295,7 @@ StorePath LocalStore::addToStoreFromDump(
                 }
             } else {
                 /* Move the temporary path we restored above. */
-                moveFile(tempPath, realPath);
+                moveFile(tempPath.string(), realPath);
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1332,9 +1330,9 @@ StorePath LocalStore::addToStoreFromDump(
 
 /* Create a temporary directory in the store that won't be
    garbage-collected until the returned FD is closed. */
-std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
+std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    Path tmpDirFn;
+    std::filesystem::path tmpDirFn;
     AutoCloseFD tmpDirFd;
     bool lockedByUs = false;
     do {
@@ -1347,7 +1345,7 @@ std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
             continue;
         }
         lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
-    } while (!pathExists(tmpDirFn) || !lockedByUs);
+    } while (!pathExists(tmpDirFn.string()) || !lockedByUs);
     return {tmpDirFn, std::move(tmpDirFd)};
 }
 
@@ -1390,15 +1388,16 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         printInfo("checking link hashes...");
 
         for (auto & link : readDirectory(linksDir)) {
-            printMsg(lvlTalkative, "checking contents of '%s'", link.name);
-            Path linkPath = linksDir + "/" + link.name;
+            auto name = link.path().filename();
+            printMsg(lvlTalkative, "checking contents of '%s'", name);
+            Path linkPath = linksDir / name;
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
-                accessor, CanonPath { linkPath },
+                {getFSSourceAccessor(), CanonPath(linkPath)},
                 FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
-            if (hash != link.name) {
+            if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
-                    linkPath, link.name, hash);
+                    linkPath, name, hash);
                 if (repair) {
                     if (unlink(linkPath.c_str()) == 0)
                         printInfo("removed link '%s'", linkPath);
@@ -1485,7 +1484,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
      */
     for (auto & i : readDirectory(realStoreDir)) {
         try {
-            storePathsInStoreDir.insert({i.name});
+            storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }
     }
 

@@ -21,6 +21,9 @@ libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(THREAD_LDFLAGS)
 ifdef HOST_LINUX
   libstore_LDFLAGS += -ldl
 endif
+ifdef HOST_WINDOWS
+  libstore_LDFLAGS += -lws2_32
+endif
 
 $(foreach file,$(libstore_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/sandbox)))
 

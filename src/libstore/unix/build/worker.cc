@@ -530,7 +530,7 @@ bool Worker::pathContentsGood(const StorePath & path)
         res = false;
     else {
         Hash current = hashPath(
-            *store.getFSAccessor(), CanonPath { store.printStorePath(path) },
+            {store.getFSAccessor(), CanonPath(store.printStorePath(path))},
             FileIngestionMethod::Recursive, info->narHash.algo);
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;

@@ -782,6 +782,7 @@ public:
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store URL is configured with `trusted=true`
           - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
@@ -1279,9 +1280,10 @@ std::vector<Path> getUserConfigFiles();
 extern const std::string nixVersion;
 
 /**
- * NB: This is not sufficient. You need to call initNix()
+ * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
+ * @note When using libexpr, and/or libmain, This is not sufficient. See initNix().
  */
-void initLibStore();
+void initLibStore(bool loadConfig = true);
 
 /**
  * It's important to initialize before doing _anything_, which is why we

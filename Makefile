@@ -27,6 +27,7 @@ makefiles = \
 ifdef HOST_UNIX
 makefiles += \
   scripts/local.mk \
+  maintainers/local.mk \
   misc/bash/local.mk \
   misc/fish/local.mk \
   misc/zsh/local.mk \

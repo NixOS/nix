@@ -454,11 +454,6 @@ struct CmdFlakeCheck : FlakeCommand
                 if (v.payload.lambda.fun->hasFormals()
                     || !argHasName(v.payload.lambda.fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
-                auto body = dynamic_cast<ExprLambda *>(v.payload.lambda.fun->body);
-                if (!body
-                    || body->hasFormals()
-                    || !argHasName(body->arg, "prev"))
-                    throw Error("overlay does not take an argument named 'prev'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
@@ -872,8 +867,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             createDirs(to);
 
             for (auto & entry : readDirectory(from)) {
-                auto from2 = from + "/" + entry.name;
-                auto to2 = to + "/" + entry.name;
+                auto from2 = entry.path().string();
+                auto to2 = to + "/" + entry.path().filename().string();
                 auto st = lstat(from2);
                 if (S_ISDIR(st.st_mode))
                     copyDir(from2, to2);

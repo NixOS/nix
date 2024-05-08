@@ -1,4 +1,5 @@
 { lib
+, fetchurl
 , stdenv
 , releaseTools
 , autoconf-archive
@@ -167,6 +168,8 @@ in {
           ./m4
           # TODO: do we really need README.md? It doesn't seem used in the build.
           ./README.md
+          # This could be put behind a conditional
+          ./maintainers/local.mk
           # For make, regardless of what we are building
           ./local.mk
           ./Makefile
