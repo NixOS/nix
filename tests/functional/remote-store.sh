@@ -13,24 +13,15 @@ startDaemon
 if isDaemonNewer "2.15pre0"; then
     # Ensure that ping works trusted with new daemon
     nix store info --json | jq -e '.trusted'
+    # Suppress grumpiness about multiple nixes on PATH
+    (nix doctor || true) 2>&1 | grep 'You are trusted by'
 else
     # And the the field is absent with the old daemon
     nix store info --json | jq -e 'has("trusted") | not'
 fi
 
 # Test import-from-derivation through the daemon.
-[[ $(nix eval --impure --raw --expr '
-  with import ./config.nix;
-  import (
-    mkDerivation {
-      name = "foo";
-      bla = import ./dependencies.nix {};
-      buildCommand = "
-        echo \\\"hi\\\" > $out
-      ";
-    }
-  )
-') = hi ]]
+[[ $(nix eval --impure --raw --file ./ifd.nix) = hi ]]
 
 storeCleared=1 NIX_REMOTE_=$NIX_REMOTE $SHELL ./user-envs.sh
 

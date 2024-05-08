@@ -4,6 +4,8 @@
 #include "terminal.hh"
 #include "util.hh"
 #include "config.hh"
+#include "source-path.hh"
+#include "position.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
@@ -35,8 +37,9 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    writeFull(STDOUT_FILENO, s);
-    writeFull(STDOUT_FILENO, "\n");
+    Descriptor standard_out = getStandardOut();
+    writeFull(standard_out, s);
+    writeFull(standard_out, "\n");
 }
 
 class SimpleLogger : public Logger
@@ -50,7 +53,7 @@ public:
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = shouldANSI();
+        tty = isTTY();
     }
 
     bool isVerbose() override {
@@ -113,8 +116,14 @@ Verbosity verbosity = lvlInfo;
 void writeToStderr(std::string_view s)
 {
     try {
-        writeFull(STDERR_FILENO, s, false);
-    } catch (SysError & e) {
+        writeFull(
+#ifdef _WIN32
+            GetStdHandle(STD_ERROR_HANDLE),
+#else
+            STDERR_FILENO,
+#endif
+            s, false);
+    } catch (SystemError & e) {
         /* Ignore failing writes to stderr.  We need to ignore write
            errors to ensure that cleanup code that logs to stderr runs
            to completion if the other side of stderr has been closed
@@ -129,20 +138,29 @@ Logger * makeSimpleLogger(bool printBuildLogs)
 
 std::atomic<uint64_t> nextId{0};
 
+static uint64_t getPid()
+{
+#ifndef _WIN32
+    return getpid();
+#else
+    return GetCurrentProcessId();
+#endif
+}
+
 Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     const std::string & s, const Logger::Fields & fields, ActivityId parent)
-    : logger(logger), id(nextId++ + (((uint64_t) getpid()) << 32))
+    : logger(logger), id(nextId++ + (((uint64_t) getPid()) << 32))
 {
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
 
-void to_json(nlohmann::json & json, std::shared_ptr<AbstractPos> pos)
+void to_json(nlohmann::json & json, std::shared_ptr<Pos> pos)
 {
     if (pos) {
         json["line"] = pos->line;
         json["column"] = pos->column;
         std::ostringstream str;
-        pos->print(str);
+        pos->print(str, true);
         json["file"] = str.str();
     } else {
         json["line"] = nullptr;
@@ -197,7 +215,7 @@ struct JSONLogger : Logger {
         json["level"] = ei.level;
         json["msg"] = oss.str();
         json["raw_msg"] = ei.msg.str();
-        to_json(json, ei.errPos);
+        to_json(json, ei.pos);
 
         if (loggerSettings.showTrace.get() && !ei.traces.empty()) {
             nlohmann::json traces = nlohmann::json::array();

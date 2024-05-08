@@ -108,7 +108,7 @@ std::string MemorySourceAccessor::readLink(const CanonPath & path)
         throw Error("file '%s' is not a symbolic link", path);
 }
 
-CanonPath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
+SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
 {
     auto * f = open(path, File { File::Regular {} });
     if (!f)
@@ -118,7 +118,7 @@ CanonPath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
     else
         throw Error("file '%s' is not a regular file", path);
 
-    return path;
+    return SourcePath{ref(shared_from_this()), path};
 }
 
 
@@ -134,36 +134,43 @@ void MemorySink::createDirectory(const Path & path)
         throw Error("file '%s' is not a directory", path);
 };
 
-void MemorySink::createRegularFile(const Path & path)
+struct CreateMemoryRegularFile : CreateRegularFileSink {
+    File::Regular & regularFile;
+
+    CreateMemoryRegularFile(File::Regular & r)
+        : regularFile(r)
+    { }
+
+    void operator () (std::string_view data) override;
+    void isExecutable() override;
+    void preallocateContents(uint64_t size) override;
+};
+
+void MemorySink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
 {
     auto * f = dst.open(CanonPath{path}, File { File::Regular {} });
     if (!f)
         throw Error("file '%s' cannot be made because some parent file is not a directory", path);
-    if (!(r = std::get_if<File::Regular>(&f->raw)))
+    if (auto * rp = std::get_if<File::Regular>(&f->raw)) {
+        CreateMemoryRegularFile crf { *rp };
+        func(crf);
+    } else
         throw Error("file '%s' is not a regular file", path);
 }
 
-void MemorySink::closeRegularFile()
+void CreateMemoryRegularFile::isExecutable()
 {
-    r = nullptr;
+    regularFile.executable = true;
 }
 
-void MemorySink::isExecutable()
+void CreateMemoryRegularFile::preallocateContents(uint64_t len)
 {
-    assert(r);
-    r->executable = true;
+    regularFile.contents.reserve(len);
 }
 
-void MemorySink::preallocateContents(uint64_t len)
+void CreateMemoryRegularFile::operator () (std::string_view data)
 {
-    assert(r);
-    r->contents.reserve(len);
-}
-
-void MemorySink::receiveContents(std::string_view data)
-{
-    assert(r);
-    r->contents += data;
+    regularFile.contents += data;
 }
 
 void MemorySink::createSymlink(const Path & path, const std::string & target)
@@ -175,6 +182,12 @@ void MemorySink::createSymlink(const Path & path, const std::string & target)
         s->target = target;
     else
         throw Error("file '%s' is not a symbolic link", path);
+}
+
+ref<SourceAccessor> makeEmptySourceAccessor()
+{
+    static auto empty = make_ref<MemorySourceAccessor>().cast<SourceAccessor>();
+    return empty;
 }
 
 }

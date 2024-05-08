@@ -146,7 +146,7 @@ MixFlakeOptions::MixFlakeOptions()
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
-            lockFlags.referenceLockFilePath = lockFilePath;
+            lockFlags.referenceLockFilePath = {getFSSourceAccessor(), CanonPath(absPath(lockFilePath))};
         }},
         .completer = completePath
     });
@@ -288,7 +288,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
             state->autoCallFunction(*autoArgs, v1, v2);
 
             if (v2.type() == nAttrs) {
-                for (auto & i : *v2.attrs) {
+                for (auto & i : *v2.attrs()) {
                     std::string name = state->symbols[i.name];
                     if (name.find(searchWord) == 0) {
                         if (prefix_ == "")
@@ -442,13 +442,10 @@ ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
-    auto fingerprint = lockedFlake->getFingerprint();
-    return make_ref<nix::eval_cache::EvalCache>(
-        evalSettings.useEvalCache && evalSettings.pureEval
-            ? std::optional { std::cref(fingerprint) }
-            : std::nullopt,
-        state,
-        [&state, lockedFlake]()
+    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
+        ? lockedFlake->getFingerprint(state.store)
+        : std::nullopt;
+    auto rootLoader = [&state, lockedFlake]()
         {
             /* For testing whether the evaluation cache is
                complete. */
@@ -460,11 +457,21 @@ ref<eval_cache::EvalCache> openEvalCache(
 
             state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
-            auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
+            auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
             assert(aOutputs);
 
             return aOutputs->value;
-        });
+        };
+
+    if (fingerprint) {
+        auto search = state.evalCaches.find(fingerprint.value());
+        if (search == state.evalCaches.end()) {
+            search = state.evalCaches.emplace(fingerprint.value(), make_ref<nix::eval_cache::EvalCache>(fingerprint, state, rootLoader)).first;
+        }
+        return search->second;
+    } else {
+        return make_ref<nix::eval_cache::EvalCache>(std::nullopt, state, rootLoader);
+    }
 }
 
 Installables SourceExprCommand::parseInstallables(
@@ -487,10 +494,11 @@ Installables SourceExprCommand::parseInstallables(
             state->eval(e, *vFile);
         }
         else if (file) {
-            state->evalFile(lookupFileArg(*state, *file, CanonPath::fromCwd(getCommandBaseDir())), *vFile);
+            auto dir = absPath(getCommandBaseDir());
+            state->evalFile(lookupFileArg(*state, *file, &dir), *vFile);
         }
         else {
-            CanonPath dir(CanonPath::fromCwd(getCommandBaseDir()));
+            Path dir = absPath(getCommandBaseDir());
             auto e = state->parseExprFromString(*expr, state->rootPath(dir));
             state->eval(e, *vFile);
         }
@@ -715,7 +723,7 @@ BuiltPaths Installable::toBuiltPaths(
     }
 }
 
-StorePathSet Installable::toStorePaths(
+StorePathSet Installable::toStorePathSet(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
@@ -729,13 +737,27 @@ StorePathSet Installable::toStorePaths(
     return outPaths;
 }
 
+StorePaths Installable::toStorePaths(
+    ref<Store> evalStore,
+    ref<Store> store,
+    Realise mode, OperateOn operateOn,
+    const Installables & installables)
+{
+    StorePaths outPaths;
+    for (auto & path : toBuiltPaths(evalStore, store, mode, operateOn, installables)) {
+        auto thisOutPaths = path.outPaths();
+        outPaths.insert(outPaths.end(), thisOutPaths.begin(), thisOutPaths.end());
+    }
+    return outPaths;
+}
+
 StorePath Installable::toStorePath(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
     ref<Installable> installable)
 {
-    auto paths = toStorePaths(evalStore, store, mode, operateOn, {installable});
+    auto paths = toStorePathSet(evalStore, store, mode, operateOn, {installable});
 
     if (paths.size() != 1)
         throw Error("argument '%s' should evaluate to one store path", installable->what());

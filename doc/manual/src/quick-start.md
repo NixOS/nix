@@ -10,7 +10,6 @@ For more in-depth information you are kindly referred to subsequent chapters.
    ```
 
    The install script will use `sudo`, so make sure you have sufficient rights.
-   On Linux, `--daemon` can be omitted for a single-user install.
 
    For other installation methods, see the detailed [installation instructions](installation/index.md).
 
@@ -35,7 +34,7 @@ For more in-depth information you are kindly referred to subsequent chapters.
    lolcat: command not found
    ```
 
-1. Search for more packages on <search.nixos.org> to try them out.
+1. Search for more packages on [search.nixos.org](https://search.nixos.org/) to try them out.
 
 1. Free up storage space:
 

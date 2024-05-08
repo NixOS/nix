@@ -79,8 +79,12 @@ void ThreadPool::process()
 
 void ThreadPool::doWork(bool mainThread)
 {
+    ReceiveInterrupts receiveInterrupts;
+
+#ifndef _WIN32 // Does Windows need anything similar for async exit handling?
     if (!mainThread)
-        interruptCheck = [&]() { return (bool) quit; };
+        unix::interruptCheck = [&]() { return (bool) quit; };
+#endif
 
     bool didWork = false;
     std::exception_ptr exc;

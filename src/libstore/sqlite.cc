@@ -7,22 +7,23 @@
 #include <sqlite3.h>
 
 #include <atomic>
+#include <thread>
 
 namespace nix {
 
-SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, hintformat && hf)
+SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, HintFmt && hf)
   : Error(""), path(path), errMsg(errMsg), errNo(errNo), extendedErrNo(extendedErrNo), offset(offset)
 {
     auto offsetStr = (offset == -1) ? "" : "at offset " + std::to_string(offset) + ": ";
-    err.msg = hintfmt("%s: %s%s, %s (in '%s')",
-        normaltxt(hf.str()),
+    err.msg = HintFmt("%s: %s%s, %s (in '%s')",
+        Uncolored(hf.str()),
         offsetStr,
         sqlite3_errstr(extendedErrNo),
         errMsg,
         path ? path : "(in-memory)");
 }
 
-[[noreturn]] void SQLiteError::throw_(sqlite3 * db, hintformat && hf)
+[[noreturn]] void SQLiteError::throw_(sqlite3 * db, HintFmt && hf)
 {
     int err = sqlite3_errcode(db);
     int exterr = sqlite3_extended_errcode(db);
@@ -33,7 +34,7 @@ SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int ex
 
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         auto exp = SQLiteBusy(path, errMsg, err, exterr, offset, std::move(hf));
-        exp.err.msg = hintfmt(
+        exp.err.msg = HintFmt(
             err == SQLITE_PROTOCOL
                 ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"
                 : "SQLite database '%s' is busy",
@@ -249,17 +250,15 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
     if (now > nextWarning) {
         nextWarning = now + 10;
         logWarning({
-            .msg = hintfmt(e.what())
+            .msg = HintFmt(e.what())
         });
     }
 
     /* Sleep for a while since retrying the transaction right away
        is likely to fail again. */
     checkInterrupt();
-    struct timespec t;
-    t.tv_sec = 0;
-    t.tv_nsec = (random() % 100) * 1000 * 1000; /* <= 0.1s */
-    nanosleep(&t, 0);
+    /* <= 0.1s */
+    std::this_thread::sleep_for(std::chrono::milliseconds { rand() % 100 });
 }
 
 }

@@ -48,6 +48,15 @@ rec {
     (f ./fixed.builder1.sh "flat" "md5" "ddd8be4b179a529afa5f2ffae4b9858")
   ];
 
+  badReferences = mkDerivation rec {
+    name = "bad-hash";
+    builder = script;
+    script = builtins.toFile "installer.sh" "echo $script >$out";
+    outputHash = "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik";
+    outputHashAlgo = "sha256";
+    outputHashMode = "flat";
+  };
+
   # Test for building two derivations in parallel that produce the
   # same output path because they're fixed-output derivations.
   parallelSame = [
@@ -55,4 +64,6 @@ rec {
     (f2 "bar" ./fixed.builder2.sh "recursive" "md5" "3670af73070fa14077ad74e0f5ea4e42")
   ];
 
+  # Can use "nar" instead of "recursive" now.
+  nar-not-recursive = f2 "foo" ./fixed.builder2.sh "nar" "md5" "3670af73070fa14077ad74e0f5ea4e42";
 }

@@ -1,0 +1,41 @@
+# redirect rules for paths (server-side) to prevent link rot.
+# see ./redirects.js for redirects based on URL fragments (client-side)
+#
+# concrete user story this supports:
+# - user finds URL to the manual for Nix x.y
+# - Nix x.z (z > y) is the most recent release
+# - updating the version in the URL will show the right thing
+#
+# format documentation:
+# - https://docs.netlify.com/routing/redirects/#syntax-for-the-redirects-file
+# - https://docs.netlify.com/routing/redirects/redirect-options/
+#
+# conventions:
+# - always force (<CODE>!) since this allows re-using file names
+# - group related paths to ease readability
+# - keep in alphabetical/wildcards-last order, which will reduce version control conflicts
+# - redirects that should have been there but are missing can be inserted where they belong
+
+/advanced-topics/advanced-topics /advanced-topics 301!
+
+/command-ref/command-ref /command-ref 301!
+
+/contributing/contributing /contributing 301!
+
+/expressions/expression-language /language/ 301!
+/expressions/language-constructs /language/constructs 301!
+/expressions/language-operators /language/operators 301!
+/expressions/language-values /language/values 301!
+/expressions/* /language/:splat 301!
+
+/installation/installation /installation 301!
+
+/package-management/basic-package-mgmt /command-ref/nix-env 301!
+/package-management/channels /command-ref/nix-channel 301!
+/package-management/package-management /package-management 301!
+/package-management/s3-substituter /store/types/s3-binary-cache-store 301!
+
+/protocols/protocols /protocols 301!
+/json/* /protocols/json/:splat 301!
+
+/release-notes/release-notes /release-notes 301!

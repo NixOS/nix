@@ -9,11 +9,15 @@
 #include "error.hh"
 #include "logging.hh"
 #include "file-descriptor.hh"
+#include "file-path.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#ifdef _WIN32
+# include <windef.h>
+#endif
 #include <signal.h>
 
 #include <boost/lexical_cast.hpp>
@@ -24,11 +28,15 @@
 #include <sstream>
 #include <optional>
 
-#ifndef HAVE_STRUCT_DIRENT_D_TYPE
-#define DT_UNKNOWN 0
-#define DT_REG 1
-#define DT_LNK 2
-#define DT_DIR 3
+/**
+ * Polyfill for MinGW
+ *
+ * Windows does in fact support symlinks, but the C runtime interfaces predate this.
+ *
+ * @todo get rid of this, and stop using `stat` when we want `lstat` too.
+ */
+#ifndef S_ISLNK
+# define S_ISLNK(m) false
 #endif
 
 namespace nix {
@@ -41,7 +49,7 @@ struct Source;
  * specified directory, or the current directory otherwise.  The path
  * is also canonicalised.
  */
-Path absPath(Path path,
+Path absPath(PathView path,
     std::optional<PathView> dir = {},
     bool resolveSymlinks = false);
 
@@ -84,6 +92,11 @@ bool isDirOrInDir(std::string_view path, std::string_view dir);
  */
 struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
+/**
+ * `lstat` the given path if it exists.
+ * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
+ */
+std::optional<struct stat> maybeLstat(const Path & path);
 
 /**
  * @return true iff the given path exists.
@@ -104,29 +117,13 @@ bool pathAccessible(const Path & path);
  */
 Path readLink(const Path & path);
 
-bool isLink(const Path & path);
-
 /**
  * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
  */
-struct DirEntry
-{
-    std::string name;
-    ino_t ino;
-    /**
-     * one of DT_*
-     */
-    unsigned char type;
-    DirEntry(std::string name, ino_t ino, unsigned char type)
-        : name(std::move(name)), ino(ino), type(type) { }
-};
+std::vector<std::filesystem::directory_entry> readDirectory(const Path & path);
 
-typedef std::vector<DirEntry> DirEntries;
-
-DirEntries readDirectory(const Path & path);
-
-unsigned char getFileType(const Path & path);
+std::filesystem::file_type getFileType(const Path & path);
 
 /**
  * Read the contents of a file into a string.
@@ -151,9 +148,9 @@ void syncParent(const Path & path);
  * recursively. It's not an error if the path does not exist. The
  * second variant returns the number of bytes and blocks freed.
  */
-void deletePath(const Path & path);
+void deletePath(const std::filesystem::path & path);
 
-void deletePath(const Path & path, uint64_t & bytesFreed);
+void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 
 /**
  * Create a directory and all its parents, if necessary.  Returns the
@@ -186,23 +183,36 @@ void renameFile(const Path & src, const Path & dst);
  */
 void moveFile(const Path & src, const Path & dst);
 
+/**
+ * Recursively copy the content of `oldPath` to `newPath`. If `andDelete` is
+ * `true`, then also remove `oldPath` (making this equivalent to `moveFile`, but
+ * with the guaranty that the destination will be “fresh”, with no stale inode
+ * or file descriptor pointing to it).
+ */
+void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
 
 /**
  * Automatic cleanup of resources.
  */
 class AutoDelete
 {
-    Path path;
+    std::filesystem::path _path;
     bool del;
     bool recursive;
 public:
     AutoDelete();
-    AutoDelete(const Path & p, bool recursive = true);
+    AutoDelete(const std::filesystem::path & p, bool recursive = true);
     ~AutoDelete();
+
     void cancel();
-    void reset(const Path & p, bool recursive = true);
-    operator Path() const { return path; }
-    operator PathView() const { return path; }
+
+    void reset(const std::filesystem::path & p, bool recursive = true);
+
+    const std::filesystem::path & path() const { return _path; }
+    PathViewNG view() const { return _path; }
+
+    operator const std::filesystem::path & () const { return _path; }
+    operator PathViewNG () const { return _path; }
 };
 
 
@@ -227,6 +237,10 @@ Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
  */
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
+/**
+ * Return `TMPDIR`, or the default temporary directory if unset or empty.
+ */
+Path defaultTempDir();
 
 /**
  * Used in various places.

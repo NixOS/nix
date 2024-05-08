@@ -12,7 +12,7 @@
 
 namespace nix {
 
-struct DrvInfo;
+struct PackageInfo;
 
 enum class Realise {
     /**
@@ -165,7 +165,14 @@ struct Installable
         const Installables & installables,
         BuildMode bMode = bmNormal);
 
-    static std::set<StorePath> toStorePaths(
+    static std::set<StorePath> toStorePathSet(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const Installables & installables);
+
+    static std::vector<StorePath> toStorePaths(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,

@@ -45,6 +45,7 @@ if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
   DAEMON_PATH="${NIX_DAEMON_PACKAGE}/bin:$DAEMON_PATH"
 fi
 coreutils=@coreutils@
+lsof=@lsof@
 
 export dot=@dot@
 export SHELL="@bash@"
@@ -95,7 +96,7 @@ startDaemon() {
     fi
     # Start the daemon, wait for the socket to appear.
     rm -f $NIX_DAEMON_SOCKET_PATH
-    PATH=$DAEMON_PATH nix-daemon &
+    PATH=$DAEMON_PATH nix --extra-experimental-features 'nix-command' daemon &
     _NIX_TEST_DAEMON_PID=$!
     export _NIX_TEST_DAEMON_PID
     for ((i = 0; i < 300; i++)); do
@@ -148,7 +149,7 @@ fi
 isDaemonNewer () {
   [[ -n "${NIX_DAEMON_PACKAGE:-}" ]] || return 0
   local requiredVersion="$1"
-  local daemonVersion=$($NIX_DAEMON_PACKAGE/bin/nix-daemon --version | cut -d' ' -f3)
+  local daemonVersion=$($NIX_DAEMON_PACKAGE/bin/nix daemon --version | cut -d' ' -f3)
   [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
 }
 
@@ -215,6 +216,17 @@ expectStderr() {
     return 0
 }
 
+# Run a command and check whether the stderr matches stdin.
+# Show a diff when output does not match.
+# Usage:
+#
+#   assertStderr nix profile remove nothing << EOF
+#   error: This error is expected
+#   EOF
+assertStderr() {
+    diff -u /dev/stdin <($@ 2>/dev/null 2>&1)
+}
+
 needLocalStore() {
   if [[ "$NIX_REMOTE" == "daemon" ]]; then
     skipTest "Can’t run through the daemon ($1)"
@@ -269,6 +281,11 @@ grepQuiet() {
 # The previous two, combined
 grepQuietInverse() {
     ! grep "$@" > /dev/null
+}
+
+# Return the number of arguments
+count() {
+  echo $#
 }
 
 trap onError ERR

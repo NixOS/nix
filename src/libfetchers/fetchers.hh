@@ -4,13 +4,14 @@
 #include "types.hh"
 #include "hash.hh"
 #include "canon-path.hh"
+#include "json-impls.hh"
 #include "attrs.hh"
 #include "url.hh"
 
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 
-namespace nix { class Store; class StorePath; struct InputAccessor; }
+namespace nix { class Store; class StorePath; struct SourceAccessor; }
 
 namespace nix::fetchers {
 
@@ -29,7 +30,6 @@ struct Input
 
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
-    bool locked = false;
 
     /**
      * path of the parent of this input, used for relative path resolution
@@ -71,7 +71,7 @@ public:
      * Check whether this is a "locked" input, that is,
      * one that contains a commit hash or content hash.
      */
-    bool isLocked() const { return locked; }
+    bool isLocked() const;
 
     bool operator ==(const Input & other) const;
 
@@ -81,9 +81,20 @@ public:
      * Fetch the entire input into the Nix store, returning the
      * location in the Nix store and the locked input.
      */
-    std::pair<StorePath, Input> fetch(ref<Store> store) const;
+    std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store) const;
+    /**
+     * Return a `SourceAccessor` that allows access to files in the
+     * input without copying it to the store. Also return a possibly
+     * unlocked input.
+     */
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store) const;
+
+private:
+
+    std::pair<ref<SourceAccessor>, Input> getAccessorUnchecked(ref<Store> store) const;
+
+public:
 
     Input applyOverrides(
         std::optional<std::string> ref,
@@ -120,7 +131,6 @@ public:
      */
     std::optional<std::string> getFingerprint(ref<Store> store) const;
 };
-
 
 /**
  * The `InputScheme` represents a type of fetcher.  Each fetcher
@@ -175,9 +185,7 @@ struct InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
-    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input);
-
-    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const;
+    virtual std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const = 0;
 
     /**
      * Is this `InputScheme` part of an experimental feature?
@@ -187,8 +195,31 @@ struct InputScheme
     virtual bool isDirect(const Input & input) const
     { return true; }
 
+    /**
+     * A sufficiently unique string that can be used as a cache key to identify the `input`.
+     *
+     * Only known-equivalent inputs should return the same fingerprint.
+     *
+     * This is not a stable identifier between Nix versions, but not guaranteed to change either.
+     */
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }
+
+    /**
+     * Return `true` if this input is considered "locked", i.e. it has
+     * attributes like a Git revision or NAR hash that uniquely
+     * identify its contents.
+     */
+    virtual bool isLocked(const Input & input) const
+    { return false; }
+
+    /**
+     * Check the locking attributes in `final` against
+     * `specified`. E.g. if `specified` has a `rev` attribute, then
+     * `final` must have the same `rev` attribute. Throw an exception
+     * if there is a mismatch.
+     */
+    virtual void checkLocks(const Input & specified, const Input & final) const;
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
@@ -199,9 +230,12 @@ struct PublicKey
 {
     std::string type = "ssh-ed25519";
     std::string key;
+
+    auto operator <=>(const PublicKey &) const = default;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(PublicKey, type, key)
 
 std::string publicKeys_to_string(const std::vector<PublicKey>&);
 
 }
+
+JSON_IMPL(fetchers::PublicKey)

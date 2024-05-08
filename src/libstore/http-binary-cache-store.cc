@@ -49,7 +49,7 @@ public:
         , BinaryCacheStore(params)
         , cacheUri(scheme + "://" + _cacheUri)
     {
-        if (cacheUri.back() == '/')
+        while (!cacheUri.empty() && cacheUri.back() == '/')
             cacheUri.pop_back();
 
         diskCache = getNarInfoDiskCache();

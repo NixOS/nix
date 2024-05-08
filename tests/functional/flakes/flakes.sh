@@ -93,6 +93,24 @@ foo
 EOF
 chmod +x $nonFlakeDir/shebang-comments.sh
 
+cat > $nonFlakeDir/shebang-different-comments.sh <<EOF
+#! $(type -P env) nix
+# some comments
+// some comments
+/* some comments
+* some comments
+\ some comments
+% some comments
+@ some comments
+-- some comments
+(* some comments
+#! nix --offline shell
+#! nix flake1#fooScript
+#! nix --no-write-lock-file --command cat
+foo
+EOF
+chmod +x $nonFlakeDir/shebang-different-comments.sh
+
 cat > $nonFlakeDir/shebang-reject.sh <<EOF
 #! $(type -P env) nix
 # some comments
@@ -212,6 +230,17 @@ nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"$flake1Dir\").pack
 
 # 'getFlake' on a locked flakeref should succeed even in pure mode.
 nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").packages.$system.default"
+
+# Regression test for dirOf on the root of the flake.
+[[ $(nix eval --json flake1#parent) = \""$NIX_STORE_DIR"\" ]]
+
+# Regression test for baseNameOf on the root of the flake.
+[[ $(nix eval --raw flake1#baseName) =~ ^[a-z0-9]+-source$ ]]
+
+# Test that the root of a tree returns a path named /nix/store/<hash1>-<hash2>-source.
+# This behavior is *not* desired, but has existed for a while.
+# Issue #10627 what to do about it.
+[[ $(nix eval --raw flake1#root) =~ ^.*/[a-z0-9]+-[a-z0-9]+-source$ ]]
 
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-registries)
@@ -564,6 +593,16 @@ nix flake lock "$flake3Dir"
 nix flake update flake2/flake1 --flake "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
 
+# Test updating multiple inputs.
+nix flake lock "$flake3Dir" --override-input flake1 flake1/master/$hash1
+nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1/master/$hash1
+[[ $(jq -r .nodes.flake1.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
+
+nix flake update flake1 flake2/flake1 --flake "$flake3Dir"
+[[ $(jq -r .nodes.flake1.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+[[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+
 # Test 'nix flake metadata --json'.
 nix flake metadata "$flake3Dir" --json | jq .
 
@@ -597,6 +636,7 @@ expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock
 [[ $($nonFlakeDir/shebang.sh) = "foo" ]]
 [[ $($nonFlakeDir/shebang.sh "bar") = "foo"$'\n'"bar" ]]
 [[ $($nonFlakeDir/shebang-comments.sh ) = "foo" ]]
+[[ "$($nonFlakeDir/shebang-different-comments.sh)" = "$(cat $nonFlakeDir/shebang-different-comments.sh)" ]]
 [[ $($nonFlakeDir/shebang-inline-expr.sh baz) = "foo"$'\n'"baz" ]]
 [[ $($nonFlakeDir/shebang-file.sh baz) = "foo"$'\n'"baz" ]]
 expect 1 $nonFlakeDir/shebang-reject.sh 2>&1 | grepQuiet -F 'error: unsupported unquoted character in nix shebang: *. Use double backticks to escape?'

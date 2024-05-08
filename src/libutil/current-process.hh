@@ -3,6 +3,10 @@
 
 #include <optional>
 
+#ifndef _WIN32
+# include <sys/resource.h>
+#endif
+
 #include "types.hh"
 
 namespace nix {
@@ -13,16 +17,18 @@ namespace nix {
  */
 unsigned int getMaxCPU();
 
+#ifndef _WIN32 // TODO implement on Windows, if needed.
 /**
  * Change the stack size.
  */
-void setStackSize(size_t stackSize);
+void setStackSize(rlim_t stackSize);
+#endif
 
 /**
  * Restore the original inherited Unix process context (such as signal
  * masks, stack size).
 
- * See startSignalHandlerThread(), saveSignalMask().
+ * See unix::startSignalHandlerThread(), unix::saveSignalMask().
  */
 void restoreProcessContext(bool restoreMounts = true);
 

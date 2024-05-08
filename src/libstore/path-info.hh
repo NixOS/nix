@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "crypto.hh"
+#include "signature/signer.hh"
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
@@ -107,7 +107,7 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
      */
     std::string fingerprint(const Store & store) const;
 
-    void sign(const Store & store, const SecretKey & secretKey);
+    void sign(const Store & store, const Signer & signer);
 
     /**
      * @return The `ContentAddressWithReferences` that determines the

@@ -17,7 +17,7 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
     using RemoteStoreConfig::RemoteStoreConfig;
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{this, "nix-daemon", "remote-program",
+    const Setting<Strings> remoteProgram{this, {"nix-daemon"}, "remote-program",
         "Path to the `nix-daemon` executable on the remote machine."};
 
     const std::string name() override { return "Experimental SSH Store"; }
@@ -108,7 +108,7 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
     {
     }
 
-    const std::string name() override { return "Experimental SSH Store with filesytem mounted"; }
+    const std::string name() override { return "Experimental SSH Store with filesystem mounted"; }
 
     std::string doc() override
     {
@@ -212,14 +212,15 @@ public:
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-
-    std::string command = remoteProgram + " --stdio";
-    if (remoteStore.get() != "")
-        command += " --store " + shellEscape(remoteStore.get());
-    for (auto & arg : extraRemoteProgramArgs)
-        command += " " + shellEscape(arg);
-
-    conn->sshConn = master.startCommand(command);
+    Strings command = remoteProgram.get();
+    command.push_back("--stdio");
+    if (remoteStore.get() != "") {
+        command.push_back("--store");
+        command.push_back(remoteStore.get());
+    }
+    command.insert(command.end(),
+        extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
+    conn->sshConn = master.startCommand(std::move(command));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

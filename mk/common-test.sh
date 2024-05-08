@@ -17,11 +17,3 @@ TESTS_ENVIRONMENT=(
 run () {
    cd "$(dirname $1)" && env "${TESTS_ENVIRONMENT[@]}" $BASH -x -e -u -o pipefail $(basename $1)
 }
-
-init_test () {
-   run "$init" 2>/dev/null > /dev/null
-}
-
-run_test_proper () {
-   run "$test"
-}

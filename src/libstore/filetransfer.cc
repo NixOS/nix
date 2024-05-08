@@ -1,5 +1,4 @@
 #include "filetransfer.hh"
-#include "namespaces.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "s3.hh"
@@ -10,6 +9,10 @@
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
+#endif
+
+#if __linux__
+# include "namespaces.hh"
 #endif
 
 #include <unistd.h>
@@ -106,6 +109,8 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            result.urls.push_back(request.uri);
+
             requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
@@ -182,6 +187,14 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->writeCallback(contents, size, nmemb);
         }
 
+        void appendCurrentUrl()
+        {
+            char * effectiveUriCStr = nullptr;
+            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
+            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr)
+                result.urls.push_back(effectiveUriCStr);
+        }
+
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
         {
             size_t realSize = size * nmemb;
@@ -196,6 +209,7 @@ struct curlFileTransfer : public FileTransfer
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
+                appendCurrentUrl();
             } else {
 
                 auto i = line.find(':');
@@ -244,11 +258,11 @@ struct curlFileTransfer : public FileTransfer
         int progressCallback(double dltotal, double dlnow)
         {
             try {
-              act.progress(dlnow, dltotal);
+                act.progress(dlnow, dltotal);
             } catch (nix::Interrupted &) {
-              assert(_isInterrupted);
+                assert(getInterrupted());
             }
-            return _isInterrupted;
+            return getInterrupted();
         }
 
         static int progressCallbackWrapper(void * userp, double dltotal, double dlnow, double ultotal, double ulnow)
@@ -360,13 +374,10 @@ struct curlFileTransfer : public FileTransfer
         {
             auto httpStatus = getHTTPStatus();
 
-            char * effectiveUriCStr = nullptr;
-            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
-            if (effectiveUriCStr)
-                result.effectiveUri = effectiveUriCStr;
-
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
+
+            appendCurrentUrl();
 
             if (decompressionSink) {
                 try {
@@ -455,7 +466,7 @@ struct curlFileTransfer : public FileTransfer
                 if (errorSink)
                     response = std::move(errorSink->s);
                 auto exc =
-                    code == CURLE_ABORTED_BY_CALLBACK && _isInterrupted
+                    code == CURLE_ABORTED_BY_CALLBACK && getInterrupted()
                     ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted", request.verb(), request.uri)
                     : httpStatus != 0
                     ? FileTransferError(err,
@@ -505,10 +516,12 @@ struct curlFileTransfer : public FileTransfer
 
     Sync<State> state_;
 
+    #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     /* We can't use a std::condition_variable to wake up the curl
        thread, because it only monitors file descriptors. So use a
        pipe instead. */
     Pipe wakeupPipe;
+    #endif
 
     std::thread workerThread;
 
@@ -528,8 +541,10 @@ struct curlFileTransfer : public FileTransfer
             fileTransferSettings.httpConnections.get());
         #endif
 
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         wakeupPipe.create();
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
+        #endif
 
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
@@ -550,17 +565,23 @@ struct curlFileTransfer : public FileTransfer
             auto state(state_.lock());
             state->quit = true;
         }
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
+        #endif
     }
 
     void workerThreadMain()
     {
         /* Cause this thread to be notified on SIGINT. */
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         auto callback = createInterruptCallback([&]() {
             stopWorkerThread();
         });
+        #endif
 
+        #if __linux__
         unshareFilesystem();
+        #endif
 
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
 
@@ -594,9 +615,11 @@ struct curlFileTransfer : public FileTransfer
             /* Wait for activity, including wakeup events. */
             int numfds = 0;
             struct curl_waitfd extraFDs[1];
+            #ifndef _WIN32 // TODO need graceful async exit support on Windows?
             extraFDs[0].fd = wakeupPipe.readSide.get();
             extraFDs[0].events = CURL_WAIT_POLLIN;
             extraFDs[0].revents = 0;
+            #endif
             long maxSleepTimeMs = items.empty() ? 10000 : 100;
             auto sleepTimeMs =
                 nextWakeup != std::chrono::steady_clock::time_point()
@@ -680,7 +703,9 @@ struct curlFileTransfer : public FileTransfer
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
+        #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ");
+        #endif
     }
 
 #if ENABLE_S3
@@ -779,7 +804,10 @@ FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
     return enqueueFileTransfer(request).get();
 }
 
-void FileTransfer::download(FileTransferRequest && request, Sink & sink)
+void FileTransfer::download(
+    FileTransferRequest && request,
+    Sink & sink,
+    std::function<void(FileTransferResult)> resultCallback)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
        that would cause the sink to execute on the fileTransfer
@@ -829,11 +857,13 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
     };
 
     enqueueFileTransfer(request,
-        {[_state](std::future<FileTransferResult> fut) {
+        {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
             try {
-                fut.get();
+                auto res = fut.get();
+                if (resultCallback)
+                    resultCallback(std::move(res));
             } catch (...) {
                 state->exc = std::current_exception();
             }
@@ -882,12 +912,12 @@ template<typename... Args>
 FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args)
     : Error(args...), error(error), response(response)
 {
-    const auto hf = hintfmt(args...);
+    const auto hf = HintFmt(args...);
     // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
     if (response && (response->size() < 1024 || response->find("<html>") != std::string::npos))
-        err.msg = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), chomp(*response));
+        err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), chomp(*response));
     else
         err.msg = hf;
 }

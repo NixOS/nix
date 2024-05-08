@@ -1,9 +1,11 @@
 #include "globals.hh"
+#include "print-ambiguous.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "get-drvs.hh"
 #include "attr-path.hh"
+#include "signals.hh"
 #include "value-to-xml.hh"
 #include "value-to-json.hh"
 #include "store-api.hh"
@@ -24,7 +26,6 @@ static int rootNr = 0;
 
 enum OutputKind { okPlain, okXML, okJSON };
 
-
 void processExpr(EvalState & state, const Strings & attrPaths,
     bool parseOnly, bool strict, Bindings & autoArgs,
     bool evalOnly, OutputKind output, bool location, Expr * e)
@@ -40,7 +41,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 
     for (auto & i : attrPaths) {
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
-        state.forceValue(v, [&]() { return v.determinePos(noPos); });
+        state.forceValue(v, v.determinePos(noPos));
 
         NixStringContext context;
         if (evalOnly) {
@@ -56,11 +57,12 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 std::cout << std::endl;
             } else {
                 if (strict) state.forceValueDeep(vRes);
-                vRes.print(state.symbols, std::cout);
+                std::set<const void *> seen;
+                printAmbiguous(vRes, state.symbols, std::cout, &seen, std::numeric_limits<int>::max());
                 std::cout << std::endl;
             }
         } else {
-            DrvInfos drvs;
+            PackageInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
             for (auto & i : drvs) {
                 auto drvPath = i.requireDrvPath();
@@ -155,7 +157,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         auto store = openStore();
         auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-        auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
+        auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, store);
         state->repair = myArgs.repair;
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
@@ -166,7 +168,7 @@ static int main_nix_instantiate(int argc, char * * argv)
             for (auto & i : files) {
                 auto p = state->findFile(i);
                 if (auto fn = p.getPhysicalPath())
-                    std::cout << fn->abs() << std::endl;
+                    std::cout << fn->string() << std::endl;
                 else
                     throw Error("'%s' has no physical path", p);
             }
@@ -182,7 +184,7 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         for (auto & i : files) {
             Expr * e = fromArgs
-                ? state->parseExprFromString(i, state->rootPath(CanonPath::fromCwd()))
+                ? state->parseExprFromString(i, state->rootPath("."))
                 : state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, i)));
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);

@@ -58,7 +58,7 @@ let
       mkdir -p $out/{commits,tarball}
 
       # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-      echo '{"sha": "${private-flake-rev}"}' > $out/commits/HEAD
+      echo '{"sha": "${private-flake-rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
 
       # Setup tarball download via API
       dir=private-flake
@@ -72,7 +72,7 @@ let
       mkdir -p $out/commits
 
       # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-      echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/HEAD
+      echo '{"sha": "${nixpkgs.rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
     '';
 
   archive = pkgs.runCommand "nixpkgs-flake" {}
@@ -144,7 +144,7 @@ in
           virtualisation.memorySize = 4096;
           nix.settings.substituters = lib.mkForce [ ];
           nix.extraOptions = "experimental-features = nix-command flakes";
-          networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
+          networking.hosts.${(builtins.head nodes.github.networking.interfaces.eth1.ipv4.addresses).address} =
             [ "channels.nixos.org" "api.github.com" "github.com" ];
           security.pki.certificateFiles = [ "${cert}/ca.crt" ];
         };
@@ -187,8 +187,13 @@ in
     client.succeed("nix flake metadata nixpkgs --tarball-ttl 0 >&2")
 
     # Test fetchTree on a github URL.
-    hash = client.succeed(f"nix eval --raw --expr '(fetchTree {info['url']}).narHash'")
+    hash = client.succeed(f"nix eval --no-trust-tarballs-from-git-forges --raw --expr '(fetchTree {info['url']}).narHash'")
     assert hash == info['locked']['narHash']
+
+    # Fetching without a narHash should succeed if trust-github is set and fail otherwise.
+    client.succeed(f"nix eval --raw --expr 'builtins.fetchTree github:github:fancy-enterprise/private-flake/{info['revision']}'")
+    out = client.fail(f"nix eval --no-trust-tarballs-from-git-forges --raw --expr 'builtins.fetchTree github:github:fancy-enterprise/private-flake/{info['revision']}' 2>&1")
+    assert "will not fetch unlocked input" in out, "--no-trust-tarballs-from-git-forges did not fail with the expected error"
 
     # Shut down the web server. The flake should be cached on the client.
     github.succeed("systemctl stop httpd.service")

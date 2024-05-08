@@ -66,7 +66,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         if (apply) {
             auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, state->rootPath(CanonPath::fromCwd())), *vApply);
+            state->eval(state->parseExprFromString(*apply, state->rootPath(".")), *vApply);
             auto vRes = state->allocValue();
             state->callFunction(*vApply, *v, *vRes, noPos);
             v = vRes;
@@ -87,9 +87,13 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                     // FIXME: disallow strings with contexts?
                     writeFile(path, v.string_view());
                 else if (v.type() == nAttrs) {
-                    if (mkdir(path.c_str(), 0777) == -1)
+                    if (mkdir(path.c_str()
+#ifndef _WIN32 // TODO abstract mkdir perms for Windows
+                        , 0777
+#endif
+                        ) == -1)
                         throw SysError("creating directory '%s'", path);
-                    for (auto & attr : *v.attrs) {
+                    for (auto & attr : *v.attrs()) {
                         std::string_view name = state->symbols[attr.name];
                         try {
                             if (name == "." || name == "..")
@@ -98,13 +102,13 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                         } catch (Error & e) {
                             e.addTrace(
                                 state->positions[attr.pos],
-                                hintfmt("while evaluating the attribute '%s'", name));
+                                HintFmt("while evaluating the attribute '%s'", name));
                             throw;
                         }
                     }
                 }
                 else
-                    throw TypeError("value at '%s' is not a string or an attribute set", state->positions[pos]);
+                    state->error<TypeError>("value at '%s' is not a string or an attribute set", state->positions[pos]).debugThrow();
             };
 
             recurse(*v, pos, *writeTo);
@@ -112,7 +116,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         else if (raw) {
             stopProgressBar();
-            writeFull(STDOUT_FILENO, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+            writeFull(getStandardOut(), *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {
@@ -120,8 +124,17 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         }
 
         else {
-            state->forceValueDeep(*v);
-            logger->cout("%s", printValue(*state, *v));
+            logger->cout(
+                "%s",
+                ValuePrinter(
+                    *state,
+                    *v,
+                    PrintOptions {
+                        .force = true,
+                        .derivationPaths = true
+                    }
+                )
+            );
         }
     }
 };

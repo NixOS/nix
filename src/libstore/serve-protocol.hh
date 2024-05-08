@@ -60,6 +60,14 @@ struct ServeProto
     };
 
     /**
+     * Stripped down serialization logic suitable for sharing with Hydra.
+     *
+     * @todo remove once Hydra uses Store abstraction consistently.
+     */
+    struct BasicClientConnection;
+    struct BasicServerConnection;
+
+    /**
      * Data type for canonical pairs of serialisers for the serve protocol.
      *
      * See https://en.cppreference.com/w/cpp/language/adl for the broader

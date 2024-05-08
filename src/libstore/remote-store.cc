@@ -13,9 +13,12 @@
 #include "derivations.hh"
 #include "pool.hh"
 #include "finally.hh"
+#include "git.hh"
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"
+#include "signals.hh"
+
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -65,6 +68,7 @@ void RemoteStore::initConnection(Connection & conn)
 {
     /* Send the magic greeting, check for the reply. */
     try {
+        conn.from.endOfFileError = "Nix daemon disconnected unexpectedly (maybe it crashed?)";
         conn.to << WORKER_MAGIC_1;
         conn.to.flush();
         StringSink saved;
@@ -186,7 +190,7 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
                 if (m.find("parsing derivation") != std::string::npos &&
                     m.find("expected string") != std::string::npos &&
                     m.find("Derive([") != std::string::npos)
-                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw dervation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
+                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw derivation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
             }
             throw;
         }
@@ -432,7 +436,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << WorkerProto::Op::AddToStore
             << name
-            << caMethod.render(hashAlgo);
+            << caMethod.renderWithAlgo(hashAlgo);
         WorkerProto::write(*this, *conn, references);
         conn->to << repair;
 
@@ -505,12 +509,30 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 StorePath RemoteStore::addToStoreFromDump(
     Source & dump,
     std::string_view name,
-    ContentAddressMethod method,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     RepairFlag repair)
 {
-    return addCAToStore(dump, name, method, hashAlgo, references, repair)->path;
+    FileSerialisationMethod fsm;
+    switch (hashMethod.getFileIngestionMethod()) {
+    case FileIngestionMethod::Flat:
+        fsm = FileSerialisationMethod::Flat;
+        break;
+    case FileIngestionMethod::Recursive:
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    case FileIngestionMethod::Git:
+        // Use NAR; Git is not a serialization method
+        fsm = FileSerialisationMethod::Recursive;
+        break;
+    default:
+        assert(false);
+    }
+    if (fsm != dumpMethod)
+        unsupported("RemoteStore::addToStoreFromDump doesn't support this `dumpMethod` `hashMethod` combination");
+    return addCAToStore(dump, name, hashMethod, hashAlgo, references, repair)->path;
 }
 
 
@@ -1066,6 +1088,7 @@ void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sin
     std::thread stderrThread([&]()
     {
         try {
+            ReceiveInterrupts receiveInterrupts;
             processStderr(nullptr, nullptr, false);
         } catch (...) {
             ex = std::current_exception();

@@ -28,7 +28,8 @@ BinaryCacheStore::BinaryCacheStore(const Params & params)
     , Store(params)
 {
     if (secretKeyFile != "")
-        secretKey = std::unique_ptr<SecretKey>(new SecretKey(readFile(secretKeyFile)));
+        signer = std::make_unique<LocalSigner>(
+            SecretKey { readFile(secretKeyFile) });
 
     StringSink sink;
     sink << narVersionMagic1;
@@ -121,14 +122,6 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     if (diskCache)
         diskCache->upsertNarInfo(getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
-}
-
-AutoCloseFD openFile(const Path & path)
-{
-    auto fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd)
-        throw SysError("opening file '%1%'", path);
-    return fd;
 }
 
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
@@ -234,14 +227,14 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
             std::regex regex2("^[0-9a-f]{38}\\.debug$");
 
             for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
-                auto dir = buildIdDir + s1;
+                auto dir = buildIdDir / s1;
 
                 if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory
                     || !std::regex_match(s1, regex1))
                     continue;
 
                 for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
-                    auto debugPath = dir + s2;
+                    auto debugPath = dir / s2;
 
                     if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular
                         || !std::regex_match(s2, regex2))
@@ -274,7 +267,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     stats.narWriteCompressionTimeMs += duration;
 
     /* Atomically write the NAR info file.*/
-    if (secretKey) narInfo->sign(*this, *secretKey);
+    if (signer) narInfo->sign(*this, *signer);
 
     writeNarInfo(narInfo);
 
@@ -304,7 +297,8 @@ void BinaryCacheStore::addToStore(const ValidPathInfo & info, Source & narSource
 StorePath BinaryCacheStore::addToStoreFromDump(
     Source & dump,
     std::string_view name,
-    ContentAddressMethod method,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     RepairFlag repair)
@@ -312,17 +306,27 @@ StorePath BinaryCacheStore::addToStoreFromDump(
     std::optional<Hash> caHash;
     std::string nar;
 
+    // Calculating Git hash from NAR stream not yet implemented. May not
+    // be possible to implement in single-pass if the NAR is in an
+    // inconvenient order. Could fetch after uploading, however.
+    if (hashMethod.getFileIngestionMethod() == FileIngestionMethod::Git)
+        unsupported("addToStoreFromDump");
+
     if (auto * dump2p = dynamic_cast<StringSource *>(&dump)) {
         auto & dump2 = *dump2p;
         // Hack, this gives us a "replayable" source so we can compute
         // multiple hashes more easily.
-        caHash = hashString(HashAlgorithm::SHA256, dump2.s);
-        switch (method.getFileIngestionMethod()) {
-        case FileIngestionMethod::Recursive:
+        //
+        // Only calculate if the dump is in the right format, however.
+        if (static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod())
+            caHash = hashString(HashAlgorithm::SHA256, dump2.s);
+        switch (dumpMethod) {
+        case FileSerialisationMethod::Recursive:
             // The dump is already NAR in this case, just use it.
             nar = dump2.s;
             break;
-        case FileIngestionMethod::Flat:
+        case FileSerialisationMethod::Flat:
+        {
             // The dump is Flat, so we need to convert it to NAR with a
             // single file.
             StringSink s;
@@ -330,10 +334,11 @@ StorePath BinaryCacheStore::addToStoreFromDump(
             nar = std::move(s.s);
             break;
         }
+        }
     } else {
         // Otherwise, we have to do th same hashing as NAR so our single
         // hash will suffice for both purposes.
-        if (method != FileIngestionMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
+        if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
             unsupported("addToStoreFromDump");
     }
     StringSource narDump { nar };
@@ -348,7 +353,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
             *this,
             name,
             ContentAddressWithReferences::fromParts(
-                method,
+                hashMethod,
                 caHash ? *caHash : nar.first,
                 {
                     .others = references,
@@ -437,8 +442,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 
 StorePath BinaryCacheStore::addToStore(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & path,
+    const SourcePath & path,
     ContentAddressMethod method,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
@@ -449,10 +453,10 @@ StorePath BinaryCacheStore::addToStore(
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
+    auto h = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
 
     auto source = sinkToSource([&](Sink & sink) {
-        accessor.dumpPath(path, sink, filter);
+        path.dumpPath(sink, filter);
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {

@@ -5,6 +5,7 @@
 #include "config.hh"
 #include "environment-variables.hh"
 #include "experimental-features.hh"
+#include "users.hh"
 
 #include <map>
 #include <limits>
@@ -144,20 +145,25 @@ public:
      */
     bool verboseBuild = true;
 
-    Setting<size_t> logLines{this, 10, "log-lines",
+    Setting<size_t> logLines{this, 25, "log-lines",
         "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
         this, 1, "max-jobs",
         R"(
-          This option defines the maximum number of jobs that Nix will try to
-          build in parallel. The default is `1`. The special value `auto`
-          causes Nix to use the number of CPUs in your system. `0` is useful
-          when using remote builders to prevent any local builds (except for
-          `preferLocalBuild` derivation attribute which executes locally
-          regardless). It can be overridden using the `--max-jobs` (`-j`)
-          command line switch.
+          Maximum number of jobs that Nix will try to build locally in parallel.
+
+          The special value `auto` causes Nix to use the number of CPUs in your system.
+          Use `0` to disable local builds and directly use the remote machines specified in [`builders`](#conf-builders).
+          This will not affect derivations that have [`preferLocalBuild = true`](@docroot@/language/advanced-attributes.md#adv-attr-preferLocalBuild), which are always built locally.
+
+          > **Note**
+          >
+          > The number of CPU cores to use for each build job is independently determined by the [`cores`](#conf-cores) setting.
+
+          <!-- TODO(@fricklerhandwerk): would be good to have those shorthands for common options as part of the specification -->
+          The setting can be overridden using the `--max-jobs` (`-j`) command line switch.
         )",
         {"build-max-jobs"}};
 
@@ -175,14 +181,21 @@ public:
         getDefaultCores(),
         "cores",
         R"(
-          Sets the value of the `NIX_BUILD_CORES` environment variable in the
-          invocation of builders. Builders can use this variable at their
-          discretion to control the maximum amount of parallelism. For
-          instance, in Nixpkgs, if the derivation attribute
-          `enableParallelBuilding` is set to `true`, the builder passes the
-          `-jN` flag to GNU Make. It can be overridden using the `--cores`
-          command line switch and defaults to `1`. The value `0` means that
-          the builder should use all available CPU cores in the system.
+          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
+          The `builder` executable can use this variable to control its own maximum amount of parallelism.
+
+          <!--
+          FIXME(@fricklerhandwerk): I don't think this should even be mentioned here.
+          A very generic example using `derivation` and `xargs` may be more appropriate to explain the mechanism.
+          Using `mkDerivation` as an example requires being aware of that there are multiple independent layers that are completely opaque here.
+          -->
+          For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it will pass the `-j${NIX_BUILD_CORES}` flag to GNU Make.
+
+          The value `0` means that the `builder` should use all available CPU cores in the system.
+
+          > **Note**
+          >
+          > The number of parallel local Nix build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
         )",
         {"build-cores"},
         // Don't document the machine-specific default value
@@ -265,9 +278,121 @@ public:
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
         R"(
-          A semicolon-separated list of build machines.
-          For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
-        )"};
+          A semicolon- or newline-separated list of build machines.
+
+          In addition to the [usual ways of setting configuration options](@docroot@/command-ref/conf-file.md), the value can be read from a file by prefixing its absolute path with `@`.
+
+          > **Example**
+          >
+          > This is the default setting:
+          >
+          > ```
+          > builders = @/etc/nix/machines
+          > ```
+
+          Each machine specification consists of the following elements, separated by spaces.
+          Only the first element is required.
+          To leave a field at its default, set it to `-`.
+
+          1. The URI of the remote store in the format `ssh://[username@]hostname`.
+
+             > **Example**
+             >
+             > `ssh://nix@mac`
+
+             For backward compatibility, `ssh://` may be omitted.
+             The hostname may be an alias defined in `~/.ssh/config`.
+
+          2. A comma-separated list of [Nix system types](@docroot@/contributing/hacking.md#system-type).
+             If omitted, this defaults to the local platform type.
+
+             > **Example**
+             >
+             > `aarch64-darwin`
+
+             It is possible for a machine to support multiple platform types.
+
+             > **Example**
+             >
+             > `i686-linux,x86_64-linux`
+
+          3. The SSH identity file to be used to log in to the remote machine.
+             If omitted, SSH will use its regular identities.
+
+             > **Example**
+             >
+             > `/home/user/.ssh/id_mac`
+
+          4. The maximum number of builds that Nix will execute in parallel on the machine.
+             Typically this should be equal to the number of CPU cores.
+
+          5. The “speed factor”, indicating the relative speed of the machine as a positive integer.
+             If there are multiple machines of the right type, Nix will prefer the fastest, taking load into account.
+
+          6. A comma-separated list of supported [system features](#conf-system-features).
+
+             A machine will only be used to build a derivation if all the features in the derivation's [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute are supported by that machine.
+
+          7. A comma-separated list of required [system features](#conf-system-features).
+
+             A machine will only be used to build a derivation if all of the machine’s required features appear in the derivation’s [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute.
+
+          8. The (base64-encoded) public host key of the remote machine.
+             If omitted, SSH will use its regular `known_hosts` file.
+
+             The value for this field can be obtained via `base64 -w0`.
+
+          > **Example**
+          >
+          > Multiple builders specified on the command line:
+          >
+          > ```console
+          > --builders 'ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd'
+          > ```
+
+          > **Example**
+          >
+          > This specifies several machines that can perform `i686-linux` builds:
+          >
+          > ```
+          > nix@scratchy.labs.cs.uu.nl i686-linux /home/nix/.ssh/id_scratchy 8 1 kvm
+          > nix@itchy.labs.cs.uu.nl    i686-linux /home/nix/.ssh/id_scratchy 8 2
+          > nix@poochie.labs.cs.uu.nl  i686-linux /home/nix/.ssh/id_scratchy 1 2 kvm benchmark
+          > ```
+          >
+          > However, `poochie` will only build derivations that have the attribute
+          >
+          > ```nix
+          > requiredSystemFeatures = [ "benchmark" ];
+          > ```
+          >
+          > or
+          >
+          > ```nix
+          > requiredSystemFeatures = [ "benchmark" "kvm" ];
+          > ```
+          >
+          > `itchy` cannot do builds that require `kvm`, but `scratchy` does support such builds.
+          > For regular builds, `itchy` will be preferred over `scratchy` because it has a higher speed factor.
+
+          For Nix to use substituters, the calling user must be in the [`trusted-users`](#conf-trusted-users) list.
+
+          > **Note**
+          >
+          > A build machine must be accessible via SSH and have Nix installed.
+          > `nix` must be available in `$PATH` for the user connecting over SSH.
+
+          > **Warning**
+          >
+          > If you are building via the Nix daemon (default), the Nix daemon user account on the local machine (that is, `root`) requires access to a user account on the remote machine (not necessarily `root`).
+          >
+          > If you can’t or don’t want to configure `root` to be able to access the remote machine, set [`store`](#conf-store) to any [local store](@docroot@/store/types/local-store.html), e.g. by passing `--store /tmp` to the command on the local machine.
+
+          To build only on remote machines and disable local builds, set [`max-jobs`](#conf-max-jobs) to 0.
+
+          If you want the remote machines to use substituters, set [`builders-use-substitutes`](#conf-builders-use-substituters) to `true`.
+        )",
+        {}, false};
 
     Setting<bool> alwaysAllowSubstitutes{
         this, false, "always-allow-substitutes",
@@ -541,7 +666,8 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<bool> requireDropSupplementaryGroups{this, getuid() == 0, "require-drop-supplementary-groups",
+#ifndef _WIN32
+    Setting<bool> requireDropSupplementaryGroups{this, isRootUser(), "require-drop-supplementary-groups",
         R"(
           Following the principle of least privilege,
           Nix will attempt to drop supplementary groups when building with sandboxing.
@@ -558,20 +684,41 @@ public:
           (since `root` usually has permissions to call setgroups)
           and `false` otherwise.
         )"};
+#endif
 
 #if __linux__
     Setting<std::string> sandboxShmSize{
         this, "50%", "sandbox-dev-shm-size",
         R"(
-          This option determines the maximum size of the `tmpfs` filesystem
-          mounted on `/dev/shm` in Linux sandboxes. For the format, see the
-          description of the `size` option of `tmpfs` in mount(8). The default
-          is `50%`.
+            *Linux only*
+
+            This option determines the maximum size of the `tmpfs` filesystem
+            mounted on `/dev/shm` in Linux sandboxes. For the format, see the
+            description of the `size` option of `tmpfs` in mount(8). The default
+            is `50%`.
         )"};
 
     Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir",
-        "The build directory inside the sandbox."};
+        R"(
+            *Linux only*
+
+            The build directory inside the sandbox.
+
+            This directory is backed by [`build-dir`](#conf-build-dir) on the host.
+        )"};
 #endif
+
+    Setting<std::optional<Path>> buildDir{this, std::nullopt, "build-dir",
+        R"(
+            The directory on the host, in which derivations' temporary build directories are created.
+
+            If not set, Nix will use the system temporary directory indicated by the `TMPDIR` environment variable.
+            Note that builds are often performed by the Nix daemon, so its `TMPDIR` is used, and not that of the Nix command line interface.
+
+            This is also the location where [`--keep-failed`](@docroot@/command-ref/opt-common.md#opt-keep-failed) leaves its files.
+
+            If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment will contain this directory, instead of the virtual location [`sandbox-build-dir`](#conf-sandbox-build-dir).
+        )"};
 
     Setting<PathSet> allowedImpureHostPrefixes{this, {}, "allowed-impure-host-deps",
         "Which prefixes to allow derivations to ask for access to (primarily for Darwin)."};
@@ -635,7 +782,8 @@ public:
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
+          - the store URL is configured with `trusted=true`
+          - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
 
@@ -788,10 +936,17 @@ public:
     Setting<unsigned int> ttlNegativeNarInfoCache{
         this, 3600, "narinfo-cache-negative-ttl",
         R"(
-          The TTL in seconds for negative lookups. If a store path is queried
-          from a substituter but was not found, there will be a negative
-          lookup cached in the local disk cache database for the specified
-          duration.
+          The TTL in seconds for negative lookups.
+          If a store path is queried from a [substituter](#conf-substituters) but was not found, there will be a negative lookup cached in the local disk cache database for the specified duration.
+
+          Set to `0` to force updating the lookup cache.
+
+          To wipe the lookup cache completely:
+
+          ```shell-session
+          $ rm $HOME/.cache/nix/binary-cache-v*.sqlite*
+          # rm /root/.cache/nix/binary-cache-v*.sqlite*
+          ```
         )"};
 
     Setting<unsigned int> ttlPositiveNarInfoCache{
@@ -946,7 +1101,9 @@ public:
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
         )"};
+#endif
 
+#if HAVE_ACL_SUPPORT
     Setting<StringSet> ignoredAcls{
         this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(
@@ -961,8 +1118,8 @@ public:
         this, {}, "hashed-mirrors",
         R"(
           A list of web servers used by `builtins.fetchurl` to obtain files by
-          hash. Given a hash type *ht* and a base-16 hash *h*, Nix will try to
-          download the file from *hashed-mirror*/*ht*/*h*. This allows files to
+          hash. Given a hash algorithm *ha* and a base-16 hash *h*, Nix will try to
+          download the file from *hashed-mirror*/*ha*/*h*. This allows files to
           be downloaded even if they have disappeared from their original URI.
           For example, given an example mirror `http://tarballs.nixos.org/`,
           when building the derivation
@@ -1003,9 +1160,10 @@ public:
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
-          be dlopened by Nix, allowing them to affect execution through static
-          initialization. In particular, these plugins may construct static
-          instances of RegisterPrimOp to add new primops or constants to the
+          be dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
+          this symbol will be called. Alternatively, they can affect execution
+          through static initialization. In particular, these plugins may construct
+          static instances of RegisterPrimOp to add new primops or constants to the
           expression language, RegisterStoreImplementation to add new store
           implementations, RegisterCommand to add new subcommands to the `nix`
           command, and RegisterSetting to add new nix config settings. See the
@@ -1122,9 +1280,10 @@ std::vector<Path> getUserConfigFiles();
 extern const std::string nixVersion;
 
 /**
- * NB: This is not sufficient. You need to call initNix()
+ * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
+ * @note When using libexpr, and/or libmain, This is not sufficient. See initNix().
  */
-void initLibStore();
+void initLibStore(bool loadConfig = true);
 
 /**
  * It's important to initialize before doing _anything_, which is why we

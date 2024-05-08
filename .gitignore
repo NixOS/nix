@@ -10,6 +10,7 @@ perl/Makefile.config
 /stamp-h1
 /svn-revision
 /libtool
+/config/config.*
 
 # /doc/manual/
 /doc/manual/*.1
@@ -45,13 +46,19 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
+/src/libexpr/tests
 /tests/unit/libexpr/libnixexpr-tests
+
+# /src/libfetchers
+/tests/unit/libfetchers/libnixfetchers-tests
 
 # /src/libstore/
 *.gen.*
+/src/libstore/tests
 /tests/unit/libstore/libnixstore-tests
 
 # /src/libutil/
+/src/libutil/tests
 /tests/unit/libutil/libnixutil-tests
 
 /src/nix/nix
@@ -94,6 +101,7 @@ perl/Makefile.config
 /tests/functional/ca/config.nix
 /tests/functional/dyn-drv/config.nix
 /tests/functional/repl-result-out
+/tests/functional/debugger-test-out
 /tests/functional/test-libstoreconsumer/test-libstoreconsumer
 
 # /tests/functional/lang/
@@ -109,8 +117,6 @@ perl/Makefile.config
 /misc/systemd/nix-daemon.socket
 /misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
-
-/src/resolve-system-dependencies/resolve-system-dependencies
 
 outputs/
 
@@ -137,14 +143,18 @@ GTAGS
 
 # auto-generated compilation database
 compile_commands.json
+*.compile_commands.json
 
 nix-rust/target
 
 result
+result-*
 
 # IDE
 .vscode/
 .idea/
+
+.pre-commit-config.yaml
 
 # clangd and possibly more
 .cache/

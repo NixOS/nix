@@ -13,7 +13,7 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> remoteProgram{this, "nix-store", "remote-program",
+    const Setting<Strings> remoteProgram{this, {"nix-store"}, "remote-program",
         "Path to the `nix-store` executable on the remote machine."};
 
     const Setting<int> maxConnections{this, 1, "max-connections",
@@ -60,8 +60,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & srcPath,
+        const SourcePath & path,
         ContentAddressMethod method,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
@@ -69,9 +68,15 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         RepairFlag repair) override
     { unsupported("addToStore"); }
 
-private:
-
-    void putBuildSettings(Connection & conn);
+    virtual StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override
+    { unsupported("addToStore"); }
 
 public:
 

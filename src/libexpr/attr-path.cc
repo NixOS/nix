@@ -65,17 +65,17 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
         if (!attrIndex) {
 
             if (v->type() != nAttrs)
-                throw TypeError(
+                state.error<TypeError>(
                     "the expression selected by the selection path '%1%' should be a set but is %2%",
                     attrPath,
-                    showType(*v));
+                    showType(*v)).debugThrow();
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
-            Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end()) {
+            auto a = v->attrs()->get(state.symbols.create(attr));
+            if (!a) {
                 std::set<std::string> attrNames;
-                for (auto & attr : *v->attrs)
+                for (auto & attr : *v->attrs())
                     attrNames.insert(state.symbols[attr.name]);
 
                 auto suggestions = Suggestions::bestMatches(attrNames, attr);
@@ -88,10 +88,10 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
         else {
 
             if (!v->isList())
-                throw TypeError(
+                state.error<TypeError>(
                     "the expression selected by the selection path '%1%' should be a list but is %2%",
                     attrPath,
-                    showType(*v));
+                    showType(*v)).debugThrow();
             if (*attrIndex >= v->listSize())
                 throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", *attrIndex, attrPath);
 

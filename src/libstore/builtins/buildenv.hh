@@ -5,6 +5,9 @@
 
 namespace nix {
 
+/**
+ * Think of this as a "store level package attrset", but stripped down to no more than the needs of buildenv.
+ */
 struct Package {
     Path path;
     bool active;
@@ -42,6 +45,8 @@ typedef std::vector<Package> Packages;
 
 void buildProfile(const Path & out, Packages && pkgs);
 
-void builtinBuildenv(const BasicDerivation & drv);
+void builtinBuildenv(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs);
 
 }

@@ -27,6 +27,8 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 1. Search for related issues that cover what you're going to work on.
    It could help to mention there that you will work on the issue.
 
+   We strongly recommend first-time contributors not to propose new features but rather fix tightly-scoped problems in order to build trust and a working relationship with maintainers.
+
    Issues labeled [good first issue](https://github.com/NixOS/nix/labels/good%20first%20issue) should be relatively easy to fix and are likely to get merged quickly.
    Pull requests addressing issues labeled [idea approved](https://github.com/NixOS/nix/labels/idea%20approved) or [RFC](https://github.com/NixOS/nix/labels/RFC) are especially welcomed by maintainers and will receive prioritised review.
 
@@ -63,11 +65,11 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
      - Functional tests – [`tests/functional/**.sh`](./tests/functional)
      - Unit tests – [`src/*/tests`](./src/)
      - Integration tests – [`tests/nixos/*`](./tests/nixos)
-   - [ ] User documentation in the [manual](..doc/manual/src)
+   - [ ] User documentation in the [manual](./doc/manual/src)
    - [ ] API documentation in header files
    - [ ] Code and comments are self-explanatory
    - [ ] Commit message explains **why** the change was made
-   - [ ] New feature or incompatible change: updated [release notes](./doc/manual/src/release-notes/rl-next.md)
+   - [ ] New feature or incompatible change: [add a release note](https://nixos.org/manual/nix/stable/contributing/hacking#add-a-release-note)
 
 7. If you need additional feedback or help to getting pull request into shape, ask other contributors using [@mentions](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#mentioning-people-and-teams).
 

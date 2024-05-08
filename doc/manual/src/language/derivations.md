@@ -36,7 +36,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   The system type on which the [`builder`](#attr-builder) executable is meant to be run.
 
   A necessary condition for Nix to build derivations locally is that the `system` attribute matches the current [`system` configuration option].
-  It can automatically [build on other platforms](../advanced-topics/distributed-builds.md) by forwarding build requests to other machines.
+  It can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other machines.
 
   [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
 
@@ -274,7 +274,7 @@ The [`builder`](#attr-builder) is executed as follows:
     directory (typically, `/nix/store`).
 
   - `NIX_ATTRS_JSON_FILE` & `NIX_ATTRS_SH_FILE` if `__structuredAttrs`
-    is set to `true` for the dervation. A detailed explanation of this
+    is set to `true` for the derivation. A detailed explanation of this
     behavior can be found in the
     [section about structured attrs](./advanced-attributes.md#adv-attr-structuredAttrs).
 

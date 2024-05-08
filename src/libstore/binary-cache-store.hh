@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "crypto.hh"
+#include "signature/local-keys.hh"
 #include "store-api.hh"
 #include "log-store.hh"
 
@@ -57,8 +57,7 @@ class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
 {
 
 private:
-
-    std::unique_ptr<SecretKey> secretKey;
+    std::unique_ptr<Signer> signer;
 
 protected:
 
@@ -126,15 +125,15 @@ public:
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        ContentAddressMethod method,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
         RepairFlag repair) override;
 
     StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & srcPath,
+        const SourcePath & path,
         ContentAddressMethod method,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
@@ -148,7 +147,7 @@ public:
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 
-    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 

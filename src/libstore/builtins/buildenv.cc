@@ -17,12 +17,12 @@ struct State
 /* For each activated package, create symlinks */
 static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
 {
-    DirEntries srcFiles;
+    std::vector<std::filesystem::directory_entry> srcFiles;
 
     try {
         srcFiles = readDirectory(srcDir);
-    } catch (SysError & e) {
-        if (e.errNo == ENOTDIR) {
+    } catch (std::filesystem::filesystem_error & e) {
+        if (e.code() == std::errc::not_a_directory) {
             warn("not including '%s' in the user environment because it's not a directory", srcDir);
             return;
         }
@@ -30,11 +30,12 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
     }
 
     for (const auto & ent : srcFiles) {
-        if (ent.name[0] == '.')
+        auto name = ent.path().filename();
+        if (name.string()[0] == '.')
             /* not matched by glob */
             continue;
-        auto srcFile = srcDir + "/" + ent.name;
-        auto dstFile = dstDir + "/" + ent.name;
+        auto srcFile = (std::filesystem::path{srcDir} / name).string();
+        auto dstFile = (std::filesystem::path{dstDir} / name).string();
 
         struct stat srcSt;
         try {
@@ -64,9 +65,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
-            struct stat dstSt;
-            auto res = lstat(dstFile.c_str(), &dstSt);
-            if (res == 0) {
+            auto dstStOpt = maybeLstat(dstFile.c_str());
+            if (dstStOpt) {
+                auto & dstSt = *dstStOpt;
                 if (S_ISDIR(dstSt.st_mode)) {
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
@@ -76,20 +77,23 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
-                    if (mkdir(dstFile.c_str(), 0755) == -1)
+                    if (mkdir(dstFile.c_str()
+                #ifndef _WIN32 // TODO abstract mkdir perms for Windows
+                            , 0755
+                #endif
+                            ) == -1)
                         throw SysError("creating directory '%1%'", dstFile);
                     createLinks(state, target, dstFile, state.priorities[dstFile]);
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
                 }
-            } else if (errno != ENOENT)
-                throw SysError("getting status of '%1%'", dstFile);
+            }
         }
 
         else {
-            struct stat dstSt;
-            auto res = lstat(dstFile.c_str(), &dstSt);
-            if (res == 0) {
+            auto dstStOpt = maybeLstat(dstFile.c_str());
+            if (dstStOpt) {
+                auto & dstSt = *dstStOpt;
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
@@ -104,8 +108,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw SysError("unlinking '%1%'", dstFile);
                 } else if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
-            } else if (errno != ENOENT)
-                throw SysError("getting status of '%1%'", dstFile);
+            }
         }
 
         createSymlink(srcFile, dstFile);
@@ -161,7 +164,9 @@ void buildProfile(const Path & out, Packages && pkgs)
     debug("created %d symlinks in user environment", state.symlinks);
 }
 
-void builtinBuildenv(const BasicDerivation & drv)
+void builtinBuildenv(
+    const BasicDerivation & drv,
+    const std::map<std::string, Path> & outputs)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
@@ -169,7 +174,7 @@ void builtinBuildenv(const BasicDerivation & drv)
         return i->second;
     };
 
-    Path out = getAttr("out");
+    auto out = outputs.at("out");
     createDirs(out);
 
     /* Convert the stuff we get from the environment back into a

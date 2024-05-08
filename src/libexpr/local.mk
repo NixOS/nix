@@ -11,14 +11,17 @@ libexpr_SOURCES := \
   $(wildcard $(d)/flake/*.cc) \
   $(d)/lexer-tab.cc \
   $(d)/parser-tab.cc
+# Not just for this library itself, but also for downstream libraries using this library
 
-libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
+INCLUDE_libexpr := -I $(d)
+
+libexpr_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libmain) $(INCLUDE_libexpr)
 
 libexpr_LIBS = libutil libstore libfetchers
 
-libexpr_LDFLAGS += -lboost_context -pthread
+libexpr_LDFLAGS += -lboost_context $(THREAD_LDFLAGS)
 ifdef HOST_LINUX
- libexpr_LDFLAGS += -ldl
+  libexpr_LDFLAGS += -ldl
 endif
 
 # The dependency on libgc must be propagated (i.e. meaning that

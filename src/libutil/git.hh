@@ -8,17 +8,24 @@
 #include "types.hh"
 #include "serialise.hh"
 #include "hash.hh"
-#include "source-accessor.hh"
+#include "source-path.hh"
 #include "fs-sink.hh"
 
 namespace nix::git {
+
+enum struct ObjectType {
+    Blob,
+    Tree,
+    //Commit,
+    //Tag,
+};
 
 using RawMode = uint32_t;
 
 enum struct Mode : RawMode {
     Directory = 0040000,
-    Executable = 0100755,
     Regular = 0100644,
+    Executable = 0100755,
     Symlink = 0120000,
 };
 
@@ -59,9 +66,51 @@ using Tree = std::map<std::string, TreeEntry>;
  */
 using SinkHook = void(const Path & name, TreeEntry entry);
 
-void parse(
-    ParseSink & sink, const Path & sinkPath,
+/**
+ * Parse the "blob " or "tree " prefix.
+ *
+ * @throws if prefix not recognized
+ */
+ObjectType parseObjectType(
     Source & source,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+/**
+ * These 3 modes are represented by blob objects.
+ *
+ * Sometimes we need this information to disambiguate how a blob is
+ * being used to better match our own "file system object" data model.
+ */
+enum struct BlobMode : RawMode
+{
+    Regular = static_cast<RawMode>(Mode::Regular),
+    Executable = static_cast<RawMode>(Mode::Executable),
+    Symlink = static_cast<RawMode>(Mode::Symlink),
+};
+
+void parseBlob(
+    FileSystemObjectSink & sink, const Path & sinkPath,
+    Source & source,
+    BlobMode blobMode,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+void parseTree(
+    FileSystemObjectSink & sink, const Path & sinkPath,
+    Source & source,
+    std::function<SinkHook> hook,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+/**
+ * Helper putting the previous three `parse*` functions together.
+ *
+ * @rootModeIfBlob How to interpret a root blob, for which there is no
+ * disambiguating dir entry to answer that questino. If the root it not
+ * a blob, this is ignored.
+ */
+void parse(
+    FileSystemObjectSink & sink, const Path & sinkPath,
+    Source & source,
+    BlobMode rootModeIfBlob,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
@@ -76,12 +125,12 @@ std::optional<Mode> convertMode(SourceAccessor::Type type);
  * Given a `Hash`, return a `SourceAccessor` and `CanonPath` pointing to
  * the file system object with that path.
  */
-using RestoreHook = std::pair<SourceAccessor *, CanonPath>(Hash);
+using RestoreHook = SourcePath(Hash);
 
 /**
  * Wrapper around `parse` and `RestoreSink`
  */
-void restore(ParseSink & sink, Source & source, std::function<RestoreHook> hook);
+void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook);
 
 /**
  * Dumps a single file to a sink
@@ -108,10 +157,10 @@ void dumpTree(
  * Note that if the child is a directory, its child in must also be so
  * processed in order to compute this information.
  */
-using DumpHook = TreeEntry(const CanonPath & path);
+using DumpHook = TreeEntry(const SourcePath & path);
 
 Mode dump(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     Sink & sink,
     std::function<DumpHook> hook,
     PathFilter & filter = defaultPathFilter,
@@ -123,9 +172,9 @@ Mode dump(
  * A smaller wrapper around `dump`.
  */
 TreeEntry dumpHash(
-            HashAlgorithm ha,
-            SourceAccessor & accessor, const CanonPath & path,
-            PathFilter & filter = defaultPathFilter);
+    HashAlgorithm ha,
+    const SourcePath & path,
+    PathFilter & filter = defaultPathFilter);
 
 /**
  * A line from the output of `git ls-remote --symref`.

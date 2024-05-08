@@ -7,6 +7,11 @@
 
 #include <boost/coroutine2/coroutine.hpp>
 
+#ifdef _WIN32
+# include <fileapi.h>
+# include "windows-error.hh"
+#endif
+
 
 namespace nix {
 
@@ -53,7 +58,7 @@ void FdSink::writeUnbuffered(std::string_view data)
     written += data.size();
     try {
         writeFull(fd, data);
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         _good = false;
         throw;
     }
@@ -82,7 +87,7 @@ void Source::operator () (std::string_view data)
 void Source::drainInto(Sink & sink)
 {
     std::string s;
-    std::vector<char> buf(8192);
+    std::array<char, 8192> buf;
     while (true) {
         size_t n;
         try {
@@ -126,13 +131,22 @@ bool BufferedSource::hasData()
 
 size_t FdSource::readUnbuffered(char * data, size_t len)
 {
+#ifdef _WIN32
+    DWORD n;
+    checkInterrupt();
+    if (!::ReadFile(fd, data, len, &n, NULL)) {
+        _good = false;
+        throw WinError("ReadFile when FdSource::readUnbuffered");
+    }
+#else
     ssize_t n;
     do {
         checkInterrupt();
         n = ::read(fd, data, len);
     } while (n == -1 && errno == EINTR);
     if (n == -1) { _good = false; throw SysError("reading from file"); }
-    if (n == 0) { _good = false; throw EndOfFile("unexpected end-of-file"); }
+    if (n == 0) { _good = false; throw EndOfFile(std::string(*endOfFileError)); }
+#endif
     read += n;
     return n;
 }
@@ -448,7 +462,7 @@ Error readError(Source & source)
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,
-        .msg = hintfmt(msg),
+        .msg = HintFmt(msg),
     };
     auto havePos = readNum<size_t>(source);
     assert(havePos == 0);
@@ -457,7 +471,7 @@ Error readError(Source & source)
         havePos = readNum<size_t>(source);
         assert(havePos == 0);
         info.traces.push_back(Trace {
-            .hint = hintfmt(readString(source))
+            .hint = HintFmt(readString(source))
         });
     }
     return Error(std::move(info));

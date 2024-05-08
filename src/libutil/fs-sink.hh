@@ -9,18 +9,13 @@
 namespace nix {
 
 /**
- * \todo Fix this API, it sucks.
+ * Actions on an open regular file in the process of creating it.
+ *
+ * See `FileSystemObjectSink::createRegularFile`.
  */
-struct ParseSink
+struct CreateRegularFileSink : Sink
 {
-    virtual void createDirectory(const Path & path) = 0;
-
-    virtual void createRegularFile(const Path & path) = 0;
-    virtual void receiveContents(std::string_view data) = 0;
     virtual void isExecutable() = 0;
-    virtual void closeRegularFile() = 0;
-
-    virtual void createSymlink(const Path & path, const std::string & target) = 0;
 
     /**
      * An optimization. By default, do nothing.
@@ -28,46 +23,57 @@ struct ParseSink
     virtual void preallocateContents(uint64_t size) { };
 };
 
+
+struct FileSystemObjectSink
+{
+    virtual ~FileSystemObjectSink() = default;
+
+    virtual void createDirectory(const Path & path) = 0;
+
+    /**
+     * This function in general is no re-entrant. Only one file can be
+     * written at a time.
+     */
+    virtual void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) = 0;
+
+    virtual void createSymlink(const Path & path, const std::string & target) = 0;
+};
+
 /**
- * Recusively copy file system objects from the source into the sink.
+ * Recursively copy file system objects from the source into the sink.
  */
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & sourcePath,
-    ParseSink & sink, const Path & destPath);
+    FileSystemObjectSink & sink, const Path & destPath);
 
 /**
  * Ignore everything and do nothing
  */
-struct NullParseSink : ParseSink
+struct NullFileSystemObjectSink : FileSystemObjectSink
 {
     void createDirectory(const Path & path) override { }
-    void receiveContents(std::string_view data) override { }
     void createSymlink(const Path & path, const std::string & target) override { }
-    void createRegularFile(const Path & path) override { }
-    void closeRegularFile() override { }
-    void isExecutable() override { }
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) override;
 };
 
 /**
  * Write files at the given path
  */
-struct RestoreSink : ParseSink
+struct RestoreSink : FileSystemObjectSink
 {
     Path dstPath;
 
     void createDirectory(const Path & path) override;
 
-    void createRegularFile(const Path & path) override;
-    void receiveContents(std::string_view data) override;
-    void isExecutable() override;
-    void closeRegularFile() override;
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) override;
 
     void createSymlink(const Path & path, const std::string & target) override;
-
-    void preallocateContents(uint64_t size) override;
-
-private:
-    AutoCloseFD fd;
 };
 
 /**
@@ -75,7 +81,7 @@ private:
  * `receiveContents` to the underlying `Sink`. For anything but a single
  * file, set `regular = true` so the caller can fail accordingly.
  */
-struct RegularFileSink : ParseSink
+struct RegularFileSink : FileSystemObjectSink
 {
     bool regular = true;
     Sink & sink;
@@ -87,19 +93,14 @@ struct RegularFileSink : ParseSink
         regular = false;
     }
 
-    void receiveContents(std::string_view data) override
-    {
-        sink(data);
-    }
-
     void createSymlink(const Path & path, const std::string & target) override
     {
         regular = false;
     }
 
-    void createRegularFile(const Path & path) override { }
-    void closeRegularFile() override { }
-    void isExecutable() override { }
+    void createRegularFile(
+        const Path & path,
+        std::function<void(CreateRegularFileSink &)>) override;
 };
 
 }

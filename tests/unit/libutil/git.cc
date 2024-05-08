@@ -66,7 +66,8 @@ TEST_F(GitTest, blob_read) {
         StringSource in { encoded };
         StringSink out;
         RegularFileSink out2 { out };
-        parse(out2, "", in, [](auto &, auto) {}, mockXpSettings);
+        ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Blob);
+        parseBlob(out2, "", in, BlobMode::Regular, mockXpSettings);
 
         auto expected = readFile(goldenMaster("hello-world.bin"));
 
@@ -114,14 +115,24 @@ const static Tree tree = {
             .hash = Hash::parseAny("4b825dc642cb6eb9a060e54bf8d69288fbee4904", HashAlgorithm::SHA1),
         },
     },
+    {
+        "quuX",
+        {
+            .mode = Mode::Symlink,
+            // hello world with special chars from above (symlink target
+            // can be anything)
+            .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", HashAlgorithm::SHA1),
+        },
+    },
 };
 
 TEST_F(GitTest, tree_read) {
     readTest("tree.bin", [&](const auto & encoded) {
         StringSource in { encoded };
-        NullParseSink out;
+        NullFileSystemObjectSink out;
         Tree got;
-        parse(out, "", in, [&](auto & name, auto entry) {
+        ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Tree);
+        parseTree(out, "", in, [&](auto & name, auto entry) {
             auto name2 = name;
             if (entry.mode == Mode::Directory)
                 name2 += '/';
@@ -143,8 +154,8 @@ TEST_F(GitTest, tree_write) {
 TEST_F(GitTest, both_roundrip) {
     using File = MemorySourceAccessor::File;
 
-    MemorySourceAccessor files;
-    files.root = File::Directory {
+    auto files = make_ref<MemorySourceAccessor>();
+    files->root = File::Directory {
         .contents {
             {
                 "foo",
@@ -163,6 +174,12 @@ TEST_F(GitTest, both_roundrip) {
                                 .contents = "good day,\n\0\n\tworld!",
                             },
                         },
+                        {
+                            "quux",
+                            File::Symlink {
+                                .target = "/over/there",
+                            },
+                        },
                     },
                 },
             },
@@ -172,12 +189,12 @@ TEST_F(GitTest, both_roundrip) {
     std::map<Hash, std::string> cas;
 
     std::function<DumpHook> dumpHook;
-    dumpHook = [&](const CanonPath & path) {
+    dumpHook = [&](const SourcePath & path) {
         StringSink s;
         HashSink hashSink { HashAlgorithm::SHA1 };
         TeeSink s2 { s, hashSink };
         auto mode = dump(
-            files, path, s2, dumpHook,
+            path, s2, dumpHook,
             defaultPathFilter, mockXpSettings);
         auto hash = hashSink.finish().first;
         cas.insert_or_assign(hash, std::move(s.s));
@@ -187,23 +204,32 @@ TEST_F(GitTest, both_roundrip) {
         };
     };
 
-    auto root = dumpHook(CanonPath::root);
+    auto root = dumpHook({files});
 
-    MemorySourceAccessor files2;
+    auto files2 = make_ref<MemorySourceAccessor>();
 
-    MemorySink sinkFiles2 { files2 };
+    MemorySink sinkFiles2 { *files2 };
 
-    std::function<void(const Path, const Hash &)> mkSinkHook;
-    mkSinkHook = [&](const Path prefix, const Hash & hash) {
+    std::function<void(const Path, const Hash &, BlobMode)> mkSinkHook;
+    mkSinkHook = [&](auto prefix, auto & hash, auto blobMode) {
         StringSource in { cas[hash] };
-        parse(sinkFiles2, prefix, in, [&](const Path & name, const auto & entry) {
-            mkSinkHook(prefix + "/" + name, entry.hash);
-        }, mockXpSettings);
+        parse(
+            sinkFiles2, prefix, in, blobMode,
+            [&](const Path & name, const auto & entry) {
+                mkSinkHook(
+                    prefix + "/" + name,
+                    entry.hash,
+                    // N.B. this cast would not be acceptable in real
+                    // code, because it would make an assert reachable,
+                    // but it should harmless in this test.
+                    static_cast<BlobMode>(entry.mode));
+            },
+            mockXpSettings);
     };
 
-    mkSinkHook("", root.hash);
+    mkSinkHook("", root.hash, BlobMode::Regular);
 
-    ASSERT_EQ(files, files2);
+    ASSERT_EQ(*files, *files2);
 }
 
 TEST(GitLsRemote, parseSymrefLineWithReference) {

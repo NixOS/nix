@@ -78,17 +78,26 @@ struct Flake
      */
     FlakeRef lockedRef;
     /**
+     * The path of `flake.nix`.
+     */
+    SourcePath path;
+    /**
      * pretend that 'lockedRef' is dirty
      */
     bool forceDirty = false;
     std::optional<std::string> description;
-    StorePath storePath;
     FlakeInputs inputs;
     /**
      * 'nixConfig' attribute
      */
     ConfigFile config;
+
     ~Flake();
+
+    SourcePath lockFilePath()
+    {
+        return path.parent() / "flake.lock";
+    }
 };
 
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
@@ -103,7 +112,14 @@ struct LockedFlake
     Flake flake;
     LockFile lockFile;
 
-    Fingerprint getFingerprint() const;
+    /**
+     * Source tree accessors for nodes that have been fetched in
+     * lockFlake(); in particular, the root node and the overriden
+     * inputs.
+     */
+    std::map<ref<Node>, SourcePath> nodePaths;
+
+    std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
 };
 
 struct LockFlags
@@ -158,7 +174,7 @@ struct LockFlags
     /**
      * The path to a lock file to read instead of the `flake.lock` file in the top-level flake
      */
-    std::optional<std::string> referenceLockFilePath;
+    std::optional<SourcePath> referenceLockFilePath;
 
     /**
      * The path to a lock file to write to instead of the `flake.lock` file in the top-level flake

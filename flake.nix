@@ -1,38 +1,32 @@
 {
   description = "The purely functional package manager";
 
-  # TODO Go back to nixos-23.05-small once
-  # https://github.com/NixOS/nixpkgs/pull/271202 is merged.
-  #
-  # Also, do not grab arbitrary further staging commits. This PR was
-  # carefully made to be based on release-23.05 and just contain
-  # rebuild-causing changes to packages that Nix actually uses.
-  #
-  # Once this is updated to something containing
-  # https://github.com/NixOS/nixpkgs/pull/271423, don't forget
-  # to remove the `nix.checkAllErrors = false;` line in the tests.
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/staging-23.05";
+  # TODO switch to nixos-23.11-small
+  #      https://nixpk.gs/pr-tracker.html?pr=291954
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+  # dev tooling
+  inputs.flake-parts.url = "github:hercules-ci/flake-parts";
+  inputs.pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+  # work around https://github.com/NixOS/nix/issues/7730
+  inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+  inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.pre-commit-hooks.inputs.nixpkgs-stable.follows = "nixpkgs";
+  # work around 7730 and https://github.com/NixOS/nix/issues/7807
+  inputs.pre-commit-hooks.inputs.flake-compat.follows = "";
+  inputs.pre-commit-hooks.inputs.gitignore.follows = "";
+
+  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
+
 
     let
       inherit (nixpkgs) lib;
-
-      # Experimental fileset library: https://github.com/NixOS/nixpkgs/pull/222981
-      # Not an "idiomatic" flake input because:
-      #  - Propagation to dependent locks: https://github.com/NixOS/nix/issues/7730
-      #  - Subflake would download redundant and huge parent flake
-      #  - No git tree hash support: https://github.com/NixOS/nix/issues/6044
-      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nix/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
-        fileset;
+      inherit (lib) fileset;
 
       officialRelease = false;
-
-      # Set to true to build the release notes for the next release.
-      buildUnreleasedNotes = false;
 
       version = lib.fileContents ./.version + versionSuffix;
       versionSuffix =
@@ -49,20 +43,13 @@
       crossSystems = [
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
-        "x86_64-unknown-freebsd13"
+        "riscv64-unknown-linux-gnu"
         "x86_64-unknown-netbsd"
-      ];
-
-      # Nix doesn't yet build on this platform, so we put it in a
-      # separate list. We just use this for `devShells` and
-      # `nixpkgsFor`, which this depends on.
-      shellCrossSystems = crossSystems ++ [
         "x86_64-w64-mingw32"
       ];
 
       stdenvs = [
         "ccacheStdenv"
-        "clang11Stdenv"
         "clangStdenv"
         "gccStdenv"
         "libcxxStdenv"
@@ -81,6 +68,17 @@
               value = f stdenvName;
             })
             stdenvs);
+
+
+      # We don't apply flake-parts to the whole flake so that non-development attributes
+      # load without fetching any development inputs.
+      devFlake = inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+        imports = [ ./maintainers/flake-module.nix ];
+        systems = lib.subtractLists crossSystems systems;
+        perSystem = { system, ... }: {
+          _module.args.pkgs = nixpkgsFor.${system}.native;
+        };
+      };
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
@@ -103,7 +101,7 @@
         in {
           inherit stdenvs native;
           static = native.pkgsStatic;
-          cross = lib.genAttrs shellCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
+          cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
       installScriptFor = tarballs:
@@ -174,11 +172,19 @@
             enableLargeConfig = true;
           }).overrideAttrs(o: {
             patches = (o.patches or []) ++ [
-              ./boehmgc-coroutine-sp-fallback.diff
+              ./dep-patches/boehmgc-coroutine-sp-fallback.diff
 
               # https://github.com/ivmai/bdwgc/pull/586
-              ./boehmgc-traceable_allocator-public.diff
+              ./dep-patches/boehmgc-traceable_allocator-public.diff
             ];
+          });
+
+          libseccomp-nix = final.libseccomp.overrideAttrs (_: rec {
+            version = "2.5.5";
+            src = final.fetchurl {
+              url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
+              hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
+            };
           });
 
           changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
@@ -200,19 +206,26 @@
               officialRelease = false;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
+              libseccomp = final.libseccomp-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
-              changelog-d = final.changelog-d-nix;
             } // {
               # this is a proper separate downstream package, but put
               # here also for back compat reasons.
               perl-bindings = final.nix-perl-bindings;
             };
 
-            nix-perl-bindings = final.callPackage ./perl {
-              inherit fileset stdenv;
-            };
-
+          nix-perl-bindings = final.callPackage ./perl {
+            inherit fileset stdenv;
           };
+
+          # See https://github.com/NixOS/nixpkgs/pull/214409
+          # Remove when fixed in this flake's nixpkgs
+          pre-commit =
+            if prev.stdenv.hostPlatform.system == "i686-linux"
+            then (prev.pre-commit.override (o: { dotnet-sdk = ""; })).overridePythonAttrs (o: { doCheck = false; })
+            else prev.pre-commit;
+
+        };
 
     in {
       # A Nixpkgs overlay that overrides the 'nix' and
@@ -231,14 +244,25 @@
         buildCross = forAllCrossSystems (crossSystem:
           lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
-        buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
+        buildNoGc = forAllSystems (system:
+          self.packages.${system}.nix.override { enableGC = false; }
+        );
 
         buildNoTests = forAllSystems (system:
-          self.packages.${system}.nix.overrideAttrs (a: {
-            doCheck =
-              assert ! a?dontCheck;
-              false;
-          })
+          self.packages.${system}.nix.override {
+            doCheck = false;
+            doInstallCheck = false;
+            installUnitTests = false;
+          }
+        );
+
+        # Toggles some settings for better coverage. Windows needs these
+        # library combinations, and Debian build Nix with GNU readline too.
+        buildReadlineNoMarkdown = forAllSystems (system:
+          self.packages.${system}.nix.override {
+            enableMarkdown = false;
+            readlineFlavor = "readline";
+          }
         );
 
         # Perl bindings for various platforms.
@@ -269,6 +293,7 @@
           # Cross
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
         ];
         installerScriptForGHA = installScriptFor [
           # Native
@@ -277,6 +302,7 @@
           # Cross
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
           self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."riscv64-unknown-linux-gnu"
         ];
 
         # docker image with Nix inside
@@ -295,6 +321,13 @@
           enableInternalAPIDocs = true;
         };
 
+        # API docs for Nix's C bindings.
+        external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+          inherit fileset;
+          doBuild = false;
+          enableExternalAPIDocs = true;
+        };
+
         # System tests.
         tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
 
@@ -308,8 +341,11 @@
               ''
                 type -p nix-env
                 # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
-                time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
-                [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
+                (
+                  set -x
+                  time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+                  [[ $(sha1sum < packages | cut -c1-40) = e01b031fc9785a572a38be6bc473957e3b6faad7 ]]
+                )
                 mkdir $out
               '';
 
@@ -350,7 +386,6 @@
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
-        perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
         rl-next =
@@ -360,10 +395,16 @@
         '';
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
-      });
+      } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
+        # Some perl dependencies are broken on i686-linux.
+        # Since the support is only best-effort there, disable the perl
+        # bindings
+        perlBindings = self.hydraJobs.perlBindings.${system};
+      } // devFlake.checks.${system} or {}
+      );
 
       packages = forAllSystems (system: rec {
-        inherit (nixpkgsFor.${system}.native) nix;
+        inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
         default = nix;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
@@ -395,7 +436,11 @@
           stdenvs)));
 
       devShells = let
-        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs: {
+        makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
+        let
+          modular = devFlake.getSystem stdenv.buildPlatform.system;
+        in {
+          pname = "shell-for-" + attrs.pname;
           installFlags = "sysconfdir=$(out)/etc";
           shellHook = ''
             PATH=$prefix/bin:$PATH
@@ -405,8 +450,25 @@
             # Make bash completion work.
             XDG_DATA_DIRS+=:$out/share
           '';
+
+          # We use this shell with the local checkout, not unpackPhase.
+          src = null;
+
+          env = {
+            # For `make format`, to work without installing pre-commit
+            _NIX_PRE_COMMIT_HOOKS_CONFIG =
+              "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
+          };
+
           nativeBuildInputs = attrs.nativeBuildInputs or []
-            ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
+            ++ [
+              modular.pre-commit.settings.package
+              (pkgs.writeScriptBin "pre-commit-hooks-install"
+                modular.pre-commit.settings.installationScript)
+            ]
+            # TODO: Remove the darwin check once
+            # https://github.com/NixOS/nixpkgs/pull/291814 is available
+            ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
         });
         in
@@ -418,8 +480,9 @@
               (forAllStdenvs (stdenvName: makeShell pkgs pkgs.${stdenvName}));
           in
             (makeShells "native" nixpkgsFor.${system}.native) //
-            (makeShells "static" nixpkgsFor.${system}.static) //
-            (lib.genAttrs shellCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
+            (lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin)
+              (makeShells "static" nixpkgsFor.${system}.static) //
+              (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv))) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
             }

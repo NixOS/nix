@@ -2,16 +2,24 @@
 #include "environment-variables.hh"
 #include "sync.hh"
 
-#include <sys/ioctl.h>
+#if _WIN32
+# include <io.h>
+# define isatty _isatty
+#else
+# include <sys/ioctl.h>
+#endif
 #include <unistd.h>
 
 namespace nix {
 
-bool shouldANSI()
+bool isTTY()
 {
-    return isatty(STDERR_FILENO)
+    static const bool tty =
+        isatty(STDERR_FILENO)
         && getEnv("TERM").value_or("dumb") != "dumb"
         && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
+
+    return tty;
 }
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
@@ -89,6 +97,7 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
 
+#ifndef _WIN32
 void updateWindowSize()
 {
     struct winsize ws;
@@ -98,6 +107,7 @@ void updateWindowSize()
         windowSize_->second = ws.ws_col;
     }
 }
+#endif
 
 
 std::pair<unsigned short, unsigned short> getWindowSize()

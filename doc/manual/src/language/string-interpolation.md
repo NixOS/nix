@@ -20,6 +20,8 @@ Rather than writing
 
 (where `freetype` is a [derivation]), you can instead write
 
+[derivation]: @docroot@/glossary.md#gloss-derivation
+
 ```nix
 "--with-freetype2-library=${freetype}/lib"
 ```
@@ -105,9 +107,9 @@ An expression that is interpolated must evaluate to one of the following:
 
 A string interpolates to itself.
 
-A path in an interpolated expression is first copied into the Nix store, and the resulting string is the [store path] of the newly created [store object](../glossary.md#gloss-store-object).
+A path in an interpolated expression is first copied into the Nix store, and the resulting string is the [store path] of the newly created [store object](@docroot@/glossary.md#gloss-store-object).
 
-[store path]: ../glossary.md#gloss-store-path
+[store path]: @docroot@/glossary.md#gloss-store-path
 
 > **Example**
 >
@@ -189,7 +191,7 @@ If neither is present, an error is thrown.
 > "${a}"
 > ```
 >
->     error: cannot coerce a set to a string
+>     error: cannot coerce a set to a string: { }
 >
 >            at «string»:4:2:
 >

@@ -20,7 +20,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
 
     if (args[0]->type() == nAttrs) {
 
-        for (auto & attr : *args[0]->attrs) {
+        for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
                 url = state.coerceToString(attr.pos, *attr.value, context,
@@ -38,17 +38,11 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.fetchMercurial");
             else
-                throw EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]),
-                    .errPos = state.positions[attr.pos]
-                });
+                state.error<EvalError>("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]).atPos(attr.pos).debugThrow();
         }
 
         if (url.empty())
-            throw EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            });
+            state.error<EvalError>("'url' argument required").atPos(pos).debugThrow();
 
     } else
         url = state.coerceToString(pos, *args[0], context,
@@ -70,8 +64,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
-    // FIXME: use name
-    auto [storePath, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetchToStore(state.store);
 
     auto attrs2 = state.buildBindings(8);
     state.mkStorePathString(storePath, attrs2.alloc(state.sOutPath));

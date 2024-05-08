@@ -6,6 +6,8 @@
 #include "common-args.hh"
 #include "search-path.hh"
 
+#include <filesystem>
+
 namespace nix {
 
 class Store;
@@ -21,14 +23,24 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 
     Bindings * getAutoArgs(EvalState & state);
 
-    SearchPath searchPath;
+    LookupPath lookupPath;
 
     std::optional<std::string> evalStoreUrl;
 
 private:
-    std::map<std::string, std::string> autoArgs;
+    struct AutoArgExpr { std::string expr; };
+    struct AutoArgString { std::string s; };
+    struct AutoArgFile { std::filesystem::path path; };
+    struct AutoArgStdin { };
+
+    using AutoArg = std::variant<AutoArgExpr, AutoArgString, AutoArgFile, AutoArgStdin>;
+
+    std::map<std::string, AutoArg> autoArgs;
 };
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir = CanonPath::fromCwd());
+/**
+ * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ */
+SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir = nullptr);
 
 }

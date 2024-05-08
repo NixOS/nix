@@ -20,4 +20,4 @@ libexpr-test-support_LIBS = \
     libstore-test-support libutil-test-support \
     libexpr libstore libutil
 
-libexpr-test-support_LDFLAGS := -pthread -lrapidcheck
+libexpr-test-support_LDFLAGS := $(THREAD_LDFLAGS) -lrapidcheck

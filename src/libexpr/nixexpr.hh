@@ -7,130 +7,18 @@
 #include "value.hh"
 #include "symbol-table.hh"
 #include "error.hh"
-#include "chunked-vector.hh"
+#include "position.hh"
+#include "eval-error.hh"
+#include "pos-idx.hh"
+#include "pos-table.hh"
 
 namespace nix {
-
-
-MakeError(EvalError, Error);
-MakeError(ParseError, Error);
-MakeError(AssertionError, EvalError);
-MakeError(ThrownError, AssertionError);
-MakeError(Abort, EvalError);
-MakeError(TypeError, EvalError);
-MakeError(UndefinedVarError, Error);
-MakeError(MissingArgumentError, EvalError);
-
-/**
- * Position objects.
- */
-struct Pos
-{
-    uint32_t line;
-    uint32_t column;
-
-    struct none_tag { };
-    struct Stdin { ref<std::string> source; };
-    struct String { ref<std::string> source; };
-
-    typedef std::variant<none_tag, Stdin, String, SourcePath> Origin;
-
-    Origin origin;
-
-    explicit operator bool() const { return line > 0; }
-
-    operator std::shared_ptr<AbstractPos>() const;
-};
-
-class PosIdx {
-    friend class PosTable;
-
-private:
-    uint32_t id;
-
-    explicit PosIdx(uint32_t id): id(id) {}
-
-public:
-    PosIdx() : id(0) {}
-
-    explicit operator bool() const { return id > 0; }
-
-    bool operator <(const PosIdx other) const { return id < other.id; }
-
-    bool operator ==(const PosIdx other) const { return id == other.id; }
-
-    bool operator !=(const PosIdx other) const { return id != other.id; }
-};
-
-class PosTable
-{
-public:
-    class Origin {
-        friend PosTable;
-    private:
-        // must always be invalid by default, add() replaces this with the actual value.
-        // subsequent add() calls use this index as a token to quickly check whether the
-        // current origins.back() can be reused or not.
-        mutable uint32_t idx = std::numeric_limits<uint32_t>::max();
-
-        // Used for searching in PosTable::[].
-        explicit Origin(uint32_t idx): idx(idx), origin{Pos::none_tag()} {}
-
-    public:
-        const Pos::Origin origin;
-
-        Origin(Pos::Origin origin): origin(origin) {}
-    };
-
-    struct Offset {
-        uint32_t line, column;
-    };
-
-private:
-    std::vector<Origin> origins;
-    ChunkedVector<Offset, 8192> offsets;
-
-public:
-    PosTable(): offsets(1024)
-    {
-        origins.reserve(1024);
-    }
-
-    PosIdx add(const Origin & origin, uint32_t line, uint32_t column)
-    {
-        const auto idx = offsets.add({line, column}).second;
-        if (origins.empty() || origins.back().idx != origin.idx) {
-            origin.idx = idx;
-            origins.push_back(origin);
-        }
-        return PosIdx(idx + 1);
-    }
-
-    Pos operator[](PosIdx p) const
-    {
-        if (p.id == 0 || p.id > offsets.size())
-            return {};
-        const auto idx = p.id - 1;
-        /* we want the last key <= idx, so we'll take prev(first key > idx).
-           this is guaranteed to never rewind origin.begin because the first
-           key is always 0. */
-        const auto pastOrigin = std::upper_bound(
-            origins.begin(), origins.end(), Origin(idx),
-            [] (const auto & a, const auto & b) { return a.idx < b.idx; });
-        const auto origin = *std::prev(pastOrigin);
-        const auto offset = offsets[idx];
-        return {offset.line, offset.column, origin.origin};
-    }
-};
-
-inline PosIdx noPos = {};
-
-std::ostream & operator << (std::ostream & str, const Pos & pos);
 
 
 struct Env;
 struct Value;
 class EvalState;
+struct ExprWith;
 struct StaticEnv;
 
 
@@ -154,6 +42,11 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 struct Expr
 {
+    struct AstSymbols {
+        Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
+    };
+
+
     static unsigned long nrExprs;
     Expr() {
         nrExprs++;
@@ -199,10 +92,10 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
-    ref<InputAccessor> accessor;
+    ref<SourceAccessor> accessor;
     std::string s;
     Value v;
-    ExprPath(ref<InputAccessor> accessor, std::string s) : accessor(accessor), s(std::move(s))
+    ExprPath(ref<SourceAccessor> accessor, std::string s) : accessor(accessor), s(std::move(s))
     {
         v.mkPath(&*accessor, this->s.c_str());
     }
@@ -219,8 +112,11 @@ struct ExprVar : Expr
     Symbol name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
-       or function argument) or from a "with". */
-    bool fromWith;
+       or function argument) or from a "with".
+
+       `nullptr`: Not from a `with`.
+       Valid pointer: the nearest, innermost `with` expression to query first. */
+    ExprWith * fromWith;
 
     /* In the former case, the value is obtained by going `level`
        levels up from the current environment and getting the
@@ -236,6 +132,23 @@ struct ExprVar : Expr
     Value * maybeThunk(EvalState & state, Env & env) override;
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
+};
+
+/**
+ * A pseudo-expression for the purpose of evaluating the `from` expression in `inherit (from)` syntax.
+ * Unlike normal variable references, the displacement is set during parsing, and always refers to
+ * `ExprAttrs::inheritFromExprs` (by itself or in `ExprLet`), whose values are put into their own `Env`.
+ */
+struct ExprInheritFrom : ExprVar
+{
+    ExprInheritFrom(PosIdx pos, Displacement displ): ExprVar(pos, {})
+    {
+        this->level = 0;
+        this->displ = displ;
+        this->fromWith = nullptr;
+    }
+
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
 };
 
 struct ExprSelect : Expr
@@ -263,16 +176,40 @@ struct ExprAttrs : Expr
     bool recursive;
     PosIdx pos;
     struct AttrDef {
-        bool inherited;
+        enum class Kind {
+            /** `attr = expr;` */
+            Plain,
+            /** `inherit attr1 attrn;` */
+            Inherited,
+            /** `inherit (expr) attr1 attrn;` */
+            InheritedFrom,
+        };
+
+        Kind kind;
         Expr * e;
         PosIdx pos;
         Displacement displ; // displacement
-        AttrDef(Expr * e, const PosIdx & pos, bool inherited=false)
-            : inherited(inherited), e(e), pos(pos) { };
+        AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
+            : kind(kind), e(e), pos(pos) { };
         AttrDef() { };
+
+        template<typename T>
+        const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
+        {
+            switch (kind) {
+            case Kind::Plain:
+                return plain;
+            case Kind::Inherited:
+                return inherited;
+            default:
+            case Kind::InheritedFrom:
+                return inheritedFrom;
+            }
+        }
     };
     typedef std::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
+    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
     struct DynamicAttrDef {
         Expr * nameExpr, * valueExpr;
         PosIdx pos;
@@ -285,6 +222,11 @@ struct ExprAttrs : Expr
     ExprAttrs() : recursive(false) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
+
+    std::shared_ptr<const StaticEnv> bindInheritSources(
+        EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+    Env * buildInheritFromEnv(EvalState & state, Env & up);
+    void showBindings(const SymbolTable & symbols, std::ostream & str) const;
 };
 
 struct ExprList : Expr
@@ -292,6 +234,7 @@ struct ExprList : Expr
     std::vector<Expr *> elems;
     ExprList() { };
     COMMON_METHODS
+    Value * maybeThunk(EvalState & state, Env & env) override;
 
     PosIdx getPos() const override
     {
@@ -378,6 +321,7 @@ struct ExprWith : Expr
     PosIdx pos;
     Expr * attrs, * body;
     size_t prevWith;
+    ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body) : pos(pos), attrs(attrs), body(body) { };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -455,20 +399,30 @@ struct ExprPos : Expr
     COMMON_METHODS
 };
 
+/* only used to mark thunks as black holes. */
+struct ExprBlackHole : Expr
+{
+    void show(const SymbolTable & symbols, std::ostream & str) const override {}
+    void eval(EvalState & state, Env & env, Value & v) override;
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
+};
+
+extern ExprBlackHole eBlackHole;
+
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at
    runtime. */
 struct StaticEnv
 {
-    bool isWith;
+    ExprWith * isWith;
     const StaticEnv * up;
 
     // Note: these must be in sorted order.
     typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
 
-    StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+    StaticEnv(ExprWith * isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
         vars.reserve(expectedSize);
     };
 

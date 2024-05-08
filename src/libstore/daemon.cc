@@ -1,5 +1,5 @@
 #include "daemon.hh"
-#include "monitor-fd.hh"
+#include "signals.hh"
 #include "worker-protocol.hh"
 #include "worker-protocol-impl.hh"
 #include "build-result.hh"
@@ -13,6 +13,11 @@
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
+#include "git.hh"
+
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
+# include "monitor-fd.hh"
+#endif
 
 namespace nix::daemon {
 
@@ -119,7 +124,7 @@ struct TunnelLogger : public Logger
             if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
                 to << STDERR_ERROR << *ex;
             } else {
-                to << STDERR_ERROR << ex->what() << ex->status;
+                to << STDERR_ERROR << ex->what() << ex->info().status;
             }
         }
     }
@@ -253,7 +258,7 @@ struct ClientSettings
                 else if (setSubstituters(settings.substituters))
                     ;
                 else
-                    debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+                    warn("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
@@ -400,11 +405,25 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashAlgo_] = ContentAddressMethod::parse(camStr);
-                auto hashAlgo = hashAlgo_; // work around clang bug
+                auto [contentAddressMethod, hashAlgo] = ContentAddressMethod::parseWithAlgo(camStr);
                 FramedSource source(from);
+                FileSerialisationMethod dumpMethod;
+                switch (contentAddressMethod.getFileIngestionMethod()) {
+                case FileIngestionMethod::Flat:
+                    dumpMethod = FileSerialisationMethod::Flat;
+                    break;
+                case FileIngestionMethod::Recursive:
+                    dumpMethod = FileSerialisationMethod::Recursive;
+                    break;
+                case FileIngestionMethod::Git:
+                    // Use NAR; Git is not a serialization method
+                    dumpMethod = FileSerialisationMethod::Recursive;
+                    break;
+                default:
+                    assert(false);
+                }
                 // TODO these two steps are essentially RemoteStore::addCAToStore. Move it up to Store.
-                auto path = store->addToStoreFromDump(source, name, contentAddressMethod, hashAlgo, refs, repair);
+                auto path = store->addToStoreFromDump(source, name, dumpMethod, contentAddressMethod, hashAlgo, refs, repair);
                 return store->queryPathInfo(path);
             }();
             logger->stopWork();
@@ -430,30 +449,23 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 hashAlgo = parseHashAlgo(hashAlgoRaw);
             }
 
+            // Old protocol always sends NAR, regardless of hashing method
             auto dumpSource = sinkToSource([&](Sink & saved) {
-                if (method == FileIngestionMethod::Recursive) {
-                    /* We parse the NAR dump through into `saved` unmodified,
-                       so why all this extra work? We still parse the NAR so
-                       that we aren't sending arbitrary data to `saved`
-                       unwittingly`, and we know when the NAR ends so we don't
-                       consume the rest of `from` and can't parse another
-                       command. (We don't trust `addToStoreFromDump` to not
-                       eagerly consume the entire stream it's given, past the
-                       length of the Nar. */
-                    TeeSource savedNARSource(from, saved);
-                    NullParseSink sink; /* just parse the NAR */
-                    parseDump(sink, savedNARSource);
-                } else {
-                    /* Incrementally parse the NAR file, stripping the
-                       metadata, and streaming the sole file we expect into
-                       `saved`. */
-                    RegularFileSink savedRegular { saved };
-                    parseDump(savedRegular, from);
-                    if (!savedRegular.regular) throw Error("regular file expected");
-                }
+                /* We parse the NAR dump through into `saved` unmodified,
+                   so why all this extra work? We still parse the NAR so
+                   that we aren't sending arbitrary data to `saved`
+                   unwittingly`, and we know when the NAR ends so we don't
+                   consume the rest of `from` and can't parse another
+                   command. (We don't trust `addToStoreFromDump` to not
+                   eagerly consume the entire stream it's given, past the
+                   length of the Nar. */
+                TeeSource savedNARSource(from, saved);
+                NullFileSystemObjectSink sink; /* just parse the NAR */
+                parseDump(sink, savedNARSource);
             });
             logger->startWork();
-            auto path = store->addToStoreFromDump(*dumpSource, baseName, method, hashAlgo);
+            auto path = store->addToStoreFromDump(
+                *dumpSource, baseName, FileSerialisationMethod::Recursive, method, hashAlgo);
             logger->stopWork();
 
             to << store->printStorePath(path);
@@ -485,7 +497,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto path = ({
             StringSource source { s };
-            store->addToStoreFromDump(source, suffix, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, NoRepair);
+            store->addToStoreFromDump(source, suffix, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, NoRepair);
         });
         logger->stopWork();
         to << store->printStorePath(path);
@@ -913,7 +925,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 source = std::make_unique<TunnelSource>(from, to);
             else {
                 TeeSource tee { from, saved };
-                NullParseSink ether;
+                NullFileSystemObjectSink ether;
                 parseDump(ether, tee);
                 source = std::make_unique<StringSource>(saved.s);
             }
@@ -1009,7 +1021,9 @@ void processConnection(
     TrustedFlag trusted,
     RecursiveFlag recursive)
 {
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
+#endif
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
@@ -1030,7 +1044,7 @@ void processConnection(
     unsigned int opCount = 0;
 
     Finally finally([&]() {
-        _isInterrupted = false;
+        setInterrupted(false);
         printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 

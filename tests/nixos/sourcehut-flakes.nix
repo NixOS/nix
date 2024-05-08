@@ -108,7 +108,7 @@ in
               flake-registry = https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json
             '';
             environment.systemPackages = [ pkgs.jq ];
-            networking.hosts.${(builtins.head nodes.sourcehut.config.networking.interfaces.eth1.ipv4.addresses).address} =
+            networking.hosts.${(builtins.head nodes.sourcehut.networking.interfaces.eth1.ipv4.addresses).address} =
               [ "git.sr.ht" ];
             security.pki.certificateFiles = [ "${cert}/ca.crt" ];
           };

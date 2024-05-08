@@ -9,7 +9,9 @@
 #include <fstream>
 #include <string>
 #include <regex>
-#include <glob.h>
+#ifndef _WIN32
+# include <glob.h>
+#endif
 
 namespace nix {
 
@@ -285,7 +287,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
                 std::string line;
                 std::getline(stream,line);
-                static const std::string commentChars("#/\\%@*-");
+                static const std::string commentChars("#/\\%@*-(");
                 std::string shebangContent;
                 while (std::getline(stream,line) && !line.empty() && commentChars.find(line[0]) != std::string::npos){
                     line = chomp(line);
@@ -304,7 +306,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 for (auto pos = savedArgs.begin(); pos != savedArgs.end();pos++)
                     cmdline.push_back(*pos);
             }
-        } catch (SysError &) { }
+        } catch (SystemError &) { }
     }
     for (auto pos = cmdline.begin(); pos != cmdline.end(); ) {
 
@@ -544,76 +546,10 @@ nlohmann::json Args::toJSON()
     return res;
 }
 
-static void hashFormatCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
-{
-    for (auto & format : hashFormats) {
-        if (hasPrefix(format, prefix)) {
-            completions.add(format);
-        }
-    }
-}
-
-Args::Flag Args::Flag::mkHashFormatFlagWithDefault(std::string &&longName, HashFormat * hf) {
-    assert(*hf == nix::HashFormat::SRI);
-    return Flag{
-            .longName = std::move(longName),
-            .description = "hash format ('base16', 'nix32', 'base64', 'sri'). Default: 'sri'",
-            .labels = {"hash-format"},
-            .handler = {[hf](std::string s) {
-                *hf = parseHashFormat(s);
-            }},
-            .completer = hashFormatCompleter,
-    };
-}
-
-Args::Flag Args::Flag::mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf) {
-    return Flag{
-            .longName = std::move(longName),
-            .description = "hash format ('base16', 'nix32', 'base64', 'sri').",
-            .labels = {"hash-format"},
-            .handler = {[ohf](std::string s) {
-                *ohf = std::optional<HashFormat>{parseHashFormat(s)};
-            }},
-            .completer = hashFormatCompleter,
-    };
-}
-
-static void hashAlgoCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
-{
-    for (auto & algo : hashAlgorithms)
-        if (hasPrefix(algo, prefix))
-            completions.add(algo);
-}
-
-Args::Flag Args::Flag::mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha)
-{
-    return Flag{
-            .longName = std::move(longName),
-            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512')",
-            .labels = {"hash-algo"},
-            .handler = {[ha](std::string s) {
-                *ha = parseHashAlgo(s);
-            }},
-            .completer = hashAlgoCompleter,
-    };
-}
-
-Args::Flag Args::Flag::mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha)
-{
-    return Flag{
-            .longName = std::move(longName),
-            .description = "hash algorithm ('md5', 'sha1', 'sha256', or 'sha512'). Optional as can also be gotten from SRI hash itself.",
-            .labels = {"hash-algo"},
-            .handler = {[oha](std::string s) {
-                *oha = std::optional<HashAlgorithm>{parseHashAlgo(s)};
-            }},
-            .completer = hashAlgoCompleter,
-    };
-}
-
 static void _completePath(AddCompletions & completions, std::string_view prefix, bool onlyDirs)
 {
     completions.setType(Completions::Type::Filenames);
+    #ifndef _WIN32 // TODO implement globbing completions on Windows
     glob_t globbuf;
     int flags = GLOB_NOESCAPE;
     #ifdef GLOB_ONLYDIR
@@ -631,6 +567,7 @@ static void _completePath(AddCompletions & completions, std::string_view prefix,
         }
     }
     globfree(&globbuf);
+    #endif
 }
 
 void Args::completePath(AddCompletions & completions, size_t, std::string_view prefix)

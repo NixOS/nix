@@ -30,7 +30,10 @@ echo hello >> $TEST_ROOT/worktree/hello
 rev2=$(git -C $repo rev-parse HEAD)
 git -C $repo tag -a tag2 -m tag2
 
-# Fetch a worktree
+# Check whether fetching in read-only mode works.
+nix-instantiate --eval -E "builtins.readFile ((builtins.fetchGit file://$TEST_ROOT/worktree) + \"/hello\") == \"utrecht\\n\""
+
+# Fetch a worktree.
 unset _NIX_FORCE_HTTP
 path0=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath")
 path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$TEST_ROOT/worktree; }).outPath")
@@ -40,9 +43,17 @@ path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree git+file://$TEST_RO
 export _NIX_FORCE_HTTP=1
 [[ $(tail -n 1 $path0/hello) = "hello" ]]
 
+# Nuke the cache
+rm -rf $TEST_HOME/.cache/nix
+
 # Fetch the default branch.
 path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]
+
+# Fetch when the cache has packed-refs
+# Regression test of #8822
+git -C $TEST_HOME/.cache/nix/gitv3/*/ pack-refs --all
+path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
 
 # Fetch a rev from another branch
 git -C $repo checkout -b devtest
@@ -65,6 +76,9 @@ path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"
 
 # In pure eval mode, fetchGit with a revision should succeed.
 [[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
+
+# But without a hash, it fails
+expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' will not fetch unlocked input"
 
 # Fetch again. This should be cached.
 mv $repo ${repo}-tmp
@@ -205,6 +219,8 @@ path6=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; ur
 [[ $path3 = $path6 ]]
 [[ $(nix eval --impure --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow\"; ref = \"dev\"; shallow = true; }).revCount or 123") == 123 ]]
 
+expectStderr 1 nix eval --expr 'builtins.fetchTree { type = "git"; url = "file:///foo"; }' | grepQuiet "'fetchTree' will not fetch unlocked input"
+
 # Explicit ref = "HEAD" should work, and produce the same outPath as without ref
 path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
 path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; }).outPath")
@@ -229,8 +245,21 @@ rev_tag2=$(git -C $repo rev-parse refs/tags/tag2)
 [[ $rev_tag2_nix = $rev_tag2 ]]
 unset _NIX_FORCE_HTTP
 
+# Ensure .gitattributes is respected
+touch $repo/not-exported-file
+touch $repo/exported-wonky
+echo "/not-exported-file export-ignore" >> $repo/.gitattributes
+echo "/exported-wonky export-ignore=wonk" >> $repo/.gitattributes
+git -C $repo add not-exported-file exported-wonky .gitattributes
+git -C $repo commit -m 'Bla6'
+rev5=$(git -C $repo rev-parse HEAD)
+path12=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev5\"; }).outPath")
+[[ ! -e $path12/not-exported-file ]]
+[[ -e $path12/exported-wonky ]]
+
 # should fail if there is no repo
 rm -rf $repo/.git
+rm -rf $TEST_HOME/.cache/nix
 (! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # should succeed for a repo without commits
@@ -251,3 +280,28 @@ git -C "$repo" add hello .gitignore
 git -C "$repo" commit -m 'Bla1'
 cd "$repo"
 path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")
+
+# Test a workdir with no commits.
+empty="$TEST_ROOT/empty"
+git init "$empty"
+
+emptyAttrs='{ lastModified = 0; lastModifiedDate = "19700101000000"; narHash = "sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo="; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }'
+
+[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = $emptyAttrs ]]
+
+echo foo > "$empty/x"
+
+[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = $emptyAttrs ]]
+
+git -C "$empty" add x
+
+[[ $(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]") = '{ lastModified = 0; lastModifiedDate = "19700101000000"; narHash = "sha256-wzlAGjxKxpaWdqVhlq55q5Gxo4Bf860+kLeEa/v02As="; rev = "0000000000000000000000000000000000000000"; revCount = 0; shortRev = "0000000"; submodules = false; }' ]]
+
+# Test a repo with an empty commit.
+git -C "$empty" rm -f x
+
+git -C "$empty" config user.email "foobar@example.com"
+git -C "$empty" config user.name "Foobar"
+git -C "$empty" commit --allow-empty --allow-empty-message --message ""
+
+nix eval --impure --expr "let attrs = builtins.fetchGit $empty; in assert attrs.lastModified != 0; assert attrs.rev != \"0000000000000000000000000000000000000000\"; assert attrs.revCount == 1; true"

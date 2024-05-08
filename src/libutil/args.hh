@@ -41,7 +41,7 @@ public:
     virtual std::string doc() { return ""; }
 
     /**
-     * @brief Get the base directory for the command.
+     * @brief Get the [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory) for the command.
      *
      * @return Generally the working directory, but in case of a shebang
      *         interpreter, returns the directory of the script.
@@ -155,6 +155,8 @@ protected:
      */
     using CompleterClosure = std::function<CompleterFun>;
 
+public:
+
     /**
      * Description of flags / options
      *
@@ -175,12 +177,9 @@ protected:
         CompleterClosure completer;
 
         std::optional<ExperimentalFeature> experimentalFeature;
-
-        static Flag mkHashAlgoFlag(std::string && longName, HashAlgorithm * ha);
-        static Flag mkHashAlgoOptFlag(std::string && longName, std::optional<HashAlgorithm> * oha);
-        static Flag mkHashFormatFlagWithDefault(std::string && longName, HashFormat * hf);
-        static Flag mkHashFormatOptFlag(std::string && longName, std::optional<HashFormat> * ohf);
     };
+
+protected:
 
     /**
      * Index of all registered "long" flag descriptions (flags like
@@ -200,6 +199,8 @@ protected:
      */
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
 
+public:
+
     /**
      * Description of positional arguments
      *
@@ -213,6 +214,8 @@ protected:
         Handler handler;
         CompleterClosure completer;
     };
+
+protected:
 
     /**
      * Queue of expected positional argument forms.

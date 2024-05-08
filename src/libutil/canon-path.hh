@@ -21,9 +21,21 @@ namespace nix {
  *
  * - There are no components equal to '.' or '..'.
  *
- * Note that the path does not need to correspond to an actually
- * existing path, and there is no guarantee that symlinks are
- * resolved.
+ * `CanonPath` are "virtual" Nix paths for abstract file system objects;
+ * they are always Unix-style paths, regardless of what OS Nix is
+ * running on. The `/` root doesn't denote the ambient host file system
+ * root, but some virtual FS root.
+ *
+ * @note It might be useful to compare `openat(some_fd, "foo/bar")` on
+ * Unix. `"foo/bar"` is a relative path because an absolute path would
+ * "override" the `some_fd` directory file descriptor and escape to the
+ * "system root". Conversely, Nix's abstract file operations *never* escape the
+ * designated virtual file system (i.e. `SourceAccessor` or
+ * `ParseSink`), so `CanonPath` does not need an absolute/relative
+ * distinction.
+ *
+ * @note The path does not need to correspond to an actually existing
+ * path, and the path may or may not have unresolved symlinks.
  */
 class CanonPath
 {
@@ -51,8 +63,6 @@ public:
      * Construct a canon path from a vector of elements.
      */
     CanonPath(const std::vector<std::string> & elems);
-
-    static CanonPath fromCwd(std::string_view path = ".");
 
     static CanonPath root;
 
@@ -87,6 +97,13 @@ public:
 
     std::string_view rel() const
     { return ((std::string_view) path).substr(1); }
+
+    const char * rel_c_str() const
+    {
+        auto cs = path.c_str();
+        assert(cs[0]); // for safety if invariant is broken
+        return &cs[1];
+    }
 
     struct Iterator
     {
@@ -183,14 +200,14 @@ public:
     /**
      * Concatenate two paths.
      */
-    CanonPath operator + (const CanonPath & x) const;
+    CanonPath operator / (const CanonPath & x) const;
 
     /**
      * Add a path component to this one. It must not contain any slashes.
      */
     void push(std::string_view c);
 
-    CanonPath operator + (std::string_view c) const;
+    CanonPath operator / (std::string_view c) const;
 
     /**
      * Check whether access to this path is allowed, which is the case
