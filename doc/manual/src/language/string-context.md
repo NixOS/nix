@@ -13,28 +13,31 @@ The purpose of string contexts is to collect non-string values attached to strin
 [string concatenation](./operators.md#string-concatenation),
 [string interpolation](./string-interpolation.md),
 and similar operations.
-The idea is that a user can combine together values to create a build recipe without manually keeping track of where the "ingredients" come from, and then the Nix language does that bookkeeping implicitly to come up with the right derivation inputs.
+The idea is that a user can combine together values to create a build instructions for derivations without manually keeping track of where they come from.
+Then the Nix language implicitly does that bookkeeping to efficiently obtain the closure of derivation inputs.
 
-> In line with this goal, string contexts are *not* explicitly manipulated in idiomatic Nix code.
-> Strings with non-empty contexts are only concatenated and eventually passed to `builtins.derivation`.
-> Plain strings with empty contexts are the only ones to be inspected, e.g. using comparison with `==`.
+> **Note**
+>
+> String contexts are *not* explicitly manipulated in idiomatic Nix language code.
+
+Strings with non-empty contexts are only concatenated and eventually passed to [`builtins.derivation`](./derivations.md).
+Plain strings with empty contexts are the only ones to be inspected, e.g. using comparison with [the equality operator (`==`)](./operators#equality).
 
 String context elements come in different forms:
 
-- [*constant*]{#string-context-element-constant}
-- [*output*]{#string-context-element-output}
+- [deriving path]{#string-context-element-derived-path}
+
+  A string context element of this type is a [deriving path](@docroot@/glossary.md#gloss-deriving-path).
+  They can be one of the varieties *constant* or *output*, which correspond to the types of deriving path.
+
+  <!-- put the two sections with examples here as a list with anchors on the items -->
+
 - [*derivation deep*]{#string-context-element-derivation-deep}
 
-*Constant* and *output* string contexts elements are just
-[deriving paths](@docroot@/glossary.md#gloss-deriving-path);
-those are just the names of the two kinds of deriving path.
-See the documentation on deriving paths for further details.
-
-*derivation deep* is an advanced feature intended to be used with the
-[`exportReferencesGraph`](./advanced-attributes.html#adv-attr-exportReferencesGraph)
-advanced derivation feature.
-A *derivation deep* string context element is a derivation path, and refers to both its outputs and the entire build closure of that derivation:
-all its outputs, all the other derivations the given derivation depends on, and all their outputs too.
+  *derivation deep* is an advanced feature intended to be used with the
+  [`exportReferencesGraph` derivation attribute](./advanced-attributes.html#adv-attr-exportReferencesGraph).
+  A *derivation deep* string context element is a derivation path, and refers to both its outputs and the entire build closure of that derivation:
+  all its outputs, all the other derivations the given derivation depends on, and all the outputs of those.
 
 ## Inspecting string contexts
 
@@ -65,15 +68,13 @@ A string with arbitrary contexts can be made like this:
 2. Dump its context with [`builtins.getContext`].
 3. Combine it with a base string and repeated [`builtins.appendContext`] calls.
 
-The remainder of this section will focus on step 1: making strings with individual string context elements on which to apply `builtins.getContext`.
-
 [`builtins.appendContext`]: ./builtins.md#builtins-appendContext
 
 ### Constant string context elements
 
-A constant string context element is just a constant [deriving path];
-a constant deriving path is just a [store path].
-We therefore want to use [`builtins.storePath`] to create a string with a single constant string context element:
+A constant string context element is a constant [deriving path];
+a constant deriving path is a [store path].
+[`builtins.storePath`] creates a string with a single constant string context element:
 
 > **Example**
 >
@@ -98,7 +99,7 @@ We therefore want to use [`builtins.storePath`] to create a string with a single
 > **Example**
 >
 > This is best illustrated with a built-in function that is still experimental: [`builtins.ouputOf`].
-> This example will *not* work the stable Nix!
+> This example will *not* work with stable Nix!
 >
 > ```nix
 > builtins.getContext
