@@ -202,7 +202,7 @@ struct CurlInputScheme : InputScheme
 {
     const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
 
-    const bool hasTarballExtension(std::string_view path) const
+    bool hasTarballExtension(std::string_view path) const
     {
         return hasSuffix(path, ".zip") || hasSuffix(path, ".tar")
             || hasSuffix(path, ".tgz") || hasSuffix(path, ".tar.gz")
