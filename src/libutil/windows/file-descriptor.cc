@@ -14,6 +14,8 @@
 
 namespace nix {
 
+using namespace nix::windows;
+
 std::string readFile(HANDLE handle)
 {
     LARGE_INTEGER li;

@@ -212,7 +212,11 @@ void PathSubstitutionGoal::tryToRun()
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
+#ifndef _WIN32
     outPipe.create();
+#else
+    outPipe.createAsyncPipe(worker.ioport.get());
+#endif
 
     promise = std::promise<void>();
 
@@ -235,7 +239,13 @@ void PathSubstitutionGoal::tryToRun()
         }
     });
 
-    worker.childStarted(shared_from_this(), {outPipe.readSide.get()}, true, false);
+    worker.childStarted(shared_from_this(), {
+#ifndef _WIN32
+        outPipe.readSide.get()
+#else
+        &outPipe
+#endif
+    }, true, false);
 
     state = &PathSubstitutionGoal::finished;
 }
@@ -294,12 +304,12 @@ void PathSubstitutionGoal::finished()
 }
 
 
-void PathSubstitutionGoal::handleChildOutput(int fd, std::string_view data)
+void PathSubstitutionGoal::handleChildOutput(Descriptor fd, std::string_view data)
 {
 }
 
 
-void PathSubstitutionGoal::handleEOF(int fd)
+void PathSubstitutionGoal::handleEOF(Descriptor fd)
 {
     if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }

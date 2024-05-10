@@ -66,7 +66,11 @@ void DrvOutputSubstitutionGoal::tryNext()
        some other error occurs), so it must not touch `this`. So put
        the shared state in a separate refcounted object. */
     downloadState = std::make_shared<DownloadState>();
+#ifndef _WIN32
     downloadState->outPipe.create();
+#else
+    downloadState->outPipe.createAsyncPipe(worker.ioport.get());
+#endif
 
     sub->queryRealisation(
         id,
@@ -79,7 +83,13 @@ void DrvOutputSubstitutionGoal::tryNext()
             }
         } });
 
-    worker.childStarted(shared_from_this(), {downloadState->outPipe.readSide.get()}, true, false);
+    worker.childStarted(shared_from_this(), {
+#ifndef _WIN32
+        downloadState->outPipe.readSide.get()
+#else
+        &downloadState->outPipe
+#endif
+    }, true, false);
 
     state = &DrvOutputSubstitutionGoal::realisationFetched;
 }
@@ -158,7 +168,7 @@ void DrvOutputSubstitutionGoal::work()
     (this->*state)();
 }
 
-void DrvOutputSubstitutionGoal::handleEOF(int fd)
+void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)
 {
     if (fd == downloadState->outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }

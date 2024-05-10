@@ -2,7 +2,7 @@
 ///@file
 
 #include "parsed-derivations.hh"
-#include "lock.hh"
+#include "user-lock.hh"
 #include "outputs-spec.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
@@ -292,8 +292,8 @@ struct DerivationGoal : public Goal
     /**
      * Callback used by the worker to write to the log.
      */
-    void handleChildOutput(int fd, std::string_view data) override;
-    void handleEOF(int fd) override;
+    void handleChildOutput(Descriptor fd, std::string_view data) override;
+    void handleEOF(Descriptor fd) override;
     void flushLine();
 
     /**

@@ -138,12 +138,12 @@ public:
 
     virtual void waiteeDone(GoalPtr waitee, ExitCode result);
 
-    virtual void handleChildOutput(int fd, std::string_view data)
+    virtual void handleChildOutput(Descriptor fd, std::string_view data)
     {
         abort();
     }
 
-    virtual void handleEOF(int fd)
+    virtual void handleEOF(Descriptor fd)
     {
         abort();
     }

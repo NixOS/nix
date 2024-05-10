@@ -2,10 +2,13 @@
 ///@file
 
 #include "types.hh"
-#include "lock.hh"
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
+
+#ifdef _WIN32
+#  include "windows-async-pipe.hh"
+#endif
 
 #include <future>
 #include <thread>
@@ -13,7 +16,9 @@
 namespace nix {
 
 /* Forward definition. */
+#ifndef _WIN32 // TODO Enable building on Windows
 struct DerivationGoal;
+#endif
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
 
@@ -36,14 +41,22 @@ typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
 /**
  * A mapping used to remember for each child process to what goal it
- * belongs, and file descriptors for receiving log data and output
+ * belongs, and comm channels for receiving log data and output
  * path creation commands.
  */
 struct Child
 {
+    using CommChannel =
+#ifndef _WIN32
+        Descriptor
+#else
+        windows::AsyncPipe *
+#endif
+        ;
+
     WeakGoalPtr goal;
     Goal * goal2; // ugly hackery
-    std::set<int> fds;
+    std::set<CommChannel> channels;
     bool respectTimeouts;
     bool inBuildSlot;
     /**
@@ -53,8 +66,10 @@ struct Child
     steady_time_point timeStarted;
 };
 
+#ifndef _WIN32 // TODO Enable building on Windows
 /* Forward definition. */
 struct HookInstance;
+#endif
 
 /**
  * The worker class.
@@ -101,7 +116,9 @@ private:
      * Maps used to prevent multiple instantiations of a goal for the
      * same derivation / path.
      */
+#ifndef _WIN32 // TODO Enable building on Windows
     std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
+#endif
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
 
@@ -152,10 +169,16 @@ public:
      */
     bool checkMismatch;
 
+#ifdef _WIN32
+    AutoCloseFD ioport;
+#endif
+
     Store & store;
     Store & evalStore;
 
+#ifndef _WIN32 // TODO Enable building on Windows
     std::unique_ptr<HookInstance> hook;
+#endif
 
     uint64_t expectedBuilds = 0;
     uint64_t doneBuilds = 0;
@@ -184,6 +207,7 @@ public:
      * Make a goal (with caching).
      */
 
+#ifndef _WIN32 // TODO Enable building on Windows
     /**
      * @ref DerivationGoal "derivation goal"
      */
@@ -198,6 +222,7 @@ public:
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
         const StorePath & drvPath, const BasicDerivation & drv,
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
+#endif
 
     /**
      * @ref SubstitutionGoal "substitution goal"
@@ -238,7 +263,7 @@ public:
      * Registers a running child process.  `inBuildSlot` means that
      * the process counts towards the jobs limit.
      */
-    void childStarted(GoalPtr goal, const std::set<int> & fds,
+    void childStarted(GoalPtr goal, const std::set<Child::CommChannel> & channels,
         bool inBuildSlot, bool respectTimeouts);
 
     /**
