@@ -30,32 +30,6 @@
 #include <sys/utsname.h>
 #include <sys/resource.h>
 
-#if HAVE_STATVFS
-#include <sys/statvfs.h>
-#endif
-
-/* Includes required for chroot support. */
-#if __linux__
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <net/if.h>
-#include <netinet/ip.h>
-#include <sys/mman.h>
-#include <sched.h>
-#include <sys/param.h>
-#include <sys/mount.h>
-#include <sys/syscall.h>
-#if HAVE_SECCOMP
-#include <seccomp.h>
-#endif
-#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
-#endif
-
-#if __APPLE__
-#include <spawn.h>
-#include <sys/sysctl.h>
-#endif
-
 #include <pwd.h>
 #include <grp.h>
 

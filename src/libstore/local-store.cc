@@ -26,7 +26,6 @@
 #include <new>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/select.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <utime.h>
@@ -34,25 +33,26 @@
 #include <errno.h>
 #include <stdio.h>
 #include <time.h>
-#include <grp.h>
+
+#ifndef _WIN32
+# include <grp.h>
+#endif
 
 #if __linux__
-#include <sched.h>
-#include <sys/statvfs.h>
-#include <sys/mount.h>
-#include <sys/ioctl.h>
+# include <sched.h>
+# include <sys/statvfs.h>
+# include <sys/mount.h>
+# include <sys/ioctl.h>
 #endif
 
 #ifdef __CYGWIN__
-#include <windows.h>
+# include <windows.h>
 #endif
 
 #include <sqlite3.h>
 
 
 namespace nix {
-
-using namespace nix::unix;
 
 std::string LocalStoreConfig::doc()
 {
@@ -224,6 +224,7 @@ LocalStore::LocalStore(const Params & params)
         }
     }
 
+#ifndef _WIN32
     /* Optionally, create directories and set permissions for a
        multi-user install. */
     if (isRootUser() && settings.buildUsersGroup != "") {
@@ -245,6 +246,7 @@ LocalStore::LocalStore(const Params & params)
             }
         }
     }
+#endif
 
     /* Ensure that the store and its parents are not symlinks. */
     if (!settings.allowSymlinkedStore) {
@@ -270,14 +272,25 @@ LocalStore::LocalStore(const Params & params)
         if (stat(reservedPath.c_str(), &st) == -1 ||
             st.st_size != settings.reservedSize)
         {
-            AutoCloseFD fd = open(reservedPath.c_str(), O_WRONLY | O_CREAT | O_CLOEXEC, 0600);
+            AutoCloseFD fd = toDescriptor(open(reservedPath.c_str(), O_WRONLY | O_CREAT
+#ifndef _WIN32
+                | O_CLOEXEC
+#endif
+                , 0600));
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
             res = posix_fallocate(fd.get(), 0, settings.reservedSize);
 #endif
             if (res == -1) {
                 writeFull(fd.get(), std::string(settings.reservedSize, 'X'));
-                [[gnu::unused]] auto res2 = ftruncate(fd.get(), settings.reservedSize);
+                [[gnu::unused]] auto res2 =
+
+#ifdef _WIN32
+                    SetEndOfFile(fd.get())
+#else
+                    ftruncate(fd.get(), settings.reservedSize)
+#endif
+                    ;
             }
         }
     } catch (SystemError & e) { /* don't care about errors */
@@ -460,10 +473,14 @@ LocalStore::LocalStore(std::string scheme, std::string path, const Params & para
 AutoCloseFD LocalStore::openGCLock()
 {
     Path fnGCLock = stateDir + "/gc.lock";
-    auto fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    auto fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT
+#ifndef _WIN32
+        | O_CLOEXEC
+#endif
+        , 0600);
     if (!fdGCLock)
         throw SysError("opening global GC lock '%1%'", fnGCLock);
-    return fdGCLock;
+    return toDescriptor(fdGCLock);
 }
 
 
@@ -491,7 +508,7 @@ LocalStore::~LocalStore()
     try {
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
-            *fdTempRoots = -1;
+            fdTempRoots->close();
             unlink(fnTempRoots.c_str());
         }
     } catch (...) {
@@ -969,11 +986,13 @@ void LocalStore::registerValidPath(const ValidPathInfo & info)
 
 void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 {
+#ifndef _WIN32
     /* SQLite will fsync by default, but the new valid paths may not
        be fsync-ed.  So some may want to fsync them before registering
        the validity, at the expense of some speed of the path
        registering operation. */
     if (settings.syncBeforeRegistering) sync();
+#endif
 
     return retrySQLite<void>([&]() {
         auto state(_state.lock());
@@ -1155,7 +1174,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             autoGC();
 
-            canonicalisePathMetaData(realPath, {});
+            canonicalisePathMetaData(realPath);
 
             optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1307,7 +1326,7 @@ StorePath LocalStore::addToStoreFromDump(
                 narHash = narSink.finish();
             }
 
-            canonicalisePathMetaData(realPath, {}); // FIXME: merge into restorePath
+            canonicalisePathMetaData(realPath); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
@@ -1340,8 +1359,8 @@ std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
            the GC between createTempDir() and when we acquire a lock on it.
            We'll repeat until 'tmpDir' exists and we've locked it. */
         tmpDirFn = createTempDir(realStoreDir, "tmp");
-        tmpDirFd = open(tmpDirFn.c_str(), O_RDONLY | O_DIRECTORY);
-        if (tmpDirFd.get() < 0) {
+        tmpDirFd = openDirectory(tmpDirFn);
+        if (!tmpDirFd) {
             continue;
         }
         lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
@@ -1390,19 +1409,16 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of '%s'", name);
-            Path linkPath = linksDir / name;
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
-                {getFSSourceAccessor(), CanonPath(linkPath)},
+                PosixSourceAccessor::createAtRoot(link.path()),
                 FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
-                    linkPath, name, hash);
+                    link.path(), name, hash);
                 if (repair) {
-                    if (unlink(linkPath.c_str()) == 0)
-                        printInfo("removed link '%s'", linkPath);
-                    else
-                        throw SysError("removing corrupt link '%s'", linkPath);
+                    std::filesystem::remove(link.path());
+                    printInfo("removed link '%s'", link.path());
                 } else {
                     errors = true;
                 }
@@ -1583,8 +1599,12 @@ static void makeMutable(const Path & path)
     /* The O_NOFOLLOW is important to prevent us from changing the
        mutable bit on the target of a symlink (which would be a
        security hole). */
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
-    if (fd == -1) {
+    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_NOFOLLOW
+#ifndef _WIN32
+        | O_CLOEXEC
+#endif
+        );
+    if (fd == INVALID_DESCRIPTOR) {
         if (errno == ELOOP) return; // it's a symlink
         throw SysError("opening file '%1%'", path);
     }

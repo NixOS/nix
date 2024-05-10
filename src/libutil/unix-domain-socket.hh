@@ -39,6 +39,7 @@ using Socket =
  * Windows gives this a different name
  */
 #  define SHUT_WR SD_SEND
+#  define SHUT_RDWR SD_BOTH
 #endif
 
 /**
