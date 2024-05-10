@@ -32,7 +32,6 @@ struct OptimiseStats
 {
     unsigned long filesLinked = 0;
     uint64_t bytesFreed = 0;
-    uint64_t blocksFreed = 0;
 };
 
 struct LocalStoreConfig : virtual LocalFSStoreConfig

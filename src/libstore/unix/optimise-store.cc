@@ -256,7 +256,6 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     stats.filesLinked++;
     stats.bytesFreed += st.st_size;
-    stats.blocksFreed += st.st_blocks;
 
     if (act)
         act->result(resFileLinked, st.st_size, st.st_blocks);
