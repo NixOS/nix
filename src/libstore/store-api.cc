@@ -171,7 +171,7 @@ std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
 {
     auto [h, size] = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
     if (size && *size >= settings.largePathWarningThreshold)
-        warn("hashed large path '%s' (%d bytes)", path, *size);
+        warn("hashed large path '%s' (%s)", path, renderSize(*size));
     return {
         makeFixedOutputPathFromCA(
             name,
@@ -215,7 +215,7 @@ StorePath Store::addToStore(
     LengthSource lengthSource(*source);
     auto storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
     if (lengthSource.total >= settings.largePathWarningThreshold)
-        warn("copied large path '%s' to the store (%d bytes)", path, lengthSource.total);
+        warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
     return storePath;
 }
 

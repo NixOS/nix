@@ -112,7 +112,7 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
 }
 
 
-std::string renderSize(uint64_t value)
+std::string renderSize(uint64_t value, bool align)
 {
     static const std::array<char, 9> prefixes{{
         'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
@@ -123,7 +123,7 @@ std::string renderSize(uint64_t value)
         ++power;
         res /= 1024;
     }
-    return fmt("%6.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
+    return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
 }
 
 
