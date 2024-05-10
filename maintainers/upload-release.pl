@@ -189,10 +189,7 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     eval {
         downloadFile("dockerImage.$system", "1", $fn);
     };
-    if ($@) {
-        warn "$@" if $@;
-        next;
-    }
+    die "$@" if $@;
     $haveDocker = 1;
 
     print STDERR "loading docker image for $dockerPlatform...\n";
