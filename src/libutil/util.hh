@@ -138,6 +138,12 @@ N string2IntWithUnitPrefix(std::string_view s)
 }
 
 /**
+ * Pretty-print a byte value, e.g. 12433615056 is rendered as `11.6
+ * GiB`.
+ */
+std::string renderSize(uint64_t value);
+
+/**
  * Parse a string into a float.
  */
 template<class N>

@@ -112,6 +112,21 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
 }
 
 
+std::string renderSize(uint64_t value)
+{
+    static const std::array<char, 9> prefixes{{
+        'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
+    }};
+    size_t power = 0;
+    double res = value;
+    while (res > 1024 && power < prefixes.size()) {
+        ++power;
+        res /= 1024;
+    }
+    return fmt("%6.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
+}
+
+
 bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
