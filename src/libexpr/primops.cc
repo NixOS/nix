@@ -1184,11 +1184,11 @@ static void derivationStrictInternal(
                         .debugThrow();
                 /* !!! Check whether j is a valid attribute
                    name. */
-                /* Derivations cannot be named ‘drv’, because
-                   then we'd have an attribute ‘drvPath’ in
-                   the resulting set. */
-                if (j == "drv")
-                    state.error<EvalError>("invalid derivation output name 'drv'")
+                /* Derivations cannot be named ‘drvPath’, because
+                   we already have an attribute ‘drvPath’ in
+                   the resulting set (see state.sDrvPath). */
+                if (j == "drvPath")
+                    state.error<EvalError>("invalid derivation output name 'drvPath'")
                         .atPos(v)
                         .debugThrow();
                 outputs.insert(j);
