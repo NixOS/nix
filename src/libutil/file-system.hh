@@ -128,8 +128,6 @@ Descriptor openDirectory(const std::filesystem::path & path);
  */
 std::vector<std::filesystem::directory_entry> readDirectory(const Path & path);
 
-std::filesystem::file_type getFileType(const Path & path);
-
 /**
  * Read the contents of a file into a string.
  */

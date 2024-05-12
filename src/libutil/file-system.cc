@@ -236,12 +236,6 @@ std::vector<fs::directory_entry> readDirectory(const Path & path)
 }
 
 
-fs::file_type getFileType(const Path & path)
-{
-    return fs::symlink_status(path).type();
-}
-
-
 std::string readFile(const Path & path)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY
