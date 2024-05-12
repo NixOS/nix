@@ -1406,7 +1406,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking link hashes...");
 
-        for (auto & link : readDirectory(linksDir)) {
+        for (auto & link : std::filesystem::directory_iterator{linksDir}) {
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of '%s'", name);
             PosixSourceAccessor accessor;
@@ -1498,7 +1498,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : readDirectory(realStoreDir)) {
+    for (auto & i : std::filesystem::directory_iterator{realStoreDir.to_string()}) {
         try {
             storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }

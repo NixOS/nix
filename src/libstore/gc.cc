@@ -161,7 +161,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    for (auto & i : readDirectory(tempRootsDir)) {
+    for (auto & i : std::filesystem::directory_iterator{tempRootsDir}) {
         auto name = i.path().filename().string();
         if (name[0] == '.') {
             // Ignore hidden files. Some package managers (notably portage) create
@@ -228,7 +228,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             type = getFileType(path);
 
         if (type == std::filesystem::file_type::directory) {
-            for (auto & i : readDirectory(path))
+            for (auto & i : std::filesystem::directory_iterator{path})
                 findRoots(i.path().string(), i.symlink_status().type(), roots);
         }
 

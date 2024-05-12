@@ -866,7 +866,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         {
             createDirs(to);
 
-            for (auto & entry : readDirectory(from)) {
+            for (auto & entry : std::filesystem::directory_iterator{from}) {
                 auto from2 = entry.path().string();
                 auto to2 = to + "/" + entry.path().filename().string();
                 auto st = lstat(from2);

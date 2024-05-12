@@ -345,7 +345,7 @@ void initPlugins()
     for (const auto & pluginFile : settings.pluginFiles.get()) {
         std::vector<std::filesystem::path> pluginFiles;
         try {
-            auto ents = readDirectory(pluginFile);
+            auto ents = std::filesystem::directory_iterator{pluginFile};
             for (const auto & ent : ents)
                 pluginFiles.emplace_back(ent.path());
         } catch (std::filesystem::filesystem_error & e) {

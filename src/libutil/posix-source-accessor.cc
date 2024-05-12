@@ -132,7 +132,7 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 {
     assertNoSymlinks(path);
     DirEntries res;
-    for (auto & entry : nix::readDirectory(makeAbsPath(path).string())) {
+    for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
         auto type = [&]() -> std::optional<Type> {
             std::filesystem::file_type nativeType;
             try {

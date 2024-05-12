@@ -222,20 +222,6 @@ Path readLink(const Path & path)
 }
 
 
-std::vector<fs::directory_entry> readDirectory(const Path & path)
-{
-    std::vector<fs::directory_entry> entries;
-    entries.reserve(64);
-
-    for (auto & entry : fs::directory_iterator{path}) {
-        checkInterrupt();
-        entries.push_back(std::move(entry));
-    }
-
-    return entries;
-}
-
-
 fs::file_type getFileType(const Path & path)
 {
     return fs::symlink_status(path).type();
