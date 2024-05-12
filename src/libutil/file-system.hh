@@ -190,7 +190,7 @@ void moveFile(const Path & src, const Path & dst);
  * with the guaranty that the destination will be “fresh”, with no stale inode
  * or file descriptor pointing to it).
  */
-void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
+void copyFile(const std::filesystem::directory_entry & from, const std::filesystem::path & to, bool andDelete);
 
 /**
  * Automatic cleanup of resources.

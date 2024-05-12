@@ -421,7 +421,9 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
     } else if (S_ISLNK(st.st_mode)) {
         // Symlinks can (apparently) not be bind-mounted, so just copy it
         createDirs(dirOf(target));
-        copyFile(source, target, /* andDelete */ false);
+        copyFile(
+            std::filesystem::directory_entry(std::filesystem::path(source)),
+            std::filesystem::path(target), false);
     } else {
         createDirs(dirOf(target));
         writeFile(target, "");
@@ -2568,7 +2570,10 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 // Replace the output by a fresh copy of itself to make sure
                 // that there's no stale file descriptor pointing to it
                 Path tmpOutput = actualPath + ".tmp";
-                copyFile(actualPath, tmpOutput, true);
+                copyFile(
+                    std::filesystem::directory_entry(std::filesystem::path(actualPath)),
+                    std::filesystem::path(tmpOutput), true);
+
                 std::filesystem::rename(tmpOutput, actualPath);
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
