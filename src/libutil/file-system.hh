@@ -177,8 +177,6 @@ void createSymlink(const Path & target, const Path & link);
  */
 void replaceSymlink(const Path & target, const Path & link);
 
-void renameFile(const Path & src, const Path & dst);
-
 /**
  * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
  * are on a different filesystem.

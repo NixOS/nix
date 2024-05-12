@@ -783,7 +783,7 @@ static void movePath(const Path & src, const Path & dst)
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    renameFile(src, dst);
+    std::filesystem::rename(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);

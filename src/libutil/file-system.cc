@@ -588,7 +588,7 @@ void replaceSymlink(const Path & target, const Path & link)
             throw;
         }
 
-        renameFile(tmp, link);
+        std::filesystem::rename(tmp, link);
 
         break;
     }
@@ -651,15 +651,10 @@ void copyFile(const Path & oldPath, const Path & newPath, bool andDelete)
     return copy(fs::directory_entry(fs::path(oldPath)), fs::path(newPath), andDelete);
 }
 
-void renameFile(const Path & oldName, const Path & newName)
-{
-    fs::rename(oldName, newName);
-}
-
 void moveFile(const Path & oldName, const Path & newName)
 {
     try {
-        renameFile(oldName, newName);
+        std::filesystem::rename(oldName, newName);
     } catch (fs::filesystem_error & e) {
         auto oldPath = fs::path(oldName);
         auto newPath = fs::path(newName);
@@ -674,7 +669,7 @@ void moveFile(const Path & oldName, const Path & newName)
             fs::remove(newPath);
             warn("Can’t rename %s as %s, copying instead", oldName, newName);
             copy(fs::directory_entry(oldPath), tempCopyTarget, true);
-            renameFile(
+            std::filesystem::rename(
                 os_string_to_string(PathViewNG { tempCopyTarget }),
                 os_string_to_string(PathViewNG { newPath }));
         }

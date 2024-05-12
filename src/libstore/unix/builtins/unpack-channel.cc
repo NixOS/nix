@@ -24,7 +24,7 @@ void builtinUnpackChannel(
     auto entries = readDirectory(out);
     if (entries.size() != 1)
         throw Error("channel tarball '%s' contains more than one file", src);
-    renameFile(entries[0].path().string(), (out + "/" + channelName));
+    std::filesystem::rename(entries[0].path().string(), (out + "/" + channelName));
 }
 
 }
