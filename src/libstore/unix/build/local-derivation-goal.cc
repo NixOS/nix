@@ -422,7 +422,7 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
         // Symlinks can (apparently) not be bind-mounted, so just copy it
         createDirs(dirOf(target));
         copyFile(
-            std::filesystem::directory_entry(std::filesystem::path(source)),
+            std::filesystem::path(source),
             std::filesystem::path(target), false);
     } else {
         createDirs(dirOf(target));
@@ -2571,7 +2571,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 // that there's no stale file descriptor pointing to it
                 Path tmpOutput = actualPath + ".tmp";
                 copyFile(
-                    std::filesystem::directory_entry(std::filesystem::path(actualPath)),
+                    std::filesystem::path(actualPath),
                     std::filesystem::path(tmpOutput), true);
 
                 std::filesystem::rename(tmpOutput, actualPath);
