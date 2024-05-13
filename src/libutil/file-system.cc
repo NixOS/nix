@@ -236,12 +236,6 @@ std::vector<fs::directory_entry> readDirectory(const Path & path)
 }
 
 
-fs::file_type getFileType(const Path & path)
-{
-    return fs::symlink_status(path).type();
-}
-
-
 std::string readFile(const Path & path)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY
@@ -588,7 +582,7 @@ void replaceSymlink(const Path & target, const Path & link)
             throw;
         }
 
-        renameFile(tmp, link);
+        std::filesystem::rename(tmp, link);
 
         break;
     }
@@ -611,29 +605,29 @@ static void setWriteTime(const fs::path & p, const struct stat & st)
 }
 #endif
 
-void copy(const fs::directory_entry & from, const fs::path & to, bool andDelete)
+void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
 {
 #ifndef _WIN32
     // TODO: Rewrite the `is_*` to use `symlink_status()`
-    auto statOfFrom = lstat(from.path().c_str());
+    auto statOfFrom = lstat(from.c_str());
 #endif
-    auto fromStatus = from.symlink_status();
+    auto fromStatus = fs::symlink_status(from);
 
     // Mark the directory as writable so that we can delete its children
     if (andDelete && fs::is_directory(fromStatus)) {
-        fs::permissions(from.path(), fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
+        fs::permissions(from, fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
     }
 
 
     if (fs::is_symlink(fromStatus) || fs::is_regular_file(fromStatus)) {
-        fs::copy(from.path(), to, fs::copy_options::copy_symlinks | fs::copy_options::overwrite_existing);
+        fs::copy(from, to, fs::copy_options::copy_symlinks | fs::copy_options::overwrite_existing);
     } else if (fs::is_directory(fromStatus)) {
         fs::create_directory(to);
-        for (auto & entry : fs::directory_iterator(from.path())) {
-            copy(entry, to / entry.path().filename(), andDelete);
+        for (auto & entry : fs::directory_iterator(from)) {
+            copyFile(entry, to / entry.path().filename(), andDelete);
         }
     } else {
-        throw Error("file '%s' has an unsupported type", from.path());
+        throw Error("file '%s' has an unsupported type", from);
     }
 
 #ifndef _WIN32
@@ -641,25 +635,15 @@ void copy(const fs::directory_entry & from, const fs::path & to, bool andDelete)
 #endif
     if (andDelete) {
         if (!fs::is_symlink(fromStatus))
-            fs::permissions(from.path(), fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
-        fs::remove(from.path());
+            fs::permissions(from, fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
+        fs::remove(from);
     }
-}
-
-void copyFile(const Path & oldPath, const Path & newPath, bool andDelete)
-{
-    return copy(fs::directory_entry(fs::path(oldPath)), fs::path(newPath), andDelete);
-}
-
-void renameFile(const Path & oldName, const Path & newName)
-{
-    fs::rename(oldName, newName);
 }
 
 void moveFile(const Path & oldName, const Path & newName)
 {
     try {
-        renameFile(oldName, newName);
+        std::filesystem::rename(oldName, newName);
     } catch (fs::filesystem_error & e) {
         auto oldPath = fs::path(oldName);
         auto newPath = fs::path(newName);
@@ -673,8 +657,8 @@ void moveFile(const Path & oldName, const Path & newName)
         if (e.code().value() == EXDEV) {
             fs::remove(newPath);
             warn("Can’t rename %s as %s, copying instead", oldName, newName);
-            copy(fs::directory_entry(oldPath), tempCopyTarget, true);
-            renameFile(
+            copyFile(oldPath, tempCopyTarget, true);
+            std::filesystem::rename(
                 os_string_to_string(PathViewNG { tempCopyTarget }),
                 os_string_to_string(PathViewNG { newPath }));
         }

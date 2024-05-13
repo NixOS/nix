@@ -285,7 +285,7 @@ static void movePath(const Path & src, const Path & dst)
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    renameFile(src, dst);
+    std::filesystem::rename(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -372,7 +372,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.toRealPath(status.known->path);
             if (pathExists(chrootRootDir + p))
-                renameFile((chrootRootDir + p), p);
+                std::filesystem::rename((chrootRootDir + p), p);
         }
 
     return diskFull;
@@ -421,7 +421,9 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
     } else if (S_ISLNK(st.st_mode)) {
         // Symlinks can (apparently) not be bind-mounted, so just copy it
         createDirs(dirOf(target));
-        copyFile(source, target, /* andDelete */ false);
+        copyFile(
+            std::filesystem::path(source),
+            std::filesystem::path(target), false);
     } else {
         createDirs(dirOf(target));
         writeFile(target, "");
@@ -2568,8 +2570,11 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 // Replace the output by a fresh copy of itself to make sure
                 // that there's no stale file descriptor pointing to it
                 Path tmpOutput = actualPath + ".tmp";
-                copyFile(actualPath, tmpOutput, true);
-                renameFile(tmpOutput, actualPath);
+                copyFile(
+                    std::filesystem::path(actualPath),
+                    std::filesystem::path(tmpOutput), true);
+
+                std::filesystem::rename(tmpOutput, actualPath);
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.ca.method,
