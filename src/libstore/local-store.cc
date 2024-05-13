@@ -1779,7 +1779,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     writeFile(tmpFile, compress("bzip2", log));
 
-    renameFile(tmpFile, logPath);
+    std::filesystem::rename(tmpFile, logPath);
 }
 
 std::optional<std::string> LocalStore::getVersion()

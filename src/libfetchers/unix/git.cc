@@ -342,7 +342,8 @@ struct GitInputScheme : InputScheme
                 logger->pause();
                 Finally restoreLogger([]() { logger->resume(); });
                 runProgram("git", true,
-                    { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
+                    { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
+                    *commitMsg);
             }
         }
     }

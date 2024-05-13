@@ -12,7 +12,7 @@ void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
-    renameFile(tempLink, link);
+    std::filesystem::rename(tempLink, link);
 }
 
 Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)

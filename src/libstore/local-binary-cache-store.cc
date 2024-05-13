@@ -64,7 +64,7 @@ protected:
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
-        renameFile(tmp, path2);
+        std::filesystem::rename(tmp, path2);
         del.cancel();
     }
 

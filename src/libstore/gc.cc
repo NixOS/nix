@@ -225,7 +225,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
     try {
 
         if (type == std::filesystem::file_type::unknown)
-            type = getFileType(path);
+            type = std::filesystem::symlink_status(path).type();
 
         if (type == std::filesystem::file_type::directory) {
             for (auto & i : std::filesystem::directory_iterator{path})
