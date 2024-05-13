@@ -123,12 +123,6 @@ Path readLink(const Path & path);
 Descriptor openDirectory(const std::filesystem::path & path);
 
 /**
- * Read the contents of a directory.  The entries `.` and `..` are
- * removed.
- */
-std::vector<std::filesystem::directory_entry> readDirectory(const Path & path);
-
-/**
  * Read the contents of a file into a string.
  */
 std::string readFile(const Path & path);

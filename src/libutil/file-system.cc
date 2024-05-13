@@ -222,20 +222,6 @@ Path readLink(const Path & path)
 }
 
 
-std::vector<fs::directory_entry> readDirectory(const Path & path)
-{
-    std::vector<fs::directory_entry> entries;
-    entries.reserve(64);
-
-    for (auto & entry : fs::directory_iterator{path}) {
-        checkInterrupt();
-        entries.push_back(std::move(entry));
-    }
-
-    return entries;
-}
-
-
 std::string readFile(const Path & path)
 {
     AutoCloseFD fd = toDescriptor(open(path.c_str(), O_RDONLY

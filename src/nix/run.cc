@@ -248,7 +248,7 @@ void chrootHelper(int argc, char * * argv)
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (auto entry : readDirectory("/")) {
+        for (auto entry : std::filesystem::directory_iterator{"/"}) {
             auto src = entry.path().string();
             Path dst = tmpDir + "/" + entry.path().filename().string();
             if (pathExists(dst)) continue;
