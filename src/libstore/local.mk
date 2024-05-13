@@ -89,11 +89,11 @@ else
   endif
 endif
 
-$(d)/unix/local-store.cc: $(d)/unix/schema.sql.gen.hh $(d)/unix/ca-specific-schema.sql.gen.hh
+$(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(d)/unix/build.cc:
 
-clean-files += $(d)/unix/schema.sql.gen.hh $(d)/unix/ca-specific-schema.sql.gen.hh
+clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(eval $(call install-file-in, $(buildprefix)$(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 

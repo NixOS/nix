@@ -118,12 +118,15 @@ bool pathAccessible(const Path & path);
 Path readLink(const Path & path);
 
 /**
+ * Open a `Descriptor` with read-only access to the given directory.
+ */
+Descriptor openDirectory(const std::filesystem::path & path);
+
+/**
  * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
  */
 std::vector<std::filesystem::directory_entry> readDirectory(const Path & path);
-
-std::filesystem::file_type getFileType(const Path & path);
 
 /**
  * Read the contents of a file into a string.
@@ -172,8 +175,6 @@ void createSymlink(const Path & target, const Path & link);
  */
 void replaceSymlink(const Path & target, const Path & link);
 
-void renameFile(const Path & src, const Path & dst);
-
 /**
  * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
  * are on a different filesystem.
@@ -189,7 +190,7 @@ void moveFile(const Path & src, const Path & dst);
  * with the guaranty that the destination will be “fresh”, with no stale inode
  * or file descriptor pointing to it).
  */
-void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
+void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete);
 
 /**
  * Automatic cleanup of resources.

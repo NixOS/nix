@@ -31,6 +31,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 
     }
 
+#ifndef _WIN32 // TODO implement
     if (st.st_mtime != mtimeStore) {
         struct timeval times[2];
         times[0].tv_sec = st.st_atime;
@@ -46,6 +47,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 #endif
             throw SysError("changing modification time of '%1%'", path);
     }
+#endif
 }
 
 
@@ -57,7 +59,9 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 
 static void canonicalisePathMetaData_(
     const Path & path,
+#ifndef _WIN32
     std::optional<std::pair<uid_t, uid_t>> uidRange,
+#endif
     InodesSeen & inodesSeen)
 {
     checkInterrupt();
@@ -99,6 +103,7 @@ static void canonicalisePathMetaData_(
      }
 #endif
 
+#ifndef _WIN32
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
        hard-linked into the output (e.g. "ln /etc/shadow $out/foo").
@@ -112,11 +117,13 @@ static void canonicalisePathMetaData_(
         assert(S_ISLNK(st.st_mode) || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
         return;
     }
+#endif
 
     inodesSeen.insert(Inode(st.st_dev, st.st_ino));
 
     canonicaliseTimestampAndPermissions(path, st);
 
+#ifndef _WIN32
     /* Change ownership to the current uid.  If it's a symlink, use
        lchown if available, otherwise don't bother.  Wrong ownership
        of a symlink doesn't matter, since the owning user can't change
@@ -134,22 +141,36 @@ static void canonicalisePathMetaData_(
             throw SysError("changing owner of '%1%' to %2%",
                 path, geteuid());
     }
+#endif
 
     if (S_ISDIR(st.st_mode)) {
         std::vector<std::filesystem::directory_entry> entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(i.path().string(), uidRange, inodesSeen);
+            canonicalisePathMetaData_(
+                i.path().string(),
+#ifndef _WIN32
+                uidRange,
+#endif
+                inodesSeen);
     }
 }
 
 
 void canonicalisePathMetaData(
     const Path & path,
+#ifndef _WIN32
     std::optional<std::pair<uid_t, uid_t>> uidRange,
+#endif
     InodesSeen & inodesSeen)
 {
-    canonicalisePathMetaData_(path, uidRange, inodesSeen);
+    canonicalisePathMetaData_(
+        path,
+#ifndef _WIN32
+        uidRange,
+#endif
+        inodesSeen);
 
+#ifndef _WIN32
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
     auto st = lstat(path);
@@ -158,14 +179,23 @@ void canonicalisePathMetaData(
         assert(S_ISLNK(st.st_mode));
         throw Error("wrong ownership of top-level store path '%1%'", path);
     }
+#endif
 }
 
 
-void canonicalisePathMetaData(const Path & path,
-    std::optional<std::pair<uid_t, uid_t>> uidRange)
+void canonicalisePathMetaData(const Path & path
+#ifndef _WIN32
+    , std::optional<std::pair<uid_t, uid_t>> uidRange
+#endif
+    )
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, uidRange, inodesSeen);
+    canonicalisePathMetaData_(
+        path,
+#ifndef _WIN32
+        uidRange,
+#endif
+        inodesSeen);
 }
 
 }
