@@ -439,7 +439,7 @@ The following attributes are supported in `flake.nix`:
    - [`bash-prompt-prefix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-prefix)
    - [`bash-prompt-suffix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-suffix)
    - [`flake-registry`](@docroot@/command-ref/conf-file.md#conf-flake-registry)
-   - [`commit-lockfile-summary`](@docroot@/command-ref/conf-file.md#conf-commit-lockfile-summary)
+   - [`commit-lock-file-summary`](@docroot@/command-ref/conf-file.md#conf-commit-lock-file-summary)
 
 ## Flake inputs
 
