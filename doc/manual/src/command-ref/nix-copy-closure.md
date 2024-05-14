@@ -78,7 +78,7 @@ authentication, you can avoid typing the passphrase with `ssh-agent`.
 Copy Firefox with all its dependencies to a remote machine:
 
 ```console
-$ nix-copy-closure --to alice@itchy.example.org $(type -p firefox)
+$ nix-copy-closure --to alice@itchy.example.org $(type -P firefox)
 ```
 
 Copy Subversion from a remote machine and then install it into a user
