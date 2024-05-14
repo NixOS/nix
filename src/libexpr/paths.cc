@@ -91,7 +91,7 @@ std::string EvalState::prettyPrintPaths(std::string_view s)
     }
 }
 
-std::string EvalState::rewriteVirtualPaths(std::string_view s, PosIdx pos)
+std::string EvalState::rewriteVirtualPaths(std::string_view s, std::string_view warning, PosIdx pos)
 {
     std::string res;
 
@@ -120,7 +120,7 @@ std::string EvalState::rewriteVirtualPaths(std::string_view s, PosIdx pos)
             assert(accessor != sourceAccessors.end()); // FIXME
 
             warn(
-                "derivation at %s has an attribute that refers to source tree '%s' without context; this does not work correctly",
+                std::string(warning), // FIXME: should accept a string_view
                 positions[pos], accessor->second->showPath(CanonPath::root));
 
             // FIXME: cache this.

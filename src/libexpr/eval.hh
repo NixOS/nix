@@ -372,7 +372,10 @@ public:
        materializing those store paths. This is a backward
        compatibility hack to make buggy derivation attributes like
        `tostring ./bla` produce the same evaluation result. */
-    std::string rewriteVirtualPaths(std::string_view s, PosIdx pos);
+    std::string rewriteVirtualPaths(
+        std::string_view s,
+        std::string_view warning,
+        PosIdx pos);
 
     /* Replace all virtual paths (i.e. `/nix/store/lazylazy...`) in a
        string by a pretty-printed rendition of the corresponding input

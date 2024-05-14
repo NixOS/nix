@@ -1352,7 +1352,10 @@ static void derivationStrictInternal(
        don't have a context, so aren't accessible from a sandbox) but
        we don't want to change evaluation results.  */
     for (auto & [name, value] : drv.env)
-        value = state.rewriteVirtualPaths(value, pos);
+        value = state.rewriteVirtualPaths(
+            value,
+            "derivation at %s has an attribute that refers to source tree '%s' without context; this does not work correctly",
+            pos);
 
     /* Do we have all required attributes? */
     if (drv.builder == "")
@@ -2169,6 +2172,11 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     NixStringContext context;
     std::string name(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.toFile"));
     std::string contents(state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.toFile"));
+
+    contents = state.rewriteVirtualPaths(
+        contents,
+        "call to `builtins.toFile` at %s refers to source tree '%s' without context; this does not work correctly",
+        pos);
 
     StorePathSet refs;
 
