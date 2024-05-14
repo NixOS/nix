@@ -75,17 +75,27 @@ authentication, you can avoid typing the passphrase with `ssh-agent`.
 
 # Examples
 
-Copy Firefox with all its dependencies to a remote machine:
+> **Example**
+>
+> Copy GNU Hello with all its dependencies to a remote machine:
+>
+> ```shell-session
+> $ storePath="$(nix-build '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello --no-out-link)"
+> $ nix-copy-closure --to alice@itchy.example.org "$storePath"
+> copying 5 paths...
+> copying path '/nix/store/nrwkk6ak3rgkrxbqhsscb01jpzmslf2r-xgcc-13.2.0-libgcc' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/gm61h1y42pqyl6178g90x8zm22n6pyy5-libunistring-1.1' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/ddfzjdykw67s20c35i7a6624by3iz5jv-libidn2-2.3.7' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/apab5i73dqa09wx0q27b6fbhd1r18ihl-glibc-2.39-31' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/g1n2vryg06amvcc1avb2mcq36faly0mh-hello-2.12.1' to 'ssh://alice@itchy.example.org'...
+> ```
 
-```console
-$ nix-copy-closure --to alice@itchy.example.org $(type -P firefox)
-```
-
-Copy Subversion from a remote machine and then install it into a user
-environment:
-
-```console
-$ nix-copy-closure --from alice@itchy.example.org \
-    /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
-$ nix-env --install /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
-```
+> **Example**
+>
+> Copy GNU Hello from a remote machine using a known store path, and run it:
+>
+> ```shell-session
+> $ storePath=/nix/store/g1n2vryg06amvcc1avb2mcq36faly0mh-hello-2.12.1
+> $ nix-copy-closure --from alice@itchy.example.org "$storePath"
+> $ "$storePath"/bin/hello
+> ```
