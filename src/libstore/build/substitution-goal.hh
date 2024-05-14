@@ -81,8 +81,8 @@ struct PathSubstitutionGoal : public Goal
         void await_suspend(std::coroutine_handle<>) noexcept;
         void await_resume() noexcept {};
     };
-    struct Done {};
-    struct Co {
+    struct [[nodiscard]] Done {};
+    struct [[nodiscard]] Co {
         struct promise_type;
         using handle_type = std::coroutine_handle<promise_type>;
         handle_type handle;
