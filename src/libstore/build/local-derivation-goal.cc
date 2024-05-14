@@ -670,15 +670,19 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
-        deletePath(chrootRootDir);
+        chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
+        autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
 
-        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootRootDir);
+        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
-        // FIXME: make this 0700
+        if (mkdir(chrootParentDir.c_str(), 0700) == -1)
+            throw SysError("cannot create '%s'", chrootRootDir);
+
+        chrootRootDir = chrootParentDir + "/root";
+
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 

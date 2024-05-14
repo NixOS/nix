@@ -65,6 +65,16 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     bool useChroot = false;
 
+    /**
+     * The parent directory of `chrootRootDir`. It has permission 700
+     * and is owned by root to ensure other users cannot mess with
+     * `chrootRootDir`.
+     */
+    Path chrootParentDir;
+
+    /**
+     * The root of the chroot environment.
+     */
     Path chrootRootDir;
 
     /**
