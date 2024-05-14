@@ -285,7 +285,7 @@ const redirects = {
     "ch-basic-package-mgmt": "package-management/basic-package-mgmt.html",
     "ssec-binary-cache-substituter": "package-management/binary-cache-substituter.html",
     "sec-channels": "command-ref/nix-channel.html",
-    "ssec-copy-closure": "package-management/copy-closure.html",
+    "ssec-copy-closure": "command-ref/nix-copy-closure.html",
     "sec-garbage-collection": "package-management/garbage-collection.html",
     "ssec-gc-roots": "package-management/garbage-collector-roots.html",
     "chap-package-management": "package-management/index.html",
