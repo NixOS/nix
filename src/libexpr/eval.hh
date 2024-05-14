@@ -540,6 +540,18 @@ public:
     StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
 
     /**
+     * Compute the base name for a `SourcePath`. For non-root paths,
+     * this is just `SourcePath::baseName()`. But for root paths, for
+     * backwards compatibility, it needs to be `<hash>-source`,
+     * i.e. as if the path were copied to the Nix store. This results
+     * in a "double-copied" store path like
+     * `/nix/store/<hash1>-<hash2>-source`. We don't need to
+     * materialize /nix/store/<hash2>-source though. Still, this
+     * requires reading/hashing the path twice.
+     */
+    std::string computeBaseName(const SourcePath & path);
+
+    /**
      * Path coercion.
      *
      * Converts strings, paths and derivations to a

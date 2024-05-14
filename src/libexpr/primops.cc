@@ -2395,9 +2395,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
     addPath(
         state,
         pos,
-        path.path.isRoot()
-        ? state.store->computeStorePath("source", path).first.to_string()
-        : path.baseName(),
+        state.computeBaseName(path),
         path,
         args[0],
         FileIngestionMethod::Recursive,

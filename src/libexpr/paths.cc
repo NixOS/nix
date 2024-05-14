@@ -1,6 +1,6 @@
 #include "eval.hh"
 #include "util.hh"
-#include "store-api.hh"
+#include "fetch-to-store.hh"
 
 namespace nix {
 
@@ -123,8 +123,7 @@ std::string EvalState::rewriteVirtualPaths(std::string_view s, std::string_view 
                 std::string(warning), // FIXME: should accept a string_view
                 positions[pos], accessor->second->showPath(CanonPath::root));
 
-            // FIXME: cache this.
-            res.append(store->computeStorePath("source", {accessor->second}).first.hashPart());
+            res.append(fetchToStore(*store, {accessor->second}, FetchMode::DryRun).hashPart());
         } catch (...) {
             ignoreException();
             res.append(s.substr(m, end - m));
