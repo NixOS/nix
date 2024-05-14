@@ -27,7 +27,7 @@ void removeOldGenerations(std::string dir)
 
     bool canWrite = access(dir.c_str(), W_OK) == 0;
 
-    for (auto & i : readDirectory(dir)) {
+    for (auto & i : std::filesystem::directory_iterator{dir}) {
         checkInterrupt();
 
         auto path = i.path().string();

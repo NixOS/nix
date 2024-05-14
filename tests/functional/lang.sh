@@ -72,7 +72,7 @@ for i in lang/eval-fail-*.nix; do
         if [[ -e "lang/$i.flags" ]]; then
             sed -e 's/#.*//' < "lang/$i.flags"
         else
-            # note that show-trace is also set by init.sh
+            # note that show-trace is also set by common/init.sh
             echo "--eval --strict --show-trace"
         fi
     )"

@@ -17,10 +17,10 @@ struct State
 /* For each activated package, create symlinks */
 static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
 {
-    std::vector<std::filesystem::directory_entry> srcFiles;
+    std::filesystem::directory_iterator srcFiles;
 
     try {
-        srcFiles = readDirectory(srcDir);
+        srcFiles = std::filesystem::directory_iterator{srcDir};
     } catch (std::filesystem::filesystem_error & e) {
         if (e.code() == std::errc::not_a_directory) {
             warn("not including '%s' in the user environment because it's not a directory", srcDir);

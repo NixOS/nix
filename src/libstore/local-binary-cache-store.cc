@@ -83,7 +83,7 @@ protected:
     {
         StorePathSet paths;
 
-        for (auto & entry : readDirectory(binaryCacheDir)) {
+        for (auto & entry : std::filesystem::directory_iterator{binaryCacheDir}) {
             auto name = entry.path().filename().string();
             if (name.size() != 40 ||
                 !hasSuffix(name, ".narinfo"))

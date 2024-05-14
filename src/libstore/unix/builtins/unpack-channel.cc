@@ -21,10 +21,13 @@ void builtinUnpackChannel(
 
     unpackTarfile(src, out);
 
-    auto entries = readDirectory(out);
-    if (entries.size() != 1)
+    auto entries = std::filesystem::directory_iterator{out};
+    auto fileName = entries->path().string();
+    auto fileCount = std::distance(std::filesystem::begin(entries), std::filesystem::end(entries));
+
+    if (fileCount != 1)
         throw Error("channel tarball '%s' contains more than one file", src);
-    std::filesystem::rename(entries[0].path().string(), (out + "/" + channelName));
+    std::filesystem::rename(fileName, (out + "/" + channelName));
 }
 
 }
