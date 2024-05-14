@@ -2450,10 +2450,15 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
 
 std::string EvalState::computeBaseName(const SourcePath & path)
 {
-    return std::string(
-        path.path.isRoot()
-        ? fetchToStore(*store, path, FetchMode::DryRun).to_string()
-        : path.baseName());
+    if (path.path.isRoot()) {
+        warn(
+            "Performing inefficient double copy of path '%s' to the store. "
+            "This can typically be avoided by rewriting an attribute like `src = ./.` "
+            "to `src = builtins.path { path = ./.; name = \"source\"; }`.",
+            path);
+        return std::string(fetchToStore(*store, path, FetchMode::DryRun).to_string());
+    } else
+        return std::string(path.baseName());
 }
 
 
