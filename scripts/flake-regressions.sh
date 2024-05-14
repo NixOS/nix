@@ -9,7 +9,7 @@ cd flake-regressions
 
 status=0
 
-flakes=$(ls -d tests/*/*/* | head -n25)
+flakes=$(ls -d tests/*/*/* | sort | head -n25)
 
 echo "Running flake tests..."
 
