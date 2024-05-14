@@ -2,7 +2,10 @@ test -n "$TEST_ROOT"
 # We would delete any daemon socket, so let's stop the daemon first.
 killDaemon
 # Destroy the test directory that may have persisted from previous runs
-rm -rf "$TEST_ROOT"
+if [[ -e "$TEST_ROOT" ]]; then
+    chmod -R u+w "$TEST_ROOT"
+    rm -rf "$TEST_ROOT"
+fi
 mkdir -p "$TEST_ROOT"
 mkdir "$TEST_HOME"
 
