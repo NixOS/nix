@@ -240,7 +240,7 @@ Co PathSubstitutionGoal::tryNext()
         if (i != storePath) /* ignore self-references */
             addWaitee(worker.makePathSubstitutionGoal(i));
 
-    co_await SuspendGoal{};
+    if (!waitees.empty()) co_await SuspendGoal{};
     co_return referencesValid();
 }
 
@@ -260,6 +260,8 @@ Co PathSubstitutionGoal::referencesValid()
         if (i != storePath) /* ignore self-references */
             assert(worker.store.isValidPath(i));
 
+    worker.wakeUp(shared_from_this());
+    co_await SuspendGoal{};
     co_return tryToRun();
 }
 
