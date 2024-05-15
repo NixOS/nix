@@ -1,9 +1,10 @@
 # Nix Archive (NAR) format
 
-This is the complete specification of the Nix Archive format.
+This is the complete specification of the [Nix Archive] format.
 The Nix Archive format closely follows the abstract specification of a [file system object] tree,
 because it is designed to serialize exactly that data structure.
 
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#nix-archive
 [file system object]: @docroot@/store/file-system-object.md
 
 The format of this specification is close to [Extended Backus–Naur form](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form), with the exception of the `str(..)` function / parameterized rule, which length-prefixes and pads strings.

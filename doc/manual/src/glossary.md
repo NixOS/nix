@@ -1,5 +1,24 @@
 # Glossary
 
+- [content address]{#gloss-content-address}
+
+  A
+  [*content address*](https://en.wikipedia.org/wiki/Content-addressable_storage)
+  is a secure way to reference immutable data.
+  The reference is calculated directly from the content of the data being referenced, which means the reference is
+  [*tamper proof*](https://en.wikipedia.org/wiki/Tamperproofing)
+  --- variations of the data should always calculate to distinct content addresses.
+
+  For how Nix uses content addresses, see:
+
+    - [Content-Addressing File System Objects](@docroot@/store/file-system-object/content-address.md)
+    - [content-addressed store object](#gloss-content-addressed-store-object)
+    - [content-addressed derivation](#gloss-content-addressed-derivation)
+
+  Software Heritage's writing on [*Intrinsic and Extrinsic identifiers*](https://www.softwareheritage.org/2020/07/09/intrinsic-vs-extrinsic-identifiers) is also a good introduction to the value of content-addressing over other referencing schemes.
+
+  Besides content addressing, the Nix store also uses [input addressing](#gloss-input-addressed-store-object).
+
 - [derivation]{#gloss-derivation}
 
   A description of a build task. The result of a derivation is a
@@ -266,12 +285,14 @@
 
   See [installables](./command-ref/new-cli/nix.md#installables) for [`nix` commands](./command-ref/new-cli/nix.md) (experimental) for details.
 
-- [NAR]{#gloss-nar}
+- [Nix Archive (NAR)]{#gloss-nar}
 
   A *N*ix *AR*chive. This is a serialisation of a path in the Nix
   store. It can contain regular files, directories and symbolic
   links.  NARs are generated and unpacked using `nix-store --dump`
   and `nix-store --restore`.
+
+  See [Nix Archive](store/file-system-object/content-address.html#serial-nix-archive) for details.
 
 - [`∅`]{#gloss-emtpy-set}
 

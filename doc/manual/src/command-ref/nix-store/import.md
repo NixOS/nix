@@ -1,6 +1,8 @@
 # Name
 
-`nix-store --import` - import Nix Archive into the store
+`nix-store --import` - import [Nix Archive] into the store
+
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
 # Synopsis
 

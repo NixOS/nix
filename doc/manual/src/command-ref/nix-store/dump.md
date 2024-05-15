@@ -1,6 +1,6 @@
 # Name
 
-`nix-store --dump` - write a single path to a Nix Archive
+`nix-store --dump` - write a single path to a [Nix Archive]
 
 ## Synopsis
 
@@ -8,7 +8,7 @@
 
 ## Description
 
-The operation `--dump` produces a NAR (Nix ARchive) file containing the
+The operation `--dump` produces a [NAR (Nix ARchive)][Nix Archive] file containing the
 contents of the file system tree rooted at *path*. The archive is
 written to standard output.
 
@@ -32,6 +32,8 @@ but not other types of files (such as device nodes).
 
 A Nix archive can be unpacked using `nix-store
 --restore`.
+
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
 {{#include ./opt-common.md}}
 

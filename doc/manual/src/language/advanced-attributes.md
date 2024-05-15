@@ -199,19 +199,23 @@ Derivations can declare some infrequently used optional attributes.
     The `outputHashMode` attribute determines how the hash is computed.
     It must be one of the following two values:
 
-      - `"flat"`\
-        The output must be a non-executable regular file. If it isn’t,
-        the build fails. The hash is simply computed over the contents
-        of that file (so it’s equal to what Unix commands like
-        `sha256sum` or `sha1sum` produce).
+    <!-- FIXME link to store object content-addressing not file system object content addressing once we have the page for that. -->
+
+      - `"flat"`
+
+        The output must be a non-executable regular file; if it isn’t, the build fails.
+        The hash is
+        [simply computed over the contents of that file](@docroot@/store/file-system-object/content-address.md#serial-flat)
+        (so it’s equal to what Unix commands like `sha256sum` or `sha1sum` produce).
 
         This is the default.
 
-      - `"recursive"` or `"nar"`\
-        The hash is computed over the [NAR archive](@docroot@/glossary.md#gloss-nar) dump of the output
-        (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
-        this case, the output can be anything, including a directory
-        tree.
+      - `"recursive"` or `"nar"`
+
+        The hash is computed over the
+        [Nix Archive (NAR)](@docroot@/store/file-system-object/content-address.md#serial-nix-archive)
+        dump of the output (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)).
+        In this case, the output is allowed to be any [file system object], including directories and more.
 
     `"recursive"` is the traditional way of indicating this,
     and is supported since 2005 (virtually the entire history of Nix).
@@ -303,7 +307,7 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
     the following attributes are available:
 
-    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/glossary.md#gloss-store-object).
+    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/store/store-object.md).
     - `maxClosureSize` defines the maximum size of the output's closure.
     - `ignoreSelfRefs` controls whether self-references should be considered when
       checking for allowed references/requisites.

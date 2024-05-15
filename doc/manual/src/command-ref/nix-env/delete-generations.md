@@ -49,7 +49,7 @@ Periodically deleting old generations is important to make garbage collection
 effective.
 The is because profiles are also garbage collection roots — any [store object] reachable from a profile is "alive" and ineligible for deletion.
 
-[store object]: @docroot@/glossary.md#gloss-store-object
+[store object]: @docroot@/store/store-object.md
 
 {{#include ./opt-common.md}}
 

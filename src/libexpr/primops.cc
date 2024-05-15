@@ -4515,7 +4515,7 @@ void EvalState::createBaseEnv()
           1683705525
           ```
 
-          The [store path](@docroot@/glossary.md#gloss-store-path) of a derivation depending on `currentTime` will differ for each evaluation, unless both evaluate `builtins.currentTime` in the same second.
+          The [store path](@docroot@/store/store-path.md) of a derivation depending on `currentTime` will differ for each evaluation, unless both evaluate `builtins.currentTime` in the same second.
         )",
         .impureOnly = true,
     });

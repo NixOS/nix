@@ -22,7 +22,7 @@ Link: <flakeref>; rel="immutable"
 
 *flakeref* must be a tarball flakeref. It can contain the tarball flake attributes
 `narHash`, `rev`, `revCount` and `lastModified`. If `narHash` is included, its
-value must be the NAR hash of the unpacked tarball (as computed via
+value must be the [NAR hash][Nix Archive] of the unpacked tarball (as computed via
 `nix hash path`). Nix checks the contents of the returned tarball
 against the `narHash` attribute. The `rev` and `revCount` attributes
 are useful when the tarball flake is a mirror of a fetcher type that
@@ -40,3 +40,5 @@ Link: <https://example.org/hello/442793d9ec0584f6a6e82fa253850c8085bb150a.tar.gz
 
 For tarball flakes, the value of the `lastModified` flake attribute is
 defined as the timestamp of the newest file inside the tarball.
+
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
