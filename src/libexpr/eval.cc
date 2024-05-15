@@ -2085,8 +2085,31 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                         .atPos(i_pos)
                         .withFrame(env, *this)
                         .debugThrow();
-                sSize += part->size();
-                s.emplace_back(std::move(part));
+                /* Backwards compatibility hack to handle `/. + path`,
+                   where `path` is a string with a source accessor
+                   context. */
+                const NixStringContextElem::SourceAccessor * a;
+                if (sSize == 1
+                    && *s[0] == "/"
+                    && context.size() == 1
+                    && (a = std::get_if<NixStringContextElem::SourceAccessor>(&context.begin()->raw))
+                    && hasPrefix(*part, state.virtualPathMarker)
+                    && part->size() >= 50
+                    && part->substr(43, 7) == "-source")
+                {
+                    auto i = state.sourceAccessors.find(a->accessor);
+                    assert(i != state.sourceAccessors.end());
+                    accessor = i->second;
+                    // Strip off /nix/store/lazylazy000...-source.
+                    std::string s2(part->substr(50));
+                    sSize = s2.size();
+                    s.clear();
+                    s.emplace_back(s2);
+                    context.clear();
+                } else {
+                    sSize += part->size();
+                    s.emplace_back(std::move(part));
+                }
             }
         } else {
             if (s.empty()) s.reserve(es->size());
