@@ -42,7 +42,6 @@
     - [Serving a Nix store via HTTP](package-management/binary-cache-substituter.md)
     - [Copying Closures via SSH](package-management/copy-closure.md)
     - [Serving a Nix store via SSH](package-management/ssh-substituter.md)
-    - [Serving a Nix store via S3](package-management/s3-substituter.md)
   - [Remote Builds](advanced-topics/distributed-builds.md)
   - [Tuning Cores and Jobs](advanced-topics/cores-vs-jobs.md)
   - [Verifying Build Reproducibility](advanced-topics/diff-hook.md)
