@@ -47,7 +47,7 @@ These pages can be viewed offline:
 
   Example: `nix-env --help --install`
 
-# Package source
+# Package sources
 
 `nix-env` can obtain packages from multiple sources:
 
