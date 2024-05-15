@@ -68,24 +68,39 @@ struct FlakeRef
 
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
 
+/**
+ * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ */
 FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true);
 
+/**
+ * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ */
 std::optional<FlakeRef> maybeParseFlake(
     const std::string & url, const std::optional<Path> & baseDir = {});
 
+/**
+ * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ */
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true);
 
+/**
+ * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ */
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const std::string & url, const std::optional<Path> & baseDir = {});
 
+/**
+ * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ */
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const std::string & url,
     const std::optional<Path> & baseDir = {},

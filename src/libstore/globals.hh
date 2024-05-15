@@ -424,8 +424,10 @@ public:
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
+#ifndef _WIN32
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
+#endif
 
     Setting<bool> useSubstitutes{
         this, true, "substitute",
@@ -666,6 +668,7 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
+#ifndef _WIN32
     Setting<bool> requireDropSupplementaryGroups{this, isRootUser(), "require-drop-supplementary-groups",
         R"(
           Following the principle of least privilege,
@@ -683,6 +686,7 @@ public:
           (since `root` usually has permissions to call setgroups)
           and `false` otherwise.
         )"};
+#endif
 
 #if __linux__
     Setting<std::string> sandboxShmSize{
@@ -780,6 +784,7 @@ public:
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store URL is configured with `trusted=true`
           - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
@@ -905,7 +910,7 @@ public:
         "substituters",
         R"(
           A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/store/store-object.md) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
@@ -1277,9 +1282,10 @@ std::vector<Path> getUserConfigFiles();
 extern const std::string nixVersion;
 
 /**
- * NB: This is not sufficient. You need to call initNix()
+ * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
+ * @note When using libexpr, and/or libmain, This is not sufficient. See initNix().
  */
-void initLibStore();
+void initLibStore(bool loadConfig = true);
 
 /**
  * It's important to initialize before doing _anything_, which is why we

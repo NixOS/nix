@@ -154,8 +154,8 @@ TEST_F(GitTest, tree_write) {
 TEST_F(GitTest, both_roundrip) {
     using File = MemorySourceAccessor::File;
 
-    MemorySourceAccessor files;
-    files.root = File::Directory {
+    auto files = make_ref<MemorySourceAccessor>();
+    files->root = File::Directory {
         .contents {
             {
                 "foo",
@@ -189,12 +189,12 @@ TEST_F(GitTest, both_roundrip) {
     std::map<Hash, std::string> cas;
 
     std::function<DumpHook> dumpHook;
-    dumpHook = [&](const CanonPath & path) {
+    dumpHook = [&](const SourcePath & path) {
         StringSink s;
         HashSink hashSink { HashAlgorithm::SHA1 };
         TeeSink s2 { s, hashSink };
         auto mode = dump(
-            files, path, s2, dumpHook,
+            path, s2, dumpHook,
             defaultPathFilter, mockXpSettings);
         auto hash = hashSink.finish().first;
         cas.insert_or_assign(hash, std::move(s.s));
@@ -204,11 +204,11 @@ TEST_F(GitTest, both_roundrip) {
         };
     };
 
-    auto root = dumpHook(CanonPath::root);
+    auto root = dumpHook({files});
 
-    MemorySourceAccessor files2;
+    auto files2 = make_ref<MemorySourceAccessor>();
 
-    MemorySink sinkFiles2 { files2 };
+    MemorySink sinkFiles2 { *files2 };
 
     std::function<void(const Path, const Hash &, BlobMode)> mkSinkHook;
     mkSinkHook = [&](auto prefix, auto & hash, auto blobMode) {
@@ -229,7 +229,7 @@ TEST_F(GitTest, both_roundrip) {
 
     mkSinkHook("", root.hash, BlobMode::Regular);
 
-    ASSERT_EQ(files, files2);
+    ASSERT_EQ(*files, *files2);
 }
 
 TEST(GitLsRemote, parseSymrefLineWithReference) {

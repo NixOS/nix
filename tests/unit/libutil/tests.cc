@@ -421,6 +421,7 @@ namespace nix {
         ASSERT_EQ(string2Int<int>("-100"), -100);
     }
 
+#ifndef _WIN32 // TODO re-enable on Windows, once we can start processes
     /* ----------------------------------------------------------------------------
      * statusOk
      * --------------------------------------------------------------------------*/
@@ -429,6 +430,7 @@ namespace nix {
         ASSERT_EQ(statusOk(0), true);
         ASSERT_EQ(statusOk(1), false);
     }
+#endif
 
 
     /* ----------------------------------------------------------------------------

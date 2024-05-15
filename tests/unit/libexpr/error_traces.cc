@@ -102,6 +102,74 @@ namespace nix {
             , type                                                          \
         )
 
+#define ASSERT_TRACE3(args, type, message, context1, context2)              \
+        ASSERT_THROW(                                                       \
+            std::string expr(args);                                         \
+            std::string name = expr.substr(0, expr.find(" "));              \
+            try {                                                           \
+                Value v = eval("builtins." args);                           \
+                state.forceValueDeep(v);                                    \
+            } catch (BaseError & e) {                                       \
+                ASSERT_EQ(PrintToString(e.info().msg),                      \
+                          PrintToString(message));                          \
+                ASSERT_EQ(e.info().traces.size(), 3) << "while testing " args << std::endl << e.what(); \
+                auto trace = e.info().traces.rbegin();                      \
+                ASSERT_EQ(PrintToString(trace->hint),                       \
+                          PrintToString(context1));                         \
+                ++trace;                                                    \
+                ASSERT_EQ(PrintToString(trace->hint),                       \
+                          PrintToString(context2));                         \
+                ++trace;                                                    \
+                ASSERT_EQ(PrintToString(trace->hint),                       \
+                          PrintToString(HintFmt("while calling the '%s' builtin", name))); \
+                throw;                                                      \
+            }                                                               \
+            , type                                                          \
+        )
+
+#define ASSERT_TRACE4(args, type, message, context1, context2, context3)    \
+        ASSERT_THROW(                                                       \
+            std::string expr(args);                                         \
+            std::string name = expr.substr(0, expr.find(" "));              \
+            try {                                                           \
+                Value v = eval("builtins." args);                           \
+                state.forceValueDeep(v);                                    \
+            } catch (BaseError & e) {                                       \
+                ASSERT_EQ(PrintToString(e.info().msg),                      \
+                          PrintToString(message));                          \
+                ASSERT_EQ(e.info().traces.size(), 4) << "while testing " args << std::endl << e.what(); \
+                auto trace = e.info().traces.rbegin();                      \
+                ASSERT_EQ(PrintToString(trace->hint),                       \
+                          PrintToString(context1));                         \
+                ++trace;                                                    \
+                ASSERT_EQ(PrintToString(trace->hint),                       \
+                          PrintToString(context2));                         \
+                ++trace;                                                    \
+                ASSERT_EQ(PrintToString(trace->hint),                       \
+                          PrintToString(context3));                         \
+                ++trace;                                                    \
+                ASSERT_EQ(PrintToString(trace->hint),                       \
+                          PrintToString(HintFmt("while calling the '%s' builtin", name))); \
+                throw;                                                      \
+            }                                                               \
+            , type                                                          \
+        )
+
+// We assume that expr starts with "builtins.derivationStrict { name =",
+// otherwise the name attribute position (1, 29) would be invalid.
+#define DERIVATION_TRACE_HINTFMT(name)                                      \
+        HintFmt("while evaluating derivation '%s'\n"                        \
+                "  whose name attribute is located at %s",                  \
+                name, Pos(1, 29, Pos::String{.source = make_ref<std::string>(expr)}))
+
+// To keep things simple, we also assume that derivation name is "foo".
+#define ASSERT_DERIVATION_TRACE1(args, type, message)                       \
+        ASSERT_TRACE2(args, type, message, DERIVATION_TRACE_HINTFMT("foo"))
+#define ASSERT_DERIVATION_TRACE2(args, type, message, context)              \
+        ASSERT_TRACE3(args, type, message, context, DERIVATION_TRACE_HINTFMT("foo"))
+#define ASSERT_DERIVATION_TRACE3(args, type, message, context1, context2)   \
+        ASSERT_TRACE4(args, type, message, context1, context2, DERIVATION_TRACE_HINTFMT("foo"))
+
     TEST_F(ErrorTraceTest, genericClosure) {
         ASSERT_TRACE2("genericClosure 1",
                       TypeError,
@@ -1185,7 +1253,6 @@ namespace nix {
     }
 
 
-    /* // Needs different ASSERTs
     TEST_F(ErrorTraceTest, derivationStrict) {
         ASSERT_TRACE2("derivationStrict \"\"",
                       TypeError,
@@ -1197,102 +1264,115 @@ namespace nix {
                       HintFmt("attribute '%s' missing", "name"),
                       HintFmt("in the attrset passed as argument to builtins.derivationStrict"));
 
-        ASSERT_TRACE2("derivationStrict { name = 1; }",
+        ASSERT_TRACE3("derivationStrict { name = 1; }",
                       TypeError,
-                      HintFmt("expected a string but found %s: %s", "an integer", "1"),
-                      HintFmt("while evaluating the `name` attribute passed to builtins.derivationStrict"));
+                      HintFmt("expected a string but found %s: %s", "an integer", Uncolored(ANSI_CYAN "1" ANSI_NORMAL)),
+                      HintFmt("while evaluating the `name` attribute passed to builtins.derivationStrict"),
+                      HintFmt("while evaluating the derivation attribute 'name'"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; }",
-                      TypeError,
-                      HintFmt("required attribute 'builder' missing"),
-                      HintFmt("while evaluating derivation 'foo'"));
+        ASSERT_DERIVATION_TRACE1("derivationStrict { name = \"foo\"; }",
+                      EvalError,
+                      HintFmt("required attribute 'builder' missing"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; __structuredAttrs = 15; }",
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; __structuredAttrs = 15; }",
                       TypeError,
-                      HintFmt("expected a Boolean but found %s: %s", "an integer", "15"),
+                      HintFmt("expected a Boolean but found %s: %s", "an integer", Uncolored(ANSI_CYAN "15" ANSI_NORMAL)),
                       HintFmt("while evaluating the `__structuredAttrs` attribute passed to builtins.derivationStrict"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; __ignoreNulls = 15; }",
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; __ignoreNulls = 15; }",
                       TypeError,
-                      HintFmt("expected a Boolean but found %s: %s", "an integer", "15"),
+                      HintFmt("expected a Boolean but found %s: %s", "an integer", Uncolored(ANSI_CYAN "15" ANSI_NORMAL)),
                       HintFmt("while evaluating the `__ignoreNulls` attribute passed to builtins.derivationStrict"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; outputHashMode = 15; }",
-                      TypeError,
-                      HintFmt("invalid value '15' for 'outputHashMode' attribute"),
-                      HintFmt("while evaluating the attribute 'outputHashMode' of derivation 'foo'"));
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; outputHashMode = 15; }",
+                      EvalError,
+                      HintFmt("invalid value '%s' for 'outputHashMode' attribute", "15"),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputHashMode", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; outputHashMode = \"custom\"; }",
-                      TypeError,
-                      HintFmt("invalid value 'custom' for 'outputHashMode' attribute"),
-                      HintFmt("while evaluating the attribute 'outputHashMode' of derivation 'foo'"));
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; outputHashMode = \"custom\"; }",
+                      EvalError,
+                      HintFmt("invalid value '%s' for 'outputHashMode' attribute", "custom"),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputHashMode", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = {}; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = {}; }",
                       TypeError,
-                      HintFmt("cannot coerce %s to a string: %s", "a set", "{ }"),
-                      HintFmt("while evaluating the attribute 'system' of derivation 'foo'"));
+                      HintFmt("cannot coerce %s to a string: { }", "a set"),
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "system", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = {}; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = {}; }",
                       TypeError,
-                      HintFmt("cannot coerce %s to a string: %s", "a set", "{ }"),
-                      HintFmt("while evaluating the attribute 'outputs' of derivation 'foo'"));
+                      HintFmt("cannot coerce %s to a string: { }", "a set"),
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputs", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"drv\"; }",
-                      TypeError,
-                      HintFmt("invalid derivation output name 'drv'"),
-                      HintFmt("while evaluating the attribute 'outputs' of derivation 'foo'"));
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"drvPath\"; }",
+                      EvalError,
+                      HintFmt("invalid derivation output name 'drvPath'"),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputs", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = []; }",
-                      TypeError,
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; outputs = \"out\"; __structuredAttrs = true; }",
+                      EvalError,
+                      HintFmt("expected a list but found %s: %s", "a string", "\"out\""),
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputs", "foo"));
+
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = []; }",
+                      EvalError,
                       HintFmt("derivation cannot have an empty set of outputs"),
-                      HintFmt("while evaluating the attribute 'outputs' of derivation 'foo'"));
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputs", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = [ \"drv\" ]; }",
-                      TypeError,
-                      HintFmt("invalid derivation output name 'drv'"),
-                      HintFmt("while evaluating the attribute 'outputs' of derivation 'foo'"));
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = [ \"drvPath\" ]; }",
+                      EvalError,
+                      HintFmt("invalid derivation output name 'drvPath'"),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputs", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = [ \"out\" \"out\" ]; }",
-                      TypeError,
-                      HintFmt("duplicate derivation output 'out'"),
-                      HintFmt("while evaluating the attribute 'outputs' of derivation 'foo'"));
+        ASSERT_DERIVATION_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = [ \"out\" \"out\" ]; }",
+                      EvalError,
+                      HintFmt("duplicate derivation output '%s'", "out"),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "outputs", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; __contentAddressed = \"true\"; }",
-                      TypeError,
-                      HintFmt("expected a Boolean but found %s: %s", "a string", "\"true\""),
-                      HintFmt("while evaluating the attribute '__contentAddressed' of derivation 'foo'"));
-
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; __impure = \"true\"; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; __contentAddressed = \"true\"; }",
                       TypeError,
                       HintFmt("expected a Boolean but found %s: %s", "a string", "\"true\""),
-                      HintFmt("while evaluating the attribute '__impure' of derivation 'foo'"));
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "__contentAddressed", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; __impure = \"true\"; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; __impure = \"true\"; }",
                       TypeError,
                       HintFmt("expected a Boolean but found %s: %s", "a string", "\"true\""),
-                      HintFmt("while evaluating the attribute '__impure' of derivation 'foo'"));
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "__impure", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = \"foo\"; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; __impure = \"true\"; }",
+                      TypeError,
+                      HintFmt("expected a Boolean but found %s: %s", "a string", "\"true\""),
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "__impure", "foo"));
+
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = \"foo\"; }",
                       TypeError,
                       HintFmt("expected a list but found %s: %s", "a string", "\"foo\""),
-                      HintFmt("while evaluating the attribute 'args' of derivation 'foo'"));
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "args", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = [ {} ]; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = [ {} ]; }",
                       TypeError,
-                      HintFmt("cannot coerce %s to a string: %s", "a set", "{ }"),
-                      HintFmt("while evaluating an element of the argument list"));
+                      HintFmt("cannot coerce %s to a string: { }", "a set"),
+                      HintFmt("while evaluating an element of the argument list"),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "args", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = [ \"a\" {} ]; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; args = [ \"a\" {} ]; }",
                       TypeError,
-                      HintFmt("cannot coerce %s to a string: %s", "a set", "{ }"),
-                      HintFmt("while evaluating an element of the argument list"));
+                      HintFmt("cannot coerce %s to a string: { }", "a set"),
+                      HintFmt("while evaluating an element of the argument list"),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "args", "foo"));
 
-        ASSERT_TRACE2("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; FOO = {}; }",
+        ASSERT_DERIVATION_TRACE3("derivationStrict { name = \"foo\"; builder = 1; system = 1; outputs = \"out\"; FOO = {}; }",
                       TypeError,
-                      HintFmt("cannot coerce %s to a string: %s", "a set", "{ }"),
-                      HintFmt("while evaluating the attribute 'FOO' of derivation 'foo'"));
-
+                      HintFmt("cannot coerce %s to a string: { }", "a set"),
+                      HintFmt(""),
+                      HintFmt("while evaluating attribute '%s' of derivation '%s'", "FOO", "foo"));
     }
-    */
 
 } /* namespace nix */

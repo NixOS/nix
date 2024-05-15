@@ -13,7 +13,7 @@ struct Hash;
  * \ref StorePath "Store path" is the fundamental reference type of Nix.
  * A store paths refers to a Store object.
  *
- * See glossary.html#gloss-store-path for more information on a
+ * See store/store-path.html for more information on a
  * conceptual level.
  */
 class StorePath

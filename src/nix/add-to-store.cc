@@ -41,9 +41,9 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto storePath = dryRun
             ? store->computeStorePath(
-                *namePart, accessor, path2, caMethod, hashAlgo, {}).first
+                *namePart, {accessor, path2}, caMethod, hashAlgo, {}).first
             : store->addToStoreSlow(
-                *namePart, accessor, path2, caMethod, hashAlgo, {}).path;
+                *namePart, {accessor, path2}, caMethod, hashAlgo, {}).path;
 
         logger->cout("%s", store->printStorePath(storePath));
     }

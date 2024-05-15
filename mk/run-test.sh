@@ -8,7 +8,6 @@ yellow=""
 normal=""
 
 test=$1
-init=${2-}
 
 dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$dir/common-test.sh"
@@ -22,10 +21,7 @@ if [ -t 1 ]; then
 fi
 
 run_test () {
-    if [ -n "$init" ]; then
-        (init_test 2>/dev/null > /dev/null)
-    fi
-    log="$(run_test_proper 2>&1)" && status=0 || status=$?
+    log="$(run "$test" 2>&1)" && status=0 || status=$?
 }
 
 run_test

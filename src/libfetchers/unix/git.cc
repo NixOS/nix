@@ -9,8 +9,7 @@
 #include "pathlocks.hh"
 #include "processes.hh"
 #include "git.hh"
-#include "fs-input-accessor.hh"
-#include "mounted-input-accessor.hh"
+#include "mounted-source-accessor.hh"
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
@@ -343,7 +342,8 @@ struct GitInputScheme : InputScheme
                 logger->pause();
                 Finally restoreLogger([]() { logger->resume(); });
                 runProgram("git", true,
-                    { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
+                    { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-F", "-" },
+                    *commitMsg);
             }
         }
     }
@@ -427,7 +427,7 @@ struct GitInputScheme : InputScheme
 
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitLastModified"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitLastModified", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 
@@ -436,14 +436,14 @@ struct GitInputScheme : InputScheme
 
         auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
 
-        cache->upsert(key, Attrs{{"lastModified", lastModified}});
+        cache->upsert(key, {{"lastModified", lastModified}});
 
         return lastModified;
     }
 
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        Attrs key{{"_what", "gitRevCount"}, {"rev", rev.gitRev()}};
+        Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
 
         auto cache = getCache();
 
@@ -495,7 +495,7 @@ struct GitInputScheme : InputScheme
         }
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessorFromCommit(
+    std::pair<ref<SourceAccessor>, Input> getAccessorFromCommit(
         ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
@@ -525,6 +525,9 @@ struct GitInputScheme : InputScheme
             PathLocks cacheDirLock({cacheDir});
 
             auto repo = GitRepo::openRepo(cacheDir, true, true);
+
+            // We need to set the origin so resolving submodule URLs works
+            repo->setRemote("origin", repoInfo.url);
 
             Path localRefFile =
                 ref.compare(0, 5, "refs/") == 0
@@ -626,10 +629,10 @@ struct GitInputScheme : InputScheme
            input accessor consisting of the accessor for the top-level
            repo and the accessors for the submodules. */
         if (getSubmodulesAttr(input)) {
-            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+            std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
-                auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
+                auto resolved = repo->resolveSubmoduleUrl(submodule.url);
                 debug("Git submodule %s: %s %s %s -> %s",
                     submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
                 fetchers::Attrs attrs;
@@ -639,15 +642,18 @@ struct GitInputScheme : InputScheme
                     attrs.insert_or_assign("ref", submodule.branch);
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+                attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
 
             if (!mounts.empty()) {
                 mounts.insert_or_assign(CanonPath::root, accessor);
-                accessor = makeMountedInputAccessor(std::move(mounts));
+                accessor = makeMountedSourceAccessor(std::move(mounts));
             }
         }
 
@@ -659,7 +665,7 @@ struct GitInputScheme : InputScheme
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
+    std::pair<ref<SourceAccessor>, Input> getAccessorFromWorkdir(
         ref<Store> store,
         RepoInfo & repoInfo,
         Input && input) const
@@ -673,16 +679,18 @@ struct GitInputScheme : InputScheme
 
         auto exportIgnore = getExportIgnoreAttr(input);
 
-        ref<InputAccessor> accessor =
+        ref<SourceAccessor> accessor =
             repo->getAccessor(repoInfo.workdirInfo,
                 exportIgnore,
                 makeNotAllowedError(repoInfo.url));
+
+        accessor->setPathDisplay(repoInfo.url);
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
         if (getSubmodulesAttr(input) && !repoInfo.workdirInfo.submodules.empty()) {
-            std::map<CanonPath, nix::ref<InputAccessor>> mounts;
+            std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {
                 auto submodulePath = CanonPath(repoInfo.url) / submodule.path;
@@ -690,10 +698,14 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", submodulePath.abs());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
+                attrs.insert_or_assign("submodules", Explicit<bool>{ true });
+                // TODO: fall back to getAccessorFromCommit-like fetch when submodules aren't checked out
+                // attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
 
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
 
                 /* If the submodule is dirty, mark this repo dirty as
                    well. */
@@ -704,7 +716,7 @@ struct GitInputScheme : InputScheme
             }
 
             mounts.insert_or_assign(CanonPath::root, accessor);
-            accessor = makeMountedInputAccessor(std::move(mounts));
+            accessor = makeMountedSourceAccessor(std::move(mounts));
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
@@ -743,7 +755,7 @@ struct GitInputScheme : InputScheme
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
 

@@ -21,7 +21,6 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
-#include "fs-input-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -147,7 +146,7 @@ MixFlakeOptions::MixFlakeOptions()
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
-            lockFlags.referenceLockFilePath = getUnfilteredRootPath(CanonPath(absPath(lockFilePath)));
+            lockFlags.referenceLockFilePath = {getFSSourceAccessor(), CanonPath(absPath(lockFilePath))};
         }},
         .completer = completePath
     });
@@ -289,7 +288,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
             state->autoCallFunction(*autoArgs, v1, v2);
 
             if (v2.type() == nAttrs) {
-                for (auto & i : *v2.attrs) {
+                for (auto & i : *v2.attrs()) {
                     std::string name = state->symbols[i.name];
                     if (name.find(searchWord) == 0) {
                         if (prefix_ == "")
@@ -443,13 +442,10 @@ ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
-    auto fingerprint = lockedFlake->getFingerprint(state.store);
-    return make_ref<nix::eval_cache::EvalCache>(
-        evalSettings.useEvalCache && evalSettings.pureEval
-            ? fingerprint
-            : std::nullopt,
-        state,
-        [&state, lockedFlake]()
+    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
+        ? lockedFlake->getFingerprint(state.store)
+        : std::nullopt;
+    auto rootLoader = [&state, lockedFlake]()
         {
             /* For testing whether the evaluation cache is
                complete. */
@@ -461,11 +457,21 @@ ref<eval_cache::EvalCache> openEvalCache(
 
             state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
-            auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
+            auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
             assert(aOutputs);
 
             return aOutputs->value;
-        });
+        };
+
+    if (fingerprint) {
+        auto search = state.evalCaches.find(fingerprint.value());
+        if (search == state.evalCaches.end()) {
+            search = state.evalCaches.emplace(fingerprint.value(), make_ref<nix::eval_cache::EvalCache>(fingerprint, state, rootLoader)).first;
+        }
+        return search->second;
+    } else {
+        return make_ref<nix::eval_cache::EvalCache>(std::nullopt, state, rootLoader);
+    }
 }
 
 Installables SourceExprCommand::parseInstallables(

@@ -1,4 +1,5 @@
 { lib
+, fetchurl
 , stdenv
 , releaseTools
 , autoconf-archive
@@ -94,8 +95,8 @@
 
 # Whether to build the internal/external API docs, can be done separately from
 # everything else.
-, enableInternalAPIDocs ? false
-, enableExternalAPIDocs ? false
+, enableInternalAPIDocs ? forDevShell
+, enableExternalAPIDocs ? forDevShell
 
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
@@ -167,6 +168,8 @@ in {
           ./m4
           # TODO: do we really need README.md? It doesn't seem used in the build.
           ./README.md
+          # This could be put behind a conditional
+          ./maintainers/local.mk
           # For make, regardless of what we are building
           ./local.mk
           ./Makefile

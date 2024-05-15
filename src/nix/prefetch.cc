@@ -36,8 +36,8 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
         vMirrors);
     state.forceAttrs(vMirrors, noPos, "while evaluating the set of all mirrors");
 
-    auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
-    if (mirrorList == vMirrors.attrs->end())
+    auto mirrorList = vMirrors.attrs()->get(state.symbols.create(mirrorName));
+    if (!mirrorList)
         throw Error("unknown mirror name '%s'", mirrorName);
     state.forceList(*mirrorList->value, noPos, "while evaluating one mirror configuration");
 
@@ -87,7 +87,7 @@ std::tuple<StorePath, Hash> prefetchFile(
     if (!storePath) {
 
         AutoDelete tmpDir(createTempDir(), true);
-        Path tmpFile = (Path) tmpDir + "/tmp";
+        std::filesystem::path tmpFile = tmpDir.path() / "tmp";
 
         /* Download the file. */
         {
@@ -95,7 +95,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             if (executable)
                 mode = 0700;
 
-            AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, mode);
+            AutoCloseFD fd = toDescriptor(open(tmpFile.string().c_str(), O_WRONLY | O_CREAT | O_EXCL, mode));
             if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
 
             FdSink sink(fd.get());
@@ -109,15 +109,16 @@ std::tuple<StorePath, Hash> prefetchFile(
         if (unpack) {
             Activity act(*logger, lvlChatty, actUnknown,
                 fmt("unpacking '%s'", url));
-            Path unpacked = (Path) tmpDir + "/unpacked";
+            auto unpacked = (tmpDir.path() / "unpacked").string();
             createDirs(unpacked);
-            unpackTarfile(tmpFile, unpacked);
+            unpackTarfile(tmpFile.string(), unpacked);
 
             /* If the archive unpacks to a single file/directory, then use
                that as the top-level. */
-            auto entries = readDirectory(unpacked);
-            if (entries.size() == 1)
-                tmpFile = unpacked + "/" + entries[0].name;
+            auto entries = std::filesystem::directory_iterator{unpacked};
+            auto file_count = std::distance(entries, std::filesystem::directory_iterator{});
+            if (file_count == 1)
+                tmpFile = entries->path();
             else
                 tmpFile = unpacked;
         }
@@ -125,9 +126,8 @@ std::tuple<StorePath, Hash> prefetchFile(
         Activity act(*logger, lvlChatty, actUnknown,
             fmt("adding '%s' to the store", url));
 
-        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(tmpFile);
         auto info = store->addToStoreSlow(
-            *name, accessor, canonPath,
+            *name, PosixSourceAccessor::createAtRoot(tmpFile),
             ingestionMethod, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);
@@ -193,7 +193,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
           startProgressBar();
 
         auto store = openStore();
-        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+        auto state = std::make_unique<EvalState>(myArgs.lookupPath, store);
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
@@ -214,7 +214,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             state->forceAttrs(v, noPos, "while evaluating the source attribute to prefetch");
 
             /* Extract the URL. */
-            auto * attr = v.attrs->get(state->symbols.create("urls"));
+            auto * attr = v.attrs()->get(state->symbols.create("urls"));
             if (!attr)
                 throw Error("attribute 'urls' missing");
             state->forceList(*attr->value, noPos, "while evaluating the urls to prefetch");
@@ -223,7 +223,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             url = state->forceString(*attr->value->listElems()[0], noPos, "while evaluating the first url from the urls list");
 
             /* Extract the hash mode. */
-            auto attr2 = v.attrs->get(state->symbols.create("outputHashMode"));
+            auto attr2 = v.attrs()->get(state->symbols.create("outputHashMode"));
             if (!attr2)
                 printInfo("warning: this does not look like a fetchurl call");
             else
@@ -231,7 +231,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
 
             /* Extract the name. */
             if (!name) {
-                auto attr3 = v.attrs->get(state->symbols.create("name"));
+                auto attr3 = v.attrs()->get(state->symbols.create("name"));
                 if (!attr3)
                     name = state->forceString(*attr3->value, noPos, "while evaluating the name of the source to prefetch");
             }

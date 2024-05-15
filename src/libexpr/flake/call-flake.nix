@@ -4,7 +4,7 @@
 lockFileStr:
 
 # A mapping of lock file node IDs to { sourceInfo, subdir } attrsets,
-# with sourceInfo.outPath providing an InputAccessor to a previously
+# with sourceInfo.outPath providing an SourceAccessor to a previously
 # fetched tree. This is necessary for possibly unlocked inputs, in
 # particular the root input, but also --override-inputs pointing to
 # unlocked trees.

@@ -1,7 +1,6 @@
 #include "derivations.hh"
 #include "parsed-derivations.hh"
 #include "globals.hh"
-#include "local-store.hh"
 #include "store-api.hh"
 #include "thread-pool.hh"
 #include "realisation.hh"

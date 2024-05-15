@@ -9,11 +9,15 @@
 #include "error.hh"
 #include "logging.hh"
 #include "file-descriptor.hh"
+#include "file-path.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#ifdef _WIN32
+# include <windef.h>
+#endif
 #include <signal.h>
 
 #include <boost/lexical_cast.hpp>
@@ -24,11 +28,15 @@
 #include <sstream>
 #include <optional>
 
-#ifndef HAVE_STRUCT_DIRENT_D_TYPE
-#define DT_UNKNOWN 0
-#define DT_REG 1
-#define DT_LNK 2
-#define DT_DIR 3
+/**
+ * Polyfill for MinGW
+ *
+ * Windows does in fact support symlinks, but the C runtime interfaces predate this.
+ *
+ * @todo get rid of this, and stop using `stat` when we want `lstat` too.
+ */
+#ifndef S_ISLNK
+# define S_ISLNK(m) false
 #endif
 
 namespace nix {
@@ -109,29 +117,10 @@ bool pathAccessible(const Path & path);
  */
 Path readLink(const Path & path);
 
-bool isLink(const Path & path);
-
 /**
- * Read the contents of a directory.  The entries `.` and `..` are
- * removed.
+ * Open a `Descriptor` with read-only access to the given directory.
  */
-struct DirEntry
-{
-    std::string name;
-    ino_t ino;
-    /**
-     * one of DT_*
-     */
-    unsigned char type;
-    DirEntry(std::string name, ino_t ino, unsigned char type)
-        : name(std::move(name)), ino(ino), type(type) { }
-};
-
-typedef std::vector<DirEntry> DirEntries;
-
-DirEntries readDirectory(const Path & path);
-
-unsigned char getFileType(const Path & path);
+Descriptor openDirectory(const std::filesystem::path & path);
 
 /**
  * Read the contents of a file into a string.
@@ -156,9 +145,9 @@ void syncParent(const Path & path);
  * recursively. It's not an error if the path does not exist. The
  * second variant returns the number of bytes and blocks freed.
  */
-void deletePath(const Path & path);
+void deletePath(const std::filesystem::path & path);
 
-void deletePath(const Path & path, uint64_t & bytesFreed);
+void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 
 /**
  * Create a directory and all its parents, if necessary.  Returns the
@@ -180,8 +169,6 @@ void createSymlink(const Path & target, const Path & link);
  */
 void replaceSymlink(const Path & target, const Path & link);
 
-void renameFile(const Path & src, const Path & dst);
-
 /**
  * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
  * are on a different filesystem.
@@ -197,24 +184,30 @@ void moveFile(const Path & src, const Path & dst);
  * with the guaranty that the destination will be “fresh”, with no stale inode
  * or file descriptor pointing to it).
  */
-void copyFile(const Path & oldPath, const Path & newPath, bool andDelete);
+void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete);
 
 /**
  * Automatic cleanup of resources.
  */
 class AutoDelete
 {
-    Path path;
+    std::filesystem::path _path;
     bool del;
     bool recursive;
 public:
     AutoDelete();
-    AutoDelete(const Path & p, bool recursive = true);
+    AutoDelete(const std::filesystem::path & p, bool recursive = true);
     ~AutoDelete();
+
     void cancel();
-    void reset(const Path & p, bool recursive = true);
-    operator Path() const { return path; }
-    operator PathView() const { return path; }
+
+    void reset(const std::filesystem::path & p, bool recursive = true);
+
+    const std::filesystem::path & path() const { return _path; }
+    PathViewNG view() const { return _path; }
+
+    operator const std::filesystem::path & () const { return _path; }
+    operator PathViewNG () const { return _path; }
 };
 
 

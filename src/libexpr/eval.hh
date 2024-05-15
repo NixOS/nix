@@ -9,7 +9,7 @@
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
-#include "input-accessor.hh"
+#include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
 
@@ -33,7 +33,10 @@ class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
-struct MemoryInputAccessor;
+struct MemorySourceAccessor;
+namespace eval_cache {
+    class EvalCache;
+}
 
 
 /**
@@ -94,7 +97,7 @@ struct PrimOp
     void check();
 };
 
-std::ostream & operator<<(std::ostream & output, PrimOp & primOp);
+std::ostream & operator<<(std::ostream & output, const PrimOp & primOp);
 
 /**
  * Info about a constant
@@ -161,7 +164,6 @@ struct DebugTrace {
     bool isError;
 };
 
-
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
@@ -227,18 +229,18 @@ public:
     /**
      * The accessor for the root filesystem.
      */
-    const ref<InputAccessor> rootFS;
+    const ref<SourceAccessor> rootFS;
 
     /**
      * The in-memory filesystem for <nix/...> paths.
      */
-    const ref<MemoryInputAccessor> corepkgsFS;
+    const ref<MemorySourceAccessor> corepkgsFS;
 
     /**
      * In-memory filesystem for internal, non-user-callable Nix
      * expressions like call-flake.nix.
      */
-    const ref<MemoryInputAccessor> internalFS;
+    const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
 
@@ -283,6 +285,11 @@ public:
         return *new EvalErrorBuilder<T>(*this, args...);
     }
 
+    /**
+     * A cache for evaluation caches, so as to reuse the same root value if possible
+     */
+    std::map<const Hash, ref<eval_cache::EvalCache>> evalCaches;
+
 private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
@@ -309,9 +316,9 @@ private:
 #endif
     FileEvalCache fileEvalCache;
 
-    SearchPath searchPath;
+    LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> searchPathResolved;
+    std::map<std::string, std::optional<std::string>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -333,12 +340,12 @@ private:
 public:
 
     EvalState(
-        const SearchPath & _searchPath,
+        const LookupPath & _lookupPath,
         ref<Store> store,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    SearchPath getSearchPath() { return searchPath; }
+    LookupPath getLookupPath() { return lookupPath; }
 
     /**
      * Return a `SourcePath` that refers to `path` in the root
@@ -407,7 +414,7 @@ public:
      * Look up a file in the search path.
      */
     SourcePath findFile(const std::string_view path);
-    SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const LookupPath & lookupPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
      * Try to resolve a search path value (not the optional key part).
@@ -416,8 +423,8 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(
-        const SearchPath::Path & elem,
+    std::optional<std::string> resolveLookupPathPath(
+        const LookupPath::Path & elem,
         bool initAccessControl = false);
 
     /**
@@ -540,6 +547,11 @@ public:
      */
     SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
 
+#if HAVE_BOEHMGC
+    /** A GC root for the baseEnv reference. */
+    std::shared_ptr<Env *> baseEnvP;
+#endif
+
 public:
 
     /**
@@ -643,9 +655,6 @@ public:
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
-    Value * allocAttr(Value & vAttrs, Symbol name);
-    Value * allocAttr(Value & vAttrs, std::string_view name);
-
     Bindings * allocBindings(size_t capacity);
 
     BindingsBuilder buildBindings(size_t capacity)
@@ -733,10 +742,12 @@ public:
     bool fullGC();
 
     /**
-     * Realise the given context, and return a mapping from the placeholders
-     * used to construct the associated value to their final store path
+     * Realise the given context
+     * @param[in] context the context to realise
+     * @param[out] maybePaths if not nullptr, all built or referenced store paths will be added to this set
+     * @return a mapping from the placeholders used to construct the associated value to their final store path.
      */
-    [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
+    [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
 
     /* Call the binary path filter predicate used builtins.path etc. */
     bool callPathFilter(

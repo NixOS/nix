@@ -1,6 +1,5 @@
 nix_tests = \
   test-infra.sh \
-  init.sh \
   flakes/flakes.sh \
   flakes/develop.sh \
   flakes/run.sh \
@@ -16,6 +15,7 @@ nix_tests = \
   flakes/absolute-attr-paths.sh \
   flakes/build-paths.sh \
   flakes/flake-in-submodule.sh \
+  flakes/prefetch.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
@@ -130,6 +130,7 @@ nix_tests = \
   nested-sandboxing.sh \
   impure-env.sh \
   debugger.sh \
+  extra-sandbox-profile.sh \
   help.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)

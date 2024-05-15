@@ -87,12 +87,12 @@ struct FetchSettings : public Config
         {}, true, Xp::Flakes};
 
     Setting<std::string> commitLockFileSummary{
-        this, "", "commit-lockfile-summary",
+        this, "", "commit-lock-file-summary",
         R"(
           The commit summary to use when committing changed flake lock files. If
           empty, the summary is generated based on the action performed.
         )",
-        {}, true, Xp::Flakes};
+        {"commit-lockfile-summary"}, true, Xp::Flakes};
 
     Setting<bool> trustTarballsFromGitForges{
         this, true, "trust-tarballs-from-git-forges",

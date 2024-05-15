@@ -157,7 +157,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         auto store = openStore();
         auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-        auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
+        auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, store);
         state->repair = myArgs.repair;
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
@@ -168,7 +168,7 @@ static int main_nix_instantiate(int argc, char * * argv)
             for (auto & i : files) {
                 auto p = state->findFile(i);
                 if (auto fn = p.getPhysicalPath())
-                    std::cout << fn->native() << std::endl;
+                    std::cout << fn->string() << std::endl;
                 else
                     throw Error("'%s' has no physical path", p);
             }

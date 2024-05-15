@@ -128,10 +128,10 @@ ref<EvalState> EvalCommand::getEvalState()
         evalState =
             #if HAVE_BOEHMGC
             std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-                searchPath, getEvalStore(), getStore())
+                lookupPath, getEvalStore(), getStore())
             #else
             std::make_shared<EvalState>(
-                searchPath, getEvalStore(), getStore())
+                lookupPath, getEvalStore(), getStore())
             #endif
             ;
 
@@ -148,7 +148,7 @@ MixOperateOnOptions::MixOperateOnOptions()
 {
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
+        .description = "Operate on the [store derivation](@docroot@/glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });

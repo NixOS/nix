@@ -147,7 +147,7 @@ Please observe these guidelines to ease reviews:
   ```
   A [store object] contains a [file system object] and [references] to other store objects.
 
-  [store object]: @docroot@/glossary.md#gloss-store-object
+  [store object]: @docroot@/store/store-object.md
   [file system object]: @docroot@/architecture/file-system-object.md
   [references]: @docroot@/glossary.md#gloss-reference
   ```
@@ -205,4 +205,24 @@ or inside `nix-shell` or `nix develop`:
 ```
 # make internal-api-html
 # xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+```
+
+## C API documentation
+
+Note that the C API is not yet stable.
+[C API documentation] is available online.
+You can also build and view it yourself:
+
+[C API documentation]: https://hydra.nixos.org/job/nix/master/external-api-docs/latest/download-by-type/doc/external-api-docs
+
+```console
+# nix build .#hydraJobs.external-api-docs
+# xdg-open ./result/share/doc/nix/external-api/html/index.html
+```
+
+or inside `nix-shell` or `nix develop`:
+
+```
+# make external-api-html
+# xdg-open ./outputs/doc/share/doc/nix/external-api/html/index.html
 ```

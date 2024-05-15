@@ -77,7 +77,7 @@ struct NixRepl
 
     std::unique_ptr<ReplInteracter> interacter;
 
-    NixRepl(const SearchPath & searchPath, nix::ref<Store> store,ref<EvalState> state,
+    NixRepl(const LookupPath & lookupPath, nix::ref<Store> store,ref<EvalState> state,
             std::function<AnnotatedValues()> getValues);
     virtual ~NixRepl() = default;
 
@@ -122,7 +122,7 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
+NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
             std::function<NixRepl::AnnotatedValues()> getValues)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
@@ -259,11 +259,13 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
-            for (auto & entry : readDirectory(dir == "" ? "/" : dir)) {
-                if (entry.name[0] != '.' && hasPrefix(entry.name, prefix2))
-                    completions.insert(prev + dir + "/" + entry.name);
+            for (auto & entry : std::filesystem::directory_iterator{dir == "" ? "/" : dir}) {
+                auto name = entry.path().filename().string();
+                if (name[0] != '.' && hasPrefix(name, prefix2))
+                    completions.insert(prev + entry.path().string());
             }
         } catch (Error &) {
+        } catch (std::filesystem::filesystem_error &) {
         }
     } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
@@ -290,7 +292,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             e->eval(*state, *env, v);
             state->forceAttrs(v, noPos, "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
-            for (auto & i : *v.attrs) {
+            for (auto & i : *v.attrs()) {
                 std::string_view name = state->symbols[i.name];
                 if (name.substr(0, cur2.size()) != cur2) continue;
                 completions.insert(concatStrings(prev, expr, ".", name));
@@ -490,7 +492,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
-                auto pos = state->positions[v.lambda.fun->pos];
+                auto pos = state->positions[v.payload.lambda.fun->pos];
                 if (auto path = std::get_if<SourcePath>(&pos.origin))
                     return {*path, pos.line};
                 else
@@ -506,9 +508,13 @@ ProcessLineResult NixRepl::processLine(std::string line)
         auto editor = args.front();
         args.pop_front();
 
+        // avoid garbling the editor with the progress bar
+        logger->pause();
+        Finally resume([&]() { logger->resume(); });
+
         // runProgram redirects stdout to a StringSink,
         // using runProgram2 to allow editors to display their UI
-        runProgram2(RunOptions { .program = editor, .searchPath = true, .args = args });
+        runProgram2(RunOptions { .program = editor, .lookupPath = true, .args = args });
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -742,17 +748,17 @@ void NixRepl::loadFiles()
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); }, "while evaluating an attribute set to be merged in the global scope");
-    if (displ + attrs.attrs->size() >= envSize)
+    if (displ + attrs.attrs()->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
-    for (auto & i : *attrs.attrs) {
+    for (auto & i : *attrs.attrs()) {
         staticEnv->vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
         varNames.emplace(state->symbols[i.name]);
     }
     staticEnv->sort();
     staticEnv->deduplicate();
-    notice("Added %1% variables.", attrs.attrs->size());
+    notice("Added %1% variables.", attrs.attrs()->size());
 }
 
 
@@ -784,11 +790,11 @@ void NixRepl::evalString(std::string s, Value & v)
 
 
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
-   const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
+   const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
    std::function<AnnotatedValues()> getValues)
 {
     return std::make_unique<NixRepl>(
-        searchPath,
+        lookupPath,
         openStore(),
         state,
         getValues
@@ -804,9 +810,9 @@ ReplExitStatus AbstractNixRepl::runSimple(
         NixRepl::AnnotatedValues values;
         return values;
     };
-    SearchPath searchPath = {};
+    LookupPath lookupPath = {};
     auto repl = std::make_unique<NixRepl>(
-            searchPath,
+            lookupPath,
             openStore(),
             evalState,
             getValues

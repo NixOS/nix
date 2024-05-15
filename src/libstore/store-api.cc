@@ -13,7 +13,6 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "git.hh"
-#include "remote-store.hh"
 #include "posix-source-accessor.hh"
 // FIXME this should not be here, see TODO below on
 // `addMultipleToStore`.
@@ -51,7 +50,7 @@ Path Store::followLinksToStore(std::string_view _path) const
 {
     Path path = absPath(std::string(_path));
     while (!isInStore(path)) {
-        if (!isLink(path)) break;
+        if (!std::filesystem::is_symlink(path)) break;
         auto target = readLink(path);
         path = absPath(target, dirOf(path));
     }
@@ -131,12 +130,12 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
             throw Error("fixed output derivation '%s' is not allowed to refer to other store paths.\nYou may need to use the 'unsafeDiscardReferences' derivation attribute, see the manual for more details.",
                 name);
         }
-        return makeStorePath("output:out",
-            hashString(HashAlgorithm::SHA256,
-                "fixed:out:"
+        // make a unique digest based on the parameters for creating this store object
+        auto payload = "fixed:out:"
                 + makeFileIngestionPrefix(info.method)
-                + info.hash.to_string(HashFormat::Base16, true) + ":"),
-            name);
+                + info.hash.to_string(HashFormat::Base16, true) + ":";
+        auto digest = hashString(HashAlgorithm::SHA256, payload);
+        return makeStorePath("output:out", digest, name);
     }
 }
 
@@ -164,14 +163,13 @@ StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const
 
 std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & path,
+    const SourcePath & path,
     ContentAddressMethod method,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     PathFilter & filter) const
 {
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
+    auto h = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
     return {
         makeFixedOutputPathFromCA(
             name,
@@ -189,8 +187,7 @@ std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
 
 StorePath Store::addToStore(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & path,
+    const SourcePath & path,
     ContentAddressMethod method,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
@@ -211,7 +208,7 @@ StorePath Store::addToStore(
         break;
     }
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(accessor, path, sink, fsm, filter);
+        dumpPath(path, sink, fsm, filter);
     });
     return addToStoreFromDump(*source, name, fsm, method, hashAlgo, references, repair);
 }
@@ -340,8 +337,7 @@ digraph graphname {
 */
 ValidPathInfo Store::addToStoreSlow(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & srcPath,
+    const SourcePath & srcPath,
     ContentAddressMethod method, HashAlgorithm hashAlgo,
     const StorePathSet & references,
     std::optional<Hash> expectedCAHash)
@@ -363,7 +359,7 @@ ValidPathInfo Store::addToStoreSlow(
        srcPath. The fact that we use scratchpadSink as a temporary buffer here
        is an implementation detail. */
     auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
-        accessor.dumpPath(srcPath, scratchpadSink);
+        srcPath.dumpPath(scratchpadSink);
     });
 
     /* tapped provides the same data as fileSource, but we also write all the
@@ -386,12 +382,11 @@ ValidPathInfo Store::addToStoreSlow(
     auto hash = method == FileIngestionMethod::Recursive && hashAlgo == HashAlgorithm::SHA256
         ? narHash
         : method == FileIngestionMethod::Git
-        ? git::dumpHash(hashAlgo, accessor, srcPath).hash
+        ? git::dumpHash(hashAlgo, srcPath).hash
         : caHashSink.finish().first;
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
-
 
     ValidPathInfo info {
         *this,
@@ -409,7 +404,7 @@ ValidPathInfo Store::addToStoreSlow(
 
     if (!isValidPath(info.path)) {
         auto source = sinkToSource([&](Sink & scratchpadSink) {
-            accessor.dumpPath(srcPath, scratchpadSink);
+            srcPath.dumpPath(scratchpadSink);
         });
         addToStore(info, *source);
     }
@@ -1298,6 +1293,8 @@ static bool isNonUriPath(const std::string & spec)
 
 std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
+    // TODO reenable on Windows once we have `LocalStore` and
+    // `UDSRemoteStore`.
     if (uri == "" || uri == "auto") {
         auto stateDir = getOr(params, "state", settings.nixStateDir);
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)

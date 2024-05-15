@@ -154,6 +154,8 @@ result-*
 .vscode/
 .idea/
 
+.pre-commit-config.yaml
+
 # clangd and possibly more
 .cache/
 

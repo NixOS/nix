@@ -229,7 +229,7 @@ operate are determined as follows:
   Note that a [store derivation] (given by its `.drv` file store path) doesn't have
   any attributes like `meta`, and thus this case doesn't apply to it.
 
-  [store derivation]: ../../glossary.md#gloss-store-derivation
+  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 * Otherwise, Nix will use all outputs of the derivation.
 

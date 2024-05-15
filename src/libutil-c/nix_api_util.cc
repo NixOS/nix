@@ -64,7 +64,7 @@ const char * nix_version_get()
 
 // Implementations
 
-nix_err nix_setting_get(nix_c_context * context, const char * key, void * callback, void * user_data)
+nix_err nix_setting_get(nix_c_context * context, const char * key, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -115,7 +115,8 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * read_con
     return nullptr;
 }
 
-nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data)
+nix_err nix_err_name(
+    nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -125,7 +126,8 @@ nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context
     return call_nix_get_string_callback(read_context->name, callback, user_data);
 }
 
-nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, void * callback, void * user_data)
+nix_err nix_err_info_msg(
+    nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -141,8 +143,8 @@ nix_err nix_err_code(const nix_c_context * read_context)
 }
 
 // internal
-nix_err call_nix_get_string_callback(const std::string str, void * callback, void * user_data)
+nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callback callback, void * user_data)
 {
-    ((nix_get_string_callback) callback)(str.c_str(), str.size(), user_data);
+    callback(str.c_str(), str.size(), user_data);
     return NIX_OK;
 }

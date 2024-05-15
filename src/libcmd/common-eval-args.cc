@@ -125,7 +125,7 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) {
-            searchPath.elements.emplace_back(SearchPath::Elem::parse(s));
+            lookupPath.elements.emplace_back(LookupPath::Elem::parse(s));
         }}
     });
 
@@ -181,7 +181,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
                 v->mkString(arg.s);
             },
             [&](const AutoArgFile & arg) {
-                v->mkString(readFile(arg.path));
+                v->mkString(readFile(arg.path.string()));
             },
             [&](const AutoArgStdin & arg) {
                 v->mkString(readFile(STDIN_FILENO));

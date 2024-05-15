@@ -4,19 +4,19 @@ nix_DIR := $(d)
 
 nix_SOURCES := \
   $(wildcard $(d)/*.cc) \
-  $(wildcard src/build-remote/*.cc) \
   $(wildcard src/nix-build/*.cc) \
-  $(wildcard src/nix-channel/*.cc) \
-  $(wildcard src/nix-collect-garbage/*.cc) \
-  $(wildcard src/nix-copy-closure/*.cc) \
-  $(wildcard src/nix-daemon/*.cc) \
   $(wildcard src/nix-env/*.cc) \
   $(wildcard src/nix-instantiate/*.cc) \
   $(wildcard src/nix-store/*.cc)
 
 ifdef HOST_UNIX
 nix_SOURCES += \
-  $(wildcard $(d)/unix/*.cc)
+  $(wildcard $(d)/unix/*.cc) \
+  $(wildcard src/build-remote/*.cc) \
+  $(wildcard src/nix-channel/*.cc) \
+  $(wildcard src/nix-collect-garbage/*.cc) \
+  $(wildcard src/nix-copy-closure/*.cc) \
+  $(wildcard src/nix-daemon/*.cc)
 endif
 
 INCLUDE_nix := -I $(d)
