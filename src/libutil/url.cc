@@ -132,7 +132,7 @@ std::string ParsedURL::to_string() const
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
 }
 
-bool ParsedURL::operator ==(const ParsedURL & other) const
+bool ParsedURL::operator ==(const ParsedURL & other) const noexcept
 {
     return
         scheme == other.scheme

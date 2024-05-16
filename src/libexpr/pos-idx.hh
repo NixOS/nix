@@ -28,19 +28,14 @@ public:
         return id > 0;
     }
 
-    bool operator<(const PosIdx other) const
+    auto operator<=>(const PosIdx other) const
     {
-        return id < other.id;
+        return id <=> other.id;
     }
 
     bool operator==(const PosIdx other) const
     {
         return id == other.id;
-    }
-
-    bool operator!=(const PosIdx other) const
-    {
-        return id != other.id;
     }
 };
 

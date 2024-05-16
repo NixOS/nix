@@ -6,9 +6,7 @@
 #include <set>
 #include <variant>
 
-#include "comparator.hh"
 #include "json-impls.hh"
-#include "comparator.hh"
 #include "variant-wrapper.hh"
 
 namespace nix {
@@ -60,7 +58,11 @@ struct OutputsSpec {
 
     Raw raw;
 
-    GENERATE_CMP(OutputsSpec, me->raw);
+    bool operator == (const OutputsSpec &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
+    bool operator < (const OutputsSpec & other) const {
+        return raw < other.raw;
+    }
 
     MAKE_WRAPPER_CONSTRUCTOR(OutputsSpec);
 
@@ -99,7 +101,9 @@ struct ExtendedOutputsSpec {
 
     Raw raw;
 
-    GENERATE_CMP(ExtendedOutputsSpec, me->raw);
+    bool operator == (const ExtendedOutputsSpec &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
+    bool operator < (const ExtendedOutputsSpec &) const;
 
     MAKE_WRAPPER_CONSTRUCTOR(ExtendedOutputsSpec);
 

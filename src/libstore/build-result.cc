@@ -2,17 +2,7 @@
 
 namespace nix {
 
-GENERATE_CMP_EXT(
-    ,
-    BuildResult,
-    me->status,
-    me->errorMsg,
-    me->timesBuilt,
-    me->isNonDeterministic,
-    me->builtOutputs,
-    me->startTime,
-    me->stopTime,
-    me->cpuUser,
-    me->cpuSystem);
+bool BuildResult::operator==(const BuildResult &) const noexcept = default;
+std::strong_ordering BuildResult::operator<=>(const BuildResult &) const noexcept = default;
 
 }

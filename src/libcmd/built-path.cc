@@ -1,6 +1,7 @@
 #include "built-path.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "comparator.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -8,30 +9,24 @@
 
 namespace nix {
 
-#define CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, COMPARATOR) \
-    bool MY_TYPE ::operator COMPARATOR (const MY_TYPE & other) const \
-    { \
-        const MY_TYPE* me = this; \
-        auto fields1 = std::tie(*me->drvPath, me->FIELD); \
-        me = &other; \
-        auto fields2 = std::tie(*me->drvPath, me->FIELD); \
-        return fields1 COMPARATOR fields2; \
-    }
-#define CMP(CHILD_TYPE, MY_TYPE, FIELD) \
-    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, ==) \
-    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, !=) \
-    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, <)
+// Custom implementation to avoid `ref` ptr equality
+GENERATE_CMP_EXT(
+    ,
+    std::strong_ordering,
+    SingleBuiltPathBuilt,
+    *me->drvPath,
+    me->output);
 
-#define FIELD_TYPE std::pair<std::string, StorePath>
-CMP(SingleBuiltPath, SingleBuiltPathBuilt, output)
-#undef FIELD_TYPE
+// Custom implementation to avoid `ref` ptr equality
 
-#define FIELD_TYPE std::map<std::string, StorePath>
-CMP(SingleBuiltPath, BuiltPathBuilt, outputs)
-#undef FIELD_TYPE
-
-#undef CMP
-#undef CMP_ONE
+// TODO no `GENERATE_CMP_EXT` because no `std::set::operator<=>` on
+// Darwin, per header.
+GENERATE_EQUAL(
+    ,
+    BuiltPathBuilt ::,
+    BuiltPathBuilt,
+    *me->drvPath,
+    me->outputs);
 
 StorePath SingleBuiltPath::outPath() const
 {

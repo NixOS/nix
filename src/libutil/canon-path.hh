@@ -169,7 +169,7 @@ public:
      * a directory is always followed directly by its children. For
      * instance, 'foo' < 'foo/bar' < 'foo!'.
      */
-    bool operator < (const CanonPath & x) const
+    auto operator <=> (const CanonPath & x) const
     {
         auto i = path.begin();
         auto j = x.path.begin();
@@ -178,10 +178,9 @@ public:
             if (c_i == '/') c_i = 0;
             auto c_j = *j;
             if (c_j == '/') c_j = 0;
-            if (c_i < c_j) return true;
-            if (c_i > c_j) return false;
+            if (auto cmp = c_i <=> c_j; cmp != 0) return cmp;
         }
-        return i == path.end() && j != x.path.end();
+        return (i != path.end()) <=> (j != x.path.end());
     }
 
     /**

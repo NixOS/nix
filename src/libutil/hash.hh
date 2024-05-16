@@ -88,12 +88,12 @@ public:
     /**
      * Check whether two hashes are equal.
      */
-    bool operator == (const Hash & h2) const;
+    bool operator == (const Hash & h2) const noexcept;
 
     /**
      * Compare how two hashes are ordered.
      */
-    std::strong_ordering operator <=> (const Hash & h2) const;
+    std::strong_ordering operator <=> (const Hash & h2) const noexcept;
 
     /**
      * Returns the length of a base-16 representation of this hash.

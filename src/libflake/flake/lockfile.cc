@@ -249,11 +249,6 @@ bool LockFile::operator ==(const LockFile & other) const
     return toJSON().first == other.toJSON().first;
 }
 
-bool LockFile::operator !=(const LockFile & other) const
-{
-    return !(*this == other);
-}
-
 InputPath parseInputPath(std::string_view s)
 {
     InputPath path;
