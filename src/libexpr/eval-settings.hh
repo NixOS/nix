@@ -15,8 +15,11 @@ struct EvalSettings : Config
 
     static std::string resolvePseudoUrl(std::string_view url);
 
-    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
-        "Whether builtin functions that allow executing native code should be enabled."};
+    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
+        Whether builtin functions that allow executing native code should be enabled.
+
+        In particular, this adds the `importNative` and `exec` builtins.
+    )"};
 
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
