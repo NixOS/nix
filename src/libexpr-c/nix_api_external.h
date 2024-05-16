@@ -48,7 +48,7 @@ void nix_set_string_return(nix_string_return * str, const char * c);
  * Print to the nix_printer
  *
  * @param[out] context Optional, stores error information
- * @param printer The nix_printer to print to
+ * @param[out] printer The nix_printer to print to
  * @param[in] str The string to print
  * @returns NIX_OK if everything worked
  */
@@ -136,7 +136,7 @@ typedef struct NixCExternalValueDesc
      * or setting it to the empty string, will make the conversion throw an error.
      */
     void (*printValueAsJSON)(
-        void * self, EvalState *, bool strict, nix_string_context * c, bool copyToStore, nix_string_return * res);
+        void * self, EvalState * state, bool strict, nix_string_context * c, bool copyToStore, nix_string_return * res);
     /**
      * @brief Convert the external value to XML
      *
@@ -155,7 +155,7 @@ typedef struct NixCExternalValueDesc
      */
     void (*printValueAsXML)(
         void * self,
-        EvalState *,
+        EvalState * state,
         int strict,
         int location,
         void * doc,
