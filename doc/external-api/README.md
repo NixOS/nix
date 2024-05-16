@@ -27,7 +27,7 @@ appreciated.
 The following examples, for simplicity, don't include error handling. See the
 [Handling errors](@ref errors) section for more information.
 
-# Embedding the Nix Evaluator
+# Embedding the Nix Evaluator{#nix_evaluator_example}
 
 In this example we programmatically start the Nix language evaluator with a
 dummy store (that has no store paths and cannot be written to), and evaluate the
