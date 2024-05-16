@@ -2489,7 +2489,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 auto fim = outputHash.method.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                 {
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
@@ -2531,7 +2531,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             {
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
             }
@@ -2554,7 +2554,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 rewriteOutput(outputRewrites);
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();

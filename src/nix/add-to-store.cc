@@ -12,7 +12,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    ContentAddressMethod caMethod = FileIngestionMethod::Recursive;
+    ContentAddressMethod caMethod = FileIngestionMethod::NixArchive;
     HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
 
     CmdAddToStore()

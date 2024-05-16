@@ -415,12 +415,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 case FileIngestionMethod::Flat:
                     dumpMethod = FileSerialisationMethod::Flat;
                     break;
-                case FileIngestionMethod::Recursive:
-                    dumpMethod = FileSerialisationMethod::Recursive;
+                case FileIngestionMethod::NixArchive:
+                    dumpMethod = FileSerialisationMethod::NixArchive;
                     break;
                 case FileIngestionMethod::Git:
                     // Use NAR; Git is not a serialization method
-                    dumpMethod = FileSerialisationMethod::Recursive;
+                    dumpMethod = FileSerialisationMethod::NixArchive;
                     break;
                 default:
                     assert(false);
@@ -441,13 +441,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 uint8_t recursive;
                 std::string hashAlgoRaw;
                 from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
-                if (recursive > (uint8_t) FileIngestionMethod::Recursive)
+                if (recursive > (uint8_t) FileIngestionMethod::NixArchive)
                     throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
                 method = FileIngestionMethod { recursive };
                 /* Compatibility hack. */
                 if (!fixed) {
                     hashAlgoRaw = "sha256";
-                    method = FileIngestionMethod::Recursive;
+                    method = FileIngestionMethod::NixArchive;
                 }
                 hashAlgo = parseHashAlgo(hashAlgoRaw);
             }
@@ -468,7 +468,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             });
             logger->startWork();
             auto path = store->addToStoreFromDump(
-                *dumpSource, baseName, FileSerialisationMethod::Recursive, method, hashAlgo);
+                *dumpSource, baseName, FileSerialisationMethod::NixArchive, method, hashAlgo);
             logger->stopWork();
 
             to << store->printStorePath(path);

@@ -12,7 +12,7 @@ TEST(ContentAddressMethod, testRoundTripPrintParse_1) {
     for (const ContentAddressMethod & cam : {
         ContentAddressMethod { TextIngestionMethod {} },
         ContentAddressMethod { FileIngestionMethod::Flat },
-        ContentAddressMethod { FileIngestionMethod::Recursive },
+        ContentAddressMethod { FileIngestionMethod::NixArchive },
         ContentAddressMethod { FileIngestionMethod::Git },
     }) {
         EXPECT_EQ(ContentAddressMethod::parse(cam.render()), cam);

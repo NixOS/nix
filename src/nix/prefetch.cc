@@ -57,7 +57,7 @@ std::tuple<StorePath, Hash> prefetchFile(
         bool unpack,
         bool executable)
 {
-    auto ingestionMethod = unpack || executable ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+    auto ingestionMethod = unpack || executable ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat;
 
     /* Figure out a name in the Nix store. */
     if (!name) {

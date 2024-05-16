@@ -1155,7 +1155,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     auto fim = specified.method.getFileIngestionMethod();
                     switch (fim) {
                     case FileIngestionMethod::Flat:
-                    case FileIngestionMethod::Recursive:
+                    case FileIngestionMethod::NixArchive:
                     {
                         HashModuloSink caSink {
                             specified.hash.algo,
@@ -1314,7 +1314,7 @@ StorePath LocalStore::addToStoreFromDump(
                 auto fim = hashMethod.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                     restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
                     break;
                 case FileIngestionMethod::Git:
@@ -1330,7 +1330,7 @@ StorePath LocalStore::addToStoreFromDump(
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
             auto narHash = std::pair { dumpHash, size };
-            if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+            if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
@@ -1423,7 +1423,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 PosixSourceAccessor::createAtRoot(link.path()),
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::NixArchive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     link.path(), name, hash);

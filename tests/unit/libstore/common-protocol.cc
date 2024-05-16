@@ -91,7 +91,7 @@ CHARACTERIZATION_TEST(
             .hash = hashString(HashAlgorithm::SHA1, "blob blob..."),
         },
         ContentAddress {
-            .method = FileIngestionMethod::Recursive,
+            .method = FileIngestionMethod::NixArchive,
             .hash = hashString(HashAlgorithm::SHA256, "(...)"),
         },
     }))

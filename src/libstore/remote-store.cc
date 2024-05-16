@@ -406,8 +406,8 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                 conn->to
                     << WorkerProto::Op::AddToStore
                     << name
-                    << ((hashAlgo == HashAlgorithm::SHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-                    << (fim == FileIngestionMethod::Recursive ? 1 : 0)
+                    << ((hashAlgo == HashAlgorithm::SHA256 && fim == FileIngestionMethod::NixArchive) ? 0 : 1) /* backwards compatibility hack */
+                    << (fim == FileIngestionMethod::NixArchive ? 1 : 0)
                     << printHashAlgo(hashAlgo);
 
                 try {
@@ -415,7 +415,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                     connections->incCapacity();
                     {
                         Finally cleanup([&]() { connections->decCapacity(); });
-                        if (fim == FileIngestionMethod::Recursive) {
+                        if (fim == FileIngestionMethod::NixArchive) {
                             dump.drainInto(conn->to);
                         } else {
                             std::string contents = dump.drain();
@@ -457,12 +457,12 @@ StorePath RemoteStore::addToStoreFromDump(
     case FileIngestionMethod::Flat:
         fsm = FileSerialisationMethod::Flat;
         break;
-    case FileIngestionMethod::Recursive:
-        fsm = FileSerialisationMethod::Recursive;
+    case FileIngestionMethod::NixArchive:
+        fsm = FileSerialisationMethod::NixArchive;
         break;
     case FileIngestionMethod::Git:
         // Use NAR; Git is not a serialization method
-        fsm = FileSerialisationMethod::Recursive;
+        fsm = FileSerialisationMethod::NixArchive;
         break;
     default:
         assert(false);

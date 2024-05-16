@@ -1209,7 +1209,7 @@ static void derivationStrictInternal(
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") {
                 // back compat, new name is "nar"
-                ingestionMethod = FileIngestionMethod::Recursive;
+                ingestionMethod = FileIngestionMethod::NixArchive;
             } else try {
                 ingestionMethod = ContentAddressMethod::parse(s);
             } catch (UsageError &) {
@@ -1432,7 +1432,7 @@ static void derivationStrictInternal(
                 .atPos(v).debugThrow();
 
         auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
-        auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
+        auto method = ingestionMethod.value_or(FileIngestionMethod::NixArchive);
 
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
@@ -2391,7 +2391,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::NixArchive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2454,7 +2454,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
-    ContentAddressMethod method = FileIngestionMethod::Recursive;
+    ContentAddressMethod method = FileIngestionMethod::NixArchive;
     std::optional<Hash> expectedHash;
     NixStringContext context;
 
@@ -2470,7 +2470,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             state.forceFunction(*(filterFun = attr.value), attr.pos, "while evaluating the `filter` parameter passed to builtins.path");
         else if (n == "recursive")
             method = state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path")
-                ? FileIngestionMethod::Recursive
+                ? FileIngestionMethod::NixArchive
                 : FileIngestionMethod::Flat;
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
