@@ -1,6 +1,7 @@
 #include "derived-path.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "comparator.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -8,26 +9,21 @@
 
 namespace nix {
 
-#define CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, COMPARATOR) \
-    bool MY_TYPE ::operator COMPARATOR (const MY_TYPE & other) const \
-    { \
-        const MY_TYPE* me = this; \
-        auto fields1 = std::tie(*me->drvPath, me->FIELD); \
-        me = &other; \
-        auto fields2 = std::tie(*me->drvPath, me->FIELD); \
-        return fields1 COMPARATOR fields2; \
-    }
-#define CMP(CHILD_TYPE, MY_TYPE, FIELD) \
-    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, ==) \
-    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, !=) \
-    CMP_ONE(CHILD_TYPE, MY_TYPE, FIELD, <)
+// Custom implementation to avoid `ref` ptr equality
+GENERATE_CMP_EXT(
+    ,
+    std::strong_ordering,
+    SingleDerivedPathBuilt,
+    *me->drvPath,
+    me->output);
 
-CMP(SingleDerivedPath, SingleDerivedPathBuilt, output)
-
-CMP(SingleDerivedPath, DerivedPathBuilt, outputs)
-
-#undef CMP
-#undef CMP_ONE
+// Custom implementation to avoid `ref` ptr equality
+GENERATE_CMP_EXT(
+    ,
+    std::strong_ordering,
+    DerivedPathBuilt,
+    *me->drvPath,
+    me->outputs);
 
 nlohmann::json DerivedPath::Opaque::toJSON(const StoreDirConfig & store) const
 {

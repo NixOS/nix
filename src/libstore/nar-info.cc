@@ -4,15 +4,6 @@
 
 namespace nix {
 
-GENERATE_CMP_EXT(
-    ,
-    NarInfo,
-    me->url,
-    me->compression,
-    me->fileHash,
-    me->fileSize,
-    static_cast<const ValidPathInfo &>(*me));
-
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
     : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
 {

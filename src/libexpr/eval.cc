@@ -2835,7 +2835,7 @@ std::string ExternalValueBase::coerceToString(EvalState & state, const PosIdx & 
 }
 
 
-bool ExternalValueBase::operator==(const ExternalValueBase & b) const
+bool ExternalValueBase::operator==(const ExternalValueBase & b) const noexcept
 {
     return false;
 }

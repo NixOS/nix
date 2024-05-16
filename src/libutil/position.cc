@@ -17,12 +17,6 @@ Pos::operator std::shared_ptr<Pos>() const
     return std::make_shared<Pos>(&*this);
 }
 
-bool Pos::operator<(const Pos &rhs) const
-{
-    return std::forward_as_tuple(line, column, origin)
-        < std::forward_as_tuple(rhs.line, rhs.column, rhs.origin);
-}
-
 std::optional<LinesOfCode> Pos::getCodeLines() const
 {
     if (line == 0)

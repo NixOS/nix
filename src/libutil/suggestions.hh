@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "comparator.hh"
 #include "types.hh"
 #include <set>
 
@@ -20,7 +19,8 @@ public:
 
     std::string to_string() const;
 
-    GENERATE_CMP(Suggestion, me->distance, me->suggestion)
+    bool operator ==(const Suggestion &) const = default;
+    auto operator <=>(const Suggestion &) const = default;
 };
 
 class Suggestions {

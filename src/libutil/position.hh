@@ -22,21 +22,17 @@ struct Pos
 
     struct Stdin {
         ref<std::string> source;
-        bool operator==(const Stdin & rhs) const
+        bool operator==(const Stdin & rhs) const noexcept
         { return *source == *rhs.source; }
-        bool operator!=(const Stdin & rhs) const
-        { return *source != *rhs.source; }
-        bool operator<(const Stdin & rhs) const
-        { return *source < *rhs.source; }
+        std::strong_ordering operator<=>(const Stdin & rhs) const noexcept
+        { return *source <=> *rhs.source; }
     };
     struct String {
         ref<std::string> source;
-        bool operator==(const String & rhs) const
+        bool operator==(const String & rhs) const noexcept
         { return *source == *rhs.source; }
-        bool operator!=(const String & rhs) const
-        { return *source != *rhs.source; }
-        bool operator<(const String & rhs) const
-        { return *source < *rhs.source; }
+        std::strong_ordering operator<=>(const String & rhs) const noexcept
+        { return *source <=> *rhs.source; }
     };
 
     typedef std::variant<std::monostate, Stdin, String, SourcePath> Origin;
@@ -65,8 +61,7 @@ struct Pos
     std::optional<LinesOfCode> getCodeLines() const;
 
     bool operator==(const Pos & rhs) const = default;
-    bool operator!=(const Pos & rhs) const = default;
-    bool operator<(const Pos & rhs) const;
+    auto operator<=>(const Pos & rhs) const = default;
 
     struct LinesIterator {
         using difference_type = size_t;
