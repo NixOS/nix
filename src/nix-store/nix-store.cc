@@ -194,10 +194,10 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    auto method = FileIngestionMethod::Flat;
+    ContentAddressMethod method = ContentAddressMethod::Raw::Flat;
 
     for (auto & i : opFlags)
-        if (i == "--recursive") method = FileIngestionMethod::NixArchive;
+        if (i == "--recursive") method = ContentAddressMethod::Raw::NixArchive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.empty())

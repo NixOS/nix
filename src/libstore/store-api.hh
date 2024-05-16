@@ -441,7 +441,7 @@ public:
     virtual StorePath addToStore(
         std::string_view name,
         const SourcePath & path,
-        ContentAddressMethod method = FileIngestionMethod::NixArchive,
+        ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         PathFilter & filter = defaultPathFilter,
@@ -455,7 +455,7 @@ public:
     ValidPathInfo addToStoreSlow(
         std::string_view name,
         const SourcePath & path,
-        ContentAddressMethod method = FileIngestionMethod::NixArchive,
+        ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         std::optional<Hash> expectedCAHash = {});
@@ -481,7 +481,7 @@ public:
         Source & dump,
         std::string_view name,
         FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
-        ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
+        ContentAddressMethod hashMethod = ContentAddressMethod::Raw::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) = 0;

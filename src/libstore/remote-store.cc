@@ -392,8 +392,9 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
 
-        std::visit(overloaded {
-            [&](const TextIngestionMethod & thm) -> void {
+        switch (caMethod.raw) {
+            case ContentAddressMethod::Raw::Text:
+            {
                 if (hashAlgo != HashAlgorithm::SHA256)
                     throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
                         name, printHashAlgo(hashAlgo));
@@ -401,8 +402,14 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                 conn->to << WorkerProto::Op::AddTextToStore << name << s;
                 WorkerProto::write(*this, *conn, references);
                 conn.processStderr();
-            },
-            [&](const FileIngestionMethod & fim) -> void {
+                break;
+            }
+            case ContentAddressMethod::Raw::Flat:
+            case ContentAddressMethod::Raw::NixArchive:
+            case ContentAddressMethod::Raw::Git:
+            default:
+            {
+                auto fim = caMethod.getFileIngestionMethod();
                 conn->to
                     << WorkerProto::Op::AddToStore
                     << name
@@ -432,9 +439,9 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                         } catch (EndOfFile & e) { }
                     throw;
                 }
-
+                break;
             }
-        }, caMethod.raw);
+        }
         auto path = parseStorePath(readString(conn->from));
         // Release our connection to prevent a deadlock in queryPathInfo().
         conn_.reset();

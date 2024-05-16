@@ -117,6 +117,8 @@ enum struct FileIngestionMethod : uint8_t {
     /**
      * Git hashing.
      *
+     * Part of `ExperimentalFeature::GitHashing`.
+     *
      * See `file-system-object/content-address.md#serial-git` in the
      * manual.
      */

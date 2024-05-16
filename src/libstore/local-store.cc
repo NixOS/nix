@@ -1253,7 +1253,7 @@ StorePath LocalStore::addToStoreFromDump(
     std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
 
-    bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
+    bool methodsMatch = static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod();
 
     /* If the methods don't match, our streaming hash of the dump is the
        wrong sort, and we need to rehash. */

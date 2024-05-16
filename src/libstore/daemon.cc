@@ -435,19 +435,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         } else {
             HashAlgorithm hashAlgo;
             std::string baseName;
-            FileIngestionMethod method;
+            ContentAddressMethod method;
             {
                 bool fixed;
                 uint8_t recursive;
                 std::string hashAlgoRaw;
                 from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
-                if (recursive > (uint8_t) FileIngestionMethod::NixArchive)
+                if (recursive > true)
                     throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
-                method = FileIngestionMethod { recursive };
+                method = recursive
+                    ? ContentAddressMethod::Raw::NixArchive
+                    : ContentAddressMethod::Raw::Flat;
                 /* Compatibility hack. */
                 if (!fixed) {
                     hashAlgoRaw = "sha256";
-                    method = FileIngestionMethod::NixArchive;
+                    method = ContentAddressMethod::Raw::NixArchive;
                 }
                 hashAlgo = parseHashAlgo(hashAlgoRaw);
             }
@@ -500,7 +502,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto path = ({
             StringSource source { s };
-            store->addToStoreFromDump(source, suffix, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, NoRepair);
+            store->addToStoreFromDump(source, suffix, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, refs, NoRepair);
         });
         logger->stopWork();
         to << store->printStorePath(path);

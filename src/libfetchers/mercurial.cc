@@ -213,7 +213,7 @@ struct MercurialInputScheme : InputScheme
                 auto storePath = store->addToStore(
                     input.getName(),
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileIngestionMethod::NixArchive, HashAlgorithm::SHA256, {},
+                    ContentAddressMethod::Raw::NixArchive, HashAlgorithm::SHA256, {},
                     filter);
 
                 return storePath;

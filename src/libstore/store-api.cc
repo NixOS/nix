@@ -356,7 +356,7 @@ ValidPathInfo Store::addToStoreSlow(
     RegularFileSink fileSink { caHashSink };
     TeeSink unusualHashTee { narHashSink, caHashSink };
 
-    auto & narSink = method == FileIngestionMethod::NixArchive && hashAlgo != HashAlgorithm::SHA256
+    auto & narSink = method == ContentAddressMethod::Raw::NixArchive && hashAlgo != HashAlgorithm::SHA256
         ? static_cast<Sink &>(unusualHashTee)
         : narHashSink;
 
@@ -384,9 +384,9 @@ ValidPathInfo Store::addToStoreSlow(
        finish. */
     auto [narHash, narSize] = narHashSink.finish();
 
-    auto hash = method == FileIngestionMethod::NixArchive && hashAlgo == HashAlgorithm::SHA256
+    auto hash = method == ContentAddressMethod::Raw::NixArchive && hashAlgo == HashAlgorithm::SHA256
         ? narHash
-        : method == FileIngestionMethod::Git
+        : method == ContentAddressMethod::Raw::Git
         ? git::dumpHash(hashAlgo, srcPath).hash
         : caHashSink.finish().first;
 

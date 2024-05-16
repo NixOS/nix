@@ -335,7 +335,7 @@ SV *
 StoreWrapper::addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
-            auto method = recursive ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat;
+            auto method = recursive ? ContentAddressMethod::Raw::NixArchive : ContentAddressMethod::Raw::Flat;
             auto path = THIS->store->addToStore(
                 std::string(baseNameOf(srcPath)),
                 PosixSourceAccessor::createAtRoot(srcPath),

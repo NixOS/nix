@@ -9,11 +9,11 @@ namespace nix {
  * --------------------------------------------------------------------------*/
 
 TEST(ContentAddressMethod, testRoundTripPrintParse_1) {
-    for (const ContentAddressMethod & cam : {
-        ContentAddressMethod { TextIngestionMethod {} },
-        ContentAddressMethod { FileIngestionMethod::Flat },
-        ContentAddressMethod { FileIngestionMethod::NixArchive },
-        ContentAddressMethod { FileIngestionMethod::Git },
+    for (ContentAddressMethod cam : {
+        ContentAddressMethod::Raw::Text,
+        ContentAddressMethod::Raw::Flat,
+        ContentAddressMethod::Raw::NixArchive,
+        ContentAddressMethod::Raw::Git,
     }) {
         EXPECT_EQ(ContentAddressMethod::parse(cam.render()), cam);
     }
