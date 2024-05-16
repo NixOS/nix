@@ -155,9 +155,27 @@ DownloadTarballResult downloadTarball(
 
     // TODO: fall back to cached value if download fails.
 
+    AutoDelete cleanupTemp;
+
     /* Note: if the download is cached, `importTarball()` will receive
        no data, which causes it to import an empty tarball. */
-    TarArchive archive { *source };
+    auto archive =
+        hasSuffix(toLower(parseURL(url).path), ".zip")
+        ? ({
+                /* In streaming mode, libarchive doesn't handle
+                   symlinks in zip files correctly (#10649). So write
+                   the entire file to disk so libarchive can access it
+                   in random-access mode. */
+                auto [fdTemp, path] = createTempFile("nix-zipfile");
+                cleanupTemp.reset(path);
+                debug("downloading '%s' into '%s'...", url, path);
+                {
+                    FdSink sink(fdTemp.get());
+                    source->drainInto(sink);
+                }
+                TarArchive{path};
+          })
+        : TarArchive{*source};
     auto parseSink = getTarballCache()->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
 
