@@ -57,9 +57,11 @@ nix_err nix_init_plugins(nix_c_context * context);
  * @brief Open a nix store
  * Store instances may share state and resources behind the scenes.
  * @param[out] context Optional, stores error information
- * @param[in] uri URI of the nix store, copied
- * @param[in] params optional, array of key-value pairs, {{"endpoint",
- * "https://s3.local"}}
+ * @param[in] uri URI of the Nix store, copied. See [*Store URL format* in the Nix Reference
+ * Manual](https://nixos.org/manual/nix/stable/store/types/#store-url-format).
+ * @param[in] params optional, null-terminated array of key-value pairs, e.g. {{"endpoint",
+ * "https://s3.local"}}. See [*Store Types* in the Nix Reference
+ * Manual](https://nixos.org/manual/nix/stable/store/types).
  * @return a Store pointer, NULL in case of errors
  * @see nix_store_free
  */

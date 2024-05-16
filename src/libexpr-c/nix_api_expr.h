@@ -140,7 +140,7 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, Value *
  * @brief Create a new Nix language evaluator state.
  *
  * @param[out] context Optional, stores error information
- * @param[in] lookupPath Array of strings corresponding to entries in NIX_PATH.
+ * @param[in] lookupPath Null-terminated array of strings corresponding to entries in NIX_PATH.
  * @param[in] store The Nix store to use.
  * @return A new Nix state or NULL on failure.
  */
