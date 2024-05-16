@@ -82,6 +82,15 @@ $ ./main
 Nix version: 2.17
 ```
 
+You might need to add the directory containing `nix-expr-c.pc` to the
+`PKG_CONFIG_PATH` environment variable. For example after [building
+Nix](https://github.com/NixOS/nix/blob/master/doc/manual/src/contributing/hacking.md#building-nix-with-flakes)
+by executing the following.
+
+```ShellSession
+$ export PKG_CONFIG_PATH=$(realpath outputs/out/lib/pkgconfig):$PKG_CONFIG_PATH
+```
+
 # Writing a Nix language plug-in
 
 In this example we add a custom primitive operation (_primop_) to `builtins`. It
