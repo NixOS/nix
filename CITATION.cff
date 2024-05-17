@@ -1,0 +1,31 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Nix
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Eelco
+    family-names: Dolstra
+    email: edolstra@gmail.com
+  - name: The Nix contributors
+    website: 'https://github.com/NixOS/nix'
+identifiers:
+  - type: url
+    value: 'https://edolstra.github.io/pubs/phd-thesis.pdf'
+    description: PHD Thesis
+repository-code: 'https://github.com/NixOS/nix'
+url: 'https://nixos.org/'
+abstract: >-
+  Nix, a purely functional package manager, is a powerful
+  package manager for Linux and other Unix systems that
+  makes package management reliable and reproducible.
+keywords:
+  - reproducibility
+  - open-source
+  - c++
+  - functional
+license: LGPL-2.1
