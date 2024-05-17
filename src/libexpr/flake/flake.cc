@@ -96,14 +96,16 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    InputPath lockRootPath);
+    InputPath lockRootPath,
+    const SourcePath & flakeDir);
 
 static FlakeInput parseFlakeInput(
     EvalState & state,
     const std::string & inputName,
     Value * value,
     const PosIdx pos,
-    InputPath lockRootPath)
+    InputPath lockRootPath,
+    const SourcePath & flakeDir)
 {
     expectType(state, nAttrs, *value, pos);
 
@@ -120,14 +122,25 @@ static FlakeInput parseFlakeInput(
     for (auto & attr : *value->attrs()) {
         try {
             if (attr.name == sUrl) {
-                expectType(state, nString, *attr.value, attr.pos);
-                url = attr.value->string_view();
+                forceTrivialValue(state, *attr.value, pos);
+                if (attr.value->type() == nString)
+                    url = attr.value->string_view();
+                else if (attr.value->type() == nPath) {
+                    auto path = attr.value->path();
+                    if (path.accessor != flakeDir.accessor)
+                        throw Error("input path '%s' at %s must be in the same source tree as %s",
+                            path, state.positions[attr.pos], flakeDir);
+                    url = "path:" + flakeDir.path.makeRelative(path.path);
+                }
+                else
+                    throw Error("expected a string or a path but got %s at %s",
+                        showType(attr.value->type()), state.positions[attr.pos]);
                 attrs.emplace("url", *url);
             } else if (attr.name == sFlake) {
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean();
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootPath);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootPath, flakeDir);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
                 auto follows(parseInputPath(attr.value->c_str()));
@@ -191,7 +204,8 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    InputPath lockRootPath)
+    InputPath lockRootPath,
+    const SourcePath & flakeDir)
 {
     std::map<FlakeId, FlakeInput> inputs;
 
@@ -203,7 +217,8 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
                 state.symbols[inputAttr.name],
                 inputAttr.value,
                 inputAttr.pos,
-                lockRootPath));
+                lockRootPath,
+                flakeDir));
     }
 
     return inputs;
@@ -217,7 +232,8 @@ static Flake readFlake(
     const SourcePath & rootDir,
     const InputPath & lockRootPath)
 {
-    auto flakePath = rootDir / CanonPath(resolvedRef.subdir) / "flake.nix";
+    auto flakeDir = rootDir / CanonPath(resolvedRef.subdir);
+    auto flakePath = flakeDir / "flake.nix";
 
     // NOTE evalFile forces vInfo to be an attrset because mustBeTrivial is true.
     Value vInfo;
@@ -238,7 +254,7 @@ static Flake readFlake(
     auto sInputs = state.symbols.create("inputs");
 
     if (auto inputs = vInfo.attrs()->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootPath);
+        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootPath, flakeDir);
 
     auto sOutputs = state.symbols.create("outputs");
 

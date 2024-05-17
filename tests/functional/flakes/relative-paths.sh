@@ -12,7 +12,7 @@ mkdir -p $rootFlake $subflake0 $subflake1 $subflake2
 
 cat > $rootFlake/flake.nix <<EOF
 {
-  inputs.sub0.url = "./sub0";
+  inputs.sub0.url = ./sub0;
   outputs = { self, sub0 }: {
     x = 2;
     y = self.x * sub0.x;
@@ -50,7 +50,7 @@ git -C $rootFlake add flake.nix sub0/flake.nix sub1/flake.nix
 
 cat > $subflake2/flake.nix <<EOF
 {
-  inputs.root.url = "../";
+  inputs.root.url = ./..;
   inputs.sub1.url = "../sub1";
   outputs = { self, root, sub1 }: {
     x = 5;
