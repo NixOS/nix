@@ -63,6 +63,10 @@ git -C $rootFlake add flake.nix sub2/flake.nix
 
 [[ $(nix eval $subflake2#y) = 15 ]]
 
+# Make sure that this still works after commiting the lock file.
+git -C $rootFlake add sub2/flake.lock
+[[ $(nix eval $subflake2#y) = 15 ]]
+
 # Make sure there are no content locks for relative path flakes.
 (! grep "$TEST_ROOT" $subflake2/flake.lock)
 (! grep "$NIX_STORE_DIR" $subflake2/flake.lock)

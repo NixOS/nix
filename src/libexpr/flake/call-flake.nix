@@ -47,7 +47,7 @@ let
             else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/"
             then
               parentNode.sourceInfo // {
-                outPath = parentNode.sourceInfo.outPath + ("/" + node.locked.path);
+                outPath = parentNode.outPath + ("/" + node.locked.path);
               }
             else
               # FIXME: remove obsolete node.info.
