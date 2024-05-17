@@ -182,6 +182,8 @@ public:
         return *this;
     }
 
+    HintFmt & operator=(HintFmt const & rhs) = default;
+
     std::string str() const
     {
         return fmt.str();
