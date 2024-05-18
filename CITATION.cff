@@ -1,6 +1,3 @@
-# This CITATION.cff file was generated with cffinit.
-# Visit https://bit.ly/cffinit to generate yours today!
-
 cff-version: 1.2.0
 title: Nix
 message: >-
@@ -13,10 +10,24 @@ authors:
     email: edolstra@gmail.com
   - name: The Nix contributors
     website: 'https://github.com/NixOS/nix'
-identifiers:
-  - type: url
-    value: 'https://edolstra.github.io/pubs/phd-thesis.pdf'
-    description: PHD Thesis
+references:
+  - title: The Purely Functional Software Deployment Model
+    authors:
+    - family-names: Dolstra
+      given-names: Eelco
+    year: 2006
+    type: thesis
+    thesis-type: PhD thesis
+    isbn: 90-393-4130-3
+    url: https://dspace.library.uu.nl/handle/1874/7540
+    database-provider: Utrecht University Repository
+    institution:
+      name: Utrecht University
+    keywords:
+    - configuration management
+    - software deployment
+    - purely functional
+    - component-based software engineering
 repository-code: 'https://github.com/NixOS/nix'
 url: 'https://nixos.org/'
 abstract: >-
