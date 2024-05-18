@@ -21,7 +21,7 @@ unsigned int getMaxCPU();
 /**
  * Change the stack size.
  */
-void setStackSize(rlim_t stackSize);
+void setStackSize(size_t stackSize);
 #endif
 
 /**

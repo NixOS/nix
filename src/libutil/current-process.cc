@@ -60,14 +60,14 @@ unsigned int getMaxCPU()
 
 
 #ifndef _WIN32
-rlim_t savedStackSize = 0;
+size_t savedStackSize = 0;
 
-void setStackSize(rlim_t stackSize)
+void setStackSize(size_t stackSize)
 {
     struct rlimit limit;
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
         savedStackSize = limit.rlim_cur;
-        limit.rlim_cur = std::min(stackSize, limit.rlim_max);
+        limit.rlim_cur = std::min(static_cast<rlim_t>(stackSize), limit.rlim_max);
         if (setrlimit(RLIMIT_STACK, &limit) != 0) {
             logger->log(
                 lvlError,
