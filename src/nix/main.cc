@@ -522,10 +522,13 @@ void mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
-#ifndef _WIN32 // TODO implement on Windows
+#ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
+#else
+    // Windows' default stack reservation is 1 MB, going over will fail
+    nix::setStackSize(1 * 1024 * 1024);
 #endif
 
     return nix::handleExceptions(argv[0], [&]() {
