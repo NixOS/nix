@@ -59,11 +59,11 @@ unsigned int getMaxCPU()
 //////////////////////////////////////////////////////////////////////
 
 
-#ifndef _WIN32
 size_t savedStackSize = 0;
 
 void setStackSize(size_t stackSize)
 {
+    #ifndef _WIN32
     struct rlimit limit;
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
         savedStackSize = limit.rlim_cur;
@@ -81,8 +81,27 @@ void setStackSize(size_t stackSize)
             );
         }
     }
+    #else
+    ULONG currStackSize = 0;
+    // This retrieves the current promised stack size
+    SetThreadStackGuarantee(&currStackSize);
+    if (currStackSize < stackSize) {
+        savedStackSize = currStackSize;
+        ULONG newStackSize = stackSize;
+        if (SetThreadStackGuarantee(&newStackSize) == 0) {
+            logger->log(
+                lvlError,
+                HintFmt(
+                    "Failed to increase stack size from %1% to %2%: %3%",
+                    savedStackSize,
+                    stackSize,
+                    std::to_string(GetLastError())
+                ).str()
+            );
+        }
+    }
+    #endif
 }
-#endif
 
 void restoreProcessContext(bool restoreMounts)
 {
