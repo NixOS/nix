@@ -200,8 +200,8 @@ static RegisterPrimOp primop_fetchTree({
     .doc = R"(
       Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
 
-      - the resulting fixed-output [store path](@docroot@/glossary.md#gloss-store-path)
-      - the corresponding [NAR](@docroot@/glossary.md#gloss-nar) hash
+      - the resulting fixed-output [store path](@docroot@/store/store-path.md)
+      - the corresponding [NAR](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) hash
       - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
 
       *input* must be an attribute set with the following attributes:

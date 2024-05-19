@@ -20,16 +20,21 @@ an example.
 The hash is computed over a *serialisation* of each path: a dump of
 the file system tree rooted at the path. This allows directories and
 symlinks to be hashed as well as regular files. The dump is in the
-*NAR format* produced by [`nix-store
+*[Nix Archive (NAR)][Nix Archive] format* produced by [`nix-store
 --dump`](@docroot@/command-ref/nix-store/dump.md).  Thus, `nix-hash path`
 yields the same cryptographic hash as `nix-store --dump path |
 md5sum`.
 
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
+
 # Options
 
   - `--flat`\
-    Print the cryptographic hash of the contents of each regular file
-    *path*. That is, do not compute the hash over the dump of *path*.
+    Print the cryptographic hash of the contents of each regular file *path*.
+    That is, instead of computing
+    the hash of the [Nix Archive (NAR)](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) of *path*,
+    just [directly hash]((@docroot@/store/file-system-object/content-address.md#serial-flat) *path* as is.
+    This requires *path* to resolve to a regular file rather than directory.
     The result is identical to that produced by the GNU commands
     `md5sum` and `sha1sum`.
 

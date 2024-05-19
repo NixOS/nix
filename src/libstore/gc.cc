@@ -781,7 +781,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 throw Error(
                     "Cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
-                    "nix-store --query --roots",
+                    "nix-store --query --roots and nix-store --query --referrers",
                     printStorePath(i));
         }
 

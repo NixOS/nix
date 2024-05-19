@@ -601,6 +601,37 @@ std::vector<BuiltPathWithResult> Installable::build(
     return res;
 }
 
+static void throwBuildErrors(
+    std::vector<KeyedBuildResult> & buildResults,
+    const Store & store)
+{
+    std::vector<KeyedBuildResult> failed;
+    for (auto & buildResult : buildResults) {
+        if (!buildResult.success()) {
+            failed.push_back(buildResult);
+        }
+    }
+
+    auto failedResult = failed.begin();
+    if (failedResult != failed.end()) {
+        if (failed.size() == 1) {
+            failedResult->rethrow();
+        } else {
+            StringSet failedPaths;
+            for (; failedResult != failed.end(); failedResult++) {
+                if (!failedResult->errorMsg.empty()) {
+                    logError(ErrorInfo{
+                        .level = lvlError,
+                        .msg = failedResult->errorMsg,
+                    });
+                }
+                failedPaths.insert(failedResult->path.to_string(store));
+            }
+            throw Error("build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
+        }
+    }
+}
+
 std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build2(
     ref<Store> evalStore,
     ref<Store> store,
@@ -662,10 +693,9 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         if (settings.printMissing)
             printMissing(store, pathsToBuild, lvlInfo);
 
-        for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
-            if (!buildResult.success())
-                buildResult.rethrow();
-
+        auto buildResults = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
+        throwBuildErrors(buildResults, *store);
+        for (auto & buildResult : buildResults) {
             for (auto & aux : backmap[buildResult.path]) {
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {

@@ -1,11 +1,13 @@
 # Complete Store Path Calculation
 
-This is the complete specification for how store paths are calculated.
+This is the complete specification for how [store path]s are calculated.
 
 The format of this specification is close to [Extended Backus–Naur form](https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form), but must deviate for a few things such as hash functions which we treat as bidirectional for specification purposes.
 
 Regular users do *not* need to know this information --- store paths can be treated as black boxes computed from the properties of the store objects they refer to.
 But for those interested in exactly how Nix works, e.g. if they are reimplementing it, this information can be useful.
+
+[store path](@docroot@/store/store-path.md)
 
 ## Store path proper
 
@@ -113,7 +115,7 @@ where
       Note that `id` = `"out"`, regardless of the name part of the store path.
       Also note that NAR + SHA-256 must not use this case, and instead must use the `type` = `"source:" ...` case.
 
-[Nix Archive (NAR)]: @docroot@/glossary.md#gloss-NAR
+[Nix Archive (NAR)]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 [sha-256]: https://en.m.wikipedia.org/wiki/SHA-256
 
 ### Historical Note

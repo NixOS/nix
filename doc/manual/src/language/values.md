@@ -124,7 +124,7 @@
   For example, assume you used a file path in an interpolated string during a `nix repl` session.
   Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents. Use `:r` to reset the repl as needed.
 
-  [store path]: @docroot@/glossary.md#gloss-store-path
+  [store path]: @docroot@/store/store-path.md
 
   Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 

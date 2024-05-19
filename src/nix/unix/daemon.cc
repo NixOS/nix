@@ -58,7 +58,7 @@ struct AuthorizationSettings : Config {
         this, {"root"}, "trusted-users",
         R"(
           A list of user names, separated by whitespace.
-          These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned [NARs](@docroot@/glossary.md#gloss-nar).
+          These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned realisations or unsigned input-addressed store objects.
 
           You can also specify groups by prefixing names with `@`.
           For instance, `@wheel` means all users in the `wheel` group.

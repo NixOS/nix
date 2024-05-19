@@ -128,7 +128,7 @@ The result is a string.
 > The file or directory at *path* must exist and is copied to the [store].
 > The path appears in the result as the corresponding [store path].
 
-[store path]: @docroot@/glossary.md#gloss-store-path
+[store path]: @docroot@/store/store-path.md
 [store]: @docroot@/glossary.md#gloss-store
 
 [String and path concatenation]: #string-and-path-concatenation

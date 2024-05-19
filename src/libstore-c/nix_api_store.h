@@ -63,7 +63,7 @@ nix_err nix_init_plugins(nix_c_context * context);
  * @return a Store pointer, NULL in case of errors
  * @see nix_store_free
  */
-Store * nix_store_open(nix_c_context *, const char * uri, const char *** params);
+Store * nix_store_open(nix_c_context * context, const char * uri, const char *** params);
 
 /**
  * @brief Deallocate a nix store and free any resources if not also held by other Store instances.

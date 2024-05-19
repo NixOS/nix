@@ -1,5 +1,11 @@
 # Store Path
 
+> **Example**
+>
+> `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+>
+> A rendered store path
+
 Nix implements references to [store objects](./index.md#store-object) as *store paths*.
 
 Think of a store path as an [opaque], [unique identifier]:
@@ -36,6 +42,10 @@ A store path is rendered to a file system path as the concatenation of
 >   |--------| |------------------------------| |----------|
 > store directory            digest                 name
 > ```
+
+Exactly how the digest is calculated depends on the type of store path.
+Store path digests are *supposed* to be opaque, and so for most operations, it is not necessary to know the details.
+That said, the manual has a full [specification of store path digests](@docroot@/protocols/store-path.md).
 
 ## Store Directory
 
