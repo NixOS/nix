@@ -29,15 +29,21 @@ Nix store, the import will fail.
 
 # Examples
 
-To copy a whole closure, do something
-like:
-
-```console
-$ nix-store --export $(nix-store --query --requisites paths) > out
-```
-
-To import the whole closure again, run:
-
-```console
-$ nix-store --import < out
-```
+> **Example**
+>
+> Deploy GNU Hello to an airgapped machine via USB stick.
+>
+> Write the closure to the block device on a machine with internet connection:
+>
+> ```shell-session
+> [alice@itchy]$ storePath=$(nix-build '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello --no-out-link)
+> [alice@itchy]$ nix-store --export $(nix-store --query --requisites $storePath) | sudo dd of=/dev/usb
+> ```
+>
+> Read the closure from the block device on the machine without internet connection:
+>
+> ```shell-session
+> [bob@scratchy]$ hello=$(sudo dd if=/dev/usb | nix-store --import | tail -1)
+> [bob@scratchy]$ $hello/bin/hello
+> Hello, world!
+> ```
