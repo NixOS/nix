@@ -25,7 +25,7 @@ jobs:
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: "sandbox = true"
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v14
+    - uses: cachix/cachix-action@v15
       if: needs.check_secrets.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
@@ -65,7 +65,7 @@ jobs:
     - uses: cachix/install-nix-action@v26
       with:
         install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - uses: cachix/cachix-action@v14
+    - uses: cachix/cachix-action@v15
       with:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
@@ -119,7 +119,7 @@ jobs:
         install_url: https://releases.nixos.org/nix/nix-2.20.3/install
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#default.version | tr -d \")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v14
+    - uses: cachix/cachix-action@v15
       if: needs.check_secrets.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
