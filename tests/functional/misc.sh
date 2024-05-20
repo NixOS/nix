@@ -30,3 +30,12 @@ expectStderr 1 nix-instantiate --eval -E '[]' -A 'x' | grepQuiet "should be a se
 expectStderr 1 nix-instantiate --eval -E '{}' -A '1' | grepQuiet "should be a list"
 expectStderr 1 nix-instantiate --eval -E '{}' -A '.' | grepQuiet "empty attribute name"
 expectStderr 1 nix-instantiate --eval -E '[]' -A '1' | grepQuiet "out of range"
+
+# Unknown setting warning
+# NOTE(cole-h): behavior is different depending on the order, which is why we test an unknown option
+# before and after the `'{}'`!
+out="$(expectStderr 0 nix-instantiate --option foobar baz --expr '{}')"
+[[ "$(echo "$out" | grep foobar | wc -l)" = 1 ]]
+
+out="$(expectStderr 0 nix-instantiate '{}' --option foobar baz --expr )"
+[[ "$(echo "$out" | grep foobar | wc -l)" = 1 ]]
