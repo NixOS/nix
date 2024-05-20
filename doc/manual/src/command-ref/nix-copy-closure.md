@@ -56,7 +56,7 @@ When using public key authentication, you can avoid typing the passphrase with `
 
     Attempt to download missing store objects on the target from [substituters](@docroot@/command-ref/conf-file.md#conf-substituters).
     Any store objects that cannot be substituted on the target are still copied normally from the source.
-    This is useful, for instance, if the connection between the source and target machine is slow, but the connection between the target machine and `nixos.org` (the default binary cache server) is fast.
+    This is useful, for instance, if the connection between the source and target machine is slow, but the connection between the target machine and `cache.nixos.org` (the default binary cache server) is fast.
 
 {{#include ./opt-common.md}}
 
