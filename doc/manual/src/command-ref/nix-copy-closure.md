@@ -14,14 +14,8 @@
 
 # Description
 
-`nix-copy-closure` copies [store objects](@docroot@/glossary.md#gloss-store-object) along with all their dependencies to or from another machine via the SSH protocol.
+Given _paths_ accesible from the source machine, `nix-copy-closure` computes the [closure](@docroot@/glossary.md#gloss-closure) of those paths (i.e. all their dependencies in the Nix store), and copies [store objects](@docroot@/glossary.md#gloss-store-object) in the closure to the target machine via SSH.
 It doesn’t copy store objects that are already present on the target machine.
-
-Given one or more _paths_ accesible from the client, `nix-copy-closure` computes the [closure](@docroot@/glossary.md#gloss-closure) of those paths (i.e. all their dependencies in the Nix store), and copies all store objects in the closure to the remote machine via SSH.
-With the `--from` option, the direction is reversed:
-The closure of _paths_ on a remote machine is copied to the specified Nix store accessible from the client.
-
-This command is efficient because it only sends the store paths that are missing on the target machine.
 
 > **Note**
 >
@@ -35,12 +29,12 @@ When using public key authentication, you can avoid typing the passphrase with `
 
   - `--to` _machine_
 
-    Copy the closure of _paths_ from the local Nix store to the Nix store on _machine_.
+    Copy the closure of _paths_ from a Nix store accessible from the client to the Nix store on the remote _machine_.
     This is the default.
 
   - `--from` _machine_
 
-    Copy the closure of _paths_ from the Nix store on _machine_ to the local Nix store.
+    Copy the closure of _paths_ from the Nix store on the remote _machine_ to the client's specified Nix store.
 
   - `--gzip`
 
