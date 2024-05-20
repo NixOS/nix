@@ -19,7 +19,7 @@ ServeProto::Version ServeProto::BasicClientConnection::handshake(
     auto remoteVersion = readInt(from);
     if (GET_PROTOCOL_MAJOR(remoteVersion) != 0x200)
         throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
-    return remoteVersion;
+    return std::min(remoteVersion, localVersion);
 }
 
 ServeProto::Version ServeProto::BasicServerConnection::handshake(
@@ -31,7 +31,8 @@ ServeProto::Version ServeProto::BasicServerConnection::handshake(
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
     to << SERVE_MAGIC_2 << localVersion;
     to.flush();
-    return readInt(from);
+    auto remoteVersion = readInt(from);
+    return std::min(remoteVersion, localVersion);
 }
 
 
@@ -48,6 +49,30 @@ StorePathSet ServeProto::BasicClientConnection::queryValidPaths(
     to.flush();
 
     return Serialise<StorePathSet>::read(store, *this);
+}
+
+
+std::map<StorePath, UnkeyedValidPathInfo> ServeProto::BasicClientConnection::queryPathInfos(
+    const Store & store,
+    const StorePathSet & paths)
+{
+    std::map<StorePath, UnkeyedValidPathInfo> infos;
+
+    to << ServeProto::Command::QueryPathInfos;
+    ServeProto::write(store, *this, paths);
+    to.flush();
+
+    while (true) {
+        auto storePathS = readString(from);
+        if (storePathS == "") break;
+
+        auto storePath = store.parseStorePath(storePathS);
+        assert(paths.count(storePath) == 1);
+        auto info = ServeProto::Serialise<UnkeyedValidPathInfo>::read(store, *this);
+        infos.insert_or_assign(std::move(storePath), std::move(info));
+    }
+
+    return infos;
 }
 
 
