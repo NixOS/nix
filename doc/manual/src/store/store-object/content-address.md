@@ -90,34 +90,6 @@ Only SHA-1 is supported at this time.
 If [SHA-256-based Git](https://git-scm.com/docs/hash-function-transition)
 becomes more widespread, this restriction will be revisited.
 
-### Reproducibility
-
-The above system is more complex than it needs to be to support all types of file system objects and references, owing to accretion of features over time.
-However, there's a lot of value in supporting old expressions and reproducing the same hashes with any version of Nix.
-Still, the fundamental property remains that if one knows how a store object is supposed to be hashed
---- all the non-Hash, non-references information above
---- one can recompute a store object's store path just from that metadata and its content proper (its references and file system objects).
-Collectively, we can call this information the "content address method".
-
-By storing the "Content address method" extra information as part of store object
---- making it data not metadata
---- we achieve the key property of making content-addressed store objects *trustless*.
-
-What this is means is that they are just plain old data, not containing any "claim" that could be false.
-All this information is free to vary, and if any of it varies one gets (ignoring the possibility of hash collisions, as usual) a different store path.
-Store paths referring to content-addressed store objects uniquely identify a store object, and given that object, one can recompute the store path.
-Any content-addressed store object purporting to be the referee of a store object can be readily verified to see whether it in fact does without any extra information.
-No other party claiming a store object corresponds to a store path need be trusted because this verification can be done instead.
-
-Content addressing currently is used when adding data like source code to the store.
-Such data are "basal inputs", not produced from any other derivation (to our knowledge).
-Content addressing is thus the only way to address them of our two options.
-([Input addressing](@docroot@/glossary.md#gloss-input-addressed-store-object), is only valid for store paths produced from derivations.)
-
-Additionally, content addressing is also used for the outputs of certain sorts of derivations.
-It is very nice to be able to uniformly content-address all data rather than rely on a mix of content addressing and input addressing.
-This however, is in some cases still experimental, so in practice input addressing is still (as of 2022) widely used.
-
 [fso-ca]: ../file-system-object/content-address.md
 [sp-spec]: @docroot@/protocols/store-path.md
 [xp-feature-git-hashing]: @docroot@/contributing/experimental-features.md#xp-feature-git-hashing
