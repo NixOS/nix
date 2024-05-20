@@ -22,8 +22,9 @@ std::string filterANSIEscapes(std::string_view s,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 
 /**
- * Recalculate the window size, updating a global variable. Used in the
- * `SIGWINCH` signal handler.
+ * Recalculate the window size, updating a global variable.
+ *
+ * Used in the `SIGWINCH` signal handler on Unix, for example.
  */
 void updateWindowSize();
 
