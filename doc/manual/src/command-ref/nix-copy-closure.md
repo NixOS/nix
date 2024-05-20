@@ -95,7 +95,7 @@ authentication, you can avoid typing the passphrase with `ssh-agent`.
 > Copy GNU Hello from a remote machine using a known store path, and run it:
 >
 > ```shell-session
-> $ storePath=/nix/store/g1n2vryg06amvcc1avb2mcq36faly0mh-hello-2.12.1
+> $ storePath="$(nix-instantiate --eval '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello.outPath | tr -d '"')"
 > $ nix-copy-closure --from alice@itchy.example.org "$storePath"
 > $ "$storePath"/bin/hello
 > Hello, world!
