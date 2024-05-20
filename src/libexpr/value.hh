@@ -449,7 +449,7 @@ public:
         return std::string_view(payload.string.c_str);
     }
 
-    const char * const c_str() const
+    const char * c_str() const
     {
         assert(internalType == tString);
         return payload.string.c_str;
