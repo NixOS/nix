@@ -98,4 +98,5 @@ authentication, you can avoid typing the passphrase with `ssh-agent`.
 > $ storePath=/nix/store/g1n2vryg06amvcc1avb2mcq36faly0mh-hello-2.12.1
 > $ nix-copy-closure --from alice@itchy.example.org "$storePath"
 > $ "$storePath"/bin/hello
+> Hello, world!
 > ```
