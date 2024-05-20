@@ -46,4 +46,6 @@ The exit status of this command is the sum of the following values:
 * **4** if any path couldn't be verified for any other reason (such as
   an I/O error).
 
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
+
 )""
