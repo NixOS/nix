@@ -122,6 +122,10 @@ struct ServeProto::BasicClientConnection
         bool lock, const StorePathSet & paths,
         SubstituteFlag maybeSubstitute);
 
+    std::map<StorePath, UnkeyedValidPathInfo> queryPathInfos(
+        const Store & store,
+        const StorePathSet & paths);
+
     /**
      * Just the request half, because Hydra may do other things between
      * issuing the request and reading the `BuildResult` response.

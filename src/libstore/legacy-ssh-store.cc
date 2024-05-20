@@ -105,24 +105,26 @@ void LegacySSHStore::queryPathInfoUncached(const StorePath & path,
 
         debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
-        conn->to << ServeProto::Command::QueryPathInfos << PathSet{printStorePath(path)};
-        conn->to.flush();
+        auto infos = conn->queryPathInfos(*this, {path});
 
-        auto p = readString(conn->from);
-        if (p.empty()) return callback(nullptr);
-        auto path2 = parseStorePath(p);
-        assert(path == path2);
-        auto info = std::make_shared<ValidPathInfo>(
-            path,
-            ServeProto::Serialise<UnkeyedValidPathInfo>::read(*this, *conn));
+        switch (infos.size()) {
+        case 0:
+            return callback(nullptr);
+        case 1: {
+            auto & [path2, info] = *infos.begin();
 
-        if (info->narHash == Hash::dummy)
-            throw Error("NAR hash is now mandatory");
+            if (info.narHash == Hash::dummy)
+                throw Error("NAR hash is now mandatory");
 
-        auto s = readString(conn->from);
-        assert(s == "");
-
-        callback(std::move(info));
+            assert(path == path2);
+            return callback(std::make_shared<ValidPathInfo>(
+                std::move(path),
+                std::move(info)
+            ));
+        }
+        default:
+            throw Error("More path infos returned than queried");
+        }
     } catch (...) { callback.rethrow(); }
 }
 
