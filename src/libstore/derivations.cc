@@ -186,7 +186,7 @@ bool DerivationT<InputsType>::isBuiltin() const
 
 // Forward declaration of specialization
 template<>
-std::string DerivationT<std::set<SingleDerivedPath>>::unparse(
+std::string DerivationT<SingleDerivedPath>::unparse(
     const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const;
 
 static auto infoForDerivation(Store & store, const Derivation & drv)
@@ -608,6 +608,10 @@ Derivation parseDerivation(
     }
 
     expect(str, ')');
+
+    drv.options = derivationOptionsFromStructuredAttrs(
+        store, drv.inputs, drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
     return drv;
 }
 
@@ -733,7 +737,7 @@ static bool hasDynamicDrvDep(const Derivation & drv)
 }
 
 template<>
-std::string DerivationT<std::set<SingleDerivedPath>>::unparse(
+std::string DerivationT<SingleDerivedPath>::unparse(
     const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const
 {
     // Convert to FullInputs for serialization
@@ -1219,7 +1223,7 @@ void DerivationT<InputsType>::applyRewrites(const StringMap & rewrites)
 }
 
 template<>
-Derivation DerivationT<StorePathSet>::unresolve() const
+Derivation DerivationT<StorePath>::unresolve() const
 {
     return Derivation{
         .outputs = outputs,
@@ -1254,14 +1258,14 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
 }
 
 template<>
-std::optional<BasicDerivation> DerivationT<std::set<SingleDerivedPath>>::tryResolve(
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>> DerivationT<SingleDerivedPath>::tryResolve(
     Store & store,
     std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const;
 
 template<>
-std::optional<BasicDerivation>
-DerivationT<std::set<SingleDerivedPath>>::tryResolve(Store & store, Store * evalStore) const
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+DerivationT<SingleDerivedPath>::tryResolve(Store & store, Store * evalStore) const
 {
     return tryResolve(
         store, [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
@@ -1274,7 +1278,7 @@ DerivationT<std::set<SingleDerivedPath>>::tryResolve(Store & store, Store * eval
 }
 
 template<>
-std::optional<BasicDerivation> DerivationT<std::set<SingleDerivedPath>>::tryResolve(
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>> DerivationT<SingleDerivedPath>::tryResolve(
     Store & store,
     std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const
@@ -1321,7 +1325,12 @@ std::optional<BasicDerivation> DerivationT<std::set<SingleDerivedPath>>::tryReso
 
     rewriteDerivation(store, result, inputRewrites);
 
-    return result;
+    auto resolvedOptions = nix::tryResolve(options, queryResolutionChain);
+
+    if (!resolvedOptions)
+        return std::nullopt;
+
+    return {{std::move(result), *std::move(resolvedOptions)}};
 }
 
 template<typename InputsType>
@@ -1357,7 +1366,7 @@ void DerivationT<InputsType>::checkInvariants(Store & store, const StorePath & d
                 [&](const DerivationOutput::InputAddressed & doia) {
                     if (!hashesModulo) {
                         // somewhat expensive so we do lazily
-                        if constexpr (std::is_same_v<InputsType, std::set<SingleDerivedPath>>) {
+                        if constexpr (std::is_same_v<InputsType, SingleDerivedPath>) {
                             hashesModulo = hashDerivationModulo(store, *this, true);
                         } else {
                             hashesModulo = hashDerivationModulo(store, this->unresolve(), true);
@@ -1400,8 +1409,8 @@ void DerivationT<InputsType>::checkInvariants(Store & store, const StorePath & d
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
 // Explicit template instantiations
-template struct DerivationT<StorePathSet>;
-template struct DerivationT<std::set<SingleDerivedPath>>;
+template struct DerivationT<StorePath>;
+template struct DerivationT<SingleDerivedPath>;
 
 } // namespace nix
 
@@ -1558,6 +1567,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
     res["builder"] = d.builder;
     res["args"] = d.args;
     res["env"] = d.env;
+    res["options"] = d.options;
 
     if (d.structuredAttrs)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
@@ -1646,6 +1656,8 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
 
     if (auto structuredAttrs = get(json, "structuredAttrs"))
         res.structuredAttrs = StructuredAttrs{*structuredAttrs};
+
+    res.options = valueAt(json, "options");
 
     return res;
 }

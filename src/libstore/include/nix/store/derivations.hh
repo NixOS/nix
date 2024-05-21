@@ -8,6 +8,7 @@
 #include "nix/util/repair-flag.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 
@@ -295,17 +296,17 @@ struct DerivationType
 template<typename Inputs>
 struct DerivationT;
 
-using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<std::set<SingleDerivedPath>>;
+using BasicDerivation = DerivationT<StorePath>;
+using Derivation = DerivationT<SingleDerivedPath>;
 
-template<typename Inputs>
+template<typename Input>
 struct DerivationT
 {
     /**
      * keyed on symbolic IDs
      */
     DerivationOutputs outputs;
-    Inputs inputs;
+    std::set<Input> inputs;
     std::string platform;
     Path builder;
     Strings args;
@@ -314,6 +315,16 @@ struct DerivationT
      */
     StringPairs env;
     std::optional<StructuredAttrs> structuredAttrs;
+
+    /**
+     * Derivation options
+     *
+     * @todo instead of `BasicDerivation`/`Derivation`, should just have
+     * `template<...> Derivation`, and then the choice of template
+     * parameter would control "possibly-unresolved vs definitely
+     * resolved" and this field would use the overall type parameter.
+     */
+    DerivationOptions<Input> options;
 
     std::string name;
 
@@ -353,7 +364,7 @@ struct DerivationT
         const StoreDirConfig & store,
         bool maskOutputs,
         DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const
-        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>>;
+        requires std::is_same_v<Input, SingleDerivedPath>;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -364,19 +375,20 @@ struct DerivationT
      * 2. Input placeholders are replaced with realized input store
      *    paths.
      */
-    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
-        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>>;
+    std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+    tryResolve(Store & store, Store * evalStore = nullptr) const
+        requires std::is_same_v<Input, SingleDerivedPath>;
 
     /**
      * Like the above, but instead of querying the Nix database for
      * realisations, uses a given mapping from input derivation paths +
      * output names to actual output store paths.
      */
-    std::optional<BasicDerivation> tryResolve(
+    std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>> tryResolve(
         Store & store,
         std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
             queryResolutionChain) const
-        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>>;
+        requires std::is_same_v<Input, SingleDerivedPath>;
 
     /**
      * Convert a BasicDerivation to a full Derivation.
@@ -384,7 +396,7 @@ struct DerivationT
      * is already resolved.
      */
     Derivation unresolve() const
-        requires std::is_same_v<Inputs, StorePathSet>;
+        requires std::is_same_v<Input, StorePath>;
 
     /**
      * Check that the derivation is valid and does not present any

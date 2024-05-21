@@ -113,10 +113,8 @@ private:
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(
-        const std::map<std::string, InitialOutput> & initialOutputs,
-        const BasicDerivation & resolvedDrv,
-        const DerivationOptions<StorePath> & drvOptions);
+    HookReply
+    tryBuildHook(const std::map<std::string, InitialOutput> & initialOutputs, const BasicDerivation & resolvedDrv);
 
     /**
      * Open a log file and a pipe to it.

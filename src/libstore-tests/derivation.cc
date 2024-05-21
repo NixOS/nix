@@ -260,6 +260,8 @@ Derivation makeSimpleDrv()
             "WOLF",
         },
     };
+    drv.options = derivationOptionsFromStructuredAttrs(
+        StoreDirConfig{"/nix/store"}, drv.inputs, drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
     return drv;
 }
 
@@ -333,6 +335,8 @@ Derivation makeDynDepDerivation()
             "WOLF",
         },
     };
+    drv.options = derivationOptionsFromStructuredAttrs(
+        StoreDirConfig{"/nix/store"}, drv.inputs, drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
     return drv;
 }
 

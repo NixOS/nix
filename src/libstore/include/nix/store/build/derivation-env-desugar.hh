@@ -11,7 +11,7 @@ class Store;
 template<typename Inputs>
 struct DerivationT;
 struct SingleDerivedPath;
-using Derivation = DerivationT<std::set<SingleDerivedPath>>;
+using Derivation = DerivationT<SingleDerivedPath>;
 
 template<typename Input>
 struct DerivationOptions;

@@ -38,8 +38,8 @@ struct DrvOutput;
 
 template<typename Inputs>
 struct DerivationT;
-using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<std::set<SingleDerivedPath>>;
+using BasicDerivation = DerivationT<StorePath>;
+using Derivation = DerivationT<SingleDerivedPath>;
 
 struct SourceAccessor;
 class NarInfoDiskCache;

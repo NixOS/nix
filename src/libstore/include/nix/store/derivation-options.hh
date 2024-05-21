@@ -19,7 +19,7 @@ struct StoreDirConfig;
 
 template<typename Inputs>
 struct DerivationT;
-using BasicDerivation = DerivationT<StorePathSet>;
+using BasicDerivation = DerivationT<StorePath>;
 
 struct StructuredAttrs;
 
@@ -186,28 +186,24 @@ struct DerivationOptions
      * the future we'll flip things around so a `BasicDerivation` has
      * `DerivationOptions` instead.
      */
-    template<typename Inputs>
-    StringSet getRequiredSystemFeatures(const DerivationT<Inputs> & drv) const;
+    StringSet getRequiredSystemFeatures(const DerivationT<Input> & drv) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
      */
-    template<typename Inputs>
-    bool canBuildLocally(Store & localStore, const DerivationT<Inputs> & drv) const;
+    bool canBuildLocally(Store & localStore, const DerivationT<Input> & drv) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
      */
-    template<typename Inputs>
-    bool willBuildLocally(Store & localStore, const DerivationT<Inputs> & drv) const;
+    bool willBuildLocally(Store & localStore, const DerivationT<Input> & drv) const;
 
     bool substitutesAllowed() const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
      */
-    template<typename Inputs>
-    bool useUidRange(const DerivationT<Inputs> & drv) const;
+    bool useUidRange(const DerivationT<Input> & drv) const;
 };
 
 extern template struct DerivationOptions<StorePath>;
@@ -249,6 +245,13 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     const DerivationOptions<SingleDerivedPath> & drvOptions,
     std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
+
+template<typename T>
+struct json_avoids_null;
+
+template<typename Input>
+struct json_avoids_null<DerivationOptions<Input>> : std::true_type
+{};
 
 }; // namespace nix
 

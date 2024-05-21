@@ -13,6 +13,22 @@
     "srcs": []
   },
   "name": "advanced-attributes-structured-attrs-defaults",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "outputChecks": {
+      "perOutput": {}
+    },
+    "passAsFile": [],
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": [],
+    "unsafeDiscardReferences": {}
+  },
   "outputs": {
     "dev": {
       "hashAlgo": "sha256",

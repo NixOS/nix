@@ -12,7 +12,7 @@ class Store;
 
 template<typename Inputs>
 struct DerivationT;
-using Derivation = DerivationT<std::set<SingleDerivedPath>>;
+using Derivation = DerivationT<SingleDerivedPath>;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,
