@@ -14,12 +14,12 @@
 
 # Description
 
-Given _paths_ accesible from the source machine, `nix-copy-closure` computes the [closure](@docroot@/glossary.md#gloss-closure) of those paths (i.e. all their dependencies in the Nix store), and copies [store objects](@docroot@/glossary.md#gloss-store-object) in the closure to the target machine via SSH.
-It doesn’t copy store objects that are already present on the target machine.
+Given _paths_ from one machine, `nix-copy-closure` computes the [closure](@docroot@/glossary.md#gloss-closure) of those paths (i.e. all their dependencies in the Nix store), and copies [store objects](@docroot@/glossary.md#gloss-store-object) in that closure to another machine via SSH.
+It doesn’t copy store objects that are already present on the other machine.
 
 > **Note**
 >
-> While the Nix store to use on the client can be specified on the command line with the [`--store`](@docroot@/command-ref/conf-file.md#conf-store) option, the Nix store to be accessed on the remote machine can only be [configured statically](@docroot@/command-ref/conf-file.md#configuration-file) on that remote machine.
+> While the Nix store to use on the local machine can be specified on the command line with the [`--store`](@docroot@/command-ref/conf-file.md#conf-store) option, the Nix store to be accessed on the remote machine can only be [configured statically](@docroot@/command-ref/conf-file.md#configuration-file) on that remote machine.
 
 Since `nix-copy-closure` calls `ssh`, you may need to authenticate with the remote machine.
 In fact, you may be asked for authentication _twice_ because `nix-copy-closure` currently connects twice to the remote machine: first to get the set of paths missing on the target machine, and second to send the dump of those paths.
@@ -29,12 +29,12 @@ When using public key authentication, you can avoid typing the passphrase with `
 
   - `--to` _machine_
 
-    Copy the closure of _paths_ from a Nix store accessible from the client to the Nix store on the remote _machine_.
+    Copy the closure of _paths_ from a Nix store accessible from the local machine to the Nix store on the remote _machine_.
     This is the default.
 
   - `--from` _machine_
 
-    Copy the closure of _paths_ from the Nix store on the remote _machine_ to the client's specified Nix store.
+    Copy the closure of _paths_ from the Nix store on the remote _machine_ to the local machine's specified Nix store.
 
   - `--gzip`
 
