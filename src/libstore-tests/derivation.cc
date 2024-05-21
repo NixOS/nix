@@ -228,6 +228,8 @@ Derivation makeSimpleDrv(const Store & store)
             "WOLF",
         },
     };
+    drv.options =
+        DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
     return drv;
 }
 
@@ -290,6 +292,8 @@ Derivation makeDynDepDerivation(const Store & store)
             "WOLF",
         },
     };
+    drv.options =
+        DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
     return drv;
 }
 

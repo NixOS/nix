@@ -455,6 +455,10 @@ Derivation parseDerivation(
     drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
     expect(str, ")");
+
+    drv.options =
+        DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
     return drv;
 }
 
@@ -576,6 +580,15 @@ static bool hasDynamicDrvDep(const Derivation & drv)
 std::string Derivation::unparse(
     const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const
 {
+    {
+        auto optionsFromEnv =
+            DerivationOptions::fromStructuredAttrs(env, structuredAttrs ? &*structuredAttrs : nullptr);
+
+        if (optionsFromEnv != options)
+            throw Error(
+                "'drv.options' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
+    }
+
     std::string s;
     s.reserve(65536);
 
@@ -963,11 +976,23 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
     }
     drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
+    drv.options =
+        DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
     return in;
 }
 
 void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv)
 {
+    {
+        auto optionsFromEnv =
+            DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
+        if (optionsFromEnv != drv.options)
+            throw Error(
+                "'drv.options' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
+    }
+
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
         out << i.first;
@@ -1374,6 +1399,7 @@ nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
     res["builder"] = builder;
     res["args"] = args;
     res["env"] = env;
+    res["options"] = options;
 
     if (structuredAttrs)
         res["structuredAttrs"] = structuredAttrs->structuredAttrs;
@@ -1447,6 +1473,8 @@ Derivation Derivation::fromJSON(
 
     if (auto structuredAttrs = get(json, "structuredAttrs"))
         res.structuredAttrs = StructuredAttrs{*structuredAttrs};
+
+    res.options = valueAt(json, "options");
 
     return res;
 }

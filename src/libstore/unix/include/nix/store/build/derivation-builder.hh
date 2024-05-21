@@ -27,13 +27,6 @@ struct DerivationBuilderParams
      */
     const Derivation & drv;
 
-    /**
-     * The derivation options of `drv`.
-     *
-     * @todo this should be part of `Derivation`.
-     */
-    const DerivationOptions & drvOptions;
-
     // The remainder is state held during the build.
 
     /**
@@ -54,13 +47,11 @@ struct DerivationBuilderParams
         const BuildMode & buildMode,
         BuildResult & buildResult,
         const Derivation & drv,
-        const DerivationOptions & drvOptions,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs)
         : drvPath{drvPath}
         , buildResult{buildResult}
         , drv{drv}
-        , drvOptions{drvOptions}
         , inputPaths{inputPaths}
         , initialOutputs{initialOutputs}
         , buildMode{buildMode}
