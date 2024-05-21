@@ -52,8 +52,6 @@ private:
      */
     std::unique_ptr<Derivation> drv;
 
-    std::unique_ptr<DerivationOptions> drvOptions;
-
     /**
      * The remainder is state held during the build.
      */

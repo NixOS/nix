@@ -552,18 +552,10 @@ static void main_nix_build(int argc, char ** argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
 
-        DerivationOptions drvOptions;
-        try {
-            drvOptions = DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs);
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
-            throw;
-        }
-
         int fileNr = 0;
 
         for (auto & var : drv.env)
-            if (drvOptions.passAsFile.count(var.first)) {
+            if (drv.options.passAsFile.count(var.first)) {
                 auto fn = ".attr-" + std::to_string(fileNr++);
                 Path p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
@@ -592,7 +584,7 @@ static void main_nix_build(int argc, char ** argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);
+            auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drv.options, inputs, drv.outputs);
 
             structuredAttrsRC = StructuredAttrs::writeShell(json);
 

@@ -107,18 +107,16 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
         EXPECT_TRUE(!got.structuredAttrs);
 
-        EXPECT_EQ(options.additionalSandboxProfile, "");
-        EXPECT_EQ(options.noChroot, false);
-        EXPECT_EQ(options.impureHostDeps, StringSet{});
-        EXPECT_EQ(options.impureEnvVars, StringSet{});
-        EXPECT_EQ(options.allowLocalNetworking, false);
-        EXPECT_EQ(options.exportReferencesGraph, ExportReferencesMap{});
+        EXPECT_EQ(got.options.additionalSandboxProfile, "");
+        EXPECT_EQ(got.options.noChroot, false);
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{});
+        EXPECT_EQ(got.options.allowLocalNetworking, false);
+        EXPECT_EQ(got.options.exportReferencesGraph, ExportReferencesMap{});
         {
-            auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
+            auto * checksForAllOutputs_ = std::get_if<0>(&got.options.outputChecks);
             ASSERT_TRUE(checksForAllOutputs_ != nullptr);
             auto & checksForAllOutputs = *checksForAllOutputs_;
 
@@ -127,10 +125,10 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
             EXPECT_EQ(checksForAllOutputs.disallowedReferences, StringSet{});
             EXPECT_EQ(checksForAllOutputs.disallowedRequisites, StringSet{});
         }
-        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.substitutesAllowed(), true);
-        EXPECT_EQ(options.useUidRange(got), false);
+        EXPECT_EQ(got.options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), true);
+        EXPECT_EQ(got.options.useUidRange(got), false);
     });
 };
 
@@ -141,9 +139,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{});
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), StringSet{});
     });
 };
 
@@ -154,9 +150,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
     });
 };
 
@@ -167,19 +161,17 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
         EXPECT_TRUE(!got.structuredAttrs);
 
-        EXPECT_EQ(options.additionalSandboxProfile, "sandcastle");
-        EXPECT_EQ(options.noChroot, true);
-        EXPECT_EQ(options.impureHostDeps, StringSet{"/usr/bin/ditto"});
-        EXPECT_EQ(options.impureEnvVars, StringSet{"UNICORN"});
-        EXPECT_EQ(options.allowLocalNetworking, true);
-        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.substitutesAllowed(), false);
-        EXPECT_EQ(options.useUidRange(got), true);
+        EXPECT_EQ(got.options.additionalSandboxProfile, "sandcastle");
+        EXPECT_EQ(got.options.noChroot, true);
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{"UNICORN"});
+        EXPECT_EQ(got.options.allowLocalNetworking, true);
+        EXPECT_EQ(got.options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), false);
+        EXPECT_EQ(got.options.useUidRange(got), true);
     });
 };
 
@@ -190,10 +182,8 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
         EXPECT_EQ(
-            options.exportReferencesGraph,
+            got.options.exportReferencesGraph,
             (ExportReferencesMap{
                 {
                     "refs1",
@@ -210,7 +200,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes)
             }));
 
         {
-            auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
+            auto * checksForAllOutputs_ = std::get_if<0>(&got.options.outputChecks);
             ASSERT_TRUE(checksForAllOutputs_ != nullptr);
             auto & checksForAllOutputs = *checksForAllOutputs_;
 
@@ -228,7 +218,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes)
 
         StringSet systemFeatures{"rainbow", "uid-range"};
 
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), systemFeatures);
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), systemFeatures);
     });
 };
 
@@ -239,10 +229,8 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
         EXPECT_EQ(
-            options.exportReferencesGraph,
+            got.options.exportReferencesGraph,
             (ExportReferencesMap{
                 {
                     "refs1",
@@ -259,7 +247,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
             }));
 
         {
-            auto * checksForAllOutputs_ = std::get_if<0>(&options.outputChecks);
+            auto * checksForAllOutputs_ = std::get_if<0>(&got.options.outputChecks);
             ASSERT_TRUE(checksForAllOutputs_ != nullptr);
             auto & checksForAllOutputs = *checksForAllOutputs_;
 
@@ -280,7 +268,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
         StringSet systemFeatures{"rainbow", "uid-range"};
         systemFeatures.insert("ca-derivations");
 
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), systemFeatures);
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), systemFeatures);
     });
 };
 
@@ -295,25 +283,25 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
 
         EXPECT_TRUE(got.structuredAttrs);
 
-        EXPECT_EQ(options.additionalSandboxProfile, "");
-        EXPECT_EQ(options.noChroot, false);
-        EXPECT_EQ(options.impureHostDeps, StringSet{});
-        EXPECT_EQ(options.impureEnvVars, StringSet{});
-        EXPECT_EQ(options.allowLocalNetworking, false);
-        EXPECT_EQ(options.exportReferencesGraph, ExportReferencesMap{});
+        EXPECT_EQ(got.options.additionalSandboxProfile, "");
+        EXPECT_EQ(got.options.noChroot, false);
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{});
+        EXPECT_EQ(got.options.allowLocalNetworking, false);
+        EXPECT_EQ(got.options.exportReferencesGraph, ExportReferencesMap{});
 
         {
-            auto * checksPerOutput_ = std::get_if<1>(&options.outputChecks);
+            auto * checksPerOutput_ = std::get_if<1>(&got.options.outputChecks);
             ASSERT_TRUE(checksPerOutput_ != nullptr);
             auto & checksPerOutput = *checksPerOutput_;
 
             EXPECT_EQ(checksPerOutput.size(), 0u);
         }
 
-        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.substitutesAllowed(), true);
-        EXPECT_EQ(options.useUidRange(got), false);
+        EXPECT_EQ(got.options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), true);
+        EXPECT_EQ(got.options.useUidRange(got), false);
     });
 };
 
@@ -324,9 +312,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{});
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), StringSet{});
     });
 };
 
@@ -337,9 +323,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_default
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), StringSet{"ca-derivations"});
     });
 };
 
@@ -350,18 +334,16 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
         EXPECT_TRUE(got.structuredAttrs);
 
-        EXPECT_EQ(options.additionalSandboxProfile, "sandcastle");
-        EXPECT_EQ(options.noChroot, true);
-        EXPECT_EQ(options.impureHostDeps, StringSet{"/usr/bin/ditto"});
-        EXPECT_EQ(options.impureEnvVars, StringSet{"UNICORN"});
-        EXPECT_EQ(options.allowLocalNetworking, true);
+        EXPECT_EQ(got.options.additionalSandboxProfile, "sandcastle");
+        EXPECT_EQ(got.options.noChroot, true);
+        EXPECT_EQ(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        EXPECT_EQ(got.options.impureEnvVars, StringSet{"UNICORN"});
+        EXPECT_EQ(got.options.allowLocalNetworking, true);
 
         {
-            auto output_ = get(std::get<1>(options.outputChecks), "dev");
+            auto output_ = get(std::get<1>(got.options.outputChecks), "dev");
             ASSERT_TRUE(output_);
             auto & output = *output_;
 
@@ -369,10 +351,10 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
             EXPECT_EQ(output.maxClosureSize, 5909);
         }
 
-        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.substitutesAllowed(), false);
-        EXPECT_EQ(options.useUidRange(got), true);
+        EXPECT_EQ(got.options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), false);
+        EXPECT_EQ(got.options.useUidRange(got), true);
     });
 };
 
@@ -383,10 +365,8 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
         EXPECT_EQ(
-            options.exportReferencesGraph,
+            got.options.exportReferencesGraph,
             (ExportReferencesMap{
                 {
                     "refs1",
@@ -404,7 +384,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         {
             {
-                auto output_ = get(std::get<1>(options.outputChecks), "out");
+                auto output_ = get(std::get<1>(got.options.outputChecks), "out");
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
 
@@ -413,7 +393,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
             }
 
             {
-                auto output_ = get(std::get<1>(options.outputChecks), "bin");
+                auto output_ = get(std::get<1>(got.options.outputChecks), "bin");
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
 
@@ -425,7 +405,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         StringSet systemFeatures{"rainbow", "uid-range"};
 
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), systemFeatures);
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), systemFeatures);
     });
 };
 
@@ -436,10 +416,8 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         auto drvPath = writeDerivation(*this->store, got, NoRepair, true);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
-
         EXPECT_EQ(
-            options.exportReferencesGraph,
+            got.options.exportReferencesGraph,
             (ExportReferencesMap{
                 {
                     "refs1",
@@ -457,7 +435,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
         {
             {
-                auto output_ = get(std::get<1>(options.outputChecks), "out");
+                auto output_ = get(std::get<1>(got.options.outputChecks), "out");
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
 
@@ -466,7 +444,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
             }
 
             {
-                auto output_ = get(std::get<1>(options.outputChecks), "bin");
+                auto output_ = get(std::get<1>(got.options.outputChecks), "bin");
                 ASSERT_TRUE(output_);
                 auto & output = *output_;
 
@@ -480,8 +458,60 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         StringSet systemFeatures{"rainbow", "uid-range"};
         systemFeatures.insert("ca-derivations");
 
-        EXPECT_EQ(options.getRequiredSystemFeatures(got), systemFeatures);
+        EXPECT_EQ(got.options.getRequiredSystemFeatures(got), systemFeatures);
     });
 };
+
+#define SYNC_CONFLICT(NAME, VALUE)                   \
+    NAME = VALUE;                                    \
+    EXPECT_THROW(got.unparse(*store, false), Error); \
+    got.options = options;
+
+TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_option_syncConflict)
+{
+    readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
+        auto got = parseDerivation(*store, std::move(encoded), "foo");
+        auto options = got.options;
+
+        SYNC_CONFLICT(got.options.additionalSandboxProfile, "foobar");
+        SYNC_CONFLICT(got.options.noChroot, true);
+        SYNC_CONFLICT(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        SYNC_CONFLICT(got.options.impureEnvVars, StringSet{"HELLO"});
+        SYNC_CONFLICT(got.options.allowLocalNetworking, true);
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).allowedReferences, StringSet{"nothing"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).allowedRequisites, StringSet{"hey"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).disallowedReferences, StringSet{"BAR"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).disallowedRequisites, StringSet{"FOO"});
+    });
+};
+
+#undef SYNC_CONFLICT
+
+#define SYNC_CONFLICT(NAME, VALUE)                   \
+    got.env[NAME] = VALUE;                           \
+    EXPECT_THROW(got.unparse(*store, false), Error); \
+    got.env = env;
+
+TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_env_syncConflict)
+{
+    readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
+        auto got = parseDerivation(*store, std::move(encoded), "foo");
+        auto env = got.env;
+
+        // TODO: Is there any way to serialize a boolean/StringSet into an env value (string)?
+        // Something like `State::coerceToString`
+        SYNC_CONFLICT("__sandboxProfile", "foobar");
+        SYNC_CONFLICT("__noChroot", "1");
+        SYNC_CONFLICT("__impureHostDeps", "/usr/bin/ditto");
+        SYNC_CONFLICT("impureEnvVars", "FOOBAR");
+        SYNC_CONFLICT("__darwinAllowLocalNetworking", "1");
+        SYNC_CONFLICT("allowedReferences", "nothing");
+        SYNC_CONFLICT("allowedRequisites", "hey");
+        SYNC_CONFLICT("disallowedReferences", "BAR");
+        SYNC_CONFLICT("disallowedRequisites", "FOO");
+    });
+};
+
+#undef SYNC_CONFLICT
 
 } // namespace nix
