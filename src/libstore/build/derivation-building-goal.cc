@@ -32,14 +32,6 @@ DerivationBuildingGoal::DerivationBuildingGoal(
 {
     drv = std::make_unique<Derivation>(drv_);
 
-    try {
-        drvOptions =
-            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs));
-    } catch (Error & e) {
-        e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-        throw;
-    }
-
     name = fmt("building of '%s' from in-memory derivation", worker.store.printStorePath(drvPath));
     trace("created");
 
@@ -529,8 +521,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     /* Don't do a remote build if the derivation has the attribute
        `preferLocalBuild' set.  Also, check and repair modes are only
        supported for local builds. */
-    bool buildLocally =
-        (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv)) && settings.maxBuildJobs.get() != 0;
+    bool buildLocally = (buildMode != bmNormal || drv->options.willBuildLocally(worker.store, *drv))
+                        && settings.maxBuildJobs.get() != 0;
 
     if (!buildLocally) {
         switch (tryBuildHook()) {
@@ -658,7 +650,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     buildMode,
                     buildResult,
                     *drv,
-                    *drvOptions,
                     inputPaths,
                     initialOutputs,
                 });
@@ -900,7 +891,7 @@ HookReply DerivationBuildingGoal::tryBuildHook()
 
         /* Send the request to the hook. */
         worker.hook->sink << "try" << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0) << drv->platform
-                          << worker.store.printStorePath(drvPath) << drvOptions->getRequiredSystemFeatures(*drv);
+                          << worker.store.printStorePath(drvPath) << drv->options.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
