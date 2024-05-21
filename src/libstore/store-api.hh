@@ -901,7 +901,14 @@ std::list<ref<Store>> getDefaultSubstituters();
 struct StoreFactory
 {
     std::set<std::string> uriSchemes;
-    std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
+    /**
+     * The `authorityPath` parameter is `<authority>/<path>`, or really
+     * whatever comes after `<scheme>://` and before `?<query-params>`.
+     */
+    std::function<std::shared_ptr<Store> (
+        std::string_view scheme,
+        std::string_view authorityPath,
+        const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
 
@@ -916,7 +923,7 @@ struct Implementations
         StoreFactory factory{
             .uriSchemes = T::uriSchemes(),
             .create =
-                ([](const std::string & scheme, const std::string & uri, const Store::Params & params)
+                ([](auto scheme, auto uri, auto & params)
                  -> std::shared_ptr<Store>
                  { return std::make_shared<T>(scheme, uri, params); }),
             .getConfig =

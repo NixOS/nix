@@ -28,8 +28,18 @@ struct LegacySSHStore::Connection : public ServeProto::BasicClientConnection
     bool good = true;
 };
 
+LegacySSHStore::LegacySSHStore(
+    std::string_view scheme,
+    std::string_view host,
+    const Params & params)
+    : LegacySSHStore{scheme, LegacySSHStoreConfig::extractConnStr(scheme, host), params}
+{
+}
 
-LegacySSHStore::LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
+LegacySSHStore::LegacySSHStore(
+    std::string_view scheme,
+    std::string host,
+    const Params & params)
     : StoreConfig(params)
     , CommonSSHStoreConfig(params)
     , LegacySSHStoreConfig(params)
@@ -42,8 +52,8 @@ LegacySSHStore::LegacySSHStore(const std::string & scheme, const std::string & h
         ))
     , master(
         host,
-        sshKey,
-        sshPublicHostKey,
+        sshKey.get(),
+        sshPublicHostKey.get(),
         // Use SSH master only if using more than 1 connection.
         connections->capacity() > 1,
         compress,

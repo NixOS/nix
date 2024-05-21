@@ -21,7 +21,6 @@
 #include "users.hh"
 
 #include <nlohmann/json.hpp>
-#include <regex>
 
 using json = nlohmann::json;
 
@@ -1321,9 +1320,7 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
                 warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
             } else
                 debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-            Store::Params params2;
-            params2["root"] = chrootStore;
-            return std::make_shared<LocalStore>(params2);
+            return std::make_shared<LocalStore>("local", chrootStore, params);
         }
         #endif
         else
@@ -1333,40 +1330,10 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
     } else if (uri == "local") {
         return std::make_shared<LocalStore>(params);
     } else if (isNonUriPath(uri)) {
-        Store::Params params2 = params;
-        params2["root"] = absPath(uri);
-        return std::make_shared<LocalStore>(params2);
+        return std::make_shared<LocalStore>("local", absPath(uri), params);
     } else {
         return nullptr;
     }
-}
-
-// The `parseURL` function supports both IPv6 URIs as defined in
-// RFC2732, but also pure addresses. The latter one is needed here to
-// connect to a remote store via SSH (it's possible to do e.g. `ssh root@::1`).
-//
-// This function now ensures that a usable connection string is available:
-// * If the store to be opened is not an SSH store, nothing will be done.
-// * If the URL looks like `root@[::1]` (which is allowed by the URL parser and probably
-//   needed to pass further flags), it
-//   will be transformed into `root@::1` for SSH (same for `[::1]` -> `::1`).
-// * If the URL looks like `root@::1` it will be left as-is.
-// * In any other case, the string will be left as-is.
-static std::string extractConnStr(const std::string &proto, const std::string &connStr)
-{
-    if (proto.rfind("ssh") != std::string::npos) {
-        std::smatch result;
-        std::regex v6AddrRegex("^((.*)@)?\\[(.*)\\]$");
-
-        if (std::regex_match(connStr, result, v6AddrRegex)) {
-            if (result[1].matched) {
-                return result.str(1) + result.str(3);
-            }
-            return result.str(3);
-        }
-    }
-
-    return connStr;
 }
 
 ref<Store> openStore(const std::string & uri_,
@@ -1377,10 +1344,7 @@ ref<Store> openStore(const std::string & uri_,
         auto parsedUri = parseURL(uri_);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
-        auto baseURI = extractConnStr(
-            parsedUri.scheme,
-            parsedUri.authority.value_or("") + parsedUri.path
-        );
+        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
 
         for (auto implem : *Implementations::registered) {
             if (implem.uriSchemes.count(parsedUri.scheme)) {

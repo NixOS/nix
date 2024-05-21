@@ -463,10 +463,20 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
-LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
-    : LocalStore(params)
+LocalStore::LocalStore(
+    std::string_view scheme,
+    PathView path,
+    const Params & _params)
+    : LocalStore([&]{
+        // Default `?root` from `path` if non set
+        if (!path.empty() && _params.count("root") == 0) {
+            auto params = _params;
+            params.insert_or_assign("root", std::string { path });
+            return params;
+        }
+        return _params;
+    }())
 {
-    throw UnimplementedError("LocalStore");
 }
 
 
