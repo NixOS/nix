@@ -61,13 +61,6 @@ struct DerivationBuilderParams
      */
     const Derivation & drv;
 
-    /**
-     * The derivation options of `drv`.
-     *
-     * @todo this should be part of `Derivation`.
-     */
-    const DerivationOptions & drvOptions;
-
     // The remainder is state held during the build.
 
     /**
