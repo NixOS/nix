@@ -29,15 +29,13 @@ protected:
 
 } // namespace
 
+Derivation makeSimpleDrv();
+
 TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
 {
-    Derivation drv{
-        .platform = "system",
-        .builder = "foo",
-        .args = {"bar", "baz"},
-        .env = {{"BIG_BAD", "WOLF"}},
-        .name = "simple-derivation",
-    };
+    auto drv = makeSimpleDrv();
+    drv.options = derivationOptionsFromStructuredAttrs(
+        StoreDirConfig{"/nix/store"}, drv.inputs, drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
 
     auto path1 = store->writeDerivation(drv, NoRepair);
     config->readOnly = true;

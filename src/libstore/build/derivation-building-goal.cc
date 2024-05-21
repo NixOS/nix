@@ -301,15 +301,8 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
 
 Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
-    auto drvOptions = [&] {
-        try {
-            return derivationOptionsFromStructuredAttrs(worker.store, drv->env, get(drv->structuredAttrs));
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-            throw;
-        }
-    }();
-
+    const auto & resolvedDrv = *drv;
+    auto drvOptions = drv->options;
     std::map<std::string, InitialOutput> initialOutputs;
 
     /* Recheck at this point. In particular, whereas before we were
@@ -364,7 +357,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             wrongStore.badPlatform = WrongLocalStore::Pair<std::string>{drv->platform, settings.thisSystem.get()};
 
         {
-            auto required = drvOptions.getRequiredSystemFeatures(*drv);
+            auto required = drvOptions.getRequiredSystemFeatures(resolvedDrv);
             auto & available = worker.store.config.systemFeatures.get();
             if (std::ranges::any_of(required, [&](const std::string & f) { return !available.count(f); }))
                 wrongStore.missingFeatures = WrongLocalStore::Pair<StringSet>{required, available};
@@ -907,8 +900,10 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 defaultPathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
             }
 
+            const auto & drvOptionsResolved = drvOptions;
+
             try {
-                desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
+                desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptionsResolved, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
                 co_return doneFailure(std::move(e));

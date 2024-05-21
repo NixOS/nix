@@ -1773,6 +1773,11 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             c.raw);
     }
 
+    /* Construct options after the loop above, so the CA-output
+       placeholders of all input derivations are resolvable. */
+    drv.options = derivationOptionsFromStructuredAttrs(
+        *state.store, drv.inputs, drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
     /* Do we have all required attributes? */
     if (drv.builder == "")
         state.error<EvalError>("required attribute 'builder' missing").atPos(v).debugThrow();

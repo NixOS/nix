@@ -8,6 +8,7 @@
 #include "nix/util/repair-flag.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 
@@ -267,6 +268,9 @@ struct DerivationType
 template<typename Inputs, typename Output = DerivationOutput>
 struct DerivationT;
 
+template<typename Input>
+struct DerivationOptions;
+
 using BasicDerivation = DerivationT<StorePathSet>;
 using Derivation = DerivationT<std::set<SingleDerivedPath>>;
 
@@ -289,6 +293,18 @@ struct DerivationT
      */
     StringPairs env;
     std::optional<StructuredAttrs> structuredAttrs;
+
+    /**
+     * Derivation options
+     *
+     * @todo instead of `BasicDerivation`/`Derivation`, should just have
+     * `template<...> Derivation`, and then the choice of template
+     * parameter would control "possibly-unresolved vs definitely
+     * resolved" and this field would use the overall type parameter.
+     */
+    using Input = typename Inputs::value_type;
+
+    DerivationOptions<Input> options;
 
     std::string name;
 
@@ -355,7 +371,8 @@ struct DerivationT
      * 2. Input placeholders are replaced with realized input store
      *    paths.
      */
-    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
+    std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+    tryResolve(Store & store, Store * evalStore = nullptr) const
         requires std::is_same_v<Inputs, std::set<SingleDerivedPath>> && std::is_same_v<Output, DerivationOutput>;
 
     /**
@@ -363,7 +380,7 @@ struct DerivationT
      * realisations, uses a given mapping from input derivation paths +
      * output names to actual output store paths.
      */
-    std::optional<BasicDerivation> tryResolve(
+    std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>> tryResolve(
         Store & store,
         fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
             queryResolutionChain) const
@@ -383,7 +400,8 @@ struct DerivationT
     template<typename F>
     DerivationT<std::invoke_result_t<F, const Inputs &>> mapInputs(F f) const
     {
-        return {
+        using NewInputs = std::invoke_result_t<F, const Inputs &>;
+        DerivationT<NewInputs, Output> res{
             .outputs = outputs,
             .inputs = f(inputs),
             .platform = platform,
@@ -393,6 +411,7 @@ struct DerivationT
             .structuredAttrs = structuredAttrs,
             .name = name,
         };
+        return res;
     }
 
     /**
@@ -479,9 +498,11 @@ std::string Derivation::unparse(const StoreDirConfig & store) const;
 template<>
 bool Derivation::shouldResolve() const;
 template<>
-std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const;
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+Derivation::tryResolve(Store & store, Store * evalStore) const;
 template<>
-std::optional<BasicDerivation> Derivation::tryResolve(
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+Derivation::tryResolve(
     Store & store,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const;

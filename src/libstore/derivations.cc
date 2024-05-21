@@ -526,6 +526,10 @@ Derivation parseDerivation(
     }
 
     expect(str, ')');
+
+    drv.options = derivationOptionsFromStructuredAttrs(
+        store, drv.inputs, drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr, true, xpSettings);
+
     return drv;
 }
 
@@ -641,6 +645,8 @@ static void unparseDerivedPathMapNode(
  */
 struct HashModuloInputs
 {
+    using value_type = SingleDerivedPath;
+
     StorePathSet srcs;
 
     using DrvMap = std::map<Hash, DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode>;
@@ -876,6 +882,7 @@ std::string Derivation::unparse(const StoreDirConfig & store) const
     };
     return unparseDerivation(store, fullDrv);
 }
+
 
 // FIXME: remove
 bool isDerivation(std::string_view fileName)
@@ -1336,12 +1343,14 @@ void DerivationT<Inputs, Output>::applyRewrites(const StringMap & rewrites)
 template<>
 Derivation DerivationT<StorePathSet>::unresolve() const
 {
-    return mapInputs([](const StorePathSet & inputs) -> std::set<SingleDerivedPath> {
+    auto res = mapInputs([](const StorePathSet & inputs) -> std::set<SingleDerivedPath> {
         auto view = inputs | std::views::transform([](const StorePath & p) -> SingleDerivedPath {
                         return SingleDerivedPath::Opaque{p};
                     });
         return std::set<SingleDerivedPath>(view.begin(), view.end());
     });
+    res.options = nix::unresolve(options);
+    return res;
 }
 
 template<>
@@ -1389,13 +1398,15 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
 
 // Forward declaration of specialization
 template<>
-std::optional<BasicDerivation> Derivation::tryResolve(
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+Derivation::tryResolve(
     Store & store,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const;
 
 template<>
-std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+Derivation::tryResolve(Store & store, Store * evalStore) const
 {
     return tryResolve(
         store, [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
@@ -1408,7 +1419,8 @@ std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * eva
 }
 
 template<>
-std::optional<BasicDerivation> Derivation::tryResolve(
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+Derivation::tryResolve(
     Store & store,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const
@@ -1443,6 +1455,14 @@ std::optional<BasicDerivation> Derivation::tryResolve(
         resolvedInputs.insert(*resolved);
     }
 
+    auto resolvedOptions = nix::tryResolve(
+        options, [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) {
+            return queryResolutionChain(drvPath, outputName);
+        });
+
+    if (!resolvedOptions)
+        return std::nullopt;
+
     BasicDerivation result{
         .outputs = outputs,
         .inputs = resolvedInputs,
@@ -1451,6 +1471,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(
         .args = args,
         .env = env,
         .structuredAttrs = structuredAttrs,
+        .options = *resolvedOptions,
         .name = name,
     };
 
@@ -1458,7 +1479,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(
 
     processDerivationOutputPaths</*maskOuputs=*/true>(store, result, result.name);
 
-    return result;
+    return std::make_pair(std::move(result), std::move(*resolvedOptions));
 }
 
 /**
@@ -1665,7 +1686,7 @@ Derivation Derivation::parseJsonAndValidate(Store & store, const nlohmann::json 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
 // Explicit template instantiations
-template struct DerivationT<StorePathSet>;
-template struct DerivationT<std::set<SingleDerivedPath>>;
+template struct DerivationT<StorePathSet, DerivationOutput>;
+template struct DerivationT<std::set<SingleDerivedPath>, DerivationOutput>;
 
 } // namespace nix

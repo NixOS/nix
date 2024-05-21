@@ -240,6 +240,20 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
 
+/**
+ * The inverse of `tryResolve`: lift resolved options back into the
+ * general form, turning every store path into a constant deriving
+ * path. Counterpart of `BasicDerivation::unresolve`.
+ */
+DerivationOptions<SingleDerivedPath> unresolve(const DerivationOptions<StorePath> & drvOptions);
+
+template<typename T>
+struct json_avoids_null;
+
+template<typename Input>
+struct json_avoids_null<DerivationOptions<Input>> : std::true_type
+{};
+
 }; // namespace nix
 
 JSON_IMPL(nix::DerivationOptions<nix::StorePath>);

@@ -21,6 +21,30 @@
         "srcs": []
       },
       "name": "root-drv",
+      "options": {
+        "additionalSandboxProfile": "",
+        "allowLocalNetworking": false,
+        "allowSubstitutes": true,
+        "exportReferencesGraph": {},
+        "impureEnvVars": [],
+        "impureHostDeps": [],
+        "noChroot": false,
+        "outputChecks": {
+          "forAllOutputs": {
+            "allowedReferences": null,
+            "allowedRequisites": null,
+            "disallowedReferences": [],
+            "disallowedRequisites": [],
+            "ignoreSelfRefs": false,
+            "maxClosureSize": null,
+            "maxSize": null
+          }
+        },
+        "passAsFile": [],
+        "preferLocalBuild": false,
+        "requiredSystemFeatures": [],
+        "unsafeDiscardReferences": {}
+      },
       "outputs": {
         "out": {
           "hashAlgo": "sha256",
@@ -39,6 +63,30 @@
         "srcs": []
       },
       "name": "dep-drv",
+      "options": {
+        "additionalSandboxProfile": "",
+        "allowLocalNetworking": false,
+        "allowSubstitutes": true,
+        "exportReferencesGraph": {},
+        "impureEnvVars": [],
+        "impureHostDeps": [],
+        "noChroot": false,
+        "outputChecks": {
+          "forAllOutputs": {
+            "allowedReferences": null,
+            "allowedRequisites": null,
+            "disallowedReferences": [],
+            "disallowedRequisites": [],
+            "ignoreSelfRefs": false,
+            "maxClosureSize": null,
+            "maxSize": null
+          }
+        },
+        "passAsFile": [],
+        "preferLocalBuild": false,
+        "requiredSystemFeatures": [],
+        "unsafeDiscardReferences": {}
+      },
       "outputs": {
         "out": {
           "hashAlgo": "sha256",

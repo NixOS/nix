@@ -171,7 +171,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                 ecFailed, BuildError(BuildResult::Failure::DependencyFailed, "failed to resolve derivation"));
         }
 
-        auto pathResolved = computeStorePath(worker.store, attempt->unresolve());
+        auto pathResolved = computeStorePath(worker.store, attempt->first.unresolve());
 
         auto msg =
             fmt("resolved derivation: '%s' -> '%s'",
@@ -187,8 +187,8 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                 worker.store.printStorePath(pathResolved),
             });
 
-        resolvedDrv =
-            std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), std::move(*attempt));
+        resolvedDrv = std::make_unique<std::tuple<StorePath, BasicDerivation, DerivationOptions<StorePath>>>(
+            std::move(pathResolved), std::move(attempt->first), std::move(attempt->second));
     }
 
     co_return amDone(ecSuccess);

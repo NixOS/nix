@@ -161,6 +161,7 @@ void adl_serializer<DerivationT<Inputs>>::to_json(json & res, const DerivationT<
     res["builder"] = d.builder;
     res["args"] = d.args;
     res["env"] = d.env;
+    res["options"] = d.options;
 
     if (d.structuredAttrs)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
@@ -275,6 +276,7 @@ adl_serializer<DerivationT<Inputs>>::from_json(const json & _json, const Experim
                 return StructuredAttrs{*structuredAttrs};
             return std::nullopt;
         }(),
+        .options = valueAt(json, "options"),
         .name = getString(valueAt(json, "name")),
     };
 }

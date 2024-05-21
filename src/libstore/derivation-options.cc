@@ -362,14 +362,6 @@ bool DerivationOptions<Input>::useUidRange(const DerivationT<Inputs, DerivationO
     return getRequiredSystemFeatures(drv).count("uid-range");
 }
 
-// Explicit instantiations for member function templates
-template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const BasicDerivation &) const;
-template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const Derivation &) const;
-template StringSet DerivationOptions<SingleDerivedPath>::getRequiredSystemFeatures(const Derivation &) const;
-
-template bool DerivationOptions<StorePath>::useUidRange(const BasicDerivation &) const;
-template bool DerivationOptions<SingleDerivedPath>::useUidRange(const Derivation &) const;
-
 std::optional<DerivationOptions<StorePath>> tryResolve(
     const DerivationOptions<SingleDerivedPath> & drvOptions,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
@@ -518,8 +510,91 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     };
 }
 
+DerivationOptions<SingleDerivedPath> unresolve(const DerivationOptions<StorePath> & drvOptions)
+{
+    auto unresolveRef = [](const DrvRef<StorePath> & ref) -> DrvRef<SingleDerivedPath> {
+        return std::visit(
+            overloaded{
+                [](const OutputName & outputName) -> DrvRef<SingleDerivedPath> { return outputName; },
+                [](const StorePath & path) -> DrvRef<SingleDerivedPath> {
+                    return SingleDerivedPath{SingleDerivedPath::Opaque{path}};
+                }},
+            ref);
+    };
+
+    auto unresolveRefSet = [&](const std::set<DrvRef<StorePath>> & refSet) {
+        std::set<DrvRef<SingleDerivedPath>> res;
+        for (const auto & ref : refSet)
+            res.insert(unresolveRef(ref));
+        return res;
+    };
+
+    auto unresolveChecks = [&](const DerivationOptions<StorePath>::OutputChecks & checks) {
+        return DerivationOptions<SingleDerivedPath>::OutputChecks{
+            .ignoreSelfRefs = checks.ignoreSelfRefs,
+            .maxSize = checks.maxSize,
+            .maxClosureSize = checks.maxClosureSize,
+            .allowedReferences = checks.allowedReferences ? std::optional{unresolveRefSet(*checks.allowedReferences)}
+                                                          : std::nullopt,
+            .disallowedReferences = unresolveRefSet(checks.disallowedReferences),
+            .allowedRequisites = checks.allowedRequisites ? std::optional{unresolveRefSet(*checks.allowedRequisites)}
+                                                          : std::nullopt,
+            .disallowedRequisites = unresolveRefSet(checks.disallowedRequisites),
+        };
+    };
+
+    using UnresolvedOutputChecks = std::variant<
+        DerivationOptions<SingleDerivedPath>::OutputChecks,
+        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>>;
+
+    auto outputChecks = std::visit(
+        overloaded{
+            [&](const DerivationOptions<StorePath>::OutputChecks & checks) -> UnresolvedOutputChecks {
+                return unresolveChecks(checks);
+            },
+            [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>> & checksMap)
+                -> UnresolvedOutputChecks {
+                std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>> res;
+                for (const auto & [outputName, checks] : checksMap)
+                    res.emplace(outputName, unresolveChecks(checks));
+                return res;
+            }},
+        drvOptions.outputChecks);
+
+    std::map<std::string, std::set<SingleDerivedPath>, std::less<>> exportReferencesGraph;
+    for (const auto & [name, paths] : drvOptions.exportReferencesGraph) {
+        std::set<SingleDerivedPath> set;
+        for (const auto & path : paths)
+            set.insert(SingleDerivedPath::Opaque{path});
+        exportReferencesGraph.emplace(name, std::move(set));
+    }
+
+    return DerivationOptions<SingleDerivedPath>{
+        .outputChecks = std::move(outputChecks),
+        .unsafeDiscardReferences = drvOptions.unsafeDiscardReferences,
+        .passAsFile = drvOptions.passAsFile,
+        .exportReferencesGraph = std::move(exportReferencesGraph),
+        .additionalSandboxProfile = drvOptions.additionalSandboxProfile,
+        .noChroot = drvOptions.noChroot,
+        .impureHostDeps = drvOptions.impureHostDeps,
+        .impureEnvVars = drvOptions.impureEnvVars,
+        .allowLocalNetworking = drvOptions.allowLocalNetworking,
+        .requiredSystemFeatures = drvOptions.requiredSystemFeatures,
+        .preferLocalBuild = drvOptions.preferLocalBuild,
+        .allowSubstitutes = drvOptions.allowSubstitutes,
+    };
+}
+
 template struct DerivationOptions<StorePath>;
 template struct DerivationOptions<SingleDerivedPath>;
+
+template StringSet
+DerivationOptions<StorePath>::getRequiredSystemFeatures(const DerivationT<StorePathSet, DerivationOutput> &) const;
+template bool DerivationOptions<StorePath>::useUidRange(const DerivationT<StorePathSet, DerivationOutput> &) const;
+template StringSet DerivationOptions<SingleDerivedPath>::getRequiredSystemFeatures(
+    const DerivationT<std::set<SingleDerivedPath>, DerivationOutput> &) const;
+template bool DerivationOptions<SingleDerivedPath>::useUidRange(
+    const DerivationT<std::set<SingleDerivedPath>, DerivationOutput> &) const;
 
 } // namespace nix
 

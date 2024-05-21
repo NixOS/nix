@@ -534,7 +534,7 @@ static void main_nix_build(int argc, char ** argv)
         if (drv.shouldResolve()) {
             auto resolvedDrv = drv.tryResolve(*store);
             assert(resolvedDrv && "Successfully resolved the derivation");
-            drv = resolvedDrv->unresolve();
+            drv = resolvedDrv->first.unresolve();
         }
 
         // Set the environment.
@@ -557,18 +557,10 @@ static void main_nix_build(int argc, char ** argv)
                 settings.getLocalSettings().buildCores ? settings.getLocalSettings().buildCores
                                                        : settings.getDefaultCores());
 
-        DerivationOptions<StorePath> drvOptions;
-        try {
-            drvOptions = derivationOptionsFromStructuredAttrs(*store, drv.env, get(drv.structuredAttrs));
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
-            throw;
-        }
-
         int fileNr = 0;
 
         for (auto & var : drv.env)
-            if (drvOptions.passAsFile.count(var.first)) {
+            if (drv.options.passAsFile.count(var.first)) {
                 auto fn = ".attr-" + std::to_string(fileNr++);
                 auto p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
@@ -592,7 +584,12 @@ static void main_nix_build(int argc, char ** argv)
                 }
             }
 
-            auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);
+            auto resolvedOptions = nix::tryResolve(
+                drv.options, [&](ref<const SingleDerivedPath>, const std::string &) -> std::optional<StorePath> {
+                    return std::nullopt;
+                });
+            assert(resolvedOptions);
+            auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, *resolvedOptions, inputs, drv.outputs);
 
             structuredAttrsRC = StructuredAttrs::writeShell(json);
 

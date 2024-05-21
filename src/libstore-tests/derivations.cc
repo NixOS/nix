@@ -91,9 +91,9 @@ protected:
         auto resolved = drv.tryResolve(*store, makeCallback(buildTrace));
         ASSERT_TRUE(resolved);
 
-        nix::checkpointJson(*this, std::string{stem} + "-after", *resolved);
+        nix::checkpointJson(*this, std::string{stem} + "-after", resolved->first);
 
-        EXPECT_EQ(*resolved, expected);
+        EXPECT_EQ(resolved->first, expected);
     }
 };
 
@@ -320,15 +320,15 @@ void TryResolveTest::exportRefGraphSubpathTest(
     auto resolved = drv.tryResolve(*store, makeCallback(buildTrace));
     ASSERT_TRUE(resolved);
 
-    nix::checkpointJson(*this, std::string{stem} + "-resolved", *resolved);
+    nix::checkpointJson(*this, std::string{stem} + "-resolved", resolved->first);
 
     // Re-parse options from the resolved derivation, where placeholders
     // have been substituted with concrete store paths.
     auto resolvedOptions = derivationOptionsFromStructuredAttrs(
         *store,
         /* inputDrvs */ {},
-        resolved->env,
-        resolved->structuredAttrs ? &*resolved->structuredAttrs : nullptr,
+        resolved->first.env,
+        resolved->first.structuredAttrs ? &*resolved->first.structuredAttrs : nullptr,
         true);
 
     nix::checkpointJson(*this, std::string{stem} + "-resolved-options", resolvedOptions);

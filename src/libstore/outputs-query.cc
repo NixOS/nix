@@ -105,7 +105,7 @@ static std::pair<Derivation, StorePath> resolveDerivation(
                     store, *concreteDrvPath, depOutputName, evalStore_, queryRealisation, cache, resCache);
             });
         if (resolvedDrv)
-            drv = resolvedDrv->unresolve();
+            drv = resolvedDrv->first.unresolve();
     }
 
     auto resolvedDrvPath = computeStorePath(store, drv);

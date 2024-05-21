@@ -348,7 +348,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(resolvedRootDrv);
 
     // Write the resolved derivation to the substituter
-    auto resolvedRootDrvPath = substituter->writeDerivation(resolvedRootDrv->unresolve());
+    auto resolvedRootDrvPath = substituter->writeDerivation(resolvedRootDrv->first.unresolve());
 
     // Snapshot the destination store before
     checkpointJson("issue-11928/store-before", dummyStore);

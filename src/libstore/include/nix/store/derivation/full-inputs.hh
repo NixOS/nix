@@ -17,6 +17,8 @@ struct SingleDerivedPath;
  */
 struct FullInputs
 {
+    using value_type = StorePath;
+
     /**
      * inputs that are sources
      */
