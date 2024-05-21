@@ -1,42 +1,39 @@
 #pragma once
 ///@file
 
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivations.hh"
 
 namespace nix {
 
 /**
- * Parse this information from its legacy encoding as part of the
- * environment. This should not be used with nice greenfield formats
- * (e.g. JSON) but is necessary for supporting old formats (e.g.
- * ATerm).
+ * Parse the legacy environment-variable (and structured-attributes)
+ * encodings of the derivation options into the corresponding fields of
+ * @a drv: the top-level options, the per-output options, and the
+ * per-environment-variable flags.
+ *
+ * This is for formats that deserialize into a derivation directly
+ * (e.g. the wire protocols); nicer formats represent the options
+ * first-class instead.
  */
-DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
+template<typename Input>
+void elaborateLegacyOptions(
     const StoreDirConfig & store,
-    const std::set<SingleDerivedPath> & inputs,
-    const StringMap & env,
-    const StructuredAttrs * parsed,
-    bool shouldWarn = true,
-    const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
-
-DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
-    const StoreDirConfig & store,
-    const StringMap & env,
-    const StructuredAttrs * parsed,
+    DerivationT<Input> & drv,
     bool shouldWarn = true,
     const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
 
 /**
- * This is the counterpart of `Derivation::tryResolve`. In particular,
- * it takes the same sort of callback, which is used to reolve
- * non-constant deriving paths.
+ * Resolve the derivation-option fields of @a drv onto @a resolved,
+ * mapping any references to derivation outputs to concrete store paths
+ * via @a queryResolutionChain.
  *
- * We need this function when resolving a derivation, and we will use
- * this as part of that if/when `Derivation` includes
- * `DerivationOptions`
+ * This is the options part of `Derivation::tryResolve`.
+ *
+ * @return false if some reference could not be resolved.
  */
-std::optional<DerivationOptions<StorePath>> tryResolve(
-    const DerivationOptions<SingleDerivedPath> & drvOptions,
+bool tryResolveDerivationOptions(
+    const Derivation & drv,
+    BasicDerivation & resolved,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
 

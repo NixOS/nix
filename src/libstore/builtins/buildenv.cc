@@ -176,7 +176,7 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
         auto i = ctx.drv.env.find(name);
         if (i == ctx.drv.env.end())
             throw Error("attribute '%s' missing", name);
-        return i->second;
+        return i->second.value;
     };
 
     auto out = ctx.outputs.at("out");

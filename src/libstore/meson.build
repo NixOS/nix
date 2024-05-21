@@ -278,8 +278,6 @@ sources = files(
   'common-ssh-store-config.cc',
   'content-address.cc',
   'daemon.cc',
-  'derivation/aterm.cc',
-  'derivation/elaborate.cc',
   'derivation-json.cc',
   'derivation-options.cc',
   'derivation/aterm.cc',

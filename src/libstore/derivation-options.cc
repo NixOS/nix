@@ -1,91 +1,40 @@
 #include "nix/store/derivation-options.hh"
 #include "nix/util/json-utils.hh"
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/worker-settings.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derived-path.hh"
-#include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 
 #include <optional>
 #include <string>
 #include <variant>
-#include <regex>
-#include <ranges>
 
-namespace nix {
-
-template<typename Inputs>
-using OutputChecksVariant = std::
-    variant<derivation::OutputChecks<Inputs>, std::map<std::string, derivation::OutputChecks<Inputs>, std::less<>>>;
+namespace nix::derivation {
 
 template<typename Input>
-template<typename Inputs>
-StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const DerivationT<Inputs, DerivationOutput> & drv) const
-{
-    // FIXME: cache this?
-    StringSet res;
-    for (auto & i : requiredSystemFeatures)
-        res.insert(i);
-    if (!drv.type().hasKnownOutputPaths())
-        res.insert("ca-derivations");
-    return res;
-}
-
-template<typename Input>
-bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
+bool TopOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
 {
     return workerSettings.alwaysAllowSubstitutes ? true : allowSubstitutes;
 }
 
-template<typename Input>
-template<typename Inputs>
-bool DerivationOptions<Input>::useUidRange(const DerivationT<Inputs, DerivationOutput> & drv) const
-{
-    return getRequiredSystemFeatures(drv).count("uid-range");
-}
+template struct TopOptions<StorePath>;
+template struct TopOptions<SingleDerivedPath>;
 
-// Explicit instantiations for member function templates
-template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const BasicDerivation &) const;
-template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const Derivation &) const;
-template StringSet DerivationOptions<SingleDerivedPath>::getRequiredSystemFeatures(const Derivation &) const;
-
-template bool DerivationOptions<StorePath>::useUidRange(const BasicDerivation &) const;
-template bool DerivationOptions<SingleDerivedPath>::useUidRange(const Derivation &) const;
-
-template struct DerivationOptions<StorePath>;
-template struct DerivationOptions<SingleDerivedPath>;
-
-} // namespace nix
+} // namespace nix::derivation
 
 namespace nlohmann {
 
 template<typename Inputs>
-static nix::DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json & json_)
+static nix::derivation::TopOptions<Inputs> derivationOptionsFromJson(const nlohmann::json & json_)
 {
     using namespace nix;
-    using namespace derivation;
 
     auto & json = getObject(json_);
 
     return {
-        .outputChecks = [&]() -> OutputChecksVariant<Inputs> {
-            auto outputChecks = getObject(valueAt(json, "outputChecks"));
+        .allOutputChecks = ptrToOwned<derivation::OutputChecks<Inputs>>(getNullable(valueAt(json, "allOutputChecks"))),
 
-            auto forAllOutputsOpt = get(outputChecks, "forAllOutputs");
-            auto perOutputOpt = get(outputChecks, "perOutput");
-
-            if (forAllOutputsOpt && !perOutputOpt) {
-                return static_cast<OutputChecks<Inputs>>(*forAllOutputsOpt);
-            } else if (perOutputOpt && !forAllOutputsOpt) {
-                return static_cast<std::map<std::string, OutputChecks<Inputs>, std::less<>>>(*perOutputOpt);
-            } else {
-                throw Error("Exactly one of 'perOutput' or 'forAllOutputs' is required");
-            }
-        }(),
-
-        .unsafeDiscardReferences = valueAt(json, "unsafeDiscardReferences"),
-        .passAsFile = getStringSet(valueAt(json, "passAsFile")),
         .exportReferencesGraph = valueAt(json, "exportReferencesGraph"),
 
         .additionalSandboxProfile = getString(valueAt(json, "additionalSandboxProfile")),
@@ -101,28 +50,12 @@ static nix::DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::
 }
 
 template<typename Inputs>
-static void derivationOptionsToJson(nlohmann::json & json, const nix::DerivationOptions<Inputs> & o)
+static void derivationOptionsToJson(nlohmann::json & json, const nix::derivation::TopOptions<Inputs> & o)
 {
     using namespace nix;
-    using namespace derivation;
 
-    json["outputChecks"] = std::visit(
-        overloaded{
-            [&](const OutputChecks<Inputs> & checks) {
-                nlohmann::json outputChecks;
-                outputChecks["forAllOutputs"] = checks;
-                return outputChecks;
-            },
-            [&](const std::map<std::string, OutputChecks<Inputs>, std::less<>> & checksPerOutput) {
-                nlohmann::json outputChecks;
-                outputChecks["perOutput"] = checksPerOutput;
-                return outputChecks;
-            },
-        },
-        o.outputChecks);
+    json["allOutputChecks"] = o.allOutputChecks;
 
-    json["unsafeDiscardReferences"] = o.unsafeDiscardReferences;
-    json["passAsFile"] = o.passAsFile;
     json["exportReferencesGraph"] = o.exportReferencesGraph;
 
     json["additionalSandboxProfile"] = o.additionalSandboxProfile;
@@ -166,26 +99,70 @@ static void outputChecksToJson(nlohmann::json & json, const nix::derivation::Out
     json["disallowedRequisites"] = c.disallowedRequisites;
 }
 
-nix::DerivationOptions<nix::SingleDerivedPath>
-adl_serializer<nix::DerivationOptions<nix::SingleDerivedPath>>::from_json(const json & json_)
+template<typename Inputs>
+static nix::derivation::OutputOptions<Inputs> outputOptionsFromJson(const nlohmann::json & json_)
+{
+    using namespace nix;
+
+    auto & json = getObject(json_);
+
+    return {
+        .checks = ptrToOwned<derivation::OutputChecks<Inputs>>(getNullable(valueAt(json, "checks"))),
+        .unsafeDiscardReferences = getBoolean(valueAt(json, "unsafeDiscardReferences")),
+    };
+}
+
+template<typename Inputs>
+static void outputOptionsToJson(nlohmann::json & json, const nix::derivation::OutputOptions<Inputs> & o)
+{
+    json["checks"] = o.checks;
+    json["unsafeDiscardReferences"] = o.unsafeDiscardReferences;
+}
+
+nix::derivation::OutputOptions<nix::SingleDerivedPath>
+adl_serializer<nix::derivation::OutputOptions<nix::SingleDerivedPath>>::from_json(const json & json_)
+{
+    return outputOptionsFromJson<nix::SingleDerivedPath>(json_);
+}
+
+void adl_serializer<nix::derivation::OutputOptions<nix::SingleDerivedPath>>::to_json(
+    json & json, const nix::derivation::OutputOptions<nix::SingleDerivedPath> & o)
+{
+    outputOptionsToJson<nix::SingleDerivedPath>(json, o);
+}
+
+nix::derivation::OutputOptions<nix::StorePath>
+adl_serializer<nix::derivation::OutputOptions<nix::StorePath>>::from_json(const json & json_)
+{
+    return outputOptionsFromJson<nix::StorePath>(json_);
+}
+
+void adl_serializer<nix::derivation::OutputOptions<nix::StorePath>>::to_json(
+    json & json, const nix::derivation::OutputOptions<nix::StorePath> & o)
+{
+    outputOptionsToJson<nix::StorePath>(json, o);
+}
+
+nix::derivation::TopOptions<nix::SingleDerivedPath>
+adl_serializer<nix::derivation::TopOptions<nix::SingleDerivedPath>>::from_json(const json & json_)
 {
     return derivationOptionsFromJson<nix::SingleDerivedPath>(json_);
 }
 
-void adl_serializer<nix::DerivationOptions<nix::SingleDerivedPath>>::to_json(
-    json & json, const nix::DerivationOptions<nix::SingleDerivedPath> & o)
+void adl_serializer<nix::derivation::TopOptions<nix::SingleDerivedPath>>::to_json(
+    json & json, const nix::derivation::TopOptions<nix::SingleDerivedPath> & o)
 {
     derivationOptionsToJson<nix::SingleDerivedPath>(json, o);
 }
 
-nix::DerivationOptions<nix::StorePath>
-adl_serializer<nix::DerivationOptions<nix::StorePath>>::from_json(const json & json_)
+nix::derivation::TopOptions<nix::StorePath>
+adl_serializer<nix::derivation::TopOptions<nix::StorePath>>::from_json(const json & json_)
 {
     return derivationOptionsFromJson<nix::StorePath>(json_);
 }
 
-void adl_serializer<nix::DerivationOptions<nix::StorePath>>::to_json(
-    json & json, const nix::DerivationOptions<nix::StorePath> & o)
+void adl_serializer<nix::derivation::TopOptions<nix::StorePath>>::to_json(
+    json & json, const nix::derivation::TopOptions<nix::StorePath> & o)
 {
     derivationOptionsToJson<nix::StorePath>(json, o);
 }

@@ -442,11 +442,11 @@ static void opQuery(Strings opFlags, Strings opArgs)
         for (auto & i : opArgs) {
             auto path = useDeriver(store->followLinksToStorePath(i));
             Derivation drv = store->derivationFromPath(path);
-            StringPairs::iterator j = drv.env.find(bindingName);
+            auto j = drv.env.find(bindingName);
             if (j == drv.env.end())
                 throw Error(
                     "derivation '%s' has no environment binding named '%s'", store->printStorePath(path), bindingName);
-            std::cout << fmt("%s\n", j->second);
+            std::cout << fmt("%s\n", j->second.value);
         }
         break;
 
@@ -532,7 +532,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
     for (auto & i : drv.env)
-        logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second));
+        logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second.value));
 
     /* Also output the arguments. */
     std::string argsStr = concatStringsSep(" ", drv.args);
@@ -1027,7 +1027,11 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             auto drvPath = store->parseStorePath(readString(in));
             BasicDerivation drv;
-            readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
+            {
+                BasicDerivationATerm drvATerm;
+                readDerivation(in, *store, drvATerm, Derivation::nameFromPath(drvPath));
+                drv = drvATerm.elaborate(*store, Derivation::nameFromPath(drvPath));
+            }
 
             getBuildSettings();
 

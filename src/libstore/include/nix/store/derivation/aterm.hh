@@ -1,11 +1,115 @@
 #pragma once
 ///@file
 
-#include "nix/store/derivations.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derivation/full-inputs.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 
 namespace nix {
+
+struct SingleDerivedPath;
+
+template<typename Input, typename Output>
+struct DerivationT;
+using Derivation = DerivationT<SingleDerivedPath, DerivationOutput>;
+using BasicDerivation = DerivationT<StorePath, DerivationOutput>;
+
+/**
+ * A derivation in the shape of the ATerm format.
+ *
+ * This corresponds closely to the on-disk `.drv` format: inputs are
+ * split into sources and derivations, and the environment is kept
+ * verbatim — including the legacy encodings of the various `Derivation`
+ * options, and the `__json` encoding of structured attributes.
+ *
+ * It is a *lossy projection* of `Derivation`: `lower` simply drops the
+ * parsed options and structured attributes, keeping only the raw
+ * environment. Faithfulness is checked by round-tripping: a
+ * `Derivation` is representable in the ATerm format iff
+ * `lower(drv).elaborate(store) == drv`, i.e. iff its parsed fields are
+ * in sync with their environment-variable encoding. Derivations whose
+ * options are specified directly (e.g. via newer formats like JSON)
+ * without the legacy environment encoding are not ATerm-representable.
+ */
+/**
+ * The element type corresponding to an ATerm inputs container: what the
+ * inputs elaborate to.
+ */
+template<typename Inputs>
+struct DerivationInputsElement;
+
+template<>
+struct DerivationInputsElement<FullInputs>
+{
+    using type = SingleDerivedPath;
+};
+
+template<>
+struct DerivationInputsElement<StorePathSet>
+{
+    using type = StorePath;
+};
+
+template<typename Inputs = FullInputs, typename Output = DerivationOutput>
+struct DerivationATermT
+{
+    /**
+     * The derivation type this elaborates to.
+     */
+    using Elaborated = DerivationT<typename DerivationInputsElement<Inputs>::type, DerivationOutput>;
+
+    DerivationOutputs<Output> outputs;
+    Inputs inputs;
+    std::string platform;
+    std::string builder;
+    Strings args;
+    /**
+     * Verbatim, including any legacy option-encoding variables and the
+     * `__json` structured-attributes encoding.
+     */
+    StringPairs env;
+
+    bool operator==(const DerivationATermT &) const = default;
+
+    /**
+     * Parse the textual ATerm format.
+     */
+    static DerivationATermT parse(
+        const StoreDirConfig & store,
+        std::string && s,
+        std::string_view name,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Print to the textual ATerm format.
+     *
+     * @param name The derivation name (not part of the format proper);
+     * needed to compute fixed-output paths.
+     */
+    std::string to_string(const StoreDirConfig & store, std::string_view name) const;
+
+    /**
+     * Parse the legacy environment-variable encodings (structured
+     * attributes, derivation options) into a full `Derivation`.
+     *
+     * @param name The derivation name (not part of the format proper;
+     * it comes from the store path / file name).
+     */
+    Elaborated elaborate(const StoreDirConfig & store, std::string_view name) const;
+
+    /**
+     * Project a `Derivation` down to its ATerm shape.
+     *
+     * This is lossy: the parsed options are dropped, and the structured
+     * attributes are re-encoded as the `__json` environment variable.
+     * See the struct doc for how faithfulness is ensured regardless.
+     */
+    static DerivationATermT lower(const Elaborated & drv);
+};
+
+using DerivationATerm = DerivationATermT<>;
+using BasicDerivationATerm = DerivationATermT<StorePathSet>;
 
 /**
  * Read a derivation from a file.
@@ -119,7 +223,15 @@ extern DrvHashes drvHashes;
 struct Source;
 struct Sink;
 
-Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivation & drv, std::string_view name);
-void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv);
+/**
+ * Wire protocol serialization of basic derivations, which also uses the
+ * legacy ATerm-style representation.
+ */
+Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivationATerm & drv, std::string_view name);
+/**
+ * @param name The derivation name (not part of the format proper);
+ * needed to compute fixed-output paths.
+ */
+void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivationATerm & drv, std::string_view name);
 
 } // namespace nix

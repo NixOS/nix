@@ -76,15 +76,15 @@ schemas = [
     ],
   },
   {
-    'stem' : 'derivation-options',
-    'schema' : schema_dir / 'derivation-options-v1.yaml',
+    'stem' : 'derivation-elaborate',
+    'schema' : schema_dir / 'derivation-elaborate-v1.yaml',
     'files' : [
-      'ia' / 'derivation-options' / 'defaults.json',
-      'ia' / 'derivation-options' / 'all_set.json',
-      'ia' / 'derivation-options' / 'structuredAttrs_defaults.json',
-      'ia' / 'derivation-options' / 'structuredAttrs_all_set.json',
-      'ca' / 'derivation-options' / 'all_set.json',
-      'ca' / 'derivation-options' / 'structuredAttrs_all_set.json',
+      'ia' / 'derivation-elaborate' / 'defaults.json',
+      'ia' / 'derivation-elaborate' / 'all_set.json',
+      'ia' / 'derivation-elaborate' / 'structuredAttrs_defaults.json',
+      'ia' / 'derivation-elaborate' / 'structuredAttrs_all_set.json',
+      'ca' / 'derivation-elaborate' / 'all_set.json',
+      'ca' / 'derivation-elaborate' / 'structuredAttrs_all_set.json',
     ],
   },
 ]

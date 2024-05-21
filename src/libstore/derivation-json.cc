@@ -143,8 +143,60 @@ static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & in
     inputsToJson(res, nix::FullInputs::fromSet(inputs));
 }
 
-template<typename Inputs>
-void adl_serializer<nix::DerivationT<Inputs>>::to_json(json & res, const nix::DerivationT<Inputs> & d)
+void adl_serializer<nix::derivation::EnvValue>::to_json(json & res, const nix::derivation::EnvValue & var)
+{
+    if (var.passAsFile) {
+        res = nlohmann::json::object();
+        res["value"] = var.value;
+        res["passAsFile"] = true;
+    } else {
+        res = var.value;
+    }
+}
+
+nix::derivation::EnvValue adl_serializer<nix::derivation::EnvValue>::from_json(const json & json)
+{
+    using namespace nix;
+    if (json.is_string())
+        return {.value = getString(json)};
+    auto & obj = getObject(json);
+    return {
+        .value = getString(valueAt(obj, "value")),
+        .passAsFile = getBoolean(valueAt(obj, "passAsFile")),
+    };
+}
+
+template<typename Input>
+void adl_serializer<nix::derivation::OutputWithOptions<Input, nix::DerivationOutput>>::to_json(
+    json & res, const nix::derivation::OutputWithOptions<Input, nix::DerivationOutput> & output)
+{
+    res = output.output;
+    res["checks"] = output.options.checks;
+    res["unsafeDiscardReferences"] = output.options.unsafeDiscardReferences;
+}
+
+template<typename Input>
+nix::derivation::OutputWithOptions<Input, nix::DerivationOutput>
+adl_serializer<nix::derivation::OutputWithOptions<Input, nix::DerivationOutput>>::from_json(
+    const json & json_, const nix::ExperimentalFeatureSettings & xpSettings)
+{
+    using namespace nix;
+    auto & json = getObject(json_);
+    return {
+        .output = adl_serializer<DerivationOutput>::from_json(json_, xpSettings),
+        .options =
+            {
+                .checks = ptrToOwned<derivation::OutputChecks<Input>>(getNullable(valueAt(json, "checks"))),
+                .unsafeDiscardReferences = getBoolean(valueAt(json, "unsafeDiscardReferences")),
+            },
+    };
+}
+
+template struct adl_serializer<nix::derivation::OutputWithOptions<nix::StorePath, nix::DerivationOutput>>;
+template struct adl_serializer<nix::derivation::OutputWithOptions<nix::SingleDerivedPath, nix::DerivationOutput>>;
+
+template<typename Input>
+void adl_serializer<nix::DerivationT<Input>>::to_json(json & res, const nix::DerivationT<Input> & d)
 {
     using namespace nix;
     res = nlohmann::json::object();
@@ -164,7 +216,13 @@ void adl_serializer<nix::DerivationT<Inputs>>::to_json(json & res, const nix::De
     res["system"] = d.platform;
     res["builder"] = d.builder;
     res["args"] = d.args;
-    res["env"] = d.env;
+    {
+        nlohmann::json & envObj = res["env"];
+        envObj = nlohmann::json::object();
+        for (auto & [name, var] : d.env)
+            envObj[name] = var;
+    }
+    res["options"] = d.options;
 
     if (d.structuredAttrs)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
@@ -229,8 +287,8 @@ std::set<nix::SingleDerivedPath> inputsFromJson<std::set<nix::SingleDerivedPath>
     return inputsFromJson<nix::FullInputs>(inputsJson, xpSettings).toSet();
 }
 
-template<typename Inputs>
-nix::DerivationT<Inputs> adl_serializer<nix::DerivationT<Inputs>>::from_json(
+template<typename Input>
+nix::DerivationT<Input> adl_serializer<nix::DerivationT<Input>>::from_json(
     const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
@@ -245,14 +303,25 @@ nix::DerivationT<Inputs> adl_serializer<nix::DerivationT<Inputs>>::from_json(
                 expectedJsonVersionDerivation);
     }
 
-    return DerivationT<Inputs>{
+    DerivationT<Input> res{
+        .name = getString(valueAt(json, "name")),
         .outputs =
             [&] {
-                DerivationOutputs<> outputs;
+                decltype(res.outputs) outputs;
                 try {
                     for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
                         outputs.insert_or_assign(
-                            outputName, adl_serializer<DerivationOutput>::from_json(output, xpSettings));
+                            outputName,
+                            derivation::OutputWithOptions<Input, DerivationOutput>{
+                                .output = adl_serializer<DerivationOutput>::from_json(output, xpSettings),
+                                .options =
+                                    {
+                                        .checks = ptrToOwned<derivation::OutputChecks<Input>>(
+                                            getNullable(valueAt(getObject(output), "checks"))),
+                                        .unsafeDiscardReferences =
+                                            getBoolean(valueAt(getObject(output), "unsafeDiscardReferences")),
+                                    },
+                            });
                 } catch (Error & e) {
                     e.addTrace({}, "while reading key 'outputs'");
                     throw;
@@ -262,7 +331,7 @@ nix::DerivationT<Inputs> adl_serializer<nix::DerivationT<Inputs>>::from_json(
         .inputs =
             [&] {
                 try {
-                    return inputsFromJson<Inputs>(valueAt(json, "inputs"), xpSettings);
+                    return inputsFromJson<std::set<Input>>(valueAt(json, "inputs"), xpSettings);
                 } catch (Error & e) {
                     e.addTrace({}, "while reading key 'inputs'");
                     throw;
@@ -273,20 +342,24 @@ nix::DerivationT<Inputs> adl_serializer<nix::DerivationT<Inputs>>::from_json(
         .args = getStringList(valueAt(json, "args")),
         .env =
             [&] {
+                decltype(res.env) env;
                 try {
-                    return getStringMap(valueAt(json, "env"));
+                    for (auto & [name, var] : getObject(valueAt(json, "env")))
+                        env.insert_or_assign(name, adl_serializer<derivation::EnvValue>::from_json(var));
                 } catch (Error & e) {
                     e.addTrace({}, "while reading key 'env'");
                     throw;
                 }
+                return env;
             }(),
         .structuredAttrs = [&]() -> std::optional<StructuredAttrs> {
             if (auto structuredAttrs = get(json, "structuredAttrs"))
                 return StructuredAttrs{*structuredAttrs};
             return std::nullopt;
         }(),
-        .name = getString(valueAt(json, "name")),
     };
+    res.options = valueAt(json, "options");
+    return res;
 }
 
 template struct adl_serializer<nix::BasicDerivation>;

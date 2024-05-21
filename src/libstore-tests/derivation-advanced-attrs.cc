@@ -13,6 +13,31 @@
 
 namespace nix {
 
+/**
+ * All the parsed option state of a derivation gathered in one place,
+ * for easy comparison: the top-level options, the per-output options,
+ * and which environment variables are passed as files.
+ */
+struct ParsedOptions
+{
+    derivation::TopOptions<SingleDerivedPath> top;
+    std::map<std::string, derivation::OutputOptions<SingleDerivedPath>, std::less<>> perOutput;
+    StringSet passAsFile;
+
+    bool operator==(const ParsedOptions &) const = default;
+};
+
+static ParsedOptions parsedOptions(const Derivation & d)
+{
+    ParsedOptions res{.top = d.options};
+    for (auto & [outputName, output] : d.outputs)
+        res.perOutput.insert_or_assign(outputName, output.options);
+    for (auto & [name, var] : d.env)
+        if (var.passAsFile)
+            res.passAsFile.insert(name);
+    return res;
+}
+
 class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>, public LibStoreTest
 {
 protected:
@@ -37,27 +62,21 @@ public:
     {
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
-            auto options = derivationOptionsFromStructuredAttrs(
-                *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-            EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedFeatures);
+            EXPECT_EQ(got.getRequiredSystemFeatures(), expectedFeatures);
         });
     }
 
     /**
-     * Helper function to test DerivationOptions parsing and comparison
+     * Helper function to test derivation-option parsing and comparison
      */
     void testDerivationOptions(
-        const std::string & fileName,
-        const DerivationOptions<SingleDerivedPath> & expected,
-        const StringSet & expectedSystemFeatures)
+        const std::string & fileName, const ParsedOptions & expected, const StringSet & expectedSystemFeatures)
     {
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
-            auto options = derivationOptionsFromStructuredAttrs(
-                *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
-            EXPECT_EQ(options, expected);
-            EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedSystemFeatures);
+            EXPECT_EQ(parsedOptions(got), expected);
+            EXPECT_EQ(got.getRequiredSystemFeatures(), expectedSystemFeatures);
         });
     }
 };
@@ -160,24 +179,25 @@ static SingleDerivedPath
         .output = "dev",
     };
 
-using ExportReferencesMap = decltype(DerivationOptions<SingleDerivedPath>::exportReferencesGraph);
+using ExportReferencesMap = decltype(derivation::TopOptions<SingleDerivedPath>::exportReferencesGraph);
 
-static const DerivationOptions<SingleDerivedPath> advancedAttributes_defaults = {
-    .outputChecks =
-        derivation::OutputChecks<SingleDerivedPath>{
-            .ignoreSelfRefs = true,
+static const ParsedOptions advancedAttributes_defaults = {
+    .top =
+        {
+            .allOutputChecks =
+                derivation::OutputChecks<SingleDerivedPath>{
+                    .ignoreSelfRefs = true,
+                },
+            .exportReferencesGraph = {},
+            .additionalSandboxProfile = "",
+            .noChroot = false,
+            .impureHostDeps = {},
+            .impureEnvVars = {},
+            .allowLocalNetworking = false,
+            .requiredSystemFeatures = {},
+            .preferLocalBuild = false,
+            .allowSubstitutes = true,
         },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
-    .exportReferencesGraph = {},
-    .additionalSandboxProfile = "",
-    .noChroot = false,
-    .impureHostDeps = {},
-    .impureEnvVars = {},
-    .allowLocalNetworking = false,
-    .requiredSystemFeatures = {},
-    .preferLocalBuild = false,
-    .allowSubstitutes = true,
 };
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
@@ -185,15 +205,12 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
     this->readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-
         EXPECT_TRUE(!got.structuredAttrs);
 
-        EXPECT_EQ(options, advancedAttributes_defaults);
+        EXPECT_EQ(parsedOptions(got), advancedAttributes_defaults);
 
-        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), true);
-        EXPECT_EQ(options.useUidRange(got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(settings.getWorkerSettings()), true);
+        EXPECT_EQ(got.useUidRange(), false);
     });
 };
 
@@ -209,65 +226,64 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 {
-    DerivationOptions<SingleDerivedPath> expected = {
-        .outputChecks =
-            derivation::OutputChecks<SingleDerivedPath>{
-                .ignoreSelfRefs = true,
+    ParsedOptions expected = {
+        .top =
+            {
+                .allOutputChecks =
+                    derivation::OutputChecks<SingleDerivedPath>{
+                        .ignoreSelfRefs = true,
+                    },
+                .additionalSandboxProfile = "sandcastle",
+                .noChroot = true,
+                .impureHostDeps = {"/usr/bin/ditto"},
+                .impureEnvVars = {"UNICORN"},
+                .allowLocalNetworking = true,
+                .requiredSystemFeatures = {"rainbow", "uid-range"},
+                .preferLocalBuild = true,
+                .allowSubstitutes = false,
             },
-        .unsafeDiscardReferences = {},
-        .passAsFile = {},
-        .additionalSandboxProfile = "sandcastle",
-        .noChroot = true,
-        .impureHostDeps = {"/usr/bin/ditto"},
-        .impureEnvVars = {"UNICORN"},
-        .allowLocalNetworking = true,
-        .requiredSystemFeatures = {"rainbow", "uid-range"},
-        .preferLocalBuild = true,
-        .allowSubstitutes = false,
     };
 
     this->readTest("advanced-attributes.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-
         EXPECT_TRUE(!got.structuredAttrs);
 
         // Reset fields that vary between test cases to enable whole-object comparison
-        options.outputChecks = derivation::OutputChecks<SingleDerivedPath>{.ignoreSelfRefs = true};
-        options.exportReferencesGraph = {};
+        got.options.allOutputChecks = derivation::OutputChecks<SingleDerivedPath>{.ignoreSelfRefs = true};
+        got.options.exportReferencesGraph = {};
 
-        EXPECT_EQ(options, expected);
+        EXPECT_EQ(parsedOptions(got), expected);
 
-        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), false);
-        EXPECT_EQ(options.useUidRange(got), true);
+        EXPECT_EQ(got.options.substitutesAllowed(settings.getWorkerSettings()), false);
+        EXPECT_EQ(got.useUidRange(), true);
     });
 };
 
-DerivationOptions<SingleDerivedPath> advancedAttributes_ia = {
-    .outputChecks =
-        derivation::OutputChecks<SingleDerivedPath>{
-            .ignoreSelfRefs = true,
-            .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
-            .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
-            .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
-            .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
+ParsedOptions advancedAttributes_ia = {
+    .top =
+        {
+            .allOutputChecks =
+                derivation::OutputChecks<SingleDerivedPath>{
+                    .ignoreSelfRefs = true,
+                    .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
+                    .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
+                    .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
+                    .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
+                },
+            .exportReferencesGraph{
+                {"refs1", {pathFoo}},
+                {"refs2", {pathBarDrvIA}},
+            },
+            .additionalSandboxProfile = "sandcastle",
+            .noChroot = true,
+            .impureHostDeps = {"/usr/bin/ditto"},
+            .impureEnvVars = {"UNICORN"},
+            .allowLocalNetworking = true,
+            .requiredSystemFeatures = {"rainbow", "uid-range"},
+            .preferLocalBuild = true,
+            .allowSubstitutes = false,
         },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
-    .exportReferencesGraph{
-        {"refs1", {pathFoo}},
-        {"refs2", {pathBarDrvIA}},
-    },
-    .additionalSandboxProfile = "sandcastle",
-    .noChroot = true,
-    .impureHostDeps = {"/usr/bin/ditto"},
-    .impureEnvVars = {"UNICORN"},
-    .allowLocalNetworking = true,
-    .requiredSystemFeatures = {"rainbow", "uid-range"},
-    .preferLocalBuild = true,
-    .allowSubstitutes = false,
 };
 
 TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
@@ -275,29 +291,30 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
     testDerivationOptions("advanced-attributes.drv", advancedAttributes_ia, {"rainbow", "uid-range"});
 };
 
-DerivationOptions<SingleDerivedPath> advancedAttributes_ca = {
-    .outputChecks =
-        derivation::OutputChecks<SingleDerivedPath>{
-            .ignoreSelfRefs = true,
-            .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
-            .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
-            .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
-            .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
+ParsedOptions advancedAttributes_ca = {
+    .top =
+        {
+            .allOutputChecks =
+                derivation::OutputChecks<SingleDerivedPath>{
+                    .ignoreSelfRefs = true,
+                    .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
+                    .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
+                    .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
+                    .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
+                },
+            .exportReferencesGraph{
+                {"refs1", {placeholderFoo}},
+                {"refs2", {pathBarDrvCA}},
+            },
+            .additionalSandboxProfile = "sandcastle",
+            .noChroot = true,
+            .impureHostDeps = {"/usr/bin/ditto"},
+            .impureEnvVars = {"UNICORN"},
+            .allowLocalNetworking = true,
+            .requiredSystemFeatures = {"rainbow", "uid-range"},
+            .preferLocalBuild = true,
+            .allowSubstitutes = false,
         },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
-    .exportReferencesGraph{
-        {"refs1", {placeholderFoo}},
-        {"refs2", {pathBarDrvCA}},
-    },
-    .additionalSandboxProfile = "sandcastle",
-    .noChroot = true,
-    .impureHostDeps = {"/usr/bin/ditto"},
-    .impureEnvVars = {"UNICORN"},
-    .allowLocalNetworking = true,
-    .requiredSystemFeatures = {"rainbow", "uid-range"},
-    .preferLocalBuild = true,
-    .allowSubstitutes = false,
 };
 
 TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
@@ -305,19 +322,20 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
     testDerivationOptions("advanced-attributes.drv", advancedAttributes_ca, {"rainbow", "uid-range", "ca-derivations"});
 };
 
-DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults = {
-    .outputChecks = std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{},
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
-    .exportReferencesGraph = {},
-    .additionalSandboxProfile = "",
-    .noChroot = false,
-    .impureHostDeps = {},
-    .impureEnvVars = {},
-    .allowLocalNetworking = false,
-    .requiredSystemFeatures = {},
-    .preferLocalBuild = false,
-    .allowSubstitutes = true,
+ParsedOptions advancedAttributes_structuredAttrs_defaults = {
+    .top =
+        {
+            .allOutputChecks = std::nullopt,
+            .exportReferencesGraph = {},
+            .additionalSandboxProfile = "",
+            .noChroot = false,
+            .impureHostDeps = {},
+            .impureEnvVars = {},
+            .allowLocalNetworking = false,
+            .requiredSystemFeatures = {},
+            .preferLocalBuild = false,
+            .allowSubstitutes = true,
+        },
 };
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_defaults)
@@ -325,15 +343,12 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
     this->readTest("advanced-attributes-structured-attrs-defaults.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-
         EXPECT_TRUE(got.structuredAttrs);
 
-        EXPECT_EQ(options, advancedAttributes_structuredAttrs_defaults);
+        EXPECT_EQ(parsedOptions(got), advancedAttributes_structuredAttrs_defaults);
 
-        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), true);
-        EXPECT_EQ(options.useUidRange(got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(settings.getWorkerSettings()), true);
+        EXPECT_EQ(got.useUidRange(), false);
     });
 };
 
@@ -349,93 +364,87 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_default
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 {
-    DerivationOptions<SingleDerivedPath> expected = {
-        .outputChecks =
-            std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
-                {"dev",
-                 derivation::OutputChecks<SingleDerivedPath>{
-                     .maxSize = 789,
-                     .maxClosureSize = 5909,
-                 }},
+    ParsedOptions expected = {
+        .top =
+            {
+                .allOutputChecks = std::nullopt,
+                .exportReferencesGraph = {},
+                .additionalSandboxProfile = "sandcastle",
+                .noChroot = true,
+                .impureHostDeps = {"/usr/bin/ditto"},
+                .impureEnvVars = {"UNICORN"},
+                .allowLocalNetworking = true,
+                .requiredSystemFeatures = {"rainbow", "uid-range"},
+                .preferLocalBuild = true,
+                .allowSubstitutes = false,
             },
-        .unsafeDiscardReferences = {},
-        .passAsFile = {},
-        .exportReferencesGraph = {},
-        .additionalSandboxProfile = "sandcastle",
-        .noChroot = true,
-        .impureHostDeps = {"/usr/bin/ditto"},
-        .impureEnvVars = {"UNICORN"},
-        .allowLocalNetworking = true,
-        .requiredSystemFeatures = {"rainbow", "uid-range"},
-        .preferLocalBuild = true,
-        .allowSubstitutes = false,
+        .perOutput =
+            {
+                {"dev",
+                 {.checks =
+                      derivation::OutputChecks<SingleDerivedPath>{
+                          .maxSize = 789,
+                          .maxClosureSize = 5909,
+                      }}},
+            },
     };
 
     this->readTest("advanced-attributes-structured-attrs.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-
         EXPECT_TRUE(got.structuredAttrs);
 
         // Reset fields that vary between test cases to enable whole-object comparison
-        {
-            // Delete all keys but "dev" in options.outputChecks
-            auto * outputChecksMapP =
-                std::get_if<std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>>(
-                    &options.outputChecks);
-            ASSERT_TRUE(outputChecksMapP);
-            auto & outputChecksMap = *outputChecksMapP;
-            auto devEntry = outputChecksMap.find("dev");
-            ASSERT_TRUE(devEntry != outputChecksMap.end());
-            auto devChecks = devEntry->second;
-            outputChecksMap.clear();
-            outputChecksMap.emplace("dev", std::move(devChecks));
-        }
-        options.exportReferencesGraph = {};
+        for (auto & [outputName, output] : got.outputs)
+            if (outputName != "dev")
+                output.options.checks = std::nullopt;
+        got.options.exportReferencesGraph = {};
 
-        EXPECT_EQ(options, expected);
+        EXPECT_EQ(parsedOptions(got), expected);
 
-        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), false);
-        EXPECT_EQ(options.useUidRange(got), true);
+        EXPECT_EQ(got.options.substitutesAllowed(settings.getWorkerSettings()), false);
+        EXPECT_EQ(got.useUidRange(), true);
     });
 };
 
-DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ia = {
-    .outputChecks =
-        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
-            {"out",
-             derivation::OutputChecks<SingleDerivedPath>{
-                 .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
-                 .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
-             }},
-            {"bin",
-             derivation::OutputChecks<SingleDerivedPath>{
-                 .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
-                 .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
-             }},
-            {"dev",
-             derivation::OutputChecks<SingleDerivedPath>{
-                 .maxSize = 789,
-                 .maxClosureSize = 5909,
-             }},
-        },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
-    .exportReferencesGraph =
+ParsedOptions advancedAttributes_structuredAttrs_ia = {
+    .top =
         {
-            {"refs1", {pathFoo}},
-            {"refs2", {pathBarDrvIA}},
+            .exportReferencesGraph =
+                {
+                    {"refs1", {pathFoo}},
+                    {"refs2", {pathBarDrvIA}},
+                },
+            .additionalSandboxProfile = "sandcastle",
+            .noChroot = true,
+            .impureHostDeps = {"/usr/bin/ditto"},
+            .impureEnvVars = {"UNICORN"},
+            .allowLocalNetworking = true,
+            .requiredSystemFeatures = {"rainbow", "uid-range"},
+            .preferLocalBuild = true,
+            .allowSubstitutes = false,
         },
-    .additionalSandboxProfile = "sandcastle",
-    .noChroot = true,
-    .impureHostDeps = {"/usr/bin/ditto"},
-    .impureEnvVars = {"UNICORN"},
-    .allowLocalNetworking = true,
-    .requiredSystemFeatures = {"rainbow", "uid-range"},
-    .preferLocalBuild = true,
-    .allowSubstitutes = false,
+    .perOutput =
+        {
+            {"out",
+             {.checks =
+                  derivation::OutputChecks<SingleDerivedPath>{
+                      .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
+                      .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
+                  }}},
+            {"bin",
+             {.checks =
+                  derivation::OutputChecks<SingleDerivedPath>{
+                      .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
+                      .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
+                  }}},
+            {"dev",
+             {.checks =
+                  derivation::OutputChecks<SingleDerivedPath>{
+                      .maxSize = 789,
+                      .maxClosureSize = 5909,
+                  }}},
+        },
 };
 
 TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
@@ -444,40 +453,44 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         "advanced-attributes-structured-attrs.drv", advancedAttributes_structuredAttrs_ia, {"rainbow", "uid-range"});
 };
 
-DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ca = {
-    .outputChecks =
-        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
-            {"out",
-             derivation::OutputChecks<SingleDerivedPath>{
-                 .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
-                 .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
-             }},
-            {"bin",
-             derivation::OutputChecks<SingleDerivedPath>{
-                 .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
-                 .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
-             }},
-            {"dev",
-             derivation::OutputChecks<SingleDerivedPath>{
-                 .maxSize = 789,
-                 .maxClosureSize = 5909,
-             }},
-        },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
-    .exportReferencesGraph =
+ParsedOptions advancedAttributes_structuredAttrs_ca = {
+    .top =
         {
-            {"refs1", {placeholderFoo}},
-            {"refs2", {pathBarDrvCA}},
+            .exportReferencesGraph =
+                {
+                    {"refs1", {placeholderFoo}},
+                    {"refs2", {pathBarDrvCA}},
+                },
+            .additionalSandboxProfile = "sandcastle",
+            .noChroot = true,
+            .impureHostDeps = {"/usr/bin/ditto"},
+            .impureEnvVars = {"UNICORN"},
+            .allowLocalNetworking = true,
+            .requiredSystemFeatures = {"rainbow", "uid-range"},
+            .preferLocalBuild = true,
+            .allowSubstitutes = false,
         },
-    .additionalSandboxProfile = "sandcastle",
-    .noChroot = true,
-    .impureHostDeps = {"/usr/bin/ditto"},
-    .impureEnvVars = {"UNICORN"},
-    .allowLocalNetworking = true,
-    .requiredSystemFeatures = {"rainbow", "uid-range"},
-    .preferLocalBuild = true,
-    .allowSubstitutes = false,
+    .perOutput =
+        {
+            {"out",
+             {.checks =
+                  derivation::OutputChecks<SingleDerivedPath>{
+                      .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
+                      .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
+                  }}},
+            {"bin",
+             {.checks =
+                  derivation::OutputChecks<SingleDerivedPath>{
+                      .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
+                      .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
+                  }}},
+            {"dev",
+             {.checks =
+                  derivation::OutputChecks<SingleDerivedPath>{
+                      .maxSize = 789,
+                      .maxClosureSize = 5909,
+                  }}},
+        },
 };
 
 TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
@@ -488,25 +501,34 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         {"rainbow", "uid-range", "ca-derivations"});
 };
 
-#define TEST_JSON_OPTIONS(FIXUTURE, INPUT, VAR, VAR2)                                                              \
-    TEST_F(FIXUTURE, DerivationOptions_##INPUT##_##VAR##_from_json)                                                \
-    {                                                                                                              \
-        nix::readJsonTest<DerivationOptions<INPUT>>(*this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
-    }                                                                                                              \
-    TEST_F(FIXUTURE, DerivationOptions_##INPUT##_##VAR##_to_json)                                                  \
-    {                                                                                                              \
-        nix::readJsonTest<DerivationOptions<INPUT>>(*this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
+#define TEST_JSON_OPTIONS(FIXUTURE, INPUT, VAR, VAR2)                                                  \
+    TEST_F(FIXUTURE, TopOptions_##INPUT##_##VAR##_from_json)                                           \
+    {                                                                                                  \
+        nix::readJsonTest<derivation::TopOptions<INPUT>>(*this, "derivation-top-options/" #VAR, VAR2); \
+    }                                                                                                  \
+    TEST_F(FIXUTURE, TopOptions_##INPUT##_##VAR##_to_json)                                             \
+    {                                                                                                  \
+        nix::writeJsonTest(*this, "derivation-top-options/" #VAR, VAR2);                               \
     }
 
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, defaults, defaults)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, all_set, ia)
-TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, SingleDerivedPath, all_set, ca)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_defaults, structuredAttrs_defaults)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_all_set, structuredAttrs_ia)
-TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_all_set, structuredAttrs_ca)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, defaults, advancedAttributes_defaults.top)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, all_set, advancedAttributes_ia.top)
+TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, SingleDerivedPath, all_set, advancedAttributes_ca.top)
+TEST_JSON_OPTIONS(
+    DerivationAdvancedAttrsTest,
+    SingleDerivedPath,
+    structuredAttrs_defaults,
+    advancedAttributes_structuredAttrs_defaults.top)
+TEST_JSON_OPTIONS(
+    DerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_all_set, advancedAttributes_structuredAttrs_ia.top)
+TEST_JSON_OPTIONS(
+    CaDerivationAdvancedAttrsTest,
+    SingleDerivedPath,
+    structuredAttrs_all_set,
+    advancedAttributes_structuredAttrs_ca.top)
 
 /**
- * `DerivationOptions<StorePath>` versions of the IA fixtures, used to
+ * `TopOptions<StorePath>` versions of the IA fixtures, used to
  * exercise the `StorePath` JSON serializers. The IA test data files are
  * reused as-is (see comment near the test invocations).
  */
@@ -514,13 +536,8 @@ static const StorePath spFoo{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
     spFooDev{"z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"}, spBar{"r5cff30838majxk5mp3ip2diffi8vpaj-bar"},
     spBarDev{"9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"}, spBarDrv{"vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"};
 
-static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
-    .outputChecks =
-        derivation::OutputChecks<StorePath>{
-            .ignoreSelfRefs = true,
-        },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
+static const derivation::TopOptions<StorePath> advancedAttributes_sp_defaults = {
+    .allOutputChecks = std::nullopt,
     .exportReferencesGraph = {},
     .additionalSandboxProfile = "",
     .noChroot = false,
@@ -532,8 +549,8 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
     .allowSubstitutes = true,
 };
 
-static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
-    .outputChecks =
+static const derivation::TopOptions<StorePath> advancedAttributes_sp_all_set = {
+    .allOutputChecks =
         derivation::OutputChecks<StorePath>{
             .ignoreSelfRefs = true,
             .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
@@ -541,8 +558,6 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
             .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
             .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
         },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
     .exportReferencesGraph{
         {"refs1", {spFoo}},
         {"refs2", {spBarDrv}},
@@ -557,10 +572,8 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
     .allowSubstitutes = false,
 };
 
-static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
-    .outputChecks = std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{},
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
+static const derivation::TopOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
+    .allOutputChecks = std::nullopt,
     .exportReferencesGraph = {},
     .additionalSandboxProfile = "",
     .noChroot = false,
@@ -572,27 +585,8 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_
     .allowSubstitutes = true,
 };
 
-static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
-    .outputChecks =
-        std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{
-            {"out",
-             derivation::OutputChecks<StorePath>{
-                 .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
-                 .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
-             }},
-            {"bin",
-             derivation::OutputChecks<StorePath>{
-                 .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
-                 .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
-             }},
-            {"dev",
-             derivation::OutputChecks<StorePath>{
-                 .maxSize = 789,
-                 .maxClosureSize = 5909,
-             }},
-        },
-    .unsafeDiscardReferences = {},
-    .passAsFile = {},
+static const derivation::TopOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
+    .allOutputChecks = std::nullopt,
     .exportReferencesGraph =
         {
             {"refs1", {spFoo}},
@@ -609,17 +603,71 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_
 };
 
 /**
- * Same JSON characterization tests, but for `DerivationOptions<StorePath>`.
+ * Same JSON characterization tests, but for `TopOptions<StorePath>`.
  *
  * Since `DrvRef<StorePath>` and `DrvRef<SingleDerivedPath>` (when only
  * the `Opaque` case is used) JSON-encode identically, the IA test data
  * files can be reused as-is.
  */
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, defaults, sp_defaults)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, all_set, sp_all_set)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, structuredAttrs_defaults, sp_structuredAttrs_defaults)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, structuredAttrs_all_set, sp_structuredAttrs_all_set)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, defaults, advancedAttributes_sp_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, all_set, advancedAttributes_sp_all_set)
+TEST_JSON_OPTIONS(
+    DerivationAdvancedAttrsTest, StorePath, structuredAttrs_defaults, advancedAttributes_sp_structuredAttrs_defaults)
+TEST_JSON_OPTIONS(
+    DerivationAdvancedAttrsTest, StorePath, structuredAttrs_all_set, advancedAttributes_sp_structuredAttrs_all_set)
 
 #undef TEST_JSON_OPTIONS
+
+static const derivation::OutputOptions<SingleDerivedPath> outputOptions_defaults = {};
+
+static const derivation::OutputOptions<SingleDerivedPath> outputOptions_all_set = {
+    .checks =
+        derivation::OutputChecks<SingleDerivedPath>{
+            .maxSize = 789,
+            .maxClosureSize = 5909,
+        },
+    .unsafeDiscardReferences = true,
+};
+
+#define TEST_JSON_OUTPUT_OPTIONS(FIXUTURE, INPUT, VAR)                                     \
+    TEST_F(FIXUTURE, OutputOptions_##INPUT##_##VAR##_from_json)                            \
+    {                                                                                      \
+        nix::readJsonTest<derivation::OutputOptions<INPUT>>(                               \
+            *this, "derivation-output-options/" #VAR, outputOptions_##VAR);                \
+    }                                                                                      \
+    TEST_F(FIXUTURE, OutputOptions_##INPUT##_##VAR##_to_json)                              \
+    {                                                                                      \
+        nix::writeJsonTest(*this, "derivation-output-options/" #VAR, outputOptions_##VAR); \
+    }
+
+TEST_JSON_OUTPUT_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, defaults)
+TEST_JSON_OUTPUT_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, all_set)
+
+#undef TEST_JSON_OUTPUT_OPTIONS
+
+#define SYNC_CONFLICT(NAME, VALUE)            \
+    NAME = VALUE;                             \
+    EXPECT_THROW(got.unparse(*store), Error); \
+    got.options = options;
+
+TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_option_syncConflict)
+{
+    readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
+        auto got = parseDerivation(*store, std::move(encoded), "foo");
+        auto options = got.options;
+
+        SYNC_CONFLICT(got.options.additionalSandboxProfile, "foobar");
+        SYNC_CONFLICT(got.options.noChroot, true);
+        SYNC_CONFLICT(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        SYNC_CONFLICT(got.options.impureEnvVars, StringSet{"HELLO"});
+        SYNC_CONFLICT(got.options.allowLocalNetworking, true);
+        using DrvRefSet = std::set<DrvRef<SingleDerivedPath>>;
+        using Checks = derivation::OutputChecks<SingleDerivedPath>;
+        SYNC_CONFLICT(got.options.allOutputChecks, (Checks{.allowedReferences = DrvRefSet{std::string{"nothing"}}}));
+        SYNC_CONFLICT(got.options.allOutputChecks, (Checks{.allowedRequisites = DrvRefSet{std::string{"hey"}}}));
+        SYNC_CONFLICT(got.options.allOutputChecks, (Checks{.disallowedReferences = DrvRefSet{std::string{"BAR"}}}));
+        SYNC_CONFLICT(got.options.allOutputChecks, (Checks{.disallowedRequisites = DrvRefSet{std::string{"FOO"}}}));
+    });
+};
 
 } // namespace nix

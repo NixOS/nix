@@ -1,35 +1,28 @@
 #pragma once
 ///@file
 
+#include "nix/util/json-impls.hh"
+#include "nix/util/json-non-null.hh"
+#include "nix/store/path.hh"
+#include "nix/store/downstream-placeholder.hh"
+
 #include <cstdint>
 #include <optional>
-#include <variant>
-
-#include "nix/util/types.hh"
-#include "nix/util/json-impls.hh"
-#include "nix/store/store-dir-config.hh"
-#include "nix/store/downstream-placeholder.hh"
-#include "nix/store/worker-settings.hh"
 
 namespace nix {
 
-class Store;
-
-struct StoreDirConfig;
-
-struct DerivationOutput;
-
-template<typename Inputs, typename Output>
-struct DerivationT;
-using BasicDerivation = DerivationT<StorePathSet, DerivationOutput>;
-
-struct StructuredAttrs;
-
-template<typename V>
-struct DerivedPathMap;
+struct SingleDerivedPath;
+struct WorkerSettings;
 
 namespace derivation {
 
+/**
+ * Checks (e.g. reference whitelists/blacklists, closure size limits)
+ * that apply to derivation outputs.
+ *
+ * Historically parsed from the legacy environment-variable encoding
+ * (see `DerivationATerm::elaborate`).
+ */
 template<typename Input>
 struct OutputChecks
 {
@@ -71,51 +64,36 @@ struct OutputChecks
     bool operator==(const OutputChecks &) const = default;
 };
 
-} // namespace derivation
-
-/**
- * This represents all the special options on a `Derivation`.
- *
- * Currently, these options are parsed from the environment variables
- * with the aid of `StructuredAttrs`.
- *
- * The first goal of this data type is to make sure that no other code
- * uses `StructuredAttrs` to ad-hoc parse some additional options. That
- * ensures this data type is up to date and fully correct.
- *
- * The second goal of this data type is to allow an alternative to
- * hackily parsing the options from the environment variables. The ATerm
- * format cannot change, but in alternatives to it (like the JSON
- * format), we have the option of instead storing the options
- * separately. That would be nice to separate concerns, and not make any
- * environment variable names magical.
- */
 template<typename Input>
-struct DerivationOptions
+struct OutputOptions
 {
-    /**
-     * Either one set of checks for all outputs, or separate checks
-     * per-output.
-     */
-    std::variant<derivation::OutputChecks<Input>, std::map<std::string, derivation::OutputChecks<Input>, std::less<>>>
-        outputChecks = derivation::OutputChecks<Input>{};
+    std::optional<OutputChecks<Input>> checks;
 
     /**
      * Whether to avoid scanning for references for a given output.
      */
-    std::map<std::string, bool, std::less<>> unsafeDiscardReferences;
+    bool unsafeDiscardReferences = false;
+
+    bool operator==(const OutputOptions &) const = default;
+};
+
+/**
+ * Options that are for the derivation as a whole, rather than per-output;
+ */
+template<typename Input>
+struct TopOptions
+{
+    /* Derivation options. Historically these are parsed from special
+       environment variables and structured attributes; see
+       `DerivationATerm::elaborate`.
+       They no longer live in a separate structure because they are
+       fields of the derivation like any other. */
 
     /**
-     * In non-structured mode, all bindings specified in the derivation
-     * go directly via the environment, except those listed in the
-     * passAsFile attribute. Those are instead passed as file names
-     * pointing to temporary files containing the contents.
-     *
-     * Note that passAsFile is ignored in structure mode because it's
-     * not needed (attributes are not passed through the environment, so
-     * there is no size constraint).
+     * Either one set of checks for all outputs, or separate checks
+     * per-output.
      */
-    StringSet passAsFile;
+    std::optional<OutputChecks<Input>> allOutputChecks;
 
     /**
      * The `exportReferencesGraph' feature allows the references graph
@@ -187,31 +165,26 @@ struct DerivationOptions
      */
     bool allowSubstitutes = true;
 
-    bool operator==(const DerivationOptions &) const = default;
-
-    /**
-     * @param drv Must be the same derivation we parsed this from. In
-     * the future we'll flip things around so a `BasicDerivation` has
-     * `DerivationOptions` instead.
-     */
-    template<typename Inputs>
-    StringSet getRequiredSystemFeatures(const DerivationT<Inputs, DerivationOutput> & drv) const;
+    bool operator==(const TopOptions &) const = default;
 
     bool substitutesAllowed(const WorkerSettings & workerSettings) const;
-
-    /**
-     * @param drv See note on `getRequiredSystemFeatures`
-     */
-    template<typename Inputs>
-    bool useUidRange(const DerivationT<Inputs, DerivationOutput> & drv) const;
 };
 
-extern template struct DerivationOptions<StorePath>;
-extern template struct DerivationOptions<SingleDerivedPath>;
+} // namespace derivation
 
-}; // namespace nix
+template<typename Input>
+struct json_avoids_null<derivation::OutputChecks<Input>> : std::true_type
+{};
 
-JSON_IMPL(nix::DerivationOptions<nix::StorePath>);
-JSON_IMPL(nix::DerivationOptions<nix::SingleDerivedPath>);
+template<typename Input>
+struct json_avoids_null<derivation::TopOptions<Input>> : std::true_type
+{};
+
+} // namespace nix
+
 JSON_IMPL(nix::derivation::OutputChecks<nix::StorePath>)
 JSON_IMPL(nix::derivation::OutputChecks<nix::SingleDerivedPath>)
+JSON_IMPL(nix::derivation::OutputOptions<nix::StorePath>)
+JSON_IMPL(nix::derivation::OutputOptions<nix::SingleDerivedPath>)
+JSON_IMPL(nix::derivation::TopOptions<nix::StorePath>)
+JSON_IMPL(nix::derivation::TopOptions<nix::SingleDerivedPath>)

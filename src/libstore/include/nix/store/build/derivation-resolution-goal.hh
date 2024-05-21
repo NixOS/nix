@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build/goal.hh"

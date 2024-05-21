@@ -1235,8 +1235,10 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         // The build log is actually attached to the corresponding
         // resolved derivation, so we need to get it first
         auto resolvedDrv = drv.tryResolve(*this);
-        if (resolvedDrv)
+        if (resolvedDrv) {
+            // TODO check options compatibility with ATerm.
             return nix::computeStorePath(*this, resolvedDrv->unresolve());
+        }
     }
 
     return path;

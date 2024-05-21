@@ -267,24 +267,24 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
-    drv.env.emplace("name", drv.name);
+    drv.env.emplace("name", derivation::EnvValue{.value = drv.name});
     drv.inputs.insert(SingleDerivedPath::Opaque{std::move(getEnvShPath)});
     for (auto & [outputName, output] : drv.outputs) {
         std::visit(
             overloaded{
                 [&](const DerivationOutput::InputAddressed &) {
-                    output = DerivationOutput::Deferred{};
-                    drv.env[outputName] = "";
+                    output.output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = {};
                 },
                 [&](const DerivationOutput::CAFixed &) {
-                    output = DerivationOutput::Deferred{};
-                    drv.env[outputName] = "";
+                    output.output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = {};
                 },
                 [&](const auto &) {
                     // Do nothing for other types (CAFloating, Deferred, Impure)
                 },
             },
-            output.raw);
+            output.output.raw);
     }
     drv.fillInOutputPaths(*evalStore);
 

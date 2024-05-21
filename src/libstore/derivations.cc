@@ -1,5 +1,7 @@
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/elaborate.hh"
+#include "nix/store/worker-settings.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
@@ -206,13 +208,33 @@ DerivationType DerivationT<Inputs, Output>::type() const
                 },
                 [&](const DerivationOutput::Impure &) { decide(DerivationType::Impure{}); },
             },
-            i.second.raw);
+            i.second.output.raw);
     }
 
     if (!ty)
         throw Error("must have at least one output");
 
     return ty.value();
+}
+
+template<typename Inputs, typename Output>
+StringSet DerivationT<Inputs, Output>::getRequiredSystemFeatures() const
+    requires std::is_same_v<Output, DerivationOutput>
+{
+    // FIXME: cache this?
+    StringSet res;
+    for (auto & i : options.requiredSystemFeatures)
+        res.insert(i);
+    if (!type().hasKnownOutputPaths())
+        res.insert("ca-derivations");
+    return res;
+}
+
+template<typename Inputs, typename Output>
+bool DerivationT<Inputs, Output>::useUidRange() const
+    requires std::is_same_v<Output, DerivationOutput>
+{
+    return getRequiredSystemFeatures().count("uid-range");
 }
 
 template<typename Inputs, typename Output>
@@ -232,7 +254,7 @@ DerivationOutputsAndOptPaths DerivationT<Inputs, Output>::outputsAndOptPaths(con
     DerivationOutputsAndOptPaths outsAndOptPaths;
     for (auto & [outputName, output] : outputs)
         outsAndOptPaths.insert(
-            std::make_pair(outputName, std::make_pair(output, output.path(store, name, outputName))));
+            std::make_pair(outputName, std::make_pair(output.output, output.output.path(store, name, outputName))));
     return outsAndOptPaths;
 }
 
@@ -269,11 +291,16 @@ void DerivationT<Inputs, Output>::applyRewrites(const StringMap & rewrites)
     for (auto & arg : args)
         arg = rewriteStrings(arg, rewrites);
 
-    StringPairs newEnv;
+    decltype(env) newEnv;
     for (auto & envVar : env) {
         auto envName = rewriteStrings(envVar.first, rewrites);
-        auto envValue = rewriteStrings(envVar.second, rewrites);
-        newEnv.emplace(envName, envValue);
+        auto envValue = rewriteStrings(envVar.second.value, rewrites);
+        newEnv.emplace(
+            std::move(envName),
+            derivation::EnvValue{
+                .value = std::move(envValue),
+                .passAsFile = envVar.second.passAsFile,
+            });
     }
     env = std::move(newEnv);
 
@@ -286,14 +313,70 @@ void DerivationT<Inputs, Output>::applyRewrites(const StringMap & rewrites)
 }
 
 template<>
-Derivation DerivationT<StorePathSet>::unresolve() const
+Derivation DerivationT<StorePath>::unresolve() const
 {
-    return mapInputs([](const StorePathSet & inputs) -> std::set<SingleDerivedPath> {
+    auto res = mapInputs([](const StorePathSet & inputs) -> std::set<SingleDerivedPath> {
         auto view = inputs | std::views::transform([](const StorePath & p) -> SingleDerivedPath {
                         return SingleDerivedPath::Opaque{p};
                     });
         return std::set<SingleDerivedPath>(view.begin(), view.end());
     });
+
+    /* Inject the option fields; store paths trivially become opaque
+       deriving paths. This cannot fail. */
+    auto injectRef = [](const DrvRef<StorePath> & ref) -> DrvRef<SingleDerivedPath> {
+        return std::visit(
+            overloaded{
+                [](const OutputName & outputName) -> DrvRef<SingleDerivedPath> { return outputName; },
+                [](const StorePath & path) -> DrvRef<SingleDerivedPath> { return SingleDerivedPath::Opaque{path}; },
+            },
+            ref);
+    };
+    auto injectRefSet = [&](const std::set<DrvRef<StorePath>> & refs) {
+        std::set<DrvRef<SingleDerivedPath>> res;
+        for (auto & ref : refs)
+            res.insert(injectRef(ref));
+        return res;
+    };
+    auto injectChecks = [&](const derivation::OutputChecks<StorePath> & checks) {
+        return derivation::OutputChecks<SingleDerivedPath>{
+            .ignoreSelfRefs = checks.ignoreSelfRefs,
+            .maxSize = checks.maxSize,
+            .maxClosureSize = checks.maxClosureSize,
+            .allowedReferences =
+                checks.allowedReferences ? std::optional{injectRefSet(*checks.allowedReferences)} : std::nullopt,
+            .disallowedReferences = injectRefSet(checks.disallowedReferences),
+            .allowedRequisites =
+                checks.allowedRequisites ? std::optional{injectRefSet(*checks.allowedRequisites)} : std::nullopt,
+            .disallowedRequisites = injectRefSet(checks.disallowedRequisites),
+        };
+    };
+
+    for (auto & [outputName, output] : outputs) {
+        auto & resOutput = res.outputs.at(outputName);
+        resOutput.options.unsafeDiscardReferences = output.options.unsafeDiscardReferences;
+        if (output.options.checks)
+            resOutput.options.checks = injectChecks(*output.options.checks);
+    }
+
+    if (options.allOutputChecks)
+        res.options.allOutputChecks = injectChecks(*options.allOutputChecks);
+    for (auto & [name, paths] : options.exportReferencesGraph) {
+        std::set<SingleDerivedPath> injected;
+        for (auto & p : paths)
+            injected.insert(SingleDerivedPath::Opaque{p});
+        res.options.exportReferencesGraph.insert_or_assign(name, std::move(injected));
+    }
+    res.options.additionalSandboxProfile = options.additionalSandboxProfile;
+    res.options.noChroot = options.noChroot;
+    res.options.impureHostDeps = options.impureHostDeps;
+    res.options.impureEnvVars = options.impureEnvVars;
+    res.options.allowLocalNetworking = options.allowLocalNetworking;
+    res.options.requiredSystemFeatures = options.requiredSystemFeatures;
+    res.options.preferLocalBuild = options.preferLocalBuild;
+    res.options.allowSubstitutes = options.allowSubstitutes;
+
+    return res;
 }
 
 template<>
@@ -409,19 +492,29 @@ std::optional<BasicDerivation> Derivation::tryResolve(
     }
 
     BasicDerivation result{
-        .outputs = outputs,
+        .name = name,
         .inputs = resolvedInputs,
         .platform = platform,
         .builder = builder,
         .args = args,
         .env = env,
         .structuredAttrs = structuredAttrs,
-        .name = name,
     };
+    for (auto & [outputName, output] : outputs)
+        result.outputs.insert_or_assign(
+            outputName,
+            derivation::OutputWithOptions<StorePath, DerivationOutput>{
+                /* The per-output options are resolved by
+                   `tryResolveDerivationOptions` below. */
+                .output = output.output,
+            });
 
     result.applyRewrites(inputRewrites);
 
     processDerivationOutputPaths</*maskOuputs=*/true>(store, result, result.name);
+
+    if (!tryResolveDerivationOptions(*this, result, queryResolutionChain))
+        return std::nullopt;
 
     return result;
 }
@@ -475,9 +568,9 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                 /* Fill in mode: fill in missing or empty environment
                    variables */
                 if (j == drv.env.end())
-                    drv.env.insert(j, {outputName, store.printStorePath(actual)});
-                else if (j->second == "")
-                    j->second = store.printStorePath(actual);
+                    drv.env.insert(j, {outputName, {.value = store.printStorePath(actual)}});
+                else if (j->second.value == "")
+                    j->second.value = store.printStorePath(actual);
                 /* We know validation will succeed after fill-in, but
                    just to be extra sure, validate unconditionally */
             }
@@ -487,19 +580,19 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                     "derivation has missing environment variable '%s', should be '%s' but is not present",
                     outputName,
                     store.printStorePath(actual));
-            if (j->second != store.printStorePath(actual)) {
+            if (j->second.value != store.printStorePath(actual)) {
                 if (isDeferred)
                     warn(
                         "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
                         outputName,
                         store.printStorePath(actual),
-                        j->second);
+                        j->second.value);
                 else
                     throw Error(
                         "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
                         outputName,
                         store.printStorePath(actual),
-                        j->second);
+                        j->second.value);
             }
         };
         auto hash = [&]<typename Output>(const Output & outputVariant) {
@@ -521,7 +614,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                 } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
                     if constexpr (fillIn) {
                         /* Fill in output path for Deferred outputs */
-                        output = DerivationOutput::InputAddressed{
+                        output.output = DerivationOutput::InputAddressed{
                             .path = outPath,
                         };
                         envHasRightPath(outPath);
@@ -563,7 +656,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                     // Nothing to do for other output types
                 },
             },
-            output.raw);
+            output.output.raw);
     }
 
     /* Don't need the answer, but do this anyways to assert is proper
@@ -630,7 +723,7 @@ Derivation Derivation::parseJsonAndValidate(Store & store, const nlohmann::json 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
 // Explicit template instantiations
-template struct DerivationT<StorePathSet>;
-template struct DerivationT<std::set<SingleDerivedPath>>;
+template struct DerivationT<StorePath>;
+template struct DerivationT<SingleDerivedPath>;
 
 } // namespace nix

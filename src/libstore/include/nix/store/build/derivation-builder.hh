@@ -6,7 +6,7 @@
 
 #include "nix/store/build-result.hh"
 #include "nix/store/daemon.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/parsed-derivations.hh"
@@ -87,9 +87,9 @@ struct DerivationBuilderParams
     /**
      * The derivation options of `drv`.
      *
-     * @todo this should be part of `Derivation`.
+     * @todo this should be part of `Derivation`/`BasicDerivation`, if
+     * those two were distinguished by type arguments not subtyping.
      */
-    const DerivationOptions<StorePath> & drvOptions;
 
     // The remainder is state held during the build.
 

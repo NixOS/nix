@@ -9,7 +9,7 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
         auto i = ctx.drv.env.find(name);
         if (i == ctx.drv.env.end())
             throw Error("attribute '%s' missing", name);
-        return i->second;
+        return i->second.value;
     };
 
     std::filesystem::path out{ctx.outputs.at("out")};

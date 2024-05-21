@@ -335,7 +335,7 @@ static int main_build_remote(int argc, char ** argv)
             });
 
             BasicDerivation resolvedDrv{
-                .outputs = drv.outputs,
+                .name = drv.name,
                 // Hijack the inputs paths of the derivation to include
                 // all the paths that come from the `inputDrvs` set. We
                 // don't do that for the derivations whose `inputDrvs`
@@ -351,8 +351,10 @@ static int main_build_remote(int argc, char ** argv)
                 .args = drv.args,
                 .env = drv.env,
                 .structuredAttrs = drv.structuredAttrs,
-                .name = drv.name,
             };
+            for (auto & [outputName, output] : drv.outputs)
+                resolvedDrv.outputs.insert_or_assign(
+                    outputName, decltype(resolvedDrv.outputs)::mapped_type{.output = output.output});
             optResult = sshStore->getBuilder()->buildDerivation(*drvPath, resolvedDrv);
             auto & result = *optResult;
             if (auto * failureP = result.tryGetFailure()) {

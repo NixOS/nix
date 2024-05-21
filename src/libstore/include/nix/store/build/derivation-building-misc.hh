@@ -12,10 +12,8 @@ class Store;
 
 struct DerivationOutput;
 
-template<typename Inputs, typename Output>
+template<typename Input, typename Output>
 struct DerivationT;
-struct SingleDerivedPath;
-using Derivation = DerivationT<std::set<SingleDerivedPath>, DerivationOutput>;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,
@@ -57,7 +55,7 @@ struct InitialOutput
 /**
  * Format the known outputs of a derivation for use in error messages.
  */
-template<typename InputsType>
-std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType, DerivationOutput> & drv);
+template<typename InputType>
+std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputType, DerivationOutput> & drv);
 
 } // namespace nix

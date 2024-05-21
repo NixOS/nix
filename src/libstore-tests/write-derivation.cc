@@ -3,6 +3,7 @@
 
 #include "nix/util/tests/gmock-matchers.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/tests/libstore.hh"
 
@@ -32,12 +33,13 @@ protected:
 TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
 {
     Derivation drv{
+        .name = "simple-derivation",
         .platform = "system",
         .builder = "foo",
         .args = {"bar", "baz"},
-        .env = {{"BIG_BAD", "WOLF"}},
-        .name = "simple-derivation",
+        .env = {{"BIG_BAD", {.value = "WOLF"}}},
     };
+    drv = DerivationATerm::lower(drv).elaborate(StoreDirConfig{"/nix/store"}, drv.name);
 
     auto path1 = store->writeDerivation(drv, NoRepair);
     config->readOnly = true;

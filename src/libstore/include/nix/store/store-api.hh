@@ -39,10 +39,10 @@ struct DrvOutput;
 
 struct DerivationOutput;
 
-template<typename Inputs, typename Output>
+template<typename Input, typename Output>
 struct DerivationT;
-using BasicDerivation = DerivationT<StorePathSet, DerivationOutput>;
-using Derivation = DerivationT<std::set<SingleDerivedPath>, DerivationOutput>;
+using BasicDerivation = DerivationT<StorePath, DerivationOutput>;
+using Derivation = DerivationT<SingleDerivedPath, DerivationOutput>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;

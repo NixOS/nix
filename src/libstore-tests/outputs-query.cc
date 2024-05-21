@@ -44,10 +44,10 @@ protected:
     Derivation makeLeafDrv(std::string name)
     {
         return Derivation{
-            .outputs = {{"out", caFloatingOutput()}},
+            .name = std::move(name),
+            .outputs = {{"out", {.output = caFloatingOutput()}}},
             .platform = "x86_64-linux",
             .builder = "/bin/sh",
-            .name = std::move(name),
         };
     }
 };

@@ -44,10 +44,24 @@
         "srcs": []
       },
       "name": "test-ca-drv",
+      "options": {
+        "additionalSandboxProfile": "",
+        "allOutputChecks": null,
+        "allowLocalNetworking": false,
+        "allowSubstitutes": true,
+        "exportReferencesGraph": {},
+        "impureEnvVars": [],
+        "impureHostDeps": [],
+        "noChroot": false,
+        "preferLocalBuild": false,
+        "requiredSystemFeatures": []
+      },
       "outputs": {
         "out": {
+          "checks": null,
           "hashAlgo": "sha256",
-          "method": "nar"
+          "method": "nar",
+          "unsafeDiscardReferences": false
         }
       },
       "system": "",

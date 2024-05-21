@@ -1,31 +1,48 @@
 {
-  "additionalSandboxProfile": "",
-  "allowLocalNetworking": false,
-  "allowSubstitutes": true,
-  "exportReferencesGraph": {
-    "refs": [
-      {
-        "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv",
-        "output": "out"
-      }
-    ]
+  "args": [],
+  "builder": "/bin/bash",
+  "env": {
+    "exportReferencesGraph": "refs /19r5f6rm1xa6ii9sam7fqbmaj8skmasskfj0rixxb1zjpqcy470p/foo"
   },
-  "impureEnvVars": [],
-  "impureHostDeps": [],
-  "noChroot": false,
-  "outputChecks": {
-    "forAllOutputs": {
-      "allowedReferences": null,
-      "allowedRequisites": null,
-      "disallowedReferences": [],
-      "disallowedRequisites": [],
-      "ignoreSelfRefs": true,
-      "maxClosureSize": null,
-      "maxSize": null
+  "inputs": {
+    "drvs": {
+      "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "out"
+        ]
+      }
+    },
+    "srcs": []
+  },
+  "name": "export-ref-subpath",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {
+      "refs": [
+        {
+          "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv",
+          "output": "out"
+        }
+      ]
+    },
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
+  "outputs": {
+    "out": {
+      "checks": null,
+      "hashAlgo": "sha256",
+      "method": "nar",
+      "unsafeDiscardReferences": false
     }
   },
-  "passAsFile": [],
-  "preferLocalBuild": false,
-  "requiredSystemFeatures": [],
-  "unsafeDiscardReferences": {}
+  "system": "x86_64-linux",
+  "version": 4
 }
