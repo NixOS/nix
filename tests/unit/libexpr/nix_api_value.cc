@@ -256,10 +256,13 @@ TEST_F(nix_api_expr_test, nix_value_init)
 
     Value * f = nix_alloc_value(ctx, state);
     nix_expr_eval_from_string(
-        ctx, state, R"(
+        ctx,
+        state,
+        R"(
         a: a * a
     )",
-        "<test>", f);
+        "<test>",
+        f);
 
     // Test
 
@@ -325,20 +328,26 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
 
     Value * f = nix_alloc_value(ctx, state);
     nix_expr_eval_from_string(
-        ctx, state, R"(
+        ctx,
+        state,
+        R"(
         a: { foo = a; }
     )",
-        "<test>", f);
+        "<test>",
+        f);
     assert_ctx_ok();
 
     Value * e = nix_alloc_value(ctx, state);
     {
         Value * g = nix_alloc_value(ctx, state);
         nix_expr_eval_from_string(
-            ctx, state, R"(
+            ctx,
+            state,
+            R"(
             _ignore: throw "error message for test case nix_value_init_apply_lazy_arg"
         )",
-            "<test>", g);
+            "<test>",
+            g);
         assert_ctx_ok();
 
         nix_init_apply(ctx, e, g, g);
