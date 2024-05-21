@@ -5,12 +5,12 @@
 # Synopsis
 
 `nix-copy-closure`
-  [`--to` _machine_ | `--from` _machine_]
+  [`--to` | `--from` ]
   [`--gzip`]
   [`--include-outputs`]
   [`--use-substitutes` | `-s`]
   [`-v`]
-  _user@machine_ _paths_
+  [_user_@]_machine_[:_port_] _paths_
 
 # Description
 
@@ -27,12 +27,12 @@ When using public key authentication, you can avoid typing the passphrase with `
 
 # Options
 
-  - `--to` _machine_
+  - `--to`
 
     Copy the closure of _paths_ from a Nix store accessible from the local machine to the Nix store on the remote _machine_.
-    This is the default.
+    This is the default behavior.
 
-  - `--from` _machine_
+  - `--from`
 
     Copy the closure of _paths_ from the Nix store on the remote _machine_ to the local machine's specified Nix store.
 
