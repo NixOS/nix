@@ -71,6 +71,13 @@ EvalErrorBuilder<T>::addTrace(PosIdx pos, std::string_view formatString, const A
 }
 
 template<class T>
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::setIsFromExpr()
+{
+    error.err.isFromExpr = true;
+    return *this;
+}
+
+template<class T>
 void EvalErrorBuilder<T>::debugThrow()
 {
     error.state.runDebugRepl(&error);
@@ -85,6 +92,7 @@ void EvalErrorBuilder<T>::debugThrow()
     throw error;
 }
 
+template class EvalErrorBuilder<EvalBaseError>;
 template class EvalErrorBuilder<EvalError>;
 template class EvalErrorBuilder<AssertionError>;
 template class EvalErrorBuilder<ThrownError>;

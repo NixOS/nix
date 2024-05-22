@@ -806,7 +806,7 @@ static RegisterPrimOp primop_abort({
         NixStringContext context;
         auto s = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.abort").toOwned();
-        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).debugThrow();
+        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).setIsFromExpr().debugThrow();
     }
 });
 
@@ -825,7 +825,7 @@ static RegisterPrimOp primop_throw({
       NixStringContext context;
       auto s = state.coerceToString(pos, *args[0], context,
               "while evaluating the error message passed to builtin.throw").toOwned();
-      state.error<ThrownError>(s).debugThrow();
+      state.error<ThrownError>(s).setIsFromExpr().debugThrow();
     }
 });
 
@@ -1052,12 +1052,13 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value
         msg.atPos(state.positions[pos]);
         auto info = msg.info();
         info.level = lvlWarn;
+        info.isFromExpr = true;
         logWarning(info);
     }
 
     if (evalSettings.builtinsAbortOnWarn) {
         // Not an EvalError or subclass, which would cause the error to be stored in the eval cache.
-        state.error<Error>("aborting to reveal stack trace of warning, as abort-on-warn is set").debugThrow();
+        state.error<EvalBaseError>("aborting to reveal stack trace of warning, as abort-on-warn is set").setIsFromExpr().debugThrow();
     }
     if (evalSettings.builtinsTraceDebugger || evalSettings.builtinsDebuggerOnWarn) {
         state.runDebugRepl(nullptr);
@@ -1080,6 +1081,11 @@ static RegisterPrimOp primop_warn({
       option is set to `true` and the `--debugger` flag is given, the
       interactive debugger will be started when `warn` is called (like
       [`break`](@docroot@/language/builtins.md#builtins-break)).
+
+      If the
+      [`abort-on-warn`](@docroot@/command-ref/conf-file.md#conf-abort-on-warn)
+      option is set, the evaluation will be aborted after the warning is printed.
+      This is useful to reveal the stack trace of the warning, when the context is non-interactive and a debugger can not be launched.
     )",
     .fun = prim_warn,
 });
