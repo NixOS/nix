@@ -35,8 +35,13 @@ void PathLocks::unlock()
 AutoCloseFD openLockFile(const Path & path, bool create)
 {
     AutoCloseFD desc = CreateFileA(
-        path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-        create ? OPEN_ALWAYS : OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_POSIX_SEMANTICS, NULL);
+        path.c_str(),
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL,
+        create ? OPEN_ALWAYS : OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_POSIX_SEMANTICS,
+        NULL);
     if (desc.get() == INVALID_HANDLE_VALUE)
         warn("%s: %s", path, std::to_string(GetLastError()));
 
