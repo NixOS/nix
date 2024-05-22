@@ -49,9 +49,15 @@ StorePath::StorePath(const Hash & hash, std::string_view _name)
     checkName(baseName, name());
 }
 
-bool StorePath::isDerivation() const
+bool StorePath::isDerivation() const noexcept
 {
     return hasSuffix(name(), drvExtension);
+}
+
+void StorePath::requireDerivation() const
+{
+    if (!isDerivation())
+        throw FormatError("store path '%s' is not a valid derivation path", to_string());
 }
 
 StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");

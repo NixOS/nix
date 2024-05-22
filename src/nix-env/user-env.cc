@@ -140,6 +140,7 @@ bool createUserEnv(EvalState & state, PackageInfos & elems,
     NixStringContext context;
     auto & aDrvPath(*topLevel.attrs()->find(state.sDrvPath));
     auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context, "");
+    topLevelDrv.requireDerivation();
     auto & aOutPath(*topLevel.attrs()->find(state.sOutPath));
     auto topLevelOut = state.coerceToStorePath(aOutPath.pos, *aOutPath.value, context, "");
 

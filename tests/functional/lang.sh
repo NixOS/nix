@@ -24,6 +24,9 @@ nix-instantiate --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grepQuietIn
 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grepQuietInverse Hello
 expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' | grepQuiet Hello
 expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello %" (throw "Foo")' | grepQuiet 'Hello %'
+# Relies on parsing the expression derivation as a derivation, can't use --eval
+expectStderr 1 nix-instantiate --show-trace lang/non-eval-fail-bad-drvPath.nix | grepQuiet "store path '8qlfcic10lw5304gqm8q45nr7g7jl62b-cachix-1.7.3-bin' is not a valid derivation path"
+
 
 nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
   2>&1 | grepQuiet -E 'trace: { x = «potential infinite recursion»; }'
