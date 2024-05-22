@@ -20,7 +20,7 @@ src/libstore/globals.hh @fricklerhandwerk
 # Documentation
 doc/manual @fricklerhandwerk
 maintainers/*.md @fricklerhandwerk
-src/**/*.md
+src/**/*.md @fricklerhandwerk
 
 # Libstore layer
 /src/libstore @thufschmitt @ericson2314
