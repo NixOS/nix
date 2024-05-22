@@ -140,7 +140,7 @@ void restoreMountNamespace()
 void unshareFilesystem()
 {
     if (unshare(CLONE_FS) != 0 && errno != EPERM)
-        throw SysError("unsharing filesystem state in download thread");
+        throw SysError("unsharing filesystem state");
 }
 
 }
