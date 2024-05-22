@@ -3,25 +3,7 @@
 /** @defgroup libexpr libexpr
  * @brief Bindings to the Nix language evaluator
  *
- * Example (without error handling):
- * @code{.c}
- * int main() {
- *    nix_libexpr_init(NULL);
- *
- *    Store* store = nix_store_open(NULL, "dummy", NULL);
- *    EvalState* state = nix_state_create(NULL, NULL, store); // empty nix path
- *    Value *value = nix_alloc_value(NULL, state);
- *
- *    nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
- *    nix_value_force(NULL, state, value);
- *    printf("nix version: %s\n", nix_get_string(NULL, value));
- *
- *    nix_gc_decref(NULL, value);
- *    nix_state_free(state);
- *    nix_store_free(store);
- *    return 0;
- *    }
- * @endcode
+ * See *[Embedding the Nix Evaluator](@ref nix_evaluator_example)* for an example.
  * @{
  */
 /** @file
