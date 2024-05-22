@@ -580,7 +580,12 @@ struct curlFileTransfer : public FileTransfer
         #endif
 
         #if __linux__
-        unshareFilesystem();
+        try {
+            tryUnshareFilesystem();
+        } catch (nix::Error & e) {
+            e.addTrace({}, "in download thread");
+            throw;
+        }
         #endif
 
         std::map<CURL *, std::shared_ptr<TransferItem>> items;
