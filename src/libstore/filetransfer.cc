@@ -581,7 +581,7 @@ struct curlFileTransfer : public FileTransfer
 
         #if __linux__
         try {
-            unshareFilesystem();
+            tryUnshareFilesystem();
         } catch (nix::Error & e) {
             e.addTrace({}, "in download thread");
             throw;
