@@ -226,4 +226,35 @@ TEST_F(nix_api_expr_test, nix_expr_primop)
     ASSERT_EQ(9, r);
 }
 
+static void
+primop_bad_no_return(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret)
+{
+}
+
+TEST_F(nix_api_expr_test, nix_expr_primop_bad_no_return)
+{
+    PrimOp * primop =
+        nix_alloc_primop(ctx, primop_bad_no_return, 1, "badNoReturn", nullptr, "a broken primop", nullptr);
+    assert_ctx_ok();
+    Value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    Value * three = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_int(ctx, three, 3);
+    assert_ctx_ok();
+
+    Value * result = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, primopValue, three, result);
+    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(
+        ctx->last_err,
+        testing::Optional(
+            testing::HasSubstr("Implementation error in custom function: return value was not initialized")));
+    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badNoReturn")));
+}
+
 } // namespace nixC

@@ -94,6 +94,12 @@ static void nix_c_primop_wrapper(
         state.error<nix::EvalError>("Error from builtin function: %s", *ctx.last_err).atPos(pos).debugThrow();
     }
 
+    if (!vTmp.isValid()) {
+        state.error<nix::EvalError>("Implementation error in custom function: return value was not initialized")
+            .atPos(pos)
+            .debugThrow();
+    }
+
     v = vTmp;
 }
 
