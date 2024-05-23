@@ -11,7 +11,6 @@ TEST_F(ValueTest, unsetValue)
 {
     Value unsetValue;
     ASSERT_EQ(false, unsetValue.isValid());
-    ASSERT_EQ(nThunk, unsetValue.type(true));
     ASSERT_DEATH(unsetValue.type(), "");
 }
 

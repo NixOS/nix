@@ -2925,6 +2925,8 @@ static void prim_mapAttrs(EvalState & state, const PosIdx pos, Value * * args, V
 
     auto attrs = state.buildBindings(args[1]->attrs()->size());
 
+    //printError("MAP ATTRS %d", args[1]->attrs->size());
+
     for (auto & i : *args[1]->attrs()) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();

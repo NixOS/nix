@@ -41,6 +41,7 @@ typedef enum {
     tFloat,
     tPending,
     tAwaited,
+    tFailed,
 } InternalType;
 
 /**
@@ -189,7 +190,11 @@ public:
     Value & operator =(const Value & v)
     {
         auto type = v.internalType.load();
-        assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
+        //assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
+        if (!(type != tThunk && type != tApp && type != tPending && type != tAwaited)) {
+            printError("UNEXPECTED TYPE %x %s", this, showType(v));
+            abort();
+        }
         internalType = type;
         payload = v.payload;
         return *this;
@@ -257,6 +262,11 @@ public:
         ExprLambda * fun;
     };
 
+    struct Failed
+    {
+        std::exception_ptr ex;
+    };
+
     using Payload = union
     {
         NixInt integer;
@@ -279,6 +289,7 @@ public:
         FunctionApplicationThunk primOpApp;
         ExternalValueBase * external;
         NixFloat fpoint;
+        Failed * failed;
     };
 
     Payload payload;
@@ -300,7 +311,7 @@ public:
             case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
             case tExternal: return nExternal;
             case tFloat: return nFloat;
-            case tThunk: case tApp: case tPending: case tAwaited: return nThunk;
+            case tThunk: case tApp: case tPending: case tAwaited: case tFailed: return nThunk;
             case tUninitialized:
             default:
                 abort();
@@ -447,6 +458,11 @@ public:
     inline void mkFloat(NixFloat n)
     {
         finishValue(tFloat, { .fpoint = n });
+    }
+
+    void mkFailed()
+    {
+        finishValue(tFailed, { .failed = new Value::Failed { .ex = std::current_exception() } });
     }
 
     bool isList() const

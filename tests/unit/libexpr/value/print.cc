@@ -10,7 +10,7 @@ using namespace testing;
 struct ValuePrintingTests : LibExprTest
 {
     template<class... A>
-    void test(Value v, std::string_view expected, A... args)
+    void test(Value & v, std::string_view expected, A... args)
     {
         std::stringstream out;
         v.print(state, out, args...);

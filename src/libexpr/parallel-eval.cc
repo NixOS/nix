@@ -2,28 +2,77 @@
 
 namespace nix {
 
-void EvalState::waitOnPendingThunk(Value & v)
+struct WaiterDomain
 {
-    /* Mark this value as being waited on. */
-    auto type = tPending;
-    if (!v.internalType.compare_exchange_strong(type, tAwaited)) {
+    std::condition_variable cv;
+};
+
+static std::array<Sync<WaiterDomain>, 128> waiterDomains;
+
+static Sync<WaiterDomain> & getWaiterDomain(Value & v)
+{
+    auto domain = std::hash<Value *>{}(&v) % waiterDomains.size();
+    printError("HASH %x -> %d %d", &v, domain, std::hash<Value *>{}(&v));
+    return waiterDomains[domain];
+}
+
+void EvalState::waitOnThunk(Value & v, bool awaited)
+{
+    auto domain = getWaiterDomain(v).lock();
+
+    if (awaited) {
+        /* Make sure that the value is still awaited, now that we're
+           holding the domain lock. */
+        auto type = v.internalType.load();
+
         /* If the value has been finalized in the meantime (i.e is no
            longer pending), we're done. */
         if (type != tAwaited) {
-            printError("VALUE DONE RIGHT AWAY");
+            printError("VALUE DONE RIGHT AWAY 2 %x", &v);
             assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
             return;
         }
-        /* The value was already in the "waited on" state, so we're
-           not the only thread waiting on it. */
+    } else {
+        /* Mark this value as being waited on. */
+        auto type = tPending;
+        if (!v.internalType.compare_exchange_strong(type, tAwaited)) {
+            /* If the value has been finalized in the meantime (i.e is
+               no longer pending), we're done. */
+            if (type != tAwaited) {
+                printError("VALUE DONE RIGHT AWAY %x", &v);
+                assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
+                return;
+            }
+            /* The value was already in the "waited on" state, so we're
+               not the only thread waiting on it. */
+            printError("ALREADY AWAITED %x", &v);
+        } else
+            printError("PENDING -> AWAITED %x", &v);
     }
 
     printError("AWAIT %x", &v);
+
+    while (true) {
+        domain.wait(domain->cv);
+        printError("WAKEUP %x", &v);
+        auto type = v.internalType.load();
+        if (type != tAwaited) {
+            if (type == tFailed)
+                std::rethrow_exception(v.payload.failed->ex);
+            assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
+            return;
+        }
+        printError("SPURIOUS %s", &v);
+    }
 }
 
 void Value::notifyWaiters()
 {
     printError("NOTIFY %x", this);
+
+    auto domain = getWaiterDomain(*this).lock();
+
+    domain->cv.notify_all(); // FIXME
 }
 
 }

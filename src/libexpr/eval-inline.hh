@@ -87,11 +87,16 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
     auto type = v.internalType.load();
 
     if (type == tThunk) {
-        if (!v.internalType.compare_exchange_strong(type, tPending))
-            throw Error("RACE");
-        Env * env = v.payload.thunk.env;
-        Expr * expr = v.payload.thunk.expr;
-        expr->eval(*this, *env, v);
+        try {
+            if (!v.internalType.compare_exchange_strong(type, tPending))
+                abort();
+            Env * env = v.payload.thunk.env;
+            Expr * expr = v.payload.thunk.expr;
+            expr->eval(*this, *env, v);
+        } catch (...) {
+            v.mkFailed();
+            throw;
+        }
     }
     #if 0
     if (v.isThunk()) {
@@ -106,11 +111,26 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
         }
     }
     #endif
-    else if (type == tApp)
-        // FIXME: mark as pending
-        callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
-    else if (type == tPending)
-        waitOnPendingThunk(v);
+    else if (type == tApp) {
+        try {
+            if (!v.internalType.compare_exchange_strong(type, tPending))
+                abort();
+            callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
+        } catch (...) {
+            v.mkFailed();
+            throw;
+        }
+    }
+    else if (type == tPending || type == tAwaited)
+        waitOnThunk(v, type == tAwaited);
+    else if (type == tFailed)
+        std::rethrow_exception(v.payload.failed->ex);
+
+    auto type2 = v.internalType.load();
+    if (!(type2 != tThunk && type2 != tApp && type2 != tPending && type2 != tAwaited)) {
+        printError("THUNK NOT FORCED %x %s %d", this, showType(v), type);
+        abort();
+    }
 }
 
 

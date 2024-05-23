@@ -451,10 +451,10 @@ public:
     inline void forceValue(Value & v, const PosIdx pos);
 
     /**
-     * Given a thunk that was observed to be in the pending state,
-     * wait for it to finish.
+     * Given a thunk that was observed to be in the pending or awaited
+     * state, wait for it to finish.
      */
-    void waitOnPendingThunk(Value & v);
+    void waitOnThunk(Value & v, bool awaited);
 
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
 

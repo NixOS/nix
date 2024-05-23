@@ -1468,7 +1468,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             if (state.countCalls) state.attrSelects[pos2]++;
         }
 
-        state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos ) );
+        state.forceValue(*vAttrs, pos2 ? pos2 : this->pos);
 
     } catch (Error & e) {
         if (pos2) {
