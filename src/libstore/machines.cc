@@ -131,7 +131,7 @@ static std::vector<std::string> expandBuilderLines(const std::string & builders)
     return result;
 }
 
-static Machine parseBuilderLine(const std::string & line)
+static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, const std::string & line)
 {
     const auto tokens = tokenizeString<std::vector<std::string>>(line);
 
@@ -170,7 +170,7 @@ static Machine parseBuilderLine(const std::string & line)
 
     return {
         tokens[0],
-        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : std::set<std::string>{settings.thisSystem},
+        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : defaultSystems,
         isSet(2) ? tokens[2] : "",
         isSet(3) ? parseUnsignedIntField(3) : 1U,
         isSet(4) ? parseFloatField(4) : 1.0f,
@@ -180,17 +180,24 @@ static Machine parseBuilderLine(const std::string & line)
     };
 }
 
-static Machines parseBuilderLines(const std::vector<std::string> & builders)
+static Machines parseBuilderLines(const std::set<std::string> & defaultSystems, const std::vector<std::string> & builders)
 {
     Machines result;
-    std::transform(builders.begin(), builders.end(), std::back_inserter(result), parseBuilderLine);
+    std::transform(
+        builders.begin(), builders.end(), std::back_inserter(result),
+        [&](auto && line) { return parseBuilderLine(defaultSystems, line); });
     return result;
+}
+
+Machines Machine::parseConfig(const std::set<std::string> & defaultSystems, const std::string & s)
+{
+    const auto builderLines = expandBuilderLines(s);
+    return parseBuilderLines(defaultSystems, builderLines);
 }
 
 Machines getMachines()
 {
-    const auto builderLines = expandBuilderLines(settings.builders);
-    return parseBuilderLines(builderLines);
+    return Machine::parseConfig({settings.thisSystem}, settings.builders);
 }
 
 }
