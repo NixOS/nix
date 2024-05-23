@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "worker-protocol.hh"
+#include "worker-protocol-connection.hh"
 #include "worker-protocol-impl.hh"
 #include "derived-path.hh"
 #include "build-result.hh"
@@ -18,9 +19,9 @@ struct WorkerProtoTest : VersionedProtoTest<WorkerProto, workerProtoDir>
 {
     /**
      * For serializers that don't care about the minimum version, we
-     * used the oldest one: 1.0.
+     * used the oldest one: 1.10.
      */
-    WorkerProto::Version defaultVersion = 1 << 8 | 0;
+    WorkerProto::Version defaultVersion = 1 << 8 | 10;
 };
 
 
@@ -590,5 +591,153 @@ VERSIONED_CHARACTERIZATION_TEST(
             },
         },
     }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    clientHandshakeInfo_1_30,
+    "client-handshake-info_1_30",
+    1 << 8 | 30,
+    (std::tuple<WorkerProto::ClientHandshakeInfo> {
+        {},
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    clientHandshakeInfo_1_33,
+    "client-handshake-info_1_33",
+    1 << 8 | 33,
+    (std::tuple<WorkerProto::ClientHandshakeInfo, WorkerProto::ClientHandshakeInfo> {
+        {
+            .daemonNixVersion = std::optional { "foo" },
+        },
+        {
+            .daemonNixVersion = std::optional { "bar" },
+        },
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    clientHandshakeInfo_1_35,
+    "client-handshake-info_1_35",
+    1 << 8 | 35,
+    (std::tuple<WorkerProto::ClientHandshakeInfo, WorkerProto::ClientHandshakeInfo> {
+        {
+            .daemonNixVersion = std::optional { "foo" },
+            .remoteTrustsUs = std::optional { NotTrusted },
+        },
+        {
+            .daemonNixVersion = std::optional { "bar" },
+            .remoteTrustsUs = std::optional { Trusted },
+        },
+    }))
+
+TEST_F(WorkerProtoTest, handshake_log)
+{
+    CharacterizationTest::writeTest("handshake-to-client", [&]() -> std::string {
+        StringSink toClientLog;
+
+        Pipe toClient, toServer;
+        toClient.create();
+        toServer.create();
+
+        WorkerProto::Version clientResult;
+
+        auto thread = std::thread([&]() {
+            FdSink out { toServer.writeSide.get() };
+            FdSource in0 { toClient.readSide.get() };
+            TeeSource in { in0, toClientLog };
+            clientResult = WorkerProto::BasicClientConnection::handshake(
+                out, in, defaultVersion);
+        });
+
+        {
+            FdSink out { toClient.writeSide.get() };
+            FdSource in { toServer.readSide.get() };
+            WorkerProto::BasicServerConnection::handshake(
+                out, in, defaultVersion);
+        };
+
+        thread.join();
+
+        return std::move(toClientLog.s);
+    });
+}
+
+/// Has to be a `BufferedSink` for handshake.
+struct NullBufferedSink : BufferedSink {
+    void writeUnbuffered(std::string_view data) override { }
+};
+
+TEST_F(WorkerProtoTest, handshake_client_replay)
+{
+    CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
+        NullBufferedSink nullSink;
+
+        StringSource in { toClientLog };
+        auto clientResult = WorkerProto::BasicClientConnection::handshake(
+            nullSink, in, defaultVersion);
+
+        EXPECT_EQ(clientResult, defaultVersion);
+    });
+}
+
+TEST_F(WorkerProtoTest, handshake_client_truncated_replay_throws)
+{
+    CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
+        for (size_t len = 0; len < toClientLog.size(); ++len) {
+            NullBufferedSink nullSink;
+            StringSource in {
+                // truncate
+                toClientLog.substr(0, len)
+            };
+            if (len < 8) {
+                EXPECT_THROW(
+                    WorkerProto::BasicClientConnection::handshake(
+                        nullSink, in, defaultVersion),
+                    EndOfFile);
+            } else {
+                // Not sure why cannot keep on checking for `EndOfFile`.
+                EXPECT_THROW(
+                    WorkerProto::BasicClientConnection::handshake(
+                        nullSink, in, defaultVersion),
+                    Error);
+            }
+        }
+    });
+}
+
+TEST_F(WorkerProtoTest, handshake_client_corrupted_throws)
+{
+    CharacterizationTest::readTest("handshake-to-client", [&](const std::string toClientLog) {
+        for (size_t idx = 0; idx < toClientLog.size(); ++idx) {
+            // corrupt a copy
+            std::string toClientLogCorrupt = toClientLog;
+            toClientLogCorrupt[idx] *= 4;
+            ++toClientLogCorrupt[idx];
+
+            NullBufferedSink nullSink;
+            StringSource in { toClientLogCorrupt };
+
+            if (idx < 4 || idx == 9) {
+                // magic bytes don't match
+                EXPECT_THROW(
+                    WorkerProto::BasicClientConnection::handshake(
+                        nullSink, in, defaultVersion),
+                    Error);
+            } else if (idx < 8 || idx >= 12) {
+                // Number out of bounds
+                EXPECT_THROW(
+                    WorkerProto::BasicClientConnection::handshake(
+                        nullSink, in, defaultVersion),
+                    SerialisationError);
+            } else {
+                auto ver = WorkerProto::BasicClientConnection::handshake(
+                    nullSink, in, defaultVersion);
+                // `std::min` of this and the other version saves us
+                EXPECT_EQ(ver, defaultVersion);
+            }
+        }
+    });
+}
 
 }

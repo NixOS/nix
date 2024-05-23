@@ -7,6 +7,7 @@
 #include "local-fs-store.hh"
 #include "log-store.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-connection.hh"
 #include "serve-protocol-impl.hh"
 #include "shared.hh"
 #include "graphml.hh"

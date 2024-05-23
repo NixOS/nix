@@ -1,6 +1,7 @@
 #include "daemon.hh"
 #include "signals.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-connection.hh"
 #include "worker-protocol-impl.hh"
 #include "build-result.hh"
 #include "store-api.hh"
@@ -1026,11 +1027,9 @@ void processConnection(
 #endif
 
     /* Exchange the greeting. */
-    unsigned int magic = readInt(from);
-    if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
-    to << WORKER_MAGIC_2 << PROTOCOL_VERSION;
-    to.flush();
-    WorkerProto::Version clientVersion = readInt(from);
+    WorkerProto::Version clientVersion =
+        WorkerProto::BasicServerConnection::handshake(
+            to, from, PROTOCOL_VERSION);
 
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
@@ -1048,29 +1047,20 @@ void processConnection(
         printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
-        // Obsolete CPU affinity.
-        readInt(from);
-    }
+    WorkerProto::BasicServerConnection conn {
+        .to = to,
+        .from = from,
+        .clientVersion = clientVersion,
+    };
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
-        readInt(from); // obsolete reserveSpace
-
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
-        to << nixVersion;
-
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 35) {
+    conn.postHandshake(*store, {
+        .daemonNixVersion = nixVersion,
         // We and the underlying store both need to trust the client for
         // it to be trusted.
-        auto temp = trusted
+        .remoteTrustsUs = trusted
             ? store->isTrustedClient()
-            : std::optional { NotTrusted };
-        WorkerProto::WriteConn wconn {
-            .to = to,
-            .version = clientVersion,
-        };
-        WorkerProto::write(*store, wconn, temp);
-    }
+            : std::optional { NotTrusted },
+    });
 
     /* Send startup error messages to the client. */
     tunnelLogger->startWork();
