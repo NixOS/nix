@@ -31,3 +31,8 @@ libstore-tests_LIBS = \
     libstore libstorec libutil libutilc
 
 libstore-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
+
+ifdef HOST_WINDOWS
+  # Increase the default reserved stack size to 65 MB so Nix doesn't run out of space
+  libstore-tests_LDFLAGS += -Wl,--stack,$(shell echo $$((65 * 1024 * 1024)))
+endif

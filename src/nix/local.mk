@@ -30,6 +30,11 @@ nix_LIBS = libexpr libmain libfetchers libstore libutil libcmd
 
 nix_LDFLAGS = $(THREAD_LDFLAGS) $(SODIUM_LIBS) $(EDITLINE_LIBS) $(BOOST_LDFLAGS) $(LOWDOWN_LIBS)
 
+ifdef HOST_WINDOWS
+  # Increase the default reserved stack size to 65 MB so Nix doesn't run out of space
+  nix_LDFLAGS += -Wl,--stack,$(shell echo $$((65 * 1024 * 1024)))
+endif
+
 $(foreach name, \
   nix-build nix-channel nix-collect-garbage nix-copy-closure nix-daemon nix-env nix-hash nix-instantiate nix-prefetch-url nix-shell nix-store, \
   $(eval $(call install-symlink, nix, $(bindir)/$(name))))
