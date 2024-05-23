@@ -373,14 +373,9 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
     nix_init_int(ctx, four, 4);
     assert_ctx_ok();
 
-    Value * partial = nix_alloc_value(ctx, state);
-    assert_ctx_ok();
-    nix_value_call(ctx, state, primopValue, toString, partial);
-    assert_ctx_ok();
-
     Value * result = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_value_call(ctx, state, partial, four, result);
+    NIX_VALUE_CALL(ctx, state, result, primopValue, toString, four);
 
     ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
     ASSERT_THAT(
