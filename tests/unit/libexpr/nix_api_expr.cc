@@ -191,4 +191,39 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
     nix_realised_string_free(r);
 }
 
+const char * SAMPLE_USER_DATA = "whatever";
+
+static void primop_square(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret)
+{
+    assert(context);
+    assert(state);
+    assert(user_data == SAMPLE_USER_DATA);
+    auto i = nix_get_int(context, args[0]);
+    nix_init_int(context, ret, i * i);
+}
+
+TEST_F(nix_api_expr_test, nix_expr_primop)
+{
+    PrimOp * primop =
+        nix_alloc_primop(ctx, primop_square, 1, "square", nullptr, "square an integer", (void *) SAMPLE_USER_DATA);
+    assert_ctx_ok();
+    Value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    Value * three = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_int(ctx, three, 3);
+    assert_ctx_ok();
+
+    Value * result = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, primopValue, three, result);
+    assert_ctx_ok();
+
+    auto r = nix_get_int(ctx, result);
+    ASSERT_EQ(9, r);
+}
+
 } // namespace nixC

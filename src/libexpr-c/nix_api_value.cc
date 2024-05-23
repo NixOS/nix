@@ -73,10 +73,28 @@ static void nix_c_primop_wrapper(
     PrimOpFun f, void * userdata, nix::EvalState & state, const nix::PosIdx pos, nix::Value ** args, nix::Value & v)
 {
     nix_c_context ctx;
-    f(userdata, &ctx, (EvalState *) &state, (Value **) args, (Value *) &v);
-    /* TODO: In the future, this should throw different errors depending on the error code */
-    if (ctx.last_err_code != NIX_OK)
+
+    // v currently has a thunk, but the C API initializers require an uninitialized value.
+    //
+    // We can't destroy the thunk, because that makes it impossible to retry,
+    // which is needed for tryEval and for evaluation drivers that evaluate more
+    // than one value (e.g. an attrset with two derivations, both of which
+    // reference v).
+    //
+    // Instead we create a temporary value, and then assign the result to v.
+    // This does not give the primop definition access to the thunk, but that's
+    // ok because we don't see a need for this yet (e.g. inspecting thunks,
+    // or maybe something to make blackholes work better; we don't know).
+    nix::Value vTmp;
+
+    f(userdata, &ctx, (EvalState *) &state, (Value **) args, (Value *) &vTmp);
+
+    if (ctx.last_err_code != NIX_OK) {
+        /* TODO: Throw different errors depending on the error code */
         state.error<nix::EvalError>("Error from builtin function: %s", *ctx.last_err).atPos(pos).debugThrow();
+    }
+
+    v = vTmp;
 }
 
 PrimOp * nix_alloc_primop(
