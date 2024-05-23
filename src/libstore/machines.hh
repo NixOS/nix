@@ -8,6 +8,10 @@ namespace nix {
 
 class Store;
 
+struct Machine;
+
+typedef std::vector<Machine> Machines;
+
 struct Machine {
 
     const StoreReference storeUri;
@@ -63,12 +67,22 @@ struct Machine {
      * ```
      */
     ref<Store> openStore() const;
+
+    /**
+     * Parse a machine configuration.
+     *
+     * Every machine is specified on its own line, and lines beginning
+     * with `@` are interpreted as paths to other configuration files in
+     * the same format.
+     */
+    static Machines parseConfig(const std::set<std::string> & defaultSystems, const std::string & config);
 };
 
-typedef std::vector<Machine> Machines;
-
-void parseMachines(const std::string & s, Machines & machines);
-
+/**
+ * Parse machines from the global config
+ *
+ * @todo Remove, globals are bad.
+ */
 Machines getMachines();
 
 }
