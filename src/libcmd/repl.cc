@@ -304,6 +304,8 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             // Quietly ignore evaluation errors.
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
+        } catch (FileNotFound & e) {
+            // Quietly ignore non-existent file beeing `import`-ed.
         }
     }
 
