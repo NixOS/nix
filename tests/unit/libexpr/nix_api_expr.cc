@@ -250,7 +250,7 @@ static void primop_repeat(void * user_data, nix_c_context * context, EvalState *
     nix_init_string(context, ret, result.c_str());
 }
 
-TEST_F(nix_api_expr_test, nix_expr_primop_arity_2)
+TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_multiple_calls)
 {
     PrimOp * primop =
         nix_alloc_primop(ctx, primop_repeat, 2, "repeat", nullptr, "repeat a string", (void *) SAMPLE_USER_DATA);
@@ -282,6 +282,38 @@ TEST_F(nix_api_expr_test, nix_expr_primop_arity_2)
 
     std::string r;
     nix_get_string(ctx, result, OBSERVE_STRING(r));
+    ASSERT_STREQ("hellohellohello", r.c_str());
+}
+
+TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_single_call)
+{
+    PrimOp * primop =
+        nix_alloc_primop(ctx, primop_repeat, 2, "repeat", nullptr, "repeat a string", (void *) SAMPLE_USER_DATA);
+    assert_ctx_ok();
+    Value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    Value * hello = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_string(ctx, hello, "hello");
+    assert_ctx_ok();
+
+    Value * three = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_int(ctx, three, 3);
+    assert_ctx_ok();
+
+    Value * result = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    NIX_VALUE_CALL(ctx, state, result, primopValue, hello, three);
+    assert_ctx_ok();
+
+    std::string r;
+    nix_get_string(ctx, result, OBSERVE_STRING(r));
+    assert_ctx_ok();
+
     ASSERT_STREQ("hellohellohello", r.c_str());
 }
 
@@ -356,5 +388,20 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
         testing::Optional(
             testing::HasSubstr("Implementation error in custom function: return value must not be a thunk")));
     ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badReturnThunk")));
+}
+
+TEST_F(nix_api_expr_test, nix_value_call_multi_no_args)
+{
+    Value * n = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, n, 3);
+    assert_ctx_ok();
+
+    Value * r = nix_alloc_value(ctx, state);
+    nix_value_call_multi(ctx, state, n, 0, nullptr, r);
+    assert_ctx_ok();
+
+    auto rInt = nix_get_int(ctx, r);
+    assert_ctx_ok();
+    ASSERT_EQ(3, rInt);
 }
 } // namespace nixC

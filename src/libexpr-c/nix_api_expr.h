@@ -12,6 +12,7 @@
 
 #include "nix_api_store.h"
 #include "nix_api_util.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,6 +80,46 @@ nix_err nix_expr_eval_from_string(
  *      Note the different argument order.
  */
 nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, Value * arg, Value * value);
+
+/**
+ * @brief Calls a Nix function with multiple arguments.
+ *
+ * Technically these are functions that return functions. It is common for Nix
+ * functions to be curried, so this function is useful for calling them.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The state of the evaluation.
+ * @param[in] fn The Nix function to call.
+ * @param[in] nargs The number of arguments.
+ * @param[in] args The arguments to pass to the function.
+ * @param[out] value The result of the function call.
+ *
+ * @see nix_value_call     For the single argument primitive.
+ * @see NIX_VALUE_CALL           For a macro that wraps this function for convenience.
+ */
+nix_err nix_value_call_multi(
+    nix_c_context * context, EvalState * state, Value * fn, size_t nargs, Value ** args, Value * value);
+
+/**
+ * @brief Calls a Nix function with multiple arguments.
+ *
+ * Technically these are functions that return functions. It is common for Nix
+ * functions to be curried, so this function is useful for calling them.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The state of the evaluation.
+ * @param[out] value The result of the function call.
+ * @param[in] fn The Nix function to call.
+ * @param[in] args The arguments to pass to the function.
+ *
+ * @see nix_value_call_multi
+ */
+#define NIX_VALUE_CALL(context, state, value, fn, ...)                  \
+  do {                                                                  \
+    Value * args_array[] = {__VA_ARGS__};                               \
+    size_t nargs = sizeof(args_array) / sizeof(args_array[0]);          \
+    nix_value_call_multi(context, state, fn, nargs, args_array, value); \
+  } while (0)
 
 /**
  * @brief Forces the evaluation of a Nix value.
