@@ -100,6 +100,15 @@ static void nix_c_primop_wrapper(
             .debugThrow();
     }
 
+    if (vTmp.type() == nix::nThunk) {
+        // We might allow this in the future if it makes sense for the evaluator
+        // e.g. implementing tail recursion by returning a thunk to the next
+        // "iteration". Until then, this is most likely a mistake or misunderstanding.
+        state.error<nix::EvalError>("Implementation error in custom function: return value must not be a thunk")
+            .atPos(pos)
+            .debugThrow();
+    }
+
     v = vTmp;
 }
 

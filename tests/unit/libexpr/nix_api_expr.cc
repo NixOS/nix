@@ -257,4 +257,45 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_no_return)
     ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badNoReturn")));
 }
 
+static void
+primop_bad_return_thunk(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret)
+{
+    nix_init_apply(context, ret, args[0], args[1]);
+}
+TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
+{
+    PrimOp * primop =
+        nix_alloc_primop(ctx, primop_bad_return_thunk, 2, "badReturnThunk", nullptr, "a broken primop", nullptr);
+    assert_ctx_ok();
+    Value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    Value * toString = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_expr_eval_from_string(ctx, state, "builtins.toString", ".", toString);
+    assert_ctx_ok();
+
+    Value * four = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_int(ctx, four, 4);
+    assert_ctx_ok();
+
+    Value * partial = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, primopValue, toString, partial);
+    assert_ctx_ok();
+
+    Value * result = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, partial, four, result);
+
+    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(
+        ctx->last_err,
+        testing::Optional(
+            testing::HasSubstr("Implementation error in custom function: return value must not be a thunk")));
+    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badReturnThunk")));
+}
 } // namespace nixC
