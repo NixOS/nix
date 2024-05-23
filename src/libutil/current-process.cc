@@ -82,19 +82,23 @@ void setStackSize(size_t stackSize)
         }
     }
     #else
+    ULONG_PTR stackLow, stackHigh;
+    GetCurrentThreadStackLimits(&stackLow, &stackHigh);
+    ULONG maxStackSize = stackHigh - stackLow;
     ULONG currStackSize = 0;
     // This retrieves the current promised stack size
     SetThreadStackGuarantee(&currStackSize);
     if (currStackSize < stackSize) {
         savedStackSize = currStackSize;
-        ULONG newStackSize = stackSize;
+        ULONG newStackSize = std::min(static_cast<ULONG>(stackSize), maxStackSize);
         if (SetThreadStackGuarantee(&newStackSize) == 0) {
             logger->log(
                 lvlError,
                 HintFmt(
-                    "Failed to increase stack size from %1% to %2%: %3%",
+                    "Failed to increase stack size from %1% to %2% (maximum allowed stack size: %3%): %4%",
                     savedStackSize,
                     stackSize,
+                    maxStackSize,
                     std::to_string(GetLastError())
                 ).str()
             );
