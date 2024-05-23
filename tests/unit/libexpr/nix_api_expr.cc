@@ -226,6 +226,65 @@ TEST_F(nix_api_expr_test, nix_expr_primop)
     ASSERT_EQ(9, r);
 }
 
+static void primop_repeat(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret)
+{
+    assert(context);
+    assert(state);
+    assert(user_data == SAMPLE_USER_DATA);
+
+    // Get the string to repeat
+    std::string s;
+    if (nix_get_string(context, args[0], OBSERVE_STRING(s)) != NIX_OK)
+        return;
+
+    // Get the number of times to repeat
+    auto n = nix_get_int(context, args[1]);
+    if (nix_err_code(context) != NIX_OK)
+        return;
+
+    // Repeat the string
+    std::string result;
+    for (int i = 0; i < n; ++i)
+        result += s;
+
+    nix_init_string(context, ret, result.c_str());
+}
+
+TEST_F(nix_api_expr_test, nix_expr_primop_arity_2)
+{
+    PrimOp * primop =
+        nix_alloc_primop(ctx, primop_repeat, 2, "repeat", nullptr, "repeat a string", (void *) SAMPLE_USER_DATA);
+    assert_ctx_ok();
+    Value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    Value * hello = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_string(ctx, hello, "hello");
+    assert_ctx_ok();
+
+    Value * three = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_int(ctx, three, 3);
+    assert_ctx_ok();
+
+    Value * partial = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, primopValue, hello, partial);
+    assert_ctx_ok();
+
+    Value * result = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, partial, three, result);
+    assert_ctx_ok();
+
+    std::string r;
+    nix_get_string(ctx, result, OBSERVE_STRING(r));
+    ASSERT_STREQ("hellohellohello", r.c_str());
+}
+
 static void
 primop_bad_no_return(void * user_data, nix_c_context * context, EvalState * state, Value ** args, Value * ret)
 {
