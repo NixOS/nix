@@ -91,7 +91,7 @@ static void nix_c_primop_wrapper(
 
     if (ctx.last_err_code != NIX_OK) {
         /* TODO: Throw different errors depending on the error code */
-        state.error<nix::EvalError>("Error from builtin function: %s", *ctx.last_err).atPos(pos).debugThrow();
+        state.error<nix::EvalError>("Error from custom function: %s", *ctx.last_err).atPos(pos).debugThrow();
     }
 
     if (!vTmp.isValid()) {
