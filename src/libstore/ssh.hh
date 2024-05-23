@@ -17,7 +17,7 @@ private:
     const std::string sshPublicHostKey;
     const bool useMaster;
     const bool compress;
-    const int logFD;
+    const Descriptor logFD;
 
     struct State
     {
@@ -43,7 +43,7 @@ public:
         std::string_view host,
         std::string_view keyFile,
         std::string_view sshPublicHostKey,
-        bool useMaster, bool compress, int logFD = -1);
+        bool useMaster, bool compress, Descriptor logFD = INVALID_DESCRIPTOR);
 
     struct Connection
     {

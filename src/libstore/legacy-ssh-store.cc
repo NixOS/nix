@@ -32,32 +32,19 @@ LegacySSHStore::LegacySSHStore(
     std::string_view scheme,
     std::string_view host,
     const Params & params)
-    : LegacySSHStore{scheme, LegacySSHStoreConfig::extractConnStr(scheme, host), params}
-{
-}
-
-LegacySSHStore::LegacySSHStore(
-    std::string_view scheme,
-    std::string host,
-    const Params & params)
     : StoreConfig(params)
-    , CommonSSHStoreConfig(params)
+    , CommonSSHStoreConfig(scheme, host, params)
     , LegacySSHStoreConfig(params)
     , Store(params)
-    , host(host)
     , connections(make_ref<Pool<Connection>>(
         std::max(1, (int) maxConnections),
         [this]() { return openConnection(); },
         [](const ref<Connection> & r) { return r->good; }
         ))
-    , master(
-        host,
-        sshKey.get(),
-        sshPublicHostKey.get(),
+    , master(createSSHMaster(
         // Use SSH master only if using more than 1 connection.
         connections->capacity() > 1,
-        compress,
-        logFD)
+        logFD))
 {
 }
 

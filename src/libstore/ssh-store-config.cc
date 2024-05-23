@@ -1,10 +1,11 @@
 #include <regex>
 
 #include "ssh-store-config.hh"
+#include "ssh.hh"
 
 namespace nix {
 
-std::string CommonSSHStoreConfig::extractConnStr(std::string_view scheme, std::string_view _connStr)
+static std::string extractConnStr(std::string_view scheme, std::string_view _connStr)
 {
     if (_connStr.empty())
         throw UsageError("`%s` store requires a valid SSH host as the authority part in Store URI", scheme);
@@ -19,6 +20,24 @@ std::string CommonSSHStoreConfig::extractConnStr(std::string_view scheme, std::s
     }
 
     return connStr;
+}
+
+CommonSSHStoreConfig::CommonSSHStoreConfig(std::string_view scheme, std::string_view host, const Params & params)
+    : StoreConfig(params)
+    , host(extractConnStr(scheme, host))
+{
+}
+
+SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD)
+{
+    return {
+        host,
+        sshKey.get(),
+        sshPublicHostKey.get(),
+        useMaster,
+        compress,
+        logFD,
+    };
 }
 
 }
