@@ -753,6 +753,7 @@ StorePath AttrCursor::forceDerivation()
 {
     auto aDrvPath = getAttr(root->state.sDrvPath, true);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
+    drvPath.requireDerivation();
     if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has
            been garbage-collected. So force it to be regenerated. */

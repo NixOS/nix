@@ -35,30 +35,23 @@ public:
 
     StorePath(const Hash & hash, std::string_view name);
 
-    std::string_view to_string() const
+    std::string_view to_string() const noexcept
     {
         return baseName;
     }
 
-    bool operator < (const StorePath & other) const
-    {
-        return baseName < other.baseName;
-    }
-
-    bool operator == (const StorePath & other) const
-    {
-        return baseName == other.baseName;
-    }
-
-    bool operator != (const StorePath & other) const
-    {
-        return baseName != other.baseName;
-    }
+    bool operator == (const StorePath & other) const noexcept = default;
+    auto operator <=> (const StorePath & other) const noexcept = default;
 
     /**
      * Check whether a file name ends with the extension for derivations.
      */
-    bool isDerivation() const;
+    bool isDerivation() const noexcept;
+
+    /**
+     * Throw an exception if `isDerivation` is false.
+     */
+    void requireDerivation() const;
 
     std::string_view name() const
     {
@@ -82,7 +75,7 @@ typedef std::vector<StorePath> StorePaths;
  * The file extension of \ref Derivation derivations when serialized
  * into store objects.
  */
-const std::string drvExtension = ".drv";
+constexpr std::string_view drvExtension = ".drv";
 
 }
 

@@ -930,10 +930,9 @@ DerivationOutputsAndOptPaths BasicDerivation::outputsAndOptPaths(const StoreDirC
 
 std::string_view BasicDerivation::nameFromPath(const StorePath & drvPath)
 {
+    drvPath.requireDerivation();
     auto nameWithSuffix = drvPath.name();
-    constexpr std::string_view extension = ".drv";
-    assert(hasSuffix(nameWithSuffix, extension));
-    nameWithSuffix.remove_suffix(extension.size());
+    nameWithSuffix.remove_suffix(drvExtension.size());
     return nameWithSuffix;
 }
 
