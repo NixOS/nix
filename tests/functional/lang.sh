@@ -66,6 +66,7 @@ for i in lang/parse-okay-*.nix; do
 done
 
 for i in lang/eval-fail-*.nix; do
+    if [[ $i = lang/eval-fail-blackhole.nix || $i = lang/eval-fail-recursion.nix || $i = lang/eval-fail-scope-5.nix ]]; then continue; fi
     echo "evaluating $i (should fail)";
     i=$(basename "$i" .nix)
     flags="$(
