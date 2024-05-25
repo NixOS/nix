@@ -27,6 +27,11 @@ libutil-tests_LIBS = libutil-test-support libutil libutilc
 
 libutil-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
 
+ifdef HOST_WINDOWS
+  # Increase the default reserved stack size to 65 MB so Nix doesn't run out of space
+  libutil-tests_LDFLAGS += -Wl,--stack,$(shell echo $$((65 * 1024 * 1024)))
+endif
+
 check: $(d)/data/git/check-data.sh.test
 
 $(eval $(call run-test,$(d)/data/git/check-data.sh))
