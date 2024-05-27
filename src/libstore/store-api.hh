@@ -92,7 +92,7 @@ enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 const uint32_t exportMagic = 0x4558494e;
 
 
-enum BuildMode { bmNormal, bmRepair, bmCheck };
+enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
 enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;

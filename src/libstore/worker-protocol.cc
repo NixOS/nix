@@ -14,6 +14,34 @@ namespace nix {
 
 /* protocol-specific definitions */
 
+BuildMode WorkerProto::Serialise<BuildMode>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto temp = readNum<uint8_t>(conn.from);
+    switch (temp) {
+    case 0: return bmNormal;
+    case 1: return bmRepair;
+    case 2: return bmCheck;
+    default: throw Error("Invalid build mode");
+    }
+}
+
+void WorkerProto::Serialise<BuildMode>::write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const BuildMode & buildMode)
+{
+    switch (buildMode) {
+    case bmNormal:
+        conn.to << uint8_t{0};
+        break;
+    case bmRepair:
+        conn.to << uint8_t{1};
+        break;
+    case bmCheck:
+        conn.to << uint8_t{2};
+        break;
+    default:
+        assert(false);
+    };
+}
+
 std::optional<TrustedFlag> WorkerProto::Serialise<std::optional<TrustedFlag>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto temp = readNum<uint8_t>(conn.from);

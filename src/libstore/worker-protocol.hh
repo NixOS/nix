@@ -35,6 +35,7 @@ struct BuildResult;
 struct KeyedBuildResult;
 struct ValidPathInfo;
 struct UnkeyedValidPathInfo;
+enum BuildMode : uint8_t;
 enum TrustedFlag : bool;
 
 
@@ -214,6 +215,8 @@ template<>
 DECLARE_WORKER_SERIALISER(ValidPathInfo);
 template<>
 DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
+template<>
+DECLARE_WORKER_SERIALISER(BuildMode);
 template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
 template<>
