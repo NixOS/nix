@@ -16,16 +16,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifdef __APPLE__
-# include <sys/syscall.h>
-#endif
-
-#ifdef __linux__
-# include <sys/prctl.h>
-# include <sys/mman.h>
-#endif
-
-
 namespace nix {
 
 std::string runProgram(Path program, bool lookupPath, const Strings & args,
@@ -34,15 +24,31 @@ std::string runProgram(Path program, bool lookupPath, const Strings & args,
     throw UnimplementedError("Cannot shell out to git on Windows yet");
 }
 
+
 // Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(RunOptions && options)
 {
     throw UnimplementedError("Cannot shell out to git on Windows yet");
 }
 
+
 void runProgram2(const RunOptions & options)
 {
     throw UnimplementedError("Cannot shell out to git on Windows yet");
+}
+
+std::string statusToString(int status)
+{
+    if (status != 0)
+        return fmt("with exit code %d", status);
+    else
+        return "succeeded";
+}
+
+
+bool statusOk(int status)
+{
+    return status == 0;
 }
 
 }

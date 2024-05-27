@@ -5,10 +5,7 @@
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
-
-#ifdef _WIN32
-#  include "windows-async-pipe.hh"
-#endif
+#include "muxable-pipe.hh"
 
 #include <future>
 #include <thread>
@@ -16,9 +13,7 @@
 namespace nix {
 
 /* Forward definition. */
-#ifndef _WIN32 // TODO Enable building on Windows
 struct DerivationGoal;
-#endif
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
 
@@ -46,17 +41,9 @@ typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
  */
 struct Child
 {
-    using CommChannel =
-#ifndef _WIN32
-        Descriptor
-#else
-        windows::AsyncPipe *
-#endif
-        ;
-
     WeakGoalPtr goal;
     Goal * goal2; // ugly hackery
-    std::set<CommChannel> channels;
+    std::set<MuxablePipePollState::CommChannel> channels;
     bool respectTimeouts;
     bool inBuildSlot;
     /**
@@ -116,9 +103,7 @@ private:
      * Maps used to prevent multiple instantiations of a goal for the
      * same derivation / path.
      */
-#ifndef _WIN32 // TODO Enable building on Windows
     std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
-#endif
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
 
@@ -207,7 +192,6 @@ public:
      * Make a goal (with caching).
      */
 
-#ifndef _WIN32 // TODO Enable building on Windows
     /**
      * @ref DerivationGoal "derivation goal"
      */
@@ -222,7 +206,6 @@ public:
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
         const StorePath & drvPath, const BasicDerivation & drv,
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
-#endif
 
     /**
      * @ref SubstitutionGoal "substitution goal"
@@ -263,7 +246,7 @@ public:
      * Registers a running child process.  `inBuildSlot` means that
      * the process counts towards the jobs limit.
      */
-    void childStarted(GoalPtr goal, const std::set<Child::CommChannel> & channels,
+    void childStarted(GoalPtr goal, const std::set<MuxablePipePollState::CommChannel> & channels,
         bool inBuildSlot, bool respectTimeouts);
 
     /**
