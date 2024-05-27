@@ -1,12 +1,20 @@
+#include "local-store.hh"
 #include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "drv-output-substitution-goal.hh"
-#include "local-derivation-goal.hh"
-#include "hook-instance.hh"
+#ifndef _WIN32 // TODO Enable building on Windows
+#  include "local-derivation-goal.hh"
+#  include "hook-instance.hh"
+#endif
 #include "signals.hh"
 
-#include <poll.h>
+#ifndef _WIN32
+#  include <poll.h>
+#else
+#  include <ioapiset.h>
+#  include "windows-error.hh"
+#endif
 
 namespace nix {
 
@@ -41,6 +49,7 @@ Worker::~Worker()
     assert(expectedNarSize == 0);
 }
 
+#ifndef _WIN32 // TODO Enable building on Windows
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StorePath & drvPath,
@@ -70,7 +79,6 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
     });
 }
 
-
 std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
     const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
@@ -80,6 +88,8 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
             : std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
 }
+
+#endif
 
 
 std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
@@ -112,10 +122,14 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
 {
     return std::visit(overloaded {
         [&](const DerivedPath::Built & bfd) -> GoalPtr {
+#ifndef _WIN32 // TODO Enable building on Windows
             if (auto bop = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath))
                 return makeDerivationGoal(bop->path, bfd.outputs, buildMode);
             else
                 throw UnimplementedError("Building dynamic derivations in one shot is not yet implemented.");
+#else
+            throw UnimplementedError("Building derivations not yet implemented on Windows");
+#endif
         },
         [&](const DerivedPath::Opaque & bo) -> GoalPtr {
             return makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair);
@@ -141,9 +155,12 @@ static void removeGoal(std::shared_ptr<G> goal, std::map<K, std::weak_ptr<G>> & 
 
 void Worker::removeGoal(GoalPtr goal)
 {
+#ifndef _WIN32 // TODO Enable building on Windows
     if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
+    else
+#endif
+    if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, substitutionGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
@@ -187,13 +204,13 @@ unsigned Worker::getNrSubstitutions()
 }
 
 
-void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
+void Worker::childStarted(GoalPtr goal, const std::set<Child::CommChannel> & channels,
     bool inBuildSlot, bool respectTimeouts)
 {
     Child child;
     child.goal = goal;
     child.goal2 = goal.get();
-    child.fds = fds;
+    child.channels = channels;
     child.timeStarted = child.lastOutput = steady_time_point::clock::now();
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
@@ -281,12 +298,15 @@ void Worker::run(const Goals & _topGoals)
 
     for (auto & i : _topGoals) {
         topGoals.insert(i);
+#ifndef _WIN32 // TODO Enable building on Windows
         if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Built {
                 .drvPath = makeConstantStorePathRef(goal->drvPath),
                 .outputs = goal->wantedOutputs,
             });
-        } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
+        } else
+#endif
+        if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Opaque{goal->storePath});
         }
     }
@@ -408,13 +428,14 @@ void Worker::waitForInput()
     if (useTimeout)
         vomit("sleeping %d seconds", timeout);
 
+#ifndef _WIN32
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
     std::vector<struct pollfd> pollStatus;
     std::map<int, size_t> fdToPollStatus;
     for (auto & i : children) {
-        for (auto & j : i.fds) {
+        for (auto & j : i.channels) {
             pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
             fdToPollStatus[j] = pollStatus.size() - 1;
         }
@@ -425,6 +446,28 @@ void Worker::waitForInput()
         if (errno == EINTR) return;
         throw SysError("waiting for input");
     }
+#else
+    OVERLAPPED_ENTRY oentries[0x20] = {0};
+    ULONG removed;
+    bool gotEOF = false;
+
+    // we are on at least Windows Vista / Server 2008 and can get many (countof(oentries)) statuses in one API call
+    if (!GetQueuedCompletionStatusEx(
+        ioport.get(),
+        oentries,
+        sizeof(oentries) / sizeof(*oentries),
+        &removed,
+        useTimeout ? timeout * 1000 : INFINITE,
+        false))
+    {
+        windows::WinError winError("GetQueuedCompletionStatusEx");
+        if (winError.lastError != WAIT_TIMEOUT)
+            throw winError;
+        assert(removed == 0);
+    } else {
+        assert(0 < removed && removed <= sizeof(oentries)/sizeof(*oentries));
+    }
+#endif
 
     auto after = steady_time_point::clock::now();
 
@@ -439,20 +482,21 @@ void Worker::waitForInput()
         GoalPtr goal = j->goal.lock();
         assert(goal);
 
-        std::set<int> fds2(j->fds);
+#ifndef _WIN32
+        std::set<Descriptor> fds2(j->channels);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
             const auto fdPollStatusId = get(fdToPollStatus, k);
             assert(fdPollStatusId);
             assert(*fdPollStatusId < pollStatus.size());
             if (pollStatus.at(*fdPollStatusId).revents) {
-                ssize_t rd = ::read(k, buffer.data(), buffer.size());
+                ssize_t rd = ::read(fromDescriptorReadOnly(k), buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?
                 if (rd == 0 || (rd == -1 && errno == EIO)) {
                     debug("%1%: got EOF", goal->getName());
                     goal->handleEOF(k);
-                    j->fds.erase(k);
+                    j->channels.erase(k);
                 } else if (rd == -1) {
                     if (errno != EINTR)
                         throw SysError("%s: read failed", goal->getName());
@@ -465,6 +509,48 @@ void Worker::waitForInput()
                 }
             }
         }
+#else
+        decltype(j->channels)::iterator p = j->channels.begin();
+        while (p != j->channels.end()) {
+            decltype(p) nextp = p;
+            ++nextp;
+            for (ULONG i = 0; i < removed; i++) {
+                if (oentries[i].lpCompletionKey == ((ULONG_PTR)((*p)->readSide.get()) ^ 0x5555)) {
+                    printMsg(lvlVomit, "%s: read %s bytes", goal->getName(), oentries[i].dwNumberOfBytesTransferred);
+                    if (oentries[i].dwNumberOfBytesTransferred > 0) {
+                        std::string data {
+                            (char *) (*p)->buffer.data(),
+                            oentries[i].dwNumberOfBytesTransferred,
+                        };
+                        //std::cerr << "read  [" << data << "]" << std::endl;
+                        j->lastOutput = after;
+                        goal->handleChildOutput((*p)->readSide.get(), data);
+                    }
+
+                    if (gotEOF) {
+                        debug("%s: got EOF", goal->getName());
+                        goal->handleEOF((*p)->readSide.get());
+                        nextp = j->channels.erase(p); // no need to maintain `j->channels` ?
+                    } else {
+                        BOOL rc = ReadFile((*p)->readSide.get(), (*p)->buffer.data(), (*p)->buffer.size(), &(*p)->got, &(*p)->overlapped);
+                        if (rc) {
+                            // here is possible (but not obligatory) to call `goal->handleChildOutput` and repeat ReadFile immediately
+                        } else {
+                            windows::WinError winError("ReadFile(%s, ..)", (*p)->readSide.get());
+                            if (winError.lastError == ERROR_BROKEN_PIPE) {
+                                debug("%s: got EOF", goal->getName());
+                                goal->handleEOF((*p)->readSide.get());
+                                nextp = j->channels.erase(p); // no need to maintain `j->channels` ?
+                            } else if (winError.lastError != ERROR_IO_PENDING)
+                                throw winError;
+                        }
+                    }
+                    break;
+                }
+            }
+            p = nextp;
+        }
+#endif
 
         if (goal->exitCode == Goal::ecBusy &&
             0 != settings.maxSilentTime &&

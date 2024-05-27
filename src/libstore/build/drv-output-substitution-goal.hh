@@ -1,11 +1,16 @@
 #pragma once
 ///@file
 
+#include <thread>
+#include <future>
+
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
-#include <thread>
-#include <future>
+
+#ifdef _WIN32
+#  include "windows-async-pipe.hh"
+#endif
 
 namespace nix {
 
@@ -43,7 +48,11 @@ class DrvOutputSubstitutionGoal : public Goal {
 
     struct DownloadState
     {
+#ifndef _WIN32
         Pipe outPipe;
+#else
+        windows::AsyncPipe outPipe;
+#endif
         std::promise<std::shared_ptr<const Realisation>> promise;
     };
 
@@ -71,7 +80,7 @@ public:
     std::string key() override;
 
     void work() override;
-    void handleEOF(int fd) override;
+    void handleEOF(Descriptor fd) override;
 
     JobCategory jobCategory() const override {
         return JobCategory::Substitution;

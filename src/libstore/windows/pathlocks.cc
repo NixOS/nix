@@ -9,6 +9,8 @@
 
 namespace nix {
 
+using namespace nix::windows;
+
 void deleteLockFile(const Path & path, Descriptor desc)
 {
 

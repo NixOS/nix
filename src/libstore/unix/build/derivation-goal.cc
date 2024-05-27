@@ -1280,7 +1280,7 @@ bool DerivationGoal::isReadDesc(int fd)
     return fd == hook->builderOut.readSide.get();
 }
 
-void DerivationGoal::handleChildOutput(int fd, std::string_view data)
+void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
 {
     // local & `ssh://`-builds are dealt with here.
     auto isWrittenToLog = isReadDesc(fd);
@@ -1347,7 +1347,7 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
 }
 
 
-void DerivationGoal::handleEOF(int fd)
+void DerivationGoal::handleEOF(Descriptor fd)
 {
     if (!currentLogLine.empty()) flushLine();
     worker.wakeUp(shared_from_this());

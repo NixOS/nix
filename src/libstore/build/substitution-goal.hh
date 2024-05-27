@@ -1,9 +1,12 @@
 #pragma once
 ///@file
 
-#include "lock.hh"
 #include "store-api.hh"
 #include "goal.hh"
+
+#ifdef _WIN32
+#  include "windows-async-pipe.hh"
+#endif
 
 namespace nix {
 
@@ -45,7 +48,11 @@ struct PathSubstitutionGoal : public Goal
     /**
      * Pipe for the substituter's standard output.
      */
+#ifndef _WIN32
     Pipe outPipe;
+#else
+    windows::AsyncPipe outPipe;
+#endif
 
     /**
      * The substituter thread.
@@ -111,8 +118,8 @@ public:
     /**
      * Callback used by the worker to write to the log.
      */
-    void handleChildOutput(int fd, std::string_view data) override;
-    void handleEOF(int fd) override;
+    void handleChildOutput(Descriptor fd, std::string_view data) override;
+    void handleEOF(Descriptor fd) override;
 
     /* Called by destructor, can't be overridden */
     void cleanup() override final;
