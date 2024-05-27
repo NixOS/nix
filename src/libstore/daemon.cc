@@ -531,7 +531,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
-            mode = (BuildMode) readInt(from);
+            mode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
                clients.
@@ -555,7 +555,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::BuildPathsWithResults: {
         auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
-        mode = (BuildMode) readInt(from);
+        mode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
 
         /* Repairing is not atomic, so disallowed for "untrusted"
            clients.
@@ -586,7 +586,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
          * correctly.
          */
         readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
-        BuildMode buildMode = (BuildMode) readInt(from);
+        auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 
         auto drvType = drv.type();

@@ -531,6 +531,17 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
+    buildMode,
+    "build-mode",
+    defaultVersion,
+    (std::tuple<BuildMode, BuildMode, BuildMode> {
+        bmNormal,
+        bmRepair,
+        bmCheck,
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     optionalTrustedFlag,
     "optional-trusted-flag",
     defaultVersion,
