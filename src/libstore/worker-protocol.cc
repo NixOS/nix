@@ -18,9 +18,9 @@ BuildMode WorkerProto::Serialise<BuildMode>::read(const StoreDirConfig & store, 
 {
     auto temp = readNum<uint8_t>(conn.from);
     switch (temp) {
-    case bmNormal: return bmNormal;
-    case bmRepair: return bmRepair;
-    case bmCheck: return bmCheck;
+    case 0: return bmNormal;
+    case 1: return bmRepair;
+    case 2: return bmCheck;
     default: throw Error("Invalid build mode");
     }
 }
@@ -29,13 +29,13 @@ void WorkerProto::Serialise<BuildMode>::write(const StoreDirConfig & store, Work
 {
     switch (buildMode) {
     case bmNormal:
-        conn.to << uint8_t{bmNormal};
+        conn.to << uint8_t{0};
         break;
     case bmRepair:
-        conn.to << uint8_t{bmRepair};
+        conn.to << uint8_t{1};
         break;
     case bmCheck:
-        conn.to << uint8_t{bmCheck};
+        conn.to << uint8_t{2};
         break;
     default:
         assert(false);
