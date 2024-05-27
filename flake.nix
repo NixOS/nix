@@ -393,6 +393,7 @@
           in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
           LANG=C.UTF-8 ${pkgs.changelog-d-nix}/bin/changelog-d ${./doc/manual/rl-next} >$out
         '';
+        repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       } // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
