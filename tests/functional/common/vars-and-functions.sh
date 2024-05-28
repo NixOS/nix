@@ -8,6 +8,12 @@ COMMON_VARS_AND_FUNCTIONS_SH_SOURCED=1
 
 set +x
 
+commonDir="$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")"
+
+source "$commonDir/subst-vars.sh"
+# Make sure shellcheck knows all these will be defined by the above generated snippet
+: "${PATH?} ${coreutils?} ${dot?} ${SHELL?} ${PAGER?} ${busybox?} ${version?} ${system?} ${BUILD_SHARED_LIBS?}"
+
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default/tests\/functional//}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
@@ -37,7 +43,6 @@ unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
 
-export PATH=@bindir@:$PATH
 if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then
   export PATH="$NIX_CLIENT_PACKAGE/bin":$PATH
 fi
@@ -45,18 +50,6 @@ DAEMON_PATH="$PATH"
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
   DAEMON_PATH="${NIX_DAEMON_PACKAGE}/bin:$DAEMON_PATH"
 fi
-coreutils=@coreutils@
-lsof=@lsof@
-
-export dot=@dot@
-export SHELL="@bash@"
-export PAGER=cat
-export busybox="@sandbox_shell@"
-
-export version=@PACKAGE_VERSION@
-export system=@system@
-
-export BUILD_SHARED_LIBS=@BUILD_SHARED_LIBS@
 
 export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar

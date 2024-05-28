@@ -153,7 +153,7 @@ $(d)/plugins.sh.test $(d)/plugins.sh.test-debug: \
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
 test-clean-files := \
-  $(d)/common/vars-and-functions.sh \
+  $(d)/common/subst-vars.sh \
   $(d)/config.nix
 
 clean-files += $(test-clean-files)
