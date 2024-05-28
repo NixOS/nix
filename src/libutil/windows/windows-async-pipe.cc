@@ -13,8 +13,14 @@ void AsyncPipe::createAsyncPipe(HANDLE iocp)
     std::string pipeName = fmt("\\\\.\\pipe\\nix-%d-%p", GetCurrentProcessId(), (void *) this);
 
     readSide = CreateNamedPipeA(
-        pipeName.c_str(), PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, 0, 0,
-        INFINITE, NULL);
+        pipeName.c_str(),
+        PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+        PIPE_TYPE_BYTE,
+        PIPE_UNLIMITED_INSTANCES,
+        0,
+        0,
+        INFINITE,
+        NULL);
     if (!readSide)
         throw WinError("CreateNamedPipeA(%s)", pipeName);
 
