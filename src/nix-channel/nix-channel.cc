@@ -1,4 +1,5 @@
 #include "profiles.hh"
+#include "profiles/channels.hh"
 #include "shared.hh"
 #include "globals.hh"
 #include "filetransfer.hh"
@@ -168,10 +169,6 @@ static int main_nix_channel(int argc, char ** argv)
         channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
         nixDefExpr = getNixDefExpr();
 
-        // Figure out the name of the channels profile.
-        profile = profilesDir() +  "/channels";
-        createDirs(dirOf(profile));
-
         enum {
             cNone,
             cAdd,
@@ -181,6 +178,9 @@ static int main_nix_channel(int argc, char ** argv)
             cListGenerations,
             cRollback
         } cmd = cNone;
+
+        DefaultProfileKind profileKind = defaultDefaultProfileKind();
+
         std::vector<std::string> args;
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help") {
@@ -199,6 +199,10 @@ static int main_nix_channel(int argc, char ** argv)
                 cmd = cListGenerations;
             } else if (*arg == "--rollback") {
                 cmd = cRollback;
+            } else if (*arg == "--user-profile") {
+                profileKind = DefaultProfileKind::User;
+            } else if (*arg == "--global-profile") {
+                profileKind = DefaultProfileKind::Global;
             } else {
                 if (hasPrefix(*arg, "-"))
                     throw UsageError("unsupported argument '%s'", *arg);
@@ -206,6 +210,19 @@ static int main_nix_channel(int argc, char ** argv)
             }
             return true;
         });
+
+        // Figure out the name of the channels profile.
+        switch (profileKind) {
+            case DefaultProfileKind::User:
+                profile = userChannelsDir();
+                break;
+            case DefaultProfileKind::Global:
+                profile = globalChannelsDir();
+                break;
+            default:
+                assert(false);
+        };
+        createDirs(dirOf(profile));
 
         switch (cmd) {
             case cNone:

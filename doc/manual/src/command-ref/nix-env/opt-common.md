@@ -19,6 +19,16 @@ The following options are allowed for all `nix-env` operations, but may not alwa
     sequence of user environments called *generations*, one of which is
     the *current generation*.
 
+  - `--user-profile`\
+    Specifies the profile as the [default user profile](@docroot@/command-ref/files/profiles.md#default-user-profile) private to this user.
+    This is a shorthand for passing `--profile` and the path to that default profile.
+    This is default if the current user is not root.
+
+  - `--global-profile`\
+    Specifies the profile as the [default global profile](@docroot@/command-ref/files/profiles.md#default-global-profile) shared between all users.
+    A shorthand instead of passing `--profile` and the path to that default profile.
+    This is default if the current user is root.
+
   - `--dry-run`\
     For the `--install`, `--upgrade`, `--uninstall`,
     `--switch-generation`, `--delete-generations` and `--rollback`

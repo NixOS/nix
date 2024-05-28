@@ -7,6 +7,7 @@
 #include "globals.hh"
 #include "names.hh"
 #include "profiles.hh"
+#include "profiles/channels.hh"
 #include "path-with-outputs.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -56,6 +57,7 @@ struct InstallSourceInfo
 struct Globals
 {
     InstallSourceInfo instSource;
+    std::optional<DefaultProfileKind> profileKind;
     Path profile;
     std::shared_ptr<EvalState> state;
     bool dryRun;
@@ -1296,7 +1298,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("exactly one argument expected");
 
     Path profile = absPath(opArgs.front());
-    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+    Path profileLink = defaultProfileLink();
 
     switchLink(profileLink, profile);
 }
@@ -1409,28 +1411,12 @@ static int main_nix_env(int argc, char * * argv)
 
         Globals globals;
 
-        globals.instSource.type = srcUnknown;
-        globals.instSource.systemFilter = "*";
-
-        Path nixExprPath = getNixDefExpr();
-
-        if (!pathExists(nixExprPath)) {
-            try {
-                createDirs(nixExprPath);
-                replaceSymlink(
-                    defaultChannelsDir(),
-                    nixExprPath + "/channels");
-                if (!isRootUser())
-                    replaceSymlink(
-                        rootChannelsDir(),
-                        nixExprPath + "/channels_root");
-            } catch (Error &) { }
-        }
-
         globals.dryRun = false;
         globals.preserveInstalled = false;
         globals.removeAll = false;
         globals.prebuiltOnly = false;
+
+        globals.profileKind = { defaultDefaultProfileKind() };
 
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
@@ -1470,8 +1456,18 @@ static int main_nix_env(int argc, char * * argv)
                 op = opQuery;
                 opName = "-query";
             }
-            else if (*arg == "--profile" || *arg == "-p")
+            else if (*arg == "--user-profile") {
+                globals.profileKind = DefaultProfileKind::User;
+                globals.profile = "";
+            }
+            else if (*arg == "--global-profile") {
+                globals.profileKind = DefaultProfileKind::Global;
+                globals.profile = "";
+            }
+            else if (*arg == "--profile" || *arg == "-p") {
+                globals.profileKind = std::nullopt;
                 globals.profile = absPath(getArg(*arg, arg, end));
+            }
             else if (*arg == "--file" || *arg == "-f")
                 file = getArg(*arg, arg, end);
             else if (*arg == "--switch-profile" || *arg == "-S") {
@@ -1523,7 +1519,38 @@ static int main_nix_env(int argc, char * * argv)
         if (showHelp) showManPage("nix-env" + opName);
         if (!op) throw UsageError("no operation specified");
 
+        // Store layer concerns
+
         auto store = openStore();
+
+        // Profiles layer concerns
+
+        if (globals.profile == "")
+            globals.profile = getEnv("NIX_PROFILE").value_or("");
+
+        if (globals.profile == "") {
+            assert(globals.profileKind);
+            globals.profile = getDefaultProfile(*globals.profileKind);
+        }
+
+        // Eval layer concerns
+
+        globals.instSource.type = srcUnknown;
+        globals.instSource.systemFilter = "*";
+
+        Path nixExprPath = getNixDefExpr();
+
+        if (!pathExists(nixExprPath)) {
+            try {
+                createDirs(nixExprPath);
+                replaceSymlink(
+                    userChannelsDir(),
+                    nixExprPath + "/channels");
+                replaceSymlink(
+                    globalChannelsDir(),
+                    nixExprPath + "/channels_root");
+            } catch (Error &) { }
+        }
 
         globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store));
         globals.state->repair = myArgs.repair;
@@ -1535,11 +1562,7 @@ static int main_nix_env(int argc, char * * argv)
 
         globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 
-        if (globals.profile == "")
-            globals.profile = getEnv("NIX_PROFILE").value_or("");
-
-        if (globals.profile == "")
-            globals.profile = getDefaultProfile();
+        // Do the operation
 
         op(globals, std::move(opFlags), std::move(opArgs));
 

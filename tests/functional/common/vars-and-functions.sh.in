@@ -68,8 +68,11 @@ readLink() {
 }
 
 clearProfiles() {
-    profiles="$HOME"/.local/state/nix/profiles
-    rm -rf "$profiles"
+    local localProfilesDir="$HOME"/.local/state/nix/profiles
+    local globalProfilesDir="$NIX_STATE_DIR/profiles"
+    rm -rf "$localProfilesDir" "$globalProfilesDir"
+    # Tests expect this
+    profiles="$localProfilesDir"
 }
 
 clearStore() {
