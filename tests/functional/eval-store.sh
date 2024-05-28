@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Using `--eval-store` with the daemon will eventually copy everything

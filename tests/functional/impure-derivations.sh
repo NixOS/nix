@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 requireDaemonNewerThan "2.8pre20220311"

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test that users cannot register specially-crafted derivations that
 # produce output paths belonging to other derivations.  This could be
 # used to inject malware into the store.

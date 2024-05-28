@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 drvPath=$(nix-instantiate simple.nix)

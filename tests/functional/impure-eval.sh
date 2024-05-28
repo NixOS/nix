@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 export REMOTE_STORE="dummy://"

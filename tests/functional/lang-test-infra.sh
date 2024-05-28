@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test the function for lang.sh
 source common.sh
 

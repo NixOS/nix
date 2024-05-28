@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Needs the config option 'impure-env' to work

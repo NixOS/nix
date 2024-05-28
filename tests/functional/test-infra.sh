@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test the functions for testing themselves!
 # Also test some assumptions on how bash works that they rely on.
 source common.sh
