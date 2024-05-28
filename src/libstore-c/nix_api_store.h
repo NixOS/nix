@@ -54,8 +54,10 @@ nix_err nix_libstore_init_no_load_config(nix_c_context * context);
 nix_err nix_init_plugins(nix_c_context * context);
 
 /**
- * @brief Open a nix store
+ * @brief Open a nix store.
+ *
  * Store instances may share state and resources behind the scenes.
+ *
  * @param[out] context Optional, stores error information
  * @param[in] uri URI of the Nix store, copied. See [*Store URL format* in the Nix Reference
  * Manual](https://nixos.org/manual/nix/stable/store/types/#store-url-format).
@@ -157,7 +159,9 @@ nix_err nix_store_realise(
 
 /**
  * @brief get the version of a nix store.
+ *
  * If the store doesn't have a version (like the dummy store), returns an empty string.
+ *
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
  * @param[in] callback Called with the version.
