@@ -161,6 +161,7 @@ nix_err nix_store_realise(
  * @brief get the version of a nix store.
  *
  * If the store doesn't have a version (like the dummy store), returns an empty string.
+ *
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
  * @param[in] callback Called with the version.
