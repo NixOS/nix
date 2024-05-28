@@ -24,24 +24,24 @@ class BindingsBuilder;
 typedef enum {
     tUninitialized = 0,
     tInt = 1,
-    tBool,
-    tString,
-    tPath,
-    tNull,
-    tAttrs,
-    tList1,
-    tList2,
-    tListN,
-    tThunk,
-    tApp,
-    tLambda,
-    tPrimOp,
-    tPrimOpApp,
-    tExternal,
-    tFloat,
-    tPending,
-    tAwaited,
-    tFailed,
+    tBool = 2,
+    tString = 3,
+    tPath = 4,
+    tNull = 5,
+    tAttrs = 6,
+    tList1 = 7,
+    tList2 = 8,
+    tListN = 9,
+    tThunk = 10,
+    tApp = 11,
+    tLambda = 12,
+    tPrimOp = 13,
+    tPrimOpApp = 14,
+    tExternal = 15,
+    tFloat = 16,
+    tPending = 17,
+    tAwaited = 18,
+    tFailed = 19,
 } InternalType;
 
 /**
@@ -190,13 +190,13 @@ public:
     Value & operator =(const Value & v)
     {
         auto type = v.internalType.load();
+        debug("ASSIGN %x %d %d", this, internalType, type);
         //assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
         if (!(type != tThunk && type != tApp && type != tPending && type != tAwaited)) {
             printError("UNEXPECTED TYPE %x %s", this, showType(v));
             abort();
         }
-        internalType = type;
-        payload = v.payload;
+        finishValue(type, v.payload);
         return *this;
     }
 
@@ -318,32 +318,19 @@ public:
         }
     }
 
-    inline void finishValue(InternalType newType, Payload newPayload)
-    {
-        payload = newPayload;
-        internalType = newType;
-    }
-
-    /**
-     * A value becomes valid when it is initialized. We don't use this
-     * in the evaluator; only in the bindings, where the slight extra
-     * cost is warranted because of inexperienced callers.
-     */
-    inline bool isValid() const
-    {
-        return internalType != tUninitialized;
-    }
-
     /**
      * Finish a pending thunk, waking up any threads that are waiting
      * on it.
      */
-    inline void finishValue(InternalType type)
+    inline void finishValue(InternalType newType, Payload newPayload)
     {
+        debug("FINISH %x %d %d", this, internalType, newType);
+        payload = newPayload;
+
         // TODO: need a barrier here to ensure the payload of the
         // value is updated before the type field.
 
-        auto oldType = internalType.exchange(type);
+        auto oldType = internalType.exchange(newType);
 
         if (oldType == tPending)
             // Nothing to do; no thread is waiting on this thunk.
@@ -355,8 +342,30 @@ public:
             // Slow path: wake up the threads that are waiting on this
             // thunk.
             notifyWaiters();
-        else
+        else {
+            printError("BAD FINISH %x %d %d", this, oldType, newType);
             abort();
+        }
+    }
+
+    inline void reset()
+    {
+        auto oldType = internalType.exchange(tUninitialized);
+        debug("RESET %x %d", this, oldType);
+        if (oldType == tPending || oldType == tAwaited) {
+            printError("BAD RESET %x %d", this, oldType);
+            abort();
+        }
+    }
+
+    /**
+     * A value becomes valid when it is initialized. We don't use this
+     * in the evaluator; only in the bindings, where the slight extra
+     * cost is warranted because of inexperienced callers.
+     */
+    inline bool isValid() const
+    {
+        return internalType != tUninitialized;
     }
 
     /**

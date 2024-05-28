@@ -130,7 +130,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             visit(*cursor2, attrPath2, false);
                         });
                     }
-                    printError("ADD %d", work.size());
+                    printError("ADD %d %s", work.size(), concatStringsSep(".", attrPathS));
                     spawn(std::move(work));
                 };
 

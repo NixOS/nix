@@ -3325,8 +3325,8 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
         ? "while evaluating the return value of the function passed to builtins.any"
         : "while evaluating the return value of the function passed to builtins.all";
 
-    Value vTmp;
     for (auto elem : args[1]->listItems()) {
+        Value vTmp;
         state.callFunction(*args[0], *elem, vTmp, pos);
         bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {

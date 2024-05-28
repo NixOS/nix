@@ -12,7 +12,7 @@ static std::array<Sync<WaiterDomain>, 128> waiterDomains;
 static Sync<WaiterDomain> & getWaiterDomain(Value & v)
 {
     auto domain = std::hash<Value *>{}(&v) % waiterDomains.size();
-    printError("HASH %x -> %d %d", &v, domain, std::hash<Value *>{}(&v));
+    debug("HASH %x -> %d %d", &v, domain, std::hash<Value *>{}(&v));
     return waiterDomains[domain];
 }
 
@@ -28,7 +28,7 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
         /* If the value has been finalized in the meantime (i.e is no
            longer pending), we're done. */
         if (type != tAwaited) {
-            printError("VALUE DONE RIGHT AWAY 2 %x", &v);
+            debug("VALUE DONE RIGHT AWAY 2 %x", &v);
             assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
             return;
         }
@@ -39,22 +39,22 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
             /* If the value has been finalized in the meantime (i.e is
                no longer pending), we're done. */
             if (type != tAwaited) {
-                printError("VALUE DONE RIGHT AWAY %x", &v);
+                debug("VALUE DONE RIGHT AWAY %x", &v);
                 assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
                 return;
             }
             /* The value was already in the "waited on" state, so we're
                not the only thread waiting on it. */
-            printError("ALREADY AWAITED %x", &v);
+            debug("ALREADY AWAITED %x", &v);
         } else
-            printError("PENDING -> AWAITED %x", &v);
+            debug("PENDING -> AWAITED %x", &v);
     }
 
-    printError("AWAIT %x", &v);
+    debug("AWAIT %x", &v);
 
     while (true) {
         domain.wait(domain->cv);
-        printError("WAKEUP %x", &v);
+        debug("WAKEUP %x", &v);
         auto type = v.internalType.load();
         if (type != tAwaited) {
             if (type == tFailed)
@@ -68,7 +68,7 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
 
 void Value::notifyWaiters()
 {
-    printError("NOTIFY %x", this);
+    debug("NOTIFY %x", this);
 
     auto domain = getWaiterDomain(*this).lock();
 

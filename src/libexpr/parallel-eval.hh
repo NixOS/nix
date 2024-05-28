@@ -6,6 +6,8 @@
 
 #include "sync.hh"
 #include "logging.hh"
+#include "environment-variables.hh"
+#include "util.hh"
 
 #include <gc.h>
 
@@ -30,8 +32,10 @@ struct Executor
 
     Executor()
     {
+        auto nrCores = string2Int<size_t>(getEnv("NR_CORES").value_or("1")).value_or(1);
+        printError("USING %d THREADS", nrCores);
         auto state(state_.lock());
-        for (size_t n = 0; n < 4; ++n)
+        for (size_t n = 0; n < nrCores; ++n)
             state->threads.push_back(std::thread([&]()
             {
                 GC_stack_base sb;

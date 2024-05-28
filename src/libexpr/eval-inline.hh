@@ -88,8 +88,17 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
 
     if (type == tThunk) {
         try {
-            if (!v.internalType.compare_exchange_strong(type, tPending))
+            if (!v.internalType.compare_exchange_strong(type, tPending)) {
+                if (type == tPending || type == tAwaited) {
+                    waitOnThunk(v, type == tAwaited);
+                    goto done;
+                }
+                if (type != tThunk && type != tPending && type != tAwaited)
+                    // FIXME: tFailed
+                    return;
+                printError("NO LONGER THUNK %x %d", this, type);
                 abort();
+            }
             Env * env = v.payload.thunk.env;
             Expr * expr = v.payload.thunk.expr;
             expr->eval(*this, *env, v);
@@ -113,8 +122,17 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
     #endif
     else if (type == tApp) {
         try {
-            if (!v.internalType.compare_exchange_strong(type, tPending))
+            if (!v.internalType.compare_exchange_strong(type, tPending)) {
+                if (type == tPending || type == tAwaited) {
+                    waitOnThunk(v, type == tAwaited);
+                    goto done;
+                }
+                if (type != tThunk && type != tPending && type != tAwaited)
+                    // FIXME: tFailed
+                    return;
+                printError("NO LONGER APP %x %d", this, type);
                 abort();
+            }
             callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
         } catch (...) {
             v.mkFailed();
@@ -126,6 +144,8 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
     else if (type == tFailed)
         std::rethrow_exception(v.payload.failed->ex);
 
+    // FIXME: remove
+    done:
     auto type2 = v.internalType.load();
     if (!(type2 != tThunk && type2 != tApp && type2 != tPending && type2 != tAwaited)) {
         printError("THUNK NOT FORCED %x %s %d", this, showType(v), type);

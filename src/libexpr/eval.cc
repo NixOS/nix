@@ -570,9 +570,7 @@ Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
 Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
-    //*v2 = v;
-    // FIXME: hack to bypass the thunk check in 'operator ='.
-    memcpy(v2, &v, sizeof(Value));
+    v2->finishValue(v.internalType, v.payload);
     addConstant(name, v2, info);
     return v2;
 }
@@ -1148,10 +1146,14 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     {
         auto cache(fileEvalCache.lock());
         // Handle the cache where another thread has evaluated this file.
-        if (auto v2 = get(*cache, path))
+        if (auto v2 = get(*cache, path)) {
+            v.reset(); // FIXME: check
             v = *v2;
-        if (auto v2 = get(*cache, resolvedPath))
+        }
+        if (auto v2 = get(*cache, resolvedPath)) {
+            v.reset(); // FIXME: check
             v = *v2;
+        }
         cache->emplace(resolvedPath, v);
         if (path != resolvedPath) cache->emplace(path, v);
     }
@@ -1532,6 +1534,7 @@ public:
 
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
+    debug("CALL %x %d", &vRes, vRes.internalType);
     #if 0
     if (callDepth > evalSettings.maxCallDepth)
         error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
@@ -1552,7 +1555,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         for (size_t i = 0; i < nrArgs; ++i) {
             auto fun2 = allocValue();
             *fun2 = vRes;
-            vRes.internalType = tUninitialized;
+            vRes.reset();
             vRes.mkPrimOpApp(fun2, args[i]);
         }
     };
@@ -1647,7 +1650,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         : "anonymous lambda")
                     : nullptr;
 
-                vCur.internalType = tUninitialized;
+                vCur.reset();
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
@@ -1684,7 +1687,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
                 try {
                     auto pos = vCur.determinePos(noPos);
-                    vCur.internalType = tUninitialized;
+                    vCur.reset();
                     fn->fun(*this, pos, args, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
@@ -1735,7 +1738,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     auto pos = vCur.determinePos(noPos);
-                    vCur.internalType = tUninitialized;
+                    vCur.reset();
                     fn->fun(*this, pos, vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
@@ -1754,6 +1757,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                heap-allocate a copy and use that instead. */
             Value * args2[] = {allocValue(), args[0]};
             *args2[0] = vCur;
+            vCur.reset();
             try {
                 callFunction(*functor->value, 2, args2, vCur, functor->pos);
             } catch (Error & e) {
@@ -1773,6 +1777,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 .debugThrow();
     }
 
+    debug("DONE %x %x", &vRes, &vCur);
     vRes = vCur;
 }
 
