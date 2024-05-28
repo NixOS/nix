@@ -26,12 +26,13 @@ run_test () {
 
 run_test
 
-if [ $status -eq 0 ]; then
+if [[ "$status" = 0 ]]; then
   echo "$post_run_msg [${green}PASS$normal]"
-elif [ $status -eq 99 ]; then
+elif [[ "$status" = 99 ]]; then
   echo "$post_run_msg [${yellow}SKIP$normal]"
 else
   echo "$post_run_msg [${red}FAIL$normal]"
+  # shellcheck disable=SC2001
   echo "$log" | sed 's/^/    /'
   exit "$status"
 fi

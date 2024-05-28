@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 source common.sh
 
 testDir="$PWD"
@@ -21,11 +22,14 @@ import $testDir/undefined-variable.nix
 "
 
 testRepl () {
-    local nixArgs=("$@")
+    local nixArgs
+    nixArgs=("$@")
     rm -rf repl-result-out || true # cleanup from other runs backed by a foreign nix store
-    local replOutput="$(nix repl "${nixArgs[@]}" <<< "$replCmds")"
+    local replOutput
+    replOutput="$(nix repl "${nixArgs[@]}" <<< "$replCmds")"
     echo "$replOutput"
-    local outPath=$(echo "$replOutput" |&
+    local outPath
+    outPath=$(echo "$replOutput" |&
         grep -o -E "$NIX_STORE_DIR/\w*-simple")
     nix path-info "${nixArgs[@]}" "$outPath"
     [ "$(realpath ./repl-result-out)" == "$outPath" ] || fail "nix repl :bl doesn't make a symlink"
@@ -34,11 +38,11 @@ testRepl () {
 
     # simple.nix prints a PATH during build
     echo "$replOutput" | grepQuiet -s 'PATH=' || fail "nix repl :log doesn't output logs"
-    local replOutput="$(nix repl "${nixArgs[@]}" <<< "$replFailingCmds" 2>&1)"
+    replOutput="$(nix repl "${nixArgs[@]}" <<< "$replFailingCmds" 2>&1)"
     echo "$replOutput"
     echo "$replOutput" | grepQuiet -s 'This should fail' \
       || fail "nix repl :log doesn't output logs for a failed derivation"
-    local replOutput="$(nix repl --show-trace "${nixArgs[@]}" <<< "$replUndefinedVariable" 2>&1)"
+    replOutput="$(nix repl --show-trace "${nixArgs[@]}" <<< "$replUndefinedVariable" 2>&1)"
     echo "$replOutput"
     echo "$replOutput" | grepQuiet -s "while evaluating the file" \
       || fail "nix repl --show-trace doesn't show the trace"
@@ -48,7 +52,7 @@ testRepl () {
     nix repl "${nixArgs[@]}" 2>&1 <<< "builtins.currentSystem" \
       | grep "$(nix-instantiate --eval -E 'builtins.currentSystem')"
 
-    expectStderr 1 nix repl ${testDir}/simple.nix \
+    expectStderr 1 nix repl "${testDir}/simple.nix" \
       | grepQuiet -s "error: path '$testDir/simple.nix' is not a flake"
 }
 
@@ -63,10 +67,11 @@ stripColors () {
 }
 
 testReplResponseGeneral () {
-    local grepMode="$1"; shift
-    local commands="$1"; shift
-    local expectedResponse="$1"; shift
-    local response="$(nix repl "$@" <<< "$commands" | stripColors)"
+    local grepMode commands expectedResponse response
+    grepMode="$1"; shift
+    commands="$1"; shift
+    expectedResponse="$1"; shift
+    response="$(nix repl "$@" <<< "$commands" | stripColors)"
     echo "$response" | grepQuiet "$grepMode" -s "$expectedResponse" \
       || fail "repl command set:
 
@@ -91,6 +96,8 @@ testReplResponseNoRegex () {
 }
 
 # :a uses the newest version of a symbol
+#
+# shellcheck disable=SC2016
 testReplResponse '
 :a { a = "1"; }
 :a { a = "2"; }
@@ -101,6 +108,8 @@ testReplResponse '
 # note the escaped \,
 #    \\
 # because the second argument is a regex
+#
+# shellcheck disable=SC2016
 testReplResponseNoRegex '
 "$" + "{hi}"
 ' '"\${hi}"'
@@ -108,12 +117,12 @@ testReplResponseNoRegex '
 testReplResponse '
 drvPath
 ' '".*-simple.drv"' \
---file $testDir/simple.nix
+--file "$testDir/simple.nix"
 
 testReplResponse '
 drvPath
 ' '".*-simple.drv"' \
---file $testDir/simple.nix --experimental-features 'ca-derivations'
+--file "$testDir/simple.nix" --experimental-features 'ca-derivations'
 
 mkdir -p flake && cat <<EOF > flake/flake.nix
 {
