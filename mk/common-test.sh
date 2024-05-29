@@ -3,8 +3,7 @@
 # Remove overall test dir (at most one of the two should match) and
 # remove file extension.
 
-# shellcheck disable=SC2154
-test_name=$(echo -n "$test" | sed \
+test_name=$(echo -n "${test?must be defined by caller (test runner)}" | sed \
     -e "s|^tests/unit/[^/]*/data/||" \
     -e "s|^tests/functional/||" \
     -e "s|\.sh$||" \

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 needLocalStore "'--no-require-sigs' can’t be used with the daemon"

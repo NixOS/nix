@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test the `--timeout' option.
 
 source common.sh

@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+
 test -n "$TEST_ROOT"
 # We would delete any daemon socket, so let's stop the daemon first.
 killDaemon

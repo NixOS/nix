@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test whether the collector is non-blocking, i.e. a build can run in
 # parallel with it.
 source common.sh

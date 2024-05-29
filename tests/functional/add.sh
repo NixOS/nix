@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 path1=$(nix-store --add ./dummy)

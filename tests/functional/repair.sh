@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 needLocalStore "--repair needs a local store"

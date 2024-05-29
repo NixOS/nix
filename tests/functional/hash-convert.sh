@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Conversion with `nix hash` `nix-hash` and `nix hash convert`

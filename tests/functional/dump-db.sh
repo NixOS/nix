@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 needLocalStore "--dump-db requires a local store"

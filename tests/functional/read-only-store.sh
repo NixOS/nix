@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 enableFeatures "read-only-local-store"

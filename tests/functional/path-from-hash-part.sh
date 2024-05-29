@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 path=$(nix build --no-link --print-out-paths -f simple.nix)

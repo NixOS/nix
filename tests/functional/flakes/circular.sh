@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test circular flake dependencies.
 source ./common.sh
 

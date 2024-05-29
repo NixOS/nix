@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 touch $TEST_ROOT/foo -t 202211111111
