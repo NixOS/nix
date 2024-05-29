@@ -1147,10 +1147,12 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         auto cache(fileEvalCache.lock());
         // Handle the cache where another thread has evaluated this file.
         if (auto v2 = get(*cache, path)) {
+            //printError("DISCARD FILE EVAL 1 %s", path);
             v.reset(); // FIXME: check
             v = *v2;
         }
         if (auto v2 = get(*cache, resolvedPath)) {
+            //printError("DISCARD FILE EVAL 2 %s", path);
             v.reset(); // FIXME: check
             v = *v2;
         }

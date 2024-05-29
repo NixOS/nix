@@ -115,8 +115,10 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             auto attrPathS = state->symbols.resolve(attrPath);
             //printError("AT %d", concatStringsSep(".", attrPathS));
 
+            /*
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+            */
             try {
                 auto recurse = [&]()
                 {
@@ -186,6 +188,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             };
                         } else {
                             auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
+                            #if 0
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",
@@ -194,6 +197,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             if (description != "")
                                 logger->cout(
                                     "  %s", hiliteMatches(description, descriptionMatches, ANSI_GREEN, ANSI_NORMAL));
+                            #endif
                         }
                     }
                 }
