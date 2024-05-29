@@ -1,5 +1,8 @@
 #include "derivation-goal.hh"
-#include "hook-instance.hh"
+#ifndef _WIN32 // TODO enable build hook on Windows
+#  include "hook-instance.hh"
+#endif
+#include "processes.hh"
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
@@ -19,19 +22,8 @@
 
 #include <fstream>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-#include <netdb.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <unistd.h>
-#include <sys/mman.h>
-#include <sys/utsname.h>
-#include <sys/resource.h>
-
-#include <pwd.h>
-#include <grp.h>
 
 #include <nlohmann/json.hpp>
 
@@ -101,7 +93,9 @@ std::string DerivationGoal::key()
 
 void DerivationGoal::killChild()
 {
+#ifndef _WIN32 // TODO enable build hook on Windows
     hook.reset();
+#endif
 }
 
 
@@ -641,9 +635,17 @@ void DerivationGoal::started()
         buildMode == bmCheck ? "checking outputs of '%s'" :
         "building '%s'", worker.store.printStorePath(drvPath));
     fmt("building '%s'", worker.store.printStorePath(drvPath));
+#ifndef _WIN32 // TODO enable build hook on Windows
     if (hook) msg += fmt(" on '%s'", machineName);
+#endif
     act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
-        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", 1, 1});
+        Logger::Fields{worker.store.printStorePath(drvPath),
+#ifndef _WIN32 // TODO enable build hook on Windows
+        hook ? machineName :
+#endif
+            "",
+        1,
+        1});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 }
@@ -778,7 +780,13 @@ static void movePath(const Path & src, const Path & dst)
 {
     auto st = lstat(src);
 
-    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+    bool changePerm = (
+#ifndef _WIN32
+        geteuid()
+#else
+        !isRootUser()
+#endif
+        && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
 
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
@@ -796,7 +804,7 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
        tmpPath (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
-    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), random());
+    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), rand());
     if (pathExists(storePath))
         movePath(storePath, oldPath);
 
@@ -818,14 +826,20 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
 
 int DerivationGoal::getChildStatus()
 {
+#ifndef _WIN32 // TODO enable build hook on Windows
     return hook->pid.kill();
+#else
+    return 0;
+#endif
 }
 
 
 void DerivationGoal::closeReadPipes()
 {
-    hook->builderOut.readSide = -1;
-    hook->fromHook.readSide = -1;
+#ifndef _WIN32 // TODO enable build hook on Windows
+    hook->builderOut.readSide.close();
+    hook->fromHook.readSide.close();
+#endif
 }
 
 
@@ -1019,13 +1033,16 @@ void DerivationGoal::buildDone()
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
+#ifndef _WIN32
         if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
 
         else if (hook && (!WIFEXITED(status) || WEXITSTATUS(status) != 100)) {
         }
 
-        else {
+        else
+#endif
+        {
             assert(derivationType);
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
@@ -1112,6 +1129,9 @@ void DerivationGoal::resolvedFinished()
 
 HookReply DerivationGoal::tryBuildHook()
 {
+#ifdef _WIN32 // TODO enable build hook on Windows
+    return rpDecline;
+#else
     if (settings.buildHook.get().empty() || !worker.tryBuildHook || !useDerivation) return rpDecline;
 
     if (!worker.hook)
@@ -1205,17 +1225,18 @@ HookReply DerivationGoal::tryBuildHook()
     }
 
     hook->sink = FdSink();
-    hook->toHook.writeSide = -1;
+    hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
     Path logFile = openLogFile();
 
-    std::set<int> fds;
+    std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
     fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
+#endif
 }
 
 
@@ -1251,7 +1272,11 @@ Path DerivationGoal::openLogFile()
     Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2),
         settings.compressLog ? ".bz2" : "");
 
-    fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
+    fdLogFile = toDescriptor(open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC
+#ifndef _WIN32
+        | O_CLOEXEC
+#endif
+        , 0666));
     if (!fdLogFile) throw SysError("creating log file '%1%'", logFileName);
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
@@ -1271,13 +1296,17 @@ void DerivationGoal::closeLogFile()
     if (logSink2) logSink2->finish();
     if (logFileSink) logFileSink->flush();
     logSink = logFileSink = 0;
-    fdLogFile = -1;
+    fdLogFile.close();
 }
 
 
-bool DerivationGoal::isReadDesc(int fd)
+bool DerivationGoal::isReadDesc(Descriptor fd)
 {
+#ifdef _WIN32 // TODO enable build hook on Windows
+    return false;
+#else
     return fd == hook->builderOut.readSide.get();
+#endif
 }
 
 void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
@@ -1310,6 +1339,7 @@ void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
         if (logSink) (*logSink)(data);
     }
 
+#ifndef _WIN32 // TODO enable build hook on Windows
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
@@ -1344,6 +1374,7 @@ void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
             } else
                 currentHookLine += c;
     }
+#endif
 }
 
 

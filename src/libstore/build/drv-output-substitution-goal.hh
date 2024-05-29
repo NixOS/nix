@@ -7,10 +7,7 @@
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
-
-#ifdef _WIN32
-#  include "windows-async-pipe.hh"
-#endif
+#include "muxable-pipe.hh"
 
 namespace nix {
 
@@ -48,11 +45,7 @@ class DrvOutputSubstitutionGoal : public Goal {
 
     struct DownloadState
     {
-#ifndef _WIN32
-        Pipe outPipe;
-#else
-        windows::AsyncPipe outPipe;
-#endif
+        MuxablePipe outPipe;
         std::promise<std::shared_ptr<const Realisation>> promise;
     };
 

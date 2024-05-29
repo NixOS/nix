@@ -3,10 +3,7 @@
 
 #include "store-api.hh"
 #include "goal.hh"
-
-#ifdef _WIN32
-#  include "windows-async-pipe.hh"
-#endif
+#include "muxable-pipe.hh"
 
 namespace nix {
 
@@ -48,11 +45,7 @@ struct PathSubstitutionGoal : public Goal
     /**
      * Pipe for the substituter's standard output.
      */
-#ifndef _WIN32
-    Pipe outPipe;
-#else
-    windows::AsyncPipe outPipe;
-#endif
+    MuxablePipe outPipe;
 
     /**
      * The substituter thread.

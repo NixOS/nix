@@ -118,8 +118,6 @@ public:
     { }
 };
 
-#ifndef _WIN32
-
 /**
  * Convert the exit status of a child as returned by wait() into an
  * error string.
@@ -127,7 +125,5 @@ public:
 std::string statusToString(int status);
 
 bool statusOk(int status);
-
-#endif
 
 }
