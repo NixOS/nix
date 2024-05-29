@@ -90,6 +90,12 @@ public:
      */
     Symbol create(std::string_view s)
     {
+        {
+            auto state(state_.read());
+            auto it = state->symbols.find(s);
+            if (it != state->symbols.end()) return Symbol(it->second.second + 1);
+        }
+
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // TODO: could probably be done more efficiently with transparent Hash and Equals
