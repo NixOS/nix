@@ -11,8 +11,9 @@ static std::array<Sync<WaiterDomain>, 128> waiterDomains;
 
 static Sync<WaiterDomain> & getWaiterDomain(Value & v)
 {
-    auto domain = std::hash<Value *>{}(&v) % waiterDomains.size();
-    debug("HASH %x -> %d %d", &v, domain, std::hash<Value *>{}(&v));
+    //auto domain = std::hash<Value *>{}(&v) % waiterDomains.size();
+    auto domain = (((size_t) &v) >> 5) % waiterDomains.size();
+    debug("HASH %x -> %d", &v, domain);
     return waiterDomains[domain];
 }
 
