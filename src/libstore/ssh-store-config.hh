@@ -5,9 +5,13 @@
 
 namespace nix {
 
+class SSHMaster;
+
 struct CommonSSHStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
+
+    CommonSSHStoreConfig(std::string_view scheme, std::string_view host, const Params & params);
 
     const Setting<Path> sshKey{this, "", "ssh-key",
         "Path to the SSH private key used to authenticate to the remote machine."};
@@ -30,9 +34,7 @@ struct CommonSSHStoreConfig : virtual StoreConfig
      * RFC2732, but also pure addresses. The latter one is needed here to
      * connect to a remote store via SSH (it's possible to do e.g. `ssh root@::1`).
      *
-     * This function now ensures that a usable connection string is available:
-     *
-     * - If the store to be opened is not an SSH store, nothing will be done.
+     * When initialized, the following adjustments are made:
      *
      * - If the URL looks like `root@[::1]` (which is allowed by the URL parser and probably
      *   needed to pass further flags), it
@@ -44,9 +46,17 @@ struct CommonSSHStoreConfig : virtual StoreConfig
      *
      * Will throw an error if `connStr` is empty too.
      */
-    static std::string extractConnStr(
-        std::string_view scheme,
-        std::string_view connStr);
+    std::string host;
+
+    /**
+     * Small wrapper around `SSHMaster::SSHMaster` that gets most
+     * arguments from this configuration.
+     *
+     * See that constructor for details on the remaining two arguments.
+     */
+    SSHMaster createSSHMaster(
+        bool useMaster,
+        Descriptor logFD = INVALID_DESCRIPTOR);
 };
 
 }

@@ -33,8 +33,6 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     struct Connection;
 
-    std::string host;
-
     ref<Pool<Connection>> connections;
 
     SSHMaster master;
@@ -45,13 +43,6 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         std::string_view scheme,
         std::string_view host,
         const Params & params);
-
-private:
-    LegacySSHStore(
-        std::string_view scheme,
-        std::string host,
-        const Params & params);
-public:
 
     ref<Connection> openConnection();
 

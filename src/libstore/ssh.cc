@@ -10,7 +10,7 @@ SSHMaster::SSHMaster(
     std::string_view host,
     std::string_view keyFile,
     std::string_view sshPublicHostKey,
-    bool useMaster, bool compress, int logFD)
+    bool useMaster, bool compress, Descriptor logFD)
     : host(host)
     , fakeSSH(host == "localhost")
     , keyFile(keyFile)
