@@ -50,6 +50,11 @@ case "$(uname -s).$(uname -m)" in
         path=@tarballPath_armv7l-linux@
         system=armv7l-linux
         ;;
+    Linux.riscv64)
+        hash=@tarballHash_riscv64-linux@
+        path=@tarballPath_riscv64-linux@
+        system=riscv64-linux
+        ;;
     Darwin.x86_64)
         hash=@tarballHash_x86_64-darwin@
         path=@tarballPath_x86_64-darwin@
