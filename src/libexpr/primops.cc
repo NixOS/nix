@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 #include <regex>
 
 #ifndef _WIN32

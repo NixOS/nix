@@ -19,6 +19,8 @@
 # include "monitor-fd.hh"
 #endif
 
+#include <sstream>
+
 namespace nix::daemon {
 
 Sink & operator << (Sink & sink, const Logger::Fields & fields)

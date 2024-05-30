@@ -8,6 +8,7 @@
 #include "position.hh"
 
 #include <atomic>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <iostream>
 

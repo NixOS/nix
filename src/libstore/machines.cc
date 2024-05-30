@@ -148,7 +148,7 @@ static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, co
     };
 
     auto parseFloatField = [&](size_t fieldIndex) {
-        const auto result = string2Int<float>(tokens[fieldIndex]);
+        const auto result = string2Float<float>(tokens[fieldIndex]);
         if (!result) {
             throw FormatError("bad machine specification: failed to convert column #%lu in a row: '%s' to 'float'", fieldIndex, line);
         }

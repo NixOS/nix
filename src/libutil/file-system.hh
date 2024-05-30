@@ -20,8 +20,6 @@
 #endif
 #include <signal.h>
 
-#include <boost/lexical_cast.hpp>
-
 #include <atomic>
 #include <functional>
 #include <map>
