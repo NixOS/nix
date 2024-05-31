@@ -210,7 +210,7 @@
       # 'nix.perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
 
-      inherit (import ./build/hydra.nix {
+      hydraJobs = import ./build/hydra.nix {
         inherit
           inputs
           binaryTarball
@@ -221,7 +221,7 @@
           nixpkgsFor
           self
           ;
-        }) hydraJobs;
+      };
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
