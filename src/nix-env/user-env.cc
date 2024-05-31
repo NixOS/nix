@@ -9,8 +9,9 @@
 #include "eval-inline.hh"
 #include "profiles.hh"
 #include "print-ambiguous.hh"
-#include <limits>
 
+#include <limits>
+#include <sstream>
 
 namespace nix {
 

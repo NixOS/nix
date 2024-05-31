@@ -7,6 +7,7 @@
 #include "file-system.hh"
 #include "processes.hh"
 #include "signals.hh"
+#include <math.h>
 
 #ifdef __APPLE__
 # include <mach-o/dyld.h>

@@ -1,5 +1,6 @@
 #include <limits>
 #include <unordered_set>
+#include <sstream>
 
 #include "print.hh"
 #include "ansicolor.hh"
