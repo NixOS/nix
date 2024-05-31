@@ -6,6 +6,8 @@ error:
              | ^
             3|   (_: f: f null)
 
+       … from call site
+
        … while calling anonymous lambda
          at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:3:7:
             2| builtins.foldl'
