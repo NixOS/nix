@@ -356,6 +356,22 @@
                   nixVersions = [ self.packages.${system}.nix ];
                 }
             );
+
+            nixosRelease =
+              let importWithBuiltinsSystem = system: scopedImport
+                {
+                  import = importWithBuiltinsSystem system;
+                  builtins = builtins // {
+                    currentSystem = system;
+                  };
+                };
+              in
+              lib.genAttrs linux64BitSystems
+                (system:
+                (importWithBuiltinsSystem system (nixpkgs + "/nixos/release-combined.nix") {
+                nixpkgs = { outPath = nixpkgs; revCount = 123456; shortRev = "gfedbca"; };
+                supportedSystems = [ system ];
+              }).tested);
         };
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
