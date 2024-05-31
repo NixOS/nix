@@ -104,28 +104,6 @@
           cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
-      installScriptFor = tarballs:
-        nixpkgsFor.x86_64-linux.native.callPackage ./scripts/installer.nix {
-          inherit tarballs;
-        };
-
-      testNixVersions = pkgs: client: daemon:
-        pkgs.callPackage ./package.nix {
-          pname =
-            "nix-tests"
-            + lib.optionalString
-              (lib.versionAtLeast daemon.version "2.4pre20211005" &&
-               lib.versionAtLeast client.version "2.4pre20211005")
-              "-${client.version}-against-${daemon.version}";
-
-          inherit fileset;
-
-          test-client = client;
-          test-daemon = daemon;
-
-          doBuild = false;
-        };
-
       binaryTarball = nix: pkgs: pkgs.callPackage ./scripts/binary-tarball.nix {
         inherit nix;
       };
@@ -238,12 +216,10 @@
           binaryTarball
           forAllCrossSystems
           forAllSystems
-          installScriptFor
           lib
           linux64BitSystems
           nixpkgsFor
           self
-          testNixVersions
           ;
         }) hydraJobs;
 

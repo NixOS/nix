@@ -2,16 +2,36 @@
 , binaryTarball
 , forAllCrossSystems
 , forAllSystems
-, installScriptFor
 , lib
 , linux64BitSystems
 , nixpkgsFor
 , self
-, testNixVersions
 }:
 let
   inherit (inputs) nixpkgs nixpkgs-regression;
   inherit (lib) fileset;
+
+  installScriptFor = tarballs:
+    nixpkgsFor.x86_64-linux.native.callPackage ./scripts/installer.nix {
+      inherit tarballs;
+    };
+
+  testNixVersions = pkgs: client: daemon:
+    pkgs.callPackage ../package.nix {
+      pname =
+        "nix-tests"
+        + lib.optionalString
+          (lib.versionAtLeast daemon.version "2.4pre20211005" &&
+           lib.versionAtLeast client.version "2.4pre20211005")
+          "-${client.version}-against-${daemon.version}";
+
+      inherit fileset;
+
+      test-client = client;
+      test-daemon = daemon;
+
+      doBuild = false;
+    };
 in
 {
   hydraJobs = {
@@ -96,14 +116,14 @@ in
     };
 
     # API docs for Nix's unstable internal C++ interfaces.
-    internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+    internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ../package.nix {
       inherit fileset;
       doBuild = false;
       enableInternalAPIDocs = true;
     };
 
     # API docs for Nix's C bindings.
-    external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ./package.nix {
+    external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ../package.nix {
       inherit fileset;
       doBuild = false;
       enableExternalAPIDocs = true;
