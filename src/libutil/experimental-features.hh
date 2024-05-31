@@ -3,7 +3,7 @@
 
 #include "comparator.hh"
 #include "error.hh"
-#include "json-utils.hh"
+#include "json-avoids-null.hh"
 #include "types.hh"
 
 namespace nix {

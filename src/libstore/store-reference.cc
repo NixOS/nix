@@ -1,4 +1,5 @@
 #include <regex>
+#include <nlohmann/json.hpp>
 
 #include "error.hh"
 #include "url.hh"
@@ -111,6 +112,25 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
         uri = uri_.substr(0, q);
     }
     return {uri, params};
+}
+
+}
+
+namespace nlohmann {
+
+using namespace nix;
+
+// TODO support something structured
+
+StoreReference adl_serializer<StoreReference>::from_json(const json & json)
+{
+    auto s = json.get<std::string>();
+    return StoreReference::parse(s);
+}
+
+void adl_serializer<StoreReference>::to_json(json & json, StoreReference ref)
+{
+    json = ref.render();
 }
 
 }

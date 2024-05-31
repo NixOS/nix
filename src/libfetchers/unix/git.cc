@@ -13,6 +13,7 @@
 #include "git-utils.hh"
 #include "logging.hh"
 #include "finally.hh"
+#include "json-utils.hh"
 
 #include "fetch-settings.hh"
 

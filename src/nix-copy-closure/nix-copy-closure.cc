@@ -47,7 +47,15 @@ static int main_nix_copy_closure(int argc, char ** argv)
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
-        auto remoteUri = "ssh://" + sshHost + (gzip ? "?compress=true" : "");
+        StoreReference remoteUri{
+            .variant =
+                StoreReference::Specified{
+                    .scheme = "ssh",
+                    .authority = sshHost,
+                },
+            .params = gzip ? (StoreReference::Params{{"compress", "true"}}) : (StoreReference::Params{}),
+        };
+
         auto to = toMode ? openStore(remoteUri) : openStore();
         auto from = toMode ? openStore() : openStore(remoteUri);
 

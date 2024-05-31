@@ -11,7 +11,7 @@ using namespace nix;
 
 struct CmdCopySigs : StorePathsCommand
 {
-    Strings substituterUris;
+    std::vector<StoreReference> substituterUris;
 
     CmdCopySigs()
     {
@@ -20,7 +20,9 @@ struct CmdCopySigs : StorePathsCommand
             .shortName = 's',
             .description = "Copy signatures from the specified store.",
             .labels = {"store-uri"},
-            .handler = {[&](std::string s) { substituterUris.push_back(s); }},
+            .handler = {[&](std::string s) {
+                substituterUris.push_back(StoreReference::parse(s));
+            }},
         });
     }
 

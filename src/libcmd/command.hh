@@ -62,7 +62,7 @@ private:
  */
 struct CopyCommand : virtual StoreCommand
 {
-    std::string srcUri, dstUri;
+    std::optional<StoreReference> srcUri, dstUri;
 
     CopyCommand();
 

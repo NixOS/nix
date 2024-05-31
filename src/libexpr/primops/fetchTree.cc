@@ -15,6 +15,8 @@
 #include <iomanip>
 #include <regex>
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 void emitTreeAttrs(
