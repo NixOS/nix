@@ -19,18 +19,18 @@ struct EvalSettings : Config
         Enable built-in functions that allow executing native code.
 
         In particular, this adds:
-        - `builtins.importNative` *path*
-        
-          Load a dynamic shared object (DSO) at *path* which exposes a function pointer to a procedure that initialises a Nix language value, and return that value.
-          The procedure must have the following signature:
+        - `builtins.importNative` *path* *symbol*
+
+          Opens dynamic shared object (DSO) at *path*, loads the function with the symbol name *symbol* from it and runs it.
+          The loaded function must have the following signature:
           ```cpp
           extern "C" typedef void (*ValueInitialiser) (EvalState & state, Value & v);
-          ``` 
-          
+          ```
+
           The [Nix C++ API documentation](@docroot@/contributing/documentation.md#api-documentation) has more details on evaluator internals.
-          
+
         - `builtins.exec` *arguments*
-        
+
           Execute a program, where *arguments* are specified as a list of strings, and parse its output as a Nix expression.
     )"};
 
