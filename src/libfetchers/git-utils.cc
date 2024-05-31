@@ -1,3 +1,4 @@
+#include "environment-variables.hh"
 #include "git-utils.hh"
 #include "cache.hh"
 #include "finally.hh"
@@ -373,11 +374,15 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto dir = this->path;
         Strings gitArgs;
         if (shallow) {
-            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
+            gitArgs = { "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
         }
         else {
-            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--", url, refspec };
+            gitArgs = { "fetch", "--quiet", "--force", "--", url, refspec };
         }
+
+
+        std::map<std::string, std::string> gitEnv = getEnv();
+        gitEnv.emplace("GIT_DIR", dir.string());
 
         runProgram(RunOptions {
             .program = "git",
@@ -385,6 +390,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             // FIXME: git stderr messes up our progress indicator, so
             // we're using --quiet for now. Should process its stderr.
             .args = gitArgs,
+            .environment = gitEnv,
             .input = {},
             .isInteractive = true
         });

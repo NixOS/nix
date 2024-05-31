@@ -166,11 +166,16 @@ struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
+        if (url.scheme != "git" && url.scheme.compare(0, 4, "git+") != 0)
+            return {};
+
         if (url.scheme != "git" &&
             url.scheme != "git+http" &&
             url.scheme != "git+https" &&
             url.scheme != "git+ssh" &&
-            url.scheme != "git+file") return {};
+            url.scheme != "git+file")
+            warn("URL scheme '%s' is non-standard and requires 'git-remote-%s'.", url.scheme, url.scheme.substr(4, url.scheme.length() - 4));
+
 
         auto url2(url);
         if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
