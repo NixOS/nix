@@ -249,11 +249,13 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     auto vDump = state.allocValue();
     vDump->mkString(toplevel.dumpCli());
 
-    auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
-    state.callFunction(*vRes, *vDump, *vRes, noPos);
+    auto vRes1 = state.allocValue();
+    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes1, noPos);
 
-    auto attr = vRes->attrs()->get(state.symbols.create(mdName + ".md"));
+    auto vRes2 = state.allocValue();
+    state.callFunction(*vRes1, *vDump, *vRes2, noPos);
+
+    auto attr = vRes2->attrs()->get(state.symbols.create(mdName + ".md"));
     if (!attr)
         throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
 

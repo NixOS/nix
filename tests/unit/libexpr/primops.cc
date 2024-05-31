@@ -447,11 +447,15 @@ namespace nix {
     }
 
     TEST_F(PrimOpTest, addFloatToInt) {
+        {
         auto v = eval("builtins.add 3.0 5");
         ASSERT_THAT(v, IsFloatEq(8.0));
+        }
 
-        v = eval("builtins.add 3 5.0");
+        {
+        auto v = eval("builtins.add 3 5.0");
         ASSERT_THAT(v, IsFloatEq(8.0));
+        }
     }
 
     TEST_F(PrimOpTest, subInt) {
@@ -465,11 +469,15 @@ namespace nix {
     }
 
     TEST_F(PrimOpTest, subFloatFromInt) {
+        {
         auto v = eval("builtins.sub 5.0 2");
         ASSERT_THAT(v, IsFloatEq(3.0));
+        }
 
-        v = eval("builtins.sub 4 2.0");
+        {
+        auto v = eval("builtins.sub 4 2.0");
         ASSERT_THAT(v, IsFloatEq(2.0));
+        }
     }
 
     TEST_F(PrimOpTest, mulInt) {
@@ -483,11 +491,15 @@ namespace nix {
     }
 
     TEST_F(PrimOpTest, mulFloatMixed) {
+        {
         auto v = eval("builtins.mul 3 5.0");
         ASSERT_THAT(v, IsFloatEq(15.0));
+        }
 
-        v = eval("builtins.mul 2.0 5");
+        {
+        auto v = eval("builtins.mul 2.0 5");
         ASSERT_THAT(v, IsFloatEq(10.0));
+        }
     }
 
     TEST_F(PrimOpTest, divInt) {
