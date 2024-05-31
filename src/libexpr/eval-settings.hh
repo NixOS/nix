@@ -165,6 +165,42 @@ struct EvalSettings : Config
 
           This is useful for debugging warnings in third-party Nix code.
         )"};
+
+    PathsSetting replOverlays{this, Paths(), "repl-overlays",
+        R"(
+          A list of files containing Nix expressions that can be used to add
+          default bindings to [`nix
+          repl`](@docroot@/command-ref/new-cli/nix3-repl.md) sessions.
+
+          Each file is called with three arguments:
+          1. An [attribute set](@docroot@/language/values.html#attribute-set)
+             containing a
+             [`currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+             attribute (this is identical to
+             [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem),
+             except that it's available in
+             [`pure-eval`](@docroot@/command-ref/conf-file.html#conf-pure-eval)
+             mode).
+          2. The top-level bindings produced by the previous `repl-overlays`
+             value (or the default top-level bindings).
+          3. The final top-level bindings produced by calling all
+             `repl-overlays`.
+
+          For example, the following file would alias `pkgs` to
+          `legacyPackages.${info.currentSystem}` (if that attribute is defined):
+
+          ```nix
+          info: prev: final:
+          if prev ? legacyPackages
+             && prev.legacyPackages ? ${info.currentSystem}
+          then
+          {
+            pkgs = prev.legacyPackages.${info.currentSystem};
+          }
+          else
+          { }
+          ```
+        )"};
 };
 
 extern EvalSettings evalSettings;
