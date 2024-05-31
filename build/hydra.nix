@@ -12,7 +12,7 @@ let
   inherit (lib) fileset;
 
   installScriptFor = tarballs:
-    nixpkgsFor.x86_64-linux.native.callPackage ./scripts/installer.nix {
+    nixpkgsFor.x86_64-linux.native.callPackage ../scripts/installer.nix {
       inherit tarballs;
     };
 
