@@ -121,6 +121,7 @@
   - [Documentation](contributing/documentation.md)
   - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
+  - [JSON guideline](contributing/json-guideline.md)
   - [C++ style guide](contributing/cxx.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
