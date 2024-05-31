@@ -155,7 +155,12 @@ struct PathInputScheme : InputScheme
         }
         input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
-        return {makeStorePathAccessor(store, *storePath), std::move(input)};
+        auto accessor = makeStorePathAccessor(store, *storePath);
+
+        /* Optimize fetchToStore() calls on this path. */
+        accessor->isStorePath = true;
+
+        return {accessor, std::move(input)};
     }
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override

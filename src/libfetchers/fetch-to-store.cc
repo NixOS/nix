@@ -1,6 +1,7 @@
 #include "fetch-to-store.hh"
 #include "fetchers.hh"
 #include "cache.hh"
+#include "posix-source-accessor.hh"
 
 namespace nix {
 
@@ -13,8 +14,16 @@ StorePath fetchToStore(
     PathFilter * filter,
     RepairFlag repair)
 {
-    // FIXME: add an optimisation for the case where the accessor is
-    // a `PosixSourceAccessor` pointing to a store path.
+    if (path.accessor->isStorePath
+        && path.path.isRoot()
+        && method == FileIngestionMethod::Recursive
+        && !filter)
+    {
+        if (auto accessor = path.accessor.dynamic_pointer_cast<PosixSourceAccessor>())
+            if (auto storePath = store.maybeParseStorePath(accessor->root.string()))
+                if (storePath->name() == name)
+                    return *storePath;
+    }
 
     std::optional<fetchers::Cache::Key> cacheKey;
 

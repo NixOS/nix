@@ -183,6 +183,13 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      */
     virtual std::optional<time_t> getLastModified()
     { return std::nullopt; }
+
+    /**
+     * Whether this is a store path using
+     * FileIngestionMethod::Recursive. This is used to optimize
+     * `fetchToStore()`.
+     */
+    bool isStorePath = false;
 };
 
 /**
