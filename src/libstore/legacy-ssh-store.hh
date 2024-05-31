@@ -6,6 +6,7 @@
 #include "ssh.hh"
 #include "callback.hh"
 #include "pool.hh"
+#include "serve-protocol-impl.hh"
 
 namespace nix {
 
@@ -18,6 +19,11 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 
     const Setting<int> maxConnections{this, 1, "max-connections",
         "Maximum number of concurrent SSH connections."};
+
+    /**
+     * Hack for hydra
+     */
+    Strings extraSshArgs = {};
 
     const std::string name() override { return "SSH Store"; }
 
@@ -51,10 +57,20 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
+    std::map<StorePath, UnkeyedValidPathInfo> queryPathInfosUncached(
+        const StorePathSet & paths);
+
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
+
+    /**
+     * Gives Hands over the connection temporarily as source.
+     *
+     * Caller must be sure to not consume more than the NAR.
+     */
+    void narFromPath(const StorePath & path, std::function<void(Source &)> fun);
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
@@ -84,6 +100,15 @@ public:
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
 
+    /**
+     * Unsafe if connection in pool is greater than 1!
+     *
+     * Can make safe once we have C++23 `std::move_only_function`.
+     */
+    std::function<BuildResult()> buildDerivationAsync(
+        const StorePath & drvPath, const BasicDerivation & drv,
+        const ServeProto::BuildOptions & options);
+
     void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
 
     void ensurePath(const StorePath & path) override
@@ -110,9 +135,35 @@ public:
     StorePathSet queryValidPaths(const StorePathSet & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
+    /**
+     * Custom variation that atomically creates temp locks on the remote
+     * side.
+     *
+     * This exists to prevent a race where the remote host
+     * garbage-collects paths that are already there. Optionally, ask
+     * the remote host to substitute missing paths.
+     */
+    StorePathSet queryValidPaths(const StorePathSet & paths,
+        bool lock,
+        SubstituteFlag maybeSubstitute = NoSubstitute);
+
+    /**
+     * Just exists because this is exactly what Hydra was doing, and we
+     * don't yet want an algorithmic change.
+     */
+    void addMultipleToStoreLegacy(Store & srcStore, const StorePathSet & paths);
+
     void connect() override;
 
     unsigned int getProtocol() override;
+
+    struct ConnectionStats {
+        size_t bytesReceived, bytesSent;
+    };
+
+    ConnectionStats getConnectionStats();
+
+    pid_t getConnectionPid();
 
     /**
      * The legacy ssh protocol doesn't support checking for trusted-user.
