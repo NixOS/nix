@@ -27,11 +27,13 @@ inline void * allocBytes(size_t n)
 [[gnu::always_inline]]
 Value * EvalState::allocValue()
 {
-#if 0 /* HAVE_BOEHMGC */
+#if HAVE_BOEHMGC
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
        have to explicitly clear the first word of every object we take. */
+    thread_local static std::shared_ptr<void *> valueAllocCache{std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+
     if (!*valueAllocCache) {
         *valueAllocCache = GC_malloc_many(sizeof(Value));
         if (!*valueAllocCache) throw std::bad_alloc();
@@ -59,9 +61,11 @@ Env & EvalState::allocEnv(size_t size)
 
     Env * env;
 
-#if 0 /* HAVE_BOEHMGC */
+#if HAVE_BOEHMGC
     if (size == 1) {
         /* see allocValue for explanations. */
+        thread_local static std::shared_ptr<void *> env1AllocCache{std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+
         if (!*env1AllocCache) {
             *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
             if (!*env1AllocCache) throw std::bad_alloc();
