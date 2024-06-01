@@ -371,8 +371,9 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (!status.known) continue;
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.toRealPath(status.known->path);
-            if (pathExists(chrootRootDir + p))
-                std::filesystem::rename((chrootRootDir + p), p);
+            auto p2 = chrootRootDir / p.relative_path();
+            if (pathExists(p2))
+                std::filesystem::rename(p2, p);
         }
 
     return diskFull;
@@ -452,7 +453,7 @@ void LocalDerivationGoal::startBuilder()
         if (ourCgroup == "")
             throw Error("cannot determine cgroup name from /proc/self/cgroup");
 
-        auto ourCgroupPath = canonPath(*cgroupFS + "/" + ourCgroup);
+        auto ourCgroupPath = canonPath(*cgroupFS / ourCgroup);
 
         if (!pathExists(ourCgroupPath))
             throw Error("expected cgroup directory '%s'", ourCgroupPath);
@@ -469,7 +470,7 @@ void LocalDerivationGoal::startBuilder()
            user so that if we got interrupted previously, we can kill
            any left-over cgroup first. */
         if (buildUser) {
-            auto cgroupsDir = settings.nixStateDir + "/cgroups";
+            auto cgroupsDir = settings.nixStateDir / "cgroups";
             createDirs(cgroupsDir);
 
             auto cgroupFile = fmt("%s/%d", cgroupsDir, buildUser->getUID());
@@ -592,7 +593,7 @@ void LocalDerivationGoal::startBuilder()
             auto storePath = worker.store.toStorePath(storePathS).first;
 
             /* Write closure info to <fileName>. */
-            writeFile(tmpDir + "/" + fileName,
+            writeFile(tmpDir / fileName,
                 worker.store.makeValidityRegistration(
                     worker.store.exportReferences({storePath}, inputPaths), false, false));
         }
@@ -690,30 +691,30 @@ void LocalDerivationGoal::startBuilder()
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
            instead.) */
-        Path chrootTmpDir = chrootRootDir + "/tmp";
+        Path chrootTmpDir = chrootRootDir / "tmp";
         createDirs(chrootTmpDir);
         chmod_(chrootTmpDir, 01777);
 
         /* Create a /etc/passwd with entries for the build user and the
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
-        createDirs(chrootRootDir + "/etc");
+        createDirs(chrootRootDir / "etc");
         if (parsedDrv->useUidRange())
-            chownToBuilder(chrootRootDir + "/etc");
+            chownToBuilder(chrootRootDir / "etc");
 
         if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
-        writeFile(chrootRootDir + "/etc/group",
+        writeFile(chrootRootDir / "etc/group",
             fmt("root:x:0:\n"
                 "nixbld:!:%1%:\n"
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
         if (derivationType->isSandboxed())
-            writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
+            writeFile(chrootRootDir / "etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
            rather than the whole Nix store.  This prevents any access
@@ -754,9 +755,9 @@ void LocalDerivationGoal::startBuilder()
             if (mkdir(cgroup->c_str(), 0755) != 0)
                 throw SysError("creating cgroup '%s'", *cgroup);
             chownToBuilder(*cgroup);
-            chownToBuilder(*cgroup + "/cgroup.procs");
-            chownToBuilder(*cgroup + "/cgroup.threads");
-            //chownToBuilder(*cgroup + "/cgroup.subtree_control");
+            chownToBuilder(*cgroup / "cgroup.procs");
+            chownToBuilder(*cgroup / "cgroup.threads");
+            //chownToBuilder(*cgroup / "cgroup.subtree_control");
         }
 
 #else
@@ -978,13 +979,13 @@ void LocalDerivationGoal::startBuilder()
             uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
             uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
 
-            writeFile("/proc/" + std::to_string(pid) + "/uid_map",
+            writeFile("/proc/" + std::to_string(pid) / "uid_map",
                 fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
 
             if (!buildUser || buildUser->getUIDCount() == 1)
-                writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
+                writeFile("/proc/" + std::to_string(pid) / "setgroups", "deny");
 
-            writeFile("/proc/" + std::to_string(pid) + "/gid_map",
+            writeFile("/proc/" + std::to_string(pid) / "gid_map",
                 fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
         } else {
             debug("note: not using a user namespace");
@@ -994,7 +995,7 @@ void LocalDerivationGoal::startBuilder()
 
         /* Now that we now the sandbox uid, we can write
            /etc/passwd. */
-        writeFile(chrootRootDir + "/etc/passwd", fmt(
+        writeFile(chrootRootDir / "etc/passwd", fmt(
                 "root:x:0:0:Nix build user:%3%:/noshell\n"
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
@@ -1014,7 +1015,7 @@ void LocalDerivationGoal::startBuilder()
 
         /* Move the child into its own cgroup. */
         if (cgroup)
-            writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
+            writeFile(*cgroup / "cgroup.procs", fmt("%d", (pid_t) pid));
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -1085,10 +1086,10 @@ void LocalDerivationGoal::initTmpDir() {
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
                 std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
-                Path p = tmpDir + "/" + fn;
+                Path p = tmpDir / fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
-                env[i.first + "Path"] = tmpDirInSandbox + "/" + fn;
+                env[i.first + "Path"] = tmpDirInSandbox / fn;
             }
         }
 
@@ -1192,12 +1193,12 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         auto jsonSh = writeStructuredAttrsShell(json);
 
-        writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.sh");
-        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox + "/.attrs.sh";
-        writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
-        chownToBuilder(tmpDir + "/.attrs.json");
-        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox + "/.attrs.json";
+        writeFile(tmpDir / ".attrs.sh", rewriteStrings(jsonSh, inputRewrites));
+        chownToBuilder(tmpDir / ".attrs.sh");
+        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox / ".attrs.sh";
+        writeFile(tmpDir / ".attrs.json", rewriteStrings(json.dump(), inputRewrites));
+        chownToBuilder(tmpDir / ".attrs.json");
+        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox / ".attrs.json";
     }
 }
 
@@ -1477,8 +1478,8 @@ void LocalDerivationGoal::startDaemon()
     addedPaths.clear();
 
     auto socketName = ".nix-socket";
-    Path socketPath = tmpDir + "/" + socketName;
-    env["NIX_REMOTE"] = "unix://" + tmpDirInSandbox + "/" + socketName;
+    Path socketPath = tmpDir / socketName;
+    env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox / socketName).string();
 
     daemonSocket = createUnixDomainSocket(socketPath, 0600);
 
@@ -1796,8 +1797,8 @@ void LocalDerivationGoal::runChild()
                bind-mount the host /dev. */
             Strings ss;
             if (pathsInChroot.find("/dev") == pathsInChroot.end()) {
-                createDirs(chrootRootDir + "/dev/shm");
-                createDirs(chrootRootDir + "/dev/pts");
+                createDirs(chrootRootDir / "dev/shm");
+                createDirs(chrootRootDir / "dev/pts");
                 ss.push_back("/dev/full");
                 if (worker.store.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
@@ -1806,10 +1807,10 @@ void LocalDerivationGoal::runChild()
                 ss.push_back("/dev/tty");
                 ss.push_back("/dev/urandom");
                 ss.push_back("/dev/zero");
-                createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
-                createSymlink("/proc/self/fd/0", chrootRootDir + "/dev/stdin");
-                createSymlink("/proc/self/fd/1", chrootRootDir + "/dev/stdout");
-                createSymlink("/proc/self/fd/2", chrootRootDir + "/dev/stderr");
+                createSymlink("/proc/self/fd", chrootRootDir / "dev/fd");
+                createSymlink("/proc/self/fd/0", chrootRootDir / "dev/stdin");
+                createSymlink("/proc/self/fd/1", chrootRootDir / "dev/stdout");
+                createSymlink("/proc/self/fd/2", chrootRootDir / "dev/stderr");
             }
 
             /* Fixed-output derivations typically need to access the
@@ -1820,7 +1821,7 @@ void LocalDerivationGoal::runChild()
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
                 // potential impurities introduced in fixed-outputs.
-                writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
+                writeFile(chrootRootDir / "etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
                 /* N.B. it is realistic that these paths might not exist. It
                    happens when testing Nix building fixed-output derivations
@@ -1863,20 +1864,20 @@ void LocalDerivationGoal::runChild()
             }
 
             /* Bind a new instance of procfs on /proc. */
-            createDirs(chrootRootDir + "/proc");
-            if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
+            createDirs(chrootRootDir / "proc");
+            if (mount("none", (chrootRootDir / "proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
 
             /* Mount sysfs on /sys. */
             if (buildUser && buildUser->getUIDCount() != 1) {
-                createDirs(chrootRootDir + "/sys");
-                if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
+                createDirs(chrootRootDir / "sys");
+                if (mount("none", (chrootRootDir / "sys").c_str(), "sysfs", 0, 0) == -1)
                     throw SysError("mounting /sys");
             }
 
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
-            if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
+            if (pathExists("/dev/shm") && mount("none", (chrootRootDir / "dev/shm").c_str(), "tmpfs", 0,
                     fmt("size=%s", settings.sandboxShmSize).c_str()) == -1)
                 throw SysError("mounting /dev/shm");
 
@@ -1885,27 +1886,27 @@ void LocalDerivationGoal::runChild()
                CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
                if /dev/ptx/ptmx exists). */
             if (pathExists("/dev/pts/ptmx") &&
-                !pathExists(chrootRootDir + "/dev/ptmx")
+                !pathExists(chrootRootDir / "dev/ptmx")
                 && !pathsInChroot.count("/dev/pts"))
             {
-                if (mount("none", (chrootRootDir + "/dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0)
+                if (mount("none", (chrootRootDir / "dev/pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0)
                 {
-                    createSymlink("/dev/pts/ptmx", chrootRootDir + "/dev/ptmx");
+                    createSymlink("/dev/pts/ptmx", chrootRootDir / "dev/ptmx");
 
                     /* Make sure /dev/pts/ptmx is world-writable.  With some
                        Linux versions, it is created with permissions 0.  */
-                    chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
+                    chmod_(chrootRootDir / "dev/pts/ptmx", 0666);
                 } else {
                     if (errno != EINVAL)
                         throw SysError("mounting /dev/pts");
-                    doBind("/dev/pts", chrootRootDir + "/dev/pts");
-                    doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx");
+                    doBind("/dev/pts", chrootRootDir / "dev/pts");
+                    doBind("/dev/ptmx", chrootRootDir / "dev/ptmx");
                 }
             }
 
             /* Make /etc unwritable */
             if (!parsedDrv->useUidRange())
-                chmod_(chrootRootDir + "/etc", 0555);
+                chmod_(chrootRootDir / "etc", 0555);
 
             /* Unshare this mount namespace. This is necessary because
                pivot_root() below changes the root of the mount
@@ -1934,7 +1935,7 @@ void LocalDerivationGoal::runChild()
                 throw SysError("cannot create real-root directory");
 
             if (pivot_root(".", "real-root") == -1)
-                throw SysError("cannot pivot old root directory onto '%1%'", (chrootRootDir + "/real-root"));
+                throw SysError("cannot pivot old root directory onto '%1%'", (chrootRootDir / "real-root"));
 
             if (chroot(".") == -1)
                 throw SysError("cannot change root directory to '%1%'", chrootRootDir);
@@ -2109,7 +2110,7 @@ void LocalDerivationGoal::runChild()
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
 
-            Path sandboxFile = tmpDir + "/.sandbox.sb";
+            Path sandboxFile = tmpDir / ".sandbox.sb";
 
             writeFile(sandboxFile, sandboxProfile);
 
@@ -2502,7 +2503,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(
                         outputHash.hashAlgo,
-                        {getFSSourceAccessor(), CanonPath(tmpDir + "/tmp")}).hash;
+                        {getFSSourceAccessor(), CanonPath(tmpDir / "tmp")}).hash;
                 }
                 }
                 assert(false);

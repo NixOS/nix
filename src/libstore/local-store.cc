@@ -465,7 +465,7 @@ LocalStore::LocalStore(const Params & params)
 
 LocalStore::LocalStore(
     std::string_view scheme,
-    PathView path,
+    std::string_view path,
     const Params & _params)
     : LocalStore([&]{
         // Default `?root` from `path` if non set

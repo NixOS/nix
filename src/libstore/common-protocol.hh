@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <filesystem>
+
 #include "serialise.hh"
 
 namespace nix {
@@ -63,6 +65,8 @@ struct CommonProto
 
 template<>
 DECLARE_COMMON_SERIALISER(std::string);
+template<>
+DECLARE_COMMON_SERIALISER(std::filesystem::path);
 template<>
 DECLARE_COMMON_SERIALISER(StorePath);
 template<>

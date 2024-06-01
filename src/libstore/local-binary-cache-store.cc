@@ -34,14 +34,14 @@ public:
      */
     LocalBinaryCacheStore(
         std::string_view scheme,
-        PathView binaryCacheDir,
+        std::string_view binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , LocalBinaryCacheStoreConfig(params)
         , Store(params)
         , BinaryCacheStore(params)
-        , binaryCacheDir(binaryCacheDir)
+        , binaryCacheDir(std::filesystem::path{std::string{binaryCacheDir}})
     {
     }
 

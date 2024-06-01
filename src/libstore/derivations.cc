@@ -441,7 +441,7 @@ Derivation parseDerivation(
     }
 
     expect(str, ",");
-    for (auto & i : parseStrings(str, true)) drv.inputSrcs.insert(i);
+    for (auto & i : parseStrings(str, true)) drv.inputSrcs.insert(store.parseStorePath(i));
     expect(str, ","); drv.platform = parseString(str).toOwned();
     expect(str, ","); drv.builder = parseString(str).toOwned();
 
@@ -639,7 +639,10 @@ std::string Derivation::unparse(const StoreDirConfig & store, bool maskOutputs,
     }
 
     s += "],";
-    auto paths = store.printStorePathSet(inputSrcs); // FIXME: slow
+    StringSet paths;
+    // FIXME: slow
+    for (auto & i : inputSrcs)
+        paths.insert(store.printStorePath(i));
     printUnquotedStrings(s, paths.begin(), paths.end());
 
     s += ','; printUnquotedString(s, platform);

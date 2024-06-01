@@ -743,7 +743,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         gcStore.collectGarbage(options, results);
         logger->stopWork();
 
-        to << results.paths << results.bytesFreed << 0 /* obsolete */;
+        WorkerProto::write(*store, wconn, results.paths);
+        to << results.bytesFreed << 0 /* obsolete */;
 
         break;
     }

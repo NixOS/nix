@@ -890,7 +890,12 @@ void runPostBuildHook(
     std::map<std::string, std::string> hookEnvironment = getEnv();
 
     hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
-    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", ({
+        StringSet paths;
+        for (auto & p : outPaths)
+            paths.insert(store.printStorePath(p));
+        paths
+    }))));
     hookEnvironment.emplace("NIX_CONFIG", globalConfig.toKeyValue());
 
     struct LogSink : Sink {

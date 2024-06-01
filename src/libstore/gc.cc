@@ -39,7 +39,7 @@ static std::string gcRootsDir = "gcroots";
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
+    std::string hash = hashString(HashAlgorithm::SHA1, path.string()).to_string(HashFormat::Nix32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
@@ -202,7 +202,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 
         while ((end = contents.find((char) 0, pos)) != std::string::npos) {
             Path root(contents, pos, end - pos);
-            debug("got temporary root '%s'", root);
+            debug("got temporary root '%s'", root.native());
             tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
             pos = end + 1;
         }

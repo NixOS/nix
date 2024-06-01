@@ -13,7 +13,7 @@ SSHMaster::SSHMaster(
     bool useMaster, bool compress, Descriptor logFD)
     : host(host)
     , fakeSSH(host == "localhost")
-    , keyFile(keyFile)
+    , keyFile(pathNG(keyFile))
     , sshPublicHostKey(sshPublicHostKey)
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
