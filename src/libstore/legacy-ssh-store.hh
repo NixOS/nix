@@ -26,10 +26,14 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 
 struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store
 {
+#ifndef _WIN32
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
     // the documentation
-    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    const Setting<int> logFD{this, INVALID_DESCRIPTOR, "log-fd", "file descriptor to which SSH's stderr is connected"};
+#else
+    Descriptor logFD = INVALID_DESCRIPTOR;
+#endif
 
     struct Connection;
 
