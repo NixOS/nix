@@ -6,7 +6,7 @@ libstore_DIR := $(d)
 
 libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 ifdef HOST_UNIX
-  libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/builtins/*.cc $(d)/unix/build/*.cc)
+  libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/build/*.cc)
 endif
 ifdef HOST_LINUX
   libstore_SOURCES += $(wildcard $(d)/linux/*.cc)

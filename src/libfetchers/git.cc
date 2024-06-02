@@ -19,7 +19,10 @@
 #include <regex>
 #include <string.h>
 #include <sys/time.h>
-#include <sys/wait.h>
+
+#ifndef _WIN32
+#  include <sys/wait.h>
+#endif
 
 using namespace std::string_literals;
 
@@ -40,6 +43,7 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 
 bool touchCacheFile(const Path & path, time_t touch_time)
 {
+#ifndef _WIN32 // TODO implement
     struct timeval times[2];
     times[0].tv_sec = touch_time;
     times[0].tv_usec = 0;
@@ -47,6 +51,9 @@ bool touchCacheFile(const Path & path, time_t touch_time)
     times[1].tv_usec = 0;
 
     return lutimes(path.c_str(), times) == 0;
+#else
+    return false;
+#endif
 }
 
 Path getCachePath(std::string_view key, bool shallow)
@@ -98,7 +105,15 @@ bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
     try {
         runProgram("git", true, { "-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef });
     } catch (ExecError &e) {
-        if (!WIFEXITED(e.status)) throw;
+        if (
+#ifndef WIN32 // TODO abstract over exit status handling on Windows
+            !WIFEXITED(e.status)
+#else
+            e.status != 0
+#endif
+            )
+            throw;
+
         return false;
     }
     /* No need to touch refs/HEAD, because `git symbolic-ref` updates the mtime. */
@@ -329,7 +344,13 @@ struct GitInputScheme : InputScheme
             .program = "git",
             .args = {"-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "check-ignore", "--quiet", std::string(path.rel())},
         });
-        auto exitCode = WEXITSTATUS(result.first);
+        auto exitCode =
+#ifndef WIN32 // TODO abstract over exit status handling on Windows
+            WEXITSTATUS(result.first)
+#else
+            result.first
+#endif
+            ;
 
         if (exitCode != 0) {
             // The path is not `.gitignore`d, we can add the file.
