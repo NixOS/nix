@@ -4,6 +4,7 @@
 #include "pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-connection.hh"
 #include "serve-protocol-impl.hh"
 #include "build-result.hh"
 #include "store-api.hh"
@@ -73,7 +74,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
         conn->sshConn->in.close();
         {
             NullSink nullSink;
-            conn->from.drainInto(nullSink);
+            tee.drainInto(nullSink);
         }
         throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
             host, chomp(saved.s));
@@ -155,41 +156,38 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
         }
         conn->to.flush();
 
+        if (readInt(conn->from) != 1)
+            throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), host);
+
     } else {
 
-        conn->to
-            << ServeProto::Command::ImportPaths
-            << 1;
-        try {
-            copyNAR(source, conn->to);
-        } catch (...) {
-            conn->good = false;
-            throw;
-        }
-        conn->to
-            << exportMagic
-            << printStorePath(info.path);
-        ServeProto::write(*this, *conn, info.references);
-        conn->to
-            << (info.deriver ? printStorePath(*info.deriver) : "")
-            << 0
-            << 0;
-        conn->to.flush();
+        conn->importPaths(*this, [&](Sink & sink) {
+            try {
+                copyNAR(source, sink);
+            } catch (...) {
+                conn->good = false;
+                throw;
+            }
+            sink
+                << exportMagic
+                << printStorePath(info.path);
+            ServeProto::write(*this, *conn, info.references);
+            sink
+                << (info.deriver ? printStorePath(*info.deriver) : "")
+                << 0
+                << 0;
+        });
 
     }
-
-    if (readInt(conn->from) != 1)
-        throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), host);
 }
 
 
 void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
 {
     auto conn(connections->get());
-
-    conn->to << ServeProto::Command::DumpStorePath << printStorePath(path);
-    conn->to.flush();
-    copyNAR(conn->from, sink);
+    conn->narFromPath(*this, path, [&](auto & source) {
+        copyNAR(source, sink);
+    });
 }
 
 
@@ -213,7 +211,7 @@ BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const Bas
 
     conn->putBuildDerivationRequest(*this, drvPath, drv, buildSettings());
 
-    return ServeProto::Serialise<BuildResult>::read(*this, *conn);
+    return conn->getBuildDerivationResponse(*this);
 }
 
 
