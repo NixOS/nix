@@ -14,9 +14,9 @@ clearStore
 clearCache
 outPath=$(nix-build dependencies.nix --no-out-link)
 
-nix copy --to file://"$cacheDir" "$outPath"
+nix copy --to "file://$cacheDir" "$outPath"
 
-readarray -t paths < <(nix path-info --all --json --store file://"$cacheDir" | jq 'keys|sort|.[]' -r)
+readarray -t paths < <(nix path-info --all --json --store "file://$cacheDir" | jq 'keys|sort|.[]' -r)
 [[ "${#paths[@]}" -eq 3 ]]
 for path in "${paths[@]}"; do
     [[ "$path" =~ -dependencies-input-0$ ]] \
@@ -25,15 +25,15 @@ for path in "${paths[@]}"; do
 done
 
 # Test copying build logs to the binary cache.
-expect 1 nix log --store file://"$cacheDir" "$outPath" 2>&1 | grep 'is not available'
-nix store copy-log --to file://"$cacheDir" "$outPath"
-nix log --store file://"$cacheDir" "$outPath" | grep FOO
+expect 1 nix log --store "file://$cacheDir" "$outPath" 2>&1 | grep 'is not available'
+nix store copy-log --to "file://$cacheDir" "$outPath"
+nix log --store "file://$cacheDir" "$outPath" | grep FOO
 rm -rf "$TEST_ROOT/var/log/nix"
 expect 1 nix log "$outPath" 2>&1 | grep 'is not available'
-nix log --substituters file://"$cacheDir" "$outPath" | grep FOO
+nix log --substituters "file://$cacheDir" "$outPath" | grep FOO
 
 # Test copying build logs from the binary cache.
-nix store copy-log --from file://"$cacheDir" "$(nix-store -qd "$outPath")"^'*'
+nix store copy-log --from "file://$cacheDir" "$(nix-store -qd "$outPath")"^'*'
 nix log "$outPath" | grep FOO
 
 basicDownloadTests() {
@@ -166,7 +166,7 @@ badKey=$(nix key convert-secret-to-public < "$TEST_ROOT/sk2")
 nix key generate-secret --key-name foo.nixos.org-1 > "$TEST_ROOT/sk3"
 otherKey=$(nix key convert-secret-to-public < "$TEST_ROOT/sk3")
 
-_NIX_FORCE_HTTP='' nix copy --to file://"$cacheDir"?secret-key="$TEST_ROOT"/sk1 "$outPath"
+_NIX_FORCE_HTTP='' nix copy --to "file://$cacheDir"?secret-key="$TEST_ROOT"/sk1 "$outPath"
 
 
 # Downloading should fail if we don't provide a key.
@@ -212,7 +212,7 @@ unset _NIX_FORCE_HTTP
 
 
 # Test 'nix verify --all' on a binary cache.
-nix store verify -vvvvv --all --store file://"$cacheDir" --no-trust
+nix store verify -vvvvv --all --store "file://$cacheDir" --no-trust
 
 
 # Test local NAR caching.
@@ -226,7 +226,7 @@ rm -rfv "$cacheDir/nar"
 
 [[ $(nix store cat --store "file://$cacheDir?local-nar-cache=$narCache" "$outPath/foobar") = FOOBAR ]]
 
-(! nix store cat --store file://"$cacheDir" "$outPath/foobar")
+(! nix store cat --store "file://$cacheDir" "$outPath/foobar")
 
 
 # Test NAR listing generation.
@@ -243,7 +243,7 @@ outPath=$(nix-build --no-out-link -E '
   }
 ')
 
-nix copy --to file://"$cacheDir"?write-nar-listing=1 "$outPath"
+nix copy --to "file://$cacheDir"?write-nar-listing=1 "$outPath"
 
 diff -u \
     <(jq -S < "$cacheDir/$(basename "$outPath" | cut -c1-32).ls") \
