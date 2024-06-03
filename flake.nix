@@ -159,8 +159,6 @@
             };
           });
 
-          changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
-
           nix =
             let
               officialRelease = false;
@@ -224,7 +222,7 @@
         rl-next =
           let pkgs = nixpkgsFor.${system}.native;
           in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
-          LANG=C.UTF-8 ${pkgs.changelog-d-nix}/bin/changelog-d ${./doc/manual/rl-next} >$out
+          LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
         '';
         repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
@@ -238,7 +236,7 @@
       );
 
       packages = forAllSystems (system: rec {
-        inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
+        inherit (nixpkgsFor.${system}.native) nix changelog-d;
         default = nix;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
