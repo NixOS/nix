@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 echo example > $TEST_ROOT/example.txt

@@ -28,9 +28,13 @@ private:
 
 public:
 
+    /**
+     * @param binaryCacheDir `file://` is a short-hand for `file:///`
+     * for now.
+     */
     LocalBinaryCacheStore(
-        const std::string scheme,
-        const Path & binaryCacheDir,
+        std::string_view scheme,
+        PathView binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
@@ -64,7 +68,7 @@ protected:
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
-        renameFile(tmp, path2);
+        std::filesystem::rename(tmp, path2);
         del.cancel();
     }
 
@@ -83,7 +87,7 @@ protected:
     {
         StorePathSet paths;
 
-        for (auto & entry : readDirectory(binaryCacheDir)) {
+        for (auto & entry : std::filesystem::directory_iterator{binaryCacheDir}) {
             auto name = entry.path().filename().string();
             if (name.size() != 40 ||
                 !hasSuffix(name, ".narinfo"))

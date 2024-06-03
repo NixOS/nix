@@ -69,50 +69,26 @@ void RemoteStore::initConnection(Connection & conn)
     /* Send the magic greeting, check for the reply. */
     try {
         conn.from.endOfFileError = "Nix daemon disconnected unexpectedly (maybe it crashed?)";
-        conn.to << WORKER_MAGIC_1;
-        conn.to.flush();
+
         StringSink saved;
+        TeeSource tee(conn.from, saved);
         try {
-            TeeSource tee(conn.from, saved);
-            unsigned int magic = readInt(tee);
-            if (magic != WORKER_MAGIC_2)
-                throw Error("protocol mismatch");
+            conn.daemonVersion = WorkerProto::BasicClientConnection::handshake(
+                conn.to, tee, PROTOCOL_VERSION);
         } catch (SerialisationError & e) {
             /* In case the other side is waiting for our input, close
                it. */
             conn.closeWrite();
-            auto msg = conn.from.drain();
-            throw Error("protocol mismatch, got '%s'", chomp(saved.s + msg));
+            {
+                NullSink nullSink;
+                tee.drainInto(nullSink);
+            }
+            throw Error("protocol mismatch, got '%s'", chomp(saved.s));
         }
 
-        conn.from >> conn.daemonVersion;
-        if (GET_PROTOCOL_MAJOR(conn.daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
-            throw Error("Nix daemon protocol version not supported");
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) < 10)
-            throw Error("the Nix daemon version is too old");
-        conn.to << PROTOCOL_VERSION;
+        static_cast<WorkerProto::ClientHandshakeInfo &>(conn) = conn.postHandshake(*this);
 
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
-            // Obsolete CPU affinity.
-            conn.to << 0;
-        }
-
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
-            conn.to << false; // obsolete reserveSpace
-
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
-            conn.to.flush();
-            conn.daemonNixVersion = readString(conn.from);
-        }
-
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 35) {
-            conn.remoteTrustsUs = WorkerProto::Serialise<std::optional<TrustedFlag>>::read(*this, conn);
-        } else {
-            // We don't know the answer; protocol to old.
-            conn.remoteTrustsUs = std::nullopt;
-        }
-
-        auto ex = conn.processStderr();
+        auto ex = conn.processStderrReturn();
         if (ex) std::rethrow_exception(ex);
     }
     catch (Error & e) {
@@ -158,7 +134,7 @@ void RemoteStore::setOptions(Connection & conn)
             conn.to << i.first << i.second.value;
     }
 
-    auto ex = conn.processStderr();
+    auto ex = conn.processStderrReturn();
     if (ex) std::rethrow_exception(ex);
 }
 
@@ -173,28 +149,7 @@ RemoteStore::ConnectionHandle::~ConnectionHandle()
 
 void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, bool flush)
 {
-    auto ex = handle->processStderr(sink, source, flush);
-    if (ex) {
-        daemonException = true;
-        try {
-            std::rethrow_exception(ex);
-        } catch (const Error & e) {
-            // Nix versions before #4628 did not have an adequate behavior for reporting that the derivation format was upgraded.
-            // To avoid having to add compatibility logic in many places, we expect to catch almost all occurrences of the
-            // old incomprehensible error here, so that we can explain to users what's going on when their daemon is
-            // older than #4628 (2023).
-            if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations) &&
-                GET_PROTOCOL_MINOR(handle->daemonVersion) <= 35)
-            {
-                auto m = e.msg();
-                if (m.find("parsing derivation") != std::string::npos &&
-                    m.find("expected string") != std::string::npos &&
-                    m.find("Derive([") != std::string::npos)
-                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw derivation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
-            }
-            throw;
-        }
-    }
+    handle->processStderr(&daemonException, sink, source, flush);
 }
 
 
@@ -226,13 +181,7 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
             if (isValidPath(i)) res.insert(i);
         return res;
     } else {
-        conn->to << WorkerProto::Op::QueryValidPaths;
-        WorkerProto::write(*this, *conn, paths);
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
-            conn->to << maybeSubstitute;
-        }
-        conn.processStderr();
-        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        return conn->queryValidPaths(*this, &conn.daemonException, paths, maybeSubstitute);
     }
 }
 
@@ -322,22 +271,10 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
         std::shared_ptr<const ValidPathInfo> info;
         {
             auto conn(getConnection());
-            conn->to << WorkerProto::Op::QueryPathInfo << printStorePath(path);
-            try {
-                conn.processStderr();
-            } catch (Error & e) {
-                // Ugly backwards compatibility hack.
-                if (e.msg().find("is not valid") != std::string::npos)
-                    throw InvalidPath(std::move(e.info()));
-                throw;
-            }
-            if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
-                bool valid; conn->from >> valid;
-                if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
-            }
             info = std::make_shared<ValidPathInfo>(
                 StorePath{path},
-                WorkerProto::Serialise<UnkeyedValidPathInfo>::read(*this, *conn));
+                conn->queryPathInfo(*this, &conn.daemonException, path));
+
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
@@ -542,8 +479,6 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
     auto conn(getConnection());
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 18) {
-        conn->to << WorkerProto::Op::ImportPaths;
-
         auto source2 = sinkToSource([&](Sink & sink) {
             sink << 1 // == path follows
                 ;
@@ -558,11 +493,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                 << 0 // == no path follows
                 ;
         });
-
-        conn.processStderr(0, source2.get());
-
-        auto importedPaths = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        assert(importedPaths.size() <= 1);
+        conn->importPaths(*this, &conn.daemonException, *source2);
     }
 
     else {
@@ -807,9 +738,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     BuildMode buildMode)
 {
     auto conn(getConnection());
-    conn->to << WorkerProto::Op::BuildDerivation << printStorePath(drvPath);
-    writeDerivation(conn->to, *this, drv);
-    conn->to << buildMode;
+    conn->putBuildDerivationRequest(*this, &conn.daemonException, drvPath, drv, buildMode);
     conn.processStderr();
     return WorkerProto::Serialise<BuildResult>::read(*this, *conn);
 }
@@ -827,9 +756,7 @@ void RemoteStore::ensurePath(const StorePath & path)
 void RemoteStore::addTempRoot(const StorePath & path)
 {
     auto conn(getConnection());
-    conn->to << WorkerProto::Op::AddTempRoot << printStorePath(path);
-    conn.processStderr();
-    readInt(conn->from);
+    conn->addTempRoot(*this, &conn.daemonException, path);
 }
 
 
@@ -969,112 +896,17 @@ void RemoteStore::flushBadConnections()
     connections->flushBad();
 }
 
-
-RemoteStore::Connection::~Connection()
-{
-    try {
-        to.flush();
-    } catch (...) {
-        ignoreException();
-    }
-}
-
 void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
 {
-    auto conn(connections->get());
-    conn->to << WorkerProto::Op::NarFromPath << printStorePath(path);
-    conn->processStderr();
-    copyNAR(conn->from, sink);
+    auto conn(getConnection());
+    conn->narFromPath(*this, &conn.daemonException, path, [&](Source & source) {
+        copyNAR(conn->from, sink);
+    });
 }
 
 ref<SourceAccessor> RemoteStore::getFSAccessor(bool requireValidPath)
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
-}
-
-static Logger::Fields readFields(Source & from)
-{
-    Logger::Fields fields;
-    size_t size = readInt(from);
-    for (size_t n = 0; n < size; n++) {
-        auto type = (decltype(Logger::Field::type)) readInt(from);
-        if (type == Logger::Field::tInt)
-            fields.push_back(readNum<uint64_t>(from));
-        else if (type == Logger::Field::tString)
-            fields.push_back(readString(from));
-        else
-            throw Error("got unsupported field type %x from Nix daemon", (int) type);
-    }
-    return fields;
-}
-
-
-std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * source, bool flush)
-{
-    if (flush)
-        to.flush();
-
-    while (true) {
-
-        auto msg = readNum<uint64_t>(from);
-
-        if (msg == STDERR_WRITE) {
-            auto s = readString(from);
-            if (!sink) throw Error("no sink");
-            (*sink)(s);
-        }
-
-        else if (msg == STDERR_READ) {
-            if (!source) throw Error("no source");
-            size_t len = readNum<size_t>(from);
-            auto buf = std::make_unique<char[]>(len);
-            writeString({(const char *) buf.get(), source->read(buf.get(), len)}, to);
-            to.flush();
-        }
-
-        else if (msg == STDERR_ERROR) {
-            if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
-                return std::make_exception_ptr(readError(from));
-            } else {
-                auto error = readString(from);
-                unsigned int status = readInt(from);
-                return std::make_exception_ptr(Error(status, error));
-            }
-        }
-
-        else if (msg == STDERR_NEXT)
-            printError(chomp(readString(from)));
-
-        else if (msg == STDERR_START_ACTIVITY) {
-            auto act = readNum<ActivityId>(from);
-            auto lvl = (Verbosity) readInt(from);
-            auto type = (ActivityType) readInt(from);
-            auto s = readString(from);
-            auto fields = readFields(from);
-            auto parent = readNum<ActivityId>(from);
-            logger->startActivity(act, lvl, type, s, fields, parent);
-        }
-
-        else if (msg == STDERR_STOP_ACTIVITY) {
-            auto act = readNum<ActivityId>(from);
-            logger->stopActivity(act);
-        }
-
-        else if (msg == STDERR_RESULT) {
-            auto act = readNum<ActivityId>(from);
-            auto type = (ResultType) readInt(from);
-            auto fields = readFields(from);
-            logger->result(act, type, fields);
-        }
-
-        else if (msg == STDERR_LAST)
-            break;
-
-        else
-            throw Error("got unknown message type %x from Nix daemon", msg);
-    }
-
-    return nullptr;
 }
 
 void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)

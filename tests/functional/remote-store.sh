@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 clearStore
@@ -23,7 +25,7 @@ fi
 # Test import-from-derivation through the daemon.
 [[ $(nix eval --impure --raw --file ./ifd.nix) = hi ]]
 
-storeCleared=1 NIX_REMOTE_=$NIX_REMOTE $SHELL ./user-envs.sh
+NIX_REMOTE_=$NIX_REMOTE $SHELL ./user-envs-test-case.sh
 
 nix-store --gc --max-freed 1K
 

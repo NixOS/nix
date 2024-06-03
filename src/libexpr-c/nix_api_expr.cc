@@ -65,6 +65,17 @@ nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, V
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_value_call_multi(nix_c_context * context, EvalState * state, Value * fn, size_t nargs, Value ** args, Value * value)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        state->state.callFunction(*(nix::Value *) fn, nargs, (nix::Value * *)args, *(nix::Value *) value, nix::noPos);
+        state->state.forceValue(*(nix::Value *) value, nix::noPos);
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_err nix_value_force(nix_c_context * context, EvalState * state, Value * value)
 {
     if (context)

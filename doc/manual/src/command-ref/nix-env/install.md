@@ -14,13 +14,12 @@
 
 # Description
 
-The install operation creates a new user environment.
+The `--install` operation creates a new user environment.
 It is based on the current generation of the active [profile](@docroot@/command-ref/files/profiles.md), to which a set of [store paths] described by *args* is added.
 
-[store paths]: @docroot@/glossary.md#gloss-store-path
+[store paths]: @docroot@/store/store-path.md
 
 The arguments *args* map to store paths in a number of possible ways:
-
 
   - By default, *args* is a set of [derivation] names denoting derivations in the [default Nix expression].
     These are [realised], and the resulting output paths are installed.

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 if [[ $BUILD_SHARED_LIBS != 1 ]]; then

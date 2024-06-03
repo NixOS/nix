@@ -2,6 +2,12 @@
 
 namespace nix {
 
+std::optional<std::filesystem::path> FilteringSourceAccessor::getPhysicalPath(const CanonPath & path)
+{
+    checkAccess(path);
+    return next->getPhysicalPath(prefix / path);
+}
+
 std::string FilteringSourceAccessor::readFile(const CanonPath & path)
 {
     checkAccess(path);

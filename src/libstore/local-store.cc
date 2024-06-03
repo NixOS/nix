@@ -463,10 +463,20 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
-LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
-    : LocalStore(params)
+LocalStore::LocalStore(
+    std::string_view scheme,
+    PathView path,
+    const Params & _params)
+    : LocalStore([&]{
+        // Default `?root` from `path` if non set
+        if (!path.empty() && _params.count("root") == 0) {
+            auto params = _params;
+            params.insert_or_assign("root", std::string { path });
+            return params;
+        }
+        return _params;
+    }())
 {
-    throw UnimplementedError("LocalStore");
 }
 
 
@@ -1406,7 +1416,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking link hashes...");
 
-        for (auto & link : readDirectory(linksDir)) {
+        for (auto & link : std::filesystem::directory_iterator{linksDir}) {
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of '%s'", name);
             PosixSourceAccessor accessor;
@@ -1498,7 +1508,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : readDirectory(realStoreDir)) {
+    for (auto & i : std::filesystem::directory_iterator{realStoreDir.to_string()}) {
         try {
             storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }
@@ -1779,7 +1789,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     writeFile(tmpFile, compress("bzip2", log));
 
-    renameFile(tmpFile, logPath);
+    std::filesystem::rename(tmpFile, logPath);
 }
 
 std::optional<std::string> LocalStore::getVersion()

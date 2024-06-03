@@ -17,7 +17,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   A symbolic name for the derivation.
   It is added to the [store path] of the corresponding [store derivation] as well as to its [output paths](@docroot@/glossary.md#gloss-output-path).
 
-  [store path]: @docroot@/glossary.md#gloss-store-path
+  [store path]: @docroot@/store/store-path.md
 
   > **Example**
   >
@@ -141,7 +141,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
   By default, a derivation produces a single output called `out`.
   However, derivations can produce multiple outputs.
-  This allows the associated [store objects](@docroot@/glossary.md#gloss-store-object) and their [closures](@docroot@/glossary.md#gloss-closure) to be copied or garbage-collected separately.
+  This allows the associated [store objects](@docroot@/store/store-object.md) and their [closures](@docroot@/glossary.md#gloss-closure) to be copied or garbage-collected separately.
 
   > **Example**
   >

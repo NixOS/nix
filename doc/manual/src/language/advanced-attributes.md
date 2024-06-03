@@ -197,33 +197,40 @@ Derivations can declare some infrequently used optional attributes.
     `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format.
 
     The `outputHashMode` attribute determines how the hash is computed.
-    It must be one of the following two values:
+    It must be one of the following values:
 
-      - `"flat"`\
-        The output must be a non-executable regular file. If it isn’t,
-        the build fails. The hash is simply computed over the contents
-        of that file (so it’s equal to what Unix commands like
-        `sha256sum` or `sha1sum` produce).
+      - [`"flat"`](@docroot@/store/store-object/content-address.md#method-flat)
 
         This is the default.
 
-      - `"recursive"` or `"nar"`\
-        The hash is computed over the [NAR archive](@docroot@/glossary.md#gloss-nar) dump of the output
-        (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
-        this case, the output can be anything, including a directory
-        tree.
+      - [`"recursive"` or `"nar"`](@docroot@/store/store-object/content-address.md#method-nix-archive)
 
-    `"recursive"` is the traditional way of indicating this,
-    and is supported since 2005 (virtually the entire history of Nix).
-    `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
-    however support for it is only added in Nix version 2.21.
+        > **Compatibility**
+        >
+        > `"recursive"` is the traditional way of indicating this,
+        > and is supported since 2005 (virtually the entire history of Nix).
+        > `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
+        > however support for it is only added in Nix version 2.21.
+
+      - [`"text"`](@docroot@/store/store-object/content-address.md#method-text)
+
+        > **Warning**
+        >
+        > The use of this method for derivation outputs is part of the [`dynamic-derivations`][xp-feature-dynamic-derivations] experimental feature.
+
+      - [`"git"`](@docroot@/store/store-object/content-address.md#method-git)
+
+        > **Warning**
+        >
+        > This method is part of the [`git-hashing`][xp-feature-git-hashing] experimental feature.
 
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
+
     > **Warning**
     > This attribute is part of an [experimental feature](@docroot@/contributing/experimental-features.md).
     >
     > To use this attribute, you must enable the
-    > [`ca-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) experimental feature.
+    > [`ca-derivations`][xp-feature-ca-derivations] experimental feature.
     > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
     >
     > ```
@@ -303,7 +310,7 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
     the following attributes are available:
 
-    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/glossary.md#gloss-store-object).
+    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/store/store-object.md).
     - `maxClosureSize` defines the maximum size of the output's closure.
     - `ignoreSelfRefs` controls whether self-references should be considered when
       checking for allowed references/requisites.
@@ -355,3 +362,7 @@ Derivations can declare some infrequently used optional attributes.
   ```
 
   ensures that the derivation can only be built on a machine with the `kvm` feature.
+
+[xp-feature-ca-derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
+[xp-feature-dynamic-derivations]: @docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations
+[xp-feature-git-hashing]: @docroot@/contributing/experimental-features.md#xp-feature-git-hashing

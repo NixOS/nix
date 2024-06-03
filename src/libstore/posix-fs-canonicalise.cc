@@ -144,8 +144,7 @@ static void canonicalisePathMetaData_(
 #endif
 
     if (S_ISDIR(st.st_mode)) {
-        std::vector<std::filesystem::directory_entry> entries = readDirectory(path);
-        for (auto & i : entries)
+        for (auto & i : std::filesystem::directory_iterator{path})
             canonicalisePathMetaData_(
                 i.path().string(),
 #ifndef _WIN32

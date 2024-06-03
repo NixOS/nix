@@ -414,12 +414,62 @@ Does evaluate to `"inner"`.
 
 ## Comments
 
-Comments can be single-line, started with a `#` character, or
-inline/multi-line, enclosed within `/* ... */`.
+- Inline comments start with `#` and run until the end of the line.
 
-`#` comments last until the end of the line.
+  > **Example**
+  >
+  > ```nix
+  > # A number
+  > 2 # Equals 1 + 1
+  > ```
+  >
+  > ```console
+  > 2
+  > ```
 
-`/*` comments run until the next occurrence of `*/`; this cannot be escaped.
+- Block comments start with `/*` and run until the next occurrence of `*/`.
+
+  > **Example**
+  >
+  > ```nix
+  > /*
+  > Block comments
+  > can span multiple lines.
+  > */ "hello"
+  > ```
+  >
+  > ```console
+  > "hello"
+  > ```
+
+  This means that block comments cannot be nested.
+
+  > **Example**
+  >
+  > ```nix
+  > /* /* nope */ */ 1
+  > ```
+  >
+  > ```console
+  > error: syntax error, unexpected '*'
+  >
+  >        at «string»:1:15:
+  >
+  >             1| /* /* nope */ *
+  >              |               ^
+  > ```
+
+  Consider escaping nested comments and unescaping them in post-processing.
+
+  > **Example**
+  >
+  > ```nix
+  > /* /* nested *\/ */ 1
+  > ```
+  >
+  > ```console
+  > 1
+  > ```
 
 ## Scoping rules
 
@@ -432,6 +482,5 @@ Nix is [statically scoped](https://en.wikipedia.org/wiki/Scope_(computer_science
 
 * secondary scope --- implicitly-bound variables
   * [`with`](#with-expressions)
-  
 Primary scope takes precedence over secondary scope.
 See [`with`](#with-expressions) for a detailed example.

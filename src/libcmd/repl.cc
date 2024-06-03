@@ -137,12 +137,13 @@ void runNix(Path program, const Strings & args,
 {
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
-
+    //isInteractive avoid grabling interactive commands
     runProgram2(RunOptions {
         .program = settings.nixBinDir+ "/" + program,
         .args = args,
         .environment = subprocessEnv,
         .input = input,
+        .isInteractive = true,
     });
 
     return;
@@ -259,7 +260,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
-            for (auto & entry : readDirectory(dir == "" ? "/" : dir)) {
+            for (auto & entry : std::filesystem::directory_iterator{dir == "" ? "/" : dir}) {
                 auto name = entry.path().filename().string();
                 if (name[0] != '.' && hasPrefix(name, prefix2))
                     completions.insert(prev + entry.path().string());
@@ -304,6 +305,8 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             // Quietly ignore evaluation errors.
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
+        } catch (FileNotFound & e) {
+            // Quietly ignore non-existent file beeing `import`-ed.
         }
     }
 
@@ -508,13 +511,9 @@ ProcessLineResult NixRepl::processLine(std::string line)
         auto editor = args.front();
         args.pop_front();
 
-        // avoid garbling the editor with the progress bar
-        logger->pause();
-        Finally resume([&]() { logger->resume(); });
-
         // runProgram redirects stdout to a StringSink,
         // using runProgram2 to allow editors to display their UI
-        runProgram2(RunOptions { .program = editor, .lookupPath = true, .args = args });
+        runProgram2(RunOptions { .program = editor, .lookupPath = true, .args = args , .isInteractive = true });
 
         // Reload right after exiting the editor
         state->resetFileCache();

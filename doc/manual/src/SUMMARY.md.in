@@ -18,7 +18,9 @@
   - [Uninstalling Nix](installation/uninstall.md)
 - [Nix Store](store/index.md)
   - [File System Object](store/file-system-object.md)
+    - [Content-Addressing File System Objects](store/file-system-object/content-address.md)
   - [Store Object](store/store-object.md)
+    - [Content-Addressing Store Objects](store/store-object/content-address.md)
   - [Store Path](store/store-path.md)
   - [Store Types](store/types/index.md)
 {{#include ./store/types/SUMMARY.md}}
@@ -41,9 +43,7 @@
 - [Advanced Topics](advanced-topics/index.md)
   - [Sharing Packages Between Machines](package-management/sharing-packages.md)
     - [Serving a Nix store via HTTP](package-management/binary-cache-substituter.md)
-    - [Copying Closures via SSH](package-management/copy-closure.md)
     - [Serving a Nix store via SSH](package-management/ssh-substituter.md)
-    - [Serving a Nix store via S3](package-management/s3-substituter.md)
   - [Remote Builds](advanced-topics/distributed-builds.md)
   - [Tuning Cores and Jobs](advanced-topics/cores-vs-jobs.md)
   - [Verifying Build Reproducibility](advanced-topics/diff-hook.md)
@@ -121,6 +121,7 @@
   - [Documentation](contributing/documentation.md)
   - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
+  - [JSON guideline](contributing/json-guideline.md)
   - [C++ style guide](contributing/cxx.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}

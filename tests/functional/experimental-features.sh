@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Skipping these two for now, because we actually *do* want flags and

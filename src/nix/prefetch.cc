@@ -115,9 +115,10 @@ std::tuple<StorePath, Hash> prefetchFile(
 
             /* If the archive unpacks to a single file/directory, then use
                that as the top-level. */
-            auto entries = readDirectory(unpacked);
-            if (entries.size() == 1)
-                tmpFile = entries[0].path();
+            auto entries = std::filesystem::directory_iterator{unpacked};
+            auto file_count = std::distance(entries, std::filesystem::directory_iterator{});
+            if (file_count == 1)
+                tmpFile = entries->path();
             else
                 tmpFile = unpacked;
         }

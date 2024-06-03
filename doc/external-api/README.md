@@ -27,7 +27,7 @@ appreciated.
 The following examples, for simplicity, don't include error handling. See the
 [Handling errors](@ref errors) section for more information.
 
-# Embedding the Nix Evaluator
+# Embedding the Nix Evaluator{#nix_evaluator_example}
 
 In this example we programmatically start the Nix language evaluator with a
 dummy store (that has no store paths and cannot be written to), and evaluate the
@@ -46,9 +46,9 @@ Nix expression `builtins.nixVersion`.
 // NOTE: This example lacks all error handling. Production code must check for
 // errors, as some return values will be undefined.
 
-void my_get_string_cb(const char * start, unsigned int n, char ** user_data)
+void my_get_string_cb(const char * start, unsigned int n, void * user_data)
 {
-    *user_data = strdup(start);
+    *((char **) user_data) = strdup(start);
 }
 
 int main()
@@ -63,7 +63,7 @@ int main()
     nix_value_force(NULL, state, value);
 
     char * version;
-    nix_get_string(NULL, value, my_get_string_cb, version);
+    nix_get_string(NULL, value, my_get_string_cb, &version);
     printf("Nix version: %s\n", version);
 
     free(version);

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source ./common.sh
 
 flake1Dir=$TEST_ROOT/flake1

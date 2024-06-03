@@ -37,7 +37,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
     std::filesystem::path profileDir = dirOf(profile);
     auto profileName = std::string(baseNameOf(profile));
 
-    for (auto & i : readDirectory(profileDir.string())) {
+    for (auto & i : std::filesystem::directory_iterator{profileDir}) {
         if (auto n = parseName(profileName, i.path().filename().string())) {
             auto path = i.path().string();
             gens.push_back({

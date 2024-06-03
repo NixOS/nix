@@ -1,4 +1,4 @@
-source ../common.sh
+source ../common/vars-and-functions.sh
 
 # The new Linux mount interface does not seem to support remounting
 # OverlayFS mount points.
@@ -37,9 +37,8 @@ addConfig () {
 setupConfig () {
   addConfig "require-drop-supplementary-groups = false"
   addConfig "build-users-group = "
+  enableFeatures "local-overlay-store"
 }
-
-enableFeatures "local-overlay-store"
 
 setupStoreDirs () {
   # Attempt to create store dirs on tmpfs volume.

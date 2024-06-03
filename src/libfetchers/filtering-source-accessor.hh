@@ -30,6 +30,8 @@ struct FilteringSourceAccessor : SourceAccessor
         displayPrefix.clear();
     }
 
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
+
     std::string readFile(const CanonPath & path) override;
 
     bool pathExists(const CanonPath & path) override;

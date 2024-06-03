@@ -136,7 +136,7 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
     checkInterrupt();
     if (!::ReadFile(fd, data, len, &n, NULL)) {
         _good = false;
-        throw WinError("ReadFile when FdSource::readUnbuffered");
+        throw windows::WinError("ReadFile when FdSource::readUnbuffered");
     }
 #else
     ssize_t n;

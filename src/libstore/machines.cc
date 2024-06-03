@@ -6,7 +6,8 @@
 
 namespace nix {
 
-Machine::Machine(decltype(storeUri) storeUri,
+Machine::Machine(
+    const std::string & storeUri,
     decltype(systemTypes) systemTypes,
     decltype(sshKey) sshKey,
     decltype(maxJobs) maxJobs,
@@ -14,7 +15,7 @@ Machine::Machine(decltype(storeUri) storeUri,
     decltype(supportedFeatures) supportedFeatures,
     decltype(mandatoryFeatures) mandatoryFeatures,
     decltype(sshPublicHostKey) sshPublicHostKey) :
-    storeUri(
+    storeUri(StoreReference::parse(
         // Backwards compatibility: if the URI is schemeless, is not a path,
         // and is not one of the special store connection words, prepend
         // ssh://.
@@ -28,7 +29,7 @@ Machine::Machine(decltype(storeUri) storeUri,
         || hasPrefix(storeUri, "local?")
         || hasPrefix(storeUri, "?")
         ? storeUri
-        : "ssh://" + storeUri),
+        : "ssh://" + storeUri)),
     systemTypes(systemTypes),
     sshKey(sshKey),
     maxJobs(maxJobs),
@@ -63,23 +64,26 @@ bool Machine::mandatoryMet(const std::set<std::string> & features) const
         });
 }
 
-ref<Store> Machine::openStore() const
+StoreReference Machine::completeStoreReference() const
 {
-    Store::Params storeParams;
-    if (hasPrefix(storeUri, "ssh://")) {
-        storeParams["max-connections"] = "1";
-        storeParams["log-fd"] = "4";
+    auto storeUri = this->storeUri;
+
+    auto * generic = std::get_if<StoreReference::Specified>(&storeUri.variant);
+
+    if (generic && generic->scheme == "ssh") {
+        storeUri.params["max-connections"] = "1";
+        storeUri.params["log-fd"] = "4";
     }
 
-    if (hasPrefix(storeUri, "ssh://") || hasPrefix(storeUri, "ssh-ng://")) {
+    if (generic && (generic->scheme == "ssh" || generic->scheme == "ssh-ng")) {
         if (sshKey != "")
-            storeParams["ssh-key"] = sshKey;
+            storeUri.params["ssh-key"] = sshKey;
         if (sshPublicHostKey != "")
-            storeParams["base64-ssh-public-host-key"] = sshPublicHostKey;
+            storeUri.params["base64-ssh-public-host-key"] = sshPublicHostKey;
     }
 
     {
-        auto & fs = storeParams["system-features"];
+        auto & fs = storeUri.params["system-features"];
         auto append = [&](auto feats) {
             for (auto & f : feats) {
                 if (fs.size() > 0) fs += ' ';
@@ -90,7 +94,12 @@ ref<Store> Machine::openStore() const
         append(mandatoryFeatures);
     }
 
-    return nix::openStore(storeUri, storeParams);
+    return storeUri;
+}
+
+ref<Store> Machine::openStore() const
+{
+    return nix::openStore(completeStoreReference());
 }
 
 static std::vector<std::string> expandBuilderLines(const std::string & builders)
@@ -122,7 +131,7 @@ static std::vector<std::string> expandBuilderLines(const std::string & builders)
     return result;
 }
 
-static Machine parseBuilderLine(const std::string & line)
+static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, const std::string & line)
 {
     const auto tokens = tokenizeString<std::vector<std::string>>(line);
 
@@ -139,7 +148,7 @@ static Machine parseBuilderLine(const std::string & line)
     };
 
     auto parseFloatField = [&](size_t fieldIndex) {
-        const auto result = string2Int<float>(tokens[fieldIndex]);
+        const auto result = string2Float<float>(tokens[fieldIndex]);
         if (!result) {
             throw FormatError("bad machine specification: failed to convert column #%lu in a row: '%s' to 'float'", fieldIndex, line);
         }
@@ -159,29 +168,46 @@ static Machine parseBuilderLine(const std::string & line)
     if (!isSet(0))
         throw FormatError("bad machine specification: store URL was not found at the first column of a row: '%s'", line);
 
+    // TODO use designated initializers, once C++ supports those with
+    // custom constructors.
     return {
+        // `storeUri`
         tokens[0],
-        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : std::set<std::string>{settings.thisSystem},
+        // `systemTypes`
+        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : defaultSystems,
+        // `sshKey`
         isSet(2) ? tokens[2] : "",
+        // `maxJobs`
         isSet(3) ? parseUnsignedIntField(3) : 1U,
+        // `speedFactor`
         isSet(4) ? parseFloatField(4) : 1.0f,
+        // `supportedFeatures`
         isSet(5) ? tokenizeString<std::set<std::string>>(tokens[5], ",") : std::set<std::string>{},
+        // `mandatoryFeatures`
         isSet(6) ? tokenizeString<std::set<std::string>>(tokens[6], ",") : std::set<std::string>{},
+        // `sshPublicHostKey`
         isSet(7) ? ensureBase64(7) : ""
     };
 }
 
-static Machines parseBuilderLines(const std::vector<std::string> & builders)
+static Machines parseBuilderLines(const std::set<std::string> & defaultSystems, const std::vector<std::string> & builders)
 {
     Machines result;
-    std::transform(builders.begin(), builders.end(), std::back_inserter(result), parseBuilderLine);
+    std::transform(
+        builders.begin(), builders.end(), std::back_inserter(result),
+        [&](auto && line) { return parseBuilderLine(defaultSystems, line); });
     return result;
+}
+
+Machines Machine::parseConfig(const std::set<std::string> & defaultSystems, const std::string & s)
+{
+    const auto builderLines = expandBuilderLines(s);
+    return parseBuilderLines(defaultSystems, builderLines);
 }
 
 Machines getMachines()
 {
-    const auto builderLines = expandBuilderLines(settings.builders);
-    return parseBuilderLines(builderLines);
+    return Machine::parseConfig({settings.thisSystem}, settings.builders);
 }
 
 }

@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 #include <regex>
 
 #ifndef _WIN32
@@ -2261,7 +2262,7 @@ static void addPath(
     std::string_view name,
     SourcePath path,
     Value * filterFun,
-    FileIngestionMethod method,
+    ContentAddressMethod method,
     const std::optional<Hash> expectedHash,
     Value & v,
     const NixStringContext & context)
@@ -2293,11 +2294,10 @@ static void addPath(
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
-            expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
-                .method = method,
-                .hash = *expectedHash,
-                .references = {},
-            });
+            expectedStorePath = state.store->makeFixedOutputPathFromCA(name, ContentAddressWithReferences::fromParts(
+                method,
+                *expectedHash,
+                {}));
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             auto dstPath = fetchToStore(
@@ -2393,7 +2393,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
-    auto method = FileIngestionMethod::Recursive;
+    ContentAddressMethod method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
     NixStringContext context;
 
@@ -2408,7 +2408,9 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
         else if (n == "filter")
             state.forceFunction(*(filterFun = attr.value), attr.pos, "while evaluating the `filter` parameter passed to builtins.path");
         else if (n == "recursive")
-            method = FileIngestionMethod { state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path") };
+            method = state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path")
+                ? FileIngestionMethod::Recursive
+                : FileIngestionMethod::Flat;
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
@@ -4515,7 +4517,7 @@ void EvalState::createBaseEnv()
           1683705525
           ```
 
-          The [store path](@docroot@/glossary.md#gloss-store-path) of a derivation depending on `currentTime` will differ for each evaluation, unless both evaluate `builtins.currentTime` in the same second.
+          The [store path](@docroot@/store/store-path.md) of a derivation depending on `currentTime` will differ for each evaluation, unless both evaluate `builtins.currentTime` in the same second.
         )",
         .impureOnly = true,
     });

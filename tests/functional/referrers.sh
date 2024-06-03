@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 needLocalStore "uses some low-level store manipulations that aren’t available through the daemon"

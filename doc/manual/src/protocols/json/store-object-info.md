@@ -24,41 +24,45 @@ Info about a [store object].
 
   An array of [store paths][store path], possibly including this one.
 
-* `ca` (optional):
+* `ca`:
 
-  Content address of this store object's file system object, used to compute its store path.
+  If the store object is [content-addressed],
+  this is the content address of this store object's file system object, used to compute its store path.
+  Otherwise (i.e. if it is [input-addressed]), this is `null`.
 
-[store path]: @docroot@/glossary.md#gloss-store-path
+[store path]: @docroot@/store/store-path.md
 [file system object]: @docroot@/store/file-system-object.md
-[Nix Archive]: @docroot@/glossary.md#gloss-nar
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
 ## Impure fields
 
 These are not intrinsic properties of the store object.
 In other words, the same store object residing in different store could have different values for these properties.
 
-* `deriver` (optional):
+* `deriver`:
 
-  The path to the [derivation] from which this store object is produced.
+  If known, the path to the [derivation] from which this store object was produced.
+  Otherwise `null`.
 
   [derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 * `registrationTime` (optional):
 
-  When this derivation was added to the store.
+  If known, when this derivation was added to the store.
+  Otherwise `null`.
 
-* `ultimate` (optional):
+* `ultimate`:
 
   Whether this store object is trusted because we built it ourselves, rather than substituted a build product from elsewhere.
 
-* `signatures` (optional):
+* `signatures`:
 
   Signatures claiming that this store object is what it claims to be.
   Not relevant for [content-addressed] store objects,
   but useful for [input-addressed] store objects.
 
-  [content-addressed]: @docroot@/glossary.md#gloss-content-addressed-store-object
-  [input-addressed]: @docroot@/glossary.md#gloss-input-addressed-store-object
+[content-addressed]: @docroot@/store/store-object/content-address.md
+[input-addressed]: @docroot@/glossary.md#gloss-input-addressed-store-object
 
 ### `.narinfo` extra fields
 

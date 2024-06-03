@@ -181,7 +181,7 @@ struct CmdToBase : Command
 
     void run() override
     {
-        warn("The old format conversion sub commands of `nix hash` where deprecated in favor of `nix hash convert`.");
+        warn("The old format conversion sub commands of `nix hash` were deprecated in favor of `nix hash convert`.");
         for (auto s : args)
             logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }

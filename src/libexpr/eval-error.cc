@@ -27,8 +27,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::atPos(Value & value, PosIdx fallback)
 template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withTrace(PosIdx pos, const std::string_view text)
 {
-    error.err.traces.push_front(
-        Trace{.pos = error.state.positions[pos], .hint = HintFmt(std::string(text))});
+    error.addTrace(error.state.positions[pos], text);
     return *this;
 }
 
@@ -99,7 +98,6 @@ template class EvalErrorBuilder<TypeError>;
 template class EvalErrorBuilder<UndefinedVarError>;
 template class EvalErrorBuilder<MissingArgumentError>;
 template class EvalErrorBuilder<InfiniteRecursionError>;
-template class EvalErrorBuilder<CachedEvalError>;
 template class EvalErrorBuilder<InvalidPathError>;
 
 }

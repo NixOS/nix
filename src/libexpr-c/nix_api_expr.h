@@ -3,25 +3,7 @@
 /** @defgroup libexpr libexpr
  * @brief Bindings to the Nix language evaluator
  *
- * Example (without error handling):
- * @code{.c}
- * int main() {
- *    nix_libexpr_init(NULL);
- *
- *    Store* store = nix_store_open(NULL, "dummy", NULL);
- *    EvalState* state = nix_state_create(NULL, NULL, store); // empty nix path
- *    Value *value = nix_alloc_value(NULL, state);
- *
- *    nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
- *    nix_value_force(NULL, state, value);
- *    printf("nix version: %s\n", nix_get_string(NULL, value));
- *
- *    nix_gc_decref(NULL, value);
- *    nix_state_free(state);
- *    nix_store_free(store);
- *    return 0;
- *    }
- * @endcode
+ * See *[Embedding the Nix Evaluator](@ref nix_evaluator_example)* for an example.
  * @{
  */
 /** @file
@@ -30,6 +12,7 @@
 
 #include "nix_api_store.h"
 #include "nix_api_util.h"
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -99,6 +82,46 @@ nix_err nix_expr_eval_from_string(
 nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, Value * arg, Value * value);
 
 /**
+ * @brief Calls a Nix function with multiple arguments.
+ *
+ * Technically these are functions that return functions. It is common for Nix
+ * functions to be curried, so this function is useful for calling them.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The state of the evaluation.
+ * @param[in] fn The Nix function to call.
+ * @param[in] nargs The number of arguments.
+ * @param[in] args The arguments to pass to the function.
+ * @param[out] value The result of the function call.
+ *
+ * @see nix_value_call     For the single argument primitive.
+ * @see NIX_VALUE_CALL           For a macro that wraps this function for convenience.
+ */
+nix_err nix_value_call_multi(
+    nix_c_context * context, EvalState * state, Value * fn, size_t nargs, Value ** args, Value * value);
+
+/**
+ * @brief Calls a Nix function with multiple arguments.
+ *
+ * Technically these are functions that return functions. It is common for Nix
+ * functions to be curried, so this function is useful for calling them.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The state of the evaluation.
+ * @param[out] value The result of the function call.
+ * @param[in] fn The Nix function to call.
+ * @param[in] args The arguments to pass to the function.
+ *
+ * @see nix_value_call_multi
+ */
+#define NIX_VALUE_CALL(context, state, value, fn, ...)                  \
+  do {                                                                  \
+    Value * args_array[] = {__VA_ARGS__};                               \
+    size_t nargs = sizeof(args_array) / sizeof(args_array[0]);          \
+    nix_value_call_multi(context, state, fn, nargs, args_array, value); \
+  } while (0)
+
+/**
  * @brief Forces the evaluation of a Nix value.
  *
  * The Nix interpreter is lazy, and not-yet-evaluated Values can be
@@ -106,10 +129,8 @@ nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, V
  *
  * This function converts these Values into their final type.
  *
- * @note You don't need this function for basic API usage, since all functions
- * that return a value call it for you. The only place you will see a
- * NIX_TYPE_THUNK is in the arguments that are passed to a PrimOp function
- * you supplied to nix_alloc_primop.
+ * @note You don't need this function for basic API usage very often, since all functions that return a `Value` call it
+ * for you. This function is mainly needed before calling @ref getters.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
@@ -140,7 +161,7 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, Value *
  * @brief Create a new Nix language evaluator state.
  *
  * @param[out] context Optional, stores error information
- * @param[in] lookupPath Array of strings corresponding to entries in NIX_PATH.
+ * @param[in] lookupPath Null-terminated array of strings corresponding to entries in NIX_PATH.
  * @param[in] store The Nix store to use.
  * @return A new Nix state or NULL on failure.
  */

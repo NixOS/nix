@@ -137,10 +137,10 @@ void restoreMountNamespace()
     }
 }
 
-void unshareFilesystem()
+void tryUnshareFilesystem()
 {
-    if (unshare(CLONE_FS) != 0 && errno != EPERM)
-        throw SysError("unsharing filesystem state in download thread");
+    if (unshare(CLONE_FS) != 0 && errno != EPERM && errno != ENOSYS)
+        throw SysError("unsharing filesystem state");
 }
 
 }

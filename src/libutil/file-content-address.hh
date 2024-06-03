@@ -12,16 +12,28 @@ struct SourcePath;
 /**
  * An enumeration of the ways we can serialize file system
  * objects.
+ *
+ * See `file-system-object/content-address.md#serial` in the manual for
+ * a user-facing description of this concept, but note that this type is also
+ * used for storing or sending copies; not just for addressing.
+ * Note also that there are other content addressing methods that don't
+ * correspond to a serialisation method.
  */
 enum struct FileSerialisationMethod : uint8_t {
     /**
      * Flat-file. The contents of a single file exactly.
+     *
+     * See `file-system-object/content-address.md#serial-flat` in the
+     * manual.
      */
     Flat,
 
     /**
      * Nix Archive. Serializes the file-system object in
      * Nix Archive format.
+     *
+     * See `file-system-object/content-address.md#serial-nix-archive` in
+     * the manual.
      */
     Recursive,
 };
@@ -81,33 +93,32 @@ HashResult hashPath(
 /**
  * An enumeration of the ways we can ingest file system
  * objects, producing a hash or digest.
+ *
+ * See `file-system-object/content-address.md` in the manual for a
+ * user-facing description of this concept.
  */
 enum struct FileIngestionMethod : uint8_t {
     /**
      * Hash `FileSerialisationMethod::Flat` serialisation.
+     *
+     * See `file-system-object/content-address.md#serial-flat` in the
+     * manual.
      */
     Flat,
 
     /**
-     * Hash `FileSerialisationMethod::Git` serialisation.
+     * Hash `FileSerialisationMethod::Recursive` serialisation.
+     *
+     * See `file-system-object/content-address.md#serial-flat` in the
+     * manual.
      */
     Recursive,
 
     /**
-     * Git hashing. In particular files are hashed as git "blobs", and
-     * directories are hashed as git "trees".
+     * Git hashing.
      *
-     * Unlike `Flat` and `Recursive`, this is not a hash of a single
-     * serialisation but a [Merkle
-     * DAG](https://en.wikipedia.org/wiki/Merkle_tree) of multiple
-     * rounds of serialisation and hashing.
-     *
-     * @note Git's data model is slightly different, in that a plain
-     * file doesn't have an executable bit, directory entries do
-     * instead. We decide treat a bare file as non-executable by fiat,
-     * as we do with `FileIngestionMethod::Flat` which also lacks this
-     * information. Thus, Git can encode some but all of Nix's "File
-     * System Objects", and this sort of hashing is likewise partial.
+     * See `file-system-object/content-address.md#serial-git` in the
+     * manual.
      */
     Git,
 };

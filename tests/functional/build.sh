@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 clearStore
@@ -41,6 +43,14 @@ nix build -f multiple-outputs.nix --json e --no-link | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-e.drv")) and
     (.outputs | keys == ["a_a", "b"]))
+'
+
+# Tests that we can handle empty 'outputsToInstall' (assuming that default
+# output "out" exists).
+nix build -f multiple-outputs.nix --json nothing-to-install --no-link | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*nothing-to-install.drv")) and
+    (.outputs | keys == ["out"]))
 '
 
 # But not when it's overriden.
@@ -133,3 +143,35 @@ nix build --impure -f multiple-outputs.nix --json e --no-link | jq --exit-status
 # Make sure that `--stdin` works and does not apply any defaults
 printf "" | nix build --no-link --stdin --json | jq --exit-status '. == []'
 printf "%s\n" "$drv^*" | nix build --no-link --stdin --json | jq --exit-status '.[0]|has("drvPath")'
+
+# --keep-going and FOD
+out="$(nix build -f fod-failing.nix -L 2>&1)" && status=0 || status=$?
+test "$status" = 1
+# one "hash mismatch" error, one "build of ... failed"
+test "$(<<<"$out" grep -E '^error:' | wc -l)" = 2
+<<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x1\\.drv'"
+<<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
+<<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
+<<<"$out" grepQuiet -E "error: build of '.*-x[1-4]\\.drv\\^out', '.*-x[1-4]\\.drv\\^out', '.*-x[1-4]\\.drv\\^out', '.*-x[1-4]\\.drv\\^out' failed"
+
+out="$(nix build -f fod-failing.nix -L x1 x2 x3 --keep-going 2>&1)" && status=0 || status=$?
+test "$status" = 1
+# three "hash mismatch" errors - for each failing fod, one "build of ... failed"
+test "$(<<<"$out" grep -E '^error:' | wc -l)" = 4
+<<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x1\\.drv'"
+<<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
+<<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
+<<<"$out" grepQuiet -E "error: build of '.*-x[1-3]\\.drv\\^out', '.*-x[1-3]\\.drv\\^out', '.*-x[1-3]\\.drv\\^out' failed"
+
+out="$(nix build -f fod-failing.nix -L x4 2>&1)" && status=0 || status=$?
+test "$status" = 1
+test "$(<<<"$out" grep -E '^error:' | wc -l)" = 2
+<<<"$out" grepQuiet -E "error: 1 dependencies of derivation '.*-x4\\.drv' failed to build"
+<<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
+
+out="$(nix build -f fod-failing.nix -L x4 --keep-going 2>&1)" && status=0 || status=$?
+test "$status" = 1
+test "$(<<<"$out" grep -E '^error:' | wc -l)" = 3
+<<<"$out" grepQuiet -E "error: 2 dependencies of derivation '.*-x4\\.drv' failed to build"
+<<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
+<<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x2\\.drv'"

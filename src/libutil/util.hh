@@ -5,7 +5,6 @@
 #include "error.hh"
 #include "logging.hh"
 
-#include <boost/lexical_cast.hpp>
 
 #include <functional>
 #include <map>
@@ -102,16 +101,7 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites);
  * Parse a string into an integer.
  */
 template<class N>
-std::optional<N> string2Int(const std::string_view s)
-{
-    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
-        return std::nullopt;
-    try {
-        return boost::lexical_cast<N>(s.data(), s.size());
-    } catch (const boost::bad_lexical_cast &) {
-        return std::nullopt;
-    }
-}
+std::optional<N> string2Int(const std::string_view s);
 
 /**
  * Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
@@ -148,14 +138,7 @@ std::string renderSize(uint64_t value, bool align = false);
  * Parse a string into a float.
  */
 template<class N>
-std::optional<N> string2Float(const std::string_view s)
-{
-    try {
-        return boost::lexical_cast<N>(s.data(), s.size());
-    } catch (const boost::bad_lexical_cast &) {
-        return std::nullopt;
-    }
-}
+std::optional<N> string2Float(const std::string_view s);
 
 
 /**

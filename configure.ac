@@ -313,7 +313,7 @@ case "$host_os" in
                                 ]))
     if test "x$enable_seccomp_sandboxing" != "xno"; then
       PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
-                        [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+                        [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS" CFLAGS="$LIBSECCOMP_CFLAGS $CFLAGS"])
       have_seccomp=1
       AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
       AC_COMPILE_IFELSE([

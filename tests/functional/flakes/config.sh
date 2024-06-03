@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 cp ../simple.nix ../simple.builder.sh ../config.nix $TEST_HOME
