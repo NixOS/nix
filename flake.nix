@@ -146,14 +146,9 @@
               ++ [ "-DUSE_SSH=exec" ];
           });
 
-          boehmgc-nix = (final.boehmgc.override {
+          boehmgc-nix = final.boehmgc.override {
             enableLargeConfig = true;
-          }).overrideAttrs(o: {
-            patches = (o.patches or []) ++ [
-              # https://github.com/ivmai/bdwgc/pull/586
-              ./dep-patches/boehmgc-traceable_allocator-public.diff
-            ];
-          });
+          };
 
           libseccomp-nix = final.libseccomp.overrideAttrs (_: rec {
             version = "2.5.5";
