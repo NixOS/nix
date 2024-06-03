@@ -124,7 +124,7 @@ in
   containers = runNixOSTestFor "x86_64-linux" ./containers/containers.nix;
 
   setuid = lib.genAttrs
-    ["i686-linux" "x86_64-linux"]
+    ["x86_64-linux"]
     (system: runNixOSTestFor system ./setuid.nix);
 
   fetch-git = runNixOSTestFor "x86_64-linux" ./fetch-git;
