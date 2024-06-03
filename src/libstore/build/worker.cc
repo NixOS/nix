@@ -528,9 +528,9 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        Hash current = hashPath(
+        auto current = hashPath(
             {store.getFSAccessor(), CanonPath(store.printStorePath(path))},
-            FileIngestionMethod::Recursive, info->narHash.algo);
+            FileIngestionMethod::Recursive, info->narHash.algo).first;
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;
     }

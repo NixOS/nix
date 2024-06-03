@@ -128,6 +128,13 @@ N string2IntWithUnitPrefix(std::string_view s)
 }
 
 /**
+ * Pretty-print a byte value, e.g. 12433615056 is rendered as `11.6
+ * GiB`. If `align` is set, the number will be right-justified by
+ * padding with spaces on the left.
+ */
+std::string renderSize(uint64_t value, bool align = false);
+
+/**
  * Parse a string into a float.
  */
 template<class N>
