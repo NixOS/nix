@@ -202,7 +202,7 @@ For example, here is a Python script that depends on Python and the
 
 ```python
 #! /usr/bin/env nix-shell
-#! nix-shell -i python3 --packages python312 python312Packages.prettytable
+#! nix-shell -i python3 --packages python3 python3Packages.prettytable
 
 import prettytable
 
