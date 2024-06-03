@@ -18,6 +18,7 @@
 #include "terminal.hh"
 #include "users.hh"
 #include "network-proxy.hh"
+#include "eval-cache.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -532,7 +533,15 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
         evalSettings.pureEval = false;
     }
-    args.command->second->run();
+
+    try {
+        args.command->second->run();
+    } catch (eval_cache::CachedEvalError & e) {
+        /* Evaluate the original attribute that resulted in this
+           cached error so that we can show the original error to the
+           user. */
+        e.force();
+    }
 }
 
 }

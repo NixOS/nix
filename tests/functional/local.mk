@@ -17,6 +17,7 @@ nix_tests = \
   flakes/build-paths.sh \
   flakes/flake-in-submodule.sh \
   flakes/prefetch.sh \
+  flakes/eval-cache.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
