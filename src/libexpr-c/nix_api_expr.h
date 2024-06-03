@@ -129,10 +129,8 @@ nix_err nix_value_call_multi(
  *
  * This function converts these Values into their final type.
  *
- * @note You don't need this function for basic API usage, since all functions
- * that return a value call it for you. The only place you will see a
- * NIX_TYPE_THUNK is in the arguments that are passed to a PrimOp function
- * you supplied to nix_alloc_primop.
+ * @note You don't need this function for basic API usage very often, since all functions that return a `Value` call it
+ * for you. This function is mainly needed before calling @ref getters.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
