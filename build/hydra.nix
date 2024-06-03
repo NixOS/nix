@@ -129,7 +129,7 @@ in
   };
 
   # System tests.
-  tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
+  tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {
 
     # Make sure that nix-env still produces the exact same result
     # on a particular version of Nixpkgs.
