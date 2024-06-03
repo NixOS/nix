@@ -4,9 +4,10 @@
 
 source common.sh
 
+# shellcheck disable=SC1111
 needLocalStore "“--no-require-sigs” can’t be used with the daemon"
 
-rm -rf $TEST_ROOT/binary_cache
+rm -rf "$TEST_ROOT"/binary_cache
 
 export REMOTE_STORE_DIR=$TEST_ROOT/binary_cache
 export REMOTE_STORE=file://$REMOTE_STORE_DIR
@@ -17,11 +18,11 @@ buildDrvs () {
 
 # Populate the remote cache
 clearStore
-nix copy --to $REMOTE_STORE --file ./content-addressed.nix
+nix copy --to "$REMOTE_STORE" --file ./content-addressed.nix
 
 # Restart the build on an empty store, ensuring that we don't build
 clearStore
-buildDrvs --substitute --substituters $REMOTE_STORE --no-require-sigs -j0 transitivelyDependentCA
+buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0 transitivelyDependentCA
 # Check that the thing we’ve just substituted has its realisation stored
 nix realisation info --file ./content-addressed.nix transitivelyDependentCA
 # Check that its dependencies have it too
@@ -63,9 +64,9 @@ clearStore
 # Add the realisations of rootCA to the cachecache
 clearCacheCache
 export _NIX_FORCE_HTTP=1
-buildDrvs --substitute --substituters $REMOTE_STORE --no-require-sigs -j0
+buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0
 # Try rebuilding, but remove the realisations from the remote cache to force
 # using the cachecache
 clearStore
-rm $REMOTE_STORE_DIR/realisations/*
-buildDrvs --substitute --substituters $REMOTE_STORE --no-require-sigs -j0
+rm "$REMOTE_STORE_DIR"/realisations/*
+buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0
