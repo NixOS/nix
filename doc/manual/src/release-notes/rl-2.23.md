@@ -7,15 +7,15 @@
   [`debugger-on-warn`](@docroot@/command-ref/conf-file.md#conf-debugger-on-warn) and
   [`abort-on-warn`](@docroot@/command-ref/conf-file.md#conf-abort-on-warn).
 
-- Show all FOD errors with `nix build --keep-going`
+- Make `nix build --keep-going` consistent with `nix-build --keep-going`
 
-  `nix build --keep-going` now behaves consistently with `nix-build --keep-going`. This means
-  that if e.g. multiple FODs fail to build, all hash mismatches are displayed.
+  This means that if e.g. multiple fixed-output derivations fail to
+  build, all hash mismatches are displayed.
 
 - Modify `nix derivation {add,show}` JSON format [#9866](https://github.com/NixOS/nix/issues/9866) [#10722](https://github.com/NixOS/nix/pull/10722)
 
   The JSON format for derivations has been slightly revised to better conform to our [JSON guidelines](@docroot@contributing/cli-guideline#returning-future-proof-json).
-  In particular, the hash algorithm and content addressing method of content-addresed derivation outputs is now separated into two fields `hashAlgo` and `method`,
+  In particular, the hash algorithm and content addressing method of content-addresed derivation outputs are now separated into two fields `hashAlgo` and `method`,
   rather than one field with an arcane `:`-separated format.
 
   This JSON format is only used by the experimental `nix derivation` family of commands, at this time.
@@ -56,33 +56,33 @@
 
   It is also somewhat analogous to the [planned](https://github.com/NixOS/nix/issues/10504) `nix dev shell` (currently `nix develop`), which is less about environment variables, and more about running a development shell, which is a more powerful command, but also requires more setup.
 
-- New-cli flake commands that expect derivations now print the failing value and its type [#10778](https://github.com/NixOS/nix/pull/10778)
+- Flake operations that expect derivations now print the failing value and its type [#10778](https://github.com/NixOS/nix/pull/10778)
 
   In errors like `flake output attribute 'nixosConfigurations.yuki.config' is not a derivation or path`, the message now includes the failing value and type.
 
   Before:
 
   ```
-      error: flake output attribute 'nixosConfigurations.yuki.config' is not a derivation or path
+  error: flake output attribute 'nixosConfigurations.yuki.config' is not a derivation or path
   ````
 
   After:
 
   ```
-      error: expected flake output attribute 'nixosConfigurations.yuki.config' to be a derivation or path but found a set: { appstream = «thunk»; assertions = «thunk»; boot = { bcache = «thunk»; binfmt = «thunk»; binfmtMiscRegistrations = «thunk»; blacklistedKernelModules = «thunk»; bootMount = «thunk»; bootspec = «thunk»; cleanTmpDir = «thunk»; consoleLogLevel = «thunk»; «43 attributes elided» }; «48 attributes elided» }
+  error: expected flake output attribute 'nixosConfigurations.yuki.config' to be a derivation or path but found a set: { appstream = «thunk»; assertions = «thunk»; boot = { bcache = «thunk»; binfmt = «thunk»; binfmtMiscRegistrations = «thunk»; blacklistedKernelModules = «thunk»; bootMount = «thunk»; bootspec = «thunk»; cleanTmpDir = «thunk»; consoleLogLevel = «thunk»; «43 attributes elided» }; «48 attributes elided» }
   ```
 
-- `fetchTree` now fetches git repositories shallowly by default [#10028](https://github.com/NixOS/nix/pull/10028)
+- `fetchTree` now fetches Git repositories shallowly by default [#10028](https://github.com/NixOS/nix/pull/10028)
 
-  `builtins.fetchTree` now clones git repositories shallowly by default, which reduces network traffic and disk usage significantly in many cases.
+  `builtins.fetchTree` now clones Git repositories shallowly by default, which reduces network traffic and disk usage significantly in many cases.
 
-  Previously, the default behavior was to clone the full history of a specific tag or branch (eg. `ref`) and only afterwards extract the files of one specific revision.
+  Previously, the default behavior was to clone the full history of a specific tag or branch (e.g. `ref`) and only afterwards extract the files of one specific revision.
 
   From now on, the `ref` and `allRefs` arguments will be ignored, except if shallow cloning is disabled by setting `shallow = false`.
 
   The defaults for `builtins.fetchGit` remain unchanged. Here, shallow cloning has to be enabled manually by passing `shallow = true`.
 
-- Store object info JSON format now uses `null` rather than omitting fields. [#9995](https://github.com/NixOS/nix/pull/9995)
+- Store object info JSON format now uses `null` rather than omitting fields [#9995](https://github.com/NixOS/nix/pull/9995)
 
   The [store object info JSON format](@docroot@/protocols/json/store-object-info.md), used for e.g. `nix path-info`, no longer omits fields to indicate absent information, but instead includes the fields with a `null` value.
   For example, `"ca": null` is used to to indicate a store object that isn't content-addressed rather than omitting the `ca` field entirely.
