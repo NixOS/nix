@@ -785,6 +785,24 @@ public:
     }
 };
 
+bool EvalState::canDebug()
+{
+    return debugRepl && !debugTraces.empty();
+}
+
+void EvalState::runDebugRepl(const Error * error)
+{
+    if (!canDebug())
+        return;
+
+    assert(!debugTraces.empty());
+    const DebugTrace & last = debugTraces.front();
+    const Env & env = last.env;
+    const Expr & expr = last.expr;
+
+    runDebugRepl(error, env, expr);
+}
+
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
     // Make sure we have a debugger to run and we're not already in a debugger.
