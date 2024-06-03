@@ -507,7 +507,6 @@
             ''^scripts/install-nix-from-closure\.sh$''
             ''^scripts/install-systemd-multi-user\.sh$''
             ''^src/nix/get-env\.sh$''
-            ''^tests/functional/bash-profile\.sh$''
             ''^tests/functional/binary-cache-build-remote\.sh$''
             ''^tests/functional/binary-cache\.sh$''
             ''^tests/functional/brotli\.sh$''
