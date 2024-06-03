@@ -17,8 +17,12 @@ static Sync<WaiterDomain> & getWaiterDomain(Value & v)
     return waiterDomains[domain];
 }
 
+std::atomic<uint64_t> nrThunksAwaited, nrThunksAwaitedSlow, usWaiting, currentlyWaiting, maxWaiting;
+
 void EvalState::waitOnThunk(Value & v, bool awaited)
 {
+    nrThunksAwaited++;
+
     auto domain = getWaiterDomain(v).lock();
 
     if (awaited) {
@@ -53,14 +57,25 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
 
     debug("AWAIT %x", &v);
 
+    nrThunksAwaitedSlow++;
+    currentlyWaiting++;
+    maxWaiting = std::max(maxWaiting.load(), currentlyWaiting.load());
+
+    auto now1 = std::chrono::steady_clock::now();
+
     while (true) {
         domain.wait(domain->cv);
         debug("WAKEUP %x", &v);
         auto type = v.internalType.load();
         if (type != tAwaited) {
-            if (type == tFailed)
+            if (type == tFailed) {
+                currentlyWaiting--;
                 std::rethrow_exception(v.payload.failed->ex);
+            }
             assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
+            auto now2 = std::chrono::steady_clock::now();
+            usWaiting += std::chrono::duration_cast<std::chrono::microseconds>(now2 - now1).count();
+            currentlyWaiting--;
             return;
         }
         printError("SPURIOUS %s", &v);

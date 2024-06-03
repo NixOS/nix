@@ -64,17 +64,12 @@ struct Executor
 
     void worker()
     {
-        printError("THREAD");
-
         while (true) {
             std::pair<std::promise<void>, work_t> item;
 
             while (true) {
                 auto state(state_.lock());
-                if (state->quit) {
-                    printError("THREAD EXIT");
-                    return;
-                }
+                if (state->quit) return;
                 if (!state->queue.empty()) {
                     item = std::move(state->queue.front());
                     state->queue.pop();
