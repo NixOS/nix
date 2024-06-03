@@ -11,16 +11,16 @@
 .github/CODEOWNERS @edolstra
 
 # Documentation of built-in functions
-src/libexpr/primops.cc @roberth @fricklerhandwerk
+subprojects/libexpr/primops.cc @roberth @fricklerhandwerk
 
 # Documentation of settings
-src/libexpr/eval-settings.hh @fricklerhandwerk
-src/libstore/globals.hh @fricklerhandwerk
+subprojects/libexpr/eval-settings.hh @fricklerhandwerk
+subprojects/libstore/globals.hh @fricklerhandwerk
 
 # Documentation
 doc/manual @fricklerhandwerk
 maintainers/*.md @fricklerhandwerk
-src/**/*.md @fricklerhandwerk
+subprojects/**/*.md @fricklerhandwerk
 
 # Libstore layer
-/src/libstore @ericson2314
+/subprojects/libstore @ericson2314

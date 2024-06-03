@@ -29,7 +29,7 @@ GENERATE_LATEX         = NO
 
 # The INPUT tag is used to specify the files and/or directories that contain
 # documented source files. You may enter file names like myfile.cpp or
-# directories like /usr/src/myproject. Separate the files or directories with
+# directories like /usr/subprojects/myproject. Separate the files or directories with
 # spaces. See also FILE_PATTERNS and EXTENSION_MAPPING
 # Note: If this tag is empty the current directory is searched.
 

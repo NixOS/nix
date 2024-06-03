@@ -38,9 +38,9 @@ GENERATE_LATEX         = NO
 # so they can expand variables despite configure variables.
 
 INPUT                  = \
-  @src@/src/libutil-c \
-  @src@/src/libexpr-c \
-  @src@/src/libstore-c \
+  @src@/subprojects/libutil-c \
+  @src@/subprojects/libexpr-c \
+  @src@/subprojects/libstore-c \
   @src@/doc/external-api/README.md
 
 FILE_PATTERNS = nix_api_*.h *.md

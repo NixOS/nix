@@ -171,7 +171,7 @@ in {
           ./doc
           ./misc
           ./precompiled-headers.h
-          (fileset.difference ./src ./src/perl)
+          (fileset.difference ./subprojects ./subprojects/perl)
           ./COPYING
           ./scripts/local.mk
         ] ++ lib.optionals enableManual [
@@ -316,7 +316,7 @@ in {
   # Work around weird bug where it doesn't think there is a Makefile.
   installCheckPhase = if (!doBuild && doInstallCheck) then ''
     runHook preInstallCheck
-    mkdir -p src/nix-channel
+    mkdir -p subprojects/nix-channel
     make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
   '' else null;
 
@@ -324,7 +324,7 @@ in {
   # built Nix.
   preInstallCheck =
     lib.optionalString (! doBuild) ''
-      mkdir -p src/nix-channel
+      mkdir -p subprojects/nix-channel
     '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;

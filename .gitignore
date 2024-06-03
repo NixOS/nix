@@ -41,59 +41,59 @@ perl/Makefile.config
 /scripts/nix-profile.fish
 /scripts/nix-profile-daemon.fish
 
-# /src/libexpr/
-/src/libexpr/lexer-tab.cc
-/src/libexpr/lexer-tab.hh
-/src/libexpr/parser-tab.cc
-/src/libexpr/parser-tab.hh
-/src/libexpr/parser-tab.output
-/src/libexpr/nix.tbl
-/src/libexpr/tests
+# /subprojects/libexpr/
+/subprojects/libexpr/lexer-tab.cc
+/subprojects/libexpr/lexer-tab.hh
+/subprojects/libexpr/parser-tab.cc
+/subprojects/libexpr/parser-tab.hh
+/subprojects/libexpr/parser-tab.output
+/subprojects/libexpr/nix.tbl
+/subprojects/libexpr/tests
 /tests/unit/libexpr/libnixexpr-tests
 
-# /src/libfetchers
+# /subprojects/libfetchers
 /tests/unit/libfetchers/libnixfetchers-tests
 
-# /src/libflake
+# /subprojects/libflake
 /tests/unit/libflake/libnixflake-tests
 
-# /src/libstore/
+# /subprojects/libstore/
 *.gen.*
-/src/libstore/tests
+/subprojects/libstore/tests
 /tests/unit/libstore/libnixstore-tests
 
-# /src/libutil/
-/src/libutil/tests
+# /subprojects/libutil/
+/subprojects/libutil/tests
 /tests/unit/libutil/libnixutil-tests
 
-/src/nix/nix
+/subprojects/nix/nix
 
-/src/nix/generated-doc
+/subprojects/nix/generated-doc
 
-# /src/nix-env/
-/src/nix-env/nix-env
+# /subprojects/nix-env/
+/subprojects/nix-env/nix-env
 
-# /src/nix-instantiate/
-/src/nix-instantiate/nix-instantiate
+# /subprojects/nix-instantiate/
+/subprojects/nix-instantiate/nix-instantiate
 
-# /src/nix-store/
-/src/nix-store/nix-store
+# /subprojects/nix-store/
+/subprojects/nix-store/nix-store
 
-/src/nix-prefetch-url/nix-prefetch-url
+/subprojects/nix-prefetch-url/nix-prefetch-url
 
-/src/nix-collect-garbage/nix-collect-garbage
+/subprojects/nix-collect-garbage/nix-collect-garbage
 
-# /src/nix-channel/
-/src/nix-channel/nix-channel
+# /subprojects/nix-channel/
+/subprojects/nix-channel/nix-channel
 
-# /src/nix-build/
-/src/nix-build/nix-build
+# /subprojects/nix-build/
+/subprojects/nix-build/nix-build
 
-/src/nix-copy-closure/nix-copy-closure
+/subprojects/nix-copy-closure/nix-copy-closure
 
-/src/error-demo/error-demo
+/subprojects/error-demo/error-demo
 
-/src/build-remote/build-remote
+/subprojects/build-remote/build-remote
 
 # /tests/functional/
 /tests/functional/test-tmp

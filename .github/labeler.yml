@@ -1,6 +1,6 @@
 "c api":
   - changed-files:
-    - any-glob-to-any-file: "src/lib*-c/**/*"
+    - any-glob-to-any-file: "subprojects/lib*-c/**/*"
     - any-glob-to-any-file: "test/unit/**/nix_api_*"
     - any-glob-to-any-file: "doc/external-api/**/*"
 
@@ -14,30 +14,30 @@
 "documentation":
   - changed-files:
     - any-glob-to-any-file: "doc/manual/**/*"
-    - any-glob-to-any-file: "src/nix/**/*.md"
+    - any-glob-to-any-file: "subprojects/nix/**/*.md"
 
 "store":
   - changed-files:
-    - any-glob-to-any-file: "src/libstore/store-api.*"
-    - any-glob-to-any-file: "src/libstore/*-store.*"
+    - any-glob-to-any-file: "subprojects/libstore/store-api.*"
+    - any-glob-to-any-file: "subprojects/libstore/*-store.*"
 
 "fetching":
   - changed-files:
-    - any-glob-to-any-file: "src/libfetchers/**/*"
+    - any-glob-to-any-file: "subprojects/libfetchers/**/*"
 
 "repl":
   - changed-files:
-    - any-glob-to-any-file: "src/libcmd/repl.*"
-    - any-glob-to-any-file: "src/nix/repl.*"
+    - any-glob-to-any-file: "subprojects/libcmd/repl.*"
+    - any-glob-to-any-file: "subprojects/nix/repl.*"
 
 "new-cli":
   - changed-files:
-    - any-glob-to-any-file: "src/nix/**/*"
+    - any-glob-to-any-file: "subprojects/nix/**/*"
 
 "with-tests":
   - changed-files:
     # Unit tests
-    - any-glob-to-any-file: "src/*/tests/**/*"
+    - any-glob-to-any-file: "subprojects/*/tests/**/*"
     # Functional and integration tests
     - any-glob-to-any-file: "tests/functional/**/*"
 
