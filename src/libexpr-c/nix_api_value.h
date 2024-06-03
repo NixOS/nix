@@ -148,7 +148,8 @@ Value * nix_alloc_value(nix_c_context * context, EvalState * state);
  * @brief Functions to inspect and change Nix language values, represented by Value.
  * @{
  */
-/** @name Getters
+/** @anchor getters
+ * @name Getters
  */
 /**@{*/
 /** @brief Get value type
