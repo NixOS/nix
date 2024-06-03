@@ -45,6 +45,14 @@ nix build -f multiple-outputs.nix --json e --no-link | jq --exit-status '
     (.outputs | keys == ["a_a", "b"]))
 '
 
+# Tests that we can handle empty 'outputsToInstall' (assuming that default
+# output "out" exists).
+nix build -f multiple-outputs.nix --json nothing-to-install --no-link | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*nothing-to-install.drv")) and
+    (.outputs | keys == ["out"]))
+'
+
 # But not when it's overriden.
 nix build -f multiple-outputs.nix --json e^a_a --no-link
 nix build -f multiple-outputs.nix --json e^a_a --no-link | jq --exit-status '

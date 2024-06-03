@@ -96,6 +96,12 @@ rec {
     buildCommand = "mkdir $a_a $b $c";
   };
 
+  nothing-to-install = mkDerivation {
+    name = "nothing-to-install";
+    meta.outputsToInstall = [ ];
+    buildCommand = "mkdir $out";
+  };
+
   independent = mkDerivation {
     name = "multiple-outputs-independent";
     outputs = [ "first" "second" ];
