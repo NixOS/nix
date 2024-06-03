@@ -52,6 +52,11 @@ let
     );
   };
 
+  otherNixes.nix_2_18.setNixPackage = { lib, pkgs, ... }: {
+    imports = [ checkOverrideNixVersion ];
+    nix.package = lib.mkForce pkgs.nixVersions.nix_2_18;
+  };
+
 in
 
 {
