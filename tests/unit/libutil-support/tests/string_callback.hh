@@ -11,6 +11,6 @@ inline void * observe_string_cb_data(std::string & out)
 };
 
 #define OBSERVE_STRING(str) \
-  (nix_get_string_callback) nix::testing::observe_string_cb, nix::testing::observe_string_cb_data(str)
+    (nix_get_string_callback) nix::testing::observe_string_cb, nix::testing::observe_string_cb_data(str)
 
 }

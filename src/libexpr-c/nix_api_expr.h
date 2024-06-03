@@ -114,12 +114,12 @@ nix_err nix_value_call_multi(
  *
  * @see nix_value_call_multi
  */
-#define NIX_VALUE_CALL(context, state, value, fn, ...)                  \
-  do {                                                                  \
-    Value * args_array[] = {__VA_ARGS__};                               \
-    size_t nargs = sizeof(args_array) / sizeof(args_array[0]);          \
-    nix_value_call_multi(context, state, fn, nargs, args_array, value); \
-  } while (0)
+#define NIX_VALUE_CALL(context, state, value, fn, ...)                      \
+    do {                                                                    \
+        Value * args_array[] = {__VA_ARGS__};                               \
+        size_t nargs = sizeof(args_array) / sizeof(args_array[0]);          \
+        nix_value_call_multi(context, state, fn, nargs, args_array, value); \
+    } while (0)
 
 /**
  * @brief Forces the evaluation of a Nix value.
