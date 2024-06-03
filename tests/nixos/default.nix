@@ -33,7 +33,9 @@ let
   checkOverrideNixVersion = { pkgs, lib, ... }: {
     # pkgs.nix: The new Nix in this repo
     # We disallow it, to make sure we don't accidentally use it.
-    system.forbiddenDependenciesRegex = lib.strings.escapeRegex "nix-${pkgs.nix.version}";
+    system.forbiddenDependenciesRegexes = [
+      (lib.strings.escapeRegex "nix-${pkgs.nix.version}")
+    ];
   };
 in
 
