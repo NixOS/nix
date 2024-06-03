@@ -17,11 +17,17 @@ struct Executor
 {
     using work_t = std::function<void()>;
 
+    struct Item
+    {
+        std::promise<void> promise;
+        work_t work;
+    };
+
     //std::future<void> enqueue(work_t work);
 
     struct State
     {
-        std::queue<std::pair<std::promise<void>, work_t>> queue;
+        std::queue<Item> queue;
         std::vector<std::thread> threads;
         bool quit = false;
     };
@@ -65,7 +71,7 @@ struct Executor
     void worker()
     {
         while (true) {
-            std::pair<std::promise<void>, work_t> item;
+            Item item;
 
             while (true) {
                 auto state(state_.lock());
@@ -80,10 +86,10 @@ struct Executor
 
             //printError("EXEC");
             try {
-                item.second();
-                item.first.set_value();
+                item.work();
+                item.promise.set_value();
             } catch (...) {
-                item.first.set_exception(std::current_exception());
+                item.promise.set_exception(std::current_exception());
             }
         }
     }
@@ -104,7 +110,11 @@ struct Executor
             for (auto & item : items) {
                 std::promise<void> promise;
                 futures.push_back(promise.get_future());
-                state->queue.emplace(std::move(promise), std::move(item));
+                state->queue.push(
+                    Item {
+                        .promise = std::move(promise),
+                        .work = std::move(item)
+                    });
             }
         }
 
