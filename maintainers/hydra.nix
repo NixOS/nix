@@ -32,6 +32,8 @@ let
 
       doBuild = false;
     };
+
+  forAllPackages = lib.genAttrs [ "nix" "nix-util" ];
 in
 {
   # Binary package for various platforms.
@@ -39,10 +41,12 @@ in
 
   shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
-  buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
+  buildStatic = forAllPackages (pkgName:
+    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.${pkgName}));
 
-  buildCross = forAllCrossSystems (crossSystem:
-    lib.genAttrs [ "x86_64-linux" ] (system: self.packages.${system}."nix-${crossSystem}"));
+  buildCross = forAllPackages (pkgName:
+    forAllCrossSystems (crossSystem:
+      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.${pkgName})));
 
   buildNoGc = forAllSystems (system:
     self.packages.${system}.nix.override { enableGC = false; }
@@ -76,7 +80,7 @@ in
   binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (system:
     forAllCrossSystems (crossSystem:
       binaryTarball
-        self.packages.${system}."nix-${crossSystem}"
+        nixpkgsFor.${system}.cross.${crossSystem}.nix
         nixpkgsFor.${system}.cross.${crossSystem}));
 
   # The first half of the installation script. This is uploaded
