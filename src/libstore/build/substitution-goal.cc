@@ -8,6 +8,8 @@
 namespace nix {
 
 using Co = nix::PathSubstitutionGoal::Co;
+using promise_type = nix::PathSubstitutionGoal::promise_type;
+using handle_type = nix::PathSubstitutionGoal::handle_type;
 using SuspendGoalAwaiter = nix::PathSubstitutionGoal::SuspendGoalAwaiter;
 using SuspendGoal = nix::PathSubstitutionGoal::SuspendGoal;
 
@@ -15,20 +17,52 @@ Co::Co(Co&& rhs) {
     this->handle = rhs.handle;
     rhs.handle = nullptr;
 }
+void Co::operator=(Co&& rhs) {
+    this->handle = rhs.handle;
+    rhs.handle = nullptr;
+}
 Co::~Co() {
-    assert(handle);
-    assert(handle.done());
-    handle.destroy();
+    std::clog << "destroying coroutine" << std::endl;
+    if (handle) {
+        assert(handle);
+        std::clog << "destroying coroutine for " << handle.promise().loc.function_name() << std::endl;
+        handle.promise().alive = false;
+        // assert(handle.done());
+        handle.destroy();
+    } else {
+        std::clog << "empty coroutine destroyed" << std::endl;
+    }
 }
 
-Co Co::promise_type::get_return_object() {
-    auto handle = Co::handle_type::from_promise(*this);
+Co promise_type::get_return_object() {
+    auto handle = handle_type::from_promise(*this);
     return Co{handle};
 };
-std::coroutine_handle<> Co::promise_type::final_awaiter::await_suspend(std::coroutine_handle<Co::promise_type> h) noexcept {
-    if (h.promise().goal.exitCode == ecBusy) {
-        return h.promise().continuation;
+// Here we execute our continuation, by passing it back to the caller.
+// C++ compiler will create code that takes that and executes it promptly.
+// `h` is the handle for the coroutine that is finishing execution,
+// thus it must be destroyed.
+std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h) noexcept {
+    auto& p = h.promise();
+    p.goal.trace("in final_awaiter");
+    // we are still on-going
+    if (p.goal.exitCode == ecBusy) {
+        p.goal.trace("we're busy");
+        assert(p.alive); // sanity check to make sure it's not been destructed prematurely
+        assert(p.goal.top_co);
+        assert(p.goal.top_co->handle == h);
+        // we move continuation to the top,
+        // note: previous top_co is actually h, so by moving into it,
+        // we're calling the destructor on h, DON'T use h and p after this!
+        auto c = std::move(p.continuation);
+        assert(c);
+        auto& goal = p.goal;
+        goal.top_co = std::move(c);
+        goal.trace(fmt("jumping to %s", goal.top_co->handle.promise().loc.function_name()));
+        return goal.top_co->handle;
+    // we are done, give control back to caller of top_co.resume()
     } else {
+        p.goal.top_co = {};
         return std::noop_coroutine();
     }
 }
@@ -39,25 +73,42 @@ std::coroutine_handle<> Co::promise_type::final_awaiter::await_suspend(std::coro
 // The original continuation we had is set as the continuation
 // of the coroutine passed in.
 // `final_suspend` is called after this, and `final_awaiter` will pass control off to `continuation`.
-void Co::promise_type::return_value(Co&& next) {
-    assert(!next.handle.promise().continuation.address());
-    next.handle.promise().continuation = continuation;
-    continuation = next.handle;
+// However, we also have to transfer the ownership of `next`, since it's an rvalue,
+// the handle to which is on our stack.
+// We thus give it to our previous continuation.
+void promise_type::return_value(Co&& next) {
+    goal.trace("return_value(Co&&)");
+    // we save our old continuation
+    auto old_continuation = std::move(continuation);
+    // we set our continuation to next
+    continuation = std::move(next);
+    // next must be continuation-less
+    assert(!continuation->handle.promise().continuation);
+    // next's continuation is set to the old continuation
+    continuation->handle.promise().continuation = std::move(old_continuation);
 }
 
 // When we `co_await` another `Co`-returning coroutine,
 // we tell the caller of `caller.resume()` to switch to our coroutine (`handle`).
 // To make sure we return to the original coroutine, we set it as the continuation of our
 // coroutine. In `final_awaiter` we check if it's set and if so we return to it.
-std::coroutine_handle<> Co::await_suspend(std::coroutine_handle<Co::promise_type> caller) {
-    assert(!handle.promise().continuation.address());
-    handle.promise().continuation = caller;
-    return handle;
+//
+// To explain in more understandable terms:
+// When we `co_await Co_returning_function()`, this function is called on the resultant Co of
+// the _called_ function, and C++ automatically passes the caller in.
+// We don't use this caller, because we make use of the invariant that top_co == caller.
+std::coroutine_handle<> Co::await_suspend(handle_type caller) {
+    assert(handle); // we must be a valid coroutine
+    auto& p = handle.promise();
+    assert(!p.continuation); // we must have no continuation
+    assert(p.goal.top_co); // top_co invariant must be maintained
+    assert(p.goal.top_co->handle == caller); // top_co invariant must be maintained
+    p.continuation = std::move(p.goal.top_co); // we set our continuation to be top_co (i.e. caller)
+    p.goal.top_co = std::move(*this); // we set top_co to ourselves
+    return handle; // we execute ourselves
 }
 
 void SuspendGoalAwaiter::await_suspend(std::coroutine_handle<> handle) noexcept {
-    // Next time we work() the goal again, this coroutine will be resumed.
-    goal.cur_co = handle;
 }
 
 PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
@@ -65,7 +116,6 @@ PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker &
     , storePath(storePath)
     , repair(repair)
     , top_co(init())
-    , cur_co(top_co.handle)
     , ca(ca)
 {
     name = fmt("substitution of '%s'", worker.store.printStorePath(this->storePath));
@@ -96,15 +146,13 @@ PathSubstitutionGoal::Done PathSubstitutionGoal::done(
 
 void PathSubstitutionGoal::work()
 {
-    assert(cur_co);
-    assert(!cur_co.done());
-    auto c = cur_co;
-    // So that we don't resume it again by accident
-    cur_co = nullptr;
-    c.resume();
+    assert(top_co);
+    assert(top_co->handle);
+    assert(top_co->handle.promise().alive);
+    top_co->handle.resume();
     // We either should be in a state where we can be work()-ed again,
     // or we should be done.
-    assert(cur_co || exitCode != ecBusy);
+    assert(top_co || exitCode != ecBusy);
 }
 
 
@@ -123,6 +171,8 @@ Co PathSubstitutionGoal::init()
         throw Error("cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
 
     subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
+
+    trace("calling tryNext");
 
     co_return tryNext();
 }
