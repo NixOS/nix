@@ -1,4 +1,5 @@
-#include "nix/config.h"
+#include "config-util.h"
+#include "config-store.h"
 
 #include "EXTERN.h"
 #include "perl.h"

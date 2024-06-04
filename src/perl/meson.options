@@ -6,11 +6,6 @@
 #============================================================================
 
 option(
-  'version',
-  type : 'string',
-  description : 'nix-perl version')
-
-option(
   'tests',
   type : 'feature',
   value : 'disabled',
