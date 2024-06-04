@@ -11,6 +11,8 @@ perl/Makefile.config
 /svn-revision
 /libtool
 /config/config.*
+# Default meson build dir
+/build
 
 # /doc/manual/
 /doc/manual/*.1
