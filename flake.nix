@@ -343,8 +343,6 @@
             ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nix-perl-bindings.mesonFlags)
             ;
 
-          inherit (pkgs.nix-util) mesonFlags;
-
           nativeBuildInputs = attrs.nativeBuildInputs or []
             ++ pkgs.nix-util.nativeBuildInputs
             ++ pkgs.nix-store.nativeBuildInputs
