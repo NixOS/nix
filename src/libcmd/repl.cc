@@ -261,6 +261,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
             for (auto & entry : std::filesystem::directory_iterator{dir == "" ? "/" : dir}) {
+                checkInterrupt();
                 auto name = entry.path().filename().string();
                 if (name[0] != '.' && hasPrefix(name, prefix2))
                     completions.insert(prev + entry.path().string());

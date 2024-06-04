@@ -144,13 +144,15 @@ static void canonicalisePathMetaData_(
 #endif
 
     if (S_ISDIR(st.st_mode)) {
-        for (auto & i : std::filesystem::directory_iterator{path})
+        for (auto & i : std::filesystem::directory_iterator{path}) {
+            checkInterrupt();
             canonicalisePathMetaData_(
                 i.path().string(),
 #ifndef _WIN32
                 uidRange,
 #endif
                 inodesSeen);
+        }
     }
 }
 
