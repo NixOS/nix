@@ -4,6 +4,7 @@
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
+#include "signals.hh"
 
 #include <algorithm>
 #include <map>
@@ -346,14 +347,17 @@ void initPlugins()
         std::vector<std::filesystem::path> pluginFiles;
         try {
             auto ents = std::filesystem::directory_iterator{pluginFile};
-            for (const auto & ent : ents)
+            for (const auto & ent : ents) {
+                checkInterrupt();
                 pluginFiles.emplace_back(ent.path());
+            }
         } catch (std::filesystem::filesystem_error & e) {
             if (e.code() != std::errc::not_a_directory)
                 throw;
             pluginFiles.emplace_back(pluginFile);
         }
         for (const auto & file : pluginFiles) {
+            checkInterrupt();
             /* handle is purposefully leaked as there may be state in the
                DSO needed by the action of the plugin. */
 #ifndef _WIN32 // TODO implement via DLL loading on Windows

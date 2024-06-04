@@ -1,4 +1,5 @@
 #include "cgroup.hh"
+#include "signals.hh"
 #include "util.hh"
 #include "file-system.hh"
 #include "finally.hh"
@@ -65,6 +66,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     /* Otherwise, manually kill every process in the subcgroups and
        this cgroup. */
     for (auto & entry : std::filesystem::directory_iterator{cgroup}) {
+        checkInterrupt();
         if (entry.symlink_status().type() != std::filesystem::file_type::directory) continue;
         destroyCgroup(cgroup / entry.path().filename(), false);
     }
