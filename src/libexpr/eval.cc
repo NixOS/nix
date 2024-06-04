@@ -31,7 +31,6 @@
 #include <sstream>
 #include <cstring>
 #include <optional>
-#include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <fstream>
@@ -47,6 +46,8 @@
 #if HAVE_BOEHMGC
 
 #define GC_INCLUDE_NEW
+
+#include <pthread.h>
 
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
