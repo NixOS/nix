@@ -198,8 +198,12 @@
               perl-bindings = final.nix-perl-bindings;
             };
 
-          nix-perl-bindings = final.callPackage ./perl {
-            inherit fileset stdenv;
+          nix-perl-bindings = final.callPackage ./src/perl/package.nix {
+            inherit
+              fileset
+              stdenv
+              versionSuffix
+              ;
           };
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
@@ -301,6 +305,13 @@
         makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
         let
           modular = devFlake.getSystem stdenv.buildPlatform.system;
+          transformFlag = prefix: flag:
+            assert builtins.isString flag;
+            let
+              rest = builtins.substring 2 (builtins.stringLength flag) flag;
+            in
+              "-D${prefix}:${rest}";
+          havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
         in {
           pname = "shell-for-" + attrs.pname;
           installFlags = "sysconfdir=$(out)/etc";
@@ -326,11 +337,16 @@
               "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
           };
 
-          mesonFlags = pkgs.nix-util.mesonFlags ++ pkgs.nix-store.mesonFlags;
+          mesonFlags =
+            map (transformFlag "libutil") pkgs.nix-util.mesonFlags
+            ++ map (transformFlag "libstore") pkgs.nix-store.mesonFlags
+            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nix-perl-bindings.mesonFlags)
+            ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
             ++ pkgs.nix-util.nativeBuildInputs
             ++ pkgs.nix-store.nativeBuildInputs
+            ++ lib.optionals havePerl pkgs.nix-perl-bindings.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
@@ -340,6 +356,10 @@
             # https://github.com/NixOS/nixpkgs/pull/291814 is available
             ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
+
+          buildInputs = attrs.buildInputs or []
+            ++ lib.optional havePerl pkgs.perl
+            ;
         });
         in
         forAllSystems (system:

@@ -180,7 +180,7 @@ in {
           ./doc
           ./misc
           ./precompiled-headers.h
-          ./src
+          (fileset.difference ./src ./src/perl)
           ./COPYING
           ./scripts/local.mk
         ] ++ lib.optionals buildUnitTests [
@@ -192,7 +192,7 @@ in {
         ] ++ lib.optionals (enableInternalAPIDocs || enableExternalAPIDocs) [
           # Source might not be compiled, but still must be available
           # for Doxygen to gather comments.
-          ./src
+          (fileset.difference ./src ./src/perl)
           ./tests/unit
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
