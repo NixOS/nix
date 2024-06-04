@@ -169,6 +169,17 @@
               ;
           };
 
+          nix-store = final.callPackage ./src/libstore/package.nix {
+            inherit
+              fileset
+              stdenv
+              officialRelease
+              versionSuffix
+              ;
+            libseccomp = final.libseccomp-nix;
+            busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+          };
+
           nix =
             final.callPackage ./package.nix {
               inherit
@@ -239,11 +250,16 @@
       );
 
       packages = forAllSystems (system: let
-        forAllPackagesList = lib.flip map [ "nix" "nix-util" ];
+        forAllPackagesList = lib.flip map [
+          "nix"
+          "nix-util"
+          "nix-store"
+        ];
       in rec {
         inherit (nixpkgsFor.${system}.native)
           nix
           nix-util
+          nix-store
           changelog-d;
         default = nix;
       } // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
@@ -310,10 +326,11 @@
               "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
           };
 
-          inherit (pkgs.nix-util) mesonFlags;
+          mesonFlags = pkgs.nix-util.mesonFlags ++ pkgs.nix-store.mesonFlags;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
             ++ pkgs.nix-util.nativeBuildInputs
+            ++ pkgs.nix-store.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"

@@ -25,6 +25,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifndef _WIN32
+#  include <sys/wait.h>
+#endif
+
 #include <nlohmann/json.hpp>
 
 namespace nix {
