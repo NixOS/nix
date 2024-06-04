@@ -1,6 +1,7 @@
 #include "binary-cache-store.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
+#include "signals.hh"
 
 #include <atomic>
 
@@ -84,6 +85,7 @@ protected:
         StorePathSet paths;
 
         for (auto & entry : std::filesystem::directory_iterator{binaryCacheDir}) {
+            checkInterrupt();
             auto name = entry.path().filename().string();
             if (name.size() != 40 ||
                 !hasSuffix(name, ".narinfo"))

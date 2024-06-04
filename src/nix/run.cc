@@ -3,6 +3,7 @@
 #include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-fs-store.hh"
@@ -249,6 +250,7 @@ void chrootHelper(int argc, char * * argv)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
         for (auto entry : std::filesystem::directory_iterator{"/"}) {
+            checkInterrupt();
             auto src = entry.path().string();
             Path dst = tmpDir + "/" + entry.path().filename().string();
             if (pathExists(dst)) continue;
