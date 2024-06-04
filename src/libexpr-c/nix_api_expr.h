@@ -129,8 +129,8 @@ nix_err nix_value_call_multi(
  *
  * This function converts these Values into their final type.
  *
- * @note You don't need this function for basic API usage very often, since all functions that return a `Value` call it
- * for you. This function is mainly needed before calling @ref getters.
+ * @note You don't need this function for basic API usage as long as you use functions that return a `Value`. This
+ * function is mainly needed before calling @ref getters.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
