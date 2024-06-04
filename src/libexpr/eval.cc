@@ -2415,10 +2415,10 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    auto i = srcToStore.find(path);
+    auto dstPathCached = get(*srcToStore.lock(), path);
 
-    auto dstPath = i != srcToStore.end()
-        ? i->second
+    auto dstPath = dstPathCached
+        ? *dstPathCached
         : [&]() {
             auto dstPath = fetchToStore(
                 *store,
@@ -2429,7 +2429,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
                 nullptr,
                 repair);
             allowPath(dstPath);
-            srcToStore.insert_or_assign(path, dstPath);
+            srcToStore.lock()->try_emplace(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
             return dstPath;
         }();

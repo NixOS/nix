@@ -306,7 +306,7 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    std::map<SourcePath, StorePath> srcToStore;
+    Sync<std::map<SourcePath, StorePath>> srcToStore;
 
     /**
      * A cache from path names to parse trees.
