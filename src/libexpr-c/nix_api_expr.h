@@ -129,8 +129,8 @@ nix_err nix_value_call_multi(
  *
  * This function converts these Values into their final type.
  *
- * @note This function is mainly needed before calling @ref getters.
- * All API calls that return a `Value` force thunks automatically.
+ * @note You do not need this function as long as you only use API calls that return a `Value`. This function is mainly
+ * needed before calling @ref getters.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
