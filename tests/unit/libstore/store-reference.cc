@@ -21,29 +21,29 @@ class StoreReferenceTest : public CharacterizationTest, public LibStoreTest
     }
 };
 
-#define URI_TEST_READ(STEM, OBJ)                         \
-  TEST_F(StoreReferenceTest, PathInfo_##STEM##_from_uri) \
-  {                                                      \
-    readTest(#STEM, ([&](const auto & encoded) {         \
-           StoreReference expected = OBJ;                \
-           auto got = StoreReference::parse(encoded);    \
-           ASSERT_EQ(got, expected);                     \
-             }));                                        \
-  }
+#define URI_TEST_READ(STEM, OBJ)                                \
+    TEST_F(StoreReferenceTest, PathInfo_##STEM##_from_uri)      \
+    {                                                           \
+        readTest(#STEM, ([&](const auto & encoded) {            \
+                     StoreReference expected = OBJ;             \
+                     auto got = StoreReference::parse(encoded); \
+                     ASSERT_EQ(got, expected);                  \
+                 }));                                           \
+    }
 
-#define URI_TEST_WRITE(STEM, OBJ)                                                           \
-  TEST_F(StoreReferenceTest, PathInfo_##STEM##_to_uri)                                      \
-  {                                                                                         \
-    writeTest(                                                                              \
-        #STEM,                                                                              \
-        [&]() -> StoreReference { return OBJ; },                                            \
-        [](const auto & file) { return StoreReference::parse(readFile(file)); },            \
-        [](const auto & file, const auto & got) { return writeFile(file, got.render()); }); \
-  }
+#define URI_TEST_WRITE(STEM, OBJ)                                                               \
+    TEST_F(StoreReferenceTest, PathInfo_##STEM##_to_uri)                                        \
+    {                                                                                           \
+        writeTest(                                                                              \
+            #STEM,                                                                              \
+            [&]() -> StoreReference { return OBJ; },                                            \
+            [](const auto & file) { return StoreReference::parse(readFile(file)); },            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.render()); }); \
+    }
 
-#define URI_TEST(STEM, OBJ) \
-  URI_TEST_READ(STEM, OBJ)  \
-  URI_TEST_WRITE(STEM, OBJ)
+#define URI_TEST(STEM, OBJ)  \
+    URI_TEST_READ(STEM, OBJ) \
+    URI_TEST_WRITE(STEM, OBJ)
 
 URI_TEST(
     auto,

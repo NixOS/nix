@@ -31,4 +31,3 @@ AlwaysBreakBeforeMultilineStrings: true
 IndentPPDirectives: AfterHash
 PPIndentWidth: 2
 BinPackArguments: false
-BinPackParameters: false

@@ -3,8 +3,9 @@
 
   # TODO switch to nixos-23.11-small
   #      https://nixpk.gs/pr-tracker.html?pr=291954
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
+  inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
 
@@ -45,6 +46,7 @@
         "armv7l-unknown-linux-gnueabihf"
         "riscv64-unknown-linux-gnu"
         "x86_64-unknown-netbsd"
+        "x86_64-unknown-freebsd"
         "x86_64-w64-mingw32"
       ];
 
@@ -146,16 +148,9 @@
               ++ [ "-DUSE_SSH=exec" ];
           });
 
-          boehmgc-nix = (final.boehmgc.override {
+          boehmgc-nix = final.boehmgc.override {
             enableLargeConfig = true;
-          }).overrideAttrs(o: {
-            patches = (o.patches or []) ++ [
-              ./dep-patches/boehmgc-coroutine-sp-fallback.diff
-
-              # https://github.com/ivmai/bdwgc/pull/586
-              ./dep-patches/boehmgc-traceable_allocator-public.diff
-            ];
-          });
+          };
 
           libseccomp-nix = final.libseccomp.overrideAttrs (_: rec {
             version = "2.5.5";
@@ -164,8 +159,6 @@
               hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
             };
           });
-
-          changelog-d-nix = final.buildPackages.callPackage ./misc/changelog-d.nix { };
 
           nix =
             let
@@ -230,7 +223,7 @@
         rl-next =
           let pkgs = nixpkgsFor.${system}.native;
           in pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
-          LANG=C.UTF-8 ${pkgs.changelog-d-nix}/bin/changelog-d ${./doc/manual/rl-next} >$out
+          LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
         '';
         repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
@@ -244,7 +237,7 @@
       );
 
       packages = forAllSystems (system: rec {
-        inherit (nixpkgsFor.${system}.native) nix changelog-d-nix;
+        inherit (nixpkgsFor.${system}.native) nix changelog-d;
         default = nix;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
