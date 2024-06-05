@@ -1096,13 +1096,13 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
     FileEvalCache::iterator i;
-    if (auto v2 = get(*fileEvalCache.lock(), path)) {
+    if (auto v2 = get(*fileEvalCache.read(), path)) {
         v = *v2;
         return;
     }
 
     auto resolvedPath = resolveExprPath(path);
-    if (auto v2 = get(*fileEvalCache.lock(), resolvedPath)) {
+    if (auto v2 = get(*fileEvalCache.read(), resolvedPath)) {
         v = *v2;
         return;
     }
@@ -1110,7 +1110,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     printTalkative("evaluating file '%1%'", resolvedPath);
     Expr * e = nullptr;
 
-    if (auto e2 = get(*fileParseCache.lock(), resolvedPath))
+    if (auto e2 = get(*fileParseCache.read(), resolvedPath))
         e = *e2;
 
     if (!e)

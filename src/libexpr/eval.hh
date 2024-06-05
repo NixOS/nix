@@ -304,7 +304,7 @@ private:
 #else
     typedef std::map<SourcePath, Expr *> FileParseCache;
 #endif
-    Sync<FileParseCache> fileParseCache;
+    SharedSync<FileParseCache> fileParseCache;
 
     /**
      * A cache from path names to values.
@@ -314,7 +314,7 @@ private:
 #else
     typedef std::map<SourcePath, Value> FileEvalCache;
 #endif
-    Sync<FileEvalCache> fileEvalCache;
+    SharedSync<FileEvalCache> fileEvalCache;
 
     LookupPath lookupPath;
 
