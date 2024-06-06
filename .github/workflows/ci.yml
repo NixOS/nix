@@ -33,6 +33,15 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix --experimental-features 'nix-command flakes' flake check -L
 
+  # Steps to test CI automation in your own fork.
+  # Cachix:
+  # 1. Sign-up for https://www.cachix.org/
+  # 2. Create a cache for $githubuser-nix-install-tests
+  # 3. Create a cachix auth token and save it in https://github.com/$githubuser/nix/settings/secrets/actions in "Repository secrets" as CACHIX_AUTH_TOKEN
+  # Dockerhub:
+  # 1. Sign-up for https://hub.docker.com/
+  # 2. Store your dockerhub username as DOCKERHUB_USERNAME in "Repository secrets" of your fork repository settings (https://github.com/$githubuser/nix/settings/secrets/actions)
+  # 3. Create an access token in https://hub.docker.com/settings/security and store it as DOCKERHUB_TOKEN in "Repository secrets" of your fork
   check_secrets:
     permissions:
       contents: none
@@ -127,8 +136,8 @@ jobs:
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
     - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
-    - run: docker tag nix:$NIX_VERSION nixos/nix:$NIX_VERSION
-    - run: docker tag nix:$NIX_VERSION nixos/nix:master
+    - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
+    - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
     # We'll deploy the newly built image to both Docker Hub and Github Container Registry.
     #
     # Push to Docker Hub first
@@ -137,8 +146,8 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - run: docker push nixos/nix:$NIX_VERSION
-    - run: docker push nixos/nix:master
+    - run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
+    - run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
     # Push to GitHub Container Registry as well
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
