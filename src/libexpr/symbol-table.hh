@@ -30,9 +30,9 @@ public:
         return *s == s2;
     }
 
-    operator const std::string & () const
+    const char * c_str() const
     {
-        return *s;
+        return s->c_str();
     }
 
     operator const std::string_view () const

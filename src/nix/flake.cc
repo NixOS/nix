@@ -165,7 +165,7 @@ struct CmdFlakeLock : FlakeCommand
 };
 
 static void enumerateOutputs(EvalState & state, Value & vFlake,
-    std::function<void(const std::string & name, Value & vProvide, const PosIdx pos)> callback)
+    std::function<void(std::string_view name, Value & vProvide, const PosIdx pos)> callback)
 {
     auto pos = vFlake.determinePos(noPos);
     state.forceAttrs(vFlake, pos, "while evaluating a flake to get its outputs");
@@ -393,15 +393,15 @@ struct CmdFlakeCheck : FlakeCommand
                 || (hasPrefix(name, "_") && name.substr(1) == expected);
         };
 
-        auto checkSystemName = [&](const std::string & system, const PosIdx pos) {
+        auto checkSystemName = [&](std::string_view system, const PosIdx pos) {
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
                 reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos)));
         };
 
-        auto checkSystemType = [&](const std::string & system, const PosIdx pos) {
+        auto checkSystemType = [&](std::string_view system, const PosIdx pos) {
             if (!checkAllSystems && system != localSystem) {
-                omittedSystems.insert(system);
+                omittedSystems.insert(std::string(system));
                 return false;
             } else {
                 return true;
@@ -450,7 +450,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        auto checkOverlay = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        auto checkOverlay = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking overlay '%s'", attrPath));
@@ -469,7 +469,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        auto checkModule = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        auto checkModule = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking NixOS module '%s'", attrPath));
@@ -480,9 +480,9 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::function<void(const std::string & attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
+        std::function<void(std::string_view attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
 
-        checkHydraJobs = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        checkHydraJobs = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking Hydra job '%s'", attrPath));
@@ -523,7 +523,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        auto checkTemplate = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+        auto checkTemplate = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking template '%s'", attrPath));
@@ -579,7 +579,7 @@ struct CmdFlakeCheck : FlakeCommand
 
             enumerateOutputs(*state,
                 *vFlake,
-                [&](const std::string & name, Value & vOutput, const PosIdx pos) {
+                [&](std::string_view name, Value & vOutput, const PosIdx pos) {
                     Activity act(*logger, lvlInfo, actUnknown,
                         fmt("checking flake output '%s'", name));
 
@@ -603,7 +603,7 @@ struct CmdFlakeCheck : FlakeCommand
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos, "");
                             for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
+                                std::string_view attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
                                 if (checkSystemType(attr_name, attr.pos)) {
                                     state->forceAttrs(*attr.value, attr.pos, "");

@@ -429,7 +429,7 @@ void mainWrapped(int argc, char * * argv)
             b["doc"] = trim(stripIndentation(primOp->doc));
             if (primOp->experimentalFeature)
                 b["experimental-feature"] = primOp->experimentalFeature;
-            builtinsJson[state.symbols[builtin.name]] = std::move(b);
+            builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
         }
         for (auto & [name, info] : state.constantInfos) {
             auto b = nlohmann::json::object();
