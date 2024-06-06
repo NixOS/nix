@@ -246,6 +246,14 @@ typename T::mapped_type * get(T & map, const typename T::key_type & key)
     return &i->second;
 }
 
+template <class T>
+std::optional<typename T::mapped_type> getOptional(const T & map, const typename T::key_type & key)
+{
+    auto i = map.find(key);
+    if (i == map.end()) return std::nullopt;
+    return {i->second};
+}
+
 /**
  * Get a value for the specified key from an associate container, or a default value if the key isn't present.
  */
