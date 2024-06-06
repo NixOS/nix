@@ -1095,30 +1095,33 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    FileEvalCache::iterator i;
-    if (auto v2 = get(*fileEvalCache.read(), path)) {
+    auto resolvedPath = getOptional(*importResolutionCache.read(), path);
+
+    if (!resolvedPath) {
+        resolvedPath = resolveExprPath(path);
+        importResolutionCache.lock()->emplace(path, *resolvedPath);
+    }
+
+    if (auto v2 = get(*fileEvalCache.read(), *resolvedPath)) {
         v = *v2;
         return;
     }
 
-    auto resolvedPath = resolveExprPath(path);
-    if (auto v2 = get(*fileEvalCache.read(), resolvedPath)) {
-        v = *v2;
-        return;
-    }
-
-    printTalkative("evaluating file '%1%'", resolvedPath);
+    printTalkative("evaluating file '%1%'", *resolvedPath);
     Expr * e = nullptr;
 
-    if (auto e2 = get(*fileParseCache.read(), resolvedPath))
+    if (auto e2 = get(*fileParseCache.read(), *resolvedPath))
         e = *e2;
 
     if (!e)
-        e = parseExprFromFile(resolvedPath);
+        e = parseExprFromFile(*resolvedPath);
 
     // It's possible that another thread parsed the same file. In that
     // case we discard the Expr we just created.
-    e = fileParseCache.lock()->emplace(resolvedPath, e).first->second;
+    auto [res, inserted] = fileParseCache.lock()->emplace(*resolvedPath, e);
+    //if (!inserted)
+    //    printError("DISCARD PARSE %s %s", path, *resolvedPath);
+    e = res->second;
 
     try {
         auto dts = debugRepl
@@ -1127,7 +1130,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
                 *e,
                 this->baseEnv,
                 e->getPos() ? std::make_shared<Pos>(positions[e->getPos()]) : nullptr,
-                "while evaluating the file '%1%':", resolvedPath.to_string())
+                "while evaluating the file '%1%':", resolvedPath->to_string())
             : nullptr;
 
         // Enforce that 'flake.nix' is a direct attrset, not a
@@ -1137,25 +1140,19 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
             error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
         eval(e, v);
     } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath.to_string());
+        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath->to_string());
         throw;
     }
 
     {
         auto cache(fileEvalCache.lock());
         // Handle the cache where another thread has evaluated this file.
-        if (auto v2 = get(*cache, path)) {
-            //printError("DISCARD FILE EVAL 1 %s", path);
-            v.reset(); // FIXME: check
-            v = *v2;
-        }
-        if (auto v2 = get(*cache, resolvedPath)) {
+        if (auto v2 = get(*cache, *resolvedPath)) {
             //printError("DISCARD FILE EVAL 2 %s", path);
             v.reset(); // FIXME: check
             v = *v2;
         }
-        cache->emplace(resolvedPath, v);
-        if (path != resolvedPath) cache->emplace(path, v);
+        cache->emplace(*resolvedPath, v);
     }
 }
 

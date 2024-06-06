@@ -297,7 +297,13 @@ private:
     Sync<std::map<SourcePath, StorePath>> srcToStore;
 
     /**
-     * A cache from path names to parse trees.
+     * A cache that maps paths to "resolved" paths for importing Nix
+     * expressions, i.e. `/foo` to `/foo/default.nix`.
+     */
+    SharedSync<std::map<SourcePath, SourcePath>> importResolutionCache; // FIXME: use unordered_map
+
+    /**
+     * A cache from resolved paths to parse trees.
      */
 #if HAVE_BOEHMGC
     typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
@@ -307,7 +313,7 @@ private:
     SharedSync<FileParseCache> fileParseCache;
 
     /**
-     * A cache from path names to values.
+     * A cache from resolved paths to values.
      */
 #if HAVE_BOEHMGC
     typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
