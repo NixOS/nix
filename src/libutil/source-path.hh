@@ -115,8 +115,19 @@ struct SourcePath
     {
         return {accessor, accessor->resolveSymlinks(path, mode)};
     }
+
+    friend class std::hash<nix::SourcePath>;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);
 
 }
+
+template<>
+struct std::hash<nix::SourcePath>
+{
+    std::size_t operator()(const nix::SourcePath & s) const noexcept
+    {
+        return std::hash<decltype(s.path)>{}(s.path);
+    }
+};

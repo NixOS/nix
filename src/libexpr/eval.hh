@@ -294,21 +294,21 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::map<SourcePath, StorePath>> srcToStore;
+    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
 
     /**
      * A cache that maps paths to "resolved" paths for importing Nix
      * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-    SharedSync<std::map<SourcePath, SourcePath>> importResolutionCache; // FIXME: use unordered_map
+    SharedSync<std::unordered_map<SourcePath, SourcePath>> importResolutionCache; // FIXME: use unordered_map
 
     /**
      * A cache from resolved paths to values.
      */
 #if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
+    typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
 #else
-    typedef std::map<SourcePath, Value> FileEvalCache;
+    typedef std::unordered_map<SourcePath, Value> FileEvalCache;
 #endif
     SharedSync<FileEvalCache> fileEvalCache;
 
