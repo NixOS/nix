@@ -69,6 +69,8 @@ public:
 
     auto operator<=>(const Symbol other) const { return id <=> other.id; }
     bool operator==(const Symbol other) const { return id == other.id; }
+
+    friend class std::hash<Symbol>;
 };
 
 /**
@@ -132,3 +134,12 @@ public:
 };
 
 }
+
+template<>
+struct std::hash<nix::Symbol>
+{
+    std::size_t operator()(const nix::Symbol & s) const noexcept
+    {
+        return std::hash<decltype(s.id)>{}(s.id);
+    }
+};
