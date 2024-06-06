@@ -37,6 +37,7 @@ let
     "nix"
     "nix-util"
     "nix-store"
+    "nix-fetchers"
   ];
 in
 {
