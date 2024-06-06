@@ -303,16 +303,6 @@ private:
     SharedSync<std::map<SourcePath, SourcePath>> importResolutionCache; // FIXME: use unordered_map
 
     /**
-     * A cache from resolved paths to parse trees.
-     */
-#if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
-#else
-    typedef std::map<SourcePath, Expr *> FileParseCache;
-#endif
-    SharedSync<FileParseCache> fileParseCache;
-
-    /**
      * A cache from resolved paths to values.
      */
 #if HAVE_BOEHMGC

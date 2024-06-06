@@ -1093,6 +1093,52 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
+/**
+ * A helper `Expr` class to lets us parse and evaluate Nix expressions
+ * from a thunk, ensuring that every file is parsed/evaluated only
+ * once (via the thunk stored in `EvalState::fileEvalCache`).
+ */
+struct ExprParseFile : Expr
+{
+    SourcePath path;
+    bool mustBeTrivial;
+
+    ExprParseFile(SourcePath path, bool mustBeTrivial)
+        : path(std::move(path))
+        , mustBeTrivial(mustBeTrivial)
+    { }
+
+    void eval(EvalState & state, Env & env, Value & v) override
+    {
+        printTalkative("evaluating file '%s'", path);
+
+        auto e = state.parseExprFromFile(path);
+
+        try {
+            auto dts = state.debugRepl
+                ? makeDebugTraceStacker(
+                    state,
+                    *e,
+                    state.baseEnv,
+                    e->getPos() ? std::make_shared<Pos>(state.positions[e->getPos()]) : nullptr,
+                    "while evaluating the file '%s':", path.to_string())
+                : nullptr;
+
+            // Enforce that 'flake.nix' is a direct attrset, not a
+            // computation.
+            if (mustBeTrivial &&
+                !(dynamic_cast<ExprAttrs *>(e)))
+                state.error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
+
+            state.eval(e, v);
+        } catch (Error & e) {
+            state.addErrorTrace(e, "while evaluating the file '%s':", path.to_string());
+            throw;
+        }
+    }
+};
+
+
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
     auto resolvedPath = getOptional(*importResolutionCache.read(), path);
@@ -1103,65 +1149,30 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     }
 
     if (auto v2 = get(*fileEvalCache.read(), *resolvedPath)) {
+        forceValue(*const_cast<Value *>(v2), noPos);
         v = *v2;
         return;
     }
 
-    printTalkative("evaluating file '%1%'", *resolvedPath);
-    Expr * e = nullptr;
-
-    if (auto e2 = get(*fileParseCache.read(), *resolvedPath))
-        e = *e2;
-
-    if (!e)
-        e = parseExprFromFile(*resolvedPath);
-
-    // It's possible that another thread parsed the same file. In that
-    // case we discard the Expr we just created.
-    auto [res, inserted] = fileParseCache.lock()->emplace(*resolvedPath, e);
-    //if (!inserted)
-    //    printError("DISCARD PARSE %s %s", path, *resolvedPath);
-    e = res->second;
-
-    try {
-        auto dts = debugRepl
-            ? makeDebugTraceStacker(
-                *this,
-                *e,
-                this->baseEnv,
-                e->getPos() ? std::make_shared<Pos>(positions[e->getPos()]) : nullptr,
-                "while evaluating the file '%1%':", resolvedPath->to_string())
-            : nullptr;
-
-        // Enforce that 'flake.nix' is a direct attrset, not a
-        // computation.
-        if (mustBeTrivial &&
-            !(dynamic_cast<ExprAttrs *>(e)))
-            error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath->to_string());
-        throw;
-    }
+    Value * vExpr;
 
     {
         auto cache(fileEvalCache.lock());
-        auto [i, inserted] = cache->emplace(*resolvedPath, v);
-        if (!inserted) {
-            // Handle the cache where another thread has evaluated
-            // this file.
-            //printError("DISCARD FILE EVAL %s", path);
-            v.reset(); // FIXME: check
-            v = i->second;
-        }
+        auto [i, inserted] = cache->emplace(*resolvedPath, Value());
+        if (inserted)
+            i->second.mkThunk(nullptr, new ExprParseFile(*resolvedPath, mustBeTrivial));
+        vExpr = &i->second;
     }
+
+    forceValue(*vExpr, noPos);
+
+    v = *vExpr;
 }
 
 
 void EvalState::resetFileCache()
 {
     fileEvalCache.lock()->clear();
-    fileParseCache.lock()->clear();
 }
 
 
