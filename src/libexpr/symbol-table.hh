@@ -1,8 +1,7 @@
 #pragma once
 ///@file
 
-#include <list>
-#include <map>
+#include <array>
 #include <unordered_map>
 
 #include "types.hh"
@@ -88,12 +87,7 @@ public:
 class SymbolTable
 {
 private:
-    struct State
-    {
-        std::unordered_map<std::string_view, uint32_t> symbols;
-    };
-
-    SharedSync<State> state_;
+    std::array<SharedSync<std::unordered_map<std::string_view, uint32_t>>, 32> symbolDomains;
     ContiguousArena arena;
 
 public:
@@ -126,10 +120,7 @@ public:
         return SymbolStr(std::string_view(arena.data + s.id));
     }
 
-    size_t size() const
-    {
-        return state_.read()->symbols.size();
-    }
+    size_t size() const;
 
     size_t totalSize() const
     {

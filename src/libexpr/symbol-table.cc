@@ -29,19 +29,22 @@ size_t ContiguousArena::allocate(size_t bytes)
 
 Symbol SymbolTable::create(std::string_view s)
 {
+    std::size_t hash = std::hash<std::string_view>{}(s);
+    auto domain = hash % symbolDomains.size();
+
     {
-        auto state(state_.read());
-        auto it = state->symbols.find(s);
-        if (it != state->symbols.end()) return Symbol(it->second);
+        auto symbols(symbolDomains[domain].read());
+        auto it = symbols->find(s);
+        if (it != symbols->end()) return Symbol(it->second);
     }
 
     // Most symbols are looked up more than once, so we trade off insertion performance
     // for lookup performance.
     // TODO: could probably be done more efficiently with transparent Hash and Equals
     // on the original implementation using unordered_set
-    auto state(state_.lock());
-    auto it = state->symbols.find(s);
-    if (it != state->symbols.end()) return Symbol(it->second);
+    auto symbols(symbolDomains[domain].lock());
+    auto it = symbols->find(s);
+    if (it != symbols->end()) return Symbol(it->second);
 
     // Atomically allocate space for the symbol in the arena.
     auto id = arena.allocate(s.size() + 1);
@@ -49,9 +52,18 @@ Symbol SymbolTable::create(std::string_view s)
     memcpy(p, s.data(), s.size());
     p[s.size()] = 0;
 
-    state->symbols.emplace(std::string_view(p, s.size()), id);
+    symbols->emplace(std::string_view(p, s.size()), id);
 
     return Symbol(id);
 }
+
+size_t SymbolTable::size() const
+{
+    size_t res = 0;
+    for (auto & domain : symbolDomains)
+        res += domain.read()->size();
+    return res;
+}
+
 
 }
