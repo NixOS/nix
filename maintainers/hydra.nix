@@ -38,7 +38,6 @@ let
     "nix-util"
     "nix-store"
   ];
-
 in
 {
   # Binary package for various platforms.
