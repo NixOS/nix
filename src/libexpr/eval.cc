@@ -1011,7 +1011,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     if (!e)
         e = parseExprFromFile(resolvedPath);
 
-    fileParseCache[resolvedPath] = e;
+    fileParseCache.emplace(resolvedPath, e);
 
     try {
         auto dts = debugRepl
@@ -1034,8 +1034,8 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         throw;
     }
 
-    fileEvalCache[resolvedPath] = v;
-    if (path != resolvedPath) fileEvalCache[path] = v;
+    fileEvalCache.emplace(resolvedPath, v);
+    if (path != resolvedPath) fileEvalCache.emplace(path, v);
 }
 
 
