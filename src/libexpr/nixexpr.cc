@@ -615,14 +615,4 @@ Pos PosTable::operator[](PosIdx p) const
 }
 
 
-
-/* Symbol table. */
-
-size_t SymbolTable::totalSize() const
-{
-    size_t n = 0;
-    dump([&] (const std::string & s) { n += s.size(); });
-    return n;
-}
-
 }

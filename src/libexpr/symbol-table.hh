@@ -6,10 +6,20 @@
 #include <unordered_map>
 
 #include "types.hh"
-#include "chunked-vector.hh"
 #include "sync.hh"
 
 namespace nix {
+
+struct ContiguousArena
+{
+    const char * data;
+    const size_t maxSize;
+    std::atomic<size_t> size{0};
+
+    ContiguousArena(size_t maxSize);
+
+    size_t allocate(size_t bytes);
+};
 
 /**
  * This class mainly exists to give us an operator<< for ostreams. We could also
@@ -21,24 +31,24 @@ class SymbolStr
     friend class SymbolTable;
 
 private:
-    const std::string * s;
+    std::string_view s;
 
-    explicit SymbolStr(const std::string & symbol): s(&symbol) {}
+    explicit SymbolStr(std::string_view s): s(s) {}
 
 public:
     bool operator == (std::string_view s2) const
     {
-        return *s == s2;
+        return s == s2;
     }
 
     const char * c_str() const
     {
-        return s->c_str();
+        return s.data();
     }
 
     operator const std::string_view () const
     {
-        return *s;
+        return s;
     }
 
     friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
@@ -54,6 +64,7 @@ class Symbol
     friend class SymbolTable;
 
 private:
+    /// The offset of the symbol in `SymbolTable::arena`.
     uint32_t id;
 
     explicit Symbol(uint32_t id): id(id) {}
@@ -77,37 +88,25 @@ class SymbolTable
 private:
     struct State
     {
-        std::unordered_map<std::string_view, std::pair<const std::string *, uint32_t>> symbols;
-        ChunkedVector<std::string, 8192> store{16};
+        std::unordered_map<std::string_view, uint32_t> symbols;
     };
 
     SharedSync<State> state_;
+    ContiguousArena arena;
 
 public:
 
-    /**
-     * converts a string into a symbol.
-     */
-    Symbol create(std::string_view s)
+    SymbolTable()
+        : arena(1 << 30)
     {
-        {
-            auto state(state_.read());
-            auto it = state->symbols.find(s);
-            if (it != state->symbols.end()) return Symbol(it->second.second + 1);
-        }
-
-        // Most symbols are looked up more than once, so we trade off insertion performance
-        // for lookup performance.
-        // TODO: could probably be done more efficiently with transparent Hash and Equals
-        // on the original implementation using unordered_set
-        auto state(state_.lock());
-        auto it = state->symbols.find(s);
-        if (it != state->symbols.end()) return Symbol(it->second.second + 1);
-
-        const auto & [rawSym, idx] = state->store.add(std::string(s));
-        state->symbols.emplace(rawSym, std::make_pair(&rawSym, idx));
-        return Symbol(idx + 1);
+        // Reserve symbol ID 0.
+        arena.allocate(1);
     }
+
+    /**
+     * Converts a string into a symbol.
+     */
+    Symbol create(std::string_view s);
 
     std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
     {
@@ -120,23 +119,26 @@ public:
 
     SymbolStr operator[](Symbol s) const
     {
-        auto state(state_.read());
-        if (s.id == 0 || s.id > state->store.size())
+        if (s.id == 0 || s.id > arena.size)
             abort();
-        return SymbolStr(state->store[s.id - 1]);
+        return SymbolStr(std::string_view(arena.data + s.id));
     }
 
     size_t size() const
     {
-        return state_.read()->store.size();
+        return state_.read()->symbols.size();
     }
 
-    size_t totalSize() const;
+    size_t totalSize() const
+    {
+        return arena.size;
+    }
 
     template<typename T>
     void dump(T callback) const
     {
-        state_.read()->store.forEach(callback);
+        // FIXME
+        //state_.read()->store.forEach(callback);
     }
 };
 
