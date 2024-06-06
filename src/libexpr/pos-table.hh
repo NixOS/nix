@@ -4,7 +4,6 @@
 #include <numeric>
 #include <vector>
 
-#include "chunked-vector.hh"
 #include "pos-idx.hh"
 #include "position.hh"
 #include "sync.hh"
@@ -60,9 +59,9 @@ public:
 
         auto state(state_.read());
         const auto idx = p.id - 1;
-        /* we want the last key <= idx, so we'll take prev(first key > idx).
-            this is guaranteed to never rewind origin.begin because the first
-            key is always 0. */
+        /* We want the last key <= idx, so we'll take prev(first key >
+           idx). This is guaranteed to never rewind origin.begin
+           because the first key is always 0. */
         const auto pastOrigin = state->origins.upper_bound(idx);
         return &std::prev(pastOrigin)->second;
     }
