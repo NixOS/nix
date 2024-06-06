@@ -344,7 +344,7 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * sta
     try {
         auto & v = check_value_in(value);
         const nix::Attr & a = (*v.attrs())[i];
-        *name = ((const std::string &) (state->state.symbols[a.name])).c_str();
+        *name = state->state.symbols[a.name].c_str();
         nix_gc_incref(nullptr, a.value);
         state->state.forceValue(*a.value, nix::noPos);
         return a.value;
@@ -359,7 +359,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
     try {
         auto & v = check_value_in(value);
         const nix::Attr & a = (*v.attrs())[i];
-        return ((const std::string &) (state->state.symbols[a.name])).c_str();
+        return state->state.symbols[a.name].c_str();
     }
     NIXC_CATCH_ERRS_NULL
 }

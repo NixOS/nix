@@ -415,7 +415,7 @@ void mainWrapped(int argc, char * * argv)
                 b["args"] = primOp->args;
                 b["doc"] = trim(stripIndentation(primOp->doc));
                 b["experimental-feature"] = primOp->experimentalFeature;
-                builtinsJson[state.symbols[builtin.name]] = std::move(b);
+                builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
             }
             std::move(builtinsJson);
         });

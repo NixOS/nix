@@ -335,9 +335,9 @@ std::optional<PackageInfo> getDerivation(EvalState & state, Value & v,
 }
 
 
-static std::string addToPath(const std::string & s1, const std::string & s2)
+static std::string addToPath(const std::string & s1, std::string_view s2)
 {
-    return s1.empty() ? s2 : s1 + "." + s2;
+    return s1.empty() ? std::string(s2) : s1 + "." + s2;
 }
 
 

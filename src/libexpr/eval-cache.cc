@@ -465,7 +465,7 @@ Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
     auto attrNames = getAttrs();
     std::set<std::string> strAttrNames;
     for (auto & name : attrNames)
-        strAttrNames.insert(root->state.symbols[name]);
+        strAttrNames.insert(std::string(root->state.symbols[name]));
 
     return Suggestions::bestMatches(strAttrNames, root->state.symbols[name]);
 }
