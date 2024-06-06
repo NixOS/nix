@@ -3,6 +3,7 @@
 #include <functional>
 #include <queue>
 #include <future>
+#include <random>
 
 #include "sync.hh"
 #include "logging.hh"
@@ -27,7 +28,7 @@ struct Executor
 
     struct State
     {
-        std::queue<Item> queue;
+        std::multimap<uint64_t, Item> queue;
         std::vector<std::thread> threads;
         bool quit = false;
     };
@@ -77,8 +78,8 @@ struct Executor
                 auto state(state_.lock());
                 if (state->quit) return;
                 if (!state->queue.empty()) {
-                    item = std::move(state->queue.front());
-                    state->queue.pop();
+                    item = std::move(state->queue.begin()->second);
+                    state->queue.erase(state->queue.begin());
                     break;
                 }
                 state.wait(wakeup);
@@ -94,7 +95,7 @@ struct Executor
         }
     }
 
-    std::vector<std::future<void>> spawn(std::vector<work_t> && items)
+    std::vector<std::future<void>> spawn(std::vector<std::pair<work_t, uint8_t>> && items)
     {
         if (items.empty()) return {};
 
@@ -110,10 +111,14 @@ struct Executor
             for (auto & item : items) {
                 std::promise<void> promise;
                 futures.push_back(promise.get_future());
-                state->queue.push(
+                thread_local std::random_device rd;
+                thread_local std::uniform_int_distribution<uint64_t> dist(0, 1ULL << 48);
+                auto key = (uint64_t(item.second) << 48) | dist(rd);
+                state->queue.emplace(
+                    key,
                     Item {
                         .promise = std::move(promise),
-                        .work = std::move(item)
+                        .work = std::move(item.first)
                     });
             }
         }

@@ -100,7 +100,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         Sync<State> state_;
 
-        auto spawn = [&](std::vector<Executor::work_t> && work)
+        auto spawn = [&](std::vector<std::pair<Executor::work_t, uint8_t>> && work)
         {
             auto futures = executor.spawn(std::move(work));
             auto state(state_.lock());
@@ -122,15 +122,17 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             try {
                 auto recurse = [&]()
                 {
-                    std::vector<Executor::work_t> work;
+                    std::vector<std::pair<Executor::work_t, uint8_t>> work;
                     for (const auto & attr : cursor.getAttrs()) {
                         auto cursor2 = cursor.getAttr(state->symbols[attr]);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);
-                        work.push_back([cursor2, attrPath2, visit]()
-                        {
-                            visit(*cursor2, attrPath2, false);
-                        });
+                        work.emplace_back(
+                            [cursor2, attrPath2, visit]()
+                            {
+                                visit(*cursor2, attrPath2, false);
+                            },
+                            std::string_view(state->symbols[attr]).find("Packages") != std::string_view::npos ? 0 : 2);
                     }
                     printError("ADD %d %s", work.size(), concatStringsSep(".", attrPathS));
                     spawn(std::move(work));
@@ -224,12 +226,12 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             }
         };
 
-        std::vector<Executor::work_t> work;
+        std::vector<std::pair<Executor::work_t, uint8_t>> work;
         for (auto & cursor : installable->getCursors(*state)) {
-            work.push_back([cursor, visit]()
+            work.emplace_back([cursor, visit]()
             {
                 visit(*cursor, cursor->getAttrPath(), true);
-            });
+            }, 1);
         }
 
         spawn(std::move(work));
