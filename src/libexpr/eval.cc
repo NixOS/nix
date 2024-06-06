@@ -1100,11 +1100,11 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
  */
 struct ExprParseFile : Expr
 {
-    SourcePath path;
+    SourcePath & path;
     bool mustBeTrivial;
 
-    ExprParseFile(SourcePath path, bool mustBeTrivial)
-        : path(std::move(path))
+    ExprParseFile(SourcePath & path, bool mustBeTrivial)
+        : path(path)
         , mustBeTrivial(mustBeTrivial)
     { }
 
@@ -1155,12 +1155,13 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     }
 
     Value * vExpr;
+    ExprParseFile expr{*resolvedPath, mustBeTrivial};
 
     {
         auto cache(fileEvalCache.lock());
         auto [i, inserted] = cache->emplace(*resolvedPath, Value());
         if (inserted)
-            i->second.mkThunk(nullptr, new ExprParseFile(*resolvedPath, mustBeTrivial));
+            i->second.mkThunk(nullptr, &expr);
         vExpr = &i->second;
     }
 
