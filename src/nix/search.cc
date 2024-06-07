@@ -134,7 +134,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             },
                             std::string_view(state->symbols[attr]).find("Packages") != std::string_view::npos ? 0 : 2);
                     }
-                    printError("ADD %d %s", work.size(), concatStringsSep(".", attrPathS));
+                    //printError("ADD %d %s", work.size(), concatStringsSep(".", attrPathS));
                     spawn(std::move(work));
                 };
 
