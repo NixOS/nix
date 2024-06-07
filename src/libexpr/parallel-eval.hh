@@ -10,7 +10,9 @@
 #include "environment-variables.hh"
 #include "util.hh"
 
+#if HAVE_BOEHMGC
 #include <gc.h>
+#endif
 
 namespace nix {
 
@@ -45,11 +47,15 @@ struct Executor
         for (size_t n = 0; n < nrCores; ++n)
             state->threads.push_back(std::thread([&]()
             {
+                #if HAVE_BOEHMGC
                 GC_stack_base sb;
                 GC_get_stack_base(&sb);
                 GC_register_my_thread(&sb);
+                #endif
                 worker();
+                #if HAVE_BOEHMGC
                 GC_unregister_my_thread();
+                #endif
             }));
     }
 
