@@ -348,6 +348,18 @@ public:
         }
     }
 
+    inline void setThunk(InternalType newType, Payload newPayload)
+    {
+        payload = newPayload;
+
+        auto oldType = internalType.exchange(newType);
+
+        if (oldType != tUninitialized) {
+            printError("BAD SET THUNK %x %d %d", this, oldType, newType);
+            abort();
+        }
+    }
+
     inline void reset()
     {
         auto oldType = internalType.exchange(tUninitialized);
@@ -432,12 +444,12 @@ public:
 
     inline void mkThunk(Env * e, Expr * ex)
     {
-        finishValue(tThunk, { .thunk = { .env = e, .expr = ex } });
+        setThunk(tThunk, { .thunk = { .env = e, .expr = ex } });
     }
 
     inline void mkApp(Value * l, Value * r)
     {
-        finishValue(tApp, { .app = { .left = l, .right = r } });
+        setThunk(tApp, { .app = { .left = l, .right = r } });
     }
 
     inline void mkLambda(Env * e, ExprLambda * f)
