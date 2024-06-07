@@ -88,11 +88,11 @@ Env & EvalState::allocEnv(size_t size)
 [[gnu::always_inline]]
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
-    auto type = v.internalType.load();
+    auto type = v.internalType.load(std::memory_order_acquire);
 
     if (type == tThunk) {
         try {
-            if (!v.internalType.compare_exchange_strong(type, tPending)) {
+            if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
                 if (type == tPending || type == tAwaited) {
                     waitOnThunk(v, type == tAwaited);
                     goto done;
@@ -126,7 +126,7 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
     #endif
     else if (type == tApp) {
         try {
-            if (!v.internalType.compare_exchange_strong(type, tPending)) {
+            if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
                 if (type == tPending || type == tAwaited) {
                     waitOnThunk(v, type == tAwaited);
                     goto done;
@@ -149,8 +149,8 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
         std::rethrow_exception(v.payload.failed->ex);
 
     // FIXME: remove
-    done:
-    auto type2 = v.internalType.load();
+ done:
+    auto type2 = v.internalType.load(std::memory_order_acquire);
     if (!(type2 != tThunk && type2 != tApp && type2 != tPending && type2 != tAwaited)) {
         printError("THUNK NOT FORCED %x %s %d", this, showType(v), type);
         abort();

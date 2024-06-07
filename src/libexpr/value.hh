@@ -189,7 +189,7 @@ public:
      */
     Value & operator =(const Value & v)
     {
-        auto type = v.internalType.load();
+        auto type = v.internalType.load(std::memory_order_acquire);
         debug("ASSIGN %x %d %d", this, internalType, type);
         //assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
         if (!(type != tThunk && type != tApp && type != tPending && type != tAwaited)) {
@@ -330,7 +330,7 @@ public:
         // TODO: need a barrier here to ensure the payload of the
         // value is updated before the type field.
 
-        auto oldType = internalType.exchange(newType);
+        auto oldType = internalType.exchange(newType, std::memory_order_release);
 
         if (oldType == tPending)
             // Nothing to do; no thread is waiting on this thunk.
@@ -352,7 +352,7 @@ public:
     {
         payload = newPayload;
 
-        auto oldType = internalType.exchange(newType);
+        auto oldType = internalType.exchange(newType, std::memory_order_release);
 
         if (oldType != tUninitialized) {
             printError("BAD SET THUNK %x %d %d", this, oldType, newType);
@@ -362,7 +362,7 @@ public:
 
     inline void reset()
     {
-        auto oldType = internalType.exchange(tUninitialized);
+        auto oldType = internalType.exchange(tUninitialized, std::memory_order_relaxed);
         debug("RESET %x %d", this, oldType);
         if (oldType == tPending || oldType == tAwaited) {
             printError("BAD RESET %x %d", this, oldType);

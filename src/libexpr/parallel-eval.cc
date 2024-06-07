@@ -28,7 +28,7 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
     if (awaited) {
         /* Make sure that the value is still awaited, now that we're
            holding the domain lock. */
-        auto type = v.internalType.load();
+        auto type = v.internalType.load(std::memory_order_acquire);
 
         /* If the value has been finalized in the meantime (i.e is no
            longer pending), we're done. */
@@ -40,7 +40,7 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
     } else {
         /* Mark this value as being waited on. */
         auto type = tPending;
-        if (!v.internalType.compare_exchange_strong(type, tAwaited)) {
+        if (!v.internalType.compare_exchange_strong(type, tAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
             /* If the value has been finalized in the meantime (i.e is
                no longer pending), we're done. */
             if (type != tAwaited) {
@@ -59,14 +59,14 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
 
     nrThunksAwaitedSlow++;
     currentlyWaiting++;
-    maxWaiting = std::max(maxWaiting.load(), currentlyWaiting.load());
+    maxWaiting = std::max(maxWaiting.load(std::memory_order_acquire), currentlyWaiting.load(std::memory_order_acquire));
 
     auto now1 = std::chrono::steady_clock::now();
 
     while (true) {
         domain.wait(domain->cv);
         debug("WAKEUP %x", &v);
-        auto type = v.internalType.load();
+        auto type = v.internalType.load(std::memory_order_acquire);
         if (type != tAwaited) {
             if (type == tFailed) {
                 currentlyWaiting--;
