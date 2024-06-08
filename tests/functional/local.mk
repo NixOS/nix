@@ -106,6 +106,7 @@ nix_tests = \
   eval-store.sh \
   why-depends.sh \
   derivation-json.sh \
+  derivation-advanced-attributes.sh \
   import-derivation.sh \
   nix_path.sh \
   case-hack.sh \
