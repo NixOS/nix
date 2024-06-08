@@ -447,7 +447,6 @@
             ''^tests/unit/libfetchers/public-key\.cc''
             ''^tests/unit/libstore-support/tests/derived-path\.cc''
             ''^tests/unit/libstore-support/tests/derived-path\.hh''
-            ''^tests/unit/libstore-support/tests/libstore\.hh''
             ''^tests/unit/libstore-support/tests/nix_api_store\.hh''
             ''^tests/unit/libstore-support/tests/outputs-spec\.cc''
             ''^tests/unit/libstore-support/tests/outputs-spec\.hh''
