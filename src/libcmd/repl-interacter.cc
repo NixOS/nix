@@ -107,8 +107,8 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
     rl_readline_name = "nix-repl";
     try {
         createDirs(dirOf(historyFile));
-    } catch (SystemError & e) {
-        logWarning(e.info());
+    } catch (std::filesystem::filesystem_error & e) {
+        warn(e.what());
     }
 #ifndef USE_READLINE
     el_hist_size = 1000;

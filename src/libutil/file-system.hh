@@ -148,11 +148,10 @@ void deletePath(const std::filesystem::path & path);
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 
 /**
- * Create a directory and all its parents, if necessary.  Returns the
- * list of created directories, in order of creation.
+ * Create a directory and all its parents, if necessary.
  */
-Paths createDirs(const Path & path);
-inline Paths createDirs(PathView path)
+void createDirs(const Path & path);
+inline void createDirs(PathView path)
 {
     return createDirs(Path(path));
 }

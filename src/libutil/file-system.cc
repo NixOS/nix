@@ -413,30 +413,9 @@ void deletePath(const fs::path & path)
 }
 
 
-Paths createDirs(const Path & path)
+void createDirs(const Path & path)
 {
-    Paths created;
-    if (path == "/") return created;
-
-    struct stat st;
-    if (STAT(path.c_str(), &st) == -1) {
-        created = createDirs(dirOf(path));
-        if (mkdir(path.c_str()
-#ifndef _WIN32 // TODO abstract mkdir perms for Windows
-            , 0777
-#endif
-            ) == -1 && errno != EEXIST)
-            throw SysError("creating directory '%1%'", path);
-        st = STAT(path);
-        created.push_back(path);
-    }
-
-    if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
-        throw SysError("statting symlink '%1%'", path);
-
-    if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
-
-    return created;
+    fs::create_directories(path);
 }
 
 
