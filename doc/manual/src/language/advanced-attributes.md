@@ -120,12 +120,11 @@ Derivations can declare some infrequently used optional attributes.
     configuration setting.
 
   - [`outputHash`]{#adv-attr-outputHash}; [`outputHashAlgo`]{#adv-attr-outputHashAlgo}; [`outputHashMode`]{#adv-attr-outputHashMode}\
-    These attributes declare that the derivation is a so-called
-    *fixed-output derivation*, which means that a cryptographic hash of
-    the output is already known in advance. When the build of a
-    fixed-output derivation finishes, Nix computes the cryptographic
-    hash of the output and compares it to the hash declared with these
-    attributes. If there is a mismatch, the build fails.
+    These attributes declare that the derivation is a so-called *fixed-output derivation* (FOD), which means that a cryptographic hash of the output is already known in advance.
+
+    As opposed to regular derivations, the [`builder`] executable of a fixed-output derivation has access to the network.
+    Nix computes a cryptographic hash of its output and compares that to the hash declared with these attributes.
+    If there is a mismatch, the derivation fails.
 
     The rationale for fixed-output derivations is derivations such as
     those produced by the `fetchurl` function. This function downloads a
@@ -279,7 +278,9 @@ Derivations can declare some infrequently used optional attributes.
 
     > **Note**
     >
-    > If set to `false`, the [`builder`](./derivations.md#attr-builder) should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
+    > If set to `false`, the [`builder`] should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
+
+    [`builder`]: ./derivations.md#attr-builder
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation
