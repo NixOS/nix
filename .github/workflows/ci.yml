@@ -19,8 +19,6 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: DeterminateSystems/nix-installer-action@main
         with:
           flakehub: true
