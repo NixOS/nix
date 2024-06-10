@@ -365,7 +365,7 @@ void initGC()
         };
     }
     #else
-    #warning "BoehmGC version does not support GC while coroutine exists. GC will be disabled inside coroutines. Consider updating bwd-gc to 8.4 or later."
+    #warning "BoehmGC version does not support GC while coroutine exists. GC will be disabled inside coroutines. Consider updating bdw-gc to 8.4 or later."
     #endif
 
 
