@@ -73,7 +73,7 @@
 
 - [fixed-output derivation]{#gloss-fixed-output-derivation} (FOD)
 
-  A [derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
+  A [derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute, and where the [`builder`](@docroot@/language/derivations.md#attr-builder) executable has access to the network.
 
 - [store]{#gloss-store}
 
