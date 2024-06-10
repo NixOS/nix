@@ -4,6 +4,7 @@
 #include "args.hh"
 #include "abstract-setting-to-json.hh"
 #include "compute-levels.hh"
+#include "file-system.hh"
 
 #include <algorithm>
 #include <map>

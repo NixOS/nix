@@ -16,6 +16,7 @@
 #include "cgroup.hh"
 #include "personality.hh"
 #include "namespaces.hh"
+#include "file-system.hh"
 
 #include <regex>
 #include <queue>

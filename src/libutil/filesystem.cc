@@ -5,6 +5,7 @@
 #include "finally.hh"
 #include "util.hh"
 #include "types.hh"
+#include "file-system.hh"
 
 namespace fs = std::filesystem;
 
