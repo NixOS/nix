@@ -145,6 +145,17 @@ public:
 
 static inline void initGCReal()
 {
+    /* Make sure we're the first to initialize the GC. If we're not, GC_init()
+       will exit early, and therefore fail to assign values from environment
+       variables we're about to modify.
+       Some setters should also be called before GC_init(). */
+    if (GC_is_init_called()) {
+        /* This can be a problem in the nix command, or perhaps a problem for someone
+           who's linked against libnixexpr. */
+        warn(
+            "to developers: GC_init() has already been called. Some parameters may not be set optimally or correctly. Make sure to always call nix::initGC() before using the GC.");
+    }
+
     /* Initialise the Boehm garbage collector. */
 
     /* Don't look for interior pointers. This reduces the odds of
