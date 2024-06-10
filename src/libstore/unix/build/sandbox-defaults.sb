@@ -17,6 +17,9 @@ R""(
 ; Allow POSIX semaphores and shared memory.
 (allow ipc-posix*)
 
+; Allow SYSV semaphores and shared memory.
+(allow ipc-sysv*)
+
 ; Allow socket creation.
 (allow system-socket)
 
