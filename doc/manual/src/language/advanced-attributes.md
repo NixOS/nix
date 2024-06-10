@@ -122,7 +122,8 @@ Derivations can declare some infrequently used optional attributes.
   - [`outputHash`]{#adv-attr-outputHash}; [`outputHashAlgo`]{#adv-attr-outputHashAlgo}; [`outputHashMode`]{#adv-attr-outputHashMode}\
     These attributes declare that the derivation is a so-called *fixed-output derivation* (FOD), which means that a cryptographic hash of the output is already known in advance.
 
-    When the [`builder`] execution of a fixed-output derivation finishes, Nix computes a cryptographic hash of the output and compares it to the hash declared with these attributes.
+    As opposed to regular derivations, the [`builder`] executable of a fixed-output derivation has access to the network.
+    Nix computes a cryptographic hash of its output and compares that to the hash declared with these attributes.
     If there is a mismatch, the derivation fails.
 
     The rationale for fixed-output derivations is derivations such as
