@@ -19,6 +19,7 @@
 #include "signals.hh"
 #include "users.hh"
 
+#include <filesystem>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -1303,7 +1304,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 if (!pathExists(chrootStore)) {
                     try {
                         createDirs(chrootStore);
-                    } catch (Error & e) {
+                    } catch (std::filesystem::filesystem_error & e) {
                         return std::make_shared<LocalStore>(params);
                     }
                     warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
