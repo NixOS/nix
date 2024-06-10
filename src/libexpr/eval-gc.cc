@@ -166,7 +166,36 @@ static inline void initGCReal()
        there. */
     GC_set_no_dls(1);
 
+    /* The GC threshold determines the number of collections during which an
+       unmappable block is kept alive. Empirically[1] we have a lot of memory
+       that can be unmapped towards the end of evaluation, and we don't perform
+       many allocations after that.
+       0 is a special value that disables unmapping altogether, so we set this
+       to 1. This also seems sensible to avoid the overhead of unmapping and
+       soon remapping the ~same memory.
+       However, in an upcoming (as of 2024-06) version, the semantics will change,
+       so that a value of 0 means "unmap immediately"[2].
+       At that point, we should probably set this to 2, to avoid aforementioned
+       overhead.
+       When implementing a final collection after e.g. `nix-build` has evaluated,
+       we should make sure to call GC_gcollect_and_unmap, which has an effect
+       similar to setting this to 1.
+       As of 2024-06, GC_unmap_threshold is only assignable through GC_init(),
+       so we have to do a little dance with environment variables.
+
+       [1]: https://github.com/NixOS/nix/issues/10862#issuecomment-2154463760
+       [2]: https://github.com/ivmai/bdwgc/commit/ece628e5a347dd319cffe4b53dbd73ebc42d0b4d
+     */
+    auto origUnmapThreshold = getEnv("GC_UNMAP_THRESHOLD");
+    if (!origUnmapThreshold) {
+        setEnv("GC_UNMAP_THRESHOLD", "1");
+    }
+
     GC_INIT();
+
+    /* Restore environment variables. We host commands like nix run, which must
+       not modify the environment more than necessary. */
+    setMaybeEnv("GC_UNMAP_THRESHOLD", origUnmapThreshold);
 
     GC_set_oom_fn(oomHandler);
 
