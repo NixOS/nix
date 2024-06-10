@@ -301,6 +301,12 @@ Derivations can declare some infrequently used optional attributes.
     (associative) arrays. For example, the attribute `hardening.format = true`
     ends up as the Bash associative array element `${hardening[format]}`.
 
+    > **Warning**
+    >
+    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
+    will have no effect.
+
   - [`outputChecks`]{#adv-attr-outputChecks}\
     When using [structured attributes](#adv-attr-structuredAttrs), the `outputChecks`
     attribute allows defining checks per-output.
