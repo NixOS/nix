@@ -73,8 +73,7 @@
 
 - [fixed-output derivation]{#gloss-fixed-output-derivation}
 
-  A derivation which includes the
-  [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
+  A [derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
 
 - [store]{#gloss-store}
 
