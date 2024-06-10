@@ -45,4 +45,12 @@ void replaceEnv(const std::map<std::string, std::string> & newEnv)
         setEnv(newEnvVar.first.c_str(), newEnvVar.second.c_str());
 }
 
+void setMaybeEnv(const char * key, std::optional<std::string> value)
+{
+    if (value)
+        setEnv(key, value->c_str());
+    else
+        unsetenv(key);
 }
+
+} // namespace nix

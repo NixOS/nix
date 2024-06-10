@@ -44,6 +44,11 @@ int unsetenv(const char * name);
 int setEnv(const char * name, const char * value);
 
 /**
+ * `unsetenv` when `value` is `nullopt`, `setEnv` otherwise.
+ */
+void setMaybeEnv(const char * key, std::optional<std::string> value);
+
+/**
  * Clear the environment.
  */
 void clearEnv();
