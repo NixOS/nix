@@ -27,5 +27,25 @@ nix run --no-write-lock-file .#pkgAsPkg
 ! nix run --no-write-lock-file .#pkgAsApp || fail "'nix run' shouldn’t accept an 'app' defined under 'packages'"
 ! nix run --no-write-lock-file .#appAsPkg || fail "elements of 'apps' should be of type 'app'"
 
+# Test that we're not setting any more environment variables than necessary.
+# e.g. GC_UNMAP_THRESHOLD is set temporarily by initGC but does not leak into
+# the environment of the command being run.
+env > $TEST_ROOT/expected-env
+nix run -f shell-hello.nix env > $TEST_ROOT/actual-env
+# Remove/reset variables we expect to be different.
+# - PATH is modified by nix shell
+# - _ is set by bash and is expected to differ because it contains the original command
+# - __CF_USER_TEXT_ENCODING is set by macOS and is beyond our control
+sed -i \
+  -e 's/PATH=.*/PATH=.../' \
+  -e 's/_=.*/_=.../' \
+  -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
+  $TEST_ROOT/expected-env $TEST_ROOT/actual-env
+sort $TEST_ROOT/expected-env | uniq > $TEST_ROOT/expected-env.sorted
+# nix run appears to clear _. I don't understand why. Is this ok?
+echo "_=..." >> $TEST_ROOT/actual-env
+sort $TEST_ROOT/actual-env | uniq > $TEST_ROOT/actual-env.sorted
+diff $TEST_ROOT/expected-env.sorted $TEST_ROOT/actual-env.sorted
+
 clearStore
 
