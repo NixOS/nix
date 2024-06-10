@@ -354,7 +354,7 @@ void initGC()
     // TODO: Remove __APPLE__ condition.
     //       Comment suggests an implementation that works on darwin and windows
     //       https://github.com/ivmai/bdwgc/issues/362#issuecomment-1936672196
-    #if GC_VERSION_MAJOR >= 8 && GC_VERSION_MINOR >= 4 && !defined(__APPLE__)
+    #if GC_VERSION_MAJOR >= 8 && GC_VERSION_MINOR >= 2 && GC_VERSION_MICRO >= 4 && !defined(__APPLE__)
     GC_set_sp_corrector(&fixupBoehmStackPointer);
 
     if (!GC_get_sp_corrector()) {
@@ -365,7 +365,7 @@ void initGC()
         };
     }
     #else
-    #warning "BoehmGC version does not support GC while coroutine exists. GC will be disabled inside coroutines. Consider updating bwd-gc to 8.4 or later."
+    #warning "BoehmGC version does not support GC while coroutine exists. GC will be disabled inside coroutines. Consider updating bdw-gc to 8.2.4 or later."
     #endif
 
 
