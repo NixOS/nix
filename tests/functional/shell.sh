@@ -21,6 +21,24 @@ nix shell -f shell-hello.nix hello-symlink -c hello | grep 'Hello World'
 # Test that symlinks outside of the store don't work.
 expect 1 nix shell -f shell-hello.nix forbidden-symlink -c hello 2>&1 | grepQuiet "is not in the Nix store"
 
+# Test that we're not setting any more environment variables than necessary
+# e.g. GC_UNMAP_THRESHOLD is set temporarily by initGC but does not leak into
+# the environment of the command being run.
+env > $TEST_ROOT/expected-env
+nix shell -f shell-hello.nix hello -c env > $TEST_ROOT/actual-env
+# Remove/reset variables we expect to be different.
+# - PATH is modified by nix shell
+# - _ is set by bash and is expectedf to differ because it contains the original command
+# - __CF_USER_TEXT_ENCODING is set by macOS and is beyond our control
+sed -i \
+  -e 's/PATH=.*/PATH=.../' \
+  -e 's/_=.*/_=.../' \
+  -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
+  $TEST_ROOT/expected-env $TEST_ROOT/actual-env
+sort $TEST_ROOT/expected-env > $TEST_ROOT/expected-env.sorted
+sort $TEST_ROOT/actual-env > $TEST_ROOT/actual-env.sorted
+diff $TEST_ROOT/expected-env.sorted $TEST_ROOT/actual-env.sorted
+
 if isDaemonNewer "2.20.0pre20231220"; then
     # Test that command line attribute ordering is reflected in the PATH
     # https://github.com/NixOS/nix/issues/7905
