@@ -59,3 +59,12 @@ test_tarball() {
 test_tarball '' cat
 test_tarball .xz xz
 test_tarball .gz gzip
+
+# Test hard links.
+path="$(nix flake prefetch --json "tarball+file://$(pwd)/tree.tar.gz" | jq -r .storePath)"
+[[ $(cat "$path/a/b/foo") = bar ]]
+[[ $(cat "$path/a/b/xyzzy") = bar ]]
+[[ $(cat "$path/a/yyy") = bar ]]
+[[ $(cat "$path/a/zzz") = bar ]]
+[[ $(cat "$path/c/aap") = bar ]]
+[[ $(cat "$path/fnord") = bar ]]
