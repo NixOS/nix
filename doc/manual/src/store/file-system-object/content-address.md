@@ -82,4 +82,4 @@ In the future, we may support a Git-like hash for such file system objects, or w
 
 [file system object]: ../file-system-object.md
 [store object]: ../store-object.md
-[xp-feature-git-hashing]: @docroot@/contributing/experimental-features.md#xp-feature-git-hashing
+[xp-feature-git-hashing]: @docroot@/development/experimental-features.md#xp-feature-git-hashing

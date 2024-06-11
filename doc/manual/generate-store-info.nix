@@ -32,10 +32,10 @@ let
         > **Warning**
         >
         > This store is part of an
-        > [experimental feature](@docroot@/contributing/experimental-features.md).
+        > [experimental feature](@docroot@/development/experimental-features.md).
         >
         > To use this store, make sure the
-        > [`${experimentalFeature}` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature})
+        > [`${experimentalFeature}` experimental feature](@docroot@/development/experimental-features.md#xp-feature-${experimentalFeature})
         > is enabled.
         > For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
         >

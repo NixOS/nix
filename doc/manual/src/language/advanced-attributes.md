@@ -113,7 +113,7 @@ Derivations can declare some infrequently used optional attributes.
     > `nix-build`.
 
     If the [`configurable-impure-env` experimental
-    feature](@docroot@/contributing/experimental-features.md#xp-feature-configurable-impure-env)
+    feature](@docroot@/development/experimental-features.md#xp-feature-configurable-impure-env)
     is enabled, these environment variables can also be controlled
     through the
     [`impure-env`](@docroot@/command-ref/conf-file.md#conf-impure-env)
@@ -226,7 +226,7 @@ Derivations can declare some infrequently used optional attributes.
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
 
     > **Warning**
-    > This attribute is part of an [experimental feature](@docroot@/contributing/experimental-features.md).
+    > This attribute is part of an [experimental feature](@docroot@/development/experimental-features.md).
     >
     > To use this attribute, you must enable the
     > [`ca-derivations`][xp-feature-ca-derivations] experimental feature.
@@ -364,6 +364,6 @@ Derivations can declare some infrequently used optional attributes.
 
   ensures that the derivation can only be built on a machine with the `kvm` feature.
 
-[xp-feature-ca-derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
-[xp-feature-dynamic-derivations]: @docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations
-[xp-feature-git-hashing]: @docroot@/contributing/experimental-features.md#xp-feature-git-hashing
+[xp-feature-ca-derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
+[xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
+[xp-feature-git-hashing]: @docroot@/development/experimental-features.md#xp-feature-git-hashing

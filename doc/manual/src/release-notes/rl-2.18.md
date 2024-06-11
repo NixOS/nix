@@ -13,7 +13,7 @@
 
 - The `discard-references` feature has been stabilized.
   This means that the
-  [unsafeDiscardReferences](@docroot@/contributing/experimental-features.md#xp-feature-discard-references)
+  [unsafeDiscardReferences](@docroot@/development/experimental-features.md#xp-feature-discard-references)
   attribute is no longer guarded by an experimental flag and can be used
   freely.
 
@@ -21,7 +21,7 @@
   This only affects `nix-build --json` when "building" non-derivation things like fetched sources, which is a no-op.
 
 - A new builtin [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) has been added.
-  It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
+  It is part of the [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
 
 - Flake follow paths at depths greater than 2 are now handled correctly, preventing "follows a non-existent input" errors.
 

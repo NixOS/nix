@@ -123,6 +123,7 @@
   - [JSON guideline](development/json-guideline.md)
   - [C++ style guide](development/cxx.md)
   - [Experimental Features](development/experimental-features.md)
+  - [Contributing](development/contributing.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
   - [Release 2.23 (2024-06-03)](release-notes/rl-2.23.md)

@@ -168,7 +168,7 @@
 
 - [impure derivation]{#gloss-impure-derivation}
 
-  [An experimental feature](#@docroot@/contributing/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
+  [An experimental feature](#@docroot@/development/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
   so that they are always rebuilt, and their outputs not reused by subsequent calls to realise them.
 
 - [Nix database]{#gloss-nix-database}
@@ -353,7 +353,7 @@
   Not yet stabilized functionality guarded by named experimental feature flags.
   These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
 
-  See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/contributing/experimental-features.md).
+  See the contribution guide on the [purpose and lifecycle of experimental feaures](@docroot@/development/experimental-features.md).
 
 
 [Nix language]: ./language/index.md

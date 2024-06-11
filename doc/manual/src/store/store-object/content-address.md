@@ -92,4 +92,4 @@ becomes more widespread, this restriction will be revisited.
 
 [fso-ca]: ../file-system-object/content-address.md
 [sp-spec]: @docroot@/protocols/store-path.md
-[xp-feature-git-hashing]: @docroot@/contributing/experimental-features.md#xp-feature-git-hashing
+[xp-feature-git-hashing]: @docroot@/development/experimental-features.md#xp-feature-git-hashing

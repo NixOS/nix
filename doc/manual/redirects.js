@@ -346,7 +346,7 @@ const redirects = {
     "macos": "uninstall.html#macos",
     "uninstalling": "uninstall.html",
   },
-  "contributing/hacking.html": {
+  "development/building.html": {
     "nix-with-flakes": "#building-nix-with-flakes",
     "classic-nix": "#building-nix",
     "running-tests": "testing.html#running-tests",
@@ -357,7 +357,12 @@ const redirects = {
     "installer-tests": "testing.html#installer-tests",
     "one-time-setup": "testing.html#one-time-setup",
     "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
-    "characterization-testing": "#characterisation-testing-unit",
+    "characterization-testing": "testing.html#characterisation-testing-unit",
+    "add-a-release-note": "contributing.html#add-a-release-note",
+    "add-an-entry": "contributing.html#add-an-entry",
+    "build-process": "contributing.html#build-process",
+    "reverting": "contributing.html#reverting",
+    "branches": "contributing.html#branches",
   },
   "glossary.html": {
     "gloss-local-store": "store/types/local-store.html",

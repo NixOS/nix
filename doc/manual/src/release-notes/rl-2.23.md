@@ -14,7 +14,7 @@
 
 - Modify `nix derivation {add,show}` JSON format [#9866](https://github.com/NixOS/nix/issues/9866) [#10722](https://github.com/NixOS/nix/pull/10722)
 
-  The JSON format for derivations has been slightly revised to better conform to our [JSON guidelines](@docroot@/contributing/cli-guideline.md#returning-future-proof-json).
+  The JSON format for derivations has been slightly revised to better conform to our [JSON guidelines](@docroot@/development/cli-guideline.md#returning-future-proof-json).
   In particular, the hash algorithm and content addressing method of content-addresed derivation outputs are now separated into two fields `hashAlgo` and `method`,
   rather than one field with an arcane `:`-separated format.
 
@@ -89,7 +89,7 @@
   This makes records of this sort more self-describing, and easier to consume programmatically.
 
   We will follow this design principle going forward;
-  the [JSON guidelines](@docroot@/contributing/json-guideline.md) in the contributing section have been updated accordingly.
+  the [JSON guidelines](@docroot@/development/json-guideline.md) in the contributing section have been updated accordingly.
 
 - Large path warnings [#10661](https://github.com/NixOS/nix/pull/10661)
 

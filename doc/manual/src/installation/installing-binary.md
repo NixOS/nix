@@ -77,7 +77,7 @@ $ su root
 # Installing from a binary tarball
 
 You can also download a binary tarball that contains Nix and all its dependencies:
-- Choose a [version](https://releases.nixos.org/?prefix=nix/) and [system type](../contributing/hacking.md#platforms)
+- Choose a [version](https://releases.nixos.org/?prefix=nix/) and [system type](../development/building.md#platforms)
 - Download and unpack the tarball
 - Run the installer
 

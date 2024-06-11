@@ -303,7 +303,7 @@ public:
              For backward compatibility, `ssh://` may be omitted.
              The hostname may be an alias defined in `~/.ssh/config`.
 
-          2. A comma-separated list of [Nix system types](@docroot@/contributing/hacking.md#system-type).
+          2. A comma-separated list of [Nix system types](@docroot@/development/hacking.md#system-type).
              If omitted, this defaults to the local platform type.
 
              > **Example**
@@ -883,13 +883,13 @@ public:
 
           - `ca-derivations`
 
-            Included by default if the [`ca-derivations` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) is enabled.
+            Included by default if the [`ca-derivations` experimental feature](@docroot@/development/experimental-features.md#xp-feature-ca-derivations) is enabled.
 
             This system feature is implicitly required by derivations with the [`__contentAddressed` attribute](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed).
 
           - `recursive-nix`
 
-            Included by default if the [`recursive-nix` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-recursive-nix) is enabled.
+            Included by default if the [`recursive-nix` experimental feature](@docroot@/development/experimental-features.md#xp-feature-recursive-nix) is enabled.
 
           - `uid-range`
 

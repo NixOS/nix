@@ -1,6 +1,6 @@
 # Experimental Commands
 
-This section lists [experimental commands](@docroot@/contributing/experimental-features.md#xp-feature-nix-command).
+This section lists [experimental commands](@docroot@/development/experimental-features.md#xp-feature-nix-command).
 
 > **Warning**
 >
