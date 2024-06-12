@@ -31,7 +31,7 @@ echo "registering..."
 nix-store --register-validity < $TEST_ROOT/reg_info
 
 echo "collecting garbage..."
-ln -sfn $reference "$NIX_STATE_DIR"/gcroots/ref
+ln -sfn $reference "$NIX_STATE_DIR/gcroots/ref"
 nix-store --gc
 
 if [ -n "$(type -p sqlite3)" -a "$(sqlite3 $NIX_STATE_DIR/db/db.sqlite 'select count(*) from Refs')" -ne 0 ]; then

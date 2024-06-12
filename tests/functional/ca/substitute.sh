@@ -7,7 +7,7 @@ source common.sh
 # shellcheck disable=SC1111
 needLocalStore "“--no-require-sigs” can’t be used with the daemon"
 
-rm -rf "$TEST_ROOT"/binary_cache
+rm -rf "$TEST_ROOT/binary_cache"
 
 export REMOTE_STORE_DIR=$TEST_ROOT/binary_cache
 export REMOTE_STORE=file://$REMOTE_STORE_DIR
