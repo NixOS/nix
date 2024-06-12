@@ -1,4 +1,5 @@
 #include <regex>
+#include <thread>
 
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>

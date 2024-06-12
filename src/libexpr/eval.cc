@@ -48,6 +48,9 @@
 #define GC_INCLUDE_NEW
 
 #include <pthread.h>
+#if __FreeBSD__
+#  include <pthread_np.h>
+#endif
 
 #include <gc/gc.h>
 #include <gc/gc_cpp.h>
@@ -264,30 +267,42 @@ static BoehmGCStackAllocator boehmGCStackAllocator;
  * However, the implementation is quite lean, and usually we don't have active
  * coroutines during evaluation, so this is acceptable.
  */
-void fixupBoehmStackPointer(void ** sp_ptr, void * pthread_id) {
+void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id) {
     void *& sp = *sp_ptr;
+    auto pthread_id = reinterpret_cast<pthread_t>(_pthread_id);
     pthread_attr_t pattr;
     size_t osStackSize;
     void * osStackLow;
     void * osStackBase;
 
-    #ifdef __APPLE__
-    osStackSize = pthread_get_stacksize_np((pthread_t)pthread_id);
-    osStackLow = pthread_get_stackaddr_np((pthread_t)pthread_id);
-    #else
+#  ifdef __APPLE__
+    osStackSize = pthread_get_stacksize_np(pthread_id);
+    osStackLow = pthread_get_stackaddr_np(pthread_id);
+#  else
     if (pthread_attr_init(&pattr)) {
         throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
     }
-    if (pthread_getattr_np((pthread_t)pthread_id, &pattr)) {
+#    ifdef HAVE_PTHREAD_GETATTR_NP
+    if (pthread_getattr_np(pthread_id, &pattr)) {
         throw Error("fixupBoehmStackPointer: pthread_getattr_np failed");
     }
+#    elif HAVE_PTHREAD_ATTR_GET_NP
+    if (!pthread_attr_init(&pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
+    }
+    if (!pthread_attr_get_np(pthread_id, &pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_get_np failed");
+    }
+#    else
+#      error "Need one of `pthread_attr_get_np` or `pthread_getattr_np`"
+#    endif
     if (pthread_attr_getstack(&pattr, &osStackLow, &osStackSize)) {
         throw Error("fixupBoehmStackPointer: pthread_attr_getstack failed");
     }
     if (pthread_attr_destroy(&pattr)) {
         throw Error("fixupBoehmStackPointer: pthread_attr_destroy failed");
     }
-    #endif
+#  endif
     osStackBase = (char *)osStackLow + osStackSize;
     // NOTE: We assume the stack grows down, as it does on all architectures we support.
     //       Architectures that grow the stack up are rare.
