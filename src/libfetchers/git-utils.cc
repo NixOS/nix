@@ -914,11 +914,16 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
         if (!prepareDirs(pathComponents, false)) return;
 
+        // We can't just look up the path from the start of the root, since
+        // some parent directories may not have finished yet, so we compute
+        // a relative path that helps us find the right git_tree_builder or object.
         auto relTarget = CanonPath(path).parent()->makeRelative(target);
 
         auto dir = pendingDirs.rbegin();
 
         // For each ../ component at the start, go up one directory.
+        // CanonPath::makeRelative() always puts all .. elements at the start,
+        // so they're all handled by this loop:
         std::string_view relTargetLeft(relTarget);
         while (hasPrefix(relTargetLeft, "../")) {
             if (dir == pendingDirs.rend())
