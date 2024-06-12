@@ -11,4 +11,4 @@ fi
 
 outPath=$(nix-build ./import-derivation.nix --no-out-link)
 
-[ "$(cat $outPath)" = FOO579 ]
+[ "$(cat "$outPath")" = FOO579 ]

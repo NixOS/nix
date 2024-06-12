@@ -13,7 +13,7 @@ mkdir "$TEST_HOME"
 
 mkdir "$NIX_STORE_DIR"
 mkdir "$NIX_LOCALSTATE_DIR"
-mkdir -p "$NIX_LOG_DIR"/drvs
+mkdir -p "$NIX_LOG_DIR/drvs"
 mkdir "$NIX_STATE_DIR"
 mkdir "$NIX_CONF_DIR"
 
