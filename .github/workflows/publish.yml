@@ -1,0 +1,20 @@
+name: Publish on FlakeHub
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+publish:
+  runs-on: ubuntu-latest
+  permissions:
+    contents: read
+    id-token: write
+  steps:
+    - uses: actions/checkout@v4
+    - uses: DeterminateSystems/nix-installer-action@main
+    - uses: "DeterminateSystems/flakehub-push@main"
+      with:
+        visibility: "private"
+        name: "DeterminateSystems/nix-priv"
+        tag: "${{ github.ref_name }}"
