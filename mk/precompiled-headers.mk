@@ -8,7 +8,7 @@ GCH = $(buildprefix)precompiled-headers.h.gch
 $(GCH): precompiled-headers.h
 	@rm -f $@
 	@mkdir -p "$(dir $@)"
-	$(trace-gen) $(CXX) -x c++-header -o $@ $< $(GLOBAL_CXXFLAGS) $(GCH_CXXFLAGS)
+	$(trace-gen) $(CXX) -c -x c++-header -o $@ $< $(GLOBAL_CXXFLAGS) $(GCH_CXXFLAGS)
 
 clean-files += $(GCH)
 
