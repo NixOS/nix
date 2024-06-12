@@ -8,8 +8,8 @@ templatesDir=$TEST_ROOT/templates
 flakeDir=$TEST_ROOT/flake
 nixpkgsDir=$TEST_ROOT/nixpkgs
 
-nix registry add --registry "$registry" templates git+file://"$templatesDir"
-nix registry add --registry "$registry" nixpkgs git+file://"$nixpkgsDir"
+nix registry add --registry "$registry" templates "git+file://$templatesDir"
+nix registry add --registry "$registry" nixpkgs "git+file://$nixpkgsDir"
 
 createGitRepo "$nixpkgsDir"
 createSimpleGitFlake "$nixpkgsDir"
