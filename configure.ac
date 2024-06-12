@@ -369,6 +369,14 @@ if test "$gc" = yes; then
   PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
   CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
+
+  # See `fixupBoehmStackPointer`, for the integration between Boehm GC
+  # and Boost coroutines.
+  old_CFLAGS="$CFLAGS"
+  # Temporary set `-pthread` just for the next check
+  CFLAGS="$CFLAGS -pthread"
+  AC_CHECK_FUNCS([pthread_attr_get_np pthread_getattr_np])
+  CFLAGS="$old_CFLAGS"
 fi
 
 AS_IF([test "$ENABLE_UNIT_TESTS" == "yes"],[

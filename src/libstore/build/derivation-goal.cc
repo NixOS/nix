@@ -25,6 +25,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifndef _WIN32 // TODO abstract over proc exit status
+# include <sys/wait.h>
+#endif
+
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -1033,7 +1037,7 @@ void DerivationGoal::buildDone()
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
-#ifndef _WIN32
+#ifndef _WIN32 // TODO abstract over proc exit status
         if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
 
