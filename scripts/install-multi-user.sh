@@ -754,7 +754,7 @@ I will:
    (if it does, I will tell you how to clean them up.)
  - create local users (see the list above for the users I'll make)
  - create a local group ($NIX_BUILD_GROUP_NAME)
- - install Nix in to $NIX_ROOT
+ - install Nix in $NIX_ROOT
  - create a configuration file in /etc/nix
  - set up the "default profile" by creating some Nix-related files in
    $ROOT_HOME
