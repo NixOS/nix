@@ -3,6 +3,7 @@
 
 #include "attr-set.hh"
 #include "eval-error.hh"
+#include "eval-gc.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
@@ -144,12 +145,6 @@ void copyContext(const Value & v, NixStringContext & context);
 
 std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
-
-
-/**
- * Initialise the Boehm GC, if applicable.
- */
-void initGC();
 
 
 struct RegexCache;
