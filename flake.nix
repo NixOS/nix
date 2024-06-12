@@ -22,7 +22,6 @@
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
 
-
     let
       inherit (nixpkgs) lib;
 
@@ -357,5 +356,9 @@
               default = self.devShells.${system}.native-stdenvPackages;
             }
         );
-  };
+
+      # Expected by the DeterminateSystems/nix-installer flake.
+      tarballs_indirect = forAllSystems (system: self.checks."${system}".binaryTarball);
+      tarballs_direct = forAllSystems (system: "${self.checks."${system}".binaryTarball}/nix-${self.packages."${system}".default.version}-${system}.tar.xz");
+    };
 }
