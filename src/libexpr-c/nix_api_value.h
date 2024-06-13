@@ -35,8 +35,11 @@ typedef enum {
 } ValueType;
 
 // forward declarations
-typedef void Value;
+typedef struct nix_value nix_value;
 typedef struct EvalState EvalState;
+
+[[deprecated("use nix_value instead")]] typedef nix_value Value;
+
 // type defs
 /** @brief Stores an under-construction set of bindings
  * @ingroup value_manip

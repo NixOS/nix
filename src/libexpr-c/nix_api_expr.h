@@ -36,7 +36,8 @@ typedef struct EvalState EvalState; // nix::EvalState
  * @struct Value
  * @see value_manip
  */
-typedef void Value; // nix::Value
+typedef struct nix_value nix_value;
+[[deprecated("use nix_value instead")]] typedef nix_value Value;
 
 // Function prototypes
 /**

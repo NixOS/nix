@@ -64,6 +64,11 @@ static nix::Value & check_value_out(Value * value)
     return v;
 }
 
+static inline nix_value * as_nix_value_ptr(nix::Value * v)
+{
+    return reinterpret_cast<nix_value *>(v);
+}
+
 /**
  * Helper function to convert calls from nix into C API.
  *
@@ -159,7 +164,7 @@ Value * nix_alloc_value(nix_c_context * context, EvalState * state)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        Value * res = state->state.allocValue();
+        nix_value * res = as_nix_value_ptr(state->state.allocValue());
         nix_gc_incref(nullptr, res);
         return res;
     }
@@ -345,7 +350,7 @@ Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalSt
         if (attr) {
             nix_gc_incref(nullptr, attr->value);
             state->state.forceValue(*attr->value, nix::noPos);
-            return attr->value;
+            return as_nix_value_ptr(attr->value);
         }
         nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
         return nullptr;
@@ -380,7 +385,7 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * sta
         *name = ((const std::string &) (state->state.symbols[a.name])).c_str();
         nix_gc_incref(nullptr, a.value);
         state->state.forceValue(*a.value, nix::noPos);
-        return a.value;
+        return as_nix_value_ptr(a.value);
     }
     NIXC_CATCH_ERRS_NULL
 }
