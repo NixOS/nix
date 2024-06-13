@@ -42,7 +42,7 @@ struct Executor
     Executor()
     {
         auto nrCores = string2Int<size_t>(getEnv("NR_CORES").value_or("1")).value_or(1);
-        printError("USING %d THREADS", nrCores);
+        debug("executor using %d threads", nrCores);
         auto state(state_.lock());
         for (size_t n = 0; n < nrCores; ++n)
             state->threads.push_back(std::thread([&]()
@@ -66,7 +66,7 @@ struct Executor
             auto state(state_.lock());
             state->quit = true;
             std::swap(threads, state->threads);
-            printError("%d ITEMS LEFT", state->queue.size());
+            debug("executor shutting down with %d items left", state->queue.size());
         }
 
         wakeup.notify_all();
@@ -91,7 +91,6 @@ struct Executor
                 state.wait(wakeup);
             }
 
-            //printError("EXEC");
             try {
                 item.work();
                 item.promise.set_value();

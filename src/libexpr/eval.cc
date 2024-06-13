@@ -2671,10 +2671,12 @@ void EvalState::maybePrintStats()
         printStatistics();
     }
 
-    printError("THUNKS AWAITED: %d", nrThunksAwaited);
-    printError("THUNKS AWAITED SLOW: %d", nrThunksAwaitedSlow);
-    printError("WAITING TIME: %d μs", usWaiting);
-    printError("MAX WAITING: %d", maxWaiting);
+    if (getEnv("NIX_SHOW_THREAD_STATS").value_or("0") != "0") {
+        printError("THUNKS AWAITED: %d", nrThunksAwaited);
+        printError("THUNKS AWAITED SLOW: %d", nrThunksAwaitedSlow);
+        printError("WAITING TIME: %d μs", usWaiting);
+        printError("MAX WAITING: %d", maxWaiting);
+    }
 }
 
 void EvalState::printStatistics()

@@ -190,16 +190,14 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             };
                         } else {
                             auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
-                            #if 0
-                            if (results > 1) logger->cout("");
-                            logger->cout(
-                                "* %s%s",
+                            auto out = fmt(
+                                "%s* %s%s",
+                                results > 1 ? "\n" : "",
                                 wrap("\e[0;1m", hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
-                                logger->cout(
-                                    "  %s", hiliteMatches(description, descriptionMatches, ANSI_GREEN, ANSI_NORMAL));
-                            #endif
+                                out += fmt("\n  %s", hiliteMatches(description, descriptionMatches, ANSI_GREEN, ANSI_NORMAL));
+                            logger->cout(out);
                         }
                     }
                 }
@@ -242,7 +240,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                 auto state(state_.lock());
                 std::swap(futures, state->futures);
             }
-            printError("GOT %d FUTURES", futures.size());
+            debug("got %d futures", futures.size());
             if (futures.empty())
                 break;
             for (auto & future : futures)
