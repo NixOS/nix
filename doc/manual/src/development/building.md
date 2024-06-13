@@ -11,7 +11,7 @@ $ cd nix
 > **Note**
 >
 > The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment.
-> If you don't have it installed, follow the [installation instructions](../installation/installation.md).
+> If you don't have it installed, follow the [installation instructions](../installation/index.md).
 
 
 To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:

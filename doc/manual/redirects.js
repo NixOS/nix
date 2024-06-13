@@ -143,7 +143,7 @@ const redirects = {
     "opt-timeout": "command-ref/opt-common.html#opt-timeout",
     "sec-common-options": "command-ref/opt-common.html",
     "ch-utilities": "command-ref/utilities.html",
-    "chap-hacking": "contributing/hacking.html",
+    "chap-hacking": "development/building.html",
     "adv-attr-allowSubstitutes": "language/advanced-attributes.html#adv-attr-allowSubstitutes",
     "adv-attr-allowedReferences": "language/advanced-attributes.html#adv-attr-allowedReferences",
     "adv-attr-allowedRequisites": "language/advanced-attributes.html#adv-attr-allowedRequisites",

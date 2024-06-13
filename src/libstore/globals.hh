@@ -303,7 +303,7 @@ public:
              For backward compatibility, `ssh://` may be omitted.
              The hostname may be an alias defined in `~/.ssh/config`.
 
-          2. A comma-separated list of [Nix system types](@docroot@/development/hacking.md#system-type).
+          2. A comma-separated list of [Nix system types](@docroot@/development/building.md#system-type).
              If omitted, this defaults to the local platform type.
 
              > **Example**
