@@ -29,12 +29,20 @@ extern "C" {
  * @see nix_state_create
  */
 typedef struct EvalState EvalState; // nix::EvalState
-/**
- * @brief Represents a value in the Nix language.
+
+/** @brief A Nix language value, or thunk that may evaluate to a value.
  *
- * Owned by the garbage collector.
- * @struct Value
+ * Values are the primary objects manipulated in the Nix language.
+ * They are considered to be immutable from a user's perspective, but the process of evaluating a Value changes its
+ * ValueType if it was a thunk. After a Value has been evaluated, its ValueType does not change.
+ *
+ * Evaluation in this context refers to the process of evaluating a single Value object, also called "forcing" the
+ * Value; see `nix_value_force`.
+ *
+ * The evaluator manages its own memory, but your use of the C API must follow the reference counting rules.
+ *
  * @see value_manip
+ * @see nix_value_incref, nix_value_decref
  */
 typedef struct nix_value nix_value;
 [[deprecated("use nix_value instead")]] typedef nix_value Value;
@@ -128,7 +136,7 @@ nix_err nix_value_call_multi(
  * The Nix interpreter is lazy, and not-yet-evaluated Values can be
  * of type NIX_TYPE_THUNK instead of their actual value.
  *
- * This function converts these Values into their final type.
+ * This function mutates such a Value, so that, if successful, it has its final type.
  *
  * @note This function is mainly needed before calling @ref getters, but not for API calls that return a `Value`.
  *
