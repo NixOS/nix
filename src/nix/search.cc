@@ -1,5 +1,3 @@
-#include "parallel-eval.hh"
-
 #include "command-installable-value.hh"
 #include "globals.hh"
 #include "eval.hh"
@@ -12,6 +10,7 @@
 #include "eval-cache.hh"
 #include "attr-path.hh"
 #include "hilite.hh"
+#include "parallel-eval.hh"
 
 #include <regex>
 #include <fstream>
@@ -92,21 +91,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         std::atomic<uint64_t> results = 0;
 
         Executor executor;
-
-        struct State
-        {
-            std::vector<std::future<void>> futures;
-        };
-
-        Sync<State> state_;
-
-        auto spawn = [&](std::vector<std::pair<Executor::work_t, uint8_t>> && work)
-        {
-            auto futures = executor.spawn(std::move(work));
-            auto state(state_.lock());
-            for (auto & future : futures)
-                state->futures.push_back(std::move(future));
-        };
+        FutureVector futures(executor);
 
         std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
 
@@ -135,7 +120,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             std::string_view(state->symbols[attr]).find("Packages") != std::string_view::npos ? 0 : 2);
                     }
                     //printError("ADD %d %s", work.size(), concatStringsSep(".", attrPathS));
-                    spawn(std::move(work));
+                    futures.spawn(std::move(work));
                 };
 
                 if (cursor.isDerivation()) {
@@ -232,24 +217,8 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             }, 1);
         }
 
-        spawn(std::move(work));
-
-        while (true) {
-            std::vector<std::future<void>> futures;
-            {
-                auto state(state_.lock());
-                std::swap(futures, state->futures);
-            }
-            debug("got %d futures", futures.size());
-            if (futures.empty())
-                break;
-            for (auto & future : futures)
-                try {
-                    future.get();
-                } catch (...) {
-                    ignoreException();
-                }
-        }
+        futures.spawn(std::move(work));
+        futures.finishAll();
 
         if (json)
             logger->cout("%s", *jsonOut);

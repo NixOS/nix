@@ -141,4 +141,44 @@ struct Executor
     }
 };
 
+struct FutureVector
+{
+    Executor & executor;
+
+    struct State
+    {
+        std::vector<std::future<void>> futures;
+    };
+
+    Sync<State> state_;
+
+    void spawn(std::vector<std::pair<Executor::work_t, uint8_t>> && work)
+    {
+        auto futures = executor.spawn(std::move(work));
+        auto state(state_.lock());
+        for (auto & future : futures)
+            state->futures.push_back(std::move(future));
+    };
+
+    void finishAll()
+    {
+        while (true) {
+            std::vector<std::future<void>> futures;
+            {
+                auto state(state_.lock());
+                std::swap(futures, state->futures);
+            }
+            debug("got %d futures", futures.size());
+            if (futures.empty())
+                break;
+            for (auto & future : futures)
+                try {
+                    future.get();
+                } catch (...) {
+                    ignoreException();
+                }
+        }
+    }
+};
+
 }
