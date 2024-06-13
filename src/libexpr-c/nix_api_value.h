@@ -147,6 +147,25 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp);
  */
 Value * nix_alloc_value(nix_c_context * context, EvalState * state);
 
+/**
+ * @brief Increment the garbage collector reference counter for the given `nix_value`.
+ *
+ * The Nix language evaluator C API keeps track of alive objects by reference counting.
+ * When you're done with a refcounted pointer, call nix_value_decref().
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] value The object to keep alive
+ */
+nix_err nix_value_incref(nix_c_context * context, nix_value * value);
+
+/**
+ * @brief Decrement the garbage collector reference counter for the given object
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] value The object to stop referencing
+ */
+nix_err nix_value_decref(nix_c_context * context, nix_value * value);
+
 /** @addtogroup value_manip Manipulating values
  * @brief Functions to inspect and change Nix language values, represented by Value.
  * @{

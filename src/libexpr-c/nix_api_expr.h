@@ -189,6 +189,11 @@ void nix_state_free(EvalState * state);
  * you're done with a value returned by the evaluator.
  * @{
  */
+
+// TODO: Deprecate nix_gc_incref in favor of the type-specific reference counting functions?
+//       e.g. nix_value_incref.
+//       It gives implementors more flexibility, and adds safety, so that generated
+//       bindings can be used without fighting the host type system (where applicable).
 /**
  * @brief Increment the garbage collector reference counter for the given object.
  *

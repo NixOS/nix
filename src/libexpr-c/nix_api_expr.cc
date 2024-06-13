@@ -181,6 +181,15 @@ nix_err nix_gc_decref(nix_c_context * context, const void *)
 void nix_gc_now() {}
 #endif
 
+nix_err nix_value_incref(nix_c_context * context, nix_value *x)
+{
+    return nix_gc_incref(context, (const void *) x);
+}
+nix_err nix_value_decref(nix_c_context * context, nix_value *x)
+{
+    return nix_gc_decref(context, (const void *) x);
+}
+
 void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd))
 {
 #ifdef HAVE_BOEHMGC
