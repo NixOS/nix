@@ -1,5 +1,5 @@
 project('nix-util', 'cpp',
-  version : run_command('cat', './.version', check : true).stdout().strip(),
+  version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
     # TODO(Qyriad): increase the warning level
@@ -8,25 +8,61 @@ project('nix-util', 'cpp',
     'optimization=2',
     'errorlogs=true', # Please print logs for tests that fail
   ],
-  meson_version : '>= 0.64.0',
+  meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
 )
 
 cxx = meson.get_compiler('cpp')
 
+# These are private dependencies with pkg-config files. What private
+# means is that the dependencies are used by the library but they are
+# *not* used (e.g. `#include`-ed) in any installed header file, and only
+# in regular source code (`*.cc`) or private, uninstalled headers. They
+# are thus part of the *implementation* of the library, but not its
+# *interface*.
+#
+# See `man pkg-config` for some details.
 deps_private = [ ]
+
+# These are public dependencies with pkg-config files. Public is the
+# opposite of private: these dependencies are used in installed header
+# files. They are part of the interface (and implementation) of the
+# library.
+#
+# N.B. This concept is mostly unrelated to our own concept of a public
+# (stable) API, for consumption outside of the Nix repository.
+# `libnixutil` is an unstable C++ library, whose public interface is
+# likewise unstable. `libutilc` conversely is a hopefully-soon stable
+# C library, whose public interface --- including public but not private
+# dependencies --- will also likewise soon be stable.
+#
+# N.B. For distributions that care about "ABI" stablity and not just
+# "API" stability, the private dependencies also matter as they can
+# potentially affect the public ABI.
 deps_public = [ ]
+
+# These are dependencencies without pkg-config files. Ideally they are
+# just private, but they may also be public (e.g. boost).
 deps_other = [ ]
 
 configdata = configuration_data()
 
-# Check for each of these functions, and create a define like `#define HAVE_LUTIMES 1`.
+# Check for each of these functions, and create a define like `#define
+# HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
+# for found. One therefore uses it with `#if` not `#ifdef`.
 check_funcs = [
-   # Optionally used for changing the mtime of symlinks.
+  # Optionally used for changing the mtime of symlinks.
   'lutimes',
+  # Optionally used for creating pipes on Unix
   'pipe2',
+  # Optionally used to preallocate files to be large enough before
+  # writing to them.
   'posix_fallocate',
+  # Optionally used to get more information about processes failing due
+  # to a signal on Unix.
   'strsignal',
+  # Optionally used to try to close more file descriptors (e.g. before
+  # forking) on Unix.
   'sysconf',
 ]
 foreach funcspec : check_funcs
@@ -35,8 +71,10 @@ foreach funcspec : check_funcs
   configdata.set(define_name, define_value)
 endforeach
 
-# Conditional to work around https://github.com/mesonbuild/meson/issues/13293
-if host_machine.system() != 'windows' and cxx.get_id() == 'gcc'
+# This is only conditional to work around
+# https://github.com/mesonbuild/meson/issues/13293. It should be
+# unconditional.
+if not (host_machine.system() == 'windows' and cxx.get_id() == 'gcc')
   deps_private += dependency('threads')
 endif
 
@@ -53,7 +91,8 @@ boost = dependency(
   'boost',
   modules : ['context', 'coroutine'],
 )
-# Actually public, but wrong type of dep for pkg config
+# boost is a public dependency, but not a pkg-config dependency unfortunately, so we
+# put in `deps_other`.
 deps_other += boost
 
 openssl = dependency(
@@ -80,8 +119,10 @@ brotli = [
 ]
 deps_private += brotli
 
-# cpuid only makes sense on x86_64
-cpuid_required = host_machine.cpu_family() == 'x86_64' ? get_option('cpuid') : false
+cpuid_required = get_option('cpuid')
+if host_machine.cpu_family() != 'x86_64' and cpuid_required.enabled()
+  warning('Force-enabling seccomp on non-x86_64 does not make sense')
+endif
 cpuid = dependency('libcpuid', 'cpuid', required : cpuid_required)
 configdata.set('HAVE_LIBCPUID', cpuid.found().to_int())
 deps_private += cpuid
@@ -89,7 +130,7 @@ deps_private += cpuid
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-config_util_h = configure_file(
+config_h = configure_file(
   configuration : configdata,
   output : 'config-util.h',
 )
@@ -157,7 +198,7 @@ sources = files(
 
 include_dirs = [include_directories('.')]
 
-headers = [config_util_h] + files(
+headers = [config_h] + files(
   'abstract-setting-to-json.hh',
   'ansicolor.hh',
   'archive.hh',
@@ -248,7 +289,7 @@ else
   linker_export_flags = []
 endif
 
-libutil = library(
+this_library = library(
   'nixutil',
   sources,
   dependencies : deps_public + deps_private + deps_other,
@@ -259,6 +300,11 @@ libutil = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
+# Part of how we copy boost libraries to a separate installation to
+# reduce closure size. These libraries will be copied to our `$out/bin`,
+# and these `-l` flags will pick them up there.
+#
+# https://github.com/NixOS/nixpkgs/issues/45462
 libraries_private = ['-lboost_context', '-lboost_coroutine']
 if host_machine.system() == 'windows'
   # `libraries_private` cannot contain ad-hoc dependencies (from
@@ -267,22 +313,20 @@ if host_machine.system() == 'windows'
 endif
 
 import('pkgconfig').generate(
-  libutil,
-  filebase : 'nix-util',
+  this_library,
+  filebase : meson.project_name(),
   name : 'Nix',
   description : 'Nix Package Manager',
   subdirs : ['nix'],
   extra_cflags : ['-std=c++2a'],
   requires : deps_public,
   requires_private : deps_private,
-  # avoid absolute paths, use vendored ones
   libraries_private : libraries_private,
 )
 
-nix_util = declare_dependency(
+meson.override_dependency(meson.project_name(), declare_dependency(
   include_directories : include_dirs,
-  link_with : libutil,
+  link_with : this_library,
   compile_args : ['-std=c++2a'],
   dependencies : [],
-)
-meson.override_dependency('nix-util', nix_util)
+))
