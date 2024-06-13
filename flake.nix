@@ -243,6 +243,7 @@
           changelog-d;
         default = self.packages.${system}.nix;
       } // lib.concatMapAttrs
+        # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         (pkgName: {}: {
           "${pkgName}" = nixpkgsFor.${system}.native.${pkgName};
           "${pkgName}-static" = nixpkgsFor.${system}.static.${pkgName};

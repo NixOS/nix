@@ -83,9 +83,8 @@ mkDerivation (finalAttrs: {
     ''
       echo ${version} > .version
     ''
-    # Copy libboost_context so we don't get all of Boost in our closure.
-
-    # https://github.com/NixOS/nixpkgs/issues/45462
+    # Copy some boost libraries so we don't get all of Boost in our
+    # closure. https://github.com/NixOS/nixpkgs/issues/45462
     + lib.optionalString (!stdenv.hostPlatform.isStatic) (''
       mkdir -p $out/lib
       cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
@@ -115,7 +114,9 @@ mkDerivation (finalAttrs: {
   enableParallelBuilding = true;
 
   postInstall =
-    # Remove absolute path to boost libs
+    # Remove absolute path to boost libs that ends up in `Libs.private`
+    # by default, and would clash with out `disallowedReferences`. Part
+    # of the https://github.com/NixOS/nixpkgs/issues/45462 workaround.
     ''
       sed -i "$out/lib/pkgconfig/nix-util.pc" -e 's, ${lib.getLib boost}[^ ]*,,g'
     ''

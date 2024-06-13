@@ -139,7 +139,9 @@ void closeMostFDs(const std::set<int> & exceptions)
 #endif
 
     int maxFD = 0;
+#if HAVE_SYSCONF
     maxFD = sysconf(_SC_OPEN_MAX);
+#endif
     for (int fd = 0; fd < maxFD; ++fd)
         if (!exceptions.count(fd))
             close(fd); /* ignore result */
