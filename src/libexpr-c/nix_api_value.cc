@@ -21,45 +21,45 @@
 #endif
 
 // Internal helper functions to check [in] and [out] `Value *` parameters
-static const nix::Value & check_value_not_null(const Value * value)
+static const nix::Value & check_value_not_null(const nix_value * value)
 {
     if (!value) {
-        throw std::runtime_error("Value is null");
+        throw std::runtime_error("nix_value is null");
     }
     return *((const nix::Value *) value);
 }
 
-static nix::Value & check_value_not_null(Value * value)
+static nix::Value & check_value_not_null(nix_value * value)
 {
     if (!value) {
-        throw std::runtime_error("Value is null");
+        throw std::runtime_error("nix_value is null");
     }
-    return *((nix::Value *) value);
+    return value->value;
 }
 
-static const nix::Value & check_value_in(const Value * value)
+static const nix::Value & check_value_in(const nix_value * value)
 {
     auto & v = check_value_not_null(value);
     if (!v.isValid()) {
-        throw std::runtime_error("Uninitialized Value");
+        throw std::runtime_error("Uninitialized nix_value");
     }
     return v;
 }
 
-static nix::Value & check_value_in(Value * value)
+static nix::Value & check_value_in(nix_value * value)
 {
     auto & v = check_value_not_null(value);
     if (!v.isValid()) {
-        throw std::runtime_error("Uninitialized Value");
+        throw std::runtime_error("Uninitialized nix_value");
     }
     return v;
 }
 
-static nix::Value & check_value_out(Value * value)
+static nix::Value & check_value_out(nix_value * value)
 {
     auto & v = check_value_not_null(value);
     if (v.isValid()) {
-        throw std::runtime_error("Value already initialized. Variables are immutable");
+        throw std::runtime_error("nix_value already initialized. Variables are immutable");
     }
     return v;
 }
@@ -92,7 +92,7 @@ static void nix_c_primop_wrapper(
     // or maybe something to make blackholes work better; we don't know).
     nix::Value vTmp;
 
-    f(userdata, &ctx, (EvalState *) &state, (Value **) args, (Value *) &vTmp);
+    f(userdata, &ctx, (EvalState *) &state, (nix_value **) args, (nix_value *) &vTmp);
 
     if (ctx.last_err_code != NIX_OK) {
         /* TODO: Throw different errors depending on the error code */
@@ -159,7 +159,7 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp)
     NIXC_CATCH_ERRS
 }
 
-Value * nix_alloc_value(nix_c_context * context, EvalState * state)
+nix_value * nix_alloc_value(nix_c_context * context, EvalState * state)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -171,7 +171,7 @@ Value * nix_alloc_value(nix_c_context * context, EvalState * state)
     NIXC_CATCH_ERRS_NULL
 }
 
-ValueType nix_get_type(nix_c_context * context, const Value * value)
+ValueType nix_get_type(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -207,7 +207,7 @@ ValueType nix_get_type(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_RES(NIX_TYPE_NULL);
 }
 
-const char * nix_get_typename(nix_c_context * context, const Value * value)
+const char * nix_get_typename(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -219,7 +219,7 @@ const char * nix_get_typename(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_NULL
 }
 
-bool nix_get_bool(nix_c_context * context, const Value * value)
+bool nix_get_bool(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -231,7 +231,8 @@ bool nix_get_bool(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_RES(false);
 }
 
-nix_err nix_get_string(nix_c_context * context, const Value * value, nix_get_string_callback callback, void * user_data)
+nix_err
+nix_get_string(nix_c_context * context, const nix_value * value, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -243,7 +244,7 @@ nix_err nix_get_string(nix_c_context * context, const Value * value, nix_get_str
     NIXC_CATCH_ERRS
 }
 
-const char * nix_get_path_string(nix_c_context * context, const Value * value)
+const char * nix_get_path_string(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -262,7 +263,7 @@ const char * nix_get_path_string(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_NULL
 }
 
-unsigned int nix_get_list_size(nix_c_context * context, const Value * value)
+unsigned int nix_get_list_size(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -274,7 +275,7 @@ unsigned int nix_get_list_size(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_RES(0);
 }
 
-unsigned int nix_get_attrs_size(nix_c_context * context, const Value * value)
+unsigned int nix_get_attrs_size(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -286,7 +287,7 @@ unsigned int nix_get_attrs_size(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_RES(0);
 }
 
-double nix_get_float(nix_c_context * context, const Value * value)
+double nix_get_float(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -298,7 +299,7 @@ double nix_get_float(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_RES(0.0);
 }
 
-int64_t nix_get_int(nix_c_context * context, const Value * value)
+int64_t nix_get_int(nix_c_context * context, const nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -310,7 +311,7 @@ int64_t nix_get_int(nix_c_context * context, const Value * value)
     NIXC_CATCH_ERRS_RES(0);
 }
 
-ExternalValue * nix_get_external(nix_c_context * context, Value * value)
+ExternalValue * nix_get_external(nix_c_context * context, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -322,7 +323,7 @@ ExternalValue * nix_get_external(nix_c_context * context, Value * value)
     NIXC_CATCH_ERRS_NULL;
 }
 
-Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int ix)
+nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int ix)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -333,12 +334,12 @@ Value * nix_get_list_byidx(nix_c_context * context, const Value * value, EvalSta
         nix_gc_incref(nullptr, p);
         if (p != nullptr)
             state->state.forceValue(*p, nix::noPos);
-        return (Value *) p;
+        return as_nix_value_ptr(p);
     }
     NIXC_CATCH_ERRS_NULL
 }
 
-Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name)
+nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value, EvalState * state, const char * name)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -358,7 +359,7 @@ Value * nix_get_attr_byname(nix_c_context * context, const Value * value, EvalSt
     NIXC_CATCH_ERRS_NULL
 }
 
-bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState * state, const char * name)
+bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalState * state, const char * name)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -374,8 +375,8 @@ bool nix_has_attr_byname(nix_c_context * context, const Value * value, EvalState
     NIXC_CATCH_ERRS_RES(false);
 }
 
-Value *
-nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i, const char ** name)
+nix_value * nix_get_attr_byidx(
+    nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i, const char ** name)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -390,7 +391,8 @@ nix_get_attr_byidx(nix_c_context * context, const Value * value, EvalState * sta
     NIXC_CATCH_ERRS_NULL
 }
 
-const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * value, EvalState * state, unsigned int i)
+const char *
+nix_get_attr_name_byidx(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -402,7 +404,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, const Value * valu
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_init_bool(nix_c_context * context, Value * value, bool b)
+nix_err nix_init_bool(nix_c_context * context, nix_value * value, bool b)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -414,7 +416,7 @@ nix_err nix_init_bool(nix_c_context * context, Value * value, bool b)
 }
 
 // todo string context
-nix_err nix_init_string(nix_c_context * context, Value * value, const char * str)
+nix_err nix_init_string(nix_c_context * context, nix_value * value, const char * str)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -425,7 +427,7 @@ nix_err nix_init_string(nix_c_context * context, Value * value, const char * str
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_path_string(nix_c_context * context, EvalState * s, Value * value, const char * str)
+nix_err nix_init_path_string(nix_c_context * context, EvalState * s, nix_value * value, const char * str)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -436,7 +438,7 @@ nix_err nix_init_path_string(nix_c_context * context, EvalState * s, Value * val
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_float(nix_c_context * context, Value * value, double d)
+nix_err nix_init_float(nix_c_context * context, nix_value * value, double d)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -447,7 +449,7 @@ nix_err nix_init_float(nix_c_context * context, Value * value, double d)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_int(nix_c_context * context, Value * value, int64_t i)
+nix_err nix_init_int(nix_c_context * context, nix_value * value, int64_t i)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -458,7 +460,7 @@ nix_err nix_init_int(nix_c_context * context, Value * value, int64_t i)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_null(nix_c_context * context, Value * value)
+nix_err nix_init_null(nix_c_context * context, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -469,7 +471,7 @@ nix_err nix_init_null(nix_c_context * context, Value * value)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_apply(nix_c_context * context, Value * value, Value * fn, Value * arg)
+nix_err nix_init_apply(nix_c_context * context, nix_value * value, nix_value * fn, nix_value * arg)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -482,7 +484,7 @@ nix_err nix_init_apply(nix_c_context * context, Value * value, Value * fn, Value
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_external(nix_c_context * context, Value * value, ExternalValue * val)
+nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalValue * val)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -509,7 +511,8 @@ ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, 
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, Value * value)
+nix_err
+nix_list_builder_insert(nix_c_context * context, ListBuilder * list_builder, unsigned int index, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -529,7 +532,7 @@ void nix_list_builder_free(ListBuilder * list_builder)
 #endif
 }
 
-nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, Value * value)
+nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -540,7 +543,7 @@ nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, Value
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * p)
+nix_err nix_init_primop(nix_c_context * context, nix_value * value, PrimOp * p)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -551,7 +554,7 @@ nix_err nix_init_primop(nix_c_context * context, Value * value, PrimOp * p)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_copy_value(nix_c_context * context, Value * value, const Value * source)
+nix_err nix_copy_value(nix_c_context * context, nix_value * value, const nix_value * source)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -563,7 +566,7 @@ nix_err nix_copy_value(nix_c_context * context, Value * value, const Value * sou
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_make_attrs(nix_c_context * context, Value * value, BindingsBuilder * b)
+nix_err nix_make_attrs(nix_c_context * context, nix_value * value, BindingsBuilder * b)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -589,7 +592,7 @@ BindingsBuilder * nix_make_bindings_builder(nix_c_context * context, EvalState *
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * bb, const char * name, Value * value)
+nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * bb, const char * name, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -610,7 +613,7 @@ void nix_bindings_builder_free(BindingsBuilder * bb)
 #endif
 }
 
-nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * state, Value * value, bool isIFD)
+nix_realised_string * nix_string_realise(nix_c_context * context, EvalState * state, nix_value * value, bool isIFD)
 {
     if (context)
         context->last_err_code = NIX_OK;
