@@ -1,5 +1,7 @@
 #include "nix/store/store-registration.hh"
+#include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/memory-source-accessor.hh"
 #include "nix/store/dummy-store.hh"
 
 namespace nix {
@@ -17,9 +19,12 @@ struct DummyStore : virtual Store
 
     ref<const Config> config;
 
+    ref<MemorySourceAccessor> contents;
+
     DummyStore(ref<const Config> config)
         : Store{*config}
         , config(config)
+        , contents(make_ref<MemorySourceAccessor>())
     {
     }
 
@@ -47,8 +52,8 @@ struct DummyStore : virtual Store
         unsupported("addToStore");
     }
 
-    virtual StorePath addToStoreFromDump(
-        Source & dump,
+    StorePath addToStoreFromDump(
+        Source & source,
         std::string_view name,
         FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
         ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
@@ -56,7 +61,45 @@ struct DummyStore : virtual Store
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override
     {
-        unsupported("addToStore");
+        if (config->readOnly)
+            unsupported("addToStoreFromDump");
+
+        auto temp = make_ref<MemorySourceAccessor>();
+
+        {
+            MemorySink tempSink{*temp};
+
+            // TODO factor this out into `restorePath`, same todo on it.
+            switch (dumpMethod) {
+            case FileSerialisationMethod::NixArchive:
+                parseDump(tempSink, source);
+                break;
+            case FileSerialisationMethod::Flat: {
+                // Replace root dir with file so next part succeeds.
+                temp->root = MemorySourceAccessor::File::Regular{};
+                tempSink.createRegularFile(CanonPath::root, [&](auto & sink) { source.drainInto(sink); });
+                break;
+            }
+            }
+        }
+
+        auto hash = hashPath({temp, CanonPath::root}, hashMethod.getFileIngestionMethod(), hashAlgo).first;
+
+        auto desc = ContentAddressWithReferences::fromParts(
+            hashMethod,
+            hash,
+            {
+                .others = references,
+                // caller is not capable of creating a self-reference, because
+                // this is content-addressed without modulus
+                .self = false,
+            });
+
+        auto dstPath = makeFixedOutputPathFromCA(name, desc);
+
+        contents->open(CanonPath(printStorePath(dstPath)), std::move(temp->root));
+
+        return dstPath;
     }
 
     void narFromPath(const StorePath & path, Sink & sink) override
@@ -72,7 +115,7 @@ struct DummyStore : virtual Store
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     {
-        return makeEmptySourceAccessor();
+        return this->contents;
     }
 };
 

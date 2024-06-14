@@ -13,6 +13,15 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
     }
 
+    Setting<bool> readOnly{
+        this,
+        true,
+        "read-only",
+        R"(
+          Make any sort of write fail instead of succeeding.
+          No additional memory will be used, because no information needs to be stored.
+        )"};
+
     static const std::string name()
     {
         return "Dummy Store";

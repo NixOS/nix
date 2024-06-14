@@ -1,5 +1,6 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/dummy-store.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/git-utils.hh"
@@ -179,10 +180,11 @@ TEST_F(GitTest, submodulePeriodSupport)
     // 6) Commit the addition in super
     commitAll(super.get(), "Add submodule with branch='.'");
 
-    // TODO: Use dummy:// store with MemorySourceAccessor.
-    Path storeTmpDir = createTempDir();
-    auto storeTmpDirAutoDelete = AutoDelete(storeTmpDir, true);
-    ref<Store> store = openStore(storeTmpDir);
+    auto store = [] {
+        auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
+        cfg->readOnly = false;
+        return cfg->openStore();
+    }();
 
     auto settings = fetchers::Settings{};
     auto input = fetchers::Input::fromAttrs(
