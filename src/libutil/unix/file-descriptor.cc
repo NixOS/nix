@@ -110,8 +110,8 @@ void Pipe::create()
     if (pipe2(fds, O_CLOEXEC) != 0) throw SysError("creating pipe");
 #else
     if (pipe(fds) != 0) throw SysError("creating pipe");
-    closeOnExec(fds[0]);
-    closeOnExec(fds[1]);
+    unix::closeOnExec(fds[0]);
+    unix::closeOnExec(fds[1]);
 #endif
     readSide = fds[0];
     writeSide = fds[1];
@@ -120,7 +120,7 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
-void closeMostFDs(const std::set<int> & exceptions)
+void unix::closeMostFDs(const std::set<int> & exceptions)
 {
 #if __linux__
     try {
@@ -148,7 +148,7 @@ void closeMostFDs(const std::set<int> & exceptions)
 }
 
 
-void closeOnExec(int fd)
+void unix::closeOnExec(int fd)
 {
     int prev;
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||

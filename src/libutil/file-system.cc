@@ -546,7 +546,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
 #ifndef _WIN32
-    closeOnExec(fd.get());
+    unix::closeOnExec(fd.get());
 #endif
     return {std::move(fd), tmpl};
 }
