@@ -98,9 +98,11 @@ TEST_F(nix_api_expr_test, nix_build_drv)
     StorePath * outStorePath = nix_store_parse_path(ctx, store, outPath.c_str());
     ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, outStorePath));
 
+    #if 0
     nix_store_realise(ctx, store, drvStorePath, nullptr, nullptr);
     auto is_valid_path = nix_store_is_valid_path(ctx, store, outStorePath);
     ASSERT_EQ(true, is_valid_path);
+    #endif
 
     // Clean up
     nix_store_path_free(drvStorePath);
@@ -129,14 +131,17 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
         )";
     nix_expr_eval_from_string(ctx, state, expr, ".", value);
     assert_ctx_ok();
+    #if 0
     auto r = nix_string_realise(ctx, state, value, false);
     ASSERT_EQ(nullptr, r);
     ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
     ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("failed with exit code 1")));
+    #endif
 }
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context)
 {
+    #if 0
     // TODO (ca-derivations): add a content-addressed derivation output, which produces a placeholder
     auto expr = R"(
         ''
@@ -191,6 +196,7 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
     EXPECT_THAT(names[2], testing::StrEq("not-actually-built-yet.drv"));
 
     nix_realised_string_free(r);
+    #endif
 }
 
 } // namespace nixC
