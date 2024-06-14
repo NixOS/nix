@@ -16,6 +16,7 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "parallel-eval.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -1121,83 +1122,14 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        std::function<bool(
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> &attrPath,
-            const Symbol &attr)> hasContent;
+        Executor executor;
+        FutureVector futures(executor);
 
-        // For frameworks it's important that structures are as lazy as possible
-        // to prevent infinite recursions, performance issues and errors that
-        // aren't related to the thing to evaluate. As a consequence, they have
-        // to emit more attributes than strictly (sic) necessary.
-        // However, these attributes with empty values are not useful to the user
-        // so we omit them.
-        hasContent = [&](
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> &attrPath,
-            const Symbol &attr) -> bool
+        std::function<void(eval_cache::AttrCursor & visitor, nlohmann::json & result)> visit;
+
+        visit = [&](eval_cache::AttrCursor & visitor, nlohmann::json & j)
         {
-            auto attrPath2(attrPath);
-            attrPath2.push_back(attr);
-            auto attrPathS = state->symbols.resolve(attrPath2);
-            const auto & attrName = state->symbols[attr];
-
-            auto visitor2 = visitor.getAttr(attrName);
-
-            try {
-                if ((attrPathS[0] == "apps"
-                        || attrPathS[0] == "checks"
-                        || attrPathS[0] == "devShells"
-                        || attrPathS[0] == "legacyPackages"
-                        || attrPathS[0] == "packages")
-                    && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
-                    for (const auto &subAttr : visitor2->getAttrs()) {
-                        if (hasContent(*visitor2, attrPath2, subAttr)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-
-                if ((attrPathS.size() == 1)
-                    && (attrPathS[0] == "formatter"
-                        || attrPathS[0] == "nixosConfigurations"
-                        || attrPathS[0] == "nixosModules"
-                        || attrPathS[0] == "overlays"
-                        )) {
-                    for (const auto &subAttr : visitor2->getAttrs()) {
-                        if (hasContent(*visitor2, attrPath2, subAttr)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-
-                // If we don't recognize it, it's probably content
-                return true;
-            } catch (EvalError & e) {
-                // Some attrs may contain errors, eg. legacyPackages of
-                // nixpkgs. We still want to recurse into it, instead of
-                // skipping it at all.
-                return true;
-            }
-        };
-
-        std::function<nlohmann::json(
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> & attrPath,
-            const std::string & headerPrefix,
-            const std::string & nextPrefix)> visit;
-
-        visit = [&](
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> & attrPath,
-            const std::string & headerPrefix,
-            const std::string & nextPrefix)
-            -> nlohmann::json
-        {
-            auto j = nlohmann::json::object();
-
+            auto attrPath = visitor.getAttrPath();
             auto attrPathS = state->symbols.resolve(attrPath);
 
             Activity act(*logger, lvlInfo, actUnknown,
@@ -1206,49 +1138,42 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             try {
                 auto recurse = [&]()
                 {
-                    if (!json)
-                        logger->cout("%s", headerPrefix);
-                    std::vector<Symbol> attrs;
-                    for (const auto &attr : visitor.getAttrs()) {
-                        if (hasContent(visitor, attrPath, attr))
-                            attrs.push_back(attr);
-                    }
-
-                    for (const auto & [i, attr] : enumerate(attrs)) {
+                    for (const auto & attr : visitor.getAttrs()) {
                         const auto & attrName = state->symbols[attr];
-                        bool last = i + 1 == attrs.size();
                         auto visitor2 = visitor.getAttr(attrName);
-                        auto attrPath2(attrPath);
-                        attrPath2.push_back(attr);
-                        auto j2 = visit(*visitor2, attrPath2,
-                            fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attrName),
-                            nextPrefix + (last ? treeNull : treeLine));
-                        if (json) j.emplace(attrName, std::move(j2));
+                        auto & j2 = *j.emplace(attrName, nlohmann::json::object()).first;
+                        futures.spawn({{[&, visitor2]() { visit(*visitor2, j2); }, 1}});
                     }
                 };
 
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
-                    if (json) {
-                        std::optional<std::string> description;
-                        if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
-                            if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
-                                description = aDescription->getString();
-                        }
-                        j.emplace("type", "derivation");
-                        j.emplace("name", name);
-                        if (description)
-                            j.emplace("description", *description);
-                    } else {
-                        logger->cout("%s: %s '%s'",
-                            headerPrefix,
+                    std::optional<std::string> description;
+                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                            description = aDescription->getString();
+                    }
+                    j.emplace("type", "derivation");
+                    if (!json)
+                        j.emplace("subtype",
                             attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
                             attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
                             attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
-                            "package",
-                            name);
+                            "package");
+                    j.emplace("name", name);
+                    if (description)
+                        j.emplace("description", *description);
+                };
+
+                auto omit = [&](std::string_view flag)
+                {
+                    if (json)
+                        logger->warn(fmt("%s omitted (use '%s' to show)", concatStringsSep(".", attrPathS), flag));
+                    else {
+                        j.emplace("type", "omitted");
+                        j.emplace("message", fmt(ANSI_WARNING "omitted" ANSI_NORMAL " (use '%s' to show)", flag));
                     }
                 };
 
@@ -1278,11 +1203,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     )
                 {
                     if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
-                        if (!json)
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
-                        else {
-                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
-                        }
+                        omit("--all-systems");
                     } else {
                         if (visitor.isDerivation())
                             showDerivation();
@@ -1302,17 +1223,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     if (attrPath.size() == 1)
                         recurse();
                     else if (!showLegacy){
-                        if (!json)
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
-                        else {
-                            logger->warn(fmt("%s omitted (use '--legacy' to show)", concatStringsSep(".", attrPathS)));
-                        }
+                        omit("--legacy");
                     } else if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
-                        if (!json)
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
-                        else {
-                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
-                        }
+                        omit("--all-systems");
                     } else {
                         if (visitor.isDerivation())
                             showDerivation();
@@ -1329,11 +1242,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     auto aType = visitor.maybeGetAttr("type");
                     if (!aType || aType->getString() != "app")
                         state->error<EvalError>("not an app definition").debugThrow();
-                    if (json) {
-                        j.emplace("type", "app");
-                    } else {
-                        logger->cout("%s: app", headerPrefix);
-                    }
+                    j.emplace("type", "app");
                 }
 
                 else if (
@@ -1341,12 +1250,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     (attrPath.size() == 2 && attrPathS[0] == "templates"))
                 {
                     auto description = visitor.getAttr("description")->getString();
-                    if (json) {
-                        j.emplace("type", "template");
-                        j.emplace("description", description);
-                    } else {
-                        logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
-                    }
+                    j.emplace("type", "template");
+                    j.emplace("description", description);
                 }
 
                 else {
@@ -1357,25 +1262,84 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         (attrPath.size() == 1 && attrPathS[0] == "nixosModule")
                         || (attrPath.size() == 2 && attrPathS[0] == "nixosModules") ? std::make_pair("nixos-module", "NixOS module") :
                         std::make_pair("unknown", "unknown");
-                    if (json) {
-                        j.emplace("type", type);
-                    } else {
-                        logger->cout("%s: " ANSI_WARNING "%s" ANSI_NORMAL, headerPrefix, description);
-                    }
+                    j.emplace("type", type);
+                    j.emplace("description", description);
                 }
             } catch (EvalError & e) {
                 if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
                     throw;
             }
-
-            return j;
         };
 
         auto cache = openEvalCache(*state, flake);
 
-        auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        auto j = nlohmann::json::object();
+
+        futures.spawn({{[&]() { visit(*cache->getRoot(), j); }, 1}});
+        futures.finishAll();
+
         if (json)
             logger->cout("%s", j.dump());
+        else {
+
+            // For frameworks it's important that structures are as
+            // lazy as possible to prevent infinite recursions,
+            // performance issues and errors that aren't related to
+            // the thing to evaluate. As a consequence, they have to
+            // emit more attributes than strictly (sic) necessary.
+            // However, these attributes with empty values are not
+            // useful to the user so we omit them.
+            std::function<bool(const nlohmann::json & j)> hasContent;
+
+            hasContent = [&](const nlohmann::json & j) -> bool
+            {
+                if (j.find("type") != j.end())
+                    return true;
+                else {
+                    for (auto & j2 : j)
+                        if (hasContent(j2))
+                            return true;
+                    return false;
+                }
+            };
+
+            // Render the JSON into a tree representation.
+            std::function<void(nlohmann::json j, const std::string & headerPrefix, const std::string & nextPrefix)> render;
+
+            render = [&](nlohmann::json j, const std::string & headerPrefix, const std::string & nextPrefix)
+            {
+                if (j.find("type") != j.end()) {
+                    std::string type = j["type"];
+                    if (type == "omitted") {
+                        logger->cout(headerPrefix + " " + (std::string) j["message"]);
+                    } else if (type == "derivation") {
+                        logger->cout(headerPrefix + ": " + (std::string) j["subtype"] + " '" + (std::string) j["name"] + "'");
+                    } else if (j.find("description") != j.end()) {
+                        logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, (std::string) j["description"]);
+                    } else {
+                        logger->cout(headerPrefix + ": " + type);
+                    }
+                    return;
+                }
+
+                logger->cout("%s", headerPrefix);
+
+                auto nonEmpty = nlohmann::json::object();
+                for (const auto & j2 : j.items()) {
+                    if (hasContent(j2.value()))
+                        nonEmpty[j2.key()] = j2.value();
+                }
+
+                for (const auto & [i, j2] : enumerate(nonEmpty.items())) {
+                    bool last = i + 1 == nonEmpty.size();
+                    render(j2.value(),
+                        fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, j2.key()),
+                        nextPrefix + (last ? treeNull : treeLine));
+                }
+            };
+
+            render(j, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
+        }
     }
 };
 

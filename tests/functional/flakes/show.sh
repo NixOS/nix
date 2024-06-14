@@ -57,13 +57,7 @@ cat >flake.nix <<EOF
   };
 }
 EOF
-nix flake show --json --all-systems > show-output.json
-nix eval --impure --expr '
-let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
-in
-assert show_output == { };
-true
-'
+[[ $(nix flake show --all-systems --legacy | wc -l) = 1 ]]
 
 # Test that attributes with errors are handled correctly.
 # nixpkgs.legacyPackages is a particularly prominent instance of this.
