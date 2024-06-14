@@ -129,7 +129,7 @@ nix_err nix_value_call_multi(
  *
  * This function converts these Values into their final type.
  *
- * @note This function is mainly needed before calling @ref getters, but not for API calls that return a `Value`.
+ * @note This function is called before calling `nix_get_type()` (and therefore before most other @ref getters), because lazy evaluation should be transparent to users.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
