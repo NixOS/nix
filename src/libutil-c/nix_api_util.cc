@@ -112,7 +112,7 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * read_con
 {
     if (context)
         context->last_err_code = NIX_OK;
-    if (read_context->last_err) {
+    if (read_context->last_err && read_context->last_err_code != NIX_OK) {
         if (n)
             *n = read_context->last_err->size();
         return read_context->last_err->c_str();
