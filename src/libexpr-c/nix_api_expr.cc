@@ -7,6 +7,7 @@
 #include "eval.hh"
 #include "globals.hh"
 #include "util.hh"
+#include "eval-settings.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -106,7 +107,21 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
             for (size_t i = 0; lookupPath_c[i] != nullptr; i++)
                 lookupPath.push_back(lookupPath_c[i]);
 
-        return new EvalState{nix::EvalState(nix::LookupPath::parse(lookupPath), store->ptr)};
+        void * p = ::operator new(
+            sizeof(EvalState),
+            static_cast<std::align_val_t>(alignof(EvalState)));
+        auto * p2 = static_cast<EvalState *>(p);
+        new (p) EvalState {
+            .settings = nix::EvalSettings{
+                nix::settings.readOnlyMode,
+            },
+            .state = nix::EvalState(
+                nix::LookupPath::parse(lookupPath),
+                store->ptr,
+                p2->settings),
+        };
+        loadConfFile(p2->settings);
+        return p2;
     }
     NIXC_CATCH_ERRS_NULL
 }

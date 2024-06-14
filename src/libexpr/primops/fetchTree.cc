@@ -171,10 +171,10 @@ static void fetchTree(
         }
     }
 
-    if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
+    if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isLocked()) {
+    if (state.settings.pureEval && !input.isLocked()) {
         auto fetcher = "fetchTree";
         if (params.isFetchGit)
             fetcher = "fetchGit";
@@ -453,14 +453,14 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
     if (who == "fetchTarball")
-        url = evalSettings.resolvePseudoUrl(*url);
+        url = state.settings.resolvePseudoUrl(*url);
 
     state.checkURI(*url);
 
     if (name == "")
         name = baseNameOf(*url);
 
-    if (evalSettings.pureEval && !expectedHash)
+    if (state.settings.pureEval && !expectedHash)
         state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who).atPos(pos).debugThrow();
 
     // early exit if pinned and already in the store
