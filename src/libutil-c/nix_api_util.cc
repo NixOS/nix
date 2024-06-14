@@ -57,6 +57,12 @@ nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg)
     return err;
 }
 
+void nix_clear_err(nix_c_context * context)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+}
+
 const char * nix_version_get()
 {
     return PACKAGE_VERSION;
