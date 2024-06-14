@@ -7,13 +7,16 @@
 , ninja
 , pkg-config
 
+, nix-util
 , boost
-, brotli
-, libarchive
-, libcpuid
-, libsodium
+, curl
+, aws-sdk-cpp
+, libseccomp
 , nlohmann_json
-, openssl
+, man
+, sqlite
+
+, busybox-sandbox-shell ? null
 
 # Configuration Options
 
@@ -23,6 +26,9 @@
 # Check test coverage of Nix. Probably want to use with at least
 # one of `doCheck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
+
+# Avoid setting things that would interfere with a functioning devShell
+, forDevShell ? false
 }:
 
 let
@@ -39,7 +45,7 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-util";
+  pname = "nix-store";
   inherit version;
 
   src = fileset.toSource {
@@ -52,6 +58,9 @@ mkDerivation (finalAttrs: {
       ./windows/meson.build
       (fileset.fileFilter (file: file.hasExt "cc") ./.)
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
+      (fileset.fileFilter (file: file.hasExt "sb") ./.)
+      (fileset.fileFilter (file: file.hasExt "md") ./.)
+      (fileset.fileFilter (file: file.hasExt "sql") ./.)
     ];
   };
 
@@ -65,14 +74,19 @@ mkDerivation (finalAttrs: {
 
   buildInputs = [
     boost
-    brotli
-    libsodium
-    openssl
-  ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
+    curl
+    sqlite
+  ] ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
+    # There have been issues building these dependencies
+    ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
+      (aws-sdk-cpp.override {
+        apis = ["s3" "transfer"];
+        customMemoryManagement = false;
+      })
   ;
 
   propagatedBuildInputs = [
-    libarchive
+    nix-util
     nlohmann_json
   ];
 
@@ -82,28 +96,13 @@ mkDerivation (finalAttrs: {
     # "Inline" .version so it's not a symlink, and includes the suffix
     ''
       echo ${version} > .version
-    ''
-    # Copy some boost libraries so we don't get all of Boost in our
-    # closure. https://github.com/NixOS/nixpkgs/issues/45462
-    + lib.optionalString (!stdenv.hostPlatform.isStatic) (''
-      mkdir -p $out/lib
-      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
-      rm -f $out/lib/*.a
-    '' + lib.optionalString stdenv.hostPlatform.isLinux ''
-      chmod u+w $out/lib/*.so.*
-      patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
-    '' + lib.optionalString stdenv.hostPlatform.isDarwin ''
-      for LIB in $out/lib/*.dylib; do
-        chmod u+w $LIB
-        install_name_tool -id $LIB $LIB
-        install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
-      done
-      install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
-    ''
-  );
+    '';
 
   mesonFlags = [
-    (lib.mesonEnable "cpuid" stdenv.hostPlatform.isx86_64)
+    (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
+    (lib.mesonBool "embedded-sandbox-shell" stdenv.hostPlatform.isStatic)
+  ] ++ lib.optionals stdenv.hostPlatform.isLinux [
+    (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
   ];
 
   env = {
@@ -122,13 +121,7 @@ mkDerivation (finalAttrs: {
     # by default, and would clash with out `disallowedReferences`. Part
     # of the https://github.com/NixOS/nixpkgs/issues/45462 workaround.
     ''
-      sed -i "$out/lib/pkgconfig/nix-util.pc" -e 's, ${lib.getLib boost}[^ ]*,,g'
-    ''
-    + lib.optionalString stdenv.isDarwin ''
-      install_name_tool \
-      -change ${boost}/lib/libboost_context.dylib \
-      $out/lib/libboost_context.dylib \
-      $out/lib/libnixutil.dylib
+      sed -i "$out/lib/pkgconfig/nix-store.pc" -e 's, ${lib.getLib boost}[^ ]*,,g'
     '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;

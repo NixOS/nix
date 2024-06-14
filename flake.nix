@@ -169,6 +169,17 @@
               ;
           };
 
+          nix-store = final.callPackage ./src/libstore/package.nix {
+            inherit
+              fileset
+              stdenv
+              officialRelease
+              versionSuffix
+              ;
+            libseccomp = final.libseccomp-nix;
+            busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+          };
+
           nix =
             final.callPackage ./package.nix {
               inherit
@@ -260,6 +271,7 @@
         {
           "nix" = { };
           "nix-util" = { };
+          "nix-store" = { };
         }
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         dockerImage =
@@ -312,10 +324,11 @@
               "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
           };
 
-          inherit (pkgs.nix-util) mesonFlags;
+          mesonFlags = pkgs.nix-util.mesonFlags ++ pkgs.nix-store.mesonFlags;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
             ++ pkgs.nix-util.nativeBuildInputs
+            ++ pkgs.nix-store.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"

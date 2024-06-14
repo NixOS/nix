@@ -26,7 +26,7 @@
 #include <unistd.h>
 
 #ifndef _WIN32 // TODO abstract over proc exit status
-# include <sys/wait.h>
+#  include <sys/wait.h>
 #endif
 
 #include <nlohmann/json.hpp>
