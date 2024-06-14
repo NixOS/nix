@@ -60,6 +60,13 @@ void PosixSourceAccessor::readFile(
     if (fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
         throw SysError("statting file");
 
+    if (!S_ISREG(st.st_mode)) {
+        std::string fileContent = nix::readFile(path.abs());
+        sizeCallback(fileContent.size());
+        sink(fileContent);
+        return;
+    }
+
     sizeCallback(st.st_size);
 
     off_t left = st.st_size;
