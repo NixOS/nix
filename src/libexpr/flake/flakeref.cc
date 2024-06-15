@@ -4,6 +4,7 @@
 #include "url-parts.hh"
 #include "fetchers.hh"
 #include "registry.hh"
+#include <filesystem>
 
 namespace nix {
 
@@ -101,8 +102,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         path = absPath(path, baseDir);
 
         if (isFlake) {
-
-            if (!S_ISDIR(lstat(path).st_mode)) {
+            if (!std::filesystem::is_directory(std::filesystem::symlink_status(path))) {
                 if (baseNameOf(path) == "flake.nix") {
                     // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
                     warn(
@@ -119,6 +119,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 notice("path '%s' does not contain a 'flake.nix', searching up",path);
 
                 // Save device to detect filesystem boundary
+                // TODO: this needs platform specific implementations
+                // TODO: Can I depend on the root path (C:/ or D:/)?
                 dev_t device = lstat(path).st_dev;
                 bool found = false;
                 while (path != "/") {

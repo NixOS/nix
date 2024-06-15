@@ -2,6 +2,7 @@
 #include "derivations.hh"
 #include "signals.hh"
 
+#include <filesystem>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -39,16 +40,16 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         auto srcFile = (std::filesystem::path{srcDir} / name).string();
         auto dstFile = (std::filesystem::path{dstDir} / name).string();
 
-        struct stat srcSt;
+        std::filesystem::file_status srcSt;
+
         try {
-            if (stat(srcFile.c_str(), &srcSt) == -1)
-                throw SysError("getting status of '%1%'", srcFile);
-        } catch (SysError & e) {
-            if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
+            srcSt = std::filesystem::status(srcFile);
+        } catch (std::filesystem::filesystem_error & e) {
+            if (e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::not_a_directory) {
                 warn("skipping dangling symlink '%s'", dstFile);
                 continue;
             }
-            throw;
+            throw SysError("getting status of '%1%'", srcFile);
         }
 
         /* The files below are special-cased to that they don't show
@@ -66,7 +67,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             hasSuffix(srcFile, "/manifest.json"))
             continue;
 
-        else if (S_ISDIR(srcSt.st_mode)) {
+        else if (std::filesystem::is_directory(srcSt)) {
             auto dstStOpt = maybeLstat(dstFile.c_str());
             if (dstStOpt) {
                 auto & dstSt = *dstStOpt;
@@ -75,7 +76,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     continue;
                 } else if (S_ISLNK(dstSt.st_mode)) {
                     auto target = canonPath(dstFile, true);
-                    if (!S_ISDIR(lstat(target).st_mode))
+                    if (!std::filesystem::is_directory(std::filesystem::symlink_status(target)))
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
