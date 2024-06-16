@@ -58,13 +58,7 @@ in
     self.packages.${system}.nix.override { enableGC = false; }
   );
 
-  buildNoTests = forAllSystems (system:
-    self.packages.${system}.nix.override {
-      doCheck = false;
-      doInstallCheck = false;
-      installUnitTests = false;
-    }
-  );
+  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nix_noTests);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.

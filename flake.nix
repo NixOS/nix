@@ -227,6 +227,12 @@
               ;
           };
 
+          nix_noTests = final.nix.override {
+            doCheck = false;
+            doInstallCheck = false;
+            installUnitTests = false;
+          };
+
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
           pre-commit =
