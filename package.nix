@@ -208,7 +208,9 @@ in {
     # If we are doing just build or just docs, the one thing will use
     # "out". We only need additional outputs if we are doing both.
     ++ lib.optional (doBuild && (enableManual || enableInternalAPIDocs || enableExternalAPIDocs)) "doc"
-    ++ lib.optional installUnitTests "check";
+    ++ lib.optional installUnitTests "check"
+    ++ lib.optional doCheck "testresults"
+    ;
 
   nativeBuildInputs = [
     autoconf-archive
@@ -316,6 +318,10 @@ in {
   enableParallelBuilding = true;
 
   makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
+
+  preCheck = ''
+    mkdir $testresults
+  '';
 
   installTargets = lib.optional doBuild "install"
     ++ lib.optional enableInternalAPIDocs "internal-api-html"

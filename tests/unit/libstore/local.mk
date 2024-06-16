@@ -4,7 +4,7 @@ programs += libstore-tests
 
 libstore-tests_NAME = libnixstore-tests
 
-libstore-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data
+libstore-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data GTEST_OUTPUT=xml:$$testresults/libstore-tests.xml
 
 libstore-tests_DIR := $(d)
 
