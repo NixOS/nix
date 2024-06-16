@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 outPath1=$(echo 'with import ./config.nix; mkDerivation { name = "foo1"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --auto-optimise-store)

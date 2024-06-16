@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 if [[ -n ${CONTENT_ADDRESSED:-} ]]; then

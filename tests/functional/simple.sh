@@ -17,6 +17,8 @@ echo "output path is $outPath"
 text=$(cat "$outPath/hello")
 if test "$text" != "Hello World!"; then exit 1; fi
 
+TODO_NixOS
+
 # Directed delete: $outPath is not reachable from a root, so it should
 # be deleteable.
 nix-store --delete $outPath

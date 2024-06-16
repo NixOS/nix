@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 outPath=$(nix-build dependencies.nix -o $TEST_ROOT/result)

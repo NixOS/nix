@@ -1,5 +1,7 @@
 source ../common.sh
 
+TODO_NixOS
+
 clearStore
 clearCache
 

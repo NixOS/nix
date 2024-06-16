@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 # Make sure that 'nix build' returns all outputs by default.

@@ -5,6 +5,8 @@ source common.sh
 # Needs the config option 'impure-env' to work
 requireDaemonNewerThan "2.19.0"
 
+TODO_NixOS
+
 enableFeatures "configurable-impure-env"
 restartDaemon
 

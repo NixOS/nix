@@ -6,6 +6,8 @@ source common.sh
 # tests for the older versions
 requireDaemonNewerThan "2.4pre20210712"
 
+TODO_NixOS
+
 clearStore
 
 rm -f $TEST_ROOT/result

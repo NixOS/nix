@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'

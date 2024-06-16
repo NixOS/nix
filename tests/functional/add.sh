@@ -31,6 +31,8 @@ test "$hash1" = "sha256:$hash2"
 
 #### New style commands
 
+TODO_NixOS
+
 clearStore
 
 (

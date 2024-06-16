@@ -4,6 +4,8 @@ source common.sh
 
 requireDaemonNewerThan "2.8pre20220311"
 
+TODO_NixOS
+
 enableFeatures "ca-derivations impure-derivations"
 restartDaemon
 

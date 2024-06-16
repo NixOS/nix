@@ -4,6 +4,8 @@ source common.sh
 
 enableFeatures "daemon-trust-override"
 
+TODO_NixOS
+
 restartDaemon
 
 # Remote doesn't trust us

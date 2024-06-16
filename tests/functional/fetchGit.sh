@@ -4,6 +4,8 @@ source common.sh
 
 requireGit
 
+TODO_NixOS
+
 clearStore
 
 # Intentionally not in a canonical form

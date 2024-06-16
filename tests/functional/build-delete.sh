@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 # https://github.com/NixOS/nix/issues/6572

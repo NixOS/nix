@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 cp ./dependencies.nix ./dependencies.builder0.sh ./config.nix $TEST_HOME

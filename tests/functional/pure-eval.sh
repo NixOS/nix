@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 nix eval --expr 'assert 1 + 2 == 3; true'
