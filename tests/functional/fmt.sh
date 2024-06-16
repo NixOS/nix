@@ -2,9 +2,9 @@
 
 source common.sh
 
-TODO_NixOS
+TODO_NixOS # Provide a `shell` variable. Try not to `export` it, perhaps.
 
-clearStore
+clearStoreIfPossible
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
 
 cp ./simple.nix ./simple.builder.sh ./fmt.simple.sh ./config.nix $TEST_HOME
@@ -33,5 +33,3 @@ EOF
 nix fmt ./file ./folder | grep 'Formatting: ./file ./folder'
 nix flake check
 nix flake show | grep -P "package 'formatter'"
-
-clearStore

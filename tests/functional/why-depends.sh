@@ -2,9 +2,7 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 cp ./dependencies.nix ./dependencies.builder0.sh ./config.nix $TEST_HOME
 

@@ -4,7 +4,7 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
+clearStoreIfPossible
 
 rm -f $TEST_ROOT/result*
 

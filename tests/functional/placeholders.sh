@@ -2,9 +2,7 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 nix-build --no-out-link -E '
   with import ./config.nix;

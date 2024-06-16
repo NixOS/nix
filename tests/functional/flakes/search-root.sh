@@ -2,9 +2,7 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 writeSimpleFlake "$TEST_HOME"
 cd "$TEST_HOME"

@@ -6,9 +6,7 @@ set -u
 
 requireGit
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 rootRepo=$TEST_ROOT/gitSubmodulesRoot
 subRepo=$TEST_ROOT/gitSubmodulesSub

@@ -4,9 +4,7 @@ source common.sh
 
 requireGit
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 # Intentionally not in a canonical form
 # See https://github.com/NixOS/nix/issues/6195

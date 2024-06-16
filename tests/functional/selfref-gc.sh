@@ -4,9 +4,7 @@ source common.sh
 
 requireDaemonNewerThan "2.6.0pre20211215"
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 nix-build --no-out-link -E '
   with import ./config.nix;

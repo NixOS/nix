@@ -2,9 +2,7 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 testStdinHeredoc=$(nix eval -f - <<EOF
 {

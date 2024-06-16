@@ -4,9 +4,7 @@ source common.sh
 
 requireGit
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 repo="$TEST_ROOT/git"
 

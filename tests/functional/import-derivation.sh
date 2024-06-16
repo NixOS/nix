@@ -2,9 +2,7 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 if nix-instantiate --readonly-mode ./import-derivation.nix; then
     echo "read-only evaluation of an imported derivation unexpectedly failed"

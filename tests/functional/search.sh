@@ -2,9 +2,7 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 clearCache
 
 (( $(nix search -f search.nix '' hello | wc -l) > 0 ))

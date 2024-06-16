@@ -2,10 +2,6 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
-
 # test help output
 
 nix-build --help

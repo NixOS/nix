@@ -7,9 +7,7 @@ requireGit
 
 enableFeatures "verified-fetches"
 
-TODO_NixOS
-
-clearStore
+clearStoreIfPossible
 
 repo="$TEST_ROOT/git"
 
