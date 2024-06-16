@@ -31,7 +31,7 @@ requireEnvironment () {
 }
 
 addConfig () {
-    echo "$1" >> "$NIX_CONF_DIR/nix.conf"
+    echo "$1" >> "$test_nix_conf"
 }
 
 setupConfig () {

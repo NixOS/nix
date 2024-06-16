@@ -6,6 +6,15 @@ if [[ -z "${COMMON_VARS_AND_FUNCTIONS_SH_SOURCED-}" ]]; then
 
 COMMON_VARS_AND_FUNCTIONS_SH_SOURCED=1
 
+isTestOnNixOS() {
+  [[ "${isTestOnNixOS:-}" == 1 ]]
+}
+
+die() {
+  echo "fatal error: $*" >&2
+  exit 1
+}
+
 set +x
 
 commonDir="$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")"
@@ -15,27 +24,35 @@ source "$commonDir/subst-vars.sh"
 : "${PATH?} ${coreutils?} ${dot?} ${SHELL?} ${PAGER?} ${busybox?} ${version?} ${system?} ${BUILD_SHARED_LIBS?}"
 
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default/tests\/functional//}
-export NIX_STORE_DIR
-if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
-    # Maybe the build directory is symlinked.
-    export NIX_IGNORE_SYMLINK_STORE=1
-    NIX_STORE_DIR=$TEST_ROOT/store
-fi
-export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
-export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
-export NIX_STATE_DIR=$TEST_ROOT/var/nix
-export NIX_CONF_DIR=$TEST_ROOT/etc
-export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
-unset NIX_USER_CONF_FILES
-export _NIX_TEST_SHARED=$TEST_ROOT/shared
-if [[ -n $NIX_STORE ]]; then
-    export _NIX_TEST_NO_SANDBOX=1
-fi
-export _NIX_IN_TEST=$TEST_ROOT/shared
-export _NIX_TEST_NO_LSOF=1
-export NIX_REMOTE=${NIX_REMOTE_-}
-unset NIX_PATH
+test_nix_conf_dir=$TEST_ROOT/etc
+test_nix_conf=$test_nix_conf_dir/nix.conf
+
 export TEST_HOME=$TEST_ROOT/test-home
+
+if ! isTestOnNixOS; then
+  export NIX_STORE_DIR
+  if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
+      # Maybe the build directory is symlinked.
+      export NIX_IGNORE_SYMLINK_STORE=1
+      NIX_STORE_DIR=$TEST_ROOT/store
+  fi
+  export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
+  export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
+  export NIX_STATE_DIR=$TEST_ROOT/var/nix
+  export NIX_CONF_DIR=$test_nix_conf_dir
+  export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
+  unset NIX_USER_CONF_FILES
+  export _NIX_TEST_SHARED=$TEST_ROOT/shared
+  if [[ -n $NIX_STORE ]]; then
+      export _NIX_TEST_NO_SANDBOX=1
+  fi
+  export _NIX_IN_TEST=$TEST_ROOT/shared
+  export _NIX_TEST_NO_LSOF=1
+  export NIX_REMOTE=${NIX_REMOTE_-}
+
+fi # ! isTestOnNixOS
+
+unset NIX_PATH
 export HOME=$TEST_HOME
 unset XDG_STATE_HOME
 unset XDG_DATA_HOME
@@ -66,6 +83,10 @@ clearProfiles() {
 }
 
 clearStore() {
+    if isTestOnNixOS; then
+      die "clearStore: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
+    fi
+
     echo "clearing store..."
     chmod -R +w "$NIX_STORE_DIR"
     rm -rf "$NIX_STORE_DIR"
@@ -84,6 +105,10 @@ clearCacheCache() {
 }
 
 startDaemon() {
+    if isTestOnNixOS; then
+      die "startDaemon: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
+    fi
+
     # Don’t start the daemon twice, as this would just make it loop indefinitely
     if [[ "${_NIX_TEST_DAEMON_PID-}" != '' ]]; then
         return
@@ -110,6 +135,10 @@ startDaemon() {
 }
 
 killDaemon() {
+    if isTestOnNixOS; then
+      die "killDaemon: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
+    fi
+
     # Don’t fail trying to stop a non-existant daemon twice
     if [[ "${_NIX_TEST_DAEMON_PID-}" == '' ]]; then
         return
@@ -130,6 +159,10 @@ killDaemon() {
 }
 
 restartDaemon() {
+    if isTestOnNixOS; then
+      die "restartDaemon: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
+    fi
+
     [[ -z "${_NIX_TEST_DAEMON_PID:-}" ]] && return 0
 
     killDaemon
@@ -150,6 +183,12 @@ isDaemonNewer () {
 skipTest () {
     echo "$1, skipping this test..." >&2
     exit 99
+}
+
+TODO_NixOS() {
+    if isTestOnNixOS; then
+        skipTest "This test has not been adapted for NixOS yet"
+    fi
 }
 
 requireDaemonNewerThan () {
@@ -234,7 +273,7 @@ buggyNeedLocalStore() {
 
 enableFeatures() {
     local features="$1"
-    sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
+    sed -i 's/experimental-features .*/& '"$features"'/' "$test_nix_conf_dir"/nix.conf
 }
 
 set -x

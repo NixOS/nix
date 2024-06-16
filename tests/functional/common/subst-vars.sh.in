@@ -1,11 +1,14 @@
 # NOTE: instances of @variable@ are substituted as defined in /mk/templates.mk
 
-export PATH=@bindir@:$PATH
+if ! isTestOnNixOS; then
+  export SHELL="@bash@"
+  export PATH=@bindir@:$PATH
+fi
+
 export coreutils=@coreutils@
 #lsof=@lsof@
 
 export dot=@dot@
-export SHELL="@bash@"
 export PAGER=cat
 export busybox="@sandbox_shell@"
 
