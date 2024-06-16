@@ -1,5 +1,6 @@
 #include "buildenv.hh"
 #include "derivations.hh"
+#include "file-system.hh"
 #include "signals.hh"
 
 #include <filesystem>
@@ -68,13 +69,13 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             continue;
 
         else if (std::filesystem::is_directory(srcSt)) {
-            auto dstStOpt = maybeLstat(dstFile.c_str());
+            auto dstStOpt = maybeSymlinkStat(dstFile);
             if (dstStOpt) {
                 auto & dstSt = *dstStOpt;
-                if (S_ISDIR(dstSt.st_mode)) {
+                if (std::filesystem::is_directory(dstSt)) {
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
-                } else if (S_ISLNK(dstSt.st_mode)) {
+                } else if (std::filesystem::is_symlink(dstSt)) {
                     auto target = canonPath(dstFile, true);
                     if (!std::filesystem::is_directory(std::filesystem::symlink_status(target)))
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
@@ -94,10 +95,10 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         }
 
         else {
-            auto dstStOpt = maybeLstat(dstFile.c_str());
+            auto dstStOpt = maybeSymlinkStat(dstFile);
             if (dstStOpt) {
                 auto & dstSt = *dstStOpt;
-                if (S_ISLNK(dstSt.st_mode)) {
+                if (std::filesystem::is_symlink(dstSt)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
                         throw BuildEnvFileConflictError(
@@ -109,7 +110,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
-                } else if (S_ISDIR(dstSt.st_mode))
+                } else if (std::filesystem::is_directory(dstSt))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             }
         }

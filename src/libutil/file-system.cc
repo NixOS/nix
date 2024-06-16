@@ -1,5 +1,6 @@
 #include "environment-variables.hh"
 #include "file-system.hh"
+#include "error.hh"
 #include "file-path.hh"
 #include "file-path-impl.hh"
 #include "signals.hh"
@@ -183,24 +184,22 @@ struct stat lstat(const Path & path)
     return st;
 }
 
-
-std::optional<struct stat> maybeLstat(const Path & path)
+std::optional<fs::file_status> maybeSymlinkStat(const Path & path)
 {
-    std::optional<struct stat> st{std::in_place};
-    if (STAT(path.c_str(), &*st))
-    {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of '%s'", path);
+    try {
+        auto st = fs::symlink_status(path);
+        if (st.type() == fs::file_type::not_found || st.type() == fs::file_type::unknown)
+            return std::nullopt;
+        return st;
+    } catch (fs::filesystem_error & e) {
+        throw SystemError("getting status of '%s'", path);
     }
-    return st;
 }
 
 
 bool pathExists(const Path & path)
 {
-    return maybeLstat(path).has_value();
+    return maybeSymlinkStat(path).has_value();
 }
 
 bool pathAccessible(const Path & path)
