@@ -7,7 +7,13 @@ let
   # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
   runNixOSTestFor = system: test:
     (nixos-lib.runTest {
-      imports = [ test ];
+      imports = [
+        test
+
+        # Add the quickBuild attribute to the check packages
+        ./quick-build.nix
+      ];
+
       hostPkgs = nixpkgsFor.${system}.native;
       defaults = {
         nixpkgs.pkgs = nixpkgsFor.${system}.native;

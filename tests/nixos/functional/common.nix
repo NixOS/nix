@@ -8,11 +8,6 @@ let
 
 in
 {
-  imports = [
-    # Add the quickBuild attribute to the check package
-    ./quick-build.nix
-  ];
-
   # We rarely change the script in a way that benefits from type checking, so
   # we skip it to save time.
   skipTypeCheck = true;
