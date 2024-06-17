@@ -233,7 +233,7 @@ LocalStore::LocalStore(const Params & params)
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
             printError("warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
-        else {
+        else if (!readOnly) {
             struct stat st;
             if (stat(realStoreDir.get().c_str(), &st))
                 throw SysError("getting attributes of path '%1%'", realStoreDir);
