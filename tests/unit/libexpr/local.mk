@@ -4,7 +4,7 @@ programs += libexpr-tests
 
 libexpr-tests_NAME := libnixexpr-tests
 
-libexpr-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data
+libexpr-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data GTEST_OUTPUT=xml:$$testresults/libexpr-tests.xml
 
 libexpr-tests_DIR := $(d)
 
