@@ -12,7 +12,9 @@ PROJECT_NAME           = "Nix"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = @PACKAGE_VERSION@
+PROJECT_NUMBER         = @PROJECT_NUMBER@
+
+OUTPUT_DIRECTORY       = @OUTPUT_DIRECTORY@
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a
@@ -36,27 +38,27 @@ GENERATE_LATEX         = NO
 # so they can expand variables despite configure variables.
 
 INPUT                  = \
-  src/libcmd \
-  src/libexpr \
-  src/libexpr/flake \
-  tests/unit/libexpr \
-  tests/unit/libexpr/value \
-  tests/unit/libexpr/test \
-  tests/unit/libexpr/test/value \
-  src/libexpr/value \
-  src/libfetchers \
-  src/libmain \
-  src/libstore \
-  src/libstore/build \
-  src/libstore/builtins \
-  tests/unit/libstore \
-  tests/unit/libstore/test \
-  src/libutil \
-  tests/unit/libutil \
-  tests/unit/libutil/test \
-  src/nix \
-  src/nix-env \
-  src/nix-store
+  @src@/src/libcmd \
+  @src@/src/libexpr \
+  @src@/src/libexpr/flake \
+  @src@/tests/unit/libexpr \
+  @src@/tests/unit/libexpr/value \
+  @src@/tests/unit/libexpr/test \
+  @src@/tests/unit/libexpr/test/value \
+  @src@/src/libexpr/value \
+  @src@/src/libfetchers \
+  @src@/src/libmain \
+  @src@/src/libstore \
+  @src@/src/libstore/build \
+  @src@/src/libstore/builtins \
+  @src@/tests/unit/libstore \
+  @src@/tests/unit/libstore/test \
+  @src@/src/libutil \
+  @src@/tests/unit/libutil \
+  @src@/tests/unit/libutil/test \
+  @src@/src/nix \
+  @src@/src/nix-env \
+  @src@/src/nix-store
 
 # If the MACRO_EXPANSION tag is set to YES, doxygen will expand all macro names
 # in the source code. If set to NO, only conditional compilation will be

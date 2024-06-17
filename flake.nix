@@ -202,6 +202,15 @@
               ;
           };
 
+
+          nix-internal-api-docs = final.callPackage ./src/internal-api-docs/package.nix {
+            inherit
+              fileset
+              stdenv
+              versionSuffix
+              ;
+          };
+
           # See https://github.com/NixOS/nixpkgs/pull/214409
           # Remove when fixed in this flake's nixpkgs
           pre-commit =
@@ -279,6 +288,7 @@
           # system, we should reenable these.
           #"nix-util" = { };
           #"nix-store" = { };
+          "nix-internal-api-docs" = { };
         }
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         dockerImage =

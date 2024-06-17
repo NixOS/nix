@@ -124,11 +124,7 @@ in
   };
 
   # API docs for Nix's unstable internal C++ interfaces.
-  internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ../package.nix {
-    inherit fileset;
-    doBuild = false;
-    enableInternalAPIDocs = true;
-  };
+  internal-api-docs = nixpkgsFor.x86_64-linux.native.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
   external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ../package.nix {
