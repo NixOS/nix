@@ -1,5 +1,5 @@
 #include <cstring>
-#include <fstream>
+#include <gc/gc.h>
 #include <iostream>
 #include <filesystem>
 #include <regex>
@@ -19,7 +19,6 @@
 #include "shared.hh"
 #include "path-with-outputs.hh"
 #include "eval.hh"
-#include "eval-inline.hh"
 #include "get-drvs.hh"
 #include "common-eval-args.hh"
 #include "attr-path.hh"
