@@ -164,6 +164,52 @@ AutoCloseFD nullFD()
     return nul;
 }
 
+// Adapted from
+// https://blogs.msdn.microsoft.com/twistylittlepassagesallalike/2011/04/23/everyone-quotes-command-line-arguments-the-wrong-way/
+std::string windowsEscape(const std::string & str, bool cmd)
+{
+    // TODO: This doesn't handle cmd.exe escaping.
+    if (cmd) {
+        throw UnimplementedError("cmd.exe escaping is not implemented");
+    }
+
+    if (str.find_first_of(" \t\n\v\"") == str.npos && !str.empty()) {
+        // No need to escape this one, the nonempty contents don't have a special character
+        return str;
+    }
+    std::string buffer;
+    // Add the opening quote
+    buffer += '"';
+    for (auto iter = str.begin();; ++iter) {
+        size_t backslashes = 0;
+        while (iter != str.end() && *iter == '\\') {
+            ++iter;
+            ++backslashes;
+        }
+
+        // We only escape backslashes if:
+        // - They come immediately before the closing quote
+        // - They come immediately before a quote in the middle of the string
+        // Both of these cases break the escaping if not handled. Otherwise backslashes are fine as-is
+        if (iter == str.end()) {
+            // Need to escape each backslash
+            buffer.append(backslashes * 2, '\\');
+            // Exit since we've reached the end of the string
+            break;
+        } else if (*iter == '"') {
+            // Need to escape each backslash and the intermediate quote character
+            buffer.append(backslashes * 2, '\\');
+            buffer += "\\\"";
+        } else {
+            // Don't escape the backslashes since they won't break the delimiter
+            buffer.append(backslashes, '\\');
+            buffer += *iter;
+        }
+    }
+    // Add the closing quote
+    return buffer + '"';
+}
+
 Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & out, Pipe & in)
 {
     // Setup pipes.
@@ -203,7 +249,7 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
     for (const auto & arg : options.args) {
         // TODO: This isn't the right way to escape windows command
         // See https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
-        cmdline += ' ' + shellEscape(arg);
+        cmdline += ' ' + windowsEscape(arg, false);
     }
 
     PROCESS_INFORMATION procInfo = {0};
