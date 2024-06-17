@@ -42,7 +42,7 @@ in
 {
   # Binary package for various platforms.
   build = forAllPackages (pkgName:
-    forAllSystems (system: self.packages.${system}.${pkgName}));
+    forAllSystems (system: nixpkgsFor.${system}.native.${pkgName}));
 
   shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 

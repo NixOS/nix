@@ -270,8 +270,11 @@
           (lib.genAttrs stdenvs (_: { })))
         {
           "nix" = { };
-          "nix-util" = { };
-          "nix-store" = { };
+          # Temporarily disabled because GitHub Actions OOM issues. Once
+          # the old build system is gone and we are back to one build
+          # system, we should reenable these.
+          #"nix-util" = { };
+          #"nix-store" = { };
         }
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         dockerImage =
