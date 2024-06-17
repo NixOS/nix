@@ -259,6 +259,26 @@ static void main_nix_build(int argc, char * * argv)
     auto store = openStore();
     auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
+    std::vector<DerivedPath> pathsToBuild;
+    std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
+    std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
+
+    auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
+        /* Note: we do this even when !printMissing to efficiently
+           fetch binary cache data. */
+        uint64_t downloadSize, narSize;
+        StorePathSet willBuild, willSubstitute, unknown;
+        store->queryMissing(paths,
+            willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+        if (settings.printMissing)
+            printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
+
+        if (!dryRun)
+            store->buildPaths(paths, buildMode, evalStore);
+    };
+
+  {
     auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, store);
     state->repair = myArgs.repair;
     if (myArgs.repair) buildMode = bmRepair;
@@ -366,21 +386,6 @@ static void main_nix_build(int argc, char * * argv)
 
     state->maybePrintStats();
 
-    auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
-        /* Note: we do this even when !printMissing to efficiently
-           fetch binary cache data. */
-        uint64_t downloadSize, narSize;
-        StorePathSet willBuild, willSubstitute, unknown;
-        store->queryMissing(paths,
-            willBuild, willSubstitute, unknown, downloadSize, narSize);
-
-        if (settings.printMissing)
-            printMissing(ref<Store>(store), willBuild, willSubstitute, unknown, downloadSize, narSize);
-
-        if (!dryRun)
-            store->buildPaths(paths, buildMode, evalStore);
-    };
-
     if (runEnv) {
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
@@ -388,7 +393,6 @@ static void main_nix_build(int argc, char * * argv)
         auto & packageInfo = drvs.front();
         auto drv = evalStore->derivationFromPath(packageInfo.requireDrvPath());
 
-        std::vector<DerivedPath> pathsToBuild;
         RealisedPath::Set pathsToCopy;
 
         /* Figure out what bash shell to use. If $NIX_BUILD_SHELL
@@ -616,11 +620,7 @@ static void main_nix_build(int argc, char * * argv)
 
     else {
 
-        std::vector<DerivedPath> pathsToBuild;
-        std::vector<std::pair<StorePath, std::string>> pathsToBuildOrdered;
         RealisedPath::Set drvsToCopy;
-
-        std::map<StorePath, std::pair<size_t, StringSet>> drvMap;
 
         for (auto & packageInfo : drvs) {
             auto drvPath = packageInfo.requireDrvPath();
@@ -642,6 +642,27 @@ static void main_nix_build(int argc, char * * argv)
             else
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
         }
+    }
+  }
+  if (!runEnv) {
+    {
+        // char bump_sp[1024 * 1024];
+        // bump_sp[0] = 0;
+        // bump_sp[sizeof(bump_sp) - 1] = 0;
+        // assert (bump_sp[0] == 0);
+        // assert (bump_sp[sizeof(bump_sp) - 1] == 0);
+
+        // TODO: Print gc stats before releasing the memory GC roots
+
+        std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        // GC_gcollect_and_unmap does not unmap immediately with bdw-gc 8.2.6;
+        // probably a bug with the way it overrides and/or comparsed the unmap delay.
+        // That code was touched on master, so 8.4 might only need one invocation.
+        GC_gcollect_and_unmap();
+        GC_gcollect_and_unmap();
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        std::cerr << "GC time: " << elapsed.count() << "s\n";
 
         buildPaths(pathsToBuild);
 
@@ -675,6 +696,7 @@ static void main_nix_build(int argc, char * * argv)
         for (auto & path : outPaths)
             std::cout << store->printStorePath(path) << '\n';
     }
+  }
 }
 
 static RegisterLegacyCommand r_nix_build("nix-build", main_nix_build);
