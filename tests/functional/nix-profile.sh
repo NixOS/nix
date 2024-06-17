@@ -248,3 +248,78 @@ printf '{ "version": 2, "elements": [ { "active": true, "attrPath": "legacyPacka
 nix build --profile $TEST_HOME/.nix-profile $(nix store add-path $TEST_ROOT/import-profile) --no-link
 nix profile list | grep -A4 'Name:.*hello' | grep "Store paths:.*$outPath"
 nix profile remove hello 2>&1 | grep 'removed 1 packages, kept 0 packages'
+
+# cleanup .nix-profile
+rm ~/.nix-profile
+
+# Test wipe-history
+testProfileWipeHistorySetup () {
+    clearProfiles
+    # Run six `nix-env` commands, should create six generations of
+    # the profile
+    nix profile install --impure --expr ./user-envs.nix#foo-1.0 "$@"
+    nix profile install --impure --expr ./user-envs.nix#foo-2.0pre1 "$@"
+    nix profile install --impure --expr ./user-envs.nix#bar-0.1 "$@"
+    nix profile install --impure --expr ./user-envs.nix#foo-2.0 "$@"
+    nix profile install --impure --expr ./user-envs.nix#bar-0.1.1 "$@"
+    nix profile install --impure --expr ./user-envs.nix#foo-0.1 "$@"
+    testProfileWipeHistoryCheckGenerations "1 2 3 4 5 6" "$@"
+}
+testProfileWipeHistoryMockTimestamps () {
+    # Modifies the date the generations were activated
+    profiles_prefix=${1:-"${profiles}/profile"}
+    touch -h -m -d "  -4 days           -1 seconds" "${profiles_prefix}-1-link"
+    touch -h -m -d "  -3 days           -1 seconds" "${profiles_prefix}-2-link"
+    touch -h -m -d "  -2 days -12 hours -1 seconds" "${profiles_prefix}-3-link"
+    touch -h -m -d "  -2 days           -1 seconds" "${profiles_prefix}-4-link"
+    touch -h -m -d "  -1 days -16 hours -1 seconds" "${profiles_prefix}-5-link"
+    touch -h -m -d "  -1 days  -8 hours -1 seconds" "${profiles_prefix}-6-link"
+}
+testProfileWipeHistoryCheckGenerations () {
+    # expected should be a space separated list of generation names
+    expected="$1"
+    actual=$(nix profile history "${@:2}" | grep "Version" | awk '{{print $2}}' | tr '\n' ' ')
+    # Use sed to remove colors as NO_COLOR environment flag is not respected for nix profile history
+    actual=$(echo "${actual}" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2};?)?)?[mGK]//g")
+    [[ "${actual%" "}" == "${expected}" ]]
+}
+
+# Delete all except latest 4 generations
+testProfileWipeHistorySetup
+nix profile wipe-history --older-than "+4"
+testProfileWipeHistoryCheckGenerations "3 4 5 6"
+
+# Delete everything older than 5 days
+# All profiles are younger than 5 days
+testProfileWipeHistorySetup
+testProfileWipeHistoryMockTimestamps
+nix profile wipe-history --older-than "5d"
+testProfileWipeHistoryCheckGenerations "1 2 3 4 5 6"
+
+# Delete everything older than 4 days
+# Profile 1 was active at 4 days ago so it will be kept
+testProfileWipeHistorySetup
+testProfileWipeHistoryMockTimestamps
+nix profile wipe-history --older-than "4d"
+testProfileWipeHistoryCheckGenerations "1 2 3 4 5 6"
+
+# Delete everything older than 3 days
+# Profile 2 was active at 3 days ago so it will be kept
+testProfileWipeHistorySetup
+testProfileWipeHistoryMockTimestamps
+nix profile wipe-history --older-than "3d"
+testProfileWipeHistoryCheckGenerations "2 3 4 5 6"
+
+# Delete everything older than 2 days
+# Profile 4 was active at 2 days ago so it will be kept
+testProfileWipeHistorySetup
+testProfileWipeHistoryMockTimestamps
+nix profile wipe-history --older-than "2d"
+testProfileWipeHistoryCheckGenerations "4 5 6"
+
+# Delete everything older than 1 day
+# Profile 6 is current and was active at 1 day ago so it will be kept
+testProfileWipeHistorySetup
+testProfileWipeHistoryMockTimestamps
+nix profile wipe-history --older-than "1d"
+testProfileWipeHistoryCheckGenerations "6"
