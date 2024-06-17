@@ -38,7 +38,7 @@ let
       result = ''
         > **Warning** \
         > This program is
-        > [**experimental**](@docroot@/contributing/experimental-features.md#xp-feature-nix-command)
+        > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
         > and its interface is subject to change.
 
         # Name

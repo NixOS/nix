@@ -27,7 +27,7 @@ struct EvalSettings : Config
           extern "C" typedef void (*ValueInitialiser) (EvalState & state, Value & v);
           ```
 
-          The [Nix C++ API documentation](@docroot@/contributing/documentation.md#api-documentation) has more details on evaluator internals.
+          The [Nix C++ API documentation](@docroot@/development/documentation.md#api-documentation) has more details on evaluator internals.
 
         - `builtins.exec` *arguments*
 

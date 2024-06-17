@@ -10,7 +10,7 @@ let
       experimentalNotice = optionalString (experimental-feature != null) ''
         > **Note**
         >
-        > This function is only available if the [`${experimental-feature}` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-${experimental-feature}) is enabled.
+        > This function is only available if the [`${experimental-feature}` experimental feature](@docroot@/development/experimental-features.md#xp-feature-${experimental-feature}) is enabled.
         >
         > For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
         >

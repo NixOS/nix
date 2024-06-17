@@ -24,7 +24,7 @@ nix build .#^doc
 
 and open `./result-doc/share/doc/nix/manual/index.html`.
 
-To build the manual incrementally, [enter the development shell](./hacking.md) and run:
+To build the manual incrementally, [enter the development shell](./building.md) and run:
 
 ```console
 make manual-html-open -j $NIX_BUILD_CORES

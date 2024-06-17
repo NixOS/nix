@@ -14,6 +14,6 @@ Derivations are serialised in one of the following formats:
   DrvWithVersion(<version-string>, ...)
   ```
 
-  The only `version-string`s that are in use today are for [experimental features](@docroot@/contributing/experimental-features.md):
+  The only `version-string`s that are in use today are for [experimental features](@docroot@/development/experimental-features.md):
 
-  - `"xp-dyn-drv"` for the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
+  - `"xp-dyn-drv"` for the [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
