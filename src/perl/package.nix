@@ -6,17 +6,19 @@
 , meson
 , ninja
 , pkg-config
-, nix
+, nix-store
 , curl
 , bzip2
 , xz
 , boost
 , libsodium
 , darwin
+, versionSuffix ? ""
 }:
 
 perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
-  name = "nix-perl-${nix.version}";
+  pname = "nix-perl";
+  version = lib.fileContents ./.version + versionSuffix;
 
   src = fileset.toSource {
     root = ./.;
@@ -24,7 +26,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
       ./MANIFEST
       ./lib
       ./meson.build
-      ./meson_options.txt
+      ./meson.options
     ] ++ lib.optionals finalAttrs.doCheck [
       ./.yath.rc.in
       ./t
@@ -38,7 +40,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
-    nix
+    nix-store
     curl
     bzip2
     xz
@@ -55,8 +57,13 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
     perlPackages.Test2Harness
   ];
 
+  preConfigure =
+    # "Inline" .version so its not a symlink, and includes the suffix
+    ''
+      echo ${finalAttrs.version} > .version
+    '';
+
   mesonFlags = [
-    (lib.mesonOption "version" (builtins.readFile ../.version))
     (lib.mesonOption "dbi_path" "${perlPackages.DBI}/${perl.libPrefix}")
     (lib.mesonOption "dbd_sqlite_path" "${perlPackages.DBDSQLite}/${perl.libPrefix}")
     (lib.mesonEnable "tests" finalAttrs.doCheck)

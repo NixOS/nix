@@ -75,7 +75,7 @@ in
   );
 
   # Perl bindings for various platforms.
-  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix.perl-bindings);
+  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix-perl-bindings);
 
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of

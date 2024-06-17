@@ -7,17 +7,17 @@
 project (
   'nix-perl',
   'cpp',
-  meson_version : '>= 0.64.0',
+  version : files('.version'),
+  meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
 )
 
 # setup env
 #-------------------------------------------------
 fs = import('fs')
-nix_version = get_option('version')
 cpp = meson.get_compiler('cpp')
 nix_perl_conf = configuration_data()
-nix_perl_conf.set('PACKAGE_VERSION', nix_version)
+nix_perl_conf.set('PACKAGE_VERSION', meson.project_version())
 
 
 # set error arguments
@@ -64,7 +64,7 @@ yath = find_program('yath', required : false)
 bzip2_dep = dependency('bzip2')
 curl_dep = dependency('libcurl')
 libsodium_dep = dependency('libsodium')
-# nix_util_dep = dependency('nix-util')
+
 nix_store_dep = dependency('nix-store')
 
 

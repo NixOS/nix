@@ -8,3 +8,4 @@ project('nix-dev-shell', 'cpp',
 
 subproject('libutil')
 subproject('libstore')
+subproject('perl')

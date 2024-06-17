@@ -192,14 +192,14 @@
               libgit2 = final.libgit2-nix;
               libseccomp = final.libseccomp-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
-            } // {
-              # this is a proper separate downstream package, but put
-              # here also for back compat reasons.
-              perl-bindings = final.nix-perl-bindings;
             };
 
-          nix-perl-bindings = final.callPackage ./perl {
-            inherit fileset stdenv;
+          nix-perl-bindings = final.callPackage ./src/perl/package.nix {
+            inherit
+              fileset
+              stdenv
+              versionSuffix
+              ;
           };
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
@@ -213,7 +213,7 @@
 
     in {
       # A Nixpkgs overlay that overrides the 'nix' and
-      # 'nix.perl-bindings' packages.
+      # 'nix-perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
 
       hydraJobs = import ./maintainers/hydra.nix {
@@ -245,7 +245,11 @@
         # Some perl dependencies are broken on i686-linux.
         # Since the support is only best-effort there, disable the perl
         # bindings
-        perlBindings = self.hydraJobs.perlBindings.${system};
+
+        # Temporarily disabled because GitHub Actions OOM issues. Once
+        # the old build system is gone and we are back to one build
+        # system, we should reenable this.
+        #perlBindings = self.hydraJobs.perlBindings.${system};
       } // devFlake.checks.${system} or {}
       );
 
@@ -297,6 +301,13 @@
         makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
         let
           modular = devFlake.getSystem stdenv.buildPlatform.system;
+          transformFlag = prefix: flag:
+            assert builtins.isString flag;
+            let
+              rest = builtins.substring 2 (builtins.stringLength flag) flag;
+            in
+              "-D${prefix}:${rest}";
+          havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
         in {
           pname = "shell-for-" + attrs.pname;
 
@@ -327,11 +338,16 @@
               "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
           };
 
-          mesonFlags = pkgs.nix-util.mesonFlags ++ pkgs.nix-store.mesonFlags;
+          mesonFlags =
+            map (transformFlag "libutil") pkgs.nix-util.mesonFlags
+            ++ map (transformFlag "libstore") pkgs.nix-store.mesonFlags
+            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nix-perl-bindings.mesonFlags)
+            ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
             ++ pkgs.nix-util.nativeBuildInputs
             ++ pkgs.nix-store.nativeBuildInputs
+            ++ lib.optionals havePerl pkgs.nix-perl-bindings.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
@@ -341,6 +357,10 @@
             # https://github.com/NixOS/nixpkgs/pull/291814 is available
             ++ lib.optional (stdenv.cc.isClang && !stdenv.buildPlatform.isDarwin) pkgs.buildPackages.bear
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
+
+          buildInputs = attrs.buildInputs or []
+            ++ lib.optional havePerl pkgs.perl
+            ;
         });
         in
         forAllSystems (system:
