@@ -180,6 +180,15 @@
             busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
           };
 
+          nix-fetchers = final.callPackage ./src/libfetchers/package.nix {
+            inherit
+              fileset
+              stdenv
+              officialRelease
+              versionSuffix
+              ;
+          };
+
           nix =
             final.callPackage ./package.nix {
               inherit
@@ -288,6 +297,7 @@
           # system, we should reenable these.
           #"nix-util" = { };
           #"nix-store" = { };
+          #"nix-fetchers" = { };
           "nix-internal-api-docs" = { };
         }
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
@@ -351,12 +361,14 @@
           mesonFlags =
             map (transformFlag "libutil") pkgs.nix-util.mesonFlags
             ++ map (transformFlag "libstore") pkgs.nix-store.mesonFlags
+            ++ map (transformFlag "libfetchers") pkgs.nix-fetchers.mesonFlags
             ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nix-perl-bindings.mesonFlags)
             ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
             ++ pkgs.nix-util.nativeBuildInputs
             ++ pkgs.nix-store.nativeBuildInputs
+            ++ pkgs.nix-fetchers.nativeBuildInputs
             ++ lib.optionals havePerl pkgs.nix-perl-bindings.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
