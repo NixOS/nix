@@ -208,7 +208,9 @@ in {
     # If we are doing just build or just docs, the one thing will use
     # "out". We only need additional outputs if we are doing both.
     ++ lib.optional (doBuild && (enableManual || enableInternalAPIDocs || enableExternalAPIDocs)) "doc"
-    ++ lib.optional installUnitTests "check";
+    ++ lib.optional installUnitTests "check"
+    ++ lib.optional doCheck "testresults"
+    ;
 
   nativeBuildInputs = [
     autoconf-archive
@@ -317,6 +319,10 @@ in {
 
   makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
+  preCheck = ''
+    mkdir $testresults
+  '';
+
   installTargets = lib.optional doBuild "install"
     ++ lib.optional enableInternalAPIDocs "internal-api-html"
     ++ lib.optional enableExternalAPIDocs "external-api-html";
@@ -385,8 +391,7 @@ in {
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
-  # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
-  # to work with `strictDeps`.
+  # TODO Always true after https://github.com/NixOS/nixpkgs/issues/318564
   strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";

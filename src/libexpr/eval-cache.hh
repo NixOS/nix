@@ -31,7 +31,7 @@ struct CachedEvalError : EvalError
 class EvalCache : public std::enable_shared_from_this<EvalCache>
 {
     friend class AttrCursor;
-    friend class CachedEvalError;
+    friend struct CachedEvalError;
 
     std::shared_ptr<AttrDb> db;
     EvalState & state;
@@ -87,7 +87,7 @@ typedef std::variant<
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {
     friend class EvalCache;
-    friend class CachedEvalError;
+    friend struct CachedEvalError;
 
     ref<EvalCache> root;
     typedef std::optional<std::pair<std::shared_ptr<AttrCursor>, Symbol>> Parent;

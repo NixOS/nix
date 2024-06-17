@@ -4062,17 +4062,23 @@ static RegisterPrimOp primop_convertHash({
 
 struct RegexCache
 {
-    // TODO use C++20 transparent comparison when available
-    std::unordered_map<std::string_view, std::regex> cache;
-    std::list<std::string> keys;
+    struct State
+    {
+        // TODO use C++20 transparent comparison when available
+        std::unordered_map<std::string_view, std::regex> cache;
+        std::list<std::string> keys;
+    };
+
+    Sync<State> state_;
 
     std::regex get(std::string_view re)
     {
-        auto it = cache.find(re);
-        if (it != cache.end())
+        auto state(state_.lock());
+        auto it = state->cache.find(re);
+        if (it != state->cache.end())
             return it->second;
-        keys.emplace_back(re);
-        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
+        state->keys.emplace_back(re);
+        return state->cache.emplace(state->keys.back(), std::regex(state->keys.back(), std::regex::extended)).first->second;
     }
 };
 

@@ -49,10 +49,10 @@ TEST_F(nix_api_expr_test, nix_expr_eval_external)
     nix_init_external(ctx, value, val);
 
     EvalState * stateResult = nix_state_create(nullptr, nullptr, store);
-    Value * valueResult = nix_alloc_value(nullptr, stateResult);
+    nix_value * valueResult = nix_alloc_value(nullptr, stateResult);
 
     EvalState * stateFn = nix_state_create(nullptr, nullptr, store);
-    Value * valueFn = nix_alloc_value(nullptr, stateFn);
+    nix_value * valueFn = nix_alloc_value(nullptr, stateFn);
 
     nix_expr_eval_from_string(nullptr, state, "builtins.typeOf", ".", valueFn);
 
