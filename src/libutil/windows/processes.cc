@@ -78,8 +78,8 @@ int Pid::wait()
 }
 
 // TODO: Merge this with Unix's runProgram since it's identical logic.
-std::string runProgram(Path program, bool lookupPath, const Strings & args,
-    const std::optional<std::string> & input, bool isInteractive)
+std::string runProgram(
+    Path program, bool lookupPath, const Strings & args, const std::optional<std::string> & input, bool isInteractive)
 {
     auto res = runProgram(RunOptions{
         .program = program, .lookupPath = lookupPath, .args = args, .input = input, .isInteractive = isInteractive});
