@@ -42,15 +42,18 @@ For non-derivation arguments, the argument itself is printed.
 
 # Options
 
-  - `--dry-run`\
+  - `--dry-run`
+
     Print on standard error a description of what packages would be
     built or downloaded, without actually performing the operation.
 
-  - `--ignore-unknown`\
+  - `--ignore-unknown`
+
     If a non-derivation path does not have a substitute, then silently
     ignore it.
 
-  - `--check`\
+  - `--check`
+
     This option allows you to check whether a derivation is
     deterministic. It rebuilds the specified derivation and checks
     whether the result is bitwise-identical with the existing outputs,

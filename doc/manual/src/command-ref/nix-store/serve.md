@@ -14,7 +14,8 @@ access to a restricted ssh user.
 
 The following flags are available:
 
-  - `--write`\
+  - `--write`
+
     Allow the connected client to request the realization of
     derivations. In effect, this can be used to make the host act as a
     remote builder.
