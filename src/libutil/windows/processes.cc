@@ -94,7 +94,7 @@ std::string runProgram(
 Path lookupPathForProgram(const Path & program)
 {
     if (program.find('/') != program.npos || program.find('\\') != program.npos) {
-        throw Error("program '%1%' partially specifies its path", program);
+        throw UsageError("program '%1%' partially specifies its path", program);
     }
 
     // Possible extensions.
@@ -107,8 +107,9 @@ Path lookupPathForProgram(const Path & program)
     }
 
     // Look through each directory listed in $PATH.
-    for (const std::string & dir : tokenizeString<Strings>(*getEnv("PATH"), ";")) {
-        Path candidate = canonPath(dir) + '/' + program;
+    for (const std::string & dir : tokenizeString<Strings>(*path, ";")) {
+        // TODO: This should actually be canonPath(dir), but that ends up appending two drive paths
+        Path candidate = dir + "/" + program;
         for (const auto ext : exts) {
             if (pathExists(candidate + ext)) {
                 return candidate;
@@ -408,5 +409,4 @@ bool statusOk(int status)
 {
     return status == 0;
 }
-
 }

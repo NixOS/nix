@@ -6,11 +6,19 @@ namespace nix {
 /*
 TEST(SpawnTest, spawnEcho)
 {
-auto output = runProgram(RunOptions{.program = "echo", .args = {}});
+auto output = runProgram(RunOptions{.program = "cmd", .lookupPath = true, .args = {"/C", "echo \"hello world\""}});
+std::cout << output.second << std::endl;
 }
 */
 
 #ifdef _WIN32
+Path lookupPathForProgram(const Path & program);
+TEST(SpawnTest, pathSearch)
+{
+    ASSERT_NO_THROW(lookupPathForProgram("cmd"));
+    ASSERT_NO_THROW(lookupPathForProgram("cmd.exe"));
+    ASSERT_THROW(lookupPathForProgram("C:/System32/cmd.exe"), UsageError);
+}
 std::string windowsEscape(const std::string & str, bool cmd);
 
 TEST(SpawnTest, windowsEscape)
