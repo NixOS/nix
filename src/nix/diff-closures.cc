@@ -31,9 +31,18 @@ GroupedPaths getClosureInfo(ref<Store> store, const StorePath & toplevel)
            version suffixes like "unstable"). */
         static std::regex regex("(.*)-([a-z]+|lib32|lib64)");
         std::smatch match;
-        std::string name(path.name());
+        std::string name{path.name()};
+        // Used to keep name alive through being potentially overwritten below
+        // (to not invalidate the references from the regex result)
+        //
+        // n.b. cannot be just path.name().{begin,end}() since that returns const
+        // char *, which does not, for some reason, convert as required on
+        // libstdc++. Seems like a libstdc++ bug or standard bug to me... we
+        // can afford the allocation in any case.
+        const std::string origName{path.name()};
         std::string outputName;
-        if (std::regex_match(name, match, regex)) {
+
+        if (std::regex_match(origName, match, regex)) {
             name = match[1];
             outputName = match[2];
         }
