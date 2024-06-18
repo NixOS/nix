@@ -285,7 +285,7 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
         TerminateProcess(procInfo.hProcess, 0);
         throw WinError("Couldn't assign child process to job object");
     }
-    if (ResumeThread(procInfo.hThread) == -1) {
+    if (ResumeThread(procInfo.hThread) == (DWORD) -1) {
         TerminateProcess(procInfo.hProcess, 0);
         throw WinError("Couldn't resume child process thread");
     }
