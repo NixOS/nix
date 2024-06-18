@@ -16,10 +16,10 @@ public url or broke since the download expression was written.
 
 This operation has the following options:
 
-  - `--recursive`
+- `--recursive`
 
-    Use recursive instead of flat hashing mode, used when adding
-    directories to the store.
+  Use recursive instead of flat hashing mode, used when adding
+  directories to the store.
 
 {{#include ./opt-common.md}}
 

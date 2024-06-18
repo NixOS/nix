@@ -42,26 +42,26 @@ For non-derivation arguments, the argument itself is printed.
 
 # Options
 
-  - `--dry-run`
+- `--dry-run`
 
-    Print on standard error a description of what packages would be
-    built or downloaded, without actually performing the operation.
+  Print on standard error a description of what packages would be
+  built or downloaded, without actually performing the operation.
 
-  - `--ignore-unknown`
+- `--ignore-unknown`
 
-    If a non-derivation path does not have a substitute, then silently
-    ignore it.
+  If a non-derivation path does not have a substitute, then silently
+  ignore it.
 
-  - `--check`
+- `--check`
 
-    This option allows you to check whether a derivation is
-    deterministic. It rebuilds the specified derivation and checks
-    whether the result is bitwise-identical with the existing outputs,
-    printing an error if that’s not the case. The outputs of the
-    specified derivation must already exist. When used with `-K`, if an
-    output path is not identical to the corresponding output from the
-    previous build, the new output path is left in
-    `/nix/store/name.check.`
+  This option allows you to check whether a derivation is
+  deterministic. It rebuilds the specified derivation and checks
+  whether the result is bitwise-identical with the existing outputs,
+  printing an error if that’s not the case. The outputs of the
+  specified derivation must already exist. When used with `-K`, if an
+  output path is not identical to the corresponding output from the
+  previous build, the new output path is left in
+  `/nix/store/name.check.`
 
 {{#include ./opt-common.md}}
 

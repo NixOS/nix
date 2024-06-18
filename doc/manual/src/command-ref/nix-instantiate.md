@@ -30,97 +30,97 @@ standard input.
 
 # Options
 
-  - `--add-root` *path*
+- `--add-root` *path*
 
-    See the [corresponding option](nix-store.md) in `nix-store`.
+  See the [corresponding option](nix-store.md) in `nix-store`.
 
-  - `--parse`
+- `--parse`
 
-    Just parse the input files, and print their abstract syntax trees on
-    standard output as a Nix expression.
+  Just parse the input files, and print their abstract syntax trees on
+  standard output as a Nix expression.
 
-  - `--eval`
+- `--eval`
 
-    Just parse and evaluate the input files, and print the resulting
-    values on standard output. No instantiation of store derivations
-    takes place.
+  Just parse and evaluate the input files, and print the resulting
+  values on standard output. No instantiation of store derivations
+  takes place.
 
-    > **Warning**
-    >
-    > This option produces output which can be parsed as a Nix expression which
-    > will produce a different result than the input expression when evaluated.
-    > For example, these two Nix expressions print the same result despite
-    > having different meaning:
-    >
-    > ```console
-    > $ nix-instantiate --eval --expr '{ a = {}; }'
-    > { a = <CODE>; }
-    > $ nix-instantiate --eval --expr '{ a = <CODE>; }'
-    > { a = <CODE>; }
-    > ```
-    >
-    > For human-readable output, `nix eval` (experimental) is more informative:
-    >
-    > ```console
-    > $ nix-instantiate --eval --expr 'a: a'
-    > <LAMBDA>
-    > $ nix eval --expr 'a: a'
-    > «lambda @ «string»:1:1»
-    > ```
-    >
-    > For machine-readable output, the `--xml` option produces unambiguous
-    > output:
-    >
-    > ```console
-    > $ nix-instantiate --eval --xml --expr '{ foo = <CODE>; }'
-    > <?xml version='1.0' encoding='utf-8'?>
-    > <expr>
-    >   <attrs>
-    >     <attr column="3" line="1" name="foo">
-    >       <unevaluated />
-    >     </attr>
-    >   </attrs>
-    > </expr>
-    > ```
+  > **Warning**
+  >
+  > This option produces output which can be parsed as a Nix expression which
+  > will produce a different result than the input expression when evaluated.
+  > For example, these two Nix expressions print the same result despite
+  > having different meaning:
+  >
+  > ```console
+  > $ nix-instantiate --eval --expr '{ a = {}; }'
+  > { a = <CODE>; }
+  > $ nix-instantiate --eval --expr '{ a = <CODE>; }'
+  > { a = <CODE>; }
+  > ```
+  >
+  > For human-readable output, `nix eval` (experimental) is more informative:
+  >
+  > ```console
+  > $ nix-instantiate --eval --expr 'a: a'
+  > <LAMBDA>
+  > $ nix eval --expr 'a: a'
+  > «lambda @ «string»:1:1»
+  > ```
+  >
+  > For machine-readable output, the `--xml` option produces unambiguous
+  > output:
+  >
+  > ```console
+  > $ nix-instantiate --eval --xml --expr '{ foo = <CODE>; }'
+  > <?xml version='1.0' encoding='utf-8'?>
+  > <expr>
+  >   <attrs>
+  >     <attr column="3" line="1" name="foo">
+  >       <unevaluated />
+  >     </attr>
+  >   </attrs>
+  > </expr>
+  > ```
 
-  - `--find-file`
+- `--find-file`
 
-    Look up the given files in Nix’s search path (as specified by the
-    `NIX_PATH` environment variable). If found, print the corresponding
-    absolute paths on standard output. For instance, if `NIX_PATH` is
-    `nixpkgs=/home/alice/nixpkgs`, then `nix-instantiate --find-file
-    nixpkgs/default.nix` will print `/home/alice/nixpkgs/default.nix`.
+  Look up the given files in Nix’s search path (as specified by the
+  `NIX_PATH` environment variable). If found, print the corresponding
+  absolute paths on standard output. For instance, if `NIX_PATH` is
+  `nixpkgs=/home/alice/nixpkgs`, then `nix-instantiate --find-file
+  nixpkgs/default.nix` will print `/home/alice/nixpkgs/default.nix`.
 
-  - `--strict`
+- `--strict`
 
-    When used with `--eval`, recursively evaluate list elements and
-    attributes. Normally, such sub-expressions are left unevaluated
-    (since the Nix language is lazy).
+  When used with `--eval`, recursively evaluate list elements and
+  attributes. Normally, such sub-expressions are left unevaluated
+  (since the Nix language is lazy).
 
-    > **Warning**
-    >
-    > This option can cause non-termination, because lazy data
-    > structures can be infinitely large.
+  > **Warning**
+  >
+  > This option can cause non-termination, because lazy data
+  > structures can be infinitely large.
 
-  - `--json`
+- `--json`
 
-    When used with `--eval`, print the resulting value as an JSON
-    representation of the abstract syntax tree rather than as a Nix expression.
+  When used with `--eval`, print the resulting value as an JSON
+  representation of the abstract syntax tree rather than as a Nix expression.
 
-  - `--xml`
+- `--xml`
 
-    When used with `--eval`, print the resulting value as an XML
-    representation of the abstract syntax tree rather than as a Nix expression.
-    The schema is the same as that used by the [`toXML`
-    built-in](../language/builtins.md).
+  When used with `--eval`, print the resulting value as an XML
+  representation of the abstract syntax tree rather than as a Nix expression.
+  The schema is the same as that used by the [`toXML`
+  built-in](../language/builtins.md).
 
-  - `--read-write-mode`
+- `--read-write-mode`
 
-    When used with `--eval`, perform evaluation in read/write mode so
-    nix language features that require it will still work (at the cost
-    of needing to do instantiation of every evaluated derivation). If
-    this option is not enabled, there may be uninstantiated store paths
-    in the final output.
+  When used with `--eval`, perform evaluation in read/write mode so
+  nix language features that require it will still work (at the cost
+  of needing to do instantiation of every evaluated derivation). If
+  this option is not enabled, there may be uninstantiated store paths
+  in the final output.
 
 {{#include ./opt-common.md}}
 
