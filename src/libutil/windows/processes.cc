@@ -89,36 +89,6 @@ std::string runProgram(
 
     return res.second;
 }
-// Looks at the $PATH environment variable to find the program.
-// Adapted from https://github.com/nix-windows/nix/blob/windows/src/libutil/util.cc#L2276
-Path lookupPathForProgram(const Path & program)
-{
-    if (program.find('/') != program.npos || program.find('\\') != program.npos) {
-        throw UsageError("program '%1%' partially specifies its path", program);
-    }
-
-    // Possible extensions.
-    // TODO: This should actually be sourced from $PATHEXT, not hardcoded.
-    static constexpr const char * exts[] = {"", ".exe", ".cmd", ".bat"};
-
-    auto path = getEnv("PATH");
-    if (!path.has_value()) {
-        throw WinError("couldn't find PATH environment variable");
-    }
-
-    // Look through each directory listed in $PATH.
-    for (const std::string & dir : tokenizeString<Strings>(*path, ";")) {
-        // TODO: This should actually be canonPath(dir), but that ends up appending two drive paths
-        Path candidate = dir + "/" + program;
-        for (const auto ext : exts) {
-            if (pathExists(candidate + ext)) {
-                return candidate;
-            }
-        }
-    }
-
-    throw WinError("program '%1%' not found on PATH", program);
-}
 
 std::optional<Path> getProgramInterpreter(const Path & program)
 {
@@ -246,7 +216,7 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
         }
     }
 
-    std::string cmdline = realProgram;
+    std::string cmdline = windowsEscape(realProgram, false);
     for (const auto & arg : options.args) {
         // TODO: This isn't the right way to escape windows command
         // See https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-commandlinetoargvw
@@ -255,7 +225,8 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
 
     PROCESS_INFORMATION procInfo = {0};
     if (CreateProcessW(
-            string_to_os_string(realProgram).c_str(),
+            // EXE path is provided in the cmdline
+            NULL,
             string_to_os_string(cmdline).data(),
             NULL,
             NULL,
@@ -335,9 +306,6 @@ void runProgram2(const RunOptions & options)
         in.create();
 
     Path realProgram = options.program;
-    if (options.lookupPath) {
-        realProgram = lookupPathForProgram(realProgram);
-    }
     // TODO: Implement shebang / program interpreter lookup on Windows
     auto interpreter = getProgramInterpreter(realProgram);
 

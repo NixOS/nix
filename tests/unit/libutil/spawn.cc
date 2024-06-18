@@ -3,22 +3,15 @@
 #include "processes.hh"
 
 namespace nix {
-/*
-TEST(SpawnTest, spawnEcho)
-{
-auto output = runProgram(RunOptions{.program = "cmd", .lookupPath = true, .args = {"/C", "echo \"hello world\""}});
-std::cout << output.second << std::endl;
-}
-*/
 
 #ifdef _WIN32
-Path lookupPathForProgram(const Path & program);
-TEST(SpawnTest, pathSearch)
+TEST(SpawnTest, spawnEcho)
 {
-    ASSERT_NO_THROW(lookupPathForProgram("cmd"));
-    ASSERT_NO_THROW(lookupPathForProgram("cmd.exe"));
-    ASSERT_THROW(lookupPathForProgram("C:/System32/cmd.exe"), UsageError);
+    auto output = runProgram(RunOptions{.program = "cmd.exe", .args = {"/C", "echo", "hello world"}});
+    ASSERT_EQ(output.first, 0);
+    ASSERT_EQ(output.second, "\"hello world\"\r\n");
 }
+
 std::string windowsEscape(const std::string & str, bool cmd);
 
 TEST(SpawnTest, windowsEscape)
