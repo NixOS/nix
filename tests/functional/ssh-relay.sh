@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 echo foo > $TEST_ROOT/hello.sh

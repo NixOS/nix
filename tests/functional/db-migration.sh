@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test that we can successfully migrate from an older db schema
 
 source common.sh

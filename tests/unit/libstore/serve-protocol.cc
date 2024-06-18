@@ -6,6 +6,7 @@
 
 #include "serve-protocol.hh"
 #include "serve-protocol-impl.hh"
+#include "serve-protocol-connection.hh"
 #include "build-result.hh"
 #include "file-descriptor.hh"
 #include "tests/protocol.hh"
@@ -505,7 +506,8 @@ TEST_F(ServeProtoTest, handshake_client_corrupted_throws)
             } else {
                 auto ver = ServeProto::BasicClientConnection::handshake(
                     nullSink, in, defaultVersion, "blah");
-                EXPECT_NE(ver, defaultVersion);
+                // `std::min` of this and the other version saves us
+                EXPECT_EQ(ver, defaultVersion);
             }
         }
     });

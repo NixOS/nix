@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # XXX: This shouldn’t be, but #4813 cause this test to fail

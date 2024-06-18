@@ -36,18 +36,23 @@ where
 - `type` = one of:
 
   - ```ebnf
-    | "text" ( ":" store-path )*
+    | "text" { ":" store-path }
     ```
 
-    for encoded derivations written to the store.
+    This is for the
+    ["Text"](@docroot@/store/store-object/content-address.md#method-text)
+    method of content addressing store objects.
     The optional trailing store paths are the references of the store object.
 
   - ```ebnf
-    | "source" ( ":" store-path )*
+    | "source" { ":" store-path } [ ":self" ]
     ```
 
-    For paths copied to the store and hashed via a [Nix Archive (NAR)] and [SHA-256][sha-256].
-    Just like in the text case, we can have the store objects referenced by their paths.
+    This is for the
+    ["Nix Archive"](@docroot@/store/store-object/content-address.md#method-nix-archive)
+    method of content addressing store objects,
+    if the hash algorithm is [SHA-256].
+    Just like in the "Text" case, we can have the store objects referenced by their paths.
     Additionally, we can have an optional `:self` label to denote self reference.
 
   - ```ebnf
@@ -55,8 +60,12 @@ where
     ```
 
     For either the outputs built from derivations,
-    paths copied to the store hashed that area single file hashed directly, or the via a hash algorithm other than [SHA-256][sha-256].
-    (in that case "source" is used; this is only necessary for compatibility).
+    or content-addressed store objects that are not using one of the two above cases.
+    To be explicit about the latter, that is currently these methods:
+
+    - ["Flat"](@docroot@/store/store-object/content-address.md#method-flat)
+    - ["Git"](@docroot@/store/store-object/content-address.md#method-git)
+    - ["Nix Archive"](@docroot@/store/store-object/content-address.md#method-nix-archive) if the hash algorithm is not [SHA-256].
 
     `id` is the name of the output (usually, "out").
     For content-addressed store objects, `id`, is always "out".
@@ -116,7 +125,7 @@ where
       Also note that NAR + SHA-256 must not use this case, and instead must use the `type` = `"source:" ...` case.
 
 [Nix Archive (NAR)]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
-[sha-256]: https://en.m.wikipedia.org/wiki/SHA-256
+[SHA-256]: https://en.m.wikipedia.org/wiki/SHA-256
 
 ### Historical Note
 

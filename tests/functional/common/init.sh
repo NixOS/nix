@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+
 test -n "$TEST_ROOT"
 # We would delete any daemon socket, so let's stop the daemon first.
 killDaemon
@@ -11,7 +13,7 @@ mkdir "$TEST_HOME"
 
 mkdir "$NIX_STORE_DIR"
 mkdir "$NIX_LOCALSTATE_DIR"
-mkdir -p "$NIX_LOG_DIR"/drvs
+mkdir -p "$NIX_LOG_DIR/drvs"
 mkdir "$NIX_STATE_DIR"
 mkdir "$NIX_CONF_DIR"
 

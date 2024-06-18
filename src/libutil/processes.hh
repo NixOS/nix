@@ -12,8 +12,6 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include <boost/lexical_cast.hpp>
-
 #include <atomic>
 #include <functional>
 #include <map>
@@ -118,8 +116,6 @@ public:
     { }
 };
 
-#ifndef _WIN32
-
 /**
  * Convert the exit status of a child as returned by wait() into an
  * error string.
@@ -127,7 +123,5 @@ public:
 std::string statusToString(int status);
 
 bool statusOk(int status);
-
-#endif
 
 }

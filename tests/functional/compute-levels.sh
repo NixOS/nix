@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 if [[ $(uname -ms) = "Linux x86_64" ]]; then

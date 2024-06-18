@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <sstream>
 #include <regex>
 
 #ifndef _WIN32
@@ -779,15 +780,14 @@ static RegisterPrimOp primop_break({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        if (state.debugRepl && !state.debugTraces.empty()) {
+        if (state.canDebug()) {
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
                 .msg = HintFmt("breakpoint reached"),
                 .pos = state.positions[pos],
             });
 
-            auto & dt = state.debugTraces.front();
-            state.runDebugRepl(&error, dt.env, dt.expr);
+            state.runDebugRepl(&error);
         }
 
         // Return the value we were passed.
@@ -806,7 +806,7 @@ static RegisterPrimOp primop_abort({
         NixStringContext context;
         auto s = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.abort").toOwned();
-        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).debugThrow();
+        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).setIsFromExpr().debugThrow();
     }
 });
 
@@ -825,7 +825,7 @@ static RegisterPrimOp primop_throw({
       NixStringContext context;
       auto s = state.coerceToString(pos, *args[0], context,
               "while evaluating the error message passed to builtin.throw").toOwned();
-      state.error<ThrownError>(s).debugThrow();
+      state.error<ThrownError>(s).setIsFromExpr().debugThrow();
     }
 });
 
@@ -1017,9 +1017,8 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
         printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
-    if (evalSettings.builtinsTraceDebugger && state.debugRepl && !state.debugTraces.empty()) {
-        const DebugTrace & last = state.debugTraces.front();
-        state.runDebugRepl(nullptr, last.env, last.expr);
+    if (evalSettings.builtinsTraceDebugger) {
+        state.runDebugRepl(nullptr);
     }
     state.forceValue(*args[1], pos);
     v = *args[1];
@@ -1040,6 +1039,55 @@ static RegisterPrimOp primop_trace({
       [`break`](@docroot@/language/builtins.md#builtins-break)).
     )",
     .fun = prim_trace,
+});
+
+static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    // We only accept a string argument for now. The use case for pretty printing a value is covered by `trace`.
+    // By rejecting non-strings we allow future versions to add more features without breaking existing code.
+    auto msgStr = state.forceString(*args[0], pos, "while evaluating the first argument; the message passed to builtins.warn");
+
+    {
+        BaseError msg(std::string{msgStr});
+        msg.atPos(state.positions[pos]);
+        auto info = msg.info();
+        info.level = lvlWarn;
+        info.isFromExpr = true;
+        logWarning(info);
+    }
+
+    if (evalSettings.builtinsAbortOnWarn) {
+        // Not an EvalError or subclass, which would cause the error to be stored in the eval cache.
+        state.error<EvalBaseError>("aborting to reveal stack trace of warning, as abort-on-warn is set").setIsFromExpr().debugThrow();
+    }
+    if (evalSettings.builtinsTraceDebugger || evalSettings.builtinsDebuggerOnWarn) {
+        state.runDebugRepl(nullptr);
+    }
+    state.forceValue(*args[1], pos);
+    v = *args[1];
+}
+
+static RegisterPrimOp primop_warn({
+    .name = "__warn",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Evaluate *e1*, which must be a string and print iton standard error as a warning.
+      Then return *e2*.
+      This function is useful for non-critical situations where attention is advisable.
+
+      If the
+      [`debugger-on-trace`](@docroot@/command-ref/conf-file.md#conf-debugger-on-trace)
+      or [`debugger-on-warn`](@docroot@/command-ref/conf-file.md#conf-debugger-on-warn)
+      option is set to `true` and the `--debugger` flag is given, the
+      interactive debugger will be started when `warn` is called (like
+      [`break`](@docroot@/language/builtins.md#builtins-break)).
+
+      If the
+      [`abort-on-warn`](@docroot@/command-ref/conf-file.md#conf-abort-on-warn)
+      option is set, the evaluation will be aborted after the warning is printed.
+      This is useful to reveal the stack trace of the warning, when the context is non-interactive and a debugger can not be launched.
+    )",
+    .fun = prim_warn,
 });
 
 
@@ -2261,7 +2309,7 @@ static void addPath(
     std::string_view name,
     SourcePath path,
     Value * filterFun,
-    FileIngestionMethod method,
+    ContentAddressMethod method,
     const std::optional<Hash> expectedHash,
     Value & v,
     const NixStringContext & context)
@@ -2293,11 +2341,10 @@ static void addPath(
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
-            expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
-                .method = method,
-                .hash = *expectedHash,
-                .references = {},
-            });
+            expectedStorePath = state.store->makeFixedOutputPathFromCA(name, ContentAddressWithReferences::fromParts(
+                method,
+                *expectedHash,
+                {}));
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             auto dstPath = fetchToStore(
@@ -2393,7 +2440,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
-    auto method = FileIngestionMethod::Recursive;
+    ContentAddressMethod method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
     NixStringContext context;
 
@@ -2408,7 +2455,9 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
         else if (n == "filter")
             state.forceFunction(*(filterFun = attr.value), attr.pos, "while evaluating the `filter` parameter passed to builtins.path");
         else if (n == "recursive")
-            method = FileIngestionMethod { state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path") };
+            method = state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path")
+                ? FileIngestionMethod::Recursive
+                : FileIngestionMethod::Flat;
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else

@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # 27ce722638 required some incompatible changes to the nix file, so skip this

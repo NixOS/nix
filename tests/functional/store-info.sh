@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 STORE_INFO=$(nix store info 2>&1)

@@ -2,7 +2,7 @@ R""(
 
 # Examples
 
-* List a file in a NAR and pipe it through `gunzip`:
+* List a file in a [Nix Archive (NAR)][Nix Archive] and pipe it through `gunzip`:
 
   ```console
   # nix nar cat ./hello.nar /share/man/man1/hello.1.gz | gunzip
@@ -16,4 +16,5 @@ R""(
 This command prints on standard output the contents of the regular
 file *path* inside the NAR file *nar*.
 
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 )""

@@ -28,7 +28,10 @@ class UDSRemoteStore : public virtual UDSRemoteStoreConfig
 public:
 
     UDSRemoteStore(const Params & params);
-    UDSRemoteStore(const std::string scheme, std::string path, const Params & params);
+    UDSRemoteStore(
+        std::string_view scheme,
+        PathView path,
+        const Params & params);
 
     std::string getUri() override;
 

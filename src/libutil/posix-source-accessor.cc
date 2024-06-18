@@ -135,6 +135,7 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
     assertNoSymlinks(path);
     DirEntries res;
     for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
+        checkInterrupt();
         auto type = [&]() -> std::optional<Type> {
             std::filesystem::file_type nativeType;
             try {

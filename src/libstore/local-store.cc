@@ -233,7 +233,7 @@ LocalStore::LocalStore(const Params & params)
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
             printError("warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
-        else {
+        else if (!readOnly) {
             struct stat st;
             if (stat(realStoreDir.get().c_str(), &st))
                 throw SysError("getting attributes of path '%1%'", realStoreDir);
@@ -463,10 +463,20 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
-LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
-    : LocalStore(params)
+LocalStore::LocalStore(
+    std::string_view scheme,
+    PathView path,
+    const Params & _params)
+    : LocalStore([&]{
+        // Default `?root` from `path` if non set
+        if (!path.empty() && _params.count("root") == 0) {
+            auto params = _params;
+            params.insert_or_assign("root", std::string { path });
+            return params;
+        }
+        return _params;
+    }())
 {
-    throw UnimplementedError("LocalStore");
 }
 
 
@@ -1272,7 +1282,7 @@ StorePath LocalStore::addToStoreFromDump(
             ? dumpHash
             : hashPath(
                 PosixSourceAccessor::createAtRoot(tempPath),
-                hashMethod.getFileIngestionMethod(), hashAlgo),
+                hashMethod.getFileIngestionMethod(), hashAlgo).first,
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1407,12 +1417,13 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         printInfo("checking link hashes...");
 
         for (auto & link : std::filesystem::directory_iterator{linksDir}) {
+            checkInterrupt();
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of '%s'", name);
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 PosixSourceAccessor::createAtRoot(link.path()),
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     link.path(), name, hash);
@@ -1499,6 +1510,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        invalid states.
      */
     for (auto & i : std::filesystem::directory_iterator{realStoreDir.to_string()}) {
+        checkInterrupt();
         try {
             storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }

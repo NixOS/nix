@@ -1262,6 +1262,16 @@ public:
           store paths of the latest Nix release.
         )"
     };
+
+    Setting<uint64_t> warnLargePathThreshold{
+        this,
+        std::numeric_limits<uint64_t>::max(),
+        "warn-large-path-threshold",
+        R"(
+          Warn when copying a path larger than this number of bytes to the Nix store
+          (as determined by its NAR serialisation).
+        )"
+    };
 };
 
 

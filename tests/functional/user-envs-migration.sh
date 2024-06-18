@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Test that the migration of user environments
 # (https://github.com/NixOS/nix/pull/5226) does preserve everything
 

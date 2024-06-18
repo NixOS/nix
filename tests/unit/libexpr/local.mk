@@ -4,7 +4,7 @@ programs += libexpr-tests
 
 libexpr-tests_NAME := libnixexpr-tests
 
-libexpr-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data
+libexpr-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data GTEST_OUTPUT=xml:$$testresults/libexpr-tests.xml
 
 libexpr-tests_DIR := $(d)
 
@@ -38,3 +38,8 @@ libexpr-tests_LIBS = \
     libexpr libexprc libfetchers libstore libstorec libutil libutilc
 
 libexpr-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS) -lgmock
+
+ifdef HOST_WINDOWS
+  # Increase the default reserved stack size to 65 MB so Nix doesn't run out of space
+  libexpr-tests_LDFLAGS += -Wl,--stack,$(shell echo $$((65 * 1024 * 1024)))
+endif

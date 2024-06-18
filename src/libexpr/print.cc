@@ -1,5 +1,6 @@
 #include <limits>
 #include <unordered_set>
+#include <sstream>
 
 #include "print.hh"
 #include "ansicolor.hh"
@@ -271,16 +272,27 @@ private:
 
     void printDerivation(Value & v)
     {
-        NixStringContext context;
-        std::string storePath;
-        if (auto i = v.attrs()->get(state.sDrvPath))
-            storePath = state.store->printStorePath(state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
+        std::optional<StorePath> storePath;
+        if (auto i = v.attrs()->get(state.sDrvPath)) {
+            NixStringContext context;
+            storePath = state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation");
+        }
+
+        /* This unfortunately breaks printing nested values because of
+           how the pretty printer is used (when pretting printing and warning
+           to same terminal / std stream). */
+#if 0
+        if (storePath && !storePath->isDerivation())
+            warn(
+                "drvPath attribute '%s' is not a valid store path to a derivation, this value not work properly",
+                state.store->printStorePath(*storePath));
+#endif
 
         if (options.ansiColors)
             output << ANSI_GREEN;
         output << "«derivation";
-        if (!storePath.empty()) {
-            output << " " << storePath;
+        if (storePath) {
+            output << " " << state.store->printStorePath(*storePath);
         }
         output << "»";
         if (options.ansiColors)

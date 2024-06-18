@@ -29,6 +29,8 @@ enum class SymlinkResolution {
     Full,
 };
 
+MakeError(FileNotFound, Error);
+
 /**
  * A read-only filesystem abstraction. This is used by the Nix
  * evaluator and elsewhere for accessing sources in various

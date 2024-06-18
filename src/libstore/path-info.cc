@@ -161,28 +161,23 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
     jsonObject["narSize"] = narSize;
 
     {
-        auto& jsonRefs = (jsonObject["references"] = json::array());
+        auto & jsonRefs = jsonObject["references"] = json::array();
         for (auto & ref : references)
             jsonRefs.emplace_back(store.printStorePath(ref));
     }
 
-    if (ca)
-        jsonObject["ca"] = renderContentAddress(ca);
+    jsonObject["ca"] = ca ? (std::optional { renderContentAddress(*ca) }) : std::nullopt;
 
     if (includeImpureInfo) {
-        if (deriver)
-            jsonObject["deriver"] = store.printStorePath(*deriver);
+        jsonObject["deriver"] = deriver ? (std::optional { store.printStorePath(*deriver) }) : std::nullopt;
 
-        if (registrationTime)
-            jsonObject["registrationTime"] = registrationTime;
+        jsonObject["registrationTime"] = registrationTime ? (std::optional { registrationTime }) : std::nullopt;
 
-        if (ultimate)
-            jsonObject["ultimate"] = ultimate;
+        jsonObject["ultimate"] = ultimate;
 
-        if (!sigs.empty()) {
-            for (auto & sig : sigs)
-                jsonObject["signatures"].push_back(sig);
-        }
+        auto & sigsObj = jsonObject["signatures"] = json::array();
+        for (auto & sig : sigs)
+            sigsObj.push_back(sig);
     }
 
     return jsonObject;
@@ -210,20 +205,25 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
         throw;
     }
 
+    // New format as this as nullable but mandatory field; handling
+    // missing is for back-compat.
     if (json.contains("ca"))
-        res.ca = ContentAddress::parse(getString(valueAt(json, "ca")));
+        if (auto * rawCa = getNullable(valueAt(json, "ca")))
+            res.ca = ContentAddress::parse(getString(*rawCa));
 
     if (json.contains("deriver"))
-        res.deriver = store.parseStorePath(getString(valueAt(json, "deriver")));
+        if (auto * rawDeriver = getNullable(valueAt(json, "deriver")))
+            res.deriver = store.parseStorePath(getString(*rawDeriver));
 
     if (json.contains("registrationTime"))
-        res.registrationTime = getInteger(valueAt(json, "registrationTime"));
+        if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
+            res.registrationTime = getInteger(*rawRegistrationTime);
 
     if (json.contains("ultimate"))
         res.ultimate = getBoolean(valueAt(json, "ultimate"));
 
     if (json.contains("signatures"))
-        res.sigs = valueAt(json, "signatures");
+        res.sigs = getStringSet(valueAt(json, "signatures"));
 
     return res;
 }

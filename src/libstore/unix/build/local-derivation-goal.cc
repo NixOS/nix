@@ -1500,7 +1500,7 @@ void LocalDerivationGoal::startDaemon()
                 throw SysError("accepting connection");
             }
 
-            closeOnExec(remote.get());
+            unix::closeOnExec(remote.get());
 
             debug("received daemon connection");
 
@@ -1961,7 +1961,7 @@ void LocalDerivationGoal::runChild()
             throw SysError("changing into '%1%'", tmpDir);
 
         /* Close all other file descriptors. */
-        closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
+        unix::closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
 #if __linux__
         linux::setPersonality(drv->platform);

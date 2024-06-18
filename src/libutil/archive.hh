@@ -82,8 +82,6 @@ void restorePath(const Path & path, Source & source);
  */
 void copyNAR(Source & source, Sink & sink);
 
-void copyPath(const Path & from, const Path & to);
-
 
 inline constexpr std::string_view narVersionMagic1 = "nix-archive-1";
 

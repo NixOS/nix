@@ -295,7 +295,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         if (getEnv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
             throw Error("unexpected systemd environment variables");
         fdSocket = SD_LISTEN_FDS_START;
-        closeOnExec(fdSocket.get());
+        unix::closeOnExec(fdSocket.get());
     }
 
     //  Otherwise, create and bind to a Unix domain socket.
@@ -323,7 +323,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 throw SysError("accepting connection");
             }
 
-            closeOnExec(remote.get());
+            unix::closeOnExec(remote.get());
 
             PeerInfo peer { .pidKnown = false };
             TrustedFlag trusted;

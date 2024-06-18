@@ -18,6 +18,7 @@
 #include "terminal.hh"
 #include "users.hh"
 #include "network-proxy.hh"
+#include "eval-cache.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -41,6 +42,19 @@ void chrootHelper(int argc, char * * argv);
 #endif
 
 namespace nix {
+
+enum struct AliasStatus {
+    /** Aliases that don't go away */
+    AcceptedShorthand,
+    /** Aliases that will go away */
+    Deprecated,
+};
+
+/** An alias, except for the original syntax, which is in the map key. */
+struct AliasInfo {
+    AliasStatus status;
+    std::vector<std::string> replacement;
+};
 
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
@@ -134,29 +148,30 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         });
     }
 
-    std::map<std::string, std::vector<std::string>> aliases = {
-        {"add-to-store", {"store", "add-path"}},
-        {"cat-nar", {"nar", "cat"}},
-        {"cat-store", {"store", "cat"}},
-        {"copy-sigs", {"store", "copy-sigs"}},
-        {"dev-shell", {"develop"}},
-        {"diff-closures", {"store", "diff-closures"}},
-        {"dump-path", {"store", "dump-path"}},
-        {"hash-file", {"hash", "file"}},
-        {"hash-path", {"hash", "path"}},
-        {"ls-nar", {"nar", "ls"}},
-        {"ls-store", {"store", "ls"}},
-        {"make-content-addressable", {"store", "make-content-addressed"}},
-        {"optimise-store", {"store", "optimise"}},
-        {"ping-store", {"store", "ping"}},
-        {"sign-paths", {"store", "sign"}},
-        {"show-derivation", {"derivation", "show"}},
-        {"show-config", {"config", "show"}},
-        {"to-base16", {"hash", "to-base16"}},
-        {"to-base32", {"hash", "to-base32"}},
-        {"to-base64", {"hash", "to-base64"}},
-        {"verify", {"store", "verify"}},
-        {"doctor", {"config", "check"}},
+    std::map<std::string, AliasInfo> aliases = {
+        {"add-to-store", { AliasStatus::Deprecated, {"store", "add-path"}}},
+        {"cat-nar", { AliasStatus::Deprecated, {"nar", "cat"}}},
+        {"cat-store", { AliasStatus::Deprecated, {"store", "cat"}}},
+        {"copy-sigs", { AliasStatus::Deprecated, {"store", "copy-sigs"}}},
+        {"dev-shell", { AliasStatus::Deprecated, {"develop"}}},
+        {"diff-closures", { AliasStatus::Deprecated, {"store", "diff-closures"}}},
+        {"dump-path", { AliasStatus::Deprecated, {"store", "dump-path"}}},
+        {"hash-file", { AliasStatus::Deprecated, {"hash", "file"}}},
+        {"hash-path", { AliasStatus::Deprecated, {"hash", "path"}}},
+        {"ls-nar", { AliasStatus::Deprecated, {"nar", "ls"}}},
+        {"ls-store", { AliasStatus::Deprecated, {"store", "ls"}}},
+        {"make-content-addressable", { AliasStatus::Deprecated, {"store", "make-content-addressed"}}},
+        {"optimise-store", { AliasStatus::Deprecated, {"store", "optimise"}}},
+        {"ping-store", { AliasStatus::Deprecated, {"store", "ping"}}},
+        {"sign-paths", { AliasStatus::Deprecated, {"store", "sign"}}},
+        {"shell", { AliasStatus::AcceptedShorthand, {"env", "shell"}}},
+        {"show-derivation", { AliasStatus::Deprecated, {"derivation", "show"}}},
+        {"show-config", { AliasStatus::Deprecated, {"config", "show"}}},
+        {"to-base16", { AliasStatus::Deprecated, {"hash", "to-base16"}}},
+        {"to-base32", { AliasStatus::Deprecated, {"hash", "to-base32"}}},
+        {"to-base64", { AliasStatus::Deprecated, {"hash", "to-base64"}}},
+        {"verify", { AliasStatus::Deprecated, {"store", "verify"}}},
+        {"doctor", { AliasStatus::Deprecated, {"config", "check"}}},
     };
 
     bool aliasUsed = false;
@@ -167,10 +182,13 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         auto arg = *pos;
         auto i = aliases.find(arg);
         if (i == aliases.end()) return pos;
-        warn("'%s' is a deprecated alias for '%s'",
-            arg, concatStringsSep(" ", i->second));
+        auto & info = i->second;
+        if (info.status == AliasStatus::Deprecated) {
+            warn("'%s' is a deprecated alias for '%s'",
+                arg, concatStringsSep(" ", info.replacement));
+        }
         pos = args.erase(pos);
-        for (auto j = i->second.rbegin(); j != i->second.rend(); ++j)
+        for (auto j = info.replacement.rbegin(); j != info.replacement.rend(); ++j)
             pos = args.insert(pos, *j);
         aliasUsed = true;
         return pos;
@@ -517,18 +535,24 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
         evalSettings.pureEval = false;
     }
-    args.command->second->run();
+
+    try {
+        args.command->second->run();
+    } catch (eval_cache::CachedEvalError & e) {
+        /* Evaluate the original attribute that resulted in this
+           cached error so that we can show the original error to the
+           user. */
+        e.force();
+    }
 }
 
 }
 
 int main(int argc, char * * argv)
 {
-#ifndef _WIN32 // TODO implement on Windows
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
-#endif
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

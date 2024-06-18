@@ -2,6 +2,7 @@ nix_tests = \
   test-infra.sh \
   flakes/flakes.sh \
   flakes/develop.sh \
+  flakes/edit.sh \
   flakes/run.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
@@ -16,6 +17,7 @@ nix_tests = \
   flakes/build-paths.sh \
   flakes/flake-in-submodule.sh \
   flakes/prefetch.sh \
+  flakes/eval-cache.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
@@ -153,7 +155,7 @@ $(d)/plugins.sh.test $(d)/plugins.sh.test-debug: \
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
 test-clean-files := \
-  $(d)/common/vars-and-functions.sh \
+  $(d)/common/subst-vars.sh \
   $(d)/config.nix
 
 clean-files += $(test-clean-files)

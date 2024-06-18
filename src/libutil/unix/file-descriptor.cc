@@ -110,8 +110,8 @@ void Pipe::create()
     if (pipe2(fds, O_CLOEXEC) != 0) throw SysError("creating pipe");
 #else
     if (pipe(fds) != 0) throw SysError("creating pipe");
-    closeOnExec(fds[0]);
-    closeOnExec(fds[1]);
+    unix::closeOnExec(fds[0]);
+    unix::closeOnExec(fds[1]);
 #endif
     readSide = fds[0];
     writeSide = fds[1];
@@ -120,11 +120,12 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
-void closeMostFDs(const std::set<int> & exceptions)
+void unix::closeMostFDs(const std::set<int> & exceptions)
 {
 #if __linux__
     try {
         for (auto & s : std::filesystem::directory_iterator{"/proc/self/fd"}) {
+            checkInterrupt();
             auto fd = std::stoi(s.path().filename());
             if (!exceptions.count(fd)) {
                 debug("closing leaked FD %d", fd);
@@ -138,14 +139,16 @@ void closeMostFDs(const std::set<int> & exceptions)
 #endif
 
     int maxFD = 0;
+#if HAVE_SYSCONF
     maxFD = sysconf(_SC_OPEN_MAX);
+#endif
     for (int fd = 0; fd < maxFD; ++fd)
         if (!exceptions.count(fd))
             close(fd); /* ignore result */
 }
 
 
-void closeOnExec(int fd)
+void unix::closeOnExec(int fd)
 {
     int prev;
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||

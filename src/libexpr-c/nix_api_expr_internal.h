@@ -20,6 +20,11 @@ struct ListBuilder
     nix::ListBuilder builder;
 };
 
+struct nix_value
+{
+    nix::Value value;
+};
+
 struct nix_string_return
 {
     std::string str;

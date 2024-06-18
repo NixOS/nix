@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 clearStore
@@ -31,7 +33,7 @@ nix-store -q --tree "$outPath" | grep '───.*dependencies-input-2'
 
 echo "output path is $outPath"
 
-text=$(cat "$outPath"/foobar)
+text=$(cat "$outPath/foobar")
 if test "$text" != "FOOBAR"; then exit 1; fi
 
 deps=$(nix-store -quR "$drvPath")

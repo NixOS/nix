@@ -100,6 +100,8 @@ struct CmdBundle : InstallableValueCommand
         NixStringContext context2;
         auto drvPath = evalState->coerceToStorePath(attr1->pos, *attr1->value, context2, "");
 
+        drvPath.requireDerivation();
+
         auto attr2 = vRes->attrs()->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());

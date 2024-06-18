@@ -240,7 +240,10 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             break;
         }
         case Verbosity::lvlWarn: {
-            prefix = ANSI_WARNING "warning";
+            if (einfo.isFromExpr)
+                prefix = ANSI_WARNING "evaluation warning";
+            else
+                prefix = ANSI_WARNING "warning";
             break;
         }
         case Verbosity::lvlInfo: {

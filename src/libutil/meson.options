@@ -1,0 +1,5 @@
+# vim: filetype=meson
+
+option('cpuid', type : 'feature',
+  description : 'determine microarchitecture levels with libcpuid (only relevant on x86_64)',
+)

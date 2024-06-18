@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 clearStore
@@ -52,3 +54,7 @@ fi
 
 # Test --arg-from-stdin.
 [[ "$(echo bla | nix eval --raw --arg-from-stdin foo --expr '{ foo }: { inherit foo; }' foo)" = bla ]]
+
+# Test that unknown settings are warned about
+out="$(expectStderr 0 nix eval --option foobar baz --expr '""' --raw)"
+[[ "$(echo "$out" | grep foobar | wc -l)" = 1 ]]

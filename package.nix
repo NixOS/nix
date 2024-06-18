@@ -93,9 +93,8 @@
 # - readline
 , readlineFlavor ? if stdenv.hostPlatform.isWindows then "readline" else "editline"
 
-# Whether to build the internal/external API docs, can be done separately from
+# Whether to build the external API docs, can be done separately from
 # everything else.
-, enableInternalAPIDocs ? forDevShell
 , enableExternalAPIDocs ? forDevShell
 
 # Whether to install unit tests. This is useful when cross compiling
@@ -180,19 +179,17 @@ in {
           ./doc
           ./misc
           ./precompiled-headers.h
-          ./src
+          (fileset.difference ./src ./src/perl)
           ./COPYING
           ./scripts/local.mk
         ] ++ lib.optionals buildUnitTests [
           ./doc/manual
-        ] ++ lib.optionals enableInternalAPIDocs [
-          ./doc/internal-api
         ] ++ lib.optionals enableExternalAPIDocs [
           ./doc/external-api
-        ] ++ lib.optionals (enableInternalAPIDocs || enableExternalAPIDocs) [
+        ] ++ lib.optionals enableExternalAPIDocs [
           # Source might not be compiled, but still must be available
           # for Doxygen to gather comments.
-          ./src
+          (fileset.difference ./src ./src/perl)
           ./tests/unit
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
@@ -207,8 +204,10 @@ in {
     ++ lib.optional doBuild "dev"
     # If we are doing just build or just docs, the one thing will use
     # "out". We only need additional outputs if we are doing both.
-    ++ lib.optional (doBuild && (enableManual || enableInternalAPIDocs || enableExternalAPIDocs)) "doc"
-    ++ lib.optional installUnitTests "check";
+    ++ lib.optional (doBuild && (enableManual || enableExternalAPIDocs)) "doc"
+    ++ lib.optional installUnitTests "check"
+    ++ lib.optional doCheck "testresults"
+    ;
 
   nativeBuildInputs = [
     autoconf-archive
@@ -229,7 +228,7 @@ in {
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
-    ++ lib.optional (enableInternalAPIDocs || enableExternalAPIDocs) doxygen
+    ++ lib.optional enableExternalAPIDocs doxygen
   ;
 
   buildInputs = lib.optionals doBuild [
@@ -292,7 +291,6 @@ in {
     (lib.enableFeature doBuild "build")
     (lib.enableFeature buildUnitTests "unit-tests")
     (lib.enableFeature doInstallCheck "functional-tests")
-    (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableExternalAPIDocs "external-api-docs")
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature enableGC "gc")
@@ -317,8 +315,11 @@ in {
 
   makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
+  preCheck = ''
+    mkdir $testresults
+  '';
+
   installTargets = lib.optional doBuild "install"
-    ++ lib.optional enableInternalAPIDocs "internal-api-html"
     ++ lib.optional enableExternalAPIDocs "external-api-html";
 
   installFlags = "sysconfdir=$(out)/etc";
@@ -343,11 +344,7 @@ in {
   ) + lib.optionalString enableManual ''
     mkdir -p ''${!outputDoc}/nix-support
     echo "doc manual ''${!outputDoc}/share/doc/nix/manual" >> ''${!outputDoc}/nix-support/hydra-build-products
-  '' + lib.optionalString enableInternalAPIDocs ''
-    mkdir -p ''${!outputDoc}/nix-support
-    echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
-  ''
-    + lib.optionalString enableExternalAPIDocs ''
+  '' + lib.optionalString enableExternalAPIDocs ''
     mkdir -p ''${!outputDoc}/nix-support
     echo "doc external-api-docs $out/share/doc/nix/external-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
@@ -385,8 +382,7 @@ in {
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
-  # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
-  # to work with `strictDeps`.
+  # TODO Always true after https://github.com/NixOS/nixpkgs/issues/318564
   strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";

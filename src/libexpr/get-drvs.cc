@@ -69,10 +69,17 @@ std::string PackageInfo::querySystem() const
 std::optional<StorePath> PackageInfo::queryDrvPath() const
 {
     if (!drvPath && attrs) {
-        NixStringContext context;
-        if (auto i = attrs->get(state->sDrvPath))
-            drvPath = {state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation")};
-        else
+        if (auto i = attrs->get(state->sDrvPath)) {
+            NixStringContext context;
+            auto found = state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation");
+            try {
+                found.requireDerivation();
+            } catch (Error & e) {
+                e.addTrace(state->positions[i->pos], "while evaluating the 'drvPath' attribute of a derivation");
+                throw;
+            }
+            drvPath = {std::move(found)};
+        } else
             drvPath = {std::nullopt};
     }
     return drvPath.value_or(std::nullopt);
