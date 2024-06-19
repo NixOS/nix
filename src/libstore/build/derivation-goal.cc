@@ -790,13 +790,23 @@ static void movePath(const Path & src, const Path & dst)
 
     auto permOpts = fs::perm_options::replace | fs::perm_options::nofollow;
 
-    if (changePerm)
-        fs::permissions(src, st.permissions() | fs::perms::owner_write, permOpts);
+    if (changePerm) {
+        try {
+            fs::permissions(src, st.permissions() | fs::perms::owner_write, permOpts);
+        } catch (const fs::filesystem_error & e) {
+            throw SysError("setting permissions on '%s'", src);
+        }
+    }
 
     fs::rename(src, dst);
 
-    if (changePerm)
-        fs::permissions(src, st.permissions(), permOpts);
+    if (changePerm) {
+        try {
+            fs::permissions(dst, st.permissions(), permOpts);
+        } catch (const fs::filesystem_error & e) {
+            throw SysError("setting permissions on '%s'", dst);
+        }
+    }
 }
 
 

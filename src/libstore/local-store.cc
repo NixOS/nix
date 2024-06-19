@@ -252,7 +252,9 @@ LocalStore::LocalStore(const Params & params)
     if (!settings.allowSymlinkedStore) {
         Path path = realStoreDir;
         while (path != "/") {
-            if (std::filesystem::is_symlink(path))
+            std::error_code _ec;
+            // ignore errors, this will return false when there's an error
+            if (std::filesystem::is_symlink(path, _ec))
                 throw Error(
                         "the path '%1%' is a symlink; "
                         "this is not allowed for the Nix store and its parent directories",
