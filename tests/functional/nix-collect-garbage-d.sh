@@ -43,6 +43,10 @@ testCollectGarbageCheckGenerations () {
     [[ "${actual%" "}" == "${expected}" ]]
 }
 
+#######################
+# nix-collect-garbage #
+#######################
+
 # Basic test that should leave 1 generation
 testCollectGarbageSetup
 nix-collect-garbage -d
@@ -54,6 +58,19 @@ ln -s $TEST_ROOT/blah ~/.nix-profile
 testCollectGarbageSetup
 nix-collect-garbage -d
 testCollectGarbageCheckGenerations "6"
+
+# Basic test that should leave 1 generation
+rm ~/.nix-profile
+testCollectGarbageSetup
+nix-collect-garbage --delete-older-than old
+testCollectGarbageCheckGenerations "6"
+
+# Basic test that deletes all but the active
+# This will delete future generations!
+testCollectGarbageSetup
+nix-env --switch-generation 4
+nix-collect-garbage --delete-older-than old
+testCollectGarbageCheckGenerations "4"
 
 # Run the same test, but forcing the profiles at their legacy location under
 # /nix/var/nix.
@@ -72,6 +89,13 @@ testCollectGarbageCheckGenerations "6" --profile "$NIX_STATE_DIR/profiles/per-us
 testCollectGarbageSetup
 nix-collect-garbage --delete-older-than "+4"
 testCollectGarbageCheckGenerations "3 4 5 6"
+
+# Delete all except latest 2 generations
+# This will keep future generations
+testCollectGarbageSetup
+nix-env --switch-generation 5
+nix-collect-garbage --delete-older-than "+2"
+testCollectGarbageCheckGenerations "4 5 6"
 
 # Delete everything older than 5 days
 # All profiles are younger than 5 days
@@ -107,3 +131,87 @@ testCollectGarbageSetup
 testCollectGarbageMockTimestamps
 nix-collect-garbage --delete-older-than "1d"
 testCollectGarbageCheckGenerations "6"
+
+# Delete everything older than 2 days
+# Profile 4 was active at 2 days ago so it will be kept
+# Profile 2 is currently active so it will be kept
+# This will delete future generations that are older than the parameter!
+testCollectGarbageSetup
+testCollectGarbageMockTimestamps
+nix-env --switch-generation 2
+nix-collect-garbage --delete-older-than "2d"
+testCollectGarbageCheckGenerations "2 4 5 6"
+
+
+################################
+# nix-env --delete-generations #
+################################
+
+# Basic test that should leave 1 generation
+testCollectGarbageSetup
+nix-env --delete-generations old
+testCollectGarbageCheckGenerations "6"
+
+# Basic test that deletes all but the active
+# This includes future generations!
+testCollectGarbageSetup
+nix-env --switch-generation 4
+nix-env --delete-generations old
+testCollectGarbageCheckGenerations "4"
+
+# Delete all except latest 4 generations
+testCollectGarbageSetup
+nix-env --delete-generations "+4"
+testCollectGarbageCheckGenerations "3 4 5 6"
+
+# Delete all except latest 2 generations
+# This will keep future generations
+testCollectGarbageSetup
+nix-env --switch-generation 5
+nix-env --delete-generations "+2"
+testCollectGarbageCheckGenerations "4 5 6"
+
+# Delete everything older than 5 days
+# All profiles are younger than 5 days
+testCollectGarbageSetup
+testCollectGarbageMockTimestamps
+nix-env --delete-generations "5d"
+testCollectGarbageCheckGenerations "1 2 3 4 5 6"
+
+# Delete everything older than 4 days
+# Profile 1 was active at 4 days ago so it will be kept
+testCollectGarbageSetup
+testCollectGarbageMockTimestamps
+nix-env --delete-generations "4d"
+testCollectGarbageCheckGenerations "1 2 3 4 5 6"
+
+# Delete everything older than 3 days
+# Profile 2 was active at 3 days ago so it will be kept
+testCollectGarbageSetup
+testCollectGarbageMockTimestamps
+nix-env --delete-generations "3d"
+testCollectGarbageCheckGenerations "2 3 4 5 6"
+
+# Delete everything older than 2 days
+# Profile 4 was active at 2 days ago so it will be kept
+testCollectGarbageSetup
+testCollectGarbageMockTimestamps
+nix-env --delete-generations "2d"
+testCollectGarbageCheckGenerations "4 5 6"
+
+# Delete everything older than 1 day
+# Profile 6 is current and was active at 1 day ago so it will be kept
+testCollectGarbageSetup
+testCollectGarbageMockTimestamps
+nix-env --delete-generations "1d"
+testCollectGarbageCheckGenerations "6"
+
+# Delete everything older than 2 days
+# Profile 4 was active at 2 days ago so it will be kept
+# Profile 2 is currently active so it will be kept
+# This will delete future generations that are older than the parameter!
+testCollectGarbageSetup
+testCollectGarbageMockTimestamps
+nix-env --switch-generation 2
+nix-env --delete-generations "2d"
+testCollectGarbageCheckGenerations "2 4 5 6"

@@ -284,10 +284,29 @@ testProfileWipeHistoryCheckGenerations () {
     [[ "${actual%" "}" == "${expected}" ]]
 }
 
+# Basic test that should leave 1 generation
+testProfileWipeHistorySetup
+nix profile wipe-history --older-than "old"
+testProfileWipeHistoryCheckGenerations "6"
+
+# Basic test that deletes all but the active
+# This will delete future generations!
+testProfileWipeHistorySetup
+nix profile rollback --to 4
+nix profile wipe-history --older-than "old"
+testProfileWipeHistoryCheckGenerations "4"
+
 # Delete all except latest 4 generations
 testProfileWipeHistorySetup
 nix profile wipe-history --older-than "+4"
 testProfileWipeHistoryCheckGenerations "3 4 5 6"
+
+# Delete all except latest 2 generations
+# This will keep future generations
+testProfileWipeHistorySetup
+nix profile rollback --to 5
+nix profile wipe-history --older-than "+2"
+testProfileWipeHistoryCheckGenerations "4 5 6"
 
 # Delete everything older than 5 days
 # All profiles are younger than 5 days
@@ -323,3 +342,13 @@ testProfileWipeHistorySetup
 testProfileWipeHistoryMockTimestamps
 nix profile wipe-history --older-than "1d"
 testProfileWipeHistoryCheckGenerations "6"
+
+# Delete everything older than 2 days
+# Profile 4 was active at 2 days ago so it will be kept
+# Profile 2 is currently active so it will be kept
+# This will delete future generations that are older than the parameter!
+testProfileWipeHistorySetup
+testProfileWipeHistoryMockTimestamps
+nix profile rollback --to 2
+nix profile wipe-history --older-than "2d"
+testProfileWipeHistoryCheckGenerations "2 4 5 6"
