@@ -68,10 +68,6 @@ ifeq ($(ENABLE_DOC_GEN), yes)
 makefiles-late += doc/manual/local.mk
 endif
 
-ifeq ($(ENABLE_EXTERNAL_API_DOCS), yes)
-makefiles-late += doc/external-api/local.mk
-endif
-
 # Miscellaneous global Flags
 
 OPTIMIZE = 1
@@ -125,12 +121,5 @@ ifneq ($(ENABLE_DOC_GEN), yes)
 .PHONY: manual-html manpages
 manual-html manpages:
 	@echo "Generated docs are disabled. Configure without '--disable-doc-gen', or avoid calling 'make manpages' and 'make manual-html'."
-	@exit 1
-endif
-
-ifneq ($(ENABLE_EXTERNAL_API_DOCS), yes)
-.PHONY: external-api-html
-external-api-html:
-	@echo "External API docs are disabled. Configure with '--enable-external-api-docs', or avoid calling 'make external-api-html'."
 	@exit 1
 endif

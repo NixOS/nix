@@ -12,7 +12,9 @@ PROJECT_NAME           = "Nix"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = @PACKAGE_VERSION@
+PROJECT_NUMBER         = @PROJECT_NUMBER@
+
+OUTPUT_DIRECTORY       = @OUTPUT_DIRECTORY@
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer a
@@ -36,10 +38,10 @@ GENERATE_LATEX         = NO
 # so they can expand variables despite configure variables.
 
 INPUT                  = \
-  src/libutil-c \
-  src/libexpr-c \
-  src/libstore-c \
-  doc/external-api/README.md
+  @src@/src/libutil-c \
+  @src@/src/libexpr-c \
+  @src@/src/libstore-c \
+  @src@/doc/external-api/README.md
 
 FILE_PATTERNS = nix_api_*.h *.md
 
@@ -49,7 +51,6 @@ FILE_PATTERNS = nix_api_*.h *.md
 # RECURSIVE has no effect here.
 # This tag requires that the tag SEARCH_INCLUDES is set to YES.
 
-INCLUDE_PATH           = @RAPIDCHECK_HEADERS@
 EXCLUDE_PATTERNS = *_internal.h
 GENERATE_TREEVIEW = YES
 OPTIMIZE_OUTPUT_FOR_C  = YES
