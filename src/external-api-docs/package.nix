@@ -18,18 +18,20 @@ stdenv.mkDerivation (finalAttrs: {
 
   src = fileset.toSource {
     root = ../..;
-    fileset = let
-      cpp = fileset.fileFilter (file: file.hasExt "cc" || file.hasExt "h");
-    in fileset.unions [
-      ./meson.build
-      ./doxygen.cfg.in
-      ./README.md
-      # Source is not compiled, but still must be available for Doxygen
-      # to gather comments.
-      (cpp ../../src/libexpr-c)
-      (cpp ../../src/libstore-c)
-      (cpp ../../src/libutil-c)
-    ];
+    fileset =
+      let
+        cpp = fileset.fileFilter (file: file.hasExt "cc" || file.hasExt "h");
+      in
+      fileset.unions [
+        ./meson.build
+        ./doxygen.cfg.in
+        ./README.md
+        # Source is not compiled, but still must be available for Doxygen
+        # to gather comments.
+        (cpp ../libexpr-c)
+        (cpp ../libstore-c)
+        (cpp ../libutil-c)
+      ];
   };
 
   nativeBuildInputs = [
