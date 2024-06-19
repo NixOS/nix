@@ -88,8 +88,10 @@ bool isDirOrInDir(std::string_view path, std::string_view dir);
 /**
  * Get status of `path`.
  */
-struct stat stat(const Path & path);
+namespace unix {
+std::optional<struct stat> maybeLstat(const Path & path);
 struct stat lstat(const Path & path);
+}
 
 /**
  * call `std::filesystem::symlink_status` on the given path if it exists.

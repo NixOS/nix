@@ -1,4 +1,5 @@
 #include "local-derivation-goal.hh"
+#include "file-system.hh"
 #include "indirect-root-store.hh"
 #include "hook-instance.hh"
 #include "worker.hh"
@@ -20,6 +21,7 @@
 #include "posix-fs-canonicalise.hh"
 #include "posix-source-accessor.hh"
 
+#include <filesystem>
 #include <regex>
 #include <queue>
 
@@ -278,7 +280,7 @@ static void chmod_(const Path & path, mode_t mode)
    directory's parent link ".."). */
 static void movePath(const Path & src, const Path & dst)
 {
-    auto st = lstat(src);
+    auto st = unix::lstat(src);
 
     bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
 
@@ -406,7 +408,7 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
             throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
     };
 
-    auto maybeSt = maybeLstat(source);
+    auto maybeSt = maybeSymlinkStat(source);
     if (!maybeSt) {
         if (optional)
             return;
@@ -415,10 +417,10 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
     }
     auto st = *maybeSt;
 
-    if (S_ISDIR(st.st_mode)) {
+    if (std::filesystem::is_directory(st)) {
         createDirs(target);
         bindMount();
-    } else if (S_ISLNK(st.st_mode)) {
+    } else if (std::filesystem::is_symlink(st)) {
         // Symlinks can (apparently) not be bind-mounted, so just copy it
         createDirs(dirOf(target));
         copyFile(
@@ -2298,12 +2300,12 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             continue;
         }
 
-        auto optSt = maybeLstat(actualPath.c_str());
+        auto optSt = unix::maybeLstat(actualPath);
         if (!optSt)
             throw BuildError(
                 "builder for '%s' failed to produce output path for output '%s' at '%s'",
                 worker.store.printStorePath(drvPath), outputName, actualPath);
-        struct stat & st = *optSt;
+        auto & st = *optSt;
 
 #ifndef __CYGWIN__
         /* Check that the output is not group or world writable, as

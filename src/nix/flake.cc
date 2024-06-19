@@ -18,6 +18,7 @@
 #include "markdown.hh"
 #include "users.hh"
 
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include <queue>
 #include <iomanip>
@@ -873,10 +874,16 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 checkInterrupt();
                 auto from2 = entry.path().string();
                 auto to2 = to + "/" + entry.path().filename().string();
-                auto st = lstat(from2);
-                if (S_ISDIR(st.st_mode))
+                auto st = entry.symlink_status();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+                switch (st.type()) {
+                case std::filesystem::file_type::directory:  {
                     copyDir(from2, to2);
-                else if (S_ISREG(st.st_mode)) {
+                    break;
+                }
+                case std::filesystem::file_type::regular: {
                     auto contents = readFile(from2);
                     if (pathExists(to2)) {
                         auto contents2 = readFile(to2);
@@ -889,8 +896,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         continue;
                     } else
                         writeFile(to2, contents);
+                    break;
                 }
-                else if (S_ISLNK(st.st_mode)) {
+                case std::filesystem::file_type::symlink: {
                     auto target = readLink(from2);
                     if (pathExists(to2)) {
                         if (readLink(to2) != target) {
@@ -902,9 +910,13 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         continue;
                     } else
                           createSymlink(target, to2);
+                    break;
                 }
-                else
+                default:
                     throw Error("file '%s' has unsupported type", from2);
+                }
+#pragma GCC diagnostic pop
+
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }

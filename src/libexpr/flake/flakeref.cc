@@ -119,9 +119,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 notice("path '%s' does not contain a 'flake.nix', searching up",path);
 
                 // Save device to detect filesystem boundary
-                // TODO: this needs platform specific implementations
-                // TODO: Can I depend on the root path (C:/ or D:/)?
-                dev_t device = lstat(path).st_dev;
+                dev_t device = unix::lstat(path).st_dev;
                 bool found = false;
                 while (path != "/") {
                     if (pathExists(path + "/flake.nix")) {
@@ -130,7 +128,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     } else if (pathExists(path + "/.git"))
                         throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
                     else {
-                        if (lstat(path).st_dev != device)
+                        if (unix::lstat(path).st_dev != device)
                             throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
                     }
                     path = dirOf(path);

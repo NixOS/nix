@@ -7,6 +7,7 @@
 #include "outputs-spec.hh"
 #include "derivations.hh"
 #include "progress-bar.hh"
+#include <filesystem>
 
 #ifndef _WIN32 // TODO re-enable on Windows
 # include "run.hh"
@@ -280,19 +281,21 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto shellDrvPath = writeDerivation(*evalStore, drv);
 
     /* Build the derivation. */
-    store->buildPaths(
+    auto res = store->buildPathsWithResults(
         { DerivedPath::Built {
             .drvPath = makeConstantStorePathRef(shellDrvPath),
             .outputs = OutputsSpec::All { },
         }},
         bmNormal, evalStore);
 
-    for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
-        assert(optPath);
-        auto & outPath = *optPath;
+    for (auto & [_0, realisation] : res[0].builtOutputs) {
+        auto & outPath = realisation.outPath;
         assert(store->isValidPath(outPath));
         auto outPathS = store->toRealPath(outPath);
-        if (lstat(outPathS).st_size)
+
+        assert(!std::filesystem::is_symlink(outPathS));
+
+        if (std::filesystem::file_size(outPathS) > 0)
             return outPath;
     }
 

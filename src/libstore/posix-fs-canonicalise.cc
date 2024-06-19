@@ -53,7 +53,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 
 void canonicaliseTimestampAndPermissions(const Path & path)
 {
-    canonicaliseTimestampAndPermissions(path, lstat(path));
+    canonicaliseTimestampAndPermissions(path, unix::lstat(path));
 }
 
 
@@ -76,7 +76,7 @@ static void canonicalisePathMetaData_(
     }
 #endif
 
-    auto st = lstat(path);
+    auto st = unix::lstat(path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
@@ -174,7 +174,7 @@ void canonicalisePathMetaData(
 #ifndef _WIN32
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
-    auto st = lstat(path);
+    auto st = unix::lstat(path);
 
     if (st.st_uid != geteuid()) {
         assert(S_ISLNK(st.st_mode));

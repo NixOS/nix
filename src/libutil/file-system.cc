@@ -162,33 +162,35 @@ bool isDirOrInDir(std::string_view path, std::string_view dir)
 }
 
 
-struct stat stat(const Path & path)
+#ifndef _WIN32
+struct stat unix::lstat(const Path & path)
 {
     struct stat st;
-    if (stat(path.c_str(), &st))
+    if (lstat(path.c_str(), &st))
         throw SysError("getting status of '%1%'", path);
     return st;
 }
 
-#ifdef _WIN32
-# define STAT stat
-#else
-# define STAT lstat
+std::optional<struct stat> unix::maybeLstat(const Path & path)
+{
+    std::optional<struct stat> st{std::in_place};
+
+    if (lstat(path.c_str(), &*st))
+    {
+        if (errno == ENOENT || errno == ENOTDIR)
+            st.reset();
+        else
+            throw SysError("getting status of '%s'", path);
+    }
+    return st;
+}
 #endif
-
-struct stat lstat(const Path & path)
-{
-    struct stat st;
-    if (STAT(path.c_str(), &st))
-        throw SysError("getting status of '%1%'", path);
-    return st;
-}
 
 std::optional<fs::file_status> maybeSymlinkStat(const Path & path)
 {
     try {
         auto st = fs::symlink_status(path);
-        if (st.type() == fs::file_type::not_found || st.type() == fs::file_type::unknown)
+        if (st.type() == fs::file_type::not_found)
             return std::nullopt;
         return st;
     } catch (fs::filesystem_error & e) {
@@ -418,7 +420,7 @@ Paths createDirs(const Path & path)
     if (path == "/") return created;
 
     struct stat st;
-    if (STAT(path.c_str(), &st) == -1) {
+    if (lstat(path.c_str(), &st) == -1) {
         created = createDirs(dirOf(path));
         if (mkdir(path.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -426,7 +428,7 @@ Paths createDirs(const Path & path)
 #endif
             ) == -1 && errno != EEXIST)
             throw SysError("creating directory '%1%'", path);
-        st = STAT(path);
+        lstat(path.c_str(), &st);
         created.push_back(path);
     }
 
@@ -594,7 +596,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
 {
 #ifndef _WIN32
     // TODO: Rewrite the `is_*` to use `symlink_status()`
-    auto statOfFrom = lstat(from.c_str());
+    auto statOfFrom = unix::lstat(from.c_str());
 #endif
     auto fromStatus = fs::symlink_status(from);
 

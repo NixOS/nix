@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -19,9 +20,14 @@ namespace nix {
 
 static void makeWritable(const Path & path)
 {
-    auto st = lstat(path);
-    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
+    auto st = std::filesystem::symlink_status(path);
+    auto writePerms = st.permissions() | std::filesystem::perms::owner_write;
+    try {
+        std::filesystem::permissions(path, writePerms);
+    }
+    catch (std::filesystem::filesystem_error &e) {
         throw SysError("changing writability of '%1%'", path);
+    }
 }
 
 
@@ -94,7 +100,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 {
     checkInterrupt();
 
-    auto st = lstat(path);
+    auto st = unix::lstat(path);
 
 #if __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
@@ -159,7 +165,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     /* Maybe delete the link, if it has been corrupted. */
     if (std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
-        auto stLink = lstat(linkPath.string());
+        auto stLink = unix::lstat(linkPath.string());
         if (st.st_size != stLink.st_size
             || (repair && hash != ({
                 hashPath(
@@ -201,9 +207,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    auto stLink = lstat(linkPath.string());
-
-    if (st.st_ino == stLink.st_ino) {
+    if (std::filesystem::equivalent(path, linkPath)) {
         debug("'%1%' is already linked to '%2%'", path, linkPath);
         return;
     }

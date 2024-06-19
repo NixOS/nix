@@ -1,4 +1,5 @@
 #include "derivation-goal.hh"
+#include <filesystem>
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "hook-instance.hh"
 #endif
@@ -770,19 +771,13 @@ void DerivationGoal::tryLocalBuild() {
 }
 
 
-static void chmod_(const Path & path, mode_t mode)
-{
-    if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on '%s'", path);
-}
-
-
 /* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
    it's a directory and we're not root (to be able to update the
    directory's parent link ".."). */
 static void movePath(const Path & src, const Path & dst)
 {
-    auto st = lstat(src);
+    namespace fs = std::filesystem;
+    auto st = fs::symlink_status(src);
 
     bool changePerm = (
 #ifndef _WIN32
@@ -790,15 +785,18 @@ static void movePath(const Path & src, const Path & dst)
 #else
         !isRootUser()
 #endif
-        && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+        && fs::is_directory(st)
+        && (st.permissions() & fs::perms::owner_write) == fs::perms::none);
+
+    auto permOpts = fs::perm_options::replace | fs::perm_options::nofollow;
 
     if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
+        fs::permissions(src, st.permissions() | fs::perms::owner_write, permOpts);
 
-    std::filesystem::rename(src, dst);
+    fs::rename(src, dst);
 
     if (changePerm)
-        chmod_(dst, st.st_mode);
+        fs::permissions(src, st.permissions(), permOpts);
 }
 
 
