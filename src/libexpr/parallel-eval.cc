@@ -11,7 +11,6 @@ static std::array<Sync<WaiterDomain>, 128> waiterDomains;
 
 static Sync<WaiterDomain> & getWaiterDomain(Value & v)
 {
-    //auto domain = std::hash<Value *>{}(&v) % waiterDomains.size();
     auto domain = (((size_t) &v) >> 5) % waiterDomains.size();
     debug("HASH %x -> %d", &v, domain);
     return waiterDomains[domain];
@@ -40,7 +39,8 @@ InternalType EvalState::waitOnThunk(Value & v, bool awaited)
     } else {
         /* Mark this value as being waited on. */
         auto type = tPending;
-        if (!v.internalType.compare_exchange_strong(type, tAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
+        if (!v.internalType.compare_exchange_strong(
+                type, tAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
             /* If the value has been finalized in the meantime (i.e. is
                no longer pending), we're done. */
             if (type != tAwaited) {

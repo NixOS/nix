@@ -11,7 +11,7 @@
 #include "util.hh"
 
 #if HAVE_BOEHMGC
-#include <gc.h>
+#  include <gc.h>
 #endif
 
 namespace nix {
@@ -25,8 +25,6 @@ struct Executor
         std::promise<void> promise;
         work_t work;
     };
-
-    //std::future<void> enqueue(work_t work);
 
     struct State
     {
@@ -45,17 +43,16 @@ struct Executor
         debug("executor using %d threads", nrCores);
         auto state(state_.lock());
         for (size_t n = 0; n < nrCores; ++n)
-            state->threads.push_back(std::thread([&]()
-            {
-                #if HAVE_BOEHMGC
+            state->threads.push_back(std::thread([&]() {
+#if HAVE_BOEHMGC
                 GC_stack_base sb;
                 GC_get_stack_base(&sb);
                 GC_register_my_thread(&sb);
-                #endif
+#endif
                 worker();
-                #if HAVE_BOEHMGC
+#if HAVE_BOEHMGC
                 GC_unregister_my_thread();
-                #endif
+#endif
             }));
     }
 
@@ -82,7 +79,8 @@ struct Executor
 
             while (true) {
                 auto state(state_.lock());
-                if (state->quit) return;
+                if (state->quit)
+                    return;
                 if (!state->queue.empty()) {
                     item = std::move(state->queue.begin()->second);
                     state->queue.erase(state->queue.begin());
@@ -102,12 +100,8 @@ struct Executor
 
     std::vector<std::future<void>> spawn(std::vector<std::pair<work_t, uint8_t>> && items)
     {
-        if (items.empty()) return {};
-
-        /*
-        auto item = std::move(items.back());
-        items.pop_back();
-        */
+        if (items.empty())
+            return {};
 
         std::vector<std::future<void>> futures;
 
@@ -119,23 +113,11 @@ struct Executor
                 thread_local std::random_device rd;
                 thread_local std::uniform_int_distribution<uint64_t> dist(0, 1ULL << 48);
                 auto key = (uint64_t(item.second) << 48) | dist(rd);
-                state->queue.emplace(
-                    key,
-                    Item {
-                        .promise = std::move(promise),
-                        .work = std::move(item.first)
-                    });
+                state->queue.emplace(key, Item{.promise = std::move(promise), .work = std::move(item.first)});
             }
         }
 
         wakeup.notify_all(); // FIXME
-
-        //item();
-
-        /*
-        for (auto & future : futures)
-            future.get();
-        */
 
         return futures;
     }

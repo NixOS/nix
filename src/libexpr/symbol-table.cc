@@ -35,7 +35,8 @@ Symbol SymbolTable::create(std::string_view s)
     {
         auto symbols(symbolDomains[domain].read());
         auto it = symbols->find(s);
-        if (it != symbols->end()) return Symbol(it->second);
+        if (it != symbols->end())
+            return Symbol(it->second);
     }
 
     // Most symbols are looked up more than once, so we trade off insertion performance
@@ -44,7 +45,8 @@ Symbol SymbolTable::create(std::string_view s)
     // on the original implementation using unordered_set
     auto symbols(symbolDomains[domain].lock());
     auto it = symbols->find(s);
-    if (it != symbols->end()) return Symbol(it->second);
+    if (it != symbols->end())
+        return Symbol(it->second);
 
     // Atomically allocate space for the symbol in the arena.
     auto id = arena.allocate(s.size() + 1);
@@ -64,6 +66,5 @@ size_t SymbolTable::size() const
         res += domain.read()->size();
     return res;
 }
-
 
 }
