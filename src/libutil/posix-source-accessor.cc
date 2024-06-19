@@ -91,9 +91,9 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
     return nix::pathExists(makeAbsPath(path).string());
 }
 
-std::optional<std::filesystem::file_status> PosixSourceAccessor::cachedLstat(const CanonPath & path)
+std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static SharedSync<std::unordered_map<Path, std::optional<std::filesystem::file_status>>> _cache;
+    static SharedSync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
 
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
@@ -105,7 +105,7 @@ std::optional<std::filesystem::file_status> PosixSourceAccessor::cachedLstat(con
         if (i != cache->end()) return i->second;
     }
 
-    auto st = nix::maybeSymlinkStat(absPath.c_str());
+    auto st = unix::maybeLstat(absPath);
 
     auto cache(_cache.lock());
     if (cache->size() >= 16384) cache->clear();
@@ -119,17 +119,15 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     if (auto parent = path.parent()) assertNoSymlinks(*parent);
     auto st = cachedLstat(path);
     if (!st) return std::nullopt;
-    // TODO: last_write_time to compile things. This follows symlinks which we don't want
-    auto st_time = std::chrono::time_point_cast<std::chrono::seconds>(std::filesystem::last_write_time(path.abs()));
-    mtime = std::max(mtime, st_time.time_since_epoch().count());
+    mtime = std::max(mtime, st->st_mtime);
     return Stat {
         .type =
-            std::filesystem::is_regular_file(*st) ? tRegular :
-            std::filesystem::is_directory(*st) ? tDirectory :
-            std::filesystem::is_symlink(*st) ? tSymlink :
+            S_ISREG(st->st_mode) ? tRegular :
+            S_ISDIR(st->st_mode) ? tDirectory :
+            S_ISLNK(st->st_mode) ? tSymlink :
             tMisc,
-        .fileSize = std::filesystem::is_regular_file(*st) ? std::optional<uint64_t>(std::filesystem::file_size(path.abs())) : std::nullopt,
-        .isExecutable = std::filesystem::is_regular_file(*st) && st->permissions() == std::filesystem::perms::owner_exec,
+        .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
     };
 }
 
@@ -184,7 +182,7 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
 {
     while (!path.isRoot()) {
         auto st = cachedLstat(path);
-        if (st && std::filesystem::is_symlink(*st))
+        if (st && S_ISLNK(st->st_mode))
             throw Error("path '%s' is a symlink", showPath(path));
         path.pop();
     }
