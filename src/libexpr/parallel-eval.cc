@@ -19,7 +19,7 @@ static Sync<WaiterDomain> & getWaiterDomain(Value & v)
 
 std::atomic<uint64_t> nrThunksAwaited, nrThunksAwaitedSlow, usWaiting, currentlyWaiting, maxWaiting;
 
-void EvalState::waitOnThunk(Value & v, bool awaited)
+InternalType EvalState::waitOnThunk(Value & v, bool awaited)
 {
     nrThunksAwaited++;
 
@@ -30,23 +30,23 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
            holding the domain lock. */
         auto type = v.internalType.load(std::memory_order_acquire);
 
-        /* If the value has been finalized in the meantime (i.e is no
+        /* If the value has been finalized in the meantime (i.e. is no
            longer pending), we're done. */
         if (type != tAwaited) {
             debug("VALUE DONE RIGHT AWAY 2 %x", &v);
-            assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
-            return;
+            assert(isFinished(type));
+            return type;
         }
     } else {
         /* Mark this value as being waited on. */
         auto type = tPending;
         if (!v.internalType.compare_exchange_strong(type, tAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
-            /* If the value has been finalized in the meantime (i.e is
+            /* If the value has been finalized in the meantime (i.e. is
                no longer pending), we're done. */
             if (type != tAwaited) {
                 debug("VALUE DONE RIGHT AWAY %x", &v);
-                assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
-                return;
+                assert(isFinished(type));
+                return type;
             }
             /* The value was already in the "waited on" state, so we're
                not the only thread waiting on it. */
@@ -55,6 +55,7 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
             debug("PENDING -> AWAITED %x", &v);
     }
 
+    /* Wait for another thread to finish this value. */
     debug("AWAIT %x", &v);
 
     nrThunksAwaitedSlow++;
@@ -68,15 +69,11 @@ void EvalState::waitOnThunk(Value & v, bool awaited)
         debug("WAKEUP %x", &v);
         auto type = v.internalType.load(std::memory_order_acquire);
         if (type != tAwaited) {
-            if (type == tFailed) {
-                currentlyWaiting--;
-                std::rethrow_exception(v.payload.failed->ex);
-            }
-            assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
+            assert(isFinished(type));
             auto now2 = std::chrono::steady_clock::now();
             usWaiting += std::chrono::duration_cast<std::chrono::microseconds>(now2 - now1).count();
             currentlyWaiting--;
-            return;
+            return type;
         }
         printError("SPURIOUS %s", &v);
     }

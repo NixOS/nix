@@ -90,6 +90,9 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     auto type = v.internalType.load(std::memory_order_acquire);
 
+    if (isFinished(type))
+        goto done;
+
     if (type == tThunk) {
         try {
             if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
@@ -97,9 +100,8 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
                     waitOnThunk(v, type == tAwaited);
                     goto done;
                 }
-                if (type != tThunk && type != tPending && type != tAwaited)
-                    // FIXME: tFailed
-                    return;
+                if (isFinished(type))
+                    goto done;
                 printError("NO LONGER THUNK %x %d", this, type);
                 abort();
             }
@@ -131,9 +133,8 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
                     waitOnThunk(v, type == tAwaited);
                     goto done;
                 }
-                if (type != tThunk && type != tPending && type != tAwaited)
-                    // FIXME: tFailed
-                    return;
+                if (isFinished(type))
+                    goto done;
                 printError("NO LONGER APP %x %d", this, type);
                 abort();
             }
@@ -144,17 +145,11 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
         }
     }
     else if (type == tPending || type == tAwaited)
-        waitOnThunk(v, type == tAwaited);
-    else if (type == tFailed)
-        std::rethrow_exception(v.payload.failed->ex);
+        type = waitOnThunk(v, type == tAwaited);
 
-    // FIXME: remove
  done:
-    auto type2 = v.internalType.load(std::memory_order_acquire);
-    if (!(type2 != tThunk && type2 != tApp && type2 != tPending && type2 != tAwaited)) {
-        printError("THUNK NOT FORCED %x %s %d", this, showType(v), type);
-        abort();
-    }
+    if (type == tFailed)
+        std::rethrow_exception(v.payload.failed->ex);
 }
 
 

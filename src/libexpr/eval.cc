@@ -192,13 +192,12 @@ PosIdx Value::determinePos(const PosIdx pos) const
 bool Value::isTrivial() const
 {
     return
-        internalType != tApp
-        && internalType != tPrimOpApp
-        && (internalType != tThunk
-            || (dynamic_cast<ExprAttrs *>(payload.thunk.expr)
-                && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(payload.thunk.expr)
-            || dynamic_cast<ExprList *>(payload.thunk.expr));
+        isFinished()
+        || (internalType == tThunk
+            && ((dynamic_cast<ExprAttrs *>(payload.thunk.expr)
+                    && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
+                || dynamic_cast<ExprLambda *>(payload.thunk.expr)
+                || dynamic_cast<ExprList *>(payload.thunk.expr)));
 }
 
 
@@ -568,7 +567,7 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    if (!env.values[0]->isThunk()) {
+    if (env.values[0]->isFinished()) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         auto j = env.values[0]->attrs()->begin();
@@ -624,7 +623,7 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     if (env.up && se.up) {
         mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
-        if (se.isWith && !env.values[0]->isThunk()) {
+        if (se.isWith && env.values[0]->isFinished()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
                 vm.insert_or_assign(std::string(st[j.name]), j.value);
@@ -1047,7 +1046,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 
     {
         auto cache(fileEvalCache.lock());
-        auto [i, inserted] = cache->emplace(*resolvedPath, Value());
+        auto [i, inserted] = cache->try_emplace(*resolvedPath);
         if (inserted)
             i->second.mkThunk(nullptr, &expr);
         vExpr = &i->second;
@@ -2051,7 +2050,7 @@ void EvalState::forceValueDeep(Value & v)
             for (auto & i : *v.attrs())
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
-                    auto dts = debugRepl && i.value->isThunk()
+                    auto dts = debugRepl && i.value->internalType == tThunk
                         ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, positions[i.pos],
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;

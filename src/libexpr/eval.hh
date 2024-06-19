@@ -443,9 +443,10 @@ public:
 
     /**
      * Given a thunk that was observed to be in the pending or awaited
-     * state, wait for it to finish.
+     * state, wait for it to finish. Returns the new type of the
+     * value.
      */
-    void waitOnThunk(Value & v, bool awaited);
+    InternalType waitOnThunk(Value & v, bool awaited);
 
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
 

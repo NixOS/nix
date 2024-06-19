@@ -20,29 +20,44 @@ namespace nix {
 struct Value;
 class BindingsBuilder;
 
-
 typedef enum {
+    /* Unfinished values. */
     tUninitialized = 0,
-    tInt = 1,
-    tBool = 2,
-    tString = 3,
-    tPath = 4,
-    tNull = 5,
-    tAttrs = 6,
-    tList1 = 7,
-    tList2 = 8,
-    tListN = 9,
-    tThunk = 10,
-    tApp = 11,
-    tLambda = 12,
-    tPrimOp = 13,
-    tPrimOpApp = 14,
-    tExternal = 15,
-    tFloat = 16,
-    tPending = 17,
-    tAwaited = 18,
-    tFailed = 19,
+    tThunk,
+    tApp,
+    tPending,
+    tAwaited,
+
+    /* Finished values. */
+    tInt = 32, // Do not move tInt (see isFinished()).
+    tBool,
+    tString,
+    tPath,
+    tNull,
+    tAttrs,
+    tList1,
+    tList2,
+    tListN,
+    tLambda,
+    tPrimOp,
+    tPrimOpApp,
+    tExternal,
+    tFloat,
+    tFailed,
 } InternalType;
+
+/**
+ * Return true if `type` denotes a "finished" value, i.e. a weak-head
+ * normal form.
+ *
+ * Note that tPrimOpApp is considered "finished" because it represents
+ * a primop call with an incomplete number of arguments, and therefore
+ * cannot be evaluated further.
+ */
+inline bool isFinished(InternalType type)
+{
+    return type >= tInt;
+}
 
 /**
  * This type abstracts over all actual value types in the language,
@@ -172,7 +187,6 @@ private:
     std::atomic<InternalType> internalType{tUninitialized};
 
     friend std::string showType(const Value & v);
-
     friend class EvalState;
 
 public:
@@ -185,14 +199,14 @@ public:
     { *this = v; }
 
     /**
-     * Copy a value. This is not allowed to be a thunk.
+     * Copy a value. This is not allowed to be a thunk to avoid
+     * accidental work duplication.
      */
     Value & operator =(const Value & v)
     {
         auto type = v.internalType.load(std::memory_order_acquire);
-        debug("ASSIGN %x %d %d", this, internalType, type);
-        //assert(type != tThunk && type != tApp && type != tPending && type != tAwaited);
-        if (!(type != tThunk && type != tApp && type != tPending && type != tAwaited)) {
+        //debug("ASSIGN %x %d %d", this, internalType, type);
+        if (!nix::isFinished(type)) {
             printError("UNEXPECTED TYPE %x %s", this, showType(v));
             abort();
         }
@@ -202,13 +216,11 @@ public:
 
     void print(EvalState &state, std::ostream &str, PrintOptions options = PrintOptions {});
 
-    // Functions needed to distinguish the type
-    // These should be removed eventually, by putting the functionality that's
-    // needed by callers into methods of this type
+    inline bool isFinished() const
+    {
+        return nix::isFinished(internalType.load(std::memory_order_acquire));
+    }
 
-    // type() == nThunk
-    inline bool isThunk() const { return internalType == tThunk; };
-    inline bool isApp() const { return internalType == tApp; };
     inline bool isBlackhole() const;
 
     // type() == nFunction
@@ -327,16 +339,13 @@ public:
         debug("FINISH %x %d %d", this, internalType, newType);
         payload = newPayload;
 
-        // TODO: need a barrier here to ensure the payload of the
-        // value is updated before the type field.
-
         auto oldType = internalType.exchange(newType, std::memory_order_release);
 
-        if (oldType == tPending)
-            // Nothing to do; no thread is waiting on this thunk.
-            ;
-        else if (oldType == tUninitialized)
+        if (oldType == tUninitialized)
             // Uninitialized value; nothing to do.
+            ;
+        else if (oldType == tPending)
+            // Nothing to do; no thread is waiting on this thunk.
             ;
         else if (oldType == tAwaited)
             // Slow path: wake up the threads that are waiting on this
@@ -516,8 +525,11 @@ public:
 
     /**
      * Check whether forcing this value requires a trivial amount of
-     * computation. In particular, function applications are
-     * non-trivial.
+     * computation. A value is trivial if it's finished or if it's a
+     * thunk whose expression is an attrset with no dynamic
+     * attributes, a lambda or a list. Note that it's up to the caller
+     * to check whether the members of those attrsets or lists must be
+     * trivial.
      */
     bool isTrivial() const;
 
