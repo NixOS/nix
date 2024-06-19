@@ -204,7 +204,6 @@ or inside `nix-shell` or `nix develop`:
 
 ```console
 $ mesonConfigurePhase
-$ cd build
 $ ninja src/internal-api-docs/html
 $ xdg-open src/internal-api-docs/html/index.html
 ```
@@ -218,13 +217,14 @@ You can also build and view it yourself:
 [C API documentation]: https://hydra.nixos.org/job/nix/master/external-api-docs/latest/download-by-type/doc/external-api-docs
 
 ```console
-# nix build .#hydraJobs.external-api-docs
-# xdg-open ./result/share/doc/nix/external-api/html/index.html
+$ nix build .#hydraJobs.external-api-docs
+$ xdg-open ./result/share/doc/nix/external-api/html/index.html
 ```
 
 or inside `nix-shell` or `nix develop`:
 
 ```
-# make external-api-html
-# xdg-open ./outputs/doc/share/doc/nix/external-api/html/index.html
+$ mesonConfigurePhase
+$ ninja src/external-api-docs/html
+$ xdg-open src/external-api-docs/html/index.html
 ```

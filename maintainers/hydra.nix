@@ -128,11 +128,7 @@ in
   internal-api-docs = nixpkgsFor.x86_64-linux.native.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
-  external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ../package.nix {
-    inherit fileset;
-    doBuild = false;
-    enableExternalAPIDocs = true;
-  };
+  external-api-docs = nixpkgsFor.x86_64-linux.native.nix-external-api-docs;
 
   # System tests.
   tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {

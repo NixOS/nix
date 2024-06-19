@@ -13,21 +13,25 @@
 }:
 
 stdenv.mkDerivation (finalAttrs: {
-  pname = "nix-internal-api-docs";
+  pname = "nix-external-api-docs";
   version = lib.fileContents ./.version + versionSuffix;
 
   src = fileset.toSource {
     root = ../..;
-    fileset = let
-      cpp = fileset.fileFilter (file: file.hasExt "cc" || file.hasExt "hh");
-    in fileset.unions [
-      ./meson.build
-      ./doxygen.cfg.in
-      # Source is not compiled, but still must be available for Doxygen
-      # to gather comments.
-      (cpp ../.)
-      (cpp ../../tests/unit)
-    ];
+    fileset =
+      let
+        cpp = fileset.fileFilter (file: file.hasExt "cc" || file.hasExt "h");
+      in
+      fileset.unions [
+        ./meson.build
+        ./doxygen.cfg.in
+        ./README.md
+        # Source is not compiled, but still must be available for Doxygen
+        # to gather comments.
+        (cpp ../libexpr-c)
+        (cpp ../libstore-c)
+        (cpp ../libutil-c)
+      ];
   };
 
   nativeBuildInputs = [
@@ -37,7 +41,7 @@ stdenv.mkDerivation (finalAttrs: {
   ];
 
   postUnpack = ''
-    sourceRoot=$sourceRoot/src/internal-api-docs
+    sourceRoot=$sourceRoot/src/external-api-docs
   '';
 
   preConfigure =
@@ -48,7 +52,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   postInstall = ''
     mkdir -p ''${!outputDoc}/nix-support
-    echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
+    echo "doc external-api-docs $out/share/doc/nix/external-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
 
   enableParallelBuilding = true;

@@ -211,8 +211,15 @@
               ;
           };
 
-
           nix-internal-api-docs = final.callPackage ./src/internal-api-docs/package.nix {
+            inherit
+              fileset
+              stdenv
+              versionSuffix
+              ;
+          };
+
+          nix-external-api-docs = final.callPackage ./src/external-api-docs/package.nix {
             inherit
               fileset
               stdenv
@@ -275,6 +282,8 @@
         inherit (nixpkgsFor.${system}.native)
           changelog-d;
         default = self.packages.${system}.nix;
+        nix-internal-api-docs = nixpkgsFor.${system}.native.nix-internal-api-docs;
+        nix-external-api-docs = nixpkgsFor.${system}.native.nix-external-api-docs;
       } // lib.concatMapAttrs
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         (pkgName: {}: {
@@ -298,7 +307,6 @@
           #"nix-util" = { };
           #"nix-store" = { };
           #"nix-fetchers" = { };
-          "nix-internal-api-docs" = { };
         }
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         dockerImage =
@@ -370,6 +378,8 @@
             ++ pkgs.nix-store.nativeBuildInputs
             ++ pkgs.nix-fetchers.nativeBuildInputs
             ++ lib.optionals havePerl pkgs.nix-perl-bindings.nativeBuildInputs
+            ++ pkgs.nix-internal-api-docs.nativeBuildInputs
+            ++ pkgs.nix-external-api-docs.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
