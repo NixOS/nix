@@ -179,14 +179,12 @@ std::optional<std::filesystem::path> PosixSourceAccessor::getPhysicalPath(const 
 
 void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
 {
-    #if 0
     while (!path.isRoot()) {
         auto st = cachedLstat(path);
         if (st && S_ISLNK(st->st_mode))
             throw Error("path '%s' is a symlink", showPath(path));
         path.pop();
     }
-    #endif
 }
 
 ref<SourceAccessor> getFSSourceAccessor()
