@@ -20,11 +20,13 @@ struct State
 /* For each activated package, create symlinks */
 static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
 {
-    std::filesystem::directory_iterator srcFiles;
+    namespace fs = std::filesystem;
+
+    fs::directory_iterator srcFiles;
 
     try {
-        srcFiles = std::filesystem::directory_iterator{srcDir};
-    } catch (std::filesystem::filesystem_error & e) {
+        srcFiles = fs::directory_iterator{srcDir};
+    } catch (fs::filesystem_error & e) {
         if (e.code() == std::errc::not_a_directory) {
             warn("not including '%s' in the user environment because it's not a directory", srcDir);
             return;
@@ -38,18 +40,19 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         if (name.string()[0] == '.')
             /* not matched by glob */
             continue;
-        auto srcFile = (std::filesystem::path{srcDir} / name).string();
-        auto dstFile = (std::filesystem::path{dstDir} / name).string();
+        auto srcFile = (fs::path{srcDir} / name).string();
+        auto dstFile = (fs::path{dstDir} / name).string();
 
-        std::filesystem::file_status srcSt;
+        fs::file_status srcSt;
 
         try {
-            srcSt = std::filesystem::status(srcFile);
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::not_a_directory) {
+            srcSt = fs::status(srcFile);
+
+            if (srcSt.type() == fs::file_type::not_found) {
                 warn("skipping dangling symlink '%s'", dstFile);
                 continue;
             }
+        } catch (fs::filesystem_error & e) {
             throw SysError("getting status of '%1%'", srcFile);
         }
 
@@ -68,16 +71,16 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             hasSuffix(srcFile, "/manifest.json"))
             continue;
 
-        else if (std::filesystem::is_directory(srcSt)) {
+        else if (fs::is_directory(srcSt)) {
             auto dstStOpt = maybeSymlinkStat(dstFile);
             if (dstStOpt) {
                 auto & dstSt = *dstStOpt;
-                if (std::filesystem::is_directory(dstSt)) {
+                if (fs::is_directory(dstSt)) {
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
-                } else if (std::filesystem::is_symlink(dstSt)) {
+                } else if (fs::is_symlink(dstSt)) {
                     auto target = canonPath(dstFile, true);
-                    if (!std::filesystem::is_directory(std::filesystem::symlink_status(target)))
+                    if (!fs::is_directory(fs::symlink_status(target)))
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
@@ -98,7 +101,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             auto dstStOpt = maybeSymlinkStat(dstFile);
             if (dstStOpt) {
                 auto & dstSt = *dstStOpt;
-                if (std::filesystem::is_symlink(dstSt)) {
+                if (fs::is_symlink(dstSt)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
                         throw BuildEnvFileConflictError(
@@ -110,7 +113,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
-                } else if (std::filesystem::is_directory(dstSt))
+                } else if (fs::is_directory(dstSt))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             }
         }
