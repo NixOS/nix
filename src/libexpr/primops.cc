@@ -1162,12 +1162,34 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 }
 
+/**
+ * Early validation for the derivation name, for better error message.
+ * It is checked again when constructing store paths.
+ *
+ * @todo Check that the `.drv` suffix also fits.
+ */
+static void checkDerivationName(EvalState & state, std::string_view drvName)
+{
+    try {
+        checkName(drvName);
+    } catch (BadStorePathName & e) {
+        // "Please pass a different name": Users may not be aware that they can
+        //     pass a different one, in functions like `fetchurl` where the name
+        //     is optional.
+        // Note that Nixpkgs generally won't trigger this, because `mkDerivation`
+        // sanitizes the name.
+        state.error<EvalError>("invalid derivation name: %s. Please pass a different '%s'.", Uncolored(e.message()), "name").debugThrow();
+    }
+}
+
 static void derivationStrictInternal(
     EvalState & state,
     const std::string & drvName,
     const Bindings * attrs,
     Value & v)
 {
+    checkDerivationName(state, drvName);
+
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
     std::optional<json> jsonObject;
