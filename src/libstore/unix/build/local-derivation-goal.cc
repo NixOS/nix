@@ -2082,13 +2082,13 @@ void LocalDerivationGoal::runChild()
                             i.first, i.second.source);
 
                     std::string path = i.first;
-                    auto optSt = maybeLstat(path.c_str());
+                    auto optSt = maybeSymlinkStat(path);
                     if (!optSt) {
                         if (i.second.optional)
                             continue;
                         throw SysError("getting attributes of required path '%s", path);
                     }
-                    if (S_ISDIR(optSt->st_mode))
+                    if (std::filesystem::is_directory(*optSt))
                         sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
                     else
                         sandboxProfile += fmt("\t(literal \"%s\")\n", path);
