@@ -415,7 +415,11 @@ void deletePath(const fs::path & path)
 
 void createDirs(const Path & path)
 {
-    fs::create_directories(path);
+    try {
+        fs::create_directories(path);
+    } catch (fs::filesystem_error & e) {
+        throw SysError("creating directory '%1%'", path);
+    }
 }
 
 

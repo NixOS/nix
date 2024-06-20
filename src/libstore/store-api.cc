@@ -1304,7 +1304,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 if (!pathExists(chrootStore)) {
                     try {
                         createDirs(chrootStore);
-                    } catch (std::filesystem::filesystem_error & e) {
+                    } catch (SystemError & e) {
                         return std::make_shared<LocalStore>(params);
                     }
                     warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
