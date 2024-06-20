@@ -36,4 +36,4 @@ Today, a world-wide developer community contributes to Nix and the ecosystem tha
 
 ## License
 
-Nix is released under the [LGPL v2.1](./COPYING).
+Nix is licensed under the [GNU Lesser General Public License v2.1 or later](./COPYING).

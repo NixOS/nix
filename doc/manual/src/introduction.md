@@ -188,6 +188,4 @@ homepage](https://nixos.org/).
 
 ## License
 
-Nix is released under the terms of the [GNU LGPLv2.1 or (at your
-option) any later
-version](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
+Nix is licensed under the [GNU Lesser General Public License v2.1 or later](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html).
