@@ -11,7 +11,7 @@ in
         When iterating on the functional tests, it's recommended to "set" this
         to `true`, so that changes to the functional tests don't require any
         recompilation of the package.
-        You can do so by buildin the `.quickBuild` attribute on the check package,
+        You can do so by building the `.quickBuild` attribute on the check package,
         e.g:
         ```console
         nix build .#hydraJobs.functional_user.quickBuild
