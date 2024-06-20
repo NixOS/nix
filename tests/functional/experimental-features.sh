@@ -33,35 +33,35 @@ source common.sh
 NIX_CONFIG='
   experimental-features = nix-command
   accept-flake-config = true
-' expect 1 nix config show accept-flake-config 1>$TEST_ROOT/stdout 2>$TEST_ROOT/stderr
-[[ $(cat $TEST_ROOT/stdout) = '' ]]
-grepQuiet "Ignoring setting 'accept-flake-config' because experimental feature 'flakes' is not enabled" $TEST_ROOT/stderr
-grepQuiet "error: could not find setting 'accept-flake-config'" $TEST_ROOT/stderr
+' expect 1 nix config show accept-flake-config 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
+[[ $(cat "$TEST_ROOT/stdout") = '' ]]
+grepQuiet "Ignoring setting 'accept-flake-config' because experimental feature 'flakes' is not enabled" "$TEST_ROOT/stderr"
+grepQuiet "error: could not find setting 'accept-flake-config'" "$TEST_ROOT/stderr"
 
 # 'flakes' experimental-feature is disabled after, ignore and warn
 NIX_CONFIG='
   accept-flake-config = true
   experimental-features = nix-command
-' expect 1 nix config show accept-flake-config 1>$TEST_ROOT/stdout 2>$TEST_ROOT/stderr
-[[ $(cat $TEST_ROOT/stdout) = '' ]]
-grepQuiet "Ignoring setting 'accept-flake-config' because experimental feature 'flakes' is not enabled" $TEST_ROOT/stderr
-grepQuiet "error: could not find setting 'accept-flake-config'" $TEST_ROOT/stderr
+' expect 1 nix config show accept-flake-config 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
+[[ $(cat "$TEST_ROOT/stdout") = '' ]]
+grepQuiet "Ignoring setting 'accept-flake-config' because experimental feature 'flakes' is not enabled" "$TEST_ROOT/stderr"
+grepQuiet "error: could not find setting 'accept-flake-config'" "$TEST_ROOT/stderr"
 
 # 'flakes' experimental-feature is enabled before, process
 NIX_CONFIG='
   experimental-features = nix-command flakes
   accept-flake-config = true
-' nix config show accept-flake-config 1>$TEST_ROOT/stdout 2>$TEST_ROOT/stderr
-grepQuiet "true" $TEST_ROOT/stdout
-grepQuietInverse "Ignoring setting 'accept-flake-config'" $TEST_ROOT/stderr
+' nix config show accept-flake-config 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
+grepQuiet "true" "$TEST_ROOT/stdout"
+grepQuietInverse "Ignoring setting 'accept-flake-config'" "$TEST_ROOT/stderr"
 
 # 'flakes' experimental-feature is enabled after, process
 NIX_CONFIG='
   accept-flake-config = true
   experimental-features = nix-command flakes
-' nix config show accept-flake-config 1>$TEST_ROOT/stdout 2>$TEST_ROOT/stderr
-grepQuiet "true" $TEST_ROOT/stdout
-grepQuietInverse "Ignoring setting 'accept-flake-config'" $TEST_ROOT/stderr
+' nix config show accept-flake-config 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
+grepQuiet "true" "$TEST_ROOT/stdout"
+grepQuietInverse "Ignoring setting 'accept-flake-config'" "$TEST_ROOT/stderr"
 
 function exit_code_both_ways {
     expect 1 nix --experimental-features 'nix-command' "$@" 1>/dev/null

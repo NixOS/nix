@@ -90,7 +90,7 @@ EOF
 EOF
 
     # Test tarball URLs on the command line.
-    [[ $(nix flake metadata --json file://$PWD/test_input_no_ext | jq -r .resolved.type) = tarball ]]
+    [[ $(nix flake metadata --json "file://$PWD/test_input_no_ext" | jq -r .resolved.type) = tarball ]]
 
     popd
 

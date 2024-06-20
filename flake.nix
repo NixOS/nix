@@ -160,21 +160,34 @@
             };
           });
 
-          nix =
-            let
-              officialRelease = false;
-              versionSuffix =
-                if officialRelease
-                then ""
-                else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
+          nix-util = final.callPackage ./src/libutil/package.nix {
+            inherit
+              fileset
+              stdenv
+              officialRelease
+              versionSuffix
+              ;
+          };
 
-            in final.callPackage ./package.nix {
+          nix-store = final.callPackage ./src/libstore/package.nix {
+            inherit
+              fileset
+              stdenv
+              officialRelease
+              versionSuffix
+              ;
+            libseccomp = final.libseccomp-nix;
+            busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+          };
+
+          nix =
+            final.callPackage ./package.nix {
               inherit
                 fileset
                 stdenv
+                officialRelease
                 versionSuffix
                 ;
-              officialRelease = false;
               boehmgc = final.boehmgc-nix;
               libgit2 = final.libgit2-nix;
               libseccomp = final.libseccomp-nix;
@@ -203,7 +216,7 @@
       # 'nix.perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
 
-      hydraJobs = import ./build/hydra.nix {
+      hydraJobs = import ./maintainers/hydra.nix {
         inherit
           inputs
           binaryTarball
@@ -236,11 +249,34 @@
       } // devFlake.checks.${system} or {}
       );
 
-      packages = forAllSystems (system: rec {
-        inherit (nixpkgsFor.${system}.native) nix changelog-d;
-        default = nix;
-      } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
-        nix-static = nixpkgsFor.${system}.static.nix;
+      packages = forAllSystems (system: {
+        inherit (nixpkgsFor.${system}.native)
+          changelog-d;
+        default = self.packages.${system}.nix;
+      } // lib.concatMapAttrs
+        # We need to flatten recursive attribute sets of derivations to pass `flake check`.
+        (pkgName: {}: {
+          "${pkgName}" = nixpkgsFor.${system}.native.${pkgName};
+          "${pkgName}-static" = nixpkgsFor.${system}.static.${pkgName};
+        } // lib.concatMapAttrs
+          (crossSystem: {}: {
+            "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.${pkgName};
+          })
+          (lib.genAttrs crossSystems (_: { }))
+        // lib.concatMapAttrs
+          (stdenvName: {}: {
+            "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".${pkgName};
+          })
+          (lib.genAttrs stdenvs (_: { })))
+        {
+          "nix" = { };
+          # Temporarily disabled because GitHub Actions OOM issues. Once
+          # the old build system is gone and we are back to one build
+          # system, we should reenable these.
+          #"nix-util" = { };
+          #"nix-store" = { };
+        }
+        // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         dockerImage =
           let
             pkgs = nixpkgsFor.${system}.native;
@@ -255,18 +291,7 @@
               ln -s ${image} $image
               echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
             '';
-      } // builtins.listToAttrs (map
-          (crossSystem: {
-            name = "nix-${crossSystem}";
-            value = nixpkgsFor.${system}.cross.${crossSystem}.nix;
-          })
-          crossSystems)
-        // builtins.listToAttrs (map
-          (stdenvName: {
-            name = "nix-${stdenvName}";
-            value = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nix;
-          })
-          stdenvs)));
+      });
 
       devShells = let
         makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
@@ -274,6 +299,11 @@
           modular = devFlake.getSystem stdenv.buildPlatform.system;
         in {
           pname = "shell-for-" + attrs.pname;
+
+          # Remove the version suffix to avoid unnecessary attempts to substitute in nix develop
+          version = lib.fileContents ./.version;
+          name = attrs.pname;
+
           installFlags = "sysconfdir=$(out)/etc";
           shellHook = ''
             PATH=$prefix/bin:$PATH
@@ -288,12 +318,20 @@
           src = null;
 
           env = {
+            # Needed for Meson to find Boost.
+            # https://github.com/NixOS/nixpkgs/issues/86131.
+            BOOST_INCLUDEDIR = "${lib.getDev pkgs.boost}/include";
+            BOOST_LIBRARYDIR = "${lib.getLib pkgs.boost}/lib";
             # For `make format`, to work without installing pre-commit
             _NIX_PRE_COMMIT_HOOKS_CONFIG =
               "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
           };
 
+          mesonFlags = pkgs.nix-util.mesonFlags ++ pkgs.nix-store.mesonFlags;
+
           nativeBuildInputs = attrs.nativeBuildInputs or []
+            ++ pkgs.nix-util.nativeBuildInputs
+            ++ pkgs.nix-store.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"

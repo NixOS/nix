@@ -4,7 +4,7 @@ programs += libutil-tests
 
 libutil-tests_NAME = libnixutil-tests
 
-libutil-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data
+libutil-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data GTEST_OUTPUT=xml:$$testresults/libutil-tests.xml
 
 libutil-tests_DIR := $(d)
 
