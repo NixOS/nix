@@ -4,7 +4,7 @@
 
 # Synopsis
 
-`nix-store` `--gc` [`--print-roots` | `--print-live` | `--print-dead`] [`--max-freed` *bytes*]
+`nix-store` `--gc` [`--print-roots` | `--print-live` | `--print-dead`] [`--max-freed` *bytes*] [`--keep-going`]
 
 # Description
 

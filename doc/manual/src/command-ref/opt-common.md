@@ -118,6 +118,7 @@ Most Nix commands accept the following command-line options:
   Keep going in case of failed builds, to the greatest extent possible.
   That is, if building an input of some derivation fails, Nix will still build the other inputs, but not the derivation itself.
   Without this option, Nix stops if any build fails (except for builds of substitutes), possibly killing builds in progress (in case of parallel or distributed builds).
+  In the context of garbage collection, this option indicates that the garbage collector should continue deleting garbage even if an error occurs while deleting a path.
 
 - <span id="opt-keep-failed">[`--keep-failed`](#opt-keep-failed)</span> / `-K`
 
