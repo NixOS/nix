@@ -9,7 +9,7 @@ if isTestOnNixOS; then
 
   export NIX_USER_CONF_FILES="$test_nix_conf_dir/nix.conf"
   mkdir -p "$test_nix_conf_dir" "$TEST_HOME"
-  (! test -e "$test_nix_conf")
+  ! test -e "$test_nix_conf"
   cat > "$test_nix_conf_dir/nix.conf" <<EOF
 # TODO: this is not needed for all tests and prevents stable commands from be tested in isolation
 experimental-features = nix-command flakes
