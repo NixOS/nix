@@ -186,12 +186,12 @@ jobs:
       - name: Checkout flake-regressions
         uses: actions/checkout@v4
         with:
-          repository: DeterminateSystems/flake-regressions
+          repository: NixOS/flake-regressions
           path: flake-regressions
       - name: Checkout flake-regressions-data
         uses: actions/checkout@v4
         with:
-          repository: DeterminateSystems/flake-regressions-data
+          repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
