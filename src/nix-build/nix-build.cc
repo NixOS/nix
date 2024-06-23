@@ -473,8 +473,11 @@ static void main_nix_build(int argc, char * * argv)
                 shellDrv = bashDrv;
 
             } catch (Error & e) {
-                logErrorInfo(lvlDebug, e.info());
-                printInfo("Canont access '(import <nixpkgs>).bashInteractive'; using bash from your environment%s.", (interactive ? "" : " for bootstrapping"));
+                // in a shebang, it doesn't matter which bash we use since we immediately execute the interpreter
+                if (!inShebang) {
+                    logErrorInfo(lvlInfo, e.info());
+                    printInfo("Cannot access '(import <nixpkgs> {}).bashInteractive'; falling back to bash from your environment.");
+                }
                 shell = "bash";
             }
         }
