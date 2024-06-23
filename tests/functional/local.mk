@@ -23,7 +23,7 @@ nix_tests = \
   remote-store.sh \
   legacy-ssh-store.sh \
   lang.sh \
-  lang-test-infra.sh \
+  characterisation-test-infra.sh \
   experimental-features.sh \
   fetchMercurial.sh \
   gc-auto.sh \
