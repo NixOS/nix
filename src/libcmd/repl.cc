@@ -8,6 +8,7 @@
 
 #include "ansicolor.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "eval.hh"
 #include "eval-cache.hh"
 #include "eval-inline.hh"
