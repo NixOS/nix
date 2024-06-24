@@ -11,7 +11,7 @@ isTestOnNixOS() {
 }
 
 die() {
-  echo "fatal error: $*" >&2
+  echo "unexpected fatal error: $*" >&2
   exit 1
 }
 
@@ -216,7 +216,7 @@ requireGit() {
 }
 
 fail() {
-    echo "$1" >&2
+    echo "test failed: $1" >&2
     exit 1
 }
 
