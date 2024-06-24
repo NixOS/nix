@@ -2760,14 +2760,18 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
     auto i = lookupPathResolved.find(value);
     if (i != lookupPathResolved.end()) return i->second;
 
-    std::optional<std::string> res;
+    auto finish = [&](std::string res) {
+        debug("resolved search path element '%s' to '%s'", value, res);
+        lookupPathResolved.emplace(value, res);
+        return res;
+    };
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto accessor = fetchers::downloadTarball(
                 EvalSettings::resolvePseudoUrl(value)).accessor;
             auto storePath = fetchToStore(*store, SourcePath(accessor), FetchMode::Copy);
-            res = { store->toRealPath(storePath) };
+            return finish(store->toRealPath(storePath));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -2775,15 +2779,17 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
         }
     }
 
-    else if (hasPrefix(value, "flake:")) {
-        experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
-        debug("fetching flake search path element '%s''", value);
-        auto storePath = flakeRef.resolve(store).fetchTree(store).first;
-        res = { store->toRealPath(storePath) };
+    if (auto colPos = value.find(':'); colPos != value.npos) {
+        auto scheme = value.substr(0, colPos);
+        auto rest = value.substr(colPos + 1);
+        if (auto * hook = get(settings.lookupPathHooks, scheme)) {
+            auto res = (*hook)(store, rest);
+            if (res)
+                return finish(std::move(*res));
+        }
     }
 
-    else {
+    {
         auto path = absPath(value);
 
         /* Allow access to paths in the search path. */
@@ -2800,22 +2806,17 @@ std::optional<std::string> EvalState::resolveLookupPathPath(const LookupPath::Pa
         }
 
         if (pathExists(path))
-            res = { path };
+            return finish(std::move(path));
         else {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' does not exist, ignoring", value)
             });
-            res = std::nullopt;
         }
     }
 
-    if (res)
-        debug("resolved search path element '%s' to '%s'", value, *res);
-    else
-        debug("failed to resolve search path element '%s'", value);
+    debug("failed to resolve search path element '%s'", value);
+    return std::nullopt;
 
-    lookupPathResolved.emplace(value, res);
-    return res;
 }
 
 

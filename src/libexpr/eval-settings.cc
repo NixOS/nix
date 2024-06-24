@@ -45,8 +45,9 @@ static Strings parseNixPath(const std::string & s)
     return res;
 }
 
-EvalSettings::EvalSettings(bool & readOnlyMode)
+EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lookupPathHooks)
     : readOnlyMode{readOnlyMode}
+    , lookupPathHooks{lookupPathHooks}
 {
     auto var = getEnv("NIX_PATH");
     if (var) nixPath = parseNixPath(*var);

@@ -5,9 +5,40 @@
 
 namespace nix {
 
+class Store;
+
 struct EvalSettings : Config
 {
-    EvalSettings(bool & readOnlyMode);
+    /**
+     * Function used to interpet look path entries of a given scheme.
+     *
+     * The argument is the non-scheme part of the lookup path entry (see
+     * `LookupPathHooks` below).
+     *
+     * The return value is (a) whether the entry was valid, and, if so,
+     * what does it map to.
+     *
+     * @todo Return (`std::optional` of) `SourceAccssor` or something
+     * more structured instead of mere `std::string`?
+     */
+    using LookupPathHook = std::optional<std::string>(ref<Store> store, std::string_view);
+
+    /**
+     * Map from "scheme" to a `LookupPathHook`.
+     *
+     * Given a lookup path value (i.e. either the whole thing, or after
+     * the `<key>=`) in the form of:
+     *
+     * ```
+     * <scheme>:<arbitrary string>
+     * ```
+     *
+     * if `<scheme>` is a key in this map, then `<arbitrary string>` is
+     * passed to the hook that is the value in this map.
+     */
+    using LookupPathHooks = std::map<std::string, std::function<LookupPathHook>>;
+
+    EvalSettings(bool & readOnlyMode, LookupPathHooks lookupPathHooks = {});
 
     bool & readOnlyMode;
 
@@ -16,6 +47,8 @@ struct EvalSettings : Config
     static bool isPseudoUrl(std::string_view s);
 
     static std::string resolvePseudoUrl(std::string_view url);
+
+    LookupPathHooks lookupPathHooks;
 
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
         Enable built-in functions that allow executing native code.
