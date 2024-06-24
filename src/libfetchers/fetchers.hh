@@ -73,7 +73,7 @@ public:
      */
     bool isLocked() const;
 
-    bool operator ==(const Input & other) const;
+    bool operator ==(const Input & other) const noexcept;
 
     bool contains(const Input & other) const;
 

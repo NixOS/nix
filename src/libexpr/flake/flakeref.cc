@@ -36,11 +36,6 @@ std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef)
     return str;
 }
 
-bool FlakeRef::operator ==(const FlakeRef & other) const
-{
-    return input == other.input && subdir == other.subdir;
-}
-
 FlakeRef FlakeRef::resolve(ref<Store> store) const
 {
     auto [input2, extraAttrs] = lookupInRegistries(store, input);

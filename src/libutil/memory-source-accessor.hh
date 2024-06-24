@@ -15,11 +15,15 @@ struct MemorySourceAccessor : virtual SourceAccessor
      * defining what a "file system object" is in Nix.
      */
     struct File {
+        bool operator == (const File &) const noexcept;
+        std::strong_ordering operator <=> (const File &) const noexcept;
+
         struct Regular {
             bool executable = false;
             std::string contents;
 
-            GENERATE_CMP(Regular, me->executable, me->contents);
+            bool operator == (const Regular &) const = default;
+            auto operator <=> (const Regular &) const = default;
         };
 
         struct Directory {
@@ -27,13 +31,15 @@ struct MemorySourceAccessor : virtual SourceAccessor
 
             std::map<Name, File, std::less<>> contents;
 
-            GENERATE_CMP(Directory, me->contents);
+            bool operator == (const Directory &) const noexcept;
+            auto operator <=> (const Directory &) const noexcept;
         };
 
         struct Symlink {
             std::string target;
 
-            GENERATE_CMP(Symlink, me->target);
+            bool operator == (const Symlink &) const = default;
+            auto operator <=> (const Symlink &) const = default;
         };
 
         using Raw = std::variant<Regular, Directory, Symlink>;
@@ -41,14 +47,13 @@ struct MemorySourceAccessor : virtual SourceAccessor
 
         MAKE_WRAPPER_CONSTRUCTOR(File);
 
-        GENERATE_CMP(File, me->raw);
-
         Stat lstat() const;
     };
 
     File root { File::Directory {} };
 
-    GENERATE_CMP(MemorySourceAccessor, me->root);
+    bool operator == (const MemorySourceAccessor &) const noexcept = default;
+    auto operator <=> (const MemorySourceAccessor &) const noexcept = default;
 
     std::string readFile(const CanonPath & path) override;
     bool pathExists(const CanonPath & path) override;
@@ -71,6 +76,17 @@ struct MemorySourceAccessor : virtual SourceAccessor
 
     SourcePath addFile(CanonPath path, std::string && contents);
 };
+
+
+bool MemorySourceAccessor::File::Directory::operator == (
+    const MemorySourceAccessor::File::Directory &) const noexcept = default;
+auto MemorySourceAccessor::File::Directory::operator <=> (
+    const MemorySourceAccessor::File::Directory &) const noexcept = default;
+
+bool MemorySourceAccessor::File::operator == (
+    const MemorySourceAccessor::File &) const noexcept = default;
+std::strong_ordering MemorySourceAccessor::File::operator <=> (
+    const MemorySourceAccessor::File &) const noexcept = default;
 
 /**
  * Write to a `MemorySourceAccessor` at the given path

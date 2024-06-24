@@ -41,7 +41,7 @@ Hash::Hash(HashAlgorithm algo) : algo(algo)
 }
 
 
-bool Hash::operator == (const Hash & h2) const
+bool Hash::operator == (const Hash & h2) const noexcept
 {
     if (hashSize != h2.hashSize) return false;
     for (unsigned int i = 0; i < hashSize; i++)
@@ -50,7 +50,7 @@ bool Hash::operator == (const Hash & h2) const
 }
 
 
-std::strong_ordering Hash::operator <=> (const Hash & h) const
+std::strong_ordering Hash::operator <=> (const Hash & h) const noexcept
 {
     if (auto cmp = hashSize <=> h.hashSize; cmp != 0) return cmp;
     for (unsigned int i = 0; i < hashSize; i++) {

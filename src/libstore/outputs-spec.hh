@@ -6,9 +6,7 @@
 #include <set>
 #include <variant>
 
-#include "comparator.hh"
 #include "json-impls.hh"
-#include "comparator.hh"
 #include "variant-wrapper.hh"
 
 namespace nix {
@@ -60,7 +58,8 @@ struct OutputsSpec {
 
     Raw raw;
 
-    GENERATE_CMP(OutputsSpec, me->raw);
+    bool operator == (const OutputsSpec &) const = default;
+    auto operator <=> (const OutputsSpec &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(OutputsSpec);
 
@@ -99,7 +98,8 @@ struct ExtendedOutputsSpec {
 
     Raw raw;
 
-    GENERATE_CMP(ExtendedOutputsSpec, me->raw);
+    bool operator == (const ExtendedOutputsSpec &) const = default;
+    auto operator <=> (const ExtendedOutputsSpec &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ExtendedOutputsSpec);
 

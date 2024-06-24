@@ -27,10 +27,10 @@ struct ProfileElementSource
     std::string attrPath;
     ExtendedOutputsSpec outputs;
 
-    bool operator < (const ProfileElementSource & other) const
+    auto operator <=> (const ProfileElementSource & other) const
     {
         return
-            std::tuple(originalRef.to_string(), attrPath, outputs) <
+            std::tuple(originalRef.to_string(), attrPath, outputs) <=>
             std::tuple(other.originalRef.to_string(), other.attrPath, other.outputs);
     }
 

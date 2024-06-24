@@ -103,9 +103,8 @@ struct SourcePath
      */
     SourcePath operator / (std::string_view c) const;
 
-    bool operator==(const SourcePath & x) const;
-    bool operator!=(const SourcePath & x) const;
-    bool operator<(const SourcePath & x) const;
+    bool operator==(const SourcePath & x) const noexcept;
+    std::strong_ordering operator<=>(const SourcePath & x) const noexcept;
 
     /**
      * Convenience wrapper around `SourceAccessor::resolveSymlinks()`.

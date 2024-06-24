@@ -54,17 +54,15 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
 
 namespace nix {
 
-GENERATE_CMP_EXT(
-    template<>,
-    DerivedPathMap<std::set<std::string>>::ChildNode,
-    me->value,
-    me->childMap);
+template<>
+bool DerivedPathMap<std::set<std::string>>::ChildNode::operator == (
+    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept = default;
 
-GENERATE_CMP_EXT(
-    template<>,
-    DerivedPathMap<std::set<std::string>>,
-    me->map);
+template<>
+std::strong_ordering DerivedPathMap<std::set<std::string>>::ChildNode::operator <=> (
+    const DerivedPathMap<std::set<std::string>>::ChildNode &) const noexcept = default;
 
+template struct DerivedPathMap<std::set<std::string>>::ChildNode;
 template struct DerivedPathMap<std::set<std::string>>;
 
 };
