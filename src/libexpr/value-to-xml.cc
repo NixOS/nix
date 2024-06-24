@@ -9,7 +9,7 @@
 namespace nix {
 
 
-static XMLAttrs singletonAttrs(const std::string & name, const std::string & value)
+static XMLAttrs singletonAttrs(const std::string & name, std::string_view value)
 {
     XMLAttrs attrs;
     attrs[name] = value;

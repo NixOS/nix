@@ -10,7 +10,7 @@ using namespace testing;
 struct ValuePrintingTests : LibExprTest
 {
     template<class... A>
-    void test(Value v, std::string_view expected, A... args)
+    void test(Value & v, std::string_view expected, A... args)
     {
         std::stringstream out;
         v.print(state, out, args...);
@@ -730,9 +730,10 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
     vThree.mkInt(3);
 
     builder.insert(state.symbols.create("three"), &vThree);
-    vAttrs.mkAttrs(builder.finish());
+    Value vAttrs2;
+    vAttrs2.mkAttrs(builder.finish());
 
-    test(vAttrs,
+    test(vAttrs2,
          "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«2 attributes elided»" ANSI_NORMAL " }",
          PrintOptions {
              .ansiColors = true,

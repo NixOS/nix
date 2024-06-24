@@ -289,10 +289,10 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
 
             if (v2.type() == nAttrs) {
                 for (auto & i : *v2.attrs()) {
-                    std::string name = state->symbols[i.name];
+                    std::string_view name = state->symbols[i.name];
                     if (name.find(searchWord) == 0) {
                         if (prefix_ == "")
-                            completions.add(name);
+                            completions.add(std::string(name));
                         else
                             completions.add(prefix_ + "." + name);
                     }

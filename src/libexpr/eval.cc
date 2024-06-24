@@ -192,13 +192,12 @@ PosIdx Value::determinePos(const PosIdx pos) const
 bool Value::isTrivial() const
 {
     return
-        internalType != tApp
-        && internalType != tPrimOpApp
-        && (internalType != tThunk
-            || (dynamic_cast<ExprAttrs *>(payload.thunk.expr)
-                && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(payload.thunk.expr)
-            || dynamic_cast<ExprList *>(payload.thunk.expr));
+        isFinished()
+        || (internalType == tThunk
+            && ((dynamic_cast<ExprAttrs *>(payload.thunk.expr)
+                    && ((ExprAttrs *) payload.thunk.expr)->dynamicAttrs.empty())
+                || dynamic_cast<ExprLambda *>(payload.thunk.expr)
+                || dynamic_cast<ExprList *>(payload.thunk.expr)));
 }
 
 
@@ -302,8 +301,6 @@ EvalState::EvalState(
     , trylevel(0)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
-    , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
 #else
@@ -446,7 +443,7 @@ Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
 Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
-    *v2 = v;
+    v2->finishValue(v.internalType, v.payload);
     addConstant(name, v2, info);
     return v2;
 }
@@ -463,8 +460,10 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 
            We might know the type of a thunk in advance, so be allowed
            to just write it down in that case. */
-        if (auto gotType = v->type(true); gotType != nThunk)
-            assert(info.type == gotType);
+        if (v->internalType != tUninitialized) {
+            if (auto gotType = v->type(); gotType != nThunk)
+                assert(info.type == gotType);
+        }
 
         /* Install value the base environment. */
         staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
@@ -574,7 +573,7 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    if (!env.values[0]->isThunk()) {
+    if (env.values[0]->isFinished()) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
         auto j = env.values[0]->attrs()->begin();
@@ -630,14 +629,14 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
     if (env.up && se.up) {
         mapStaticEnvBindings(st, *se.up, *env.up, vm);
 
-        if (se.isWith && !env.values[0]->isThunk()) {
+        if (se.isWith && env.values[0]->isFinished()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
-                vm[st[j.name]] = j.value;
+                vm.insert_or_assign(std::string(st[j.name]), j.value);
         } else {
             // iterate through staticenv bindings and add them.
             for (auto & i : se.vars)
-                vm[st[i.first]] = env.values[i.second];
+                vm.insert_or_assign(std::string(st[i.first]), env.values[i.second]);
         }
     }
 }
@@ -987,62 +986,87 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
+/**
+ * A helper `Expr` class to lets us parse and evaluate Nix expressions
+ * from a thunk, ensuring that every file is parsed/evaluated only
+ * once (via the thunk stored in `EvalState::fileEvalCache`).
+ */
+struct ExprParseFile : Expr
+{
+    SourcePath & path;
+    bool mustBeTrivial;
+
+    ExprParseFile(SourcePath & path, bool mustBeTrivial)
+        : path(path)
+        , mustBeTrivial(mustBeTrivial)
+    { }
+
+    void eval(EvalState & state, Env & env, Value & v) override
+    {
+        printTalkative("evaluating file '%s'", path);
+
+        auto e = state.parseExprFromFile(path);
+
+        try {
+            auto dts = state.debugRepl
+                ? makeDebugTraceStacker(
+                    state,
+                    *e,
+                    state.baseEnv,
+                    e->getPos() ? std::make_shared<Pos>(state.positions[e->getPos()]) : nullptr,
+                    "while evaluating the file '%s':", path.to_string())
+                : nullptr;
+
+            // Enforce that 'flake.nix' is a direct attrset, not a
+            // computation.
+            if (mustBeTrivial &&
+                !(dynamic_cast<ExprAttrs *>(e)))
+                state.error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
+
+            state.eval(e, v);
+        } catch (Error & e) {
+            state.addErrorTrace(e, "while evaluating the file '%s':", path.to_string());
+            throw;
+        }
+    }
+};
+
+
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
-        v = i->second;
+    auto resolvedPath = getOptional(*importResolutionCache.read(), path);
+
+    if (!resolvedPath) {
+        resolvedPath = resolveExprPath(path);
+        importResolutionCache.lock()->emplace(path, *resolvedPath);
+    }
+
+    if (auto v2 = get(*fileEvalCache.read(), *resolvedPath)) {
+        forceValue(*const_cast<Value *>(v2), noPos);
+        v = *v2;
         return;
     }
 
-    auto resolvedPath = resolveExprPath(path);
-    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
-        v = i->second;
-        return;
+    Value * vExpr;
+    ExprParseFile expr{*resolvedPath, mustBeTrivial};
+
+    {
+        auto cache(fileEvalCache.lock());
+        auto [i, inserted] = cache->try_emplace(*resolvedPath);
+        if (inserted)
+            i->second.mkThunk(nullptr, &expr);
+        vExpr = &i->second;
     }
 
-    printTalkative("evaluating file '%1%'", resolvedPath);
-    Expr * e = nullptr;
+    forceValue(*vExpr, noPos);
 
-    auto j = fileParseCache.find(resolvedPath);
-    if (j != fileParseCache.end())
-        e = j->second;
-
-    if (!e)
-        e = parseExprFromFile(resolvedPath);
-
-    fileParseCache[resolvedPath] = e;
-
-    try {
-        auto dts = debugRepl
-            ? makeDebugTraceStacker(
-                *this,
-                *e,
-                this->baseEnv,
-                e->getPos() ? std::make_shared<Pos>(positions[e->getPos()]) : nullptr,
-                "while evaluating the file '%1%':", resolvedPath.to_string())
-            : nullptr;
-
-        // Enforce that 'flake.nix' is a direct attrset, not a
-        // computation.
-        if (mustBeTrivial &&
-            !(dynamic_cast<ExprAttrs *>(e)))
-            error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath.to_string());
-        throw;
-    }
-
-    fileEvalCache[resolvedPath] = v;
-    if (path != resolvedPath) fileEvalCache[path] = v;
+    v = *vExpr;
 }
 
 
 void EvalState::resetFileCache()
 {
-    fileEvalCache.clear();
-    fileParseCache.clear();
+    fileEvalCache.lock()->clear();
 }
 
 
@@ -1338,7 +1362,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 if (!(j = vAttrs->attrs()->get(name))) {
                     std::set<std::string> allAttrNames;
                     for (auto & attr : *vAttrs->attrs())
-                        allAttrNames.insert(state.symbols[attr.name]);
+                        allAttrNames.insert(std::string(state.symbols[attr.name]));
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
                     state.error<EvalError>("attribute '%1%' missing", state.symbols[name])
                         .atPos(pos).withSuggestions(suggestions).withFrame(env, *this).debugThrow();
@@ -1349,7 +1373,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             if (state.countCalls) state.attrSelects[pos2]++;
         }
 
-        state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos ) );
+        state.forceValue(*vAttrs, pos2 ? pos2 : this->pos);
 
     } catch (Error & e) {
         if (pos2) {
@@ -1396,18 +1420,21 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
+thread_local size_t EvalState::callDepth = 0;
+
 namespace {
-/** Increments a count on construction and decrements on destruction.
+/**
+ * Increments a count on construction and decrements on destruction.
  */
 class CallDepth {
-  size_t & count;
+    size_t & count;
 public:
-  CallDepth(size_t & count) : count(count) {
-    ++count;
-  }
-  ~CallDepth() {
-    --count;
-  }
+    CallDepth(size_t & count) : count(count) {
+        ++count;
+    }
+    ~CallDepth() {
+        --count;
+    }
 };
 };
 
@@ -1423,7 +1450,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
     forceValue(fun, pos);
 
-    Value vCur(fun);
+    Value vCur = fun;
 
     auto makeAppChain = [&]()
     {
@@ -1431,6 +1458,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         for (size_t i = 0; i < nrArgs; ++i) {
             auto fun2 = allocValue();
             *fun2 = vRes;
+            vRes.reset();
             vRes.mkPrimOpApp(fun2, args[i]);
         }
     };
@@ -1496,7 +1524,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         if (!lambda.formals->has(i.name)) {
                             std::set<std::string> formalNames;
                             for (auto & formal : lambda.formals->formals)
-                                formalNames.insert(symbols[formal.name]);
+                                formalNames.insert(std::string(symbols[formal.name]));
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
                             error<TypeError>("function '%1%' called with unexpected argument '%2%'",
                                              (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
@@ -1525,6 +1553,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         : "anonymous lambda")
                     : nullptr;
 
+                vCur.reset();
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
@@ -1560,7 +1589,9 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[fn->name]++;
 
                 try {
-                    fn->fun(*this, vCur.determinePos(noPos), args, vCur);
+                    auto pos = vCur.determinePos(noPos);
+                    vCur.reset();
+                    fn->fun(*this, pos, args, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1609,7 +1640,9 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     // 1. Unify this and above code. Heavily redundant.
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2 etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    fn->fun(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    auto pos = vCur.determinePos(noPos);
+                    vCur.reset();
+                    fn->fun(*this, pos, vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1627,6 +1660,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                heap-allocate a copy and use that instead. */
             Value * args2[] = {allocValue(), args[0]};
             *args2[0] = vCur;
+            vCur.reset();
             try {
                 callFunction(*functor->value, 2, args2, vCur, functor->pos);
             } catch (Error & e) {
@@ -1646,6 +1680,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 .debugThrow();
     }
 
+    debug("DONE %x %x", &vRes, &vCur);
     vRes = vCur;
 }
 
@@ -2021,7 +2056,7 @@ void EvalState::forceValueDeep(Value & v)
             for (auto & i : *v.attrs())
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
-                    auto dts = debugRepl && i.value->isThunk()
+                    auto dts = debugRepl && i.value->internalType == tThunk
                         ? makeDebugTraceStacker(*this, *i.value->payload.thunk.expr, *i.value->payload.thunk.env, positions[i.pos],
                             "while evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
@@ -2513,6 +2548,8 @@ bool EvalState::fullGC() {
 #endif
 }
 
+extern std::atomic<uint64_t> nrThunksAwaited, nrThunksAwaitedSlow, usWaiting, maxWaiting;
+
 void EvalState::maybePrintStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
@@ -2525,6 +2562,13 @@ void EvalState::maybePrintStats()
         }
 #endif
         printStatistics();
+    }
+
+    if (getEnv("NIX_SHOW_THREAD_STATS").value_or("0") != "0") {
+        printError("THUNKS AWAITED: %d", nrThunksAwaited);
+        printError("THUNKS AWAITED SLOW: %d", nrThunksAwaitedSlow);
+        printError("WAITING TIME: %d μs", usWaiting);
+        printError("MAX WAITING: %d", maxWaiting);
     }
 }
 

@@ -38,8 +38,8 @@ int levenshteinDistance(std::string_view first, std::string_view second)
 }
 
 Suggestions Suggestions::bestMatches (
-    std::set<std::string> allMatches,
-    std::string query)
+    const std::set<std::string> & allMatches,
+    std::string_view query)
 {
     std::set<Suggestion> res;
     for (const auto & possibleMatch : allMatches) {

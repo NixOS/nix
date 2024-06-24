@@ -205,7 +205,7 @@ protected:
         LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 
-    Sync<State> state;
+    SharedSync<State> state;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 

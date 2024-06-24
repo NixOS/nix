@@ -32,6 +32,8 @@ Value * EvalState::allocValue()
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
        have to explicitly clear the first word of every object we take. */
+    thread_local static std::shared_ptr<void *> valueAllocCache{std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+
     if (!*valueAllocCache) {
         *valueAllocCache = GC_malloc_many(sizeof(Value));
         if (!*valueAllocCache) throw std::bad_alloc();
@@ -62,6 +64,8 @@ Env & EvalState::allocEnv(size_t size)
 #if HAVE_BOEHMGC
     if (size == 1) {
         /* see allocValue for explanations. */
+        thread_local static std::shared_ptr<void *> env1AllocCache{std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+
         if (!*env1AllocCache) {
             *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
             if (!*env1AllocCache) throw std::bad_alloc();
@@ -84,9 +88,33 @@ Env & EvalState::allocEnv(size_t size)
 [[gnu::always_inline]]
 void EvalState::forceValue(Value & v, const PosIdx pos)
 {
+    auto type = v.internalType.load(std::memory_order_acquire);
+
+    if (isFinished(type))
+        goto done;
+
+    if (type == tThunk) {
+        try {
+            if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
+                if (type == tPending || type == tAwaited) {
+                    waitOnThunk(v, type == tAwaited);
+                    goto done;
+                }
+                if (isFinished(type))
+                    goto done;
+                printError("NO LONGER THUNK %x %d", this, type);
+                abort();
+            }
+            Env * env = v.payload.thunk.env;
+            Expr * expr = v.payload.thunk.expr;
+            expr->eval(*this, *env, v);
+        } catch (...) {
+            v.mkFailed();
+            throw;
+        }
+    }
+    #if 0
     if (v.isThunk()) {
-        Env * env = v.payload.thunk.env;
-        Expr * expr = v.payload.thunk.expr;
         try {
             v.mkBlackhole();
             //checkInterrupt();
@@ -97,8 +125,31 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             throw;
         }
     }
-    else if (v.isApp())
-        callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
+    #endif
+    else if (type == tApp) {
+        try {
+            if (!v.internalType.compare_exchange_strong(type, tPending, std::memory_order_acquire, std::memory_order_acquire)) {
+                if (type == tPending || type == tAwaited) {
+                    waitOnThunk(v, type == tAwaited);
+                    goto done;
+                }
+                if (isFinished(type))
+                    goto done;
+                printError("NO LONGER APP %x %d", this, type);
+                abort();
+            }
+            callFunction(*v.payload.app.left, *v.payload.app.right, v, pos);
+        } catch (...) {
+            v.mkFailed();
+            throw;
+        }
+    }
+    else if (type == tPending || type == tAwaited)
+        type = waitOnThunk(v, type == tAwaited);
+
+ done:
+    if (type == tFailed)
+        std::rethrow_exception(v.payload.failed->ex);
 }
 
 

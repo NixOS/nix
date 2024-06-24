@@ -157,6 +157,8 @@ static inline void initGCReal()
 
     GC_INIT();
 
+    GC_allow_register_threads();
+
     GC_set_oom_fn(oomHandler);
 
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;

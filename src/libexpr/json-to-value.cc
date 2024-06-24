@@ -42,7 +42,7 @@ class JSONSax : nlohmann::json_sax<json> {
             auto attrs2 = state.buildBindings(attrs.size());
             for (auto & i : attrs)
                 attrs2.insert(i.first, i.second);
-            parent->value(state).mkAttrs(attrs2.alreadySorted());
+            parent->value(state).mkAttrs(attrs2);
             return std::move(parent);
         }
         void add() override { v = nullptr; }

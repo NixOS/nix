@@ -304,27 +304,23 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::map<SourcePath, StorePath>> srcToStore;
+    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
 
     /**
-     * A cache from path names to parse trees.
+     * A cache that maps paths to "resolved" paths for importing Nix
+     * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-#if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
-#else
-    typedef std::map<SourcePath, Expr *> FileParseCache;
-#endif
-    FileParseCache fileParseCache;
+    SharedSync<std::unordered_map<SourcePath, SourcePath>> importResolutionCache; // FIXME: use unordered_map
 
     /**
-     * A cache from path names to values.
+     * A cache from resolved paths to values.
      */
 #if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
+    typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
 #else
-    typedef std::map<SourcePath, Value> FileEvalCache;
+    typedef std::unordered_map<SourcePath, Value> FileEvalCache;
 #endif
-    FileEvalCache fileEvalCache;
+    SharedSync<FileEvalCache> fileEvalCache;
 
     LookupPath lookupPath;
 
@@ -334,18 +330,6 @@ private:
      * Cache used by prim_match().
      */
     std::shared_ptr<RegexCache> regexCache;
-
-#if HAVE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
 
 public:
 
@@ -459,6 +443,13 @@ public:
      * result.  Otherwise, this is a no-op.
      */
     inline void forceValue(Value & v, const PosIdx pos);
+
+    /**
+     * Given a thunk that was observed to be in the pending or awaited
+     * state, wait for it to finish. Returns the new type of the
+     * value.
+     */
+    InternalType waitOnThunk(Value & v, bool awaited);
 
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
@@ -630,9 +621,11 @@ private:
         std::shared_ptr<StaticEnv> & staticEnv);
 
     /**
-     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run out of system stack.
+     * Current Nix call stack depth, used with `max-call-depth`
+     * setting to throw stack overflow hopefully before we run out of
+     * system stack.
      */
-    size_t callDepth = 0;
+    thread_local static size_t callDepth;
 
 public:
 

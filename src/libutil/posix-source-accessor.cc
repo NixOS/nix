@@ -90,21 +90,23 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static SharedSync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
+    static std::array<SharedSync<std::unordered_map<Path, std::optional<struct stat>>>, 32> _cache;
+
+    auto domain = std::hash<CanonPath>{}(path) % _cache.size();
 
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
 
     {
-        auto cache(_cache.read());
+        auto cache(_cache[domain].read());
         auto i = cache->find(absPath);
         if (i != cache->end()) return i->second;
     }
 
     auto st = nix::maybeLstat(absPath.c_str());
 
-    auto cache(_cache.lock());
+    auto cache(_cache[domain].lock());
     if (cache->size() >= 16384) cache->clear();
     cache->emplace(absPath, st);
 

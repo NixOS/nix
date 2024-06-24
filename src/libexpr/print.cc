@@ -478,14 +478,15 @@ private:
             output << "«potential infinite recursion»";
             if (options.ansiColors)
                 output << ANSI_NORMAL;
-        } else if (v.isThunk() || v.isApp()) {
+        } else if (!v.isFinished()) {
             if (options.ansiColors)
                     output << ANSI_MAGENTA;
             output << "«thunk»";
             if (options.ansiColors)
                     output << ANSI_NORMAL;
         } else {
-            abort();
+            // FIXME
+            output << "«pending»";
         }
     }
 

@@ -1203,7 +1203,7 @@ static void derivationStrictInternal(
 
     for (auto & i : attrs->lexicographicOrder(state.symbols)) {
         if (i->name == state.sIgnoreNulls) continue;
-        const std::string & key = state.symbols[i->name];
+        auto key = state.symbols[i->name];
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string_view s) {
@@ -1287,7 +1287,7 @@ static void derivationStrictInternal(
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    (*jsonObject)[key] = printValueAsJSON(state, true, *i->value, pos, context);
+                    jsonObject->emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, pos, context_below);
@@ -2988,6 +2988,8 @@ static void prim_mapAttrs(EvalState & state, const PosIdx pos, Value * * args, V
 
     auto attrs = state.buildBindings(args[1]->attrs()->size());
 
+    //printError("MAP ATTRS %d", args[1]->attrs->size());
+
     for (auto & i : *args[1]->attrs()) {
         Value * vName = state.allocValue();
         Value * vFun2 = state.allocValue();
@@ -3386,8 +3388,8 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value * * ar
         ? "while evaluating the return value of the function passed to builtins.any"
         : "while evaluating the return value of the function passed to builtins.all";
 
-    Value vTmp;
     for (auto elem : args[1]->listItems()) {
+        Value vTmp;
         state.callFunction(*args[0], *elem, vTmp, pos);
         bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
@@ -4490,9 +4492,10 @@ void EvalState::createBaseEnv()
     baseEnv.up = 0;
 
     /* Add global constants such as `true' to the base environment. */
-    Value v;
 
     /* `builtins' must be first! */
+    {
+    Value v;
     v.mkAttrs(buildBindings(128).finish());
     addConstant("builtins", v, {
         .type = nAttrs,
@@ -4507,7 +4510,10 @@ void EvalState::createBaseEnv()
           ```
         )",
     });
+    }
 
+    {
+    Value v;
     v.mkBool(true);
     addConstant("true", v, {
         .type = nBool,
@@ -4527,7 +4533,10 @@ void EvalState::createBaseEnv()
           ```
         )",
     });
+    }
 
+    {
+    Value v;
     v.mkBool(false);
     addConstant("false", v, {
         .type = nBool,
@@ -4547,6 +4556,7 @@ void EvalState::createBaseEnv()
           ```
         )",
     });
+    }
 
     addConstant("null", &vNull, {
         .type = nNull,
@@ -4562,9 +4572,12 @@ void EvalState::createBaseEnv()
         )",
     });
 
-    if (!evalSettings.pureEval) {
+    {
+    Value v;
+    if (!evalSettings.pureEval)
         v.mkInt(time(0));
-    }
+    else
+        v.mkNull();
     addConstant("__currentTime", v, {
         .type = nInt,
         .doc = R"(
@@ -4588,9 +4601,14 @@ void EvalState::createBaseEnv()
         )",
         .impureOnly = true,
     });
+    }
 
+    {
+    Value v;
     if (!evalSettings.pureEval)
         v.mkString(evalSettings.getCurrentSystem());
+    else
+        v.mkNull();
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
@@ -4618,7 +4636,10 @@ void EvalState::createBaseEnv()
         )",
         .impureOnly = true,
     });
+    }
 
+    {
+    Value v;
     v.mkString(nixVersion);
     addConstant("__nixVersion", v, {
         .type = nString,
@@ -4640,7 +4661,10 @@ void EvalState::createBaseEnv()
           ```
         )",
     });
+    }
 
+    {
+    Value v;
     v.mkString(store->storeDir);
     addConstant("__storeDir", v, {
         .type = nString,
@@ -4655,11 +4679,14 @@ void EvalState::createBaseEnv()
           ```
         )",
     });
+    }
 
     /* Language version.  This should be increased every time a new
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
+    {
+    Value v;
     v.mkInt(6);
     addConstant("__langVersion", v, {
         .type = nInt,
@@ -4667,6 +4694,7 @@ void EvalState::createBaseEnv()
           The current version of the Nix language.
         )",
     });
+    }
 
 #ifndef _WIN32 // TODO implement on Windows
     // Miscellaneous
@@ -4697,6 +4725,7 @@ void EvalState::createBaseEnv()
     });
 
     /* Add a value containing the current Nix expression search path. */
+    {
     auto list = buildList(lookupPath.elements.size());
     for (const auto & [n, i] : enumerate(lookupPath.elements)) {
         auto attrs = buildBindings(2);
@@ -4704,6 +4733,7 @@ void EvalState::createBaseEnv()
         attrs.alloc("prefix").mkString(i.prefix.s);
         (list[n] = allocValue())->mkAttrs(attrs);
     }
+    Value v;
     v.mkList(list);
     addConstant("__nixPath", v, {
         .type = nList,
@@ -4724,6 +4754,7 @@ void EvalState::createBaseEnv()
           ```
         )",
     });
+    }
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
