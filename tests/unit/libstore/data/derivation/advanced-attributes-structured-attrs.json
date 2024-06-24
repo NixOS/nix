@@ -1,0 +1,41 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "__json": "{\"__darwinAllowLocalNetworking\":true,\"__impureHostDeps\":[\"/usr/bin/ditto\"],\"__noChroot\":true,\"__sandboxProfile\":\"sandcastle\",\"allowSubstitutes\":false,\"builder\":\"/bin/bash\",\"impureEnvVars\":[\"UNICORN\"],\"name\":\"advanced-attributes-structured-attrs\",\"outputChecks\":{\"bin\":{\"disallowedReferences\":[\"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar\"],\"disallowedRequisites\":[\"/nix/store/7rhsm8i393hm1wcsmph782awg1hi2f7x-bar\"]},\"dev\":{\"maxClosureSize\":5909,\"maxSize\":789},\"out\":{\"allowedReferences\":[\"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo\"],\"allowedRequisites\":[\"/nix/store/3c08bzb71z4wiag719ipjxr277653ynp-foo\"]}},\"outputs\":[\"out\",\"bin\",\"dev\"],\"preferLocalBuild\":true,\"requiredSystemFeatures\":[\"rainbow\",\"uid-range\"],\"system\":\"my-system\"}",
+    "bin": "/nix/store/pbzb48v0ycf80jgligcp4n8z0rblna4n-advanced-attributes-structured-attrs-bin",
+    "dev": "/nix/store/7xapi8jv7flcz1qq8jhw55ar8ag8hldh-advanced-attributes-structured-attrs-dev",
+    "out": "/nix/store/mpq3l1l1qc2yr50q520g08kprprwv79f-advanced-attributes-structured-attrs"
+  },
+  "inputDrvs": {
+    "/nix/store/4xm4wccqsvagz9gjksn24s7rip2fdy7v-foo.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    },
+    "/nix/store/plsq5jbr5nhgqwcgb2qxw7jchc09dnl8-bar.drv": {
+      "dynamicOutputs": {},
+      "outputs": [
+        "out"
+      ]
+    }
+  },
+  "inputSrcs": [],
+  "name": "advanced-attributes-structured-attrs",
+  "outputs": {
+    "bin": {
+      "path": "/nix/store/pbzb48v0ycf80jgligcp4n8z0rblna4n-advanced-attributes-structured-attrs-bin"
+    },
+    "dev": {
+      "path": "/nix/store/7xapi8jv7flcz1qq8jhw55ar8ag8hldh-advanced-attributes-structured-attrs-dev"
+    },
+    "out": {
+      "path": "/nix/store/mpq3l1l1qc2yr50q520g08kprprwv79f-advanced-attributes-structured-attrs"
+    }
+  },
+  "system": "my-system"
+}
