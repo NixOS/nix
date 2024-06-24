@@ -468,7 +468,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
-                .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+                .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
                 .hash = *expectedHash,
                 .references = {}
             });

@@ -2303,7 +2303,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 path.baseName(),
-                FileIngestionMethod::Recursive,
+                ContentAddressMethod::Raw::NixArchive,
                 nullptr,
                 repair);
             allowPath(dstPath);
