@@ -7,9 +7,11 @@ namespace nix {
 
 struct EvalSettings : Config
 {
-    EvalSettings();
+    EvalSettings(bool & readOnlyMode);
 
-    static Strings getDefaultNixPath();
+    bool & readOnlyMode;
+
+    Strings getDefaultNixPath() const;
 
     static bool isPseudoUrl(std::string_view s);
 
@@ -74,7 +76,7 @@ struct EvalSettings : Config
      * Implements the `eval-system` vs `system` defaulting logic
      * described for `eval-system`.
      */
-    const std::string & getCurrentSystem();
+    const std::string & getCurrentSystem() const;
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
@@ -192,8 +194,6 @@ struct EvalSettings : Config
           This option can be enabled by setting `NIX_ABORT_ON_WARN=1` in the environment.
         )"};
 };
-
-extern EvalSettings evalSettings;
 
 /**
  * Conventionally part of the default nix path in impure mode.

@@ -30,6 +30,7 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+struct EvalSettings;
 class EvalState;
 class StorePath;
 struct SingleDerivedPath;
@@ -38,7 +39,6 @@ struct MemorySourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
-
 
 /**
  * Function that implements a primop.
@@ -162,6 +162,7 @@ struct DebugTrace {
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
 
@@ -352,6 +353,7 @@ public:
     EvalState(
         const LookupPath & _lookupPath,
         ref<Store> store,
+        const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 

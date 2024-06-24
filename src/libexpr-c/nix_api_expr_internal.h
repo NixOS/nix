@@ -2,11 +2,13 @@
 #define NIX_API_EXPR_INTERNAL_H
 
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "attr-set.hh"
 #include "nix_api_value.h"
 
 struct EvalState
 {
+    nix::EvalSettings settings;
     nix::EvalState state;
 };
 

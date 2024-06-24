@@ -9,7 +9,6 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
-#include "globals.hh"
 #include "eval-inline.hh"
 #include "filetransfer.hh"
 #include "function-trace.hh"
@@ -219,8 +218,10 @@ static constexpr size_t BASE_ENV_SIZE = 128;
 EvalState::EvalState(
     const LookupPath & _lookupPath,
     ref<Store> store,
+    const EvalSettings & settings,
     std::shared_ptr<Store> buildStore)
-    : sWith(symbols.create("<with>"))
+    : settings{settings}
+    , sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
     , sType(symbols.create("type"))
@@ -276,10 +277,10 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
-        evalSettings.restrictEval || evalSettings.pureEval
+        settings.restrictEval || settings.pureEval
         ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {},
-            [](const CanonPath & path) -> RestrictedPathError {
-                auto modeInformation = evalSettings.pureEval
+            [&settings](const CanonPath & path) -> RestrictedPathError {
+                auto modeInformation = settings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
@@ -330,10 +331,10 @@ EvalState::EvalState(
     vStringUnknown.mkString("unknown");
 
     /* Initialise the Nix expression search path. */
-    if (!evalSettings.pureEval) {
+    if (!settings.pureEval) {
         for (auto & i : _lookupPath.elements)
             lookupPath.elements.emplace_back(LookupPath::Elem {i});
-        for (auto & i : evalSettings.nixPath.get())
+        for (auto & i : settings.nixPath.get())
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
     }
 
@@ -411,9 +412,9 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
 
 void EvalState::checkURI(const std::string & uri)
 {
-    if (!evalSettings.restrictEval) return;
+    if (!settings.restrictEval) return;
 
-    if (isAllowedURI(uri, evalSettings.allowedUris.get())) return;
+    if (isAllowedURI(uri, settings.allowedUris.get())) return;
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
@@ -458,7 +459,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 
     constantInfos.push_back({name2, info});
 
-    if (!(evalSettings.pureEval && info.impureOnly)) {
+    if (!(settings.pureEval && info.impureOnly)) {
         /* Check the type, if possible.
 
            We might know the type of a thunk in advance, so be allowed
@@ -1413,11 +1414,11 @@ public:
 
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
-    if (callDepth > evalSettings.maxCallDepth)
+    if (callDepth > settings.maxCallDepth)
         error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
     CallDepth _level(callDepth);
 
-    auto trace = evalSettings.traceFunctionCalls
+    auto trace = settings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
         : nullptr;
 
@@ -2745,7 +2746,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         return {corepkgsFS, CanonPath(path.substr(3))};
 
     error<ThrownError>(
-        evalSettings.pureEval
+        settings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
         path
@@ -2825,7 +2826,7 @@ Expr * EvalState::parse(
     const SourcePath & basePath,
     std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, positions, rootFS, exprSymbols);
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, rootFS, exprSymbols);
 
     result->bindVars(*this, staticEnv);
 

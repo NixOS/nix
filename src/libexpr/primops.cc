@@ -5,7 +5,6 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "gc-small-vector.hh"
-#include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
 #include "path-references.hh"
@@ -78,7 +77,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     if (drvs.empty()) return {};
 
-    if (isIFD && !evalSettings.enableImportFromDerivation)
+    if (isIFD && !settings.enableImportFromDerivation)
         error<EvalError>(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             drvs.begin()->to_string(*store)
@@ -901,7 +900,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     MaintainCount trylevel(state.trylevel);
 
     ReplExitStatus (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
-    if (state.debugRepl && evalSettings.ignoreExceptionsDuringTry)
+    if (state.debugRepl && state.settings.ignoreExceptionsDuringTry)
     {
         /* to prevent starting the repl from exceptions withing a tryEval, null it. */
         savedDebugRepl = state.debugRepl;
@@ -950,7 +949,7 @@ static RegisterPrimOp primop_tryEval({
 static void prim_getEnv(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     std::string name(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.getEnv"));
-    v.mkString(evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
+    v.mkString(state.settings.restrictEval || state.settings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
 static RegisterPrimOp primop_getEnv({
@@ -1017,7 +1016,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
         printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
-    if (evalSettings.builtinsTraceDebugger) {
+    if (state.settings.builtinsTraceDebugger) {
         state.runDebugRepl(nullptr);
     }
     state.forceValue(*args[1], pos);
@@ -1056,11 +1055,11 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value
         logWarning(info);
     }
 
-    if (evalSettings.builtinsAbortOnWarn) {
+    if (state.settings.builtinsAbortOnWarn) {
         // Not an EvalError or subclass, which would cause the error to be stored in the eval cache.
         state.error<EvalBaseError>("aborting to reveal stack trace of warning, as abort-on-warn is set").setIsFromExpr().debugThrow();
     }
-    if (evalSettings.builtinsTraceDebugger || evalSettings.builtinsDebuggerOnWarn) {
+    if (state.settings.builtinsTraceDebugger || state.settings.builtinsDebuggerOnWarn) {
         state.runDebugRepl(nullptr);
     }
     state.forceValue(*args[1], pos);
@@ -1578,7 +1577,7 @@ static RegisterPrimOp primop_toPath({
    corner cases. */
 static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    if (evalSettings.pureEval)
+    if (state.settings.pureEval)
         state.error<EvalError>(
             "'%s' is not allowed in pure evaluation mode",
             "builtins.storePath"
@@ -4562,7 +4561,7 @@ void EvalState::createBaseEnv()
         )",
     });
 
-    if (!evalSettings.pureEval) {
+    if (!settings.pureEval) {
         v.mkInt(time(0));
     }
     addConstant("__currentTime", v, {
@@ -4589,8 +4588,8 @@ void EvalState::createBaseEnv()
         .impureOnly = true,
     });
 
-    if (!evalSettings.pureEval)
-        v.mkString(evalSettings.getCurrentSystem());
+    if (!settings.pureEval)
+        v.mkString(settings.getCurrentSystem());
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
@@ -4670,7 +4669,7 @@ void EvalState::createBaseEnv()
 
 #ifndef _WIN32 // TODO implement on Windows
     // Miscellaneous
-    if (evalSettings.enableNativeCode) {
+    if (settings.enableNativeCode) {
         addPrimOp({
             .name = "__importNative",
             .arity = 2,
@@ -4693,7 +4692,7 @@ void EvalState::createBaseEnv()
           error if `--trace-verbose` is enabled. Then return *e2*. This function
           is useful for debugging.
         )",
-        .fun = evalSettings.traceVerbose ? prim_trace : prim_second,
+        .fun = settings.traceVerbose ? prim_trace : prim_second,
     });
 
     /* Add a value containing the current Nix expression search path. */
