@@ -5,7 +5,8 @@ namespace nix {
 bool GlobalConfig::set(const std::string & name, const std::string & value)
 {
     for (auto & config : *configRegistrations)
-        if (config->set(name, value)) return true;
+        if (config->set(name, value))
+            return true;
 
     unknownSettings.emplace(name, value);
 
