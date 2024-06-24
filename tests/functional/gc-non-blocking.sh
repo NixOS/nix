@@ -4,6 +4,8 @@
 # parallel with it.
 source common.sh
 
+TODO_NixOS
+
 needLocalStore "the GC test needs a synchronisation point"
 
 clearStore

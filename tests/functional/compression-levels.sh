@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 clearCache
 
 outPath=$(nix-build dependencies.nix --no-out-link)

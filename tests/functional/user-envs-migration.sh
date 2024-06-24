@@ -13,6 +13,8 @@ fi
 killDaemon
 unset NIX_REMOTE
 
+TODO_NixOS
+
 clearStore
 clearProfiles
 rm -rf ~/.nix-profile

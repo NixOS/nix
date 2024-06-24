@@ -4,6 +4,7 @@ source common.sh
 
 enableFeatures "daemon-trust-override"
 
+TODO_NixOS
 restartDaemon
 
 requireSandboxSupport

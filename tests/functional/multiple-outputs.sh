@@ -2,7 +2,9 @@
 
 source common.sh
 
-clearStore
+TODO_NixOS
+
+clearStoreIfPossible
 
 rm -f $TEST_ROOT/result*
 

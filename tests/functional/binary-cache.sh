@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 needLocalStore "'--no-require-sigs' can’t be used with the daemon"
 
 # We can produce drvs directly into the binary cache
