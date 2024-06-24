@@ -3,7 +3,7 @@
 # Test the function for lang.sh
 source common.sh
 
-source lang/framework.sh
+source characterisation/framework.sh
 
 # We are testing this, so don't want outside world to affect us.
 unset _NIX_TEST_ACCEPT

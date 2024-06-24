@@ -21,9 +21,11 @@ commonDir="$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")"
 
 source "$commonDir/subst-vars.sh"
 # Make sure shellcheck knows all these will be defined by the above generated snippet
-: "${PATH?} ${coreutils?} ${dot?} ${SHELL?} ${PAGER?} ${busybox?} ${version?} ${system?} ${BUILD_SHARED_LIBS?}"
+: "${bindir?} ${coreutils?} ${dot?} ${SHELL?} ${PAGER?} ${busybox?} ${version?} ${system?} ${BUILD_SHARED_LIBS?}"
 
-export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default/tests\/functional//}
+source "$commonDir/paths.sh"
+source "$commonDir/test-root.sh"
+
 test_nix_conf_dir=$TEST_ROOT/etc
 test_nix_conf=$test_nix_conf_dir/nix.conf
 
@@ -59,14 +61,6 @@ unset XDG_DATA_HOME
 unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
-
-if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then
-  export PATH="$NIX_CLIENT_PACKAGE/bin":$PATH
-fi
-DAEMON_PATH="$PATH"
-if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
-  DAEMON_PATH="${NIX_DAEMON_PACKAGE}/bin:$DAEMON_PATH"
-fi
 
 export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar

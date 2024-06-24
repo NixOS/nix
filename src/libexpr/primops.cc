@@ -1209,7 +1209,7 @@ static void derivationStrictInternal(
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") {
                 // back compat, new name is "nar"
-                ingestionMethod = FileIngestionMethod::Recursive;
+                ingestionMethod = ContentAddressMethod::Raw::NixArchive;
             } else try {
                 ingestionMethod = ContentAddressMethod::parse(s);
             } catch (UsageError &) {
@@ -1217,9 +1217,9 @@ static void derivationStrictInternal(
                     "invalid value '%s' for 'outputHashMode' attribute", s
                 ).atPos(v).debugThrow();
             }
-            if (ingestionMethod == TextIngestionMethod {})
+            if (ingestionMethod == ContentAddressMethod::Raw::Text)
                 experimentalFeatureSettings.require(Xp::DynamicDerivations);
-            if (ingestionMethod == FileIngestionMethod::Git)
+            if (ingestionMethod == ContentAddressMethod::Raw::Git)
                 experimentalFeatureSettings.require(Xp::GitHashing);
         };
 
@@ -1308,6 +1308,20 @@ static void derivationStrictInternal(
                         handleOutputs(ss);
                     }
 
+                    if (i->name == state.sAllowedReferences)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedReferences'; use 'outputChecks.<output>.allowedReferences' instead", drvName);
+                    if (i->name == state.sAllowedRequisites)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedRequisites'; use 'outputChecks.<output>.allowedRequisites' instead", drvName);
+                    if (i->name == state.sDisallowedReferences)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedReferences'; use 'outputChecks.<output>.disallowedReferences' instead", drvName);
+                    if (i->name == state.sDisallowedRequisites)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedRequisites'; use 'outputChecks.<output>.disallowedRequisites' instead", drvName);
+                    if (i->name == state.sMaxSize)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxSize'; use 'outputChecks.<output>.maxSize' instead", drvName);
+                    if (i->name == state.sMaxClosureSize)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxClosureSize'; use 'outputChecks.<output>.maxClosureSize' instead", drvName);
+
+
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
                     drv.env.emplace(key, s);
@@ -1377,7 +1391,7 @@ static void derivationStrictInternal(
 
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName) &&
-        !(ingestionMethod == ContentAddressMethod { TextIngestionMethod { } } &&
+        !(ingestionMethod == ContentAddressMethod::Raw::Text &&
           outputs.size() == 1 &&
           *(outputs.begin()) == "out"))
     {
@@ -1399,7 +1413,7 @@ static void derivationStrictInternal(
 
         auto h = newHashAllowEmpty(*outputHash, outputHashAlgo);
 
-        auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
+        auto method = ingestionMethod.value_or(ContentAddressMethod::Raw::Flat);
 
         DerivationOutput::CAFixed dof {
             .ca = ContentAddress {
@@ -1418,7 +1432,7 @@ static void derivationStrictInternal(
                 .atPos(v).debugThrow();
 
         auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
-        auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
+        auto method = ingestionMethod.value_or(ContentAddressMethod::Raw::NixArchive);
 
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
@@ -2194,7 +2208,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
         })
         : ({
             StringSource s { contents };
-            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, refs, state.repair);
         });
 
     /* Note: we don't need to add `context' to the context of the
@@ -2377,7 +2391,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+    addPath(state, pos, path.baseName(), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2440,7 +2454,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
-    ContentAddressMethod method = FileIngestionMethod::Recursive;
+    auto method = ContentAddressMethod::Raw::NixArchive;
     std::optional<Hash> expectedHash;
     NixStringContext context;
 
@@ -2456,8 +2470,8 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             state.forceFunction(*(filterFun = attr.value), attr.pos, "while evaluating the `filter` parameter passed to builtins.path");
         else if (n == "recursive")
             method = state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path")
-                ? FileIngestionMethod::Recursive
-                : FileIngestionMethod::Flat;
+                ? ContentAddressMethod::Raw::NixArchive
+                : ContentAddressMethod::Raw::Flat;
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
