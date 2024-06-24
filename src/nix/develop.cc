@@ -1,3 +1,4 @@
+#include "config-global.hh"
 #include "eval.hh"
 #include "installable-flake.hh"
 #include "command-installable-value.hh"

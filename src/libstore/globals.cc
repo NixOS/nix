@@ -1,4 +1,5 @@
 #include "globals.hh"
+#include "config-global.hh"
 #include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
