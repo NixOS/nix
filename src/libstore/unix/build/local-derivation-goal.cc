@@ -2904,6 +2904,24 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
         };
 
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (get(*structuredAttrs, "allowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "allowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxClosureSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
+            }
             if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
                 if (auto output = get(*outputChecks, outputName)) {
                     Checks checks;
