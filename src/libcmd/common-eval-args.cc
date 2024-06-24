@@ -20,7 +20,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "expr"},
-        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr(expr)}); }}
+        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr{expr}}); }}
     });
 
     addFlag({
@@ -28,7 +28,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the string *string* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "string"},
-        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString(s)}); }},
+        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString{s}}); }},
     });
 
     addFlag({
@@ -36,7 +36,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the contents of file *path* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "path"},
-        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile(path)}); }},
+        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile{path}}); }},
         .completer = completePath
     });
 
@@ -125,7 +125,7 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) {
-            searchPath.elements.emplace_back(SearchPath::Elem::parse(s));
+            lookupPath.elements.emplace_back(LookupPath::Elem::parse(s));
         }}
     });
 
@@ -181,7 +181,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
                 v->mkString(arg.s);
             },
             [&](const AutoArgFile & arg) {
-                v->mkString(readFile(arg.path));
+                v->mkString(readFile(arg.path.string()));
             },
             [&](const AutoArgStdin & arg) {
                 v->mkString(readFile(STDIN_FILENO));

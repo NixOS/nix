@@ -1,7 +1,12 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 clearStore
 clearCache
+
+# nix shell is an alias for nix env shell. We'll use the shorter form in the rest of the test.
+nix env shell -f shell-hello.nix hello -c hello | grep 'Hello World'
 
 nix shell -f shell-hello.nix hello -c hello | grep 'Hello World'
 nix shell -f shell-hello.nix hello -c hello NixOS | grep 'Hello NixOS'
@@ -10,6 +15,11 @@ nix shell -f shell-hello.nix hello -c hello NixOS | grep 'Hello NixOS'
 nix shell -f shell-hello.nix hello^dev -c hello2 | grep 'Hello2'
 nix shell -f shell-hello.nix 'hello^*' -c hello2 | grep 'Hello2'
 
+# Test output paths that are a symlink.
+nix shell -f shell-hello.nix hello-symlink -c hello | grep 'Hello World'
+
+# Test that symlinks outside of the store don't work.
+expect 1 nix shell -f shell-hello.nix forbidden-symlink -c hello 2>&1 | grepQuiet "is not in the Nix store"
 
 if isDaemonNewer "2.20.0pre20231220"; then
     # Test that command line attribute ordering is reflected in the PATH

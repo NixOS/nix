@@ -1,7 +1,6 @@
 #pragma once
 
-#include "filtering-input-accessor.hh"
-#include "input-accessor.hh"
+#include "filtering-source-accessor.hh"
 #include "fs-sink.hh"
 
 namespace nix {
@@ -31,6 +30,8 @@ struct GitRepo
 
     /* Return the commit hash to which a ref points. */
     virtual Hash resolveRef(std::string ref) = 0;
+
+    virtual void setRemote(const std::string & name, const std::string & url) = 0;
 
     /**
      * Info about a submodule.
@@ -69,15 +70,13 @@ struct GitRepo
      */
     virtual std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) = 0;
 
-    virtual std::string resolveSubmoduleUrl(
-        const std::string & url,
-        const std::string & base) = 0;
+    virtual std::string resolveSubmoduleUrl(const std::string & url) = 0;
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
+    virtual ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) = 0;
 
-    virtual ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
+    virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 

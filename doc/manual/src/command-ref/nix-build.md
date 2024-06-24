@@ -41,7 +41,7 @@ expression to a low-level [store derivation]) and [`nix-store
 --realise`](@docroot@/command-ref/nix-store/realise.md) (to build the store
 derivation).
 
-[store derivation]: ../glossary.md#gloss-store-derivation
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 > **Warning**
 >
@@ -55,20 +55,20 @@ All options not listed here are passed to
 [`nix-store --realise`](nix-store/realise.md),
 except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](nix-instantiate.md).
 
-  - <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
+- <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
 
-    Do not create a symlink to the output path. Note that as a result
-    the output does not become a root of the garbage collector, and so
-    might be deleted by `nix-store --gc`.
+  Do not create a symlink to the output path. Note that as a result
+  the output does not become a root of the garbage collector, and so
+  might be deleted by `nix-store --gc`.
 
-  - <span id="opt-dry-run">[`--dry-run`](#opt-dry-run)</span>
+- <span id="opt-dry-run">[`--dry-run`](#opt-dry-run)</span>
 
-    Show what store paths would be built or downloaded.
+  Show what store paths would be built or downloaded.
 
-  - <span id="opt-out-link">[`--out-link`](#opt-out-link)</span> / `-o` *outlink*
+- <span id="opt-out-link">[`--out-link`](#opt-out-link)</span> / `-o` *outlink*
 
-    Change the name of the symlink to the output path created from
-    `result` to *outlink*.
+  Change the name of the symlink to the output path created from
+  `result` to *outlink*.
 
 {{#include ./status-build-failure.md}}
 

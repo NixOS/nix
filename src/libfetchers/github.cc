@@ -225,8 +225,8 @@ struct GitArchiveInputScheme : InputScheme
 
         auto cache = getCache();
 
-        Attrs treeHashKey{{"_what", "gitRevToTreeHash"}, {"rev", rev->gitRev()}};
-        Attrs lastModifiedKey{{"_what", "gitRevToLastModified"}, {"rev", rev->gitRev()}};
+        Cache::Key treeHashKey{"gitRevToTreeHash", {{"rev", rev->gitRev()}}};
+        Cache::Key lastModifiedKey{"gitRevToLastModified", {{"rev", rev->gitRev()}}};
 
         if (auto treeHashAttrs = cache->lookup(treeHashKey)) {
             if (auto lastModifiedAttrs = cache->lookup(lastModifiedKey)) {
@@ -272,7 +272,7 @@ struct GitArchiveInputScheme : InputScheme
         return {std::move(input), tarballInfo};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto [input, tarballInfo] = downloadArchive(store, _input);
 
@@ -294,7 +294,9 @@ struct GitArchiveInputScheme : InputScheme
            Git revision alone, we also require a NAR hash for
            locking. FIXME: in the future, we may want to require a Git
            tree hash instead of a NAR hash. */
-        return input.getRev().has_value() && input.getNarHash().has_value();
+        return input.getRev().has_value()
+            && (fetchSettings.trustTarballsFromGitForges ||
+                input.getNarHash().has_value());
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() const override
@@ -355,7 +357,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
         return RefInfo {
             .rev = Hash::parseAny(std::string { json["sha"] }, HashAlgorithm::SHA1),
@@ -429,11 +431,17 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto json = nlohmann::json::parse(
             readFile(
                 store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+                    downloadFile(store, url, "source", headers).storePath)));
 
-        return RefInfo {
-            .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
-        };
+        if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
+          return RefInfo {
+              .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
+          };
+        } if (json.is_array() && json.size() == 0) {
+            throw Error("No commits returned by GitLab API -- does the git ref really exist?");
+        } else {
+            throw Error("Unexpected response received from GitLab: %s", json);
+        }
     }
 
     DownloadUrl getDownloadUrl(const Input & input) const override
@@ -493,7 +501,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
-                downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
+                downloadFile(store, fmt("%s/HEAD", base_url), "source", headers).storePath);
             std::ifstream is(file);
             std::string line;
             getline(is, line);
@@ -509,7 +517,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
-            downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
+            downloadFile(store, fmt("%s/info/refs", base_url), "source", headers).storePath);
         std::ifstream is(file);
 
         std::string line;

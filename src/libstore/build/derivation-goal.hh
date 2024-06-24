@@ -2,7 +2,9 @@
 ///@file
 
 #include "parsed-derivations.hh"
-#include "lock.hh"
+#ifndef _WIN32
+#  include "user-lock.hh"
+#endif
 #include "outputs-spec.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
@@ -12,7 +14,9 @@ namespace nix {
 
 using std::map;
 
+#ifndef _WIN32 // TODO enable build hook on Windows
 struct HookInstance;
+#endif
 
 typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
 
@@ -178,10 +182,12 @@ struct DerivationGoal : public Goal
 
     std::string currentHookLine;
 
+#ifndef _WIN32 // TODO enable build hook on Windows
     /**
      * The build hook.
      */
     std::unique_ptr<HookInstance> hook;
+#endif
 
     /**
      * The sort of derivation we are building.
@@ -287,13 +293,13 @@ struct DerivationGoal : public Goal
     virtual void cleanupPostOutputsRegisteredModeCheck();
     virtual void cleanupPostOutputsRegisteredModeNonCheck();
 
-    virtual bool isReadDesc(int fd);
+    virtual bool isReadDesc(Descriptor fd);
 
     /**
      * Callback used by the worker to write to the log.
      */
-    void handleChildOutput(int fd, std::string_view data) override;
-    void handleEOF(int fd) override;
+    void handleChildOutput(Descriptor fd, std::string_view data) override;
+    void handleEOF(Descriptor fd) override;
     void flushLine();
 
     /**

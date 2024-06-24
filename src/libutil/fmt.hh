@@ -144,6 +144,10 @@ public:
         : HintFmt("%s", Uncolored(literal))
     { }
 
+    static HintFmt fromFormatString(const std::string & format) {
+        return HintFmt(boost::format(format));
+    }
+
     /**
      * Interpolate the given arguments into the format string.
      */
@@ -177,6 +181,8 @@ public:
         fmt % value.value;
         return *this;
     }
+
+    HintFmt & operator=(HintFmt const & rhs) = default;
 
     std::string str() const
     {

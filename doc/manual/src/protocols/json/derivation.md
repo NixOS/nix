@@ -18,10 +18,30 @@ is a JSON object with the following fields:
   Information about the output paths of the derivation.
   This is a JSON object with one member per output, where the key is the output name and the value is a JSON object with these fields:
 
-  * `path`: The output path.
+  * `path`:
+    The output path, if it is known in advanced.
+    Otherwise, `null`.
+
+
+  * `method`:
+    For an output which will be [content addresed], a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
+    Valid method strings are:
+
+    - [`flat`](@docroot@/store/store-object/content-address.md#method-flat)
+    - [`nar`](@docroot@/store/store-object/content-address.md#method-nix-archive)
+    - [`text`](@docroot@/store/store-object/content-address.md#method-text)
+    - [`git`](@docroot@/store/store-object/content-address.md#method-git)
+
+    Otherwise, `null`.
 
   * `hashAlgo`:
-    For fixed-output derivations, the hashing algorithm (e.g. `sha256`), optionally prefixed by `r:` if `hash` denotes a NAR hash rather than a flat file hash.
+    For an output which will be [content addresed], the name of the hash algorithm used.
+    Valid algorithm strings are:
+
+    - `md5`
+    - `sha1`
+    - `sha256`
+    - `sha512`
 
   * `hash`:
     For fixed-output derivations, the expected content hash in base-16.
@@ -32,7 +52,8 @@ is a JSON object with the following fields:
   > "outputs": {
   >   "out": {
   >     "path": "/nix/store/2543j7c6jn75blc3drf4g5vhb1rhdq29-source",
-  >     "hashAlgo": "r:sha256",
+  >     "method": "nar",
+  >     "hashAlgo": "sha256",
   >     "hash": "6fc80dcc62179dbc12fc0b5881275898f93444833d21b89dfe5f7fbcbb1d0d62"
   >   }
   > }

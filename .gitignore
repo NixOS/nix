@@ -11,6 +11,8 @@ perl/Makefile.config
 /svn-revision
 /libtool
 /config/config.*
+# Default meson build dir
+/build
 
 # /doc/manual/
 /doc/manual/*.1
@@ -48,6 +50,9 @@ perl/Makefile.config
 /src/libexpr/nix.tbl
 /src/libexpr/tests
 /tests/unit/libexpr/libnixexpr-tests
+
+# /src/libfetchers
+/tests/unit/libfetchers/libnixfetchers-tests
 
 # /src/libstore/
 *.gen.*
@@ -89,7 +94,7 @@ perl/Makefile.config
 
 # /tests/functional/
 /tests/functional/test-tmp
-/tests/functional/common/vars-and-functions.sh
+/tests/functional/common/subst-vars.sh
 /tests/functional/result*
 /tests/functional/restricted-innocent
 /tests/functional/shell
@@ -114,8 +119,6 @@ perl/Makefile.config
 /misc/systemd/nix-daemon.socket
 /misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
-
-/src/resolve-system-dependencies/resolve-system-dependencies
 
 outputs/
 
@@ -142,6 +145,7 @@ GTAGS
 
 # auto-generated compilation database
 compile_commands.json
+*.compile_commands.json
 
 nix-rust/target
 
@@ -151,6 +155,8 @@ result-*
 # IDE
 .vscode/
 .idea/
+
+.pre-commit-config.yaml
 
 # clangd and possibly more
 .cache/

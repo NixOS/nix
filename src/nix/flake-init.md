@@ -56,7 +56,7 @@ outputs = { self }: {
 
       ## More info
       - [Rust language](https://www.rust-lang.org/)
-      - [Rust on the NixOS Wiki](https://nixos.wiki/wiki/Rust)
+      - [Rust on the NixOS Wiki](https://wiki.nixos.org/wiki/Rust)
       - ...
     '';
   };

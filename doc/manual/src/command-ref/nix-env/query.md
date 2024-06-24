@@ -35,11 +35,13 @@ The derivations are sorted by their `name` attributes.
 The following flags specify the set of things on which the query
 operates.
 
-  - `--installed`\
+  - `--installed`
+
     The query operates on the store paths that are installed in the
     current generation of the active profile. This is the default.
 
-  - `--available`; `-a`\
+  - `--available` / `-a`
+
     The query operates on the derivations that are available in the
     active Nix expression.
 
@@ -50,24 +52,28 @@ selected derivations. Multiple flags may be specified, in which case the
 information is shown in the order given here. Note that the name of the
 derivation is shown unless `--no-name` is specified.
 
-  - `--xml`\
+  - `--xml`
+
     Print the result in an XML representation suitable for automatic
     processing by other tools. The root element is called `items`, which
     contains a `item` element for each available or installed
     derivation. The fields discussed below are all stored in attributes
     of the `item` elements.
 
-  - `--json`\
+  - `--json`
+
     Print the result in a JSON representation suitable for automatic
     processing by other tools.
 
-  - `--prebuilt-only` / `-b`\
+  - `--prebuilt-only` / `-b`
+
     Show only derivations for which a substitute is registered, i.e.,
     there is a pre-built binary available that can be downloaded in lieu
     of building the derivation. Thus, this shows all packages that
     probably can be installed quickly.
 
-  - `--status`; `-s`\
+  - `--status` / `-s`
+
     Print the *status* of the derivation. The status consists of three
     characters. The first is `I` or `-`, indicating whether the
     derivation is currently installed in the current generation of the
@@ -78,49 +84,61 @@ derivation is shown unless `--no-name` is specified.
     derivation to be built. The third is `S` or `-`, indicating whether
     a substitute is available for the derivation.
 
-  - `--attr-path`; `-P`\
+  - `--attr-path` / `-P`
+
     Print the *attribute path* of the derivation, which can be used to
     unambiguously select it using the `--attr` option available in
     commands that install derivations like `nix-env --install`. This
     option only works together with `--available`
 
-  - `--no-name`\
+  - `--no-name`
+
     Suppress printing of the `name` attribute of each derivation.
 
-  - `--compare-versions` / `-c`\
+  - `--compare-versions` / `-c`
+
     Compare installed versions to available versions, or vice versa (if
     `--available` is given). This is useful for quickly seeing whether
     upgrades for installed packages are available in a Nix expression. A
     column is added with the following meaning:
 
-      - `<` *version*\
+      - `<` *version*
+
         A newer version of the package is available or installed.
 
-      - `=` *version*\
+      - `=` *version*
+
         At most the same version of the package is available or
         installed.
 
-      - `>` *version*\
+      - `>` *version*
+
         Only older versions of the package are available or installed.
 
-      - `- ?`\
+      - `- ?`
+
         No version of the package is available or installed.
 
-  - `--system`\
+  - `--system`
+
     Print the `system` attribute of the derivation.
 
-  - `--drv-path`\
+  - `--drv-path`
+
     Print the path of the [store derivation](@docroot@/glossary.md#gloss-store-derivation).
 
-  - `--out-path`\
+  - `--out-path`
+
     Print the output path of the derivation.
 
-  - `--description`\
+  - `--description`
+
     Print a short (one-line) description of the derivation, if
     available. The description is taken from the `meta.description`
     attribute of the derivation.
 
-  - `--meta`\
+  - `--meta`
+
     Print all of the meta-attributes of the derivation. This option is
     only available with `--xml` or `--json`.
 

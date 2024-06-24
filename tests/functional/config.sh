@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Isolate the home for this test.
@@ -43,6 +45,16 @@ export NIX_USER_CONF_FILES=$here/config/nix-with-substituters.conf
 var=$(nix config show | grep '^substituters =' | cut -d '=' -f 2 | xargs)
 [[ $var == https://example.com ]]
 
+# Test that we can include a file.
+export NIX_USER_CONF_FILES=$here/config/nix-with-include.conf
+var=$(nix config show | grep '^allowed-uris =' | cut -d '=' -f 2 | xargs)
+[[ $var == https://github.com/NixOS/nix ]]
+
+# Test that we can !include a file.
+export NIX_USER_CONF_FILES=$here/config/nix-with-bang-include.conf
+var=$(nix config show | grep '^experimental-features =' | cut -d '=' -f 2 | xargs)
+[[ $var == nix-command ]]
+
 # Test that it's possible to load config from the environment
 prev=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
 export NIX_CONFIG="cores = 4242"$'\n'"experimental-features = nix-command flakes"
@@ -57,3 +69,8 @@ exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2
 val=$(nix config show | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)
 val2=$(nix config show warn-dirty)
 [[ $val == $val2 ]]
+
+# Test unit prefixes.
+[[ $(nix config show --min-free 64K min-free) = 65536 ]]
+[[ $(nix config show --min-free 1M min-free) = 1048576 ]]
+[[ $(nix config show --min-free 2G min-free) = 2147483648 ]]

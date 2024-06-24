@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 BINARY_CACHE=file://$cacheDir

@@ -1,10 +1,12 @@
 { lib
+, fetchurl
 , stdenv
 , releaseTools
 , autoconf-archive
 , autoreconfHook
 , aws-sdk-cpp
 , boehmgc
+, buildPackages
 , nlohmann_json
 , bison
 , boost
@@ -18,7 +20,6 @@
 , git
 , gtest
 , jq
-, doxygen
 , libarchive
 , libcpuid
 , libgit2
@@ -51,8 +52,7 @@
 , versionSuffix ? ""
 , officialRelease ? false
 
-# Whether to build Nix. Useful to skip for tasks like (a) just
-# generating API docs or (b) testing existing pre-built versions of Nix
+# Whether to build Nix. Useful to skip for tasks like testing existing pre-built versions of Nix
 , doBuild ? true
 
 # Run the unit tests as part of the build. See `installUnitTests` for an
@@ -75,7 +75,10 @@
 # sounds so long as evaluation just takes places within short-lived
 # processes. (When the process exits, the memory is reclaimed; it is
 # only leaked *within* the process.)
-, enableGC ? true
+#
+# Temporarily disabled on Windows because the `GC_throw_bad_alloc`
+# symbol is missing during linking.
+, enableGC ? !stdenv.hostPlatform.isWindows
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
@@ -87,10 +90,6 @@
 # - editline (default)
 # - readline
 , readlineFlavor ? if stdenv.hostPlatform.isWindows then "readline" else "editline"
-
-# Whether to build the internal API docs, can be done separately from
-# everything else.
-, enableInternalAPIDocs ? false
 
 # Whether to install unit tests. This is useful when cross compiling
 # since we cannot run them natively during the build, but can do so
@@ -162,6 +161,8 @@ in {
           ./m4
           # TODO: do we really need README.md? It doesn't seem used in the build.
           ./README.md
+          # This could be put behind a conditional
+          ./maintainers/local.mk
           # For make, regardless of what we are building
           ./local.mk
           ./Makefile
@@ -172,17 +173,11 @@ in {
           ./doc
           ./misc
           ./precompiled-headers.h
-          ./src
+          (fileset.difference ./src ./src/perl)
           ./COPYING
           ./scripts/local.mk
         ] ++ lib.optionals buildUnitTests [
           ./doc/manual
-        ] ++ lib.optionals enableInternalAPIDocs [
-          ./doc/internal-api
-          # Source might not be compiled, but still must be available
-          # for Doxygen to gather comments.
-          ./src
-          ./tests/unit
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
         ] ++ lib.optionals doInstallCheck [
@@ -196,8 +191,10 @@ in {
     ++ lib.optional doBuild "dev"
     # If we are doing just build or just docs, the one thing will use
     # "out". We only need additional outputs if we are doing both.
-    ++ lib.optional (doBuild && (enableManual || enableInternalAPIDocs)) "doc"
-    ++ lib.optional installUnitTests "check";
+    ++ lib.optional (doBuild && enableManual) "doc"
+    ++ lib.optional installUnitTests "check"
+    ++ lib.optional doCheck "testresults"
+    ;
 
   nativeBuildInputs = [
     autoconf-archive
@@ -218,7 +215,6 @@ in {
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
-    ++ lib.optional enableInternalAPIDocs doxygen
   ;
 
   buildInputs = lib.optionals doBuild [
@@ -281,7 +277,6 @@ in {
     (lib.enableFeature doBuild "build")
     (lib.enableFeature buildUnitTests "unit-tests")
     (lib.enableFeature doInstallCheck "functional-tests")
-    (lib.enableFeature enableInternalAPIDocs "internal-api-docs")
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature enableGC "gc")
     (lib.enableFeature enableMarkdown "markdown")
@@ -305,8 +300,11 @@ in {
 
   makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
-  installTargets = lib.optional doBuild "install"
-    ++ lib.optional enableInternalAPIDocs "internal-api-html";
+  preCheck = ''
+    mkdir $testresults
+  '';
+
+  installTargets = lib.optional doBuild "install";
 
   installFlags = "sysconfdir=$(out)/etc";
 
@@ -330,9 +328,12 @@ in {
   ) + lib.optionalString enableManual ''
     mkdir -p ''${!outputDoc}/nix-support
     echo "doc manual ''${!outputDoc}/share/doc/nix/manual" >> ''${!outputDoc}/nix-support/hydra-build-products
-  '' + lib.optionalString enableInternalAPIDocs ''
-    mkdir -p ''${!outputDoc}/nix-support
-    echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
+  '';
+
+  # So the check output gets links for DLLs in the out output.
+  preFixup = lib.optionalString (stdenv.hostPlatform.isWindows && builtins.elem "check" finalAttrs.outputs) ''
+    ln -s "$check/lib/"*.dll "$check/bin"
+    ln -s "$out/bin/"*.dll "$check/bin"
   '';
 
   doInstallCheck = attrs.doInstallCheck;
@@ -343,6 +344,7 @@ in {
 
   # Work around weird bug where it doesn't think there is a Makefile.
   installCheckPhase = if (!doBuild && doInstallCheck) then ''
+    runHook preInstallCheck
     mkdir -p src/nix-channel
     make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
   '' else null;
@@ -361,8 +363,7 @@ in {
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
-  # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
-  # to work with `strictDeps`.
+  # TODO Always true after https://github.com/NixOS/nixpkgs/issues/318564
   strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";

@@ -2,7 +2,7 @@ R""(
 
 # Examples
 
-* To list a specific file in a NAR:
+* To list a specific file in a [NAR][Nix Archive]:
 
   ```console
   # nix nar ls --long ./hello.nar /bin/hello
@@ -19,6 +19,8 @@ R""(
 
 # Description
 
-This command shows information about a *path* inside NAR file *nar*.
+This command shows information about a *path* inside [Nix Archive (NAR)][Nix Archive] file *nar*.
+
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
 )""

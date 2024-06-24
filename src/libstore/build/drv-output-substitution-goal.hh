@@ -1,11 +1,13 @@
 #pragma once
 ///@file
 
+#include <thread>
+#include <future>
+
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
-#include <thread>
-#include <future>
+#include "muxable-pipe.hh"
 
 namespace nix {
 
@@ -43,7 +45,7 @@ class DrvOutputSubstitutionGoal : public Goal {
 
     struct DownloadState
     {
-        Pipe outPipe;
+        MuxablePipe outPipe;
         std::promise<std::shared_ptr<const Realisation>> promise;
     };
 
@@ -71,7 +73,7 @@ public:
     std::string key() override;
 
     void work() override;
-    void handleEOF(int fd) override;
+    void handleEOF(Descriptor fd) override;
 
     JobCategory jobCategory() const override {
         return JobCategory::Substitution;

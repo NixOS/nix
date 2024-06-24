@@ -26,14 +26,16 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 
 struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store
 {
+#ifndef _WIN32
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
     // the documentation
-    const Setting<int> logFD{this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    const Setting<int> logFD{this, INVALID_DESCRIPTOR, "log-fd", "file descriptor to which SSH's stderr is connected"};
+#else
+    Descriptor logFD = INVALID_DESCRIPTOR;
+#endif
 
     struct Connection;
-
-    std::string host;
 
     ref<Pool<Connection>> connections;
 
@@ -41,7 +43,10 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
-    LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params);
+    LegacySSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params);
 
     ref<Connection> openConnection();
 
@@ -60,8 +65,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & srcPath,
+        const SourcePath & path,
         ContentAddressMethod method,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,

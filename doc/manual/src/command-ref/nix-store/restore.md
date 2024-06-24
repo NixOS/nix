@@ -8,8 +8,10 @@
 
 ## Description
 
-The operation `--restore` unpacks a NAR archive to *path*, which must
+The operation `--restore` unpacks a [Nix Archive (NAR)][Nix Archive] to *path*, which must
 not already exist. The archive is read from standard input.
+
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
 {{#include ./opt-common.md}}
 

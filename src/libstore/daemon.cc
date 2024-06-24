@@ -1,6 +1,7 @@
 #include "daemon.hh"
-#include "monitor-fd.hh"
+#include "signals.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-connection.hh"
 #include "worker-protocol-impl.hh"
 #include "build-result.hh"
 #include "store-api.hh"
@@ -14,6 +15,12 @@
 #include "derivations.hh"
 #include "args.hh"
 #include "git.hh"
+
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
+# include "monitor-fd.hh"
+#endif
+
+#include <sstream>
 
 namespace nix::daemon {
 
@@ -254,7 +261,7 @@ struct ClientSettings
                 else if (setSubstituters(settings.substituters))
                     ;
                 else
-                    debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+                    warn("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
@@ -527,7 +534,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
-            mode = (BuildMode) readInt(from);
+            mode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
                clients.
@@ -551,7 +558,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::BuildPathsWithResults: {
         auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
-        mode = (BuildMode) readInt(from);
+        mode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
 
         /* Repairing is not atomic, so disallowed for "untrusted"
            clients.
@@ -582,7 +589,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
          * correctly.
          */
         readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
-        BuildMode buildMode = (BuildMode) readInt(from);
+        auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 
         auto drvType = drv.type();
@@ -1017,14 +1024,14 @@ void processConnection(
     TrustedFlag trusted,
     RecursiveFlag recursive)
 {
+#ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
+#endif
 
     /* Exchange the greeting. */
-    unsigned int magic = readInt(from);
-    if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
-    to << WORKER_MAGIC_2 << PROTOCOL_VERSION;
-    to.flush();
-    WorkerProto::Version clientVersion = readInt(from);
+    WorkerProto::Version clientVersion =
+        WorkerProto::BasicServerConnection::handshake(
+            to, from, PROTOCOL_VERSION);
 
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
@@ -1038,33 +1045,24 @@ void processConnection(
     unsigned int opCount = 0;
 
     Finally finally([&]() {
-        _isInterrupted = false;
+        setInterrupted(false);
         printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
-        // Obsolete CPU affinity.
-        readInt(from);
-    }
+    WorkerProto::BasicServerConnection conn {
+        .to = to,
+        .from = from,
+        .clientVersion = clientVersion,
+    };
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
-        readInt(from); // obsolete reserveSpace
-
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
-        to << nixVersion;
-
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 35) {
+    conn.postHandshake(*store, {
+        .daemonNixVersion = nixVersion,
         // We and the underlying store both need to trust the client for
         // it to be trusted.
-        auto temp = trusted
+        .remoteTrustsUs = trusted
             ? store->isTrustedClient()
-            : std::optional { NotTrusted };
-        WorkerProto::WriteConn wconn {
-            .to = to,
-            .version = clientVersion,
-        };
-        WorkerProto::write(*store, wconn, temp);
-    }
+            : std::optional { NotTrusted },
+    });
 
     /* Send startup error messages to the client. */
     tunnelLogger->startWork();

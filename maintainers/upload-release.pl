@@ -171,6 +171,10 @@ eval {
     downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
 };
 warn "$@" if $@;
+eval {
+    downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
+};
+warn "$@" if $@;
 downloadFile("installerScript", "1");
 
 # Upload docker images to dockerhub.
@@ -185,10 +189,7 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     eval {
         downloadFile("dockerImage.$system", "1", $fn);
     };
-    if ($@) {
-        warn "$@" if $@;
-        next;
-    }
+    die "$@" if $@;
     $haveDocker = 1;
 
     print STDERR "loading docker image for $dockerPlatform...\n";
@@ -242,6 +243,7 @@ write_file("$tmpDir/fallback-paths.nix",
     "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
     "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
     "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
+    "  riscv64-linux = \"" . getStorePath("buildCross.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
     "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
     "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
     "}\n");

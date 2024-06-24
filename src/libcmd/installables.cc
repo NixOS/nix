@@ -21,7 +21,6 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
-#include "fs-input-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -147,7 +146,7 @@ MixFlakeOptions::MixFlakeOptions()
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
-            lockFlags.referenceLockFilePath = getUnfilteredRootPath(CanonPath(absPath(lockFilePath)));
+            lockFlags.referenceLockFilePath = {getFSSourceAccessor(), CanonPath(absPath(lockFilePath))};
         }},
         .completer = completePath
     });
@@ -289,7 +288,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
             state->autoCallFunction(*autoArgs, v1, v2);
 
             if (v2.type() == nAttrs) {
-                for (auto & i : *v2.attrs) {
+                for (auto & i : *v2.attrs()) {
                     std::string name = state->symbols[i.name];
                     if (name.find(searchWord) == 0) {
                         if (prefix_ == "")
@@ -443,24 +442,31 @@ ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
-    auto fingerprint = lockedFlake->getFingerprint(state.store);
-    return make_ref<nix::eval_cache::EvalCache>(
-        evalSettings.useEvalCache && evalSettings.pureEval
-            ? fingerprint
-            : std::nullopt,
-        state,
-        [&state, lockedFlake]()
+    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
+        ? lockedFlake->getFingerprint(state.store)
+        : std::nullopt;
+    auto rootLoader = [&state, lockedFlake]()
         {
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
             state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
-            auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
+            auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
             assert(aOutputs);
 
             return aOutputs->value;
-        });
+        };
+
+    if (fingerprint) {
+        auto search = state.evalCaches.find(fingerprint.value());
+        if (search == state.evalCaches.end()) {
+            search = state.evalCaches.emplace(fingerprint.value(), make_ref<nix::eval_cache::EvalCache>(fingerprint, state, rootLoader)).first;
+        }
+        return search->second;
+    } else {
+        return make_ref<nix::eval_cache::EvalCache>(std::nullopt, state, rootLoader);
+    }
 }
 
 Installables SourceExprCommand::parseInstallables(
@@ -590,6 +596,37 @@ std::vector<BuiltPathWithResult> Installable::build(
     return res;
 }
 
+static void throwBuildErrors(
+    std::vector<KeyedBuildResult> & buildResults,
+    const Store & store)
+{
+    std::vector<KeyedBuildResult> failed;
+    for (auto & buildResult : buildResults) {
+        if (!buildResult.success()) {
+            failed.push_back(buildResult);
+        }
+    }
+
+    auto failedResult = failed.begin();
+    if (failedResult != failed.end()) {
+        if (failed.size() == 1) {
+            failedResult->rethrow();
+        } else {
+            StringSet failedPaths;
+            for (; failedResult != failed.end(); failedResult++) {
+                if (!failedResult->errorMsg.empty()) {
+                    logError(ErrorInfo{
+                        .level = lvlError,
+                        .msg = failedResult->errorMsg,
+                    });
+                }
+                failedPaths.insert(failedResult->path.to_string(store));
+            }
+            throw Error("build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
+        }
+    }
+}
+
 std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build2(
     ref<Store> evalStore,
     ref<Store> store,
@@ -651,10 +688,9 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         if (settings.printMissing)
             printMissing(store, pathsToBuild, lvlInfo);
 
-        for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
-            if (!buildResult.success())
-                buildResult.rethrow();
-
+        auto buildResults = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
+        throwBuildErrors(buildResults, *store);
+        for (auto & buildResult : buildResults) {
             for (auto & aux : backmap[buildResult.path]) {
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {

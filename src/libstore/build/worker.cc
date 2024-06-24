@@ -1,12 +1,14 @@
+#include "local-store.hh"
 #include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "drv-output-substitution-goal.hh"
-#include "local-derivation-goal.hh"
-#include "hook-instance.hh"
+#include "derivation-goal.hh"
+#ifndef _WIN32 // TODO Enable building on Windows
+#  include "local-derivation-goal.hh"
+#  include "hook-instance.hh"
+#endif
 #include "signals.hh"
-
-#include <poll.h>
 
 namespace nix {
 
@@ -64,20 +66,27 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
     const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return !dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
-            : std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+        return
+#ifndef _WIN32 // TODO Enable building on Windows
+            dynamic_cast<LocalStore *>(&store)
+            ? std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
+            :
+#endif
+            std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
     });
 }
-
 
 std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
     const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
-        return !dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
-            : std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+        return
+#ifndef _WIN32 // TODO Enable building on Windows
+            dynamic_cast<LocalStore *>(&store)
+            ? std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
+            :
+#endif
+            std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
 }
 
@@ -143,7 +152,8 @@ void Worker::removeGoal(GoalPtr goal)
 {
     if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
+    else
+    if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, substitutionGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
@@ -187,13 +197,13 @@ unsigned Worker::getNrSubstitutions()
 }
 
 
-void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
+void Worker::childStarted(GoalPtr goal, const std::set<MuxablePipePollState::CommChannel> & channels,
     bool inBuildSlot, bool respectTimeouts)
 {
     Child child;
     child.goal = goal;
     child.goal2 = goal.get();
-    child.fds = fds;
+    child.channels = channels;
     child.timeStarted = child.lastOutput = steady_time_point::clock::now();
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
@@ -286,7 +296,8 @@ void Worker::run(const Goals & _topGoals)
                 .drvPath = makeConstantStorePathRef(goal->drvPath),
                 .outputs = goal->wantedOutputs,
             });
-        } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
+        } else
+        if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
             topPaths.push_back(DerivedPath::Opaque{goal->storePath});
         }
     }
@@ -408,23 +419,25 @@ void Worker::waitForInput()
     if (useTimeout)
         vomit("sleeping %d seconds", timeout);
 
+    MuxablePipePollState state;
+
+#ifndef _WIN32
     /* Use select() to wait for the input side of any logger pipe to
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
-    std::vector<struct pollfd> pollStatus;
-    std::map<int, size_t> fdToPollStatus;
     for (auto & i : children) {
-        for (auto & j : i.fds) {
-            pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
-            fdToPollStatus[j] = pollStatus.size() - 1;
+        for (auto & j : i.channels) {
+            state.pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
+            state.fdToPollStatus[j] = state.pollStatus.size() - 1;
         }
     }
+#endif
 
-    if (poll(pollStatus.data(), pollStatus.size(),
-            useTimeout ? timeout * 1000 : -1) == -1) {
-        if (errno == EINTR) return;
-        throw SysError("waiting for input");
-    }
+    state.poll(
+#ifdef _WIN32
+        ioport.get(),
+#endif
+        useTimeout ? (std::optional { timeout * 1000 }) : std::nullopt);
 
     auto after = steady_time_point::clock::now();
 
@@ -439,32 +452,18 @@ void Worker::waitForInput()
         GoalPtr goal = j->goal.lock();
         assert(goal);
 
-        std::set<int> fds2(j->fds);
-        std::vector<unsigned char> buffer(4096);
-        for (auto & k : fds2) {
-            const auto fdPollStatusId = get(fdToPollStatus, k);
-            assert(fdPollStatusId);
-            assert(*fdPollStatusId < pollStatus.size());
-            if (pollStatus.at(*fdPollStatusId).revents) {
-                ssize_t rd = ::read(k, buffer.data(), buffer.size());
-                // FIXME: is there a cleaner way to handle pt close
-                // than EIO? Is this even standard?
-                if (rd == 0 || (rd == -1 && errno == EIO)) {
-                    debug("%1%: got EOF", goal->getName());
-                    goal->handleEOF(k);
-                    j->fds.erase(k);
-                } else if (rd == -1) {
-                    if (errno != EINTR)
-                        throw SysError("%s: read failed", goal->getName());
-                } else {
-                    printMsg(lvlVomit, "%1%: read %2% bytes",
-                        goal->getName(), rd);
-                    std::string_view data((char *) buffer.data(), rd);
-                    j->lastOutput = after;
-                    goal->handleChildOutput(k, data);
-                }
-            }
-        }
+        state.iterate(
+            j->channels,
+            [&](Descriptor k, std::string_view data) {
+                printMsg(lvlVomit, "%1%: read %2% bytes",
+                    goal->getName(), data.size());
+                j->lastOutput = after;
+                goal->handleChildOutput(k, data);
+            },
+            [&](Descriptor k) {
+                debug("%1%: got EOF", goal->getName());
+                goal->handleEOF(k);
+            });
 
         if (goal->exitCode == Goal::ecBusy &&
             0 != settings.maxSilentTime &&
@@ -529,9 +528,9 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!pathExists(store.printStorePath(path)))
         res = false;
     else {
-        Hash current = hashPath(
-            *store.getFSAccessor(), CanonPath { store.printStorePath(path) },
-            FileIngestionMethod::Recursive, info->narHash.algo);
+        auto current = hashPath(
+            {store.getFSAccessor(), CanonPath(store.printStorePath(path))},
+            FileIngestionMethod::Recursive, info->narHash.algo).first;
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;
     }

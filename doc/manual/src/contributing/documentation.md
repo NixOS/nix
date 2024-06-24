@@ -27,10 +27,8 @@ and open `./result-doc/share/doc/nix/manual/index.html`.
 To build the manual incrementally, [enter the development shell](./hacking.md) and run:
 
 ```console
-make manual-html -j $NIX_BUILD_CORES
+make manual-html-open -j $NIX_BUILD_CORES
 ```
-
-and open `./outputs/out/share/doc/nix/manual/language/index.html`.
 
 In order to reflect changes to the [Makefile for the manual], clear all generated files before re-building:
 
@@ -149,7 +147,7 @@ Please observe these guidelines to ease reviews:
   ```
   A [store object] contains a [file system object] and [references] to other store objects.
 
-  [store object]: @docroot@/glossary.md#gloss-store-object
+  [store object]: @docroot@/store/store-object.md
   [file system object]: @docroot@/architecture/file-system-object.md
   [references]: @docroot@/glossary.md#gloss-reference
   ```
@@ -198,13 +196,35 @@ You can also build and view it yourself:
 [Doxygen API documentation]: https://hydra.nixos.org/job/nix/master/internal-api-docs/latest/download-by-type/doc/internal-api-docs
 
 ```console
-# nix build .#hydraJobs.internal-api-docs
-# xdg-open ./result/share/doc/nix/internal-api/html/index.html
+$ nix build .#hydraJobs.internal-api-docs
+$ xdg-open ./result/share/doc/nix/internal-api/html/index.html
+```
+
+or inside `nix-shell` or `nix develop`:
+
+```console
+$ mesonConfigurePhase
+$ ninja src/internal-api-docs/html
+$ xdg-open src/internal-api-docs/html/index.html
+```
+
+## C API documentation
+
+Note that the C API is not yet stable.
+[C API documentation] is available online.
+You can also build and view it yourself:
+
+[C API documentation]: https://hydra.nixos.org/job/nix/master/external-api-docs/latest/download-by-type/doc/external-api-docs
+
+```console
+$ nix build .#hydraJobs.external-api-docs
+$ xdg-open ./result/share/doc/nix/external-api/html/index.html
 ```
 
 or inside `nix-shell` or `nix develop`:
 
 ```
-# make internal-api-html
-# xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+$ mesonConfigurePhase
+$ ninja src/external-api-docs/html
+$ xdg-open src/external-api-docs/html/index.html
 ```

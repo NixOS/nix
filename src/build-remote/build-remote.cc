@@ -37,7 +37,7 @@ static std::string currentLoad;
 
 static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 {
-    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
+    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri.render()), slot), true);
 }
 
 static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
@@ -99,7 +99,7 @@ static int main_build_remote(int argc, char * * argv)
         }
 
         std::optional<StorePath> drvPath;
-        std::string storeUri;
+        StoreReference storeUri;
 
         while (true) {
 
@@ -135,7 +135,7 @@ static int main_build_remote(int argc, char * * argv)
                 Machine * bestMachine = nullptr;
                 uint64_t bestLoad = 0;
                 for (auto & m : machines) {
-                    debug("considering building on remote machine '%s'", m.storeUri);
+                    debug("considering building on remote machine '%s'", m.storeUri.render());
 
                     if (m.enabled &&
                         m.systemSupported(neededSystem) &&
@@ -202,7 +202,7 @@ static int main_build_remote(int argc, char * * argv)
                         else
                             drvstr = "<unknown>";
 
-                        auto error = HintFmt(errorText);
+                        auto error = HintFmt::fromFormatString(errorText);
                         error
                             % drvstr
                             % neededSystem
@@ -233,7 +233,7 @@ static int main_build_remote(int argc, char * * argv)
 
                 try {
 
-                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri));
+                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri.render()));
 
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
@@ -242,7 +242,7 @@ static int main_build_remote(int argc, char * * argv)
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
                     printError("cannot build on '%s': %s%s",
-                        bestMachine->storeUri, e.what(),
+                        bestMachine->storeUri.render(), e.what(),
                         msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;
@@ -257,15 +257,15 @@ connected:
 
         assert(sshStore);
 
-        std::cerr << "# accept\n" << storeUri << "\n";
+        std::cerr << "# accept\n" << storeUri.render() << "\n";
 
         auto inputs = readStrings<PathSet>(source);
         auto wantedOutputs = readStrings<StringSet>(source);
 
-        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri) + ".upload-lock", true);
+        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri.render()) + ".upload-lock", true);
 
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri.render()));
 
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
@@ -278,7 +278,7 @@ connected:
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri.render()));
             copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
@@ -316,7 +316,7 @@ connected:
             optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
             auto & result = *optResult;
             if (!result.success())
-                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri.render(), result.errorMsg);
         } else {
             copyClosure(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
             auto res = sshStore->buildPathsWithResults({
@@ -359,7 +359,7 @@ connected:
         }
 
         if (!missingPaths.empty()) {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri.render()));
             if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
                 for (auto & path : missingPaths)
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */

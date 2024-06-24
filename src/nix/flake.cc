@@ -7,6 +7,7 @@
 #include "eval-settings.hh"
 #include "flake/flake.hh"
 #include "get-drvs.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "outputs-spec.hh"
@@ -663,9 +664,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         {
             createDirs(to);
 
-            for (auto & entry : readDirectory(from)) {
-                auto from2 = from + "/" + entry.name;
-                auto to2 = to + "/" + entry.name;
+            for (auto & entry : std::filesystem::directory_iterator{from}) {
+                checkInterrupt();
+                auto from2 = entry.path().string();
+                auto to2 = to + "/" + entry.path().filename().string();
                 auto st = lstat(from2);
                 if (S_ISDIR(st.st_mode))
                     copyDir(from2, to2);

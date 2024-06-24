@@ -1,6 +1,7 @@
 #include "binary-cache-store.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
+#include "signals.hh"
 
 #include <atomic>
 
@@ -28,9 +29,13 @@ private:
 
 public:
 
+    /**
+     * @param binaryCacheDir `file://` is a short-hand for `file:///`
+     * for now.
+     */
     LocalBinaryCacheStore(
-        const std::string scheme,
-        const Path & binaryCacheDir,
+        std::string_view scheme,
+        PathView binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
@@ -64,7 +69,7 @@ protected:
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
-        renameFile(tmp, path2);
+        std::filesystem::rename(tmp, path2);
         del.cancel();
     }
 
@@ -83,12 +88,14 @@ protected:
     {
         StorePathSet paths;
 
-        for (auto & entry : readDirectory(binaryCacheDir)) {
-            if (entry.name.size() != 40 ||
-                !hasSuffix(entry.name, ".narinfo"))
+        for (auto & entry : std::filesystem::directory_iterator{binaryCacheDir}) {
+            checkInterrupt();
+            auto name = entry.path().filename().string();
+            if (name.size() != 40 ||
+                !hasSuffix(name, ".narinfo"))
                 continue;
             paths.insert(parseStorePath(
-                    storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)
+                    storeDir + "/" + name.substr(0, name.size() - 8)
                     + "-" + MissingName));
         }
 

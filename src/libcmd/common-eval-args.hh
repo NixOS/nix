@@ -23,7 +23,7 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 
     Bindings * getAutoArgs(EvalState & state);
 
-    SearchPath searchPath;
+    LookupPath lookupPath;
 
     std::optional<std::string> evalStoreUrl;
 
@@ -38,6 +38,9 @@ private:
     std::map<std::string, AutoArg> autoArgs;
 };
 
+/**
+ * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ */
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir = nullptr);
 
 }

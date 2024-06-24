@@ -13,6 +13,7 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 #include "store-dir-config.hh"
+#include "store-reference.hh"
 #include "source-path.hh"
 
 #include <nlohmann/json_fwd.hpp>
@@ -65,7 +66,7 @@ MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
 
-MakeError(InvalidStoreURI, Error);
+MakeError(InvalidStoreReference, Error);
 
 struct Realisation;
 struct RealisedPath;
@@ -91,7 +92,7 @@ enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 const uint32_t exportMagic = 0x4558494e;
 
 
-enum BuildMode { bmNormal, bmRepair, bmCheck };
+enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
 enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
@@ -102,7 +103,7 @@ typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 struct StoreConfig : public StoreDirConfig
 {
-    typedef std::map<std::string, std::string> Params;
+    using Params = StoreReference::Params;
 
     using StoreDirConfig::StoreDirConfig;
 
@@ -439,8 +440,7 @@ public:
      */
     virtual StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & path,
+        const SourcePath & path,
         ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
@@ -454,8 +454,7 @@ public:
      */
     ValidPathInfo addToStoreSlow(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & path,
+        const SourcePath & path,
         ContentAddressMethod method = FileIngestionMethod::Recursive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
@@ -861,34 +860,13 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
 /**
  * @return a Store object to access the Nix store denoted by
  * ‘uri’ (slight misnomer...).
- *
- * @param uri Supported values are:
- *
- * - ‘local’: The Nix store in /nix/store and database in
- *   /nix/var/nix/db, accessed directly.
- *
- * - ‘daemon’: The Nix store accessed via a Unix domain socket
- *   connection to nix-daemon.
- *
- * - ‘unix://<path>’: The Nix store accessed via a Unix domain socket
- *   connection to nix-daemon, with the socket located at <path>.
- *
- * - ‘auto’ or ‘’: Equivalent to ‘local’ or ‘daemon’ depending on
- *   whether the user has write access to the local Nix
- *   store/database.
- *
- * - ‘file://<path>’: A binary cache stored in <path>.
- *
- * - ‘https://<path>’: A binary cache accessed via HTTP.
- *
- * - ‘s3://<path>’: A writable binary cache stored on Amazon's Simple
- *   Storage Service.
- *
- * - ‘ssh://[user@]<host>’: A remote Nix store accessed by running
- *   ‘nix-store --serve’ via SSH.
- *
- * You can pass parameters to the store type by appending
- * ‘?key=value&key=value&...’ to the URI.
+ */
+ref<Store> openStore(StoreReference && storeURI);
+
+
+/**
+ * Opens the store at `uri`, where `uri` is in the format expected by `StoreReference::parse`
+
  */
 ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
     const Store::Params & extraParams = Store::Params());
@@ -903,7 +881,14 @@ std::list<ref<Store>> getDefaultSubstituters();
 struct StoreFactory
 {
     std::set<std::string> uriSchemes;
-    std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
+    /**
+     * The `authorityPath` parameter is `<authority>/<path>`, or really
+     * whatever comes after `<scheme>://` and before `?<query-params>`.
+     */
+    std::function<std::shared_ptr<Store> (
+        std::string_view scheme,
+        std::string_view authorityPath,
+        const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
 
@@ -918,7 +903,7 @@ struct Implementations
         StoreFactory factory{
             .uriSchemes = T::uriSchemes(),
             .create =
-                ([](const std::string & scheme, const std::string & uri, const Store::Params & params)
+                ([](auto scheme, auto uri, auto & params)
                  -> std::shared_ptr<Store>
                  { return std::make_shared<T>(scheme, uri, params); }),
             .getConfig =
@@ -951,11 +936,6 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
     const Store & store,
     std::istream & str,
     std::optional<HashResult> hashGiven = std::nullopt);
-
-/**
- * Split URI into protocol+hierarchy part and its parameter set.
- */
-std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
 const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 

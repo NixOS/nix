@@ -1,8 +1,4 @@
 #include "git-utils.hh"
-#include "fs-input-accessor.hh"
-#include "input-accessor.hh"
-#include "filtering-input-accessor.hh"
-#include "memory-input-accessor.hh"
 #include "cache.hh"
 #include "finally.hh"
 #include "processes.hh"
@@ -21,6 +17,7 @@
 #include <git2/refs.h>
 #include <git2/remote.h>
 #include <git2/repository.h>
+#include <git2/revparse.h>
 #include <git2/status.h>
 #include <git2/submodule.h>
 #include <git2/tree.h>
@@ -56,7 +53,7 @@ bool operator == (const git_oid & oid1, const git_oid & oid2)
 
 namespace nix {
 
-struct GitInputAccessor;
+struct GitSourceAccessor;
 
 // Some wrapper types that ensure that the git_*_free functions get called.
 template<auto del>
@@ -150,11 +147,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
-        if (pathExists(path.native())) {
-            if (git_repository_open(Setter(repo), path.c_str()))
+        if (pathExists(path.string())) {
+            if (git_repository_open(Setter(repo), path.string().c_str()))
                 throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
         } else {
-            if (git_repository_init(Setter(repo), path.c_str(), bare))
+            if (git_repository_init(Setter(repo), path.string().c_str(), bare))
                 throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
         }
     }
@@ -197,36 +194,25 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return git_repository_is_shallow(*this);
     }
 
+    void setRemote(const std::string & name, const std::string & url) override
+    {
+        if (git_remote_set_url(*this, name.c_str(), url.c_str()))
+            throw Error("setting remote '%s' URL to '%s': %s", name, url, git_error_last()->message);
+    }
+
     Hash resolveRef(std::string ref) override
     {
-        // Handle revisions used as refs.
-        {
-            git_oid oid;
-            if (git_oid_fromstr(&oid, ref.c_str()) == 0)
-                return toHash(oid);
-        }
-
-        // Resolve short names like 'master'.
-        Reference ref2;
-        if (!git_reference_dwim(Setter(ref2), *this, ref.c_str()))
-            ref = git_reference_name(ref2.get());
-
-        // Resolve full references like 'refs/heads/master'.
-        Reference ref3;
-        if (git_reference_lookup(Setter(ref3), *this, ref.c_str()))
+        Object object;
+        if (git_revparse_single(Setter(object), *this, ref.c_str()))
             throw Error("resolving Git reference '%s': %s", ref, git_error_last()->message);
-
-        auto oid = git_reference_target(ref3.get());
-        if (!oid)
-            throw Error("cannot get OID for Git reference '%s'", git_reference_name(ref3.get()));
-
+        auto oid = git_object_id(object.get());
         return toHash(*oid);
     }
 
     std::vector<Submodule> parseSubmodules(const std::filesystem::path & configFile)
     {
         GitConfig config;
-        if (git_config_open_ondisk(Setter(config), configFile.c_str()))
+        if (git_config_open_ondisk(Setter(config), configFile.string().c_str()))
             throw Error("parsing .gitmodules file: %s", git_error_last()->message);
 
         ConfigIterator it;
@@ -298,7 +284,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         /* Get submodule info. */
         auto modulesFile = path / ".gitmodules";
-        if (pathExists(modulesFile))
+        if (pathExists(modulesFile.string()))
             info.submodules = parseSubmodules(modulesFile);
 
         return info;
@@ -318,9 +304,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     std::vector<std::tuple<Submodule, Hash>> getSubmodules(const Hash & rev, bool exportIgnore) override;
 
-    std::string resolveSubmoduleUrl(
-        const std::string & url,
-        const std::string & base) override
+    std::string resolveSubmoduleUrl(const std::string & url) override
     {
         git_buf buf = GIT_BUF_INIT;
         if (git_submodule_resolve_url(&buf, *this, url.c_str()))
@@ -328,10 +312,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         Finally cleanup = [&]() { git_buf_dispose(&buf); };
 
         std::string res(buf.ptr);
-
-        if (!hasPrefix(res, "/") && res.find("://") == res.npos)
-            res = parseURL(base + "/" + res).canonicalise().to_string();
-
         return res;
     }
 
@@ -350,13 +330,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 
     /**
-     * A 'GitInputAccessor' with no regard for export-ignore or any other transformations.
+     * A 'GitSourceAccessor' with no regard for export-ignore or any other transformations.
      */
-    ref<GitInputAccessor> getRawAccessor(const Hash & rev);
+    ref<GitSourceAccessor> getRawAccessor(const Hash & rev);
 
-    ref<InputAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
+    ref<SourceAccessor> getAccessor(const Hash & rev, bool exportIgnore) override;
 
-    ref<InputAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
+    ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
     ref<GitFileSystemObjectSink> getFileSystemObjectSink() override;
 
@@ -364,7 +344,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         auto act = (Activity *) payload;
         act->result(resFetchStatus, trim(std::string_view(str, len)));
-        return _isInterrupted ? -1 : 0;
+        return getInterrupted() ? -1 : 0;
     }
 
     static int transferProgressCallback(const git_indexer_progress * stats, void * payload)
@@ -377,7 +357,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 stats->indexed_deltas,
                 stats->total_deltas,
                 stats->received_bytes / (1024.0 * 1024.0)));
-        return _isInterrupted ? -1 : 0;
+        return getInterrupted() ? -1 : 0;
     }
 
     void fetch(
@@ -393,15 +373,15 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto dir = this->path;
         Strings gitArgs;
         if (shallow) {
-            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
+            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
         }
         else {
-            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--", url, refspec };
+            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--", url, refspec };
         }
 
         runProgram(RunOptions {
             .program = "git",
-            .searchPath = true,
+            .lookupPath = true,
             // FIXME: git stderr messes up our progress indicator, so
             // we're using --quiet for now. Should process its stderr.
             .args = gitArgs,
@@ -442,7 +422,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 .args = {
                     "-c",
                     "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
-                    "-C", path,
+                    "-C", path.string(),
                     "verify-commit",
                     rev.gitRev()
                 },
@@ -472,7 +452,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         auto accessor = getAccessor(treeHash, false);
 
-        fetchers::Attrs cacheKey({{"_what", "treeHashToNarHash"}, {"treeHash", treeHash.gitRev()}});
+        fetchers::Cache::Key cacheKey{"treeHashToNarHash", {{"treeHash", treeHash.gitRev()}}};
 
         if (auto res = fetchers::getCache()->lookup(cacheKey))
             return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), HashAlgorithm::SHA256);
@@ -493,12 +473,12 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 /**
  * Raw git tree input accessor.
  */
-struct GitInputAccessor : InputAccessor
+struct GitSourceAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
     Tree root;
 
-    GitInputAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
+    GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
         : repo(repo_)
         , root(peelObject<Tree>(*repo, lookupObject(*repo, hashToOID(rev)).get(), GIT_OBJECT_TREE))
     {
@@ -722,12 +702,12 @@ struct GitInputAccessor : InputAccessor
     }
 };
 
-struct GitExportIgnoreInputAccessor : CachingFilteringInputAccessor {
+struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor {
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 
-    GitExportIgnoreInputAccessor(ref<GitRepoImpl> repo, ref<InputAccessor> next, std::optional<Hash> rev)
-        : CachingFilteringInputAccessor(next, [&](const CanonPath & path) {
+    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev)
+        : CachingFilteringSourceAccessor(next, [&](const CanonPath & path) {
             return RestrictedPathError(fmt("'%s' does not exist because it was fetched with exportIgnore enabled", path));
         })
         , repo(repo)
@@ -938,40 +918,40 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 };
 
-ref<GitInputAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
+ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    return make_ref<GitInputAccessor>(self, rev);
+    return make_ref<GitSourceAccessor>(self, rev);
 }
 
-ref<InputAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
+ref<SourceAccessor> GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    ref<GitInputAccessor> rawGitAccessor = getRawAccessor(rev);
+    ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev);
     if (exportIgnore) {
-        return make_ref<GitExportIgnoreInputAccessor>(self, rawGitAccessor, rev);
+        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
     }
     else {
         return rawGitAccessor;
     }
 }
 
-ref<InputAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
+ref<SourceAccessor> GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     /* In case of an empty workdir, return an empty in-memory tree. We
-       cannot use AllowListInputAccessor because it would return an
+       cannot use AllowListSourceAccessor because it would return an
        error for the root (and we can't add the root to the allow-list
        since that would allow access to all its children). */
-    ref<InputAccessor> fileAccessor =
+    ref<SourceAccessor> fileAccessor =
         wd.files.empty()
-        ? makeEmptyInputAccessor()
-        : AllowListInputAccessor::create(
-            makeFSInputAccessor(path),
+        ? makeEmptySourceAccessor()
+        : AllowListSourceAccessor::create(
+            makeFSSourceAccessor(path),
             std::set<CanonPath> { wd.files },
-            std::move(makeNotAllowedError)).cast<InputAccessor>();
+            std::move(makeNotAllowedError)).cast<SourceAccessor>();
     if (exportIgnore)
-        return make_ref<GitExportIgnoreInputAccessor>(self, fileAccessor, std::nullopt);
+        return make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
     else
         return fileAccessor;
 }

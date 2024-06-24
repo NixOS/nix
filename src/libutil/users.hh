@@ -3,16 +3,20 @@
 
 #include "types.hh"
 
-#include <sys/types.h>
+#ifndef _WIN32
+# include <sys/types.h>
+#endif
 
 namespace nix {
 
 std::string getUserName();
 
+#ifndef _WIN32
 /**
  * @return the given user's home directory from /etc/passwd.
  */
 Path getHomeOf(uid_t userId);
+#endif
 
 /**
  * @return $HOME or the user's home directory from /etc/passwd.
@@ -54,5 +58,13 @@ Path createNixStateDir();
  * home directory.
  */
 std::string expandTilde(std::string_view path);
+
+
+/**
+ * Is the current user UID 0 on Unix?
+ *
+ * Currently always false on Windows, but that may change.
+ */
+bool isRootUser();
 
 }

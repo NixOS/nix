@@ -15,8 +15,24 @@ struct EvalSettings : Config
 
     static std::string resolvePseudoUrl(std::string_view url);
 
-    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
-        "Whether builtin functions that allow executing native code should be enabled."};
+    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
+        Enable built-in functions that allow executing native code.
+
+        In particular, this adds:
+        - `builtins.importNative` *path* *symbol*
+
+          Opens dynamic shared object (DSO) at *path*, loads the function with the symbol name *symbol* from it and runs it.
+          The loaded function must have the following signature:
+          ```cpp
+          extern "C" typedef void (*ValueInitialiser) (EvalState & state, Value & v);
+          ```
+
+          The [Nix C++ API documentation](@docroot@/contributing/documentation.md#api-documentation) has more details on evaluator internals.
+
+        - `builtins.exec` *arguments*
+
+          Execute a program, where *arguments* are specified as a list of strings, and parse its output as a Nix expression.
+    )"};
 
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
@@ -76,9 +92,10 @@ struct EvalSettings : Config
 
           - Restrict file system and network access to files specified by cryptographic hash
           - Disable impure constants:
-            - [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+            - [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
             - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
             - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
+            - [`builtins.storePath`](@docroot@/language/builtin-constants.md#builtins-storePath)
         )"
         };
 
@@ -141,12 +158,38 @@ struct EvalSettings : Config
 
     Setting<bool> builtinsTraceDebugger{this, false, "debugger-on-trace",
         R"(
-          If set to true and the `--debugger` flag is given,
-          [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace) will
-          enter the debugger like
-          [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+          If set to true and the `--debugger` flag is given, the following functions
+          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+
+          * [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace)
+          * [`builtins.traceVerbose`](@docroot@/language/builtins.md#builtins-traceVerbose)
+            if [`trace-verbose`](#conf-trace-verbose) is set to true.
+          * [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn)
 
           This is useful for debugging warnings in third-party Nix code.
+        )"};
+
+    Setting<bool> builtinsDebuggerOnWarn{this, false, "debugger-on-warn",
+        R"(
+          If set to true and the `--debugger` flag is given, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn)
+          will enter the debugger like [`builtins.break`](@docroot@/language/builtins.md#builtins-break).
+
+          This is useful for debugging warnings in third-party Nix code.
+
+          Use [`debugger-on-trace`](#conf-debugger-on-trace) to also enter the debugger on legacy warnings that are logged with [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace).
+        )"};
+
+    Setting<bool> builtinsAbortOnWarn{this, false, "abort-on-warn",
+        R"(
+          If set to true, [`builtins.warn`](@docroot@/language/builtins.md#builtins-warn) will throw an error when logging a warning.
+
+          This will give you a stack trace that leads to the location of the warning.
+
+          This is useful for finding information about warnings in third-party Nix code when you can not start the interactive debugger, such as when Nix is called from a non-interactive script. See [`debugger-on-warn`](#conf-debugger-on-warn).
+
+          Currently, a stack trace can only be produced when the debugger is enabled, or when evaluation is aborted.
+
+          This option can be enabled by setting `NIX_ABORT_ON_WARN=1` in the environment.
         )"};
 };
 

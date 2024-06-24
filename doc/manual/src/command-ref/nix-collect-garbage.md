@@ -48,12 +48,14 @@ Instead, it looks in a few locations, and acts on all profiles it finds there:
 
 These options are for deleting old [profiles] prior to deleting unreachable [store objects].
 
-- <span id="opt-delete-old">[`--delete-old`](#opt-delete-old)</span> / `-d`\
+- <span id="opt-delete-old">[`--delete-old`](#opt-delete-old)</span> / `-d`
+
   Delete all old generations of profiles.
 
   This is the equivalent of invoking [`nix-env --delete-generations old`](@docroot@/command-ref/nix-env/delete-generations.md#generations-old) on each found profile.
 
-- <span id="opt-delete-older-than">[`--delete-older-than`](#opt-delete-older-than)</span> *period*\
+- <span id="opt-delete-older-than">[`--delete-older-than`](#opt-delete-older-than)</span> *period*
+
   Delete all generations of profiles older than the specified amount (except for the generations that were active at that point in time).
   *period* is a value such as `30d`, which would mean 30 days.
 
@@ -74,4 +76,4 @@ $ nix-collect-garbage -d
 ```
 
 [profiles]: @docroot@/command-ref/files/profiles.md
-[store objects]: @docroot@/glossary.md#gloss-store-object
+[store objects]: @docroot@/store/store-object.md

@@ -7,6 +7,8 @@ clean-files += $(buildprefix)Makefile.config
 
 # List makefiles
 
+include mk/platform.mk
+
 ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
   mk/precompiled-headers.mk \
@@ -18,14 +20,21 @@ makefiles = \
   src/libexpr/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
-  src/resolve-system-dependencies/local.mk \
+  src/libutil-c/local.mk \
+  src/libstore-c/local.mk \
+  src/libexpr-c/local.mk
+
+ifdef HOST_UNIX
+makefiles += \
   scripts/local.mk \
+  maintainers/local.mk \
   misc/bash/local.mk \
   misc/fish/local.mk \
   misc/zsh/local.mk \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk
+endif
 endif
 
 ifeq ($(ENABLE_UNIT_TESTS), yes)
@@ -34,18 +43,22 @@ makefiles += \
   tests/unit/libutil-support/local.mk \
   tests/unit/libstore/local.mk \
   tests/unit/libstore-support/local.mk \
+  tests/unit/libfetchers/local.mk \
   tests/unit/libexpr/local.mk \
   tests/unit/libexpr-support/local.mk
 endif
 
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
+ifdef HOST_UNIX
 makefiles += \
   tests/functional/local.mk \
   tests/functional/ca/local.mk \
   tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \
+  tests/functional/local-overlay-store/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
+endif
 endif
 
 # Some makefiles require access to built programs and must be included late.
@@ -53,10 +66,6 @@ makefiles-late =
 
 ifeq ($(ENABLE_DOC_GEN), yes)
 makefiles-late += doc/manual/local.mk
-endif
-
-ifeq ($(ENABLE_INTERNAL_API_DOCS), yes)
-makefiles-late += doc/internal-api/local.mk
 endif
 
 # Miscellaneous global Flags
@@ -71,8 +80,6 @@ else
   unexport NIX_HARDENING_ENABLE
 endif
 
-include mk/platform.mk
-
 ifdef HOST_WINDOWS
   # Windows DLLs are stricter about symbol visibility than Unix shared
   # objects --- see https://gcc.gnu.org/wiki/Visibility for details.
@@ -83,7 +90,7 @@ ifdef HOST_WINDOWS
   GLOBAL_LDFLAGS += -Wl,--export-all-symbols
 endif
 
-GLOBAL_CXXFLAGS += -g -Wall -Wimplicit-fallthrough -include $(buildprefix)config.h -std=c++2a -I src
+GLOBAL_CXXFLAGS += -g -Wall -Wdeprecated-copy -Wignored-qualifiers -Wimplicit-fallthrough -include $(buildprefix)config.h -std=c++2a -I src
 
 # Include the main lib, causing rules to be defined
 
@@ -114,12 +121,5 @@ ifneq ($(ENABLE_DOC_GEN), yes)
 .PHONY: manual-html manpages
 manual-html manpages:
 	@echo "Generated docs are disabled. Configure without '--disable-doc-gen', or avoid calling 'make manpages' and 'make manual-html'."
-	@exit 1
-endif
-
-ifneq ($(ENABLE_INTERNAL_API_DOCS), yes)
-.PHONY: internal-api-html
-internal-api-html:
-	@echo "Internal API docs are disabled. Configure with '--enable-internal-api-docs', or avoid calling 'make internal-api-html'."
 	@exit 1
 endif

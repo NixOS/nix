@@ -4,10 +4,11 @@
 #include <array>
 #include <cctype>
 #include <iostream>
-#include <grp.h>
 #include <regex>
 
 #include <sodium.h>
+#include <boost/lexical_cast.hpp>
+#include <stdint.h>
 
 #ifdef NDEBUG
 #error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
@@ -110,6 +111,58 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
             s.replace(j, i.first.size(), i.second);
     }
     return s;
+}
+
+template<class N>
+std::optional<N> string2Int(const std::string_view s)
+{
+    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+        return std::nullopt;
+    try {
+        return boost::lexical_cast<N>(s.data(), s.size());
+    } catch (const boost::bad_lexical_cast &) {
+        return std::nullopt;
+    }
+}
+
+// Explicitly instantiated in one place for faster compilation
+template std::optional<unsigned char>  string2Int<unsigned char>(const std::string_view s);
+template std::optional<unsigned short> string2Int<unsigned short>(const std::string_view s);
+template std::optional<unsigned int> string2Int<unsigned int>(const std::string_view s);
+template std::optional<unsigned long> string2Int<unsigned long>(const std::string_view s);
+template std::optional<unsigned long long> string2Int<unsigned long long>(const std::string_view s);
+template std::optional<signed char> string2Int<signed char>(const std::string_view s);
+template std::optional<signed short> string2Int<signed short>(const std::string_view s);
+template std::optional<signed int> string2Int<signed int>(const std::string_view s);
+template std::optional<signed long> string2Int<signed long>(const std::string_view s);
+template std::optional<signed long long> string2Int<signed long long>(const std::string_view s);
+
+template<class N>
+std::optional<N> string2Float(const std::string_view s)
+{
+    try {
+        return boost::lexical_cast<N>(s.data(), s.size());
+    } catch (const boost::bad_lexical_cast &) {
+        return std::nullopt;
+    }
+}
+
+template std::optional<double> string2Float<double>(const std::string_view s);
+template std::optional<float> string2Float<float>(const std::string_view s);
+
+
+std::string renderSize(uint64_t value, bool align)
+{
+    static const std::array<char, 9> prefixes{{
+        'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
+    }};
+    size_t power = 0;
+    double res = value;
+    while (res > 1024 && power < prefixes.size()) {
+        ++power;
+        res /= 1024;
+    }
+    return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
 }
 
 

@@ -39,3 +39,5 @@
 /json/* /protocols/json/:splat 301!
 
 /release-notes/release-notes /release-notes 301!
+
+/package-management/copy-closure /command-ref/nix-copy-closure 301!

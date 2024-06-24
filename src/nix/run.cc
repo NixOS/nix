@@ -3,17 +3,18 @@
 #include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "derivations.hh"
-#include "local-store.hh"
+#include "local-fs-store.hh"
 #include "finally.hh"
 #include "source-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
-#include "build/personality.hh"
 
 #if __linux__
-#include <sys/mount.h>
+# include <sys/mount.h>
+# include "personality.hh"
 #endif
 
 #include <queue>
@@ -25,7 +26,7 @@ std::string chrootHelperName = "__run_in_chroot";
 namespace nix {
 
 void runProgramInStore(ref<Store> store,
-    UseSearchPath useSearchPath,
+    UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,
     std::optional<std::string_view> system)
@@ -56,10 +57,12 @@ void runProgramInStore(ref<Store> store,
         throw SysError("could not execute chroot helper");
     }
 
+#if __linux__
     if (system)
-        setPersonality(*system);
+        linux::setPersonality(*system);
+#endif
 
-    if (useSearchPath == UseSearchPath::Use)
+    if (useLookupPath == UseLookupPath::Use)
         execvp(program.c_str(), stringsToCharPtrs(args).data());
     else
         execv(program.c_str(), stringsToCharPtrs(args).data());
@@ -68,82 +71,6 @@ void runProgramInStore(ref<Store> store,
 }
 
 }
-
-struct CmdShell : InstallablesCommand, MixEnvironment
-{
-
-    using InstallablesCommand::run;
-
-    std::vector<std::string> command = { getEnv("SHELL").value_or("bash") };
-
-    CmdShell()
-    {
-        addFlag({
-            .longName = "command",
-            .shortName = 'c',
-            .description = "Command and arguments to be executed, defaulting to `$SHELL`",
-            .labels = {"command", "args"},
-            .handler = {[&](std::vector<std::string> ss) {
-                if (ss.empty()) throw UsageError("--command requires at least one argument");
-                command = ss;
-            }}
-        });
-    }
-
-    std::string description() override
-    {
-        return "run a shell in which the specified packages are available";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "shell.md"
-          ;
-    }
-
-    void run(ref<Store> store, Installables && installables) override
-    {
-        auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
-
-        auto accessor = store->getFSAccessor();
-
-        std::unordered_set<StorePath> done;
-        std::queue<StorePath> todo;
-        for (auto & path : outPaths) todo.push(path);
-
-        setEnviron();
-
-        std::vector<std::string> pathAdditions;
-
-        while (!todo.empty()) {
-            auto path = todo.front();
-            todo.pop();
-            if (!done.insert(path).second) continue;
-
-            if (true)
-                pathAdditions.push_back(store->printStorePath(path) + "/bin");
-
-            auto propPath = CanonPath(store->printStorePath(path)) / "nix-support" / "propagated-user-env-packages";
-            if (auto st = accessor->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(accessor->readFile(propPath)))
-                    todo.push(store->parseStorePath(p));
-            }
-        }
-
-        auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
-        unixPath.insert(unixPath.begin(), pathAdditions.begin(), pathAdditions.end());
-        auto unixPathString = concatStringsSep(":", unixPath);
-        setenv("PATH", unixPathString.c_str(), 1);
-
-        Strings args;
-        for (auto & arg : command) args.push_back(arg);
-
-        runProgramInStore(store, UseSearchPath::Use, *command.begin(), args);
-    }
-};
-
-static auto rCmdShell = registerCommand<CmdShell>("shell");
 
 struct CmdRun : InstallableValueCommand
 {
@@ -201,7 +128,7 @@ struct CmdRun : InstallableValueCommand
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
 
-        runProgramInStore(store, UseSearchPath::DontUse, app.program, allArgs);
+        runProgramInStore(store, UseLookupPath::DontUse, app.program, allArgs);
     }
 };
 
@@ -245,9 +172,10 @@ void chrootHelper(int argc, char * * argv)
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (auto entry : readDirectory("/")) {
-            auto src = "/" + entry.name;
-            Path dst = tmpDir + "/" + entry.name;
+        for (auto entry : std::filesystem::directory_iterator{"/"}) {
+            checkInterrupt();
+            auto src = entry.path().string();
+            Path dst = tmpDir + "/" + entry.path().filename().string();
             if (pathExists(dst)) continue;
             auto st = lstat(src);
             if (S_ISDIR(st.st_mode)) {
@@ -276,8 +204,10 @@ void chrootHelper(int argc, char * * argv)
     writeFile("/proc/self/uid_map", fmt("%d %d %d", uid, uid, 1));
     writeFile("/proc/self/gid_map", fmt("%d %d %d", gid, gid, 1));
 
+#if __linux__
     if (system != "")
-        setPersonality(system);
+        linux::setPersonality(system);
+#endif
 
     execvp(cmd.c_str(), stringsToCharPtrs(args).data());
 

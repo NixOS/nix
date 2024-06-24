@@ -87,30 +87,29 @@ struct CmdHashBase : Command
                     return std::make_unique<HashSink>(hashAlgo);
             };
 
-            auto [accessor_, canonPath] = PosixSourceAccessor::createAtRoot(path);
-            auto & accessor = accessor_;
+            auto path2 = PosixSourceAccessor::createAtRoot(path);
             Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
             switch (mode) {
             case FileIngestionMethod::Flat:
             case FileIngestionMethod::Recursive:
             {
                 auto hashSink = makeSink();
-                dumpPath(accessor, canonPath, *hashSink, (FileSerialisationMethod) mode);
+                dumpPath(path2, *hashSink, (FileSerialisationMethod) mode);
                 h = hashSink->finish().first;
                 break;
             }
             case FileIngestionMethod::Git: {
                 std::function<git::DumpHook> hook;
-                hook = [&](const CanonPath & path) -> git::TreeEntry {
+                hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
-                    auto mode = dump(accessor, path, *hashSink, hook);
+                    auto mode = dump(path, *hashSink, hook);
                     auto hash = hashSink->finish().first;
                     return {
                         .mode = mode,
                         .hash = hash,
                     };
                 };
-                h = hook(canonPath).hash;
+                h = hook(path2).hash;
                 break;
             }
             }
@@ -182,7 +181,7 @@ struct CmdToBase : Command
 
     void run() override
     {
-        warn("The old format conversion sub commands of `nix hash` where deprecated in favor of `nix hash convert`.");
+        warn("The old format conversion sub commands of `nix hash` were deprecated in favor of `nix hash convert`.");
         for (auto s : args)
             logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }

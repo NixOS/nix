@@ -92,9 +92,14 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
             fmt("while evaluating the flake output attribute '%s'", attrPath)))
         {
             return { *derivedPathWithInfo };
+        } else {
+            throw Error(
+                "expected flake output attribute '%s' to be a derivation or path but found %s: %s",
+                attrPath,
+                showType(v),
+                ValuePrinter(*this->state, v, errorPrintOptions)
+            );
         }
-        else
-            throw Error("flake output attribute '%s' is not a derivation or path", attrPath);
     }
 
     auto drvPath = attr->forceDerivation();

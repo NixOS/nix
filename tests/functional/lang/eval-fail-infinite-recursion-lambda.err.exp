@@ -29,7 +29,7 @@ error:
              |              ^
             2|
 
-       (19997 duplicate frames omitted)
+       (197 duplicate frames omitted)
 
        error: stack overflow; max-call-depth exceeded
        at /pwd/lang/eval-fail-infinite-recursion-lambda.nix:1:14:

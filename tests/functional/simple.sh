@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 drvPath=$(nix-instantiate simple.nix)
@@ -12,7 +14,7 @@ echo "output path is $outPath"
 
 (! [ -w $outPath ])
 
-text=$(cat "$outPath"/hello)
+text=$(cat "$outPath/hello")
 if test "$text" != "Hello World!"; then exit 1; fi
 
 # Directed delete: $outPath is not reachable from a root, so it should

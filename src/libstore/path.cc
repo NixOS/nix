@@ -49,9 +49,15 @@ StorePath::StorePath(const Hash & hash, std::string_view _name)
     checkName(baseName, name());
 }
 
-bool StorePath::isDerivation() const
+bool StorePath::isDerivation() const noexcept
 {
     return hasSuffix(name(), drvExtension);
+}
+
+void StorePath::requireDerivation() const
+{
+    if (!isDerivation())
+        throw FormatError("store path '%s' is not a valid derivation path", to_string());
 }
 
 StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
@@ -63,7 +69,18 @@ StorePath StorePath::random(std::string_view name)
 
 StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 {
-    auto p = canonPath(std::string(path));
+    // On Windows, `/nix/store` is not a canonical path. More broadly it
+    // is unclear whether this function should be using the native
+    // notion of a canonical path at all. For example, it makes to
+    // support remote stores whose store dir is a non-native path (e.g.
+    // Windows <-> Unix ssh-ing).
+    auto p =
+#ifdef _WIN32
+        path
+#else
+        canonPath(std::string(path))
+#endif
+        ;
     if (dirOf(p) != storeDir)
         throw BadStorePath("path '%s' is not in the Nix store", p);
     return StorePath(baseNameOf(p));

@@ -101,13 +101,14 @@ struct CmdConfigCheck : StoreCommand
                 Path userEnv = canonPath(profileDir, true);
 
                 if (store->isStorePath(userEnv) && hasSuffix(userEnv, "user-environment")) {
-                    while (profileDir.find("/profiles/") == std::string::npos && isLink(profileDir))
+                    while (profileDir.find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
                         profileDir = absPath(readLink(profileDir), dirOf(profileDir));
 
                     if (profileDir.find("/profiles/") == std::string::npos)
                         dirs.insert(dir);
                 }
-            } catch (SystemError &) {}
+            } catch (SystemError &) {
+            } catch (std::filesystem::filesystem_error &) {}
         }
 
         if (!dirs.empty()) {
@@ -145,10 +146,14 @@ struct CmdConfigCheck : StoreCommand
 
     void checkTrustedUser(ref<Store> store)
     {
-        std::string_view trusted = store->isTrustedClient()
-            ? "trusted"
-            : "not trusted";
-        checkInfo(fmt("You are %s by store uri: %s", trusted, store->getUri()));
+        if (auto trustedMay = store->isTrustedClient()) {
+            std::string_view trusted = trustedMay.value()
+                ? "trusted"
+                : "not trusted";
+            checkInfo(fmt("You are %s by store uri: %s", trusted, store->getUri()));
+        } else {
+            checkInfo(fmt("Store uri: %s doesn't have a notion of trusted user", store->getUri()));
+        }
     }
 };
 

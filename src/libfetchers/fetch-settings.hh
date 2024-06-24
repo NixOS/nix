@@ -78,7 +78,6 @@ struct FetchSettings : public Config
         )",
         {}, true, Xp::Flakes};
 
-
     Setting<bool> useRegistries{this, true, "use-registries",
         "Whether to use flake registries to resolve flake references.",
         {}, true, Xp::Flakes};
@@ -88,12 +87,28 @@ struct FetchSettings : public Config
         {}, true, Xp::Flakes};
 
     Setting<std::string> commitLockFileSummary{
-        this, "", "commit-lockfile-summary",
+        this, "", "commit-lock-file-summary",
         R"(
           The commit summary to use when committing changed flake lock files. If
           empty, the summary is generated based on the action performed.
         )",
-        {}, true, Xp::Flakes};
+        {"commit-lockfile-summary"}, true, Xp::Flakes};
+
+    Setting<bool> trustTarballsFromGitForges{
+        this, true, "trust-tarballs-from-git-forges",
+        R"(
+          If enabled (the default), Nix will consider tarballs from
+          GitHub and similar Git forges to be locked if a Git revision
+          is specified,
+          e.g. `github:NixOS/patchelf/7c2f768bf9601268a4e71c2ebe91e2011918a70f`.
+          This requires Nix to trust that the provider will return the
+          correct contents for the specified Git revision.
+
+          If disabled, such tarballs are only considered locked if a
+          `narHash` attribute is specified,
+          e.g. `github:NixOS/patchelf/7c2f768bf9601268a4e71c2ebe91e2011918a70f?narHash=sha256-PPXqKY2hJng4DBVE0I4xshv/vGLUskL7jl53roB8UdU%3D`.
+        )"};
+
 };
 
 // FIXME: don't use a global variable.

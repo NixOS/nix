@@ -1,4 +1,4 @@
-#include "source-accessor.hh"
+#include "source-path.hh"
 #include "fs-sink.hh"
 #include "variant-wrapper.hh"
 
@@ -69,7 +69,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
      */
     File * open(const CanonPath & path, std::optional<File> create);
 
-    CanonPath addFile(CanonPath path, std::string && contents);
+    SourcePath addFile(CanonPath path, std::string && contents);
 };
 
 /**

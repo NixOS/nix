@@ -5,6 +5,7 @@
 #include "config.hh"
 #include "environment-variables.hh"
 #include "experimental-features.hh"
+#include "users.hh"
 
 #include <map>
 #include <limits>
@@ -423,8 +424,10 @@ public:
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
         "Whether SQLite should use WAL mode."};
 
+#ifndef _WIN32
     Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
         "Whether to call `sync()` before registering a path as valid."};
+#endif
 
     Setting<bool> useSubstitutes{
         this, true, "substitute",
@@ -665,7 +668,8 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<bool> requireDropSupplementaryGroups{this, getuid() == 0, "require-drop-supplementary-groups",
+#ifndef _WIN32
+    Setting<bool> requireDropSupplementaryGroups{this, isRootUser(), "require-drop-supplementary-groups",
         R"(
           Following the principle of least privilege,
           Nix will attempt to drop supplementary groups when building with sandboxing.
@@ -682,20 +686,41 @@ public:
           (since `root` usually has permissions to call setgroups)
           and `false` otherwise.
         )"};
+#endif
 
 #if __linux__
     Setting<std::string> sandboxShmSize{
         this, "50%", "sandbox-dev-shm-size",
         R"(
-          This option determines the maximum size of the `tmpfs` filesystem
-          mounted on `/dev/shm` in Linux sandboxes. For the format, see the
-          description of the `size` option of `tmpfs` in mount(8). The default
-          is `50%`.
+            *Linux only*
+
+            This option determines the maximum size of the `tmpfs` filesystem
+            mounted on `/dev/shm` in Linux sandboxes. For the format, see the
+            description of the `size` option of `tmpfs` in mount(8). The default
+            is `50%`.
         )"};
 
     Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir",
-        "The build directory inside the sandbox."};
+        R"(
+            *Linux only*
+
+            The build directory inside the sandbox.
+
+            This directory is backed by [`build-dir`](#conf-build-dir) on the host.
+        )"};
 #endif
+
+    Setting<std::optional<Path>> buildDir{this, std::nullopt, "build-dir",
+        R"(
+            The directory on the host, in which derivations' temporary build directories are created.
+
+            If not set, Nix will use the system temporary directory indicated by the `TMPDIR` environment variable.
+            Note that builds are often performed by the Nix daemon, so its `TMPDIR` is used, and not that of the Nix command line interface.
+
+            This is also the location where [`--keep-failed`](@docroot@/command-ref/opt-common.md#opt-keep-failed) leaves its files.
+
+            If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment will contain this directory, instead of the virtual location [`sandbox-build-dir`](#conf-sandbox-build-dir).
+        )"};
 
     Setting<PathSet> allowedImpureHostPrefixes{this, {}, "allowed-impure-host-deps",
         "Which prefixes to allow derivations to ask for access to (primarily for Darwin)."};
@@ -759,6 +784,7 @@ public:
 
           - the store object has been signed using a key in the trusted keys list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store URL is configured with `trusted=true`
           - the store object is [content-addressed](@docroot@/glossary.md#gloss-content-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
@@ -884,7 +910,7 @@ public:
         "substituters",
         R"(
           A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/store/store-object.md) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
@@ -1136,9 +1162,10 @@ public:
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
-          be dlopened by Nix, allowing them to affect execution through static
-          initialization. In particular, these plugins may construct static
-          instances of RegisterPrimOp to add new primops or constants to the
+          be dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
+          this symbol will be called. Alternatively, they can affect execution
+          through static initialization. In particular, these plugins may construct
+          static instances of RegisterPrimOp to add new primops or constants to the
           expression language, RegisterStoreImplementation to add new store
           implementations, RegisterCommand to add new subcommands to the `nix`
           command, and RegisterSetting to add new nix config settings. See the
@@ -1235,6 +1262,16 @@ public:
           store paths of the latest Nix release.
         )"
     };
+
+    Setting<uint64_t> warnLargePathThreshold{
+        this,
+        std::numeric_limits<uint64_t>::max(),
+        "warn-large-path-threshold",
+        R"(
+          Warn when copying a path larger than this number of bytes to the Nix store
+          (as determined by its NAR serialisation).
+        )"
+    };
 };
 
 
@@ -1255,9 +1292,10 @@ std::vector<Path> getUserConfigFiles();
 extern const std::string nixVersion;
 
 /**
- * NB: This is not sufficient. You need to call initNix()
+ * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
+ * @note When using libexpr, and/or libmain, This is not sufficient. See initNix().
  */
-void initLibStore();
+void initLibStore(bool loadConfig = true);
 
 /**
  * It's important to initialize before doing _anything_, which is why we

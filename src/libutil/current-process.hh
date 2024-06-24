@@ -2,7 +2,10 @@
 ///@file
 
 #include <optional>
-#include <sys/resource.h>
+
+#ifndef _WIN32
+# include <sys/resource.h>
+#endif
 
 #include "types.hh"
 
@@ -17,13 +20,13 @@ unsigned int getMaxCPU();
 /**
  * Change the stack size.
  */
-void setStackSize(rlim_t stackSize);
+void setStackSize(size_t stackSize);
 
 /**
  * Restore the original inherited Unix process context (such as signal
  * masks, stack size).
 
- * See startSignalHandlerThread(), saveSignalMask().
+ * See unix::startSignalHandlerThread(), unix::saveSignalMask().
  */
 void restoreProcessContext(bool restoreMounts = true);
 

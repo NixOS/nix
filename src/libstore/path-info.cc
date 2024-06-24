@@ -161,28 +161,23 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
     jsonObject["narSize"] = narSize;
 
     {
-        auto& jsonRefs = (jsonObject["references"] = json::array());
+        auto & jsonRefs = jsonObject["references"] = json::array();
         for (auto & ref : references)
             jsonRefs.emplace_back(store.printStorePath(ref));
     }
 
-    if (ca)
-        jsonObject["ca"] = renderContentAddress(ca);
+    jsonObject["ca"] = ca ? (std::optional { renderContentAddress(*ca) }) : std::nullopt;
 
     if (includeImpureInfo) {
-        if (deriver)
-            jsonObject["deriver"] = store.printStorePath(*deriver);
+        jsonObject["deriver"] = deriver ? (std::optional { store.printStorePath(*deriver) }) : std::nullopt;
 
-        if (registrationTime)
-            jsonObject["registrationTime"] = registrationTime;
+        jsonObject["registrationTime"] = registrationTime ? (std::optional { registrationTime }) : std::nullopt;
 
-        if (ultimate)
-            jsonObject["ultimate"] = ultimate;
+        jsonObject["ultimate"] = ultimate;
 
-        if (!sigs.empty()) {
-            for (auto & sig : sigs)
-                jsonObject["signatures"].push_back(sig);
-        }
+        auto & sigsObj = jsonObject["signatures"] = json::array();
+        for (auto & sig : sigs)
+            sigsObj.push_back(sig);
     }
 
     return jsonObject;
@@ -190,23 +185,18 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(
 
 UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
     const Store & store,
-    const nlohmann::json & json)
+    const nlohmann::json & _json)
 {
-    using nlohmann::detail::value_t;
-
     UnkeyedValidPathInfo res {
         Hash(Hash::dummy),
     };
 
-    ensureType(json, value_t::object);
-    res.narHash = Hash::parseAny(
-        static_cast<const std::string &>(
-            ensureType(valueAt(json, "narHash"), value_t::string)),
-        std::nullopt);
-    res.narSize = ensureType(valueAt(json, "narSize"), value_t::number_integer);
+    auto & json = getObject(_json);
+    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+    res.narSize = getInteger(valueAt(json, "narSize"));
 
     try {
-        auto & references = ensureType(valueAt(json, "references"), value_t::array);
+        auto references = getStringList(valueAt(json, "references"));
         for (auto & input : references)
             res.references.insert(store.parseStorePath(static_cast<const std::string &>
 (input)));
@@ -215,24 +205,25 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
         throw;
     }
 
+    // New format as this as nullable but mandatory field; handling
+    // missing is for back-compat.
     if (json.contains("ca"))
-        res.ca = ContentAddress::parse(
-            static_cast<const std::string &>(
-                ensureType(valueAt(json, "ca"), value_t::string)));
+        if (auto * rawCa = getNullable(valueAt(json, "ca")))
+            res.ca = ContentAddress::parse(getString(*rawCa));
 
     if (json.contains("deriver"))
-        res.deriver = store.parseStorePath(
-            static_cast<const std::string &>(
-                ensureType(valueAt(json, "deriver"), value_t::string)));
+        if (auto * rawDeriver = getNullable(valueAt(json, "deriver")))
+            res.deriver = store.parseStorePath(getString(*rawDeriver));
 
     if (json.contains("registrationTime"))
-        res.registrationTime = ensureType(valueAt(json, "registrationTime"), value_t::number_integer);
+        if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
+            res.registrationTime = getInteger(*rawRegistrationTime);
 
     if (json.contains("ultimate"))
-        res.ultimate = ensureType(valueAt(json, "ultimate"), value_t::boolean);
+        res.ultimate = getBoolean(valueAt(json, "ultimate"));
 
     if (json.contains("signatures"))
-        res.sigs = valueAt(json, "signatures");
+        res.sigs = getStringSet(valueAt(json, "signatures"));
 
     return res;
 }

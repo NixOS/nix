@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source ./common.sh
 
 requireGit
@@ -92,6 +94,24 @@ cat > $nonFlakeDir/shebang-comments.sh <<EOF
 foo
 EOF
 chmod +x $nonFlakeDir/shebang-comments.sh
+
+cat > $nonFlakeDir/shebang-different-comments.sh <<EOF
+#! $(type -P env) nix
+# some comments
+// some comments
+/* some comments
+* some comments
+\ some comments
+% some comments
+@ some comments
+-- some comments
+(* some comments
+#! nix --offline shell
+#! nix flake1#fooScript
+#! nix --no-write-lock-file --command cat
+foo
+EOF
+chmod +x $nonFlakeDir/shebang-different-comments.sh
 
 cat > $nonFlakeDir/shebang-reject.sh <<EOF
 #! $(type -P env) nix
@@ -212,6 +232,17 @@ nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"$flake1Dir\").pack
 
 # 'getFlake' on a locked flakeref should succeed even in pure mode.
 nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").packages.$system.default"
+
+# Regression test for dirOf on the root of the flake.
+[[ $(nix eval --json flake1#parent) = \""$NIX_STORE_DIR"\" ]]
+
+# Regression test for baseNameOf on the root of the flake.
+[[ $(nix eval --raw flake1#baseName) =~ ^[a-z0-9]+-source$ ]]
+
+# Test that the root of a tree returns a path named /nix/store/<hash1>-<hash2>-source.
+# This behavior is *not* desired, but has existed for a while.
+# Issue #10627 what to do about it.
+[[ $(nix eval --raw flake1#root) =~ ^.*/[a-z0-9]+-[a-z0-9]+-source$ ]]
 
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-registries)
@@ -607,6 +638,7 @@ expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock
 [[ $($nonFlakeDir/shebang.sh) = "foo" ]]
 [[ $($nonFlakeDir/shebang.sh "bar") = "foo"$'\n'"bar" ]]
 [[ $($nonFlakeDir/shebang-comments.sh ) = "foo" ]]
+[[ "$($nonFlakeDir/shebang-different-comments.sh)" = "$(cat $nonFlakeDir/shebang-different-comments.sh)" ]]
 [[ $($nonFlakeDir/shebang-inline-expr.sh baz) = "foo"$'\n'"baz" ]]
 [[ $($nonFlakeDir/shebang-file.sh baz) = "foo"$'\n'"baz" ]]
 expect 1 $nonFlakeDir/shebang-reject.sh 2>&1 | grepQuiet -F 'error: unsupported unquoted character in nix shebang: *. Use double backticks to escape?'

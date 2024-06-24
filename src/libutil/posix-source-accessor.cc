@@ -1,4 +1,5 @@
 #include "posix-source-accessor.hh"
+#include "source-path.hh"
 #include "signals.hh"
 #include "sync.hh"
 
@@ -10,19 +11,19 @@ PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && root)
     : root(std::move(root))
 {
     assert(root.empty() || root.is_absolute());
-    displayPrefix = root;
+    displayPrefix = root.string();
 }
 
 PosixSourceAccessor::PosixSourceAccessor()
     : PosixSourceAccessor(std::filesystem::path {})
 { }
 
-std::pair<PosixSourceAccessor, CanonPath> PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
+SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
-    std::filesystem::path path2 = absPath(path.native());
+    std::filesystem::path path2 = absPath(path.string());
     return {
-        PosixSourceAccessor { path2.root_path() },
-        CanonPath { static_cast<std::string>(path2.relative_path()) },
+        make_ref<PosixSourceAccessor>(path2.root_path()),
+        CanonPath { path2.relative_path().string() },
     };
 }
 
@@ -47,12 +48,16 @@ void PosixSourceAccessor::readFile(
 
     auto ap = makeAbsPath(path);
 
-    AutoCloseFD fd = open(ap.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    AutoCloseFD fd = toDescriptor(open(ap.string().c_str(), O_RDONLY
+    #ifndef _WIN32
+        | O_NOFOLLOW | O_CLOEXEC
+    #endif
+        ));
     if (!fd)
-        throw SysError("opening file '%1%'", ap.native());
+        throw SysError("opening file '%1%'", ap.string());
 
     struct stat st;
-    if (fstat(fd.get(), &st) == -1)
+    if (fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
         throw SysError("statting file");
 
     sizeCallback(st.st_size);
@@ -62,7 +67,7 @@ void PosixSourceAccessor::readFile(
     std::array<unsigned char, 64 * 1024> buf;
     while (left) {
         checkInterrupt();
-        ssize_t rd = read(fd.get(), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
+        ssize_t rd = read(fromDescriptorReadOnly(fd.get()), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
         if (rd == -1) {
             if (errno != EINTR)
                 throw SysError("reading from file '%s'", showPath(path));
@@ -80,30 +85,24 @@ void PosixSourceAccessor::readFile(
 bool PosixSourceAccessor::pathExists(const CanonPath & path)
 {
     if (auto parent = path.parent()) assertNoSymlinks(*parent);
-    return nix::pathExists(makeAbsPath(path));
+    return nix::pathExists(makeAbsPath(path).string());
 }
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static Sync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
+    static SharedSync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
 
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
-    Path absPath = makeAbsPath(path);
+    Path absPath = makeAbsPath(path).string();
 
     {
-        auto cache(_cache.lock());
+        auto cache(_cache.read());
         auto i = cache->find(absPath);
         if (i != cache->end()) return i->second;
     }
 
-    std::optional<struct stat> st{std::in_place};
-    if (::lstat(absPath.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of '%s'", showPath(path));
-    }
+    auto st = nix::maybeLstat(absPath.c_str());
 
     auto cache(_cache.lock());
     if (cache->size() >= 16384) cache->clear();
@@ -133,14 +132,34 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 {
     assertNoSymlinks(path);
     DirEntries res;
-    for (auto & entry : nix::readDirectory(makeAbsPath(path))) {
-        std::optional<Type> type;
-        switch (entry.type) {
-        case DT_REG: type = Type::tRegular; break;
-        case DT_LNK: type = Type::tSymlink; break;
-        case DT_DIR: type = Type::tDirectory; break;
-        }
-        res.emplace(entry.name, type);
+    for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
+        checkInterrupt();
+        auto type = [&]() -> std::optional<Type> {
+            std::filesystem::file_type nativeType;
+            try {
+                nativeType = entry.symlink_status().type();
+            } catch (std::filesystem::filesystem_error & e) {
+                // We cannot always stat the child. (Ideally there is no
+                // stat because the native directory entry has the type
+                // already, but this isn't always the case.)
+                if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
+                    return std::nullopt;
+                else throw;
+            }
+
+            // cannot exhaustively enumerate because implementation-specific
+            // additional file types are allowed.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+            switch (nativeType) {
+            case std::filesystem::file_type::regular: return Type::tRegular; break;
+            case std::filesystem::file_type::symlink: return Type::tSymlink; break;
+            case std::filesystem::file_type::directory: return Type::tDirectory; break;
+            default: return tMisc;
+            }
+#pragma GCC diagnostic pop
+        }();
+        res.emplace(entry.path().filename().string(), type);
     }
     return res;
 }
@@ -148,7 +167,7 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 std::string PosixSourceAccessor::readLink(const CanonPath & path)
 {
     if (auto parent = path.parent()) assertNoSymlinks(*parent);
-    return nix::readLink(makeAbsPath(path));
+    return nix::readLink(makeAbsPath(path).string());
 }
 
 std::optional<std::filesystem::path> PosixSourceAccessor::getPhysicalPath(const CanonPath & path)
@@ -166,4 +185,14 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     }
 }
 
+ref<SourceAccessor> getFSSourceAccessor()
+{
+    static auto rootFS = make_ref<PosixSourceAccessor>();
+    return rootFS;
+}
+
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root)
+{
+    return make_ref<PosixSourceAccessor>(std::move(root));
+}
 }

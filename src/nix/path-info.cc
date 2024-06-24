@@ -43,9 +43,15 @@ static json pathInfoToJSON(
 
     for (auto & storePath : storePaths) {
         json jsonObject;
+        auto printedStorePath = store.printStorePath(storePath);
 
         try {
             auto info = store.queryPathInfo(storePath);
+
+            // `storePath` has the representation `<hash>-x` rather than
+            // `<hash>-<name>` in case of binary-cache stores & `--all` because we don't
+            // know the name yet until we've read the NAR info.
+            printedStorePath = store.printStorePath(info->path);
 
             jsonObject = info->toJSON(store, true, HashFormat::SRI);
 
@@ -74,7 +80,7 @@ static json pathInfoToJSON(
             jsonObject = nullptr;
         }
 
-        jsonAllObjects[store.printStorePath(storePath)] = std::move(jsonObject);
+        jsonAllObjects[printedStorePath] = std::move(jsonObject);
     }
     return jsonAllObjects;
 }
@@ -133,21 +139,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
     void printSize(uint64_t value)
     {
-        if (!humanReadable) {
+        if (humanReadable)
+            std::cout << fmt("\t%s", renderSize(value, true));
+        else
             std::cout << fmt("\t%11d", value);
-            return;
-        }
-
-        static const std::array<char, 9> idents{{
-            ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
-        }};
-        size_t power = 0;
-        double res = value;
-        while (res > 1024 && power < idents.size()) {
-            ++power;
-            res /= 1024;
-        }
-        std::cout << fmt("\t%6.1f%c", res, idents.at(power));
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override
