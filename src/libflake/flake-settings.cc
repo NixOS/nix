@@ -3,9 +3,7 @@
 
 namespace nix {
 
-FlakeSettings::FlakeSettings()
-{
-}
+FlakeSettings::FlakeSettings() {}
 
 FlakeSettings flakeSettings;
 
