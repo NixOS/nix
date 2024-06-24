@@ -216,7 +216,7 @@ requireGit() {
 }
 
 fail() {
-    echo "test failed: $1" >&2
+    echo "test failed: $*" >&2
     exit 1
 }
 
