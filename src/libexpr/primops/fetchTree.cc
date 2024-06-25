@@ -431,7 +431,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     state.forceValue(*args[0], pos);
 
-    if (args[0]->type() == nAttrs) {
+    bool isArgAttrs = args[0]->type() == nAttrs;
+    bool nameAttrPassed = false;
+
+    if (isArgAttrs) {
 
         for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
@@ -439,8 +442,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
                 url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
             else if (n == "sha256")
                 expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), HashAlgorithm::SHA256);
-            else if (n == "name")
+            else if (n == "name") {
+                nameAttrPassed = true;
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
+            }
             else
                 state.error<EvalError>("unsupported argument '%s' to '%s'", n, who)
                 .atPos(pos).debugThrow();
@@ -459,6 +464,19 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     if (name == "")
         name = baseNameOf(*url);
+
+    try {
+        checkName(name);
+    } catch (BadStorePathName & e) {
+        auto resolution =
+            nameAttrPassed ? HintFmt("Please change the value for the 'name' attribute passed to '%s', so that it can create a valid store path.", who) :
+            isArgAttrs ? HintFmt("Please add a valid 'name' attribute to the argument for '%s', so that it can create a valid store path.", who) :
+            HintFmt("Please pass an attribute set with 'url' and 'name' attributes to '%s',  so that it can create a valid store path.", who);
+
+        state.error<EvalError>(
+            std::string("invalid store path name when fetching URL '%s': %s. %s"), *url, Uncolored(e.message()), Uncolored(resolution.str()))
+        .atPos(pos).debugThrow();
+    }
 
     if (state.settings.pureEval && !expectedHash)
         state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who).atPos(pos).debugThrow();

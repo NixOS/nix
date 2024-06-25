@@ -16,6 +16,7 @@ namespace nix {
 struct SourcePath;
 
 MakeError(BadStorePath, Error);
+MakeError(BadStorePathName, BadStorePath);
 
 struct StoreDirConfig : public Config
 {
