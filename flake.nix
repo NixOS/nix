@@ -160,11 +160,48 @@
             };
           });
 
+          # TODO: define everything here instead of top level?
+          nix-components = {
+            inherit (final)
+              nix-util
+              nix-util-test-support
+              nix-util-test
+              nix-util-c
+              nix-store
+              nix-fetchers
+              nix-perl-bindings
+              ;
+          };
+
           nix-util = final.callPackage ./src/libutil/package.nix {
             inherit
               fileset
               stdenv
               officialRelease
+              versionSuffix
+              ;
+          };
+
+          nix-util-test-support = final.callPackage ./tests/unit/libutil-support/package.nix {
+            inherit
+              fileset
+              stdenv
+              versionSuffix
+              ;
+          };
+
+          nix-util-test = final.callPackage ./tests/unit/libutil/package.nix {
+            inherit
+              fileset
+              stdenv
+              versionSuffix
+              ;
+          };
+
+          nix-util-c = final.callPackage ./src/libutil-c/package.nix {
+            inherit
+              fileset
+              stdenv
               versionSuffix
               ;
           };
@@ -281,7 +318,19 @@
         # the old build system is gone and we are back to one build
         # system, we should reenable this.
         #perlBindings = self.hydraJobs.perlBindings.${system};
-      } // devFlake.checks.${system} or {}
+      }
+      // lib.concatMapAttrs (nixpkgsPrefix: nixpkgs: 
+          lib.concatMapAttrs (pkgName: pkg:
+            lib.concatMapAttrs (testName: test: {
+              # Add "passthru" tests
+              "${nixpkgsPrefix}${pkgName}-${testName}" = test;
+            }) pkg.tests or {}
+          ) nixpkgs.nix-components
+        ) {
+          "" = nixpkgsFor.${system}.native;
+          "static-" = nixpkgsFor.${system}.static;
+        }
+      // devFlake.checks.${system} or {}
       );
 
       packages = forAllSystems (system: {

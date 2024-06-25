@@ -36,6 +36,9 @@ let
   forAllPackages = lib.genAttrs [
     "nix"
     "nix-util"
+    "nix-util-c"
+    "nix-util-test-support"
+    "nix-util-test"
     "nix-store"
     "nix-fetchers"
   ];
