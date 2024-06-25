@@ -296,7 +296,8 @@ using namespace eval_cache;
 std::tuple<ref<EvalCache>, ref<eval_cache::AttrCursor>>
 call(
     EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake)
+    std::shared_ptr<flake::LockedFlake> lockedFlake,
+    const FlakeRef & defaultSchemasFlake)
 {
     auto fingerprint = lockedFlake->getFingerprint(state.store);
 
@@ -304,12 +305,16 @@ call(
         #include "call-flake-schemas.nix.gen.hh"
         ;
 
+    auto lockedDefaultSchemasFlake = flake::lockFlake(state, defaultSchemasFlake, {});
+    auto lockedDefaultSchemasFlakeFingerprint = lockedDefaultSchemasFlake.getFingerprint(state.store);
+
     std::optional<Fingerprint> fingerprint2;
-    if (fingerprint)
+    if (fingerprint && lockedDefaultSchemasFlakeFingerprint)
         fingerprint2 = hashString(HashAlgorithm::SHA256,
-            fmt("app:%s:%s",
+            fmt("app:%s:%s:%s",
                 hashString(HashAlgorithm::SHA256, callFlakeSchemasNix).to_string(HashFormat::Base16, false),
-                fingerprint->to_string(HashFormat::Base16, false)));
+                fingerprint->to_string(HashFormat::Base16, false),
+                lockedDefaultSchemasFlakeFingerprint->to_string(HashFormat::Base16, false)));
 
     // FIXME: merge with openEvalCache().
     auto cache = make_ref<EvalCache>(
@@ -317,7 +322,7 @@ call(
             ? fingerprint2
             : std::nullopt,
         state,
-        [&state, lockedFlake, callFlakeSchemasNix]()
+        [&state, lockedFlake, callFlakeSchemasNix, lockedDefaultSchemasFlake]()
         {
             auto vCallFlakeSchemas = state.allocValue();
             state.eval(state.parseExprFromString(callFlakeSchemasNix, state.rootPath(CanonPath::root)), *vCallFlakeSchemas);
@@ -325,8 +330,15 @@ call(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
+            auto vDefaultSchemasFlake = state.allocValue();
+            if (vFlake->type() == nAttrs && vFlake->attrs()->get(state.symbols.create("schemas")))
+                vDefaultSchemasFlake->mkNull();
+            else
+                flake::callFlake(state, lockedDefaultSchemasFlake, *vDefaultSchemasFlake);
+
             auto vRes = state.allocValue();
-            state.callFunction(*vCallFlakeSchemas, *vFlake, *vRes, noPos);
+            Value * args[] = {vDefaultSchemasFlake, vFlake};
+            state.callFunction(*vCallFlakeSchemas, 2, args, *vRes, noPos);
 
             return vRes;
         });
@@ -454,7 +466,34 @@ std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
 
 }
 
-struct CmdFlakeCheck : FlakeCommand
+struct MixFlakeSchemas : virtual Args, virtual StoreCommand
+{
+    std::string defaultFlakeSchemas =
+        "github:DeterminateSystems/flake-schemas/3b4d5fef938f698c8737515532a1be53bf6355f2?narHash=sha256-TBmeIZHYzqKTaTe8YFgTimVBGLzkoUgZfkDMkZBZyfo%3D";
+
+    MixFlakeSchemas()
+    {
+        addFlag({
+            .longName = "default-flake-schemas",
+            .description = "The URL of the flake providing default flake schema definitions.",
+            .labels = {"flake-ref"},
+            .handler = {&defaultFlakeSchemas},
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(
+                    completions,
+                    getStore(),
+                    prefix);
+            }}
+        });
+    }
+
+    FlakeRef getDefaultFlakeSchemas()
+    {
+        return parseFlakeRef(defaultFlakeSchemas, absPath("."));
+    }
+};
+
+struct CmdFlakeCheck : FlakeCommand, MixFlakeSchemas
 {
     bool build = true;
     bool checkAllSystems = false;
@@ -498,7 +537,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        auto [cache, inventory] = flake_schemas::call(*state, flake);
+        auto [cache, inventory] = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
 
         std::vector<DerivedPath> drvPaths;
 
@@ -881,7 +920,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
-struct CmdFlakeShow : FlakeCommand, MixJSON
+struct CmdFlakeShow : FlakeCommand, MixJSON, MixFlakeSchemas
 {
     bool showLegacy = false;
     bool showAllSystems = false;
@@ -918,7 +957,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        auto [cache, inventory] = flake_schemas::call(*state, flake);
+        auto [cache, inventory] = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
 
         if (json) {
             std::function<void(ref<eval_cache::AttrCursor> node, nlohmann::json & obj)> visit;

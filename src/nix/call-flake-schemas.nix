@@ -1,3 +1,7 @@
+/* The flake providing default schemas. */
+defaultSchemasFlake:
+
+/* The flake whose contents we want to extract. */
 flake:
 
 let
@@ -11,11 +15,7 @@ in
 rec {
   outputNames = builtins.attrNames flake.outputs;
 
-  allSchemas = (flake.outputs.schemas or defaultSchemas) // schemaOverrides;
-
-  # FIXME: make this configurable
-  # FIXME: a pre-cached copy of the flake-schemas needs to be built in to the nix binary
-  defaultSchemas = (builtins.getFlake "github:DeterminateSystems/flake-schemas/3b4d5fef938f698c8737515532a1be53bf6355f2?narHash=sha256-TBmeIZHYzqKTaTe8YFgTimVBGLzkoUgZfkDMkZBZyfo%3D").schemas;
+  allSchemas = (flake.outputs.schemas or defaultSchemasFlake.schemas) // schemaOverrides;
 
   schemaOverrides = {}; # FIXME
 
