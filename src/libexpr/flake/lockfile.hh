@@ -38,11 +38,19 @@ struct LockedNode : Node
     FlakeRef lockedRef, originalRef;
     bool isFlake = true;
 
+    /* The node relative to which relative source paths
+       (e.g. 'path:../foo') are interpreted. */
+    std::optional<InputPath> parentPath;
+
     LockedNode(
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
-        bool isFlake = true)
-        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake)
+        bool isFlake = true,
+        std::optional<InputPath> parentPath = {})
+        : lockedRef(lockedRef)
+        , originalRef(originalRef)
+        , isFlake(isFlake)
+        , parentPath(parentPath)
     { }
 
     LockedNode(const nlohmann::json & json);
