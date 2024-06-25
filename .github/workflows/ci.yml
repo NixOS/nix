@@ -193,3 +193,11 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes .#hydraJobs.tests.functional_user
+
+  meson_build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix build -L .#hydraJobs.build.{nix-fetchers,nix-store,nix-util}.$(nix-instantiate --eval --expr builtins.currentSystem | sed -e 's/"//g')
