@@ -332,11 +332,13 @@
         #perlBindings = self.hydraJobs.perlBindings.${system};
       }
       # Add "passthru" tests
-      // flatMapAttrs {
+      // flatMapAttrs ({
           "" = nixpkgsFor.${system}.native;
-          # FIXME: Static build on darwin currently broken
-          # "static-" = nixpkgsFor.${system}.static;
-        }
+        } // lib.optionalAttrs (! nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
+          # TODO: enable static builds for darwin, blocked on:
+          #       https://github.com/NixOS/nixpkgs/issues/320448
+          "static-" = nixpkgsFor.${system}.static;
+        })
         (nixpkgsPrefix: nixpkgs: 
           flatMapAttrs nixpkgs.nix-components
             (pkgName: pkg:
