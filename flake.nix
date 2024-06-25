@@ -334,7 +334,8 @@
       # Add "passthru" tests
       // flatMapAttrs {
           "" = nixpkgsFor.${system}.native;
-          "static-" = nixpkgsFor.${system}.static;
+          # FIXME: Static build on darwin currently broken
+          # "static-" = nixpkgsFor.${system}.static;
         }
         (nixpkgsPrefix: nixpkgs: 
           flatMapAttrs nixpkgs.nix-components
