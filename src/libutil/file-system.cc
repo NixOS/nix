@@ -557,29 +557,69 @@ void replaceSymlink(const Path & target, const Path & link)
     }
 }
 
-#ifndef _WIN32
-static void setWriteTime(const fs::path & p, const struct stat & st)
+void setWriteTime(
+    const std::filesystem::path & path,
+    time_t accessedTime,
+    time_t modificationTime,
+    std::optional<bool> optIsSymlink)
 {
-    struct timeval times[2];
-    times[0] = {
-        .tv_sec = st.st_atime,
-        .tv_usec = 0,
+#ifndef _WIN32
+    struct timeval times[2] = {
+        {
+            .tv_sec = accessedTime,
+            .tv_usec = 0,
+        },
+        {
+            .tv_sec = modificationTime,
+            .tv_usec = 0,
+        },
     };
-    times[1] = {
-        .tv_sec = st.st_mtime,
-        .tv_usec = 0,
-    };
-    if (lutimes(p.c_str(), times) != 0)
-        throw SysError("changing modification time of '%s'", p);
-}
 #endif
+
+    auto nonSymlink = [&]{
+        bool isSymlink = optIsSymlink
+            ? *optIsSymlink
+            : fs::is_symlink(path);
+
+        if (!isSymlink) {
+#ifdef _WIN32
+            // FIXME use `fs::last_write_time`.
+            //
+            // Would be nice to use std::filesystem unconditionally, but
+            // doesn't support access time just modification time.
+            //
+            // System clock vs File clock issues also make that annoying.
+            warn("Changing file times is not yet implemented on Windows, path is '%s'", path);
+#else
+            if (utimes(path.c_str(), times) == -1) {
+
+                throw SysError("changing modification time of '%s' (not a symlink)", path);
+            }
+#endif
+        } else {
+            throw Error("Cannot modification time of symlink '%s'", path);
+        }
+    };
+
+#if HAVE_LUTIMES
+    if (lutimes(path.c_str(), times) == -1) {
+        if (errno == ENOSYS)
+            nonSymlink();
+        else
+            throw SysError("changing modification time of '%s'", path);
+    }
+#else
+    nonSymlink();
+#endif
+}
+
+void setWriteTime(const fs::path & path, const struct stat & st)
+{
+    setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
+}
 
 void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
 {
-#ifndef _WIN32
-    // TODO: Rewrite the `is_*` to use `symlink_status()`
-    auto statOfFrom = lstat(from.c_str());
-#endif
     auto fromStatus = fs::symlink_status(from);
 
     // Mark the directory as writable so that we can delete its children
@@ -599,9 +639,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
         throw Error("file '%s' has an unsupported type", from);
     }
 
-#ifndef _WIN32
-    setWriteTime(to, statOfFrom);
-#endif
+    setWriteTime(to, lstat(from.string().c_str()));
     if (andDelete) {
         if (!fs::is_symlink(fromStatus))
             fs::permissions(from, fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
