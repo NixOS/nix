@@ -1,8 +1,11 @@
 #include "posix-source-accessor.hh"
+#include "file-system.hh"
 #include "source-path.hh"
 #include "signals.hh"
 #include "sync.hh"
 
+#include <chrono>
+#include <filesystem>
 #include <unordered_map>
 
 namespace nix {
@@ -102,7 +105,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
         if (i != cache->end()) return i->second;
     }
 
-    auto st = nix::maybeLstat(absPath.c_str());
+    auto st = unix::maybeLstat(absPath);
 
     auto cache(_cache.lock());
     if (cache->size() >= 16384) cache->clear();

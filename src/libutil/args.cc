@@ -6,6 +6,7 @@
 #include "users.hh"
 #include "json-utils.hh"
 
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <regex>
@@ -553,8 +554,8 @@ static void _completePath(AddCompletions & completions, std::string_view prefix,
     if (glob((expandTilde(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
         for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
             if (onlyDirs) {
-                auto st = stat(globbuf.gl_pathv[i]);
-                if (!S_ISDIR(st.st_mode)) continue;
+                if (!std::filesystem::is_directory(globbuf.gl_pathv[i]))
+                    continue;
             }
             completions.add(globbuf.gl_pathv[i]);
         }

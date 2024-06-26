@@ -11,6 +11,7 @@
 #include "source-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include <filesystem>
 
 #if __linux__
 # include <sys/mount.h>
@@ -174,17 +175,31 @@ void chrootHelper(int argc, char * * argv)
 
         for (auto entry : std::filesystem::directory_iterator{"/"}) {
             checkInterrupt();
-            auto src = entry.path().string();
+            auto src = entry.path();
             Path dst = tmpDir + "/" + entry.path().filename().string();
             if (pathExists(dst)) continue;
-            auto st = lstat(src);
-            if (S_ISDIR(st.st_mode)) {
+            auto st = entry.symlink_status();
+
+            // cannot exhaustively enumerate because implementation-specific
+            // additional file types are allowed.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+            switch (st.type()) {
+            case std::filesystem::file_type::directory:  {
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory '%s'", dst);
-                if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+                if (mount(src.string().c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting '%s' on '%s'", src, dst);
-            } else if (S_ISLNK(st.st_mode))
+
+                break;
+            }
+            case std::filesystem::file_type::symlink: {
                 createSymlink(readLink(src), dst);
+                break;
+            }
+            default: break;
+            }
+#pragma GCC diagnostic pop
         }
 
         char * cwd = getcwd(0, 0);

@@ -9,6 +9,7 @@
 #include "store-path-accessor.hh"
 #include "fetch-settings.hh"
 
+#include <filesystem>
 #include <sys/time.h>
 
 using namespace std::string_literals;
@@ -199,9 +200,9 @@ struct MercurialInputScheme : InputScheme
                     assert(hasPrefix(p, actualPath));
                     std::string file(p, actualPath.size() + 1);
 
-                    auto st = lstat(p);
+                    auto st = std::filesystem::symlink_status(p);
 
-                    if (S_ISDIR(st.st_mode)) {
+                    if (std::filesystem::is_directory(st)) {
                         auto prefix = file + "/";
                         auto i = files.lower_bound(prefix);
                         return i != files.end() && hasPrefix(*i, prefix);
