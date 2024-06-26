@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 # Ensure "fake ssh" remote store works just as legacy fake ssh would.

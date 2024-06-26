@@ -803,7 +803,7 @@ static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, V
 {
     std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
-    if (evalSettings.pureEval && !flakeRef.input.isLocked())
+    if (state.settings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);
 
     callFlake(state,
@@ -811,8 +811,8 @@ static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, V
             LockFlags {
                 .updateLockFile = false,
                 .writeLockFile = false,
-                .useRegistries = !evalSettings.pureEval && fetchSettings.useRegistries,
-                .allowUnlocked = !evalSettings.pureEval,
+                .useRegistries = !state.settings.pureEval && fetchSettings.useRegistries,
+                .allowUnlocked = !state.settings.pureEval,
             }),
         v);
 }

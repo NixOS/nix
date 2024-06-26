@@ -33,19 +33,9 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
 
 #ifndef _WIN32 // TODO implement
     if (st.st_mtime != mtimeStore) {
-        struct timeval times[2];
-        times[0].tv_sec = st.st_atime;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = mtimeStore;
-        times[1].tv_usec = 0;
-#if HAVE_LUTIMES
-        if (lutimes(path.c_str(), times) == -1)
-            if (errno != ENOSYS ||
-                (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1))
-#else
-        if (!S_ISLNK(st.st_mode) && utimes(path.c_str(), times) == -1)
-#endif
-            throw SysError("changing modification time of '%1%'", path);
+        struct stat st2 = st;
+        st2.st_mtime = mtimeStore,
+        setWriteTime(path, st2);
     }
 #endif
 }

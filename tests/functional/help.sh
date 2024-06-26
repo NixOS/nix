@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStore
-
 # test help output
 
 nix-build --help

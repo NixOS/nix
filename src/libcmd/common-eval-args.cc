@@ -1,6 +1,7 @@
 #include "eval-settings.hh"
 #include "common-eval-args.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "filetransfer.hh"
 #include "eval.hh"
 #include "fetchers.hh"
@@ -12,6 +13,12 @@
 #include "fetch-to-store.hh"
 
 namespace nix {
+
+EvalSettings evalSettings {
+    settings.readOnlyMode
+};
+
+static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 MixEvalArgs::MixEvalArgs()
 {

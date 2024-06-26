@@ -6,7 +6,7 @@
 #include <strings.h> // for strcasecmp
 
 #include "archive.hh"
-#include "config.hh"
+#include "config-global.hh"
 #include "posix-source-accessor.hh"
 #include "source-path.hh"
 #include "file-system.hh"

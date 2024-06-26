@@ -4,6 +4,7 @@
 #  include "hook-instance.hh"
 #endif
 #include "processes.hh"
+#include "config-global.hh"
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"

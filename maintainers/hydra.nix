@@ -36,12 +36,17 @@ let
   forAllPackages = lib.genAttrs [
     "nix"
     "nix-util"
+    "nix-util-c"
+    "nix-util-test-support"
+    "nix-util-test"
     "nix-store"
+    "nix-fetchers"
   ];
 in
 {
   # Binary package for various platforms.
-  build = forAllSystems (system: self.packages.${system}.nix);
+  build = forAllPackages (pkgName:
+    forAllSystems (system: nixpkgsFor.${system}.native.${pkgName}));
 
   shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
@@ -56,13 +61,7 @@ in
     self.packages.${system}.nix.override { enableGC = false; }
   );
 
-  buildNoTests = forAllSystems (system:
-    self.packages.${system}.nix.override {
-      doCheck = false;
-      doInstallCheck = false;
-      installUnitTests = false;
-    }
-  );
+  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nix_noTests);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
@@ -74,7 +73,7 @@ in
   );
 
   # Perl bindings for various platforms.
-  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix.perl-bindings);
+  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix-perl-bindings);
 
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
@@ -123,18 +122,10 @@ in
   };
 
   # API docs for Nix's unstable internal C++ interfaces.
-  internal-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ../package.nix {
-    inherit fileset;
-    doBuild = false;
-    enableInternalAPIDocs = true;
-  };
+  internal-api-docs = nixpkgsFor.x86_64-linux.native.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
-  external-api-docs = nixpkgsFor.x86_64-linux.native.callPackage ../package.nix {
-    inherit fileset;
-    doBuild = false;
-    enableExternalAPIDocs = true;
-  };
+  external-api-docs = nixpkgsFor.x86_64-linux.native.nix-external-api-docs;
 
   # System tests.
   tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {

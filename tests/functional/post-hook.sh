@@ -2,12 +2,14 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 rm -f $TEST_ROOT/result
 
 export REMOTE_STORE=file:$TEST_ROOT/remote_store
-echo 'require-sigs = false' >> $NIX_CONF_DIR/nix.conf
+echo 'require-sigs = false' >> $test_nix_conf
 
 restartDaemon
 

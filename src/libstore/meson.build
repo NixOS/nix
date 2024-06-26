@@ -425,12 +425,13 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-requires = deps_public
+requires = []
 if nix_util.type_name() == 'internal'
   # `requires` cannot contain declared dependencies (from the
   # subproject), so we need to do this manually
-  requires = [ 'nix-util' ] + requires
+  requires += 'nix-util'
 endif
+requires += deps_public
 
 import('pkgconfig').generate(
   this_library,

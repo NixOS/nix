@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS # NixOS doesn't provide $NIX_STATE_DIR (and shouldn't)
+
 clearStore
 
 outPath=$(nix-build --no-out-link readfile-context.nix)

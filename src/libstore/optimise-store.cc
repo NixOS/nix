@@ -104,9 +104,10 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
 #if __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
-       special files within .app dirs. *.app/Contents/PkgInfo and
-       *.app/Contents/Resources/\*.lproj seem to be the only paths affected. See
-       https://github.com/NixOS/nix/issues/1443 for more discussion. */
+       special files within .app dirs. Known affected paths include
+       *.app/Contents/{PkgInfo,Resources/\*.lproj,_CodeSignature} and .DS_Store.
+       See https://github.com/NixOS/nix/issues/1443 and 
+       https://github.com/NixOS/nix/pull/2230 for more discussion. */
 
     if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
     {
@@ -156,7 +157,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     Hash hash = ({
         hashPath(
             {make_ref<PosixSourceAccessor>(), CanonPath(path)},
-            FileSerialisationMethod::Recursive, HashAlgorithm::SHA256).first;
+            FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).first;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
@@ -170,7 +171,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
             || (repair && hash != ({
                 hashPath(
                     PosixSourceAccessor::createAtRoot(linkPath),
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256).first;
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).first;
            })))
         {
             // XXX: Consider overwriting linkPath with our valid version.

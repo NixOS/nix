@@ -72,6 +72,7 @@ mkDerivation (finalAttrs: {
   ;
 
   propagatedBuildInputs = [
+    boost.dev
     libarchive
     nlohmann_json
   ];

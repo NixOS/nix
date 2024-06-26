@@ -4,6 +4,8 @@ source common.sh
 # First, test that -jN performs builds in parallel.
 echo "testing nix-build -j..."
 
+TODO_NixOS
+
 clearStore
 
 rm -f $_NIX_TEST_SHARED.cur $_NIX_TEST_SHARED.max

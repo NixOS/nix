@@ -258,7 +258,7 @@ struct ProfileManifest
             *store,
             "profile",
             FixedOutputInfo {
-                .method = FileIngestionMethod::Recursive,
+                .method = FileIngestionMethod::NixArchive,
                 .hash = narHash,
                 .references = {
                     .others = std::move(references),
