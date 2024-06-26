@@ -40,6 +40,8 @@
 
 , busybox-sandbox-shell ? null
 
+, flake-schemas
+
 # Configuration Options
 #:
 # This probably seems like too many degrees of freedom, but it
@@ -282,6 +284,7 @@ in {
     (lib.enableFeature enableMarkdown "markdown")
     (lib.enableFeature installUnitTests "install-unit-tests")
     (lib.withFeatureAs true "readline-flavor" readlineFlavor)
+    "--with-default-flake-schemas=${flake-schemas}"
   ] ++ lib.optionals (!forDevShell) [
     "--sysconfdir=/etc"
   ] ++ lib.optionals installUnitTests [

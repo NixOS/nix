@@ -201,6 +201,7 @@
               libgit2 = final.libgit2-nix;
               libseccomp = final.libseccomp-nix;
               busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+              inherit flake-schemas;
             };
 
           nix-perl-bindings = final.callPackage ./src/perl/package.nix {

@@ -17,6 +17,8 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "memory-source-accessor.hh"
+#include "fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -293,11 +295,34 @@ namespace flake_schemas {
 
 using namespace eval_cache;
 
+static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
+{
+    auto accessor = make_ref<MemorySourceAccessor>();
+
+    accessor->setPathDisplay("«builtin-flake-schemas»");
+
+    accessor->addFile(CanonPath("flake.nix"),
+        #include "builtin-flake-schemas.nix.gen.hh"
+        );
+
+    // FIXME: remove this when we have lazy trees.
+    auto storePath = fetchToStore(*state.store, {accessor}, FetchMode::Copy);
+    state.allowPath(storePath);
+
+    // Construct a dummy flakeref.
+    auto flakeRef = parseFlakeRef(fmt("tarball+https://builtin-flake-schemas?narHash=%s",
+            state.store->queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)));
+
+    auto flake = readFlake(state, flakeRef, flakeRef, flakeRef, state.rootPath(state.store->toRealPath(storePath)), {});
+
+    return lockFlake(state, flakeRef, {}, flake);
+}
+
 std::tuple<ref<EvalCache>, ref<eval_cache::AttrCursor>>
 call(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake,
-    const FlakeRef & defaultSchemasFlake)
+    std::optional<FlakeRef> defaultSchemasFlake)
 {
     auto fingerprint = lockedFlake->getFingerprint(state.store);
 
@@ -305,7 +330,10 @@ call(
         #include "call-flake-schemas.nix.gen.hh"
         ;
 
-    auto lockedDefaultSchemasFlake = flake::lockFlake(state, defaultSchemasFlake, {});
+    auto lockedDefaultSchemasFlake =
+        defaultSchemasFlake
+        ? flake::lockFlake(state, *defaultSchemasFlake, {})
+        : getBuiltinDefaultSchemasFlake(state);
     auto lockedDefaultSchemasFlakeFingerprint = lockedDefaultSchemasFlake.getFingerprint(state.store);
 
     std::optional<Fingerprint> fingerprint2;
@@ -468,8 +496,7 @@ std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
 
 struct MixFlakeSchemas : virtual Args, virtual StoreCommand
 {
-    std::string defaultFlakeSchemas =
-        "github:DeterminateSystems/flake-schemas/3b4d5fef938f698c8737515532a1be53bf6355f2?narHash=sha256-TBmeIZHYzqKTaTe8YFgTimVBGLzkoUgZfkDMkZBZyfo%3D";
+    std::optional<std::string> defaultFlakeSchemas;
 
     MixFlakeSchemas()
     {
@@ -487,9 +514,12 @@ struct MixFlakeSchemas : virtual Args, virtual StoreCommand
         });
     }
 
-    FlakeRef getDefaultFlakeSchemas()
+    std::optional<FlakeRef> getDefaultFlakeSchemas()
     {
-        return parseFlakeRef(defaultFlakeSchemas, absPath("."));
+        if (!defaultFlakeSchemas)
+            return std::nullopt;
+        else
+            return parseFlakeRef(*defaultFlakeSchemas, absPath("."));
     }
 };
 
