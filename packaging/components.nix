@@ -1,70 +1,29 @@
-{pkgs, stdenv, officialRelease, versionSuffix}: scope:
+{pkgs, stdenv, versionSuffix}: scope:
 let
   inherit (scope) callPackage;
 in
 
 # This becomes the pkgs.nixComponents attribute set
 {
-  # TODO: build the nix CLI with meson
-  nix = pkgs.callPackage ../package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-    boehmgc = pkgs.boehmgc-nix;
-    libgit2 = pkgs.libgit2-nix;
-    libseccomp = pkgs.libseccomp-nix;
-    busybox-sandbox-shell = pkgs.busybox-sandbox-shell or pkgs.default-busybox-sandbox-shell;
-  };
+  inherit stdenv versionSuffix;
+  libseccomp = pkgs.libseccomp-nix;
+  boehmgc = pkgs.boehmgc-nix;
+  libgit2 = pkgs.libgit2-nix;
+  busybox-sandbox-shell = pkgs.busybox-sandbox-shell or pkgs.default-busybox-sandbox-shell;
 
-  nix-util = callPackage ../src/libutil/package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-  };
+  nix = callPackage ../package.nix { };
 
-  nix-util-test-support = callPackage ../tests/unit/libutil-support/package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-  };
+  nix-util = callPackage ../src/libutil/package.nix { };
 
-  nix-util-test = callPackage ../tests/unit/libutil/package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-  };
+  nix-util-test-support = callPackage ../tests/unit/libutil-support/package.nix { };
 
-  nix-util-c = callPackage ../src/libutil-c/package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-  };
+  nix-util-test = callPackage ../tests/unit/libutil/package.nix { };
 
-  nix-store = callPackage ../src/libstore/package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-    libseccomp = pkgs.libseccomp-nix;
-    busybox-sandbox-shell = pkgs.busybox-sandbox-shell or pkgs.default-busybox-sandbox-shell;
-  };
+  nix-util-c = callPackage ../src/libutil-c/package.nix { };
 
-  nix-fetchers = callPackage ../src/libfetchers/package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-  };
+  nix-store = callPackage ../src/libstore/package.nix { };
 
-  nix-perl-bindings = callPackage ../src/perl/package.nix {
-    inherit
-      stdenv
-      versionSuffix
-      ;
-  };
+  nix-fetchers = callPackage ../src/libfetchers/package.nix { };
+
+  nix-perl-bindings = callPackage ../src/perl/package.nix { };
 }

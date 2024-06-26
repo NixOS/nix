@@ -178,7 +178,7 @@
           # we can iterate over.
           nixComponents = lib.makeScope final.newScope (import ./packaging/components.nix {
             pkgs = final;
-            inherit stdenv versionSuffix officialRelease;
+            inherit stdenv versionSuffix;
           });
 
           nix = final.nixComponents.nix;
