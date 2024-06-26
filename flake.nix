@@ -153,18 +153,18 @@
             '';
           };
 
-          libgit2-nix = final.libgit2.overrideAttrs (attrs: {
+          libgit2_nix = final.libgit2.overrideAttrs (attrs: {
             src = libgit2;
             version = libgit2.lastModifiedDate;
             cmakeFlags = attrs.cmakeFlags or []
               ++ [ "-DUSE_SSH=exec" ];
           });
 
-          boehmgc-nix = final.boehmgc.override {
+          boehmgc_nix = final.boehmgc.override {
             enableLargeConfig = true;
           };
 
-          libseccomp-nix = final.libseccomp.overrideAttrs (_: rec {
+          libseccomp_nix = final.libseccomp.overrideAttrs (_: rec {
             version = "2.5.5";
             src = final.fetchurl {
               url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";

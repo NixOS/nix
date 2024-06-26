@@ -6,9 +6,9 @@ in
 # This becomes the pkgs.nixComponents attribute set
 {
   inherit stdenv versionSuffix;
-  libseccomp = pkgs.libseccomp-nix;
-  boehmgc = pkgs.boehmgc-nix;
-  libgit2 = pkgs.libgit2-nix;
+  libseccomp = pkgs.libseccomp_nix;
+  boehmgc = pkgs.boehmgc_nix;
+  libgit2 = pkgs.libgit2_nix;
   busybox-sandbox-shell = pkgs.busybox-sandbox-shell or pkgs.default-busybox-sandbox-shell;
 
   nix = callPackage ../package.nix { };
