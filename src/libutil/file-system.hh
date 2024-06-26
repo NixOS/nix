@@ -185,6 +185,11 @@ inline Paths createDirs(PathView path)
 }
 
 /**
+ * Create a single directory.
+ */
+void createDir(const Path & path, mode_t mode = 0755);
+
+/**
  * Create a symlink.
  */
 void createSymlink(const Path & target, const Path & link);
