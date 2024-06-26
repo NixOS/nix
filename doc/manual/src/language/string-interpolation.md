@@ -43,6 +43,17 @@ configureFlags = "
 Note that Nix expressions and strings can be arbitrarily nested;
 in this case the outer string contains various interpolated expressions that themselves contain strings (e.g., `"-thread"`), some of which in turn contain interpolated expressions (e.g., `${mesa}`).
 
+If you want to write a literal `${...}` you can escape them with two `'`s, see the [string] documentation for details:
+
+```nix
+output = ''
+  Shell value: ''${PATH}
+  ''
+```
+
+[string]: ./values.md#type-string
+
+
 ### Path
 
 Rather than writing
