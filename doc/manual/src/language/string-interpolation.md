@@ -46,9 +46,10 @@ in this case the outer string contains various interpolated expressions that the
 If you want to write a literal `${...}` in a `''`-delimited string literal, you can escape the interpolation with two `'`s, as shown in the following example, or see the [string] documentation for details:
 
 ```nix
-output = ''
-  Shell value: ''${PATH}
-  ''
+nix-repl> ''
+            echo ''${PATH}
+          ''
+"echo \${PATH}\n"
 ```
 
 [string]: ./values.md#type-string
