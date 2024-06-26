@@ -296,16 +296,16 @@
           }
           (pkgName: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}" = nixpkgsFor.${system}.native.${pkgName};
-              "${pkgName}-static" = nixpkgsFor.${system}.static.${pkgName};
+              "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
+              "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
             }
             // flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.${pkgName};
+              "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
             })
             // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (stdenvName: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".${pkgName};
+              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nixComponents.${pkgName};
             })
           )
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
@@ -367,17 +367,17 @@
           };
 
           mesonFlags =
-            map (transformFlag "libutil") pkgs.nix-util.mesonFlags
-            ++ map (transformFlag "libstore") pkgs.nix-store.mesonFlags
-            ++ map (transformFlag "libfetchers") pkgs.nix-fetchers.mesonFlags
-            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nix-perl-bindings.mesonFlags)
+            map (transformFlag "libutil") pkgs.nixComponents.nix-util.mesonFlags
+            ++ map (transformFlag "libstore") pkgs.nixComponents.nix-store.mesonFlags
+            ++ map (transformFlag "libfetchers") pkgs.nixComponents.nix-fetchers.mesonFlags
+            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nixComponents.nix-perl-bindings.mesonFlags)
             ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
-            ++ pkgs.nix-util.nativeBuildInputs
-            ++ pkgs.nix-store.nativeBuildInputs
-            ++ pkgs.nix-fetchers.nativeBuildInputs
-            ++ lib.optionals havePerl pkgs.nix-perl-bindings.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-util.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-store.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
+            ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
             ++ pkgs.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nix-external-api-docs.nativeBuildInputs
             ++ [

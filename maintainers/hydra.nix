@@ -33,6 +33,9 @@ let
       doBuild = false;
     };
 
+  # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
+  # convention to transpose it, and to transpose it efficiently, we need to
+  # enumerate them manually, so that we don't evaluate unnecessary package sets.
   forAllPackages = lib.genAttrs [
     "nix"
     "nix-util"
@@ -46,16 +49,16 @@ in
 {
   # Binary package for various platforms.
   build = forAllPackages (pkgName:
-    forAllSystems (system: nixpkgsFor.${system}.native.${pkgName}));
+    forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName}));
 
   shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
   buildStatic = forAllPackages (pkgName:
-    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.${pkgName}));
+    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
 
   buildCross = forAllPackages (pkgName:
     forAllCrossSystems (crossSystem:
-      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.${pkgName})));
+      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName})));
 
   buildNoGc = forAllSystems (system:
     self.packages.${system}.nix.override { enableGC = false; }
@@ -73,7 +76,7 @@ in
   );
 
   # Perl bindings for various platforms.
-  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix-perl-bindings);
+  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
 
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
