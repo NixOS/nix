@@ -1,7 +1,6 @@
 { lib
 , stdenv
 , releaseTools
-, fileset
 
 , meson
 , ninja
@@ -13,7 +12,6 @@
 , aws-sdk-cpp
 , libseccomp
 , nlohmann_json
-, man
 , sqlite
 
 , busybox-sandbox-shell ? null
@@ -21,7 +19,6 @@
 # Configuration Options
 
 , versionSuffix ? ""
-, officialRelease ? false
 
 # Check test coverage of Nix. Probably want to use with at least
 # one of `doCheck` or `doInstallCheck` enabled.
@@ -32,6 +29,8 @@
 }:
 
 let
+  inherit (lib) fileset;
+
   version = lib.fileContents ./.version + versionSuffix;
 
   mkDerivation =

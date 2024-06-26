@@ -1,7 +1,6 @@
 { lib
 , stdenv
 , releaseTools
-, fileset
 
 , meson
 , ninja
@@ -19,6 +18,8 @@
 }:
 
 let
+  inherit (lib) fileset;
+
   version = lib.fileContents ./.version + versionSuffix;
 
   mkDerivation =

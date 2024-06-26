@@ -1,5 +1,4 @@
 { lib
-, fileset
 , stdenv
 , perl
 , perlPackages
@@ -15,6 +14,10 @@
 , darwin
 , versionSuffix ? ""
 }:
+
+let
+  inherit (lib) fileset;
+in
 
 perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
   pname = "nix-perl";
