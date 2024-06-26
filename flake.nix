@@ -129,49 +129,6 @@
         {
           nixStable = prev.nix;
 
-          default-busybox-sandbox-shell = final.busybox.override {
-            useMusl = true;
-            enableStatic = true;
-            enableMinimal = true;
-            extraConfig = ''
-              CONFIG_FEATURE_FANCY_ECHO y
-              CONFIG_FEATURE_SH_MATH y
-              CONFIG_FEATURE_SH_MATH_64 y
-
-              CONFIG_ASH y
-              CONFIG_ASH_OPTIMIZE_FOR_SIZE y
-
-              CONFIG_ASH_ALIAS y
-              CONFIG_ASH_BASH_COMPAT y
-              CONFIG_ASH_CMDCMD y
-              CONFIG_ASH_ECHO y
-              CONFIG_ASH_GETOPTS y
-              CONFIG_ASH_INTERNAL_GLOB y
-              CONFIG_ASH_JOB_CONTROL y
-              CONFIG_ASH_PRINTF y
-              CONFIG_ASH_TEST y
-            '';
-          };
-
-          libgit2_nix = final.libgit2.overrideAttrs (attrs: {
-            src = libgit2;
-            version = libgit2.lastModifiedDate;
-            cmakeFlags = attrs.cmakeFlags or []
-              ++ [ "-DUSE_SSH=exec" ];
-          });
-
-          boehmgc_nix = final.boehmgc.override {
-            enableLargeConfig = true;
-          };
-
-          libseccomp_nix = final.libseccomp.overrideAttrs (_: rec {
-            version = "2.5.5";
-            src = final.fetchurl {
-              url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
-              hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
-            };
-          });
-
           # A new scope, so that we can use `callPackage` to inject our own interdependencies
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
@@ -180,12 +137,9 @@
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
-          nixDependencies = lib.makeScope final.newScope (scope: {
-            inherit stdenv versionSuffix;
-            libseccomp = final.libseccomp_nix;
-            boehmgc = final.boehmgc_nix;
-            libgit2 = final.libgit2_nix;
-            busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
+          nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
+            inherit inputs stdenv versionSuffix;
+            pkgs = final;
           });
 
           nix = final.nixComponents.nix;
