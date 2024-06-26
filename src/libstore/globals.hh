@@ -1284,7 +1284,13 @@ extern Settings settings;
  */
 void initPlugins();
 
-void loadConfFile();
+/**
+ * Load the configuration (from `nix.conf`, `NIX_CONFIG`, etc.) into the
+ * given configuration object.
+ *
+ * Usually called with `globalConfig`.
+ */
+void loadConfFile(AbstractConfig & config);
 
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();

@@ -1,7 +1,5 @@
 { lib
 , stdenv
-, releaseTools
-, fileset
 
 , meson
 , ninja
@@ -11,6 +9,10 @@
 
 , versionSuffix ? ""
 }:
+
+let
+  inherit (lib) fileset;
+in
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "nix-internal-api-docs";

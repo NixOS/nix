@@ -148,11 +148,10 @@ void deletePath(const std::filesystem::path & path);
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 
 /**
- * Create a directory and all its parents, if necessary.  Returns the
- * list of created directories, in order of creation.
+ * Create a directory and all its parents, if necessary.
  */
-Paths createDirs(const Path & path);
-inline Paths createDirs(PathView path)
+void createDirs(const Path & path);
+inline void createDirs(PathView path)
 {
     return createDirs(Path(path));
 }
@@ -161,6 +160,30 @@ inline Paths createDirs(PathView path)
  * Create a single directory.
  */
 void createDir(const Path & path, mode_t mode = 0755);
+
+/**
+ * Set the access and modification times of the given path, not
+ * following symlinks.
+ *
+ * @param accessTime Specified in seconds.
+ *
+ * @param modificationTime Specified in seconds.
+ *
+ * @param isSymlink Whether the file in question is a symlink. Used for
+ * fallback code where we don't have `lutimes` or similar. if
+ * `std::optional` is passed, the information will be recomputed if it
+ * is needed. Race conditions are possible so be careful!
+ */
+void setWriteTime(
+    const std::filesystem::path & path,
+    time_t accessedTime,
+    time_t modificationTime,
+    std::optional<bool> isSymlink = std::nullopt);
+
+/**
+ * Convenience wrapper that takes all arguments from the `struct stat`.
+ */
+void setWriteTime(const std::filesystem::path & path, const struct stat & st);
 
 /**
  * Create a symlink.

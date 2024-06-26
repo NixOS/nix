@@ -19,7 +19,6 @@ Worker::Worker(Store & store, Store & evalStore)
     , store(store)
     , evalStore(evalStore)
 {
-    /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;
     nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
@@ -530,7 +529,7 @@ bool Worker::pathContentsGood(const StorePath & path)
     else {
         auto current = hashPath(
             {store.getFSAccessor(), CanonPath(store.printStorePath(path))},
-            FileIngestionMethod::Recursive, info->narHash.algo).first;
+            FileIngestionMethod::NixArchive, info->narHash.algo).first;
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;
     }

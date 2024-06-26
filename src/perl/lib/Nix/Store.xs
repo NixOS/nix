@@ -259,7 +259,7 @@ hashPath(char * algo, int base32, char * path)
         try {
             Hash h = hashPath(
                 PosixSourceAccessor::createAtRoot(path),
-                FileIngestionMethod::Recursive, parseHashAlgo(algo)).first;
+                FileIngestionMethod::NixArchive, parseHashAlgo(algo)).first;
             auto s = h.to_string(base32 ? HashFormat::Nix32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
@@ -335,7 +335,7 @@ SV *
 StoreWrapper::addToStore(char * srcPath, int recursive, char * algo)
     PPCODE:
         try {
-            auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            auto method = recursive ? ContentAddressMethod::Raw::NixArchive : ContentAddressMethod::Raw::Flat;
             auto path = THIS->store->addToStore(
                 std::string(baseNameOf(srcPath)),
                 PosixSourceAccessor::createAtRoot(srcPath),
@@ -351,7 +351,7 @@ StoreWrapper::makeFixedOutputPath(int recursive, char * algo, char * hash, char 
     PPCODE:
         try {
             auto h = Hash::parseAny(hash, parseHashAlgo(algo));
-            auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+            auto method = recursive ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat;
             auto path = THIS->store->makeFixedOutputPath(name, FixedOutputInfo {
                 .method = method,
                 .hash = h,

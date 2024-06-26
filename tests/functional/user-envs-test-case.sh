@@ -11,6 +11,8 @@ outPath10=$(nix-env -f ./user-envs.nix -qa --out-path --no-name '*' | grep foo-1
 drvPath10=$(nix-env -f ./user-envs.nix -qa --drv-path --no-name '*' | grep foo-1.0)
 [ -n "$outPath10" -a -n "$drvPath10" ]
 
+TODO_NixOS
+
 # Query with json
 nix-env -f ./user-envs.nix -qa --json | jq -e '.[] | select(.name == "bar-0.1") | [
     .outputName == "out",

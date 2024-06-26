@@ -1,7 +1,7 @@
 // redirect rules for URL fragments (client-side) to prevent link rot.
 // this must be done on the client side, as web servers do not see the fragment part of the URL.
 // it will only work with JavaScript enabled in the browser, but this is the best we can do here.
-// see ./_redirects for path redirects (client-side)
+// see src/_redirects for path redirects (server-side)
 
 // redirects are declared as follows:
 // each entry has as its key a path matching the requested URL path, relative to the mdBook document root.

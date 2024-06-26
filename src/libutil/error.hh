@@ -155,6 +155,7 @@ public:
         : err(e)
     { }
 
+    /** The error message without "error: " prefixed to it. */
     std::string message() {
         return err.msg.str();
     }

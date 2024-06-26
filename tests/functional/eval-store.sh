@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 # Using `--eval-store` with the daemon will eventually copy everything
 # to the build store, invalidating most of the tests here
 needLocalStore "“--eval-store” doesn't achieve much with the daemon"

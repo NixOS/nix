@@ -1,3 +1,4 @@
+#include "config-global.hh"
 #include "eval.hh"
 #include "installable-flake.hh"
 #include "command-installable-value.hh"
@@ -238,7 +239,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto getEnvShPath = ({
         StringSource source { getEnvSh };
         evalStore->addToStoreFromDump(
-            source, "get-env.sh", FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, {});
+            source, "get-env.sh", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, {});
     });
 
     drv.args = {store->printStorePath(getEnvShPath)};

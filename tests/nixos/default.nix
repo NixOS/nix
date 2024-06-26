@@ -7,7 +7,13 @@ let
   # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
   runNixOSTestFor = system: test:
     (nixos-lib.runTest {
-      imports = [ test ];
+      imports = [
+        test
+
+        # Add the quickBuild attribute to the check packages
+        ./quick-build.nix
+      ];
+
       hostPkgs = nixpkgsFor.${system}.native;
       defaults = {
         nixpkgs.pkgs = nixpkgsFor.${system}.native;
@@ -132,6 +138,12 @@ in
   ca-fd-leak = runNixOSTestFor "x86_64-linux" ./ca-fd-leak;
 
   gzip-content-encoding = runNixOSTestFor "x86_64-linux" ./gzip-content-encoding.nix;
+
+  functional_user = runNixOSTestFor "x86_64-linux" ./functional/as-user.nix;
+
+  functional_trusted = runNixOSTestFor "x86_64-linux" ./functional/as-trusted-user.nix;
+
+  functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
 
   user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
 }

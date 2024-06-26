@@ -31,6 +31,23 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+    - if: matrix.os == 'ubuntu-latest'
+      run: |
+        free -h
+        swapon --show
+        swap=$(swapon --show --noheadings | head -n 1 | awk '{print $1}')
+        echo "Found swap: $swap"
+        sudo swapoff $swap
+        # resize it (fallocate)
+        sudo fallocate -l 10G $swap
+        sudo mkswap $swap
+        sudo swapon $swap
+        free -h
+        (
+          while sleep 60; do
+            free -h
+          done
+        ) &
     - run: nix --experimental-features 'nix-command flakes' flake check -L
 
   # Steps to test CI automation in your own fork.
@@ -175,4 +192,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes
+      - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes .#hydraJobs.tests.functional_user
+
+  meson_build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix build -L .#hydraJobs.build.{nix-fetchers,nix-store,nix-util}.$(nix-instantiate --eval --expr builtins.currentSystem | sed -e 's/"//g')

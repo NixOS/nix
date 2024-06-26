@@ -1,12 +1,10 @@
 { lib
-, fetchurl
 , stdenv
 , releaseTools
 , autoconf-archive
 , autoreconfHook
 , aws-sdk-cpp
 , boehmgc
-, buildPackages
 , nlohmann_json
 , bison
 , boost
@@ -15,7 +13,6 @@
 , curl
 , editline
 , readline
-, fileset
 , flex
 , git
 , gtest
@@ -50,7 +47,6 @@
 , pname ? "nix"
 
 , versionSuffix ? ""
-, officialRelease ? false
 
 # Whether to build Nix. Useful to skip for tasks like testing existing pre-built versions of Nix
 , doBuild ? true
@@ -113,6 +109,8 @@
 }:
 
 let
+  inherit (lib) fileset;
+
   version = lib.fileContents ./.version + versionSuffix;
 
   # selected attributes with defaults, will be used to define some

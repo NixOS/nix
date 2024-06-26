@@ -1,7 +1,6 @@
 { lib
 , stdenv
 , releaseTools
-, fileset
 
 , meson
 , ninja
@@ -16,17 +15,16 @@
 # Configuration Options
 
 , versionSuffix ? ""
-, officialRelease ? false
 
 # Check test coverage of Nix. Probably want to use with with at least
 # one of `doCheck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
 
-# Avoid setting things that would interfere with a functioning devShell
-, forDevShell ? false
 }:
 
 let
+  inherit (lib) fileset;
+
   version = lib.fileContents ./.version + versionSuffix;
 
   mkDerivation =
