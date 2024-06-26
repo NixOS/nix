@@ -642,6 +642,8 @@
 
         tests.ca-fd-leak = runNixOSTestFor "x86_64-linux" ./tests/nixos/ca-fd-leak;
 
+        tests.user-sandboxing = runNixOSTestFor "x86_64-linux" ./tests/nixos/user-sandboxing;
+
 
         # Make sure that nix-env still produces the exact same result
         # on a particular version of Nixpkgs.
