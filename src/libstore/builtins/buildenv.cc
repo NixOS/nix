@@ -41,7 +41,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             /* not matched by glob */
             continue;
         auto srcFile = (fs::path{srcDir} / name).string();
-        auto dstFile = (fs::path{dstDir} / name).string();
+        auto dstFile = fs::path{dstDir} / name;
 
         fs::file_status srcSt;
 
@@ -79,7 +79,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
                 } else if (fs::is_symlink(dstSt)) {
-                    auto target = canonPath(dstFile, true);
+                    auto target = canonPath(dstFile.string(), true);
                     if (!fs::is_directory(fs::symlink_status(target)))
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)

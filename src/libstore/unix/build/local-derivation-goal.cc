@@ -1831,7 +1831,7 @@ void LocalDerivationGoal::runChild()
                     if (pathExists(path))
                         ss.push_back(path);
 
-                if (settings.caFile != "" && pathExists(settings.caFile)) {
+                if (settings.caFile != "" && pathExists(settings.caFile.to_string())) {
                     Path caFile = settings.caFile;
                     pathsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", canonPath(caFile, true), true);
                 }

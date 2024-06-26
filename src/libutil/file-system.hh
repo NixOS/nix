@@ -97,12 +97,12 @@ struct stat lstat(const Path & path);
  * call `std::filesystem::symlink_status` on the given path if it exists.
  * @return std::nullopt if the path doesn't exist, or an optional containing the result of `std::filesystem::symlink_status` otherwise
  */
-std::optional<std::filesystem::file_status> maybeSymlinkStat(const Path & path);
+std::optional<std::filesystem::file_status> maybeSymlinkStat(const std::filesystem::path & path);
 
 /**
  * @return true iff the given path exists.
  */
-bool pathExists(const Path & path);
+bool pathExists(const std::filesystem::path & path);
 
 /**
  * A version of pathExists that returns false on a permission error.
@@ -110,7 +110,7 @@ bool pathExists(const Path & path);
  * be readable.
  * @return true iff the given path can be accessed and exists
  */
-bool pathAccessible(const Path & path);
+bool pathAccessible(const std::filesystem::path & path);
 
 /**
  * Read the contents (target) of a symbolic link.  The result is not

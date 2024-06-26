@@ -186,7 +186,7 @@ std::optional<struct stat> unix::maybeLstat(const Path & path)
 }
 #endif
 
-std::optional<fs::file_status> maybeSymlinkStat(const Path & path)
+std::optional<fs::file_status> maybeSymlinkStat(const fs::path & path)
 {
     try {
         auto st = fs::symlink_status(path);
@@ -199,12 +199,12 @@ std::optional<fs::file_status> maybeSymlinkStat(const Path & path)
 }
 
 
-bool pathExists(const Path & path)
+bool pathExists(const fs::path & path)
 {
     return maybeSymlinkStat(path).has_value();
 }
 
-bool pathAccessible(const Path & path)
+bool pathAccessible(const fs::path & path)
 {
     try {
         return pathExists(path);
@@ -640,7 +640,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
         throw Error("file '%s' has an unsupported type", from);
     }
 
-    setWriteTime(to, lstat(from.string().c_str()));
+    setWriteTime(to, unix::lstat(from.string().c_str()));
     if (andDelete) {
         if (!fs::is_symlink(fromStatus))
             fs::permissions(from, fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
