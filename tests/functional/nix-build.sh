@@ -2,7 +2,9 @@
 
 source common.sh
 
-clearStore
+TODO_NixOS
+
+clearStoreIfPossible
 
 outPath=$(nix-build dependencies.nix -o $TEST_ROOT/result)
 test "$(cat $TEST_ROOT/result/foobar)" = FOOBAR

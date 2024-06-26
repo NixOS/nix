@@ -122,7 +122,7 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
     if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
         throw Error("Git file ingestion must use SHA-1 hash");
 
-    if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::Recursive) {
+    if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::NixArchive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
         if (!info.references.empty()) {
@@ -200,12 +200,12 @@ StorePath Store::addToStore(
     case FileIngestionMethod::Flat:
         fsm = FileSerialisationMethod::Flat;
         break;
-    case FileIngestionMethod::Recursive:
-        fsm = FileSerialisationMethod::Recursive;
+    case FileIngestionMethod::NixArchive:
+        fsm = FileSerialisationMethod::NixArchive;
         break;
     case FileIngestionMethod::Git:
         // Use NAR; Git is not a serialization method
-        fsm = FileSerialisationMethod::Recursive;
+        fsm = FileSerialisationMethod::NixArchive;
         break;
     }
     auto source = sinkToSource([&](Sink & sink) {
@@ -356,7 +356,7 @@ ValidPathInfo Store::addToStoreSlow(
     RegularFileSink fileSink { caHashSink };
     TeeSink unusualHashTee { narHashSink, caHashSink };
 
-    auto & narSink = method == FileIngestionMethod::Recursive && hashAlgo != HashAlgorithm::SHA256
+    auto & narSink = method == ContentAddressMethod::Raw::NixArchive && hashAlgo != HashAlgorithm::SHA256
         ? static_cast<Sink &>(unusualHashTee)
         : narHashSink;
 
@@ -384,9 +384,9 @@ ValidPathInfo Store::addToStoreSlow(
        finish. */
     auto [narHash, narSize] = narHashSink.finish();
 
-    auto hash = method == FileIngestionMethod::Recursive && hashAlgo == HashAlgorithm::SHA256
+    auto hash = method == ContentAddressMethod::Raw::NixArchive && hashAlgo == HashAlgorithm::SHA256
         ? narHash
-        : method == FileIngestionMethod::Git
+        : method == ContentAddressMethod::Raw::Git
         ? git::dumpHash(hashAlgo, srcPath).hash
         : caHashSink.finish().first;
 

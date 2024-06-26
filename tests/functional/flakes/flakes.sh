@@ -2,6 +2,8 @@
 
 source ./common.sh
 
+TODO_NixOS
+
 requireGit
 
 clearStore

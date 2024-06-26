@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 ###################################################
 # Check that --dry-run isn't confused with read-only mode
 # https://github.com/NixOS/nix/issues/1795

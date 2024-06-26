@@ -4,7 +4,7 @@ source common.sh
 
 requireGit
 
-clearStore
+clearStoreIfPossible
 
 repo="$TEST_ROOT/git"
 

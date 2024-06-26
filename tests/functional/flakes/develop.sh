@@ -2,6 +2,8 @@
 
 source ../common.sh
 
+TODO_NixOS
+
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
 

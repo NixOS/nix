@@ -7,7 +7,7 @@ requireGit
 
 enableFeatures "verified-fetches"
 
-clearStore
+clearStoreIfPossible
 
 repo="$TEST_ROOT/git"
 

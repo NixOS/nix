@@ -10,6 +10,7 @@
 #include "serialise.hh"
 #include "archive.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "derivations.hh"
 #include "finally.hh"
 #include "legacy.hh"

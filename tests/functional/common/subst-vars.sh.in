@@ -9,7 +9,6 @@ export coreutils=@coreutils@
 #lsof=@lsof@
 
 export dot=@dot@
-export SHELL="@bash@"
 export PAGER=cat
 export busybox="@sandbox_shell@"
 
@@ -17,5 +16,10 @@ export version=@PACKAGE_VERSION@
 export system=@system@
 
 export BUILD_SHARED_LIBS=@BUILD_SHARED_LIBS@
+
+if ! isTestOnNixOS; then
+  export SHELL="@bash@"
+  export PATH=@bindir@:$PATH
+fi
 
 fi

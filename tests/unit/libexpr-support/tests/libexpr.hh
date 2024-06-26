@@ -19,14 +19,14 @@ namespace nix {
             static void SetUpTestSuite() {
                 LibStoreTest::SetUpTestSuite();
                 initGC();
-                evalSettings.nixPath = {};
             }
 
         protected:
             LibExprTest()
                 : LibStoreTest()
-                , state({}, store)
+                , state({}, store, evalSettings, nullptr)
             {
+                evalSettings.nixPath = {};
             }
             Value eval(std::string input, bool forceValue = true) {
                 Value v;
@@ -42,6 +42,8 @@ namespace nix {
                 return state.symbols.create(value);
             }
 
+            bool readOnlyMode = true;
+            EvalSettings evalSettings{readOnlyMode};
             EvalState state;
     };
 

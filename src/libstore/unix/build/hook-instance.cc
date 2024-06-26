@@ -1,4 +1,5 @@
 #include "globals.hh"
+#include "config-global.hh"
 #include "hook-instance.hh"
 #include "file-system.hh"
 #include "child.hh"

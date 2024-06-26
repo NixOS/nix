@@ -15,6 +15,8 @@ checkBuildTempDirRemoved ()
 # written to build temp directories to verify created by this instance
 checkBuildId=$(date +%s%N)
 
+TODO_NixOS
+
 clearStore
 
 nix-build dependencies.nix --no-out-link
@@ -75,6 +77,8 @@ nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
 grep 'may not be deterministic' $TEST_ROOT/log
 [ "$status" = "104" ]
 if checkBuildTempDirRemoved $TEST_ROOT/log; then false; fi
+
+TODO_NixOS
 
 clearStore
 

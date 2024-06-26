@@ -1,4 +1,5 @@
 #include "fetch-settings.hh"
+#include "config-global.hh"
 
 namespace nix {
 

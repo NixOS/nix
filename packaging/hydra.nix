@@ -9,7 +9,6 @@
 }:
 let
   inherit (inputs) nixpkgs nixpkgs-regression;
-  inherit (lib) fileset;
 
   installScriptFor = tarballs:
     nixpkgsFor.x86_64-linux.native.callPackage ../scripts/installer.nix {
@@ -25,17 +24,21 @@ let
            lib.versionAtLeast client.version "2.4pre20211005")
           "-${client.version}-against-${daemon.version}";
 
-      inherit fileset;
-
       test-client = client;
       test-daemon = daemon;
 
       doBuild = false;
     };
 
+  # Technically we could just return `pkgs.nixComponents`, but for Hydra it's
+  # convention to transpose it, and to transpose it efficiently, we need to
+  # enumerate them manually, so that we don't evaluate unnecessary package sets.
   forAllPackages = lib.genAttrs [
     "nix"
     "nix-util"
+    "nix-util-c"
+    "nix-util-test-support"
+    "nix-util-test"
     "nix-store"
     "nix-fetchers"
   ];
@@ -43,28 +46,22 @@ in
 {
   # Binary package for various platforms.
   build = forAllPackages (pkgName:
-    forAllSystems (system: nixpkgsFor.${system}.native.${pkgName}));
+    forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.${pkgName}));
 
   shellInputs = forAllSystems (system: self.devShells.${system}.default.inputDerivation);
 
   buildStatic = forAllPackages (pkgName:
-    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.${pkgName}));
+    lib.genAttrs linux64BitSystems (system: nixpkgsFor.${system}.static.nixComponents.${pkgName}));
 
   buildCross = forAllPackages (pkgName:
     forAllCrossSystems (crossSystem:
-      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.${pkgName})));
+      lib.genAttrs [ "x86_64-linux" ] (system: nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName})));
 
   buildNoGc = forAllSystems (system:
     self.packages.${system}.nix.override { enableGC = false; }
   );
 
-  buildNoTests = forAllSystems (system:
-    self.packages.${system}.nix.override {
-      doCheck = false;
-      doInstallCheck = false;
-      installUnitTests = false;
-    }
-  );
+  buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nix_noTests);
 
   # Toggles some settings for better coverage. Windows needs these
   # library combinations, and Debian build Nix with GNU readline too.
@@ -76,7 +73,7 @@ in
   );
 
   # Perl bindings for various platforms.
-  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix-perl-bindings);
+  perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents.nix-perl-bindings);
 
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
@@ -125,10 +122,10 @@ in
   };
 
   # API docs for Nix's unstable internal C++ interfaces.
-  internal-api-docs = nixpkgsFor.x86_64-linux.native.nix-internal-api-docs;
+  internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
-  external-api-docs = nixpkgsFor.x86_64-linux.native.nix-external-api-docs;
+  external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-external-api-docs;
 
   # System tests.
   tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {
