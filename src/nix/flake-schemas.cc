@@ -14,16 +14,18 @@ static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
 
     accessor->setPathDisplay("«builtin-flake-schemas»");
 
-    accessor->addFile(CanonPath("flake.nix"),
-        #include "builtin-flake-schemas.nix.gen.hh"
-        );
+    accessor->addFile(
+        CanonPath("flake.nix"),
+#include "builtin-flake-schemas.nix.gen.hh"
+    );
 
     // FIXME: remove this when we have lazy trees.
     auto storePath = fetchToStore(*state.store, {accessor}, FetchMode::Copy);
     state.allowPath(storePath);
 
     // Construct a dummy flakeref.
-    auto flakeRef = parseFlakeRef(fmt("tarball+https://builtin-flake-schemas?narHash=%s",
+    auto flakeRef = parseFlakeRef(
+        fmt("tarball+https://builtin-flake-schemas?narHash=%s",
             state.store->queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)));
 
     auto flake = readFlake(state, flakeRef, flakeRef, flakeRef, state.rootPath(state.store->toRealPath(storePath)), {});
@@ -32,26 +34,22 @@ static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
 }
 
 std::tuple<ref<EvalCache>, ref<eval_cache::AttrCursor>>
-call(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake,
-    std::optional<FlakeRef> defaultSchemasFlake)
+call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake)
 {
     auto fingerprint = lockedFlake->getFingerprint(state.store);
 
     std::string callFlakeSchemasNix =
-        #include "call-flake-schemas.nix.gen.hh"
+#include "call-flake-schemas.nix.gen.hh"
         ;
 
     auto lockedDefaultSchemasFlake =
-        defaultSchemasFlake
-        ? flake::lockFlake(state, *defaultSchemasFlake, {})
-        : getBuiltinDefaultSchemasFlake(state);
+        defaultSchemasFlake ? flake::lockFlake(state, *defaultSchemasFlake, {}) : getBuiltinDefaultSchemasFlake(state);
     auto lockedDefaultSchemasFlakeFingerprint = lockedDefaultSchemasFlake.getFingerprint(state.store);
 
     std::optional<Fingerprint> fingerprint2;
     if (fingerprint && lockedDefaultSchemasFlakeFingerprint)
-        fingerprint2 = hashString(HashAlgorithm::SHA256,
+        fingerprint2 = hashString(
+            HashAlgorithm::SHA256,
             fmt("app:%s:%s:%s",
                 hashString(HashAlgorithm::SHA256, callFlakeSchemasNix).to_string(HashFormat::Base16, false),
                 fingerprint->to_string(HashFormat::Base16, false),
@@ -59,14 +57,12 @@ call(
 
     // FIXME: merge with openEvalCache().
     auto cache = make_ref<EvalCache>(
-        evalSettings.useEvalCache && evalSettings.pureEval
-            ? fingerprint2
-            : std::nullopt,
+        evalSettings.useEvalCache && evalSettings.pureEval ? fingerprint2 : std::nullopt,
         state,
-        [&state, lockedFlake, callFlakeSchemasNix, lockedDefaultSchemasFlake]()
-        {
+        [&state, lockedFlake, callFlakeSchemasNix, lockedDefaultSchemasFlake]() {
             auto vCallFlakeSchemas = state.allocValue();
-            state.eval(state.parseExprFromString(callFlakeSchemasNix, state.rootPath(CanonPath::root)), *vCallFlakeSchemas);
+            state.eval(
+                state.parseExprFromString(callFlakeSchemasNix, state.rootPath(CanonPath::root)), *vCallFlakeSchemas);
 
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
@@ -99,7 +95,8 @@ std::vector<Symbol> toAttrPath(ref<AttrCursor> cursor)
     ++i; // skip "inventory"
     assert(i != attrPath.end());
     res.push_back(*i++); // copy output name
-    if (i != attrPath.end()) ++i; // skip "outputs"
+    if (i != attrPath.end())
+        ++i; // skip "outputs"
     while (i != attrPath.end()) {
         ++i; // skip "children"
         if (i != attrPath.end())
@@ -118,19 +115,18 @@ void forEachOutput(
     std::function<void(Symbol outputName, std::shared_ptr<AttrCursor> output, const std::string & doc, bool isLast)> f)
 {
     // FIXME: handle non-IFD outputs first.
-    //evalSettings.enableImportFromDerivation.setDefault(false);
+    // evalSettings.enableImportFromDerivation.setDefault(false);
 
     auto outputNames = inventory->getAttrs();
     for (const auto & [i, outputName] : enumerate(outputNames)) {
         auto output = inventory->getAttr(outputName);
         try {
             auto isUnknown = (bool) output->maybeGetAttr("unknown");
-            Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", toAttrPathStr(output)));
+            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", toAttrPathStr(output)));
             f(outputName,
-                isUnknown ? std::shared_ptr<AttrCursor>() : output->getAttr("output"),
-                isUnknown ? "" : output->getAttr("doc")->getString(),
-                i + 1 == outputNames.size());
+              isUnknown ? std::shared_ptr<AttrCursor>() : output->getAttr("output"),
+              isUnknown ? "" : output->getAttr("doc")->getString(),
+              i + 1 == outputNames.size());
         } catch (Error & e) {
             e.addTrace(nullptr, "while evaluating the flake output '%s':", toAttrPathStr(output));
             throw;
@@ -145,8 +141,7 @@ void visit(
     std::function<void(std::function<void(ForEachChild)>)> visitNonLeaf,
     std::function<void(ref<AttrCursor> node, const std::vector<std::string> & systems)> visitFiltered)
 {
-    Activity act(*logger, lvlInfo, actUnknown,
-        fmt("evaluating '%s'", toAttrPathStr(node)));
+    Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", toAttrPathStr(node)));
 
     /* Apply the system type filter. */
     if (system) {
@@ -168,8 +163,7 @@ void visit(
                 } catch (Error & e) {
                     // FIXME: make it a flake schema attribute whether to ignore evaluation errors.
                     if (node->root->state.symbols[toAttrPath(node)[0]] != "legacyPackages") {
-                        e.addTrace(nullptr, "while evaluating the flake output attribute '%s':",
-                            toAttrPathStr(node));
+                        e.addTrace(nullptr, "while evaluating the flake output attribute '%s':", toAttrPathStr(node));
                         throw;
                     }
                 }
@@ -193,7 +187,8 @@ std::optional<std::string> shortDescription(ref<AttrCursor> leaf)
 {
     if (auto what = leaf->maybeGetAttr("shortDescription")) {
         auto s = trim(what->getString());
-        if (s != "") return s;
+        if (s != "")
+            return s;
     }
     return std::nullopt;
 }
@@ -205,18 +200,14 @@ std::shared_ptr<AttrCursor> derivation(ref<AttrCursor> leaf)
 
 MixFlakeSchemas::MixFlakeSchemas()
 {
-    addFlag({
-        .longName = "default-flake-schemas",
-        .description = "The URL of the flake providing default flake schema definitions.",
-        .labels = {"flake-ref"},
-        .handler = {&defaultFlakeSchemas},
-        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-            completeFlakeRef(
-                completions,
-                getStore(),
-                prefix);
-        }}
-    });
+    addFlag(
+        {.longName = "default-flake-schemas",
+         .description = "The URL of the flake providing default flake schema definitions.",
+         .labels = {"flake-ref"},
+         .handler = {&defaultFlakeSchemas},
+         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+             completeFlakeRef(completions, getStore(), prefix);
+         }}});
 }
 
 std::optional<FlakeRef> MixFlakeSchemas::getDefaultFlakeSchemas()
@@ -228,4 +219,3 @@ std::optional<FlakeRef> MixFlakeSchemas::getDefaultFlakeSchemas()
 }
 
 }
-
