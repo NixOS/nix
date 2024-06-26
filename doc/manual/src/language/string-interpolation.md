@@ -43,7 +43,7 @@ configureFlags = "
 Note that Nix expressions and strings can be arbitrarily nested;
 in this case the outer string contains various interpolated expressions that themselves contain strings (e.g., `"-thread"`), some of which in turn contain interpolated expressions (e.g., `${mesa}`).
 
-If you want to write a literal `${...}` you can escape them with two `'`s, see the [string] documentation for details:
+If you want to write a literal `${...}` in a `''`-delimited string literal, you can escape the interpolation with two `'`s, as shown in the following example, or see the [string] documentation for details:
 
 ```nix
 output = ''
