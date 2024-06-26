@@ -351,36 +351,40 @@
       // devFlake.checks.${system} or {}
       );
 
-      packages = forAllSystems (system: {
-        inherit (nixpkgsFor.${system}.native)
-          changelog-d;
-        default = self.packages.${system}.nix;
-        nix-internal-api-docs = nixpkgsFor.${system}.native.nix-internal-api-docs;
-        nix-external-api-docs = nixpkgsFor.${system}.native.nix-external-api-docs;
-      } // lib.concatMapAttrs
-        # We need to flatten recursive attribute sets of derivations to pass `flake check`.
-        (pkgName: {}: {
-          "${pkgName}" = nixpkgsFor.${system}.native.${pkgName};
-          "${pkgName}-static" = nixpkgsFor.${system}.static.${pkgName};
-        } // lib.concatMapAttrs
-          (crossSystem: {}: {
-            "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.${pkgName};
-          })
-          (lib.genAttrs crossSystems (_: { }))
-        // lib.concatMapAttrs
-          (stdenvName: {}: {
-            "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".${pkgName};
-          })
-          (lib.genAttrs stdenvs (_: { })))
-        {
-          "nix" = { };
-          # Temporarily disabled because GitHub Actions OOM issues. Once
-          # the old build system is gone and we are back to one build
-          # system, we should reenable these.
-          #"nix-util" = { };
-          #"nix-store" = { };
-          #"nix-fetchers" = { };
+      packages = forAllSystems (system:
+        { # Here we put attributes that map 1:1 into packages.<system>, ie
+          # for which we don't apply the full build matrix such as cross or static.
+          inherit (nixpkgsFor.${system}.native)
+            changelog-d;
+          default = self.packages.${system}.nix;
+          nix-internal-api-docs = nixpkgsFor.${system}.native.nix-internal-api-docs;
+          nix-external-api-docs = nixpkgsFor.${system}.native.nix-external-api-docs;
         }
+        # We need to flatten recursive attribute sets of derivations to pass `flake check`.
+        // flatMapAttrs
+          { # Components we'll iterate over in the upcoming lambda
+            "nix" = { };
+            # Temporarily disabled because GitHub Actions OOM issues. Once
+            # the old build system is gone and we are back to one build
+            # system, we should reenable these.
+            #"nix-util" = { };
+            #"nix-store" = { };
+            #"nix-fetchers" = { };
+          }
+          (pkgName: {}: {
+              # These attributes go right into `packages.<system>`.
+              "${pkgName}" = nixpkgsFor.${system}.native.${pkgName};
+              "${pkgName}-static" = nixpkgsFor.${system}.static.${pkgName};
+            }
+            // flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
+              # These attributes go right into `packages.<system>`.
+              "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.${pkgName};
+            })
+            // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (stdenvName: {}: {
+              # These attributes go right into `packages.<system>`.
+              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".${pkgName};
+            })
+          )
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         dockerImage =
           let
