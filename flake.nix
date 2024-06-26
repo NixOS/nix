@@ -224,7 +224,7 @@
       # 'nix-perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
 
-      hydraJobs = import ./maintainers/hydra.nix {
+      hydraJobs = import ./packaging/hydra.nix {
         inherit
           inputs
           binaryTarball
