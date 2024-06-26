@@ -1,4 +1,4 @@
-{pkgs, stdenv, versionSuffix}: scope:
+scope:
 let
   inherit (scope) callPackage;
 in

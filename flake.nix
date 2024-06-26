@@ -176,10 +176,7 @@
           # without "polluting" the top level "`pkgs`" attrset.
           # This also has the benefit of providing us with a distinct set of packages
           # we can iterate over.
-          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix {
-            pkgs = final;
-            inherit stdenv versionSuffix;
-          });
+          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix);
 
           # The dependencies are in their own scope, so that they don't have to be
           # in Nixpkgs top level `pkgs` or `nixComponents`.
