@@ -122,10 +122,10 @@ in
   };
 
   # API docs for Nix's unstable internal C++ interfaces.
-  internal-api-docs = nixpkgsFor.x86_64-linux.native.nix-internal-api-docs;
+  internal-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-internal-api-docs;
 
   # API docs for Nix's C bindings.
-  external-api-docs = nixpkgsFor.x86_64-linux.native.nix-external-api-docs;
+  external-api-docs = nixpkgsFor.x86_64-linux.native.nixComponents.nix-external-api-docs;
 
   # System tests.
   tests = import ../tests/nixos { inherit lib nixpkgs nixpkgsFor self; } // {

@@ -144,20 +144,6 @@
 
           nix = final.nixComponents.nix;
 
-          nix-internal-api-docs = final.callPackage ./src/internal-api-docs/package.nix {
-            inherit
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-external-api-docs = final.callPackage ./src/external-api-docs/package.nix {
-            inherit
-              stdenv
-              versionSuffix
-              ;
-          };
-
           nix_noTests = final.nix.override {
             doCheck = false;
             doInstallCheck = false;
@@ -239,8 +225,8 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nix-external-api-docs;
+          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
+          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         // flatMapAttrs
@@ -337,8 +323,8 @@
             ++ pkgs.nixComponents.nix-store.nativeBuildInputs
             ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
-            ++ pkgs.nix-internal-api-docs.nativeBuildInputs
-            ++ pkgs.nix-external-api-docs.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ [
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
