@@ -172,93 +172,16 @@
             };
           });
 
-          # TODO: define everything here instead of top level?
-          nix-components = {
-            inherit (final)
-              nix-util
-              nix-util-test-support
-              nix-util-test
-              nix-util-c
-              nix-store
-              nix-fetchers
-              nix-perl-bindings
-              ;
-          };
+          # A new scope, so that we can use `callPackage` to inject our own interdependencies
+          # without "polluting" the top level "`pkgs`" attrset.
+          # This also has the benefit of providing us with a distinct set of packages
+          # we can iterate over.
+          nixComponents = lib.makeScope final.newScope (import ./packaging/components.nix {
+            pkgs = final;
+            inherit stdenv versionSuffix officialRelease;
+          });
 
-          nix-util = final.callPackage ./src/libutil/package.nix {
-            inherit
-              fileset
-              stdenv
-              officialRelease
-              versionSuffix
-              ;
-          };
-
-          nix-util-test-support = final.callPackage ./tests/unit/libutil-support/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-util-test = final.callPackage ./tests/unit/libutil/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-util-c = final.callPackage ./src/libutil-c/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-store = final.callPackage ./src/libstore/package.nix {
-            inherit
-              fileset
-              stdenv
-              officialRelease
-              versionSuffix
-              ;
-            libseccomp = final.libseccomp-nix;
-            busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
-          };
-
-          nix-fetchers = final.callPackage ./src/libfetchers/package.nix {
-            inherit
-              fileset
-              stdenv
-              officialRelease
-              versionSuffix
-              ;
-          };
-
-          nix =
-            final.callPackage ./package.nix {
-              inherit
-                fileset
-                stdenv
-                officialRelease
-                versionSuffix
-                ;
-              boehmgc = final.boehmgc-nix;
-              libgit2 = final.libgit2-nix;
-              libseccomp = final.libseccomp-nix;
-              busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
-            };
-
-          nix-perl-bindings = final.callPackage ./src/perl/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
+          nix = final.nixComponents.nix;
 
           nix-internal-api-docs = final.callPackage ./src/internal-api-docs/package.nix {
             inherit
@@ -340,7 +263,7 @@
           "static-" = nixpkgsFor.${system}.static;
         })
         (nixpkgsPrefix: nixpkgs: 
-          flatMapAttrs nixpkgs.nix-components
+          flatMapAttrs nixpkgs.nixComponents
             (pkgName: pkg:
               flatMapAttrs pkg.tests or {}
               (testName: test: {
