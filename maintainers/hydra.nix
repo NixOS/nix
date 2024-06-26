@@ -9,7 +9,6 @@
 }:
 let
   inherit (inputs) nixpkgs nixpkgs-regression;
-  inherit (lib) fileset;
 
   installScriptFor = tarballs:
     nixpkgsFor.x86_64-linux.native.callPackage ../scripts/installer.nix {
@@ -24,8 +23,6 @@ let
           (lib.versionAtLeast daemon.version "2.4pre20211005" &&
            lib.versionAtLeast client.version "2.4pre20211005")
           "-${client.version}-against-${daemon.version}";
-
-      inherit fileset;
 
       test-client = client;
       test-daemon = daemon;

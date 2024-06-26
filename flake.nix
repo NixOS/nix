@@ -185,7 +185,6 @@
 
           nix-internal-api-docs = final.callPackage ./src/internal-api-docs/package.nix {
             inherit
-              fileset
               stdenv
               versionSuffix
               ;
@@ -193,7 +192,6 @@
 
           nix-external-api-docs = final.callPackage ./src/external-api-docs/package.nix {
             inherit
-              fileset
               stdenv
               versionSuffix
               ;
