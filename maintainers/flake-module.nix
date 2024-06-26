@@ -429,6 +429,7 @@
             ''^tests/functional/test-libstoreconsumer/main\.cc''
             ''^tests/nixos/ca-fd-leak/sender\.c''
             ''^tests/nixos/ca-fd-leak/smuggler\.c''
+            ''^tests/nixos/user-sandboxing/attacker\.c''
             ''^tests/unit/libexpr-support/tests/libexpr\.hh''
             ''^tests/unit/libexpr-support/tests/value/context\.cc''
             ''^tests/unit/libexpr-support/tests/value/context\.hh''
