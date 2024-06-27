@@ -43,17 +43,46 @@ configureFlags = "
 Note that Nix expressions and strings can be arbitrarily nested;
 in this case the outer string contains various interpolated expressions that themselves contain strings (e.g., `"-thread"`), some of which in turn contain interpolated expressions (e.g., `${mesa}`).
 
-If you want to write a literal `${...}` in a `''`-delimited string literal, you can escape the interpolation with two `'`s, as shown in the following example, or see the [string] documentation for details:
+To write a literal `${` in an regular string, escape it with a backslash (`\`).
 
-```nix
-nix-repl> ''
-            echo ''${PATH}
-          ''
-"echo \${PATH}\n"
-```
+> **Example**
+>
+> ```nix
+> "echo \${PATH}"
+> ```
+>
+>     "echo ${PATH}"
 
-[string]: ./values.md#type-string
+To write a literal `${` in an indented string, escape it with two single quotes (`''`).
 
+> **Example**
+>
+> ```nix
+> ''
+>   echo ''${PATH}
+> ''
+> ```
+>
+>     "echo ${PATH}\n"
+
+`$${` can be written literally in any string.
+
+> **Example**
+>
+> In Make, `$` in file names or recipes is represented as `$$`, see [GNU `make`: Basics of Variable Reference](https://www.gnu.org/software/make/manual/html_node/Reference.html#Basics-of-Variable-References).
+> This can be expressed directly in the Nix language strings:
+>
+> ```nix
+> ''
+>   MAKEVAR = Hello
+>   all:
+>   	@export BASHVAR=world; echo $(MAKEVAR) $${BASHVAR}
+> ''
+> ```
+>
+>     "MAKEVAR = Hello\nall:\n\t@export BASHVAR=world; echo $(MAKEVAR) $\${BASHVAR}\n"
+
+See the [documentation on strings][string] for details.
 
 ### Path
 
