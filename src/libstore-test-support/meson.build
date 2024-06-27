@@ -1,4 +1,4 @@
-project('nix-util-test-support', 'cpp',
+project('nix-store-test-support', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -28,6 +28,8 @@ deps_other = [ ]
 
 foreach nix_dep : [
   dependency('nix-util'),
+  dependency('nix-util-test-support'),
+  dependency('nix-store'),
 ]
   if nix_dep.type_name() == 'internal'
     deps_public_subproject += nix_dep
@@ -42,11 +44,14 @@ rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
 
 add_project_arguments(
+  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
+  # It would be nice for our headers to be idempotent instead.
+  '-include', 'config-util.hh',
+  '-include', 'config-store.hh',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
   '-Werror=switch',
   '-Werror=switch-enum',
-  '-Werror=unused-result',
   '-Wdeprecated-copy',
   '-Wignored-qualifiers',
   # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
@@ -59,17 +64,20 @@ add_project_arguments(
 )
 
 sources = files(
-  'tests/hash.cc',
-  'tests/string_callback.cc',
+  'tests/derived-path.cc',
+  'tests/outputs-spec.cc',
+  'tests/path.cc',
 )
 
 include_dirs = [include_directories('.')]
 
 headers = files(
-  'tests/characterization.hh',
-  'tests/hash.hh',
-  'tests/nix_api_util.hh',
-  'tests/string_callback.hh',
+  'tests/derived-path.hh',
+  'tests/libstore.hh',
+  'tests/nix_api_store.hh',
+  'tests/outputs-spec.hh',
+  'tests/path.hh',
+  'tests/protocol.hh',
 )
 
 if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
@@ -85,7 +93,7 @@ else
 endif
 
 this_library = library(
-  'nix-util-test-support',
+  'nix-store-test-support',
   sources,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,

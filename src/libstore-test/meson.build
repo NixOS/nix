@@ -1,4 +1,4 @@
-project('nix-util-test', 'cpp',
+project('nix-store-test', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -23,15 +23,13 @@ deps_private_subproject = [ ]
 # See note in ../nix-util/meson.build
 deps_other = [ ]
 
-configdata = configuration_data()
-
-# TODO rename, because it will conflict with downstream projects
-configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
-
 foreach nix_dep : [
   dependency('nix-util'),
   dependency('nix-util-c'),
   dependency('nix-util-test-support'),
+  dependency('nix-store'),
+  dependency('nix-store-c'),
+  dependency('nix-store-test-support'),
 ]
   if nix_dep.type_name() == 'internal'
     deps_private_subproject += nix_dep
@@ -60,20 +58,17 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-util-test.h',
-)
-
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util-test.h',
+  '-include', 'config-util.hh',
+  '-include', 'config-store.hh',
+  '-include', 'config-util.h',
+  '-include', 'config-store.h',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
   '-Werror=switch',
   '-Werror=switch-enum',
-  '-Werror=unused-result',
   '-Wdeprecated-copy',
   '-Wignored-qualifiers',
   # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
@@ -86,34 +81,30 @@ add_project_arguments(
 )
 
 sources = files(
-  'args.cc',
-  'canon-path.cc',
-  'chunked-vector.cc',
-  'closure.cc',
-  'compression.cc',
-  'config.cc',
-  'file-content-address.cc',
-  'git.cc',
-  'hash.cc',
-  'hilite.cc',
-  'json-utils.cc',
-  'logging.cc',
-  'lru-cache.cc',
-  'nix_api_util.cc',
-  'pool.cc',
+  'common-protocol.cc',
+  'content-address.cc',
+  'derivation-advanced-attrs.cc',
+  'derivation.cc',
+  'derived-path.cc',
+  'downstream-placeholder.cc',
+  'machines.cc',
+  'nar-info-disk-cache.cc',
+  'nar-info.cc',
+  'nix_api_store.cc',
+  'outputs-spec.cc',
+  'path-info.cc',
+  'path.cc',
   'references.cc',
-  'spawn.cc',
-  'suggestions.cc',
-  'tests.cc',
-  'url.cc',
-  'xml-writer.cc',
+  'serve-protocol.cc',
+  'store-reference.cc',
+  'worker-protocol.cc',
 )
 
 include_dirs = [include_directories('.')]
 
 
 this_exe = executable(
-  'nix-util-test',
+  meson.project_name(),
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
@@ -123,7 +114,7 @@ this_exe = executable(
   install : true,
 )
 
-test('nix-util-test', this_exe, env : ['_NIX_TEST_UNIT_DATA=' + meson.current_source_dir() + '/data'])
+test(meson.project_name(), this_exe, env : ['_NIX_TEST_UNIT_DATA=' + meson.current_source_dir() + '/data'])
 
 meson.override_dependency(meson.project_name(), declare_dependency(
   include_directories : include_dirs,
