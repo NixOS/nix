@@ -401,12 +401,7 @@ foreach name, value : cpp_str_defines
   ]
 endforeach
 
-if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
-  # See note in `../nix-util/meson.build`
-  linker_export_flags = ['-Wl,--export-all-symbols']
-else
-  linker_export_flags = []
-endif
+subdir('meson-utils/export-all-symbols')
 
 this_library = library(
   'nixstore',
