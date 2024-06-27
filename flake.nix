@@ -278,6 +278,7 @@
             in
               "-D${prefix}:${rest}";
           havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
+          ignoreCrossFile = flags: builtins.filter (flag: !(lib.strings.hasInfix "cross-file" flag)) flags;
         in {
           pname = "shell-for-" + attrs.pname;
 
@@ -309,10 +310,10 @@
           };
 
           mesonFlags =
-            map (transformFlag "libutil") pkgs.nixComponents.nix-util.mesonFlags
-            ++ map (transformFlag "libstore") pkgs.nixComponents.nix-store.mesonFlags
-            ++ map (transformFlag "libfetchers") pkgs.nixComponents.nix-fetchers.mesonFlags
-            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nixComponents.nix-perl-bindings.mesonFlags)
+            map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents.nix-util.mesonFlags)
+            ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents.nix-store.mesonFlags)
+            ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents.nix-fetchers.mesonFlags)
+            ++ lib.optionals havePerl (map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents.nix-perl-bindings.mesonFlags))
             ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
@@ -324,7 +325,7 @@
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ [
               pkgs.buildPackages.cmake
-              pkgs.shellcheck
+              pkgs.buildPackages.shellcheck
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)

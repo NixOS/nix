@@ -27,6 +27,7 @@
 , mdbook
 , mdbook-linkcheck
 , mercurial
+, mesonEmulatorHook
 , openssh
 , openssl
 , pkg-config
@@ -214,6 +215,9 @@ in {
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
   ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
+  ++ lib.optionals (!stdenv.buildPlatform.canExecute stdenv.hostPlatform) [
+    mesonEmulatorHook
+  ] ++ lib.optional stdenv.hostPlatform.isLinux unixtools.util-linux
   ;
 
   buildInputs = lib.optionals doBuild [
