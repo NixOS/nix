@@ -19,10 +19,13 @@ in
 
   nix-fetchers = callPackage ../src/libfetchers/package.nix { };
 
-  nix-perl-bindings = callPackage ../src/perl/package.nix { };
+  nix-expr = callPackage ../src/libexpr/package.nix { };
+
+  nix-flake = callPackage ../src/libflake/package.nix { };
 
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { };
 
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { };
 
+  nix-perl-bindings = callPackage ../src/perl/package.nix { };
 }

@@ -7,14 +7,11 @@
 , pkg-config
 
 , nix-util
+, nix-store
+, nix-fetchers
 , boost
-, curl
-, aws-sdk-cpp
-, libseccomp
+, boehmgc
 , nlohmann_json
-, sqlite
-
-, busybox-sandbox-shell ? null
 
 # Configuration Options
 
@@ -23,6 +20,17 @@
 # Check test coverage of Nix. Probably want to use with at least
 # one of `doCheck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
+
+# Whether to use garbage collection for the Nix language evaluator.
+#
+# If it is disabled, we just leak memory, but this is not as bad as it
+# sounds so long as evaluation just takes places within short-lived
+# processes. (When the process exits, the memory is reclaimed; it is
+# only leaked *within* the process.)
+#
+# Temporarily disabled on Windows because the `GC_throw_bad_alloc`
+# symbol is missing during linking.
+, enableGC ? !stdenv.hostPlatform.isWindows
 }:
 
 let
@@ -41,7 +49,7 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-store";
+  pname = "nix-expr";
   inherit version;
 
   src = fileset.toSource {
@@ -49,14 +57,8 @@ mkDerivation (finalAttrs: {
     fileset = fileset.unions [
       ./meson.build
       ./meson.options
-      ./linux/meson.build
-      ./unix/meson.build
-      ./windows/meson.build
       (fileset.fileFilter (file: file.hasExt "cc") ./.)
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
-      (fileset.fileFilter (file: file.hasExt "sb") ./.)
-      (fileset.fileFilter (file: file.hasExt "md") ./.)
-      (fileset.fileFilter (file: file.hasExt "sql") ./.)
     ];
   };
 
@@ -70,21 +72,14 @@ mkDerivation (finalAttrs: {
 
   buildInputs = [
     boost
-    curl
-    sqlite
-  ] ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
-    # There have been issues building these dependencies
-    ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
-      (aws-sdk-cpp.override {
-        apis = ["s3" "transfer"];
-        customMemoryManagement = false;
-      })
-  ;
+  ];
 
   propagatedBuildInputs = [
     nix-util
+    nix-store
+    nix-fetchers
     nlohmann_json
-  ];
+  ] ++ lib.optional enableGC boehmgc;
 
   disallowedReferences = [ boost ];
 
@@ -95,10 +90,7 @@ mkDerivation (finalAttrs: {
     '';
 
   mesonFlags = [
-    (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
-    (lib.mesonBool "embedded-sandbox-shell" stdenv.hostPlatform.isStatic)
-  ] ++ lib.optionals stdenv.hostPlatform.isLinux [
-    (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
+    (lib.mesonFeature "gc" enableGC)
   ];
 
   env = {
@@ -117,7 +109,7 @@ mkDerivation (finalAttrs: {
     # by default, and would clash with out `disallowedReferences`. Part
     # of the https://github.com/NixOS/nixpkgs/issues/45462 workaround.
     ''
-      sed -i "$out/lib/pkgconfig/nix-store.pc" -e 's, ${lib.getLib boost}[^ ]*,,g'
+      sed -i "$out/lib/pkgconfig/nix-expr.pc" -e 's, ${lib.getLib boost}[^ ]*,,g'
     '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;

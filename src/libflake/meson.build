@@ -1,4 +1,4 @@
-project('nix-fetchers', 'cpp',
+project('nix-flake', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -29,6 +29,8 @@ deps_other = [ ]
 foreach nix_dep : [
   dependency('nix-util'),
   dependency('nix-store'),
+  dependency('nix-fetchers'),
+  dependency('nix-expr'),
 ]
   if nix_dep.type_name() == 'internal'
     deps_public_subproject += nix_dep
@@ -51,11 +53,11 @@ add_project_arguments(
   '-include', 'config-util.h',
   '-include', 'config-store.h',
   # '-include', 'config-fetchers.h',
+  '-include', 'config-expr.h',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
   '-Werror=switch',
   '-Werror=switch-enum',
-  '-Werror=unused-result',
   '-Wdeprecated-copy',
   '-Wignored-qualifiers',
   # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
@@ -68,40 +70,24 @@ add_project_arguments(
 )
 
 sources = files(
-  'attrs.cc',
-  'cache.cc',
-  'fetch-settings.cc',
-  'fetch-to-store.cc',
-  'fetchers.cc',
-  'filtering-source-accessor.cc',
-  'git.cc',
-  'git-utils.cc',
-  'github.cc',
-  'indirect.cc',
-  'mercurial.cc',
-  'mounted-source-accessor.cc',
-  'path.cc',
-  'store-path-accessor.cc',
-  'registry.cc',
-  'tarball.cc',
+  'flake-settings.cc',
+  'flake/config.cc',
+  'flake/flake.cc',
+  'flake/flakeref.cc',
+  'flake/url-name.cc',
+  'flake/lockfile.cc',
 )
 
 headers = files(
-  'attrs.hh',
-  'cache.hh',
-  'fetch-settings.hh',
-  'fetch-to-store.hh',
-  'filtering-source-accessor.hh',
-  'git-utils.hh',
-  'mounted-source-accessor.hh',
-  'fetchers.hh',
-  'registry.hh',
-  'store-path-accessor.hh',
-  'tarball.hh',
+  'flake-settings.hh',
+  'flake/flake.hh',
+  'flake/flakeref.hh',
+  'flake/lockfile.hh',
+  'flake/url-name.hh',
 )
 
 this_library = library(
-  'nixfetchers',
+  'nixflake',
   sources,
   dependencies : deps_public + deps_private + deps_other,
   install : true,

@@ -8,6 +8,8 @@
 
 , nix-util
 , nix-store
+, nix-fetchers
+, nix-expr
 , nlohmann_json
 , libgit2
 , man
@@ -58,13 +60,11 @@ mkDerivation (finalAttrs: {
     pkg-config
   ];
 
-  buildInputs = [
-    libgit2
-  ];
-
   propagatedBuildInputs = [
     nix-store
     nix-util
+    nix-fetchers
+    nix-expr
     nlohmann_json
   ];
 

@@ -21,7 +21,25 @@ deps_private = [ ]
 deps_public = [ ]
 
 # See note in ../nix-util/meson.build
+deps_public_subproject = [ ]
+
+# See note in ../nix-util/meson.build
 deps_other = [ ]
+
+foreach nix_dep : [
+  dependency('nix-util'),
+]
+  if nix_dep.type_name() == 'internal'
+    deps_public_subproject += nix_dep
+    # subproject sadly no good for pkg-config module
+    deps_other += nix_dep
+  else
+    deps_public += nix_dep
+  endif
+endforeach
+
+rapidcheck = dependency('rapidcheck')
+deps_public += rapidcheck
 
 add_project_arguments(
   '-Wno-deprecated-declarations',
@@ -66,17 +84,6 @@ else
   linker_export_flags = []
 endif
 
-nix_util = dependency('nix-util')
-if nix_util.type_name() == 'internal'
-  # subproject sadly no good for pkg-config module
-  deps_other += nix_util
-else
-  deps_public += nix_util
-endif
-
-rapidcheck = dependency('rapidcheck')
-deps_public += rapidcheck
-
 this_library = library(
   'nix-util-test-support',
   sources,
@@ -90,7 +97,11 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-libraries_private = []
+requires = []
+foreach dep : deps_public_subproject
+  requires += dep.name()
+endforeach
+requires += deps_public
 
 import('pkgconfig').generate(
   this_library,
@@ -99,7 +110,7 @@ import('pkgconfig').generate(
   description : 'Nix Package Manager',
   subdirs : ['nix'],
   extra_cflags : ['-std=c++2a'],
-  requires : deps_public,
+  requires : requires,
   requires_private : deps_private,
 )
 
@@ -107,5 +118,5 @@ meson.override_dependency(meson.project_name(), declare_dependency(
   include_directories : include_dirs,
   link_with : this_library,
   compile_args : ['-std=c++2a'],
-  dependencies : [],
+  dependencies : deps_public_subproject + deps_public,
 ))
