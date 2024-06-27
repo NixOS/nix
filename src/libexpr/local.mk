@@ -15,7 +15,7 @@ libexpr_SOURCES := \
 INCLUDE_libexpr := -I $(d)
 
 libexpr_CXXFLAGS += \
-	$(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libmain) $(INCLUDE_libexpr) \
+	$(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libexpr) \
 	-DGC_THREADS
 
 libexpr_LIBS = libutil libstore libfetchers

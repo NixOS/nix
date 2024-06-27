@@ -3,7 +3,7 @@
 #include "hash.hh"
 #include "primops.hh"
 #include "print-options.hh"
-#include "shared.hh"
+#include "exit.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
