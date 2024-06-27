@@ -40,6 +40,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
     meson
     ninja
     pkg-config
+    perl
   ];
 
   buildInputs = [
