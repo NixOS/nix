@@ -6,12 +6,12 @@
 , ninja
 , pkg-config
 
-, nix-util
-, nix-store
 , nix-fetchers
-, boost
-, boehmgc
-, nlohmann_json
+, nix-store-test-support
+
+, rapidcheck
+, gtest
+, runCommand
 
 # Configuration Options
 
@@ -20,17 +20,6 @@
 # Check test coverage of Nix. Probably want to use with at least
 # one of `doCheck` or `doInstallCheck` enabled.
 , withCoverageChecks ? false
-
-# Whether to use garbage collection for the Nix language evaluator.
-#
-# If it is disabled, we just leak memory, but this is not as bad as it
-# sounds so long as evaluation just takes places within short-lived
-# processes. (When the process exits, the memory is reclaimed; it is
-# only leaked *within* the process.)
-#
-# Temporarily disabled on Windows because the `GC_throw_bad_alloc`
-# symbol is missing during linking.
-, enableGC ? !stdenv.hostPlatform.isWindows
 }:
 
 let
@@ -49,14 +38,14 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-expr";
+  pname = "nix-fetchers-test";
   inherit version;
 
   src = fileset.toSource {
     root = ./.;
     fileset = fileset.unions [
       ./meson.build
-      ./meson.options
+      # ./meson.options
       (fileset.fileFilter (file: file.hasExt "cc") ./.)
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
     ];
@@ -70,13 +59,12 @@ mkDerivation (finalAttrs: {
     pkg-config
   ];
 
-  propagatedBuildInputs = [
-    nix-util
-    nix-store
+  buildInputs = [
     nix-fetchers
-    boost
-    nlohmann_json
-  ] ++ lib.optional enableGC boehmgc;
+    nix-store-test-support
+    rapidcheck
+    gtest
+  ];
 
   preConfigure =
     # "Inline" .version so it's not a symlink, and includes the suffix
@@ -85,15 +73,9 @@ mkDerivation (finalAttrs: {
     '';
 
   mesonFlags = [
-    (lib.mesonEnable "gc" enableGC)
   ];
 
-  env = {
-    # Needed for Meson to find Boost.
-    # https://github.com/NixOS/nixpkgs/issues/86131.
-    BOOST_INCLUDEDIR = "${lib.getDev boost}/include";
-    BOOST_LIBRARYDIR = "${lib.getLib boost}/lib";
-  } // lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
+  env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
     LDFLAGS = "-fuse-ld=gold";
   };
 
@@ -105,6 +87,18 @@ mkDerivation (finalAttrs: {
   strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+
+  passthru = {
+    tests = {
+      run = runCommand "${finalAttrs.pname}-run" {
+      } ''
+        PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
+        export _NIX_TEST_UNIT_DATA=${./data}
+        nix-fetchers-test
+        touch $out
+      '';
+    };
+  };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

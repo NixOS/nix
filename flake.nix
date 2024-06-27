@@ -334,6 +334,10 @@
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
 
           buildInputs = attrs.buildInputs or []
+            ++ [
+              pkgs.gtest
+              pkgs.rapidcheck
+            ]
             ++ lib.optional havePerl pkgs.perl
             ;
         });
