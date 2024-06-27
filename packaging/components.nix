@@ -26,6 +26,7 @@ in
   nix-expr-test = callPackage ../src/libexpr-test/package.nix { };
 
   nix-flake = callPackage ../src/libflake/package.nix { };
+  nix-flake-test = callPackage ../src/libflake-test/package.nix { };
 
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { };
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { };

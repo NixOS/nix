@@ -40,7 +40,17 @@ let
     "nix-util-test-support"
     "nix-util-test"
     "nix-store"
+    "nix-store-c"
+    "nix-store-test-support"
+    "nix-store-test"
     "nix-fetchers"
+    "nix-fetcher-test"
+    "nix-expr"
+    "nix-expr-c"
+    "nix-expr-test-support"
+    "nix-expr-test"
+    "nix-flake"
+    "nix-flake-test"
   ];
 in
 {
