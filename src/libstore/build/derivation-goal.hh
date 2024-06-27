@@ -194,9 +194,6 @@ struct DerivationGoal : public Goal
      */
     std::optional<DerivationType> derivationType;
 
-    typedef void (DerivationGoal::*GoalState)();
-    GoalState state;
-
     BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
@@ -227,8 +224,6 @@ struct DerivationGoal : public Goal
 
     std::string key() override;
 
-    void work() override;
-
     /**
      * Add wanted outputs to an already existing derivation goal.
      */
@@ -237,18 +232,19 @@ struct DerivationGoal : public Goal
     /**
      * The states.
      */
-    void getDerivation();
-    void loadDerivation();
-    void haveDerivation();
-    void outputsSubstitutionTried();
-    void gaveUpOnSubstitution();
-    void closureRepaired();
-    void inputsRealised();
-    void tryToBuild();
-    virtual void tryLocalBuild();
-    void buildDone();
+    Co init() override;
+    Co getDerivation();
+    Co loadDerivation();
+    Co haveDerivation();
+    Co outputsSubstitutionTried();
+    Co gaveUpOnSubstitution();
+    Co closureRepaired();
+    Co inputsRealised();
+    Co tryToBuild();
+    virtual Co tryLocalBuild();
+    Co buildDone();
 
-    void resolvedFinished();
+    Co resolvedFinished();
 
     /**
      * Is the build hook willing to perform the build?
@@ -329,11 +325,11 @@ struct DerivationGoal : public Goal
      */
     virtual void killChild();
 
-    void repairClosure();
+    Co repairClosure();
 
     void started();
 
-    void done(
+    Done done(
         BuildResult::Status status,
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
