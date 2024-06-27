@@ -15,7 +15,7 @@ libexpr_SOURCES := \
 INCLUDE_libexpr := -I $(d)
 
 libexpr_CXXFLAGS += \
-	$(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libmain) $(INCLUDE_libexpr) \
+	$(INCLUDE_libutil) $(INCLUDE_libstore) $(INCLUDE_libfetchers) $(INCLUDE_libexpr) \
 	-DGC_THREADS
 
 libexpr_LIBS = libutil libstore libfetchers
@@ -48,5 +48,3 @@ $(foreach i, $(wildcard src/libexpr/value/*.hh), \
 $(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh
 
 $(d)/eval.cc: $(d)/primops/derivation.nix.gen.hh $(d)/fetchurl.nix.gen.hh $(d)/flake/call-flake.nix.gen.hh
-
-$(buildprefix)src/libexpr/primops/fromTOML.o:	ERROR_SWITCH_ENUM =
