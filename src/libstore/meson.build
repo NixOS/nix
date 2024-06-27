@@ -67,12 +67,7 @@ has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('lremovexattr')
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 
-# This is only conditional to work around
-# https://github.com/mesonbuild/meson/issues/13293. It should be
-# unconditional.
-if not (host_machine.system() == 'windows' and cxx.get_id() == 'gcc')
-  deps_private += dependency('threads')
-endif
+subdir('meson-utils/threads')
 
 boost = dependency(
   'boost',
