@@ -14,14 +14,7 @@ project('nix-flake-test', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# See note in ../nix-util/meson.build
-deps_private = [ ]
-
-# See note in ../nix-util/meson.build
-deps_private_subproject = [ ]
-
-# See note in ../nix-util/meson.build
-deps_other = [ ]
+subdir('meson-utils')
 
 foreach nix_dep : [
   dependency('nix-util'),
@@ -106,9 +99,3 @@ this_exe = executable(
 )
 
 test(meson.project_name(), this_exe, env : ['_NIX_TEST_UNIT_DATA=' + meson.current_source_dir() + '/data'])
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_dirs,
-  link_with : this_exe,
-  compile_args : ['-std=c++2a'],
-))

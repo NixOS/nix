@@ -14,36 +14,7 @@ project('nix-util', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# These are private dependencies with pkg-config files. What private
-# means is that the dependencies are used by the library but they are
-# *not* used (e.g. `#include`-ed) in any installed header file, and only
-# in regular source code (`*.cc`) or private, uninstalled headers. They
-# are thus part of the *implementation* of the library, but not its
-# *interface*.
-#
-# See `man pkg-config` for some details.
-deps_private = [ ]
-
-# These are public dependencies with pkg-config files. Public is the
-# opposite of private: these dependencies are used in installed header
-# files. They are part of the interface (and implementation) of the
-# library.
-#
-# N.B. This concept is mostly unrelated to our own concept of a public
-# (stable) API, for consumption outside of the Nix repository.
-# `libnixutil` is an unstable C++ library, whose public interface is
-# likewise unstable. `libutilc` conversely is a hopefully-soon stable
-# C library, whose public interface --- including public but not private
-# dependencies --- will also likewise soon be stable.
-#
-# N.B. For distributions that care about "ABI" stablity and not just
-# "API" stability, the private dependencies also matter as they can
-# potentially affect the public ABI.
-deps_public = [ ]
-
-# These are dependencencies without pkg-config files. Ideally they are
-# just private, but they may also be public (e.g. boost).
-deps_other = [ ]
+subdir('meson-utils')
 
 configdata = configuration_data()
 
@@ -315,21 +286,4 @@ if host_machine.system() == 'windows'
   libraries_private += ['-lws2_32']
 endif
 
-import('pkgconfig').generate(
-  this_library,
-  filebase : meson.project_name(),
-  name : 'Nix',
-  description : 'Nix Package Manager',
-  subdirs : ['nix'],
-  extra_cflags : ['-std=c++2a'],
-  requires : deps_public,
-  requires_private : deps_private,
-  libraries_private : libraries_private,
-)
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_dirs,
-  link_with : this_library,
-  compile_args : ['-std=c++2a'],
-  dependencies : [],
-))
+subdir('meson-utils/export')

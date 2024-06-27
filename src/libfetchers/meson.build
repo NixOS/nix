@@ -14,17 +14,9 @@ project('nix-fetchers', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# See note in ../nix-util/meson.build
-deps_private = [ ]
+subdir('meson-utils')
 
-# See note in ../nix-util/meson.build
-deps_public = [ ]
-
-# See note in ../nix-util/meson.build
-deps_public_subproject = [ ]
-
-# See note in ../nix-util/meson.build
-deps_other = [ ]
+configdata = configuration_data()
 
 foreach nix_dep : [
   dependency('nix-util'),
@@ -86,6 +78,8 @@ sources = files(
   'tarball.cc',
 )
 
+include_dirs = [include_directories('.')]
+
 headers = files(
   'attrs.hh',
   'cache.hh',
@@ -109,26 +103,6 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-requires = []
-foreach dep : deps_public_subproject
-  requires += dep.name()
-endforeach
-requires += deps_public
+libraries_private = []
 
-import('pkgconfig').generate(
-  this_library,
-  filebase : meson.project_name(),
-  name : 'Nix',
-  description : 'Nix Package Manager',
-  subdirs : ['nix'],
-  extra_cflags : ['-std=c++2a'],
-  requires : requires,
-  requires_private : deps_private,
-)
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_directories('.'),
-  link_with : this_library,
-  compile_args : ['-std=c++2a'],
-  dependencies : deps_public_subproject + deps_public,
-))
+subdir('meson-utils/export')

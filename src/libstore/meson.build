@@ -14,17 +14,7 @@ project('nix-store', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# See note in ../nix-util/meson.build
-deps_private = [ ]
-
-# See note in ../nix-util/meson.build
-deps_public = [ ]
-
-# See note in ../nix-util/meson.build
-deps_public_subproject = [ ]
-
-# See note in ../nix-util/meson.build
-deps_other = [ ]
+subdir('meson-utils')
 
 configdata = configuration_data()
 
@@ -436,27 +426,6 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-requires = []
-foreach dep : deps_public_subproject
-  requires += dep.name()
-endforeach
-requires += deps_public
+libraries_private = ['-lboost_container']
 
-import('pkgconfig').generate(
-  this_library,
-  filebase : meson.project_name(),
-  name : 'Nix',
-  description : 'Nix Package Manager',
-  subdirs : ['nix'],
-  extra_cflags : ['-std=c++2a'],
-  requires : requires,
-  requires_private : deps_private,
-  libraries_private : ['-lboost_container'],
-)
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_dirs,
-  link_with : this_library,
-  compile_args : ['-std=c++2a'],
-  dependencies : deps_public_subproject + deps_public,
-))
+subdir('meson-utils/export')
