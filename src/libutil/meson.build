@@ -18,6 +18,12 @@ subdir('meson-utils/deps-lists')
 
 configdata = configuration_data()
 
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
+]
+subdir('meson-utils/subprojects')
+
 # Check for each of these functions, and create a define like `#define
 # HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
 # for found. One therefore uses it with `#if` not `#ifdef`.

@@ -16,7 +16,9 @@ cxx = meson.get_compiler('cpp')
 
 subdir('meson-utils/deps-lists')
 
-foreach nix_dep : [
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-util-c'),
   dependency('nix-util-test-support'),
@@ -27,14 +29,7 @@ foreach nix_dep : [
   dependency('nix-expr-c'),
   dependency('nix-expr-test-support'),
 ]
-  if nix_dep.type_name() == 'internal'
-    deps_private_subproject += nix_dep
-    # subproject sadly no good for pkg-config module
-    deps_other += nix_dep
-  else
-    deps_private += nix_dep
-  endif
-endforeach
+subdir('meson-utils/subprojects')
 
 if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
   # Windows DLLs are stricter about symbol visibility than Unix shared

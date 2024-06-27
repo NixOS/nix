@@ -18,30 +18,17 @@ subdir('meson-utils/deps-lists')
 
 configdata = configuration_data()
 
-foreach nix_dep : [
+deps_private_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
 ]
-  if nix_dep.type_name() == 'internal'
-    deps_private_subproject += nix_dep
-    # subproject sadly no good for pkg-config module
-    deps_other += nix_dep
-  else
-    deps_private += nix_dep
-  endif
-endforeach
-
-foreach nix_dep : [
+deps_public_maybe_subproject = [
   dependency('nix-util-c'),
 ]
-  if nix_dep.type_name() == 'internal'
-    deps_public_subproject += nix_dep
-    # subproject sadly no good for pkg-config module
-    deps_other += nix_dep
-  else
-    deps_public += nix_dep
-  endif
-endforeach
+subdir('meson-utils/subprojects')
+
+# TODO rename, because it will conflict with downstream projects
+configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 config_h = configure_file(
   configuration : configdata,

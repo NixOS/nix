@@ -18,19 +18,14 @@ subdir('meson-utils/deps-lists')
 
 configdata = configuration_data()
 
-foreach nix_dep : [
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
   dependency('nix-fetchers'),
 ]
-  if nix_dep.type_name() == 'internal'
-    deps_public_subproject += nix_dep
-    # subproject sadly no good for pkg-config module
-    deps_other += nix_dep
-  else
-    deps_public += nix_dep
-  endif
-endforeach
+subdir('meson-utils/subprojects')
 
 # This is only conditional to work around
 # https://github.com/mesonbuild/meson/issues/13293. It should be

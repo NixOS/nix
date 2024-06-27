@@ -16,19 +16,14 @@ cxx = meson.get_compiler('cpp')
 
 subdir('meson-utils/deps-lists')
 
-foreach nix_dep : [
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-util-test-support'),
   dependency('nix-store'),
 ]
-  if nix_dep.type_name() == 'internal'
-    deps_public_subproject += nix_dep
-    # subproject sadly no good for pkg-config module
-    deps_other += nix_dep
-  else
-    deps_public += nix_dep
-  endif
-endforeach
+subdir('meson-utils/subprojects')
 
 rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck

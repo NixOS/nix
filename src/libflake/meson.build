@@ -16,20 +16,15 @@ cxx = meson.get_compiler('cpp')
 
 subdir('meson-utils/deps-lists')
 
-foreach nix_dep : [
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
   dependency('nix-fetchers'),
   dependency('nix-expr'),
 ]
-  if nix_dep.type_name() == 'internal'
-    deps_public_subproject += nix_dep
-    # subproject sadly no good for pkg-config module
-    deps_other += nix_dep
-  else
-    deps_public += nix_dep
-  endif
-endforeach
+subdir('meson-utils/subprojects')
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json

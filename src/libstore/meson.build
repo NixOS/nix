@@ -23,17 +23,12 @@ configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 configdata.set_quoted('SYSTEM', host_machine.system())
 
-foreach nix_dep : [
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
   dependency('nix-util'),
 ]
-  if nix_dep.type_name() == 'internal'
-    deps_public_subproject += nix_dep
-    # subproject sadly no good for pkg-config module
-    deps_other += nix_dep
-  else
-    deps_public += nix_dep
-  endif
-endforeach
+subdir('meson-utils/subprojects')
 
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
