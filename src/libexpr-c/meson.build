@@ -14,7 +14,7 @@ project('nix-expr-c', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('meson-utils')
+subdir('meson-utils/deps-lists')
 
 configdata = configuration_data()
 

@@ -14,7 +14,7 @@ project('nix-fetchers-test', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('meson-utils')
+subdir('meson-utils/deps-lists')
 
 foreach nix_dep : [
   dependency('nix-util'),
