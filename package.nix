@@ -207,10 +207,7 @@ in {
     libsodium
     openssl
     sqlite
-    (toml11.overrideAttrs (old: {
-      # TODO change in Nixpkgs, Windows works fine.
-      meta.platforms = lib.platforms.all;
-    }))
+    toml11
     xz
     ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [

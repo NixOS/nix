@@ -10,6 +10,7 @@
   stdenv,
   versionSuffix,
 }:
+
 let
   inherit (pkgs) lib;
 
@@ -52,7 +53,7 @@ scope: {
     enableLargeConfig = true;
   };
 
-  # Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
+  # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
   boost = (pkgs.boost.override {
     extraB2Args = [
       "--with-container"
@@ -61,8 +62,8 @@ scope: {
     ];
   }).overrideAttrs (old: {
     # Need to remove `--with-*` to use `--with-libraries=...`
-    buildPhase = pkgs.lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
-    installPhase = pkgs.lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
+    buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
+    installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
   });
 
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
@@ -94,6 +95,12 @@ scope: {
       CONFIG_ASH_PRINTF y
       CONFIG_ASH_TEST y
     '';
+  });
+
+  # TODO change in Nixpkgs, Windows works fine. First commit of
+  # https://github.com/NixOS/nixpkgs/pull/322977 backported will fix.
+  toml11 = pkgs.toml11.overrideAttrs (old: {
+    meta.platforms = lib.platforms.all;
   });
 
   mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
