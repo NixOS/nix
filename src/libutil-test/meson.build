@@ -14,7 +14,7 @@ project('nix-util-test', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('meson-utils/deps-lists')
+subdir('build-utils-meson/deps-lists')
 
 deps_private_maybe_subproject = [
 ]
@@ -23,9 +23,9 @@ deps_public_maybe_subproject = [
   dependency('nix-util-c'),
   dependency('nix-util-test-support'),
 ]
-subdir('meson-utils/subprojects')
+subdir('build-utils-meson/subprojects')
 
-subdir('meson-utils/export-all-symbols')
+subdir('build-utils-meson/export-all-symbols')
 
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
@@ -41,7 +41,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('meson-utils/diagnostics')
+subdir('build-utils-meson/diagnostics')
 
 sources = files(
   'args.cc',

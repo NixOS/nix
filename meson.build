@@ -13,8 +13,8 @@ subproject('libexpr')
 subproject('libflake')
 
 # Docs
-subproject('internal-api-docs')
-subproject('external-api-docs')
+#subproject('internal-api-docs')
+#subproject('external-api-docs')
 
 # C wrappers
 subproject('libutil-c')

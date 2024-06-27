@@ -14,7 +14,7 @@ project('nix-store', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('meson-utils/deps-lists')
+subdir('build-utils-meson/deps-lists')
 
 configdata = configuration_data()
 
@@ -28,7 +28,7 @@ deps_private_maybe_subproject = [
 deps_public_maybe_subproject = [
   dependency('nix-util'),
 ]
-subdir('meson-utils/subprojects')
+subdir('build-utils-meson/subprojects')
 
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
@@ -67,7 +67,7 @@ has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('lremovexattr')
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 
-subdir('meson-utils/threads')
+subdir('build-utils-meson/threads')
 
 boost = dependency(
   'boost',
@@ -153,7 +153,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('meson-utils/diagnostics')
+subdir('build-utils-meson/diagnostics')
 
 sources = files(
   'binary-cache-store.cc',
@@ -385,7 +385,7 @@ foreach name, value : cpp_str_defines
   ]
 endforeach
 
-subdir('meson-utils/export-all-symbols')
+subdir('build-utils-meson/export-all-symbols')
 
 this_library = library(
   'nixstore',
@@ -402,4 +402,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('meson-utils/export')
+subdir('build-utils-meson/export')

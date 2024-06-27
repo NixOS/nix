@@ -14,7 +14,7 @@ project('nix-expr', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('meson-utils/deps-lists')
+subdir('build-utils-meson/deps-lists')
 
 configdata = configuration_data()
 
@@ -25,9 +25,9 @@ deps_public_maybe_subproject = [
   dependency('nix-store'),
   dependency('nix-fetchers'),
 ]
-subdir('meson-utils/subprojects')
+subdir('build-utils-meson/subprojects')
 
-subdir('meson-utils/threads')
+subdir('build-utils-meson/threads')
 
 boost = dependency(
   'boost',
@@ -69,7 +69,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('meson-utils/diagnostics')
+subdir('build-utils-meson/diagnostics')
 
 parser_tab = custom_target(
   input : 'parser.y',
@@ -201,4 +201,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-subdir('meson-utils/export')
+subdir('build-utils-meson/export')

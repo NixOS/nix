@@ -14,7 +14,7 @@ project('nix-util', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-subdir('meson-utils/deps-lists')
+subdir('build-utils-meson/deps-lists')
 
 configdata = configuration_data()
 
@@ -22,7 +22,7 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = [
 ]
-subdir('meson-utils/subprojects')
+subdir('build-utils-meson/subprojects')
 
 # Check for each of these functions, and create a define like `#define
 # HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
@@ -48,7 +48,7 @@ foreach funcspec : check_funcs
   configdata.set(define_name, define_value)
 endforeach
 
-subdir('meson-utils/threads')
+subdir('build-utils-meson/threads')
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
@@ -114,7 +114,7 @@ add_project_arguments(
   language : 'cpp',
 )
 
-subdir('meson-utils/diagnostics')
+subdir('build-utils-meson/diagnostics')
 
 sources = files(
   'archive.cc',
@@ -241,7 +241,7 @@ else
   subdir('unix')
 endif
 
-subdir('meson-utils/export-all-symbols')
+subdir('build-utils-meson/export-all-symbols')
 
 this_library = library(
   'nixutil',
@@ -261,4 +261,4 @@ if host_machine.system() == 'windows'
   libraries_private += ['-lws2_32']
 endif
 
-subdir('meson-utils/export')
+subdir('build-utils-meson/export')
