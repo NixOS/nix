@@ -58,6 +58,7 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME=~root
 
+
 if [ -t 0 ] && [ -z "${NIX_INSTALLER_YES:-}" ]; then
     readonly IS_HEADLESS='no'
 else
@@ -95,6 +96,12 @@ is_os_darwin() {
         return 1
     fi
 }
+
+if [ -d "/nix" ]; then
+    echo "$(tput setaf 1)Error: /nix already exists on your system.$(tput sgr0)"
+    echo "$(tput setaf 2)To remove it, you can use the following command: sudo rm -rf /nix$(tput sgr0)"
+    exit 1
+fi
 
 contact_us() {
     echo "You can open an issue at"
