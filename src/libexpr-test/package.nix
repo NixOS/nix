@@ -6,7 +6,13 @@
 , ninja
 , pkg-config
 
-, nix-util
+, nix-expr
+, nix-expr-c
+, nix-expr-test-support
+
+, rapidcheck
+, gtest
+, runCommand
 
 # Configuration Options
 
@@ -33,17 +39,16 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-util-c";
+  pname = "nix-expr-test";
   inherit version;
 
   src = fileset.toSource {
     root = ./.;
     fileset = fileset.unions [
       ./meson.build
-      ./meson.options
+      # ./meson.options
       (fileset.fileFilter (file: file.hasExt "cc") ./.)
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
-      (fileset.fileFilter (file: file.hasExt "h") ./.)
     ];
   };
 
@@ -55,8 +60,12 @@ mkDerivation (finalAttrs: {
     pkg-config
   ];
 
-  propagatedBuildInputs = [
-    nix-util
+  buildInputs = [
+    nix-expr
+    nix-expr-c
+    nix-expr-test-support
+    rapidcheck
+    gtest
   ];
 
   preConfigure =
@@ -80,6 +89,18 @@ mkDerivation (finalAttrs: {
   strictDeps = !withCoverageChecks;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
+
+  passthru = {
+    tests = {
+      run = runCommand "${finalAttrs.pname}-run" {
+      } ''
+        PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
+        export _NIX_TEST_UNIT_DATA=${./data}
+        nix-expr-test
+        touch $out
+      '';
+    };
+  };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

@@ -56,14 +56,9 @@ mkDerivation (finalAttrs: {
     pkg-config
   ];
 
-  buildInputs = [
-    nix-util
-    rapidcheck
-  ]
-  ;
-
   propagatedBuildInputs = [
     nix-util
+    rapidcheck
   ];
 
   preConfigure =

@@ -6,7 +6,10 @@
 , ninja
 , pkg-config
 
-, nix-util
+, nix-store-test-support
+, nix-expr
+
+, rapidcheck
 
 # Configuration Options
 
@@ -33,17 +36,16 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-util-c";
+  pname = "nix-util-test-support";
   inherit version;
 
   src = fileset.toSource {
     root = ./.;
     fileset = fileset.unions [
       ./meson.build
-      ./meson.options
+      # ./meson.options
       (fileset.fileFilter (file: file.hasExt "cc") ./.)
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
-      (fileset.fileFilter (file: file.hasExt "h") ./.)
     ];
   };
 
@@ -56,7 +58,9 @@ mkDerivation (finalAttrs: {
   ];
 
   propagatedBuildInputs = [
-    nix-util
+    nix-store-test-support
+    nix-expr
+    rapidcheck
   ];
 
   preConfigure =

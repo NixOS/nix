@@ -6,7 +6,8 @@
 , ninja
 , pkg-config
 
-, nix-util
+, nix-store-c
+, nix-expr
 
 # Configuration Options
 
@@ -33,7 +34,7 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-util-c";
+  pname = "nix-expr-c";
   inherit version;
 
   src = fileset.toSource {
@@ -56,7 +57,8 @@ mkDerivation (finalAttrs: {
   ];
 
   propagatedBuildInputs = [
-    nix-util
+    nix-store-c
+    nix-expr
   ];
 
   preConfigure =
