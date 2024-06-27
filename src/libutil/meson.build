@@ -132,13 +132,13 @@ deps_public += nlohmann_json
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-util.h',
+  output : 'config-util.hh',
 )
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.h',
+  '-include', 'config-util.hh',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
   '-Werror=switch',

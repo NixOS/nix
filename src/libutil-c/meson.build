@@ -18,18 +18,59 @@ cxx = meson.get_compiler('cpp')
 deps_private = [ ]
 
 # See note in ../nix-util/meson.build
+deps_private_subproject = [ ]
+
+# See note in ../nix-util/meson.build
 deps_public = [ ]
+
+# See note in ../nix-util/meson.build
+deps_public_subproject = [ ]
 
 # See note in ../nix-util/meson.build
 deps_other = [ ]
 
 configdata = configuration_data()
 
+foreach nix_dep : [
+  dependency('nix-util'),
+]
+  if nix_dep.type_name() == 'internal'
+    deps_private_subproject += nix_dep
+    # subproject sadly no good for pkg-config module
+    deps_other += nix_dep
+  else
+    deps_private += nix_dep
+  endif
+endforeach
+
+foreach nix_dep : [
+]
+  if nix_dep.type_name() == 'internal'
+    deps_public_subproject += nix_dep
+    # subproject sadly no good for pkg-config module
+    deps_other += nix_dep
+  else
+    deps_public += nix_dep
+  endif
+endforeach
+
+# TODO rename, because it will conflict with downstream projects
+configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+
+config_h = configure_file(
+  configuration : configdata,
+  output : 'config-util.h',
+)
+
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
+
+  # From C++ libraries, only for internals
+  '-include', 'config-util.hh',
+
+  # From C libraries, for our public, installed headers too
   '-include', 'config-util.h',
-  # '-include', 'config-store.h',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
   '-Werror=switch',
@@ -52,13 +93,12 @@ sources = files(
 
 include_dirs = [include_directories('.')]
 
-headers = files(
+headers = [config_h] + files(
   'nix_api_util.h',
-  'nix_api_util_internal.h',
 )
 
 if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
-  # Windows DLLs are stricter about symbol visibility than Unix shared
+  # Windows DLLs are stricter ab_subprojectout symbol visibility than Unix shared
   # objects --- see https://gcc.gnu.org/wiki/Visibility for details.
   # This is a temporary sledgehammer to export everything like on Unix,
   # and not detail with this yet.
@@ -68,22 +108,6 @@ if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
 else
   linker_export_flags = []
 endif
-
-nix_util = dependency('nix-util')
-if nix_util.type_name() == 'internal'
-  # subproject sadly no good for pkg-config module
-  deps_other += nix_util
-else
-  deps_public += nix_util
-endif
-
-# TODO rename, because it will conflict with downstream projects
-configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
-
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-util.h',
-)
 
 this_library = library(
   'nixutilc',
@@ -96,7 +120,17 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-libraries_private = []
+requires_private = []
+foreach dep : deps_private_subproject
+  requires_private  += dep.name()
+endforeach
+requires_private += deps_private
+
+requires_public  = []
+foreach dep : deps_public_subproject
+  requires_public  += dep.name()
+endforeach
+requires_public += deps_public
 
 import('pkgconfig').generate(
   this_library,
@@ -105,9 +139,8 @@ import('pkgconfig').generate(
   description : 'Nix Package Manager',
   subdirs : ['nix'],
   extra_cflags : ['-std=c++2a'],
-  requires : deps_public,
-  requires_private : deps_private,
-  libraries_private : libraries_private,
+  requires : requires_public,
+  requires_private : requires_private,
 )
 
 meson.override_dependency(meson.project_name(), declare_dependency(

@@ -18,6 +18,8 @@ subproject('external-api-docs')
 
 # C wrappers
 subproject('libutil-c')
+subproject('libstore-c')
+subproject('libexpr-c')
 
 # Language Bindings
 subproject('perl')
@@ -25,3 +27,8 @@ subproject('perl')
 # Testing
 subproject('libutil-test-support')
 subproject('libutil-test')
+#subproject('libstore-test-support')
+#subproject('libstore-test')
+#subproject('libexpr-test-support')
+#subproject('libexpr-test')
+#subproject('libflake-test')

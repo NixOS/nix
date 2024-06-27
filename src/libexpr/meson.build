@@ -77,16 +77,16 @@ configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-expr.h',
+  output : 'config-expr.hh',
 )
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
+  '-include', 'config-util.hh',
+  '-include', 'config-store.hh',
   # '-include', 'config-fetchers.h',
-  '-include', 'config-expr.h',
+  '-include', 'config-expr.hh',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
   '-Werror=switch',

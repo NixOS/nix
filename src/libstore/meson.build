@@ -162,14 +162,14 @@ endif
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-store.h',
+  output : 'config-store.hh',
 )
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
+  '-include', 'config-util.hh',
+  '-include', 'config-store.hh',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
   '-Werror=switch',

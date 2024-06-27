@@ -48,8 +48,8 @@ deps_public += libgit2
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
+  '-include', 'config-util.hh',
+  '-include', 'config-store.hh',
   # '-include', 'config-fetchers.h',
   '-Wno-deprecated-declarations',
   '-Wimplicit-fallthrough',
