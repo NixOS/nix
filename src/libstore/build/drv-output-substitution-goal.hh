@@ -62,17 +62,16 @@ public:
     typedef void (DrvOutputSubstitutionGoal::*GoalState)();
     GoalState state;
 
-    void init();
-    void tryNext();
-    void realisationFetched();
-    void outPathValid();
-    void finished();
+    Co init() override;
+    Co tryNext();
+    Co realisationFetched();
+    Co outPathValid();
+    Co finished();
 
     void timedOut(Error && ex) override { abort(); };
 
     std::string key() override;
 
-    void work() override;
     void handleEOF(Descriptor fd) override;
 
     JobCategory jobCategory() const override {

@@ -1,9 +1,10 @@
 #pragma once
 ///@file
 
-#include "types.hh"
 #include "store-api.hh"
 #include "build-result.hh"
+
+#include <coroutine>
 
 namespace nix {
 
@@ -98,13 +99,101 @@ struct Goal : public std::enable_shared_from_this<Goal>
      */
     ExitCode exitCode = ecBusy;
 
-protected:
+public:
     /**
      * Build result.
      */
     BuildResult buildResult;
 
-public:
+    /*
+     * Suspend our goal and wait until we get work()-ed again.
+     */
+    struct SuspendGoal {};
+    struct [[nodiscard]] Done {
+        private:
+        Done() {}
+    };
+    struct promise_type;
+    using handle_type = std::coroutine_handle<promise_type>;
+    // FIXME: Allocate explicitly on stack since HALO thing doesn't really work,
+    // specifically, there's no way to uphold the requirements when trying to do
+    // tail-calls without using a trampoline AFAICT.
+    // NOTES:
+    // These are good resources for understanding how coroutines work:
+    // https://lewissbaker.github.io/
+    // https://www.chiark.greenend.org.uk/~sgtatham/quasiblog/coroutines-c++20/
+    // https://www.scs.stanford.edu/~dm/blog/c++-coroutines.html
+    struct [[nodiscard]] Co {
+        handle_type handle;
+        explicit Co(handle_type handle) : handle(handle) {};
+        Co(const Co&) = delete;
+        Co &operator=(const Co&) = delete;
+        void operator=(Co&&);
+        Co(Co&& rhs);
+        ~Co();
+
+        bool await_ready() { return false; };
+        std::coroutine_handle<> await_suspend(handle_type handle);
+        void await_resume() {};
+
+    };
+    struct promise_type {
+        ~promise_type() {
+            goal.trace(fmt("destroying promise %p for %s", this, loc.function_name()));
+        }
+        // Either this is who called us, or it is who we will tail-call.
+        // It is what we "jump" to once we are done.
+        std::optional<Co> continuation;
+        Goal& goal;
+        std::source_location loc;
+        bool alive = true;
+
+        promise_type(Goal& goal, std::source_location loc = std::source_location::current()) : goal(goal), loc(loc) {
+            goal.trace(fmt("creating promise %p for %s", this, loc.function_name()));
+        };
+
+        struct final_awaiter {
+            bool await_ready() noexcept { return false; };;
+            std::coroutine_handle<> await_suspend(handle_type) noexcept;
+            void await_resume() noexcept { assert(false); };
+        };
+        Co get_return_object();
+        std::suspend_always initial_suspend() { 
+            // top_co isn't set to us yet,
+            // we've merely constructed the frame and now the
+            // caller is free to do whatever they wish to us.
+            goal.trace(fmt("suspend promise %p for %s", this, loc.function_name()));
+            return {};
+        };
+        final_awaiter final_suspend() noexcept { return {}; };
+        // Same as returning void, but makes it clear that we're done.
+        // Should ideally call `done` rather than `done` giving you a `Done`.
+        // `final_suspend` will be called after this (since we're returning),
+        // and that will give us a `final_awaiter`, which will stop the coroutine
+        // from executing since `exitCode != ecBusy`.
+        void return_value(Done) {
+            assert(goal.exitCode != ecBusy);
+        }
+        void return_value(Co&&);
+        void unhandled_exception() { throw; };
+
+        Co&& await_transform(Co&& co) { return static_cast<Co&&>(co); }
+        std::suspend_always await_transform(SuspendGoal) { return {}; };
+    };
+    /**
+     * The coroutine being currently executed.
+     * You MUST update this when switching the coroutine being executed!
+     * This is used both for memory management and to resume the last
+     * coroutine executed.
+     */
+    std::optional<Co> top_co;
+
+    virtual Co init() = 0;
+    inline Co init_wrapper();
+
+    Done amDone(ExitCode result, std::optional<Error> ex = {});
+
+    virtual void cleanup() { }
 
     /**
      * Project a `BuildResult` with just the information that pertains
@@ -124,7 +213,7 @@ public:
     std::optional<Error> ex;
 
     Goal(Worker & worker, DerivedPath path)
-        : worker(worker)
+        : worker(worker), top_co(init_wrapper())
     { }
 
     virtual ~Goal()
@@ -132,7 +221,7 @@ public:
         trace("goal destroyed");
     }
 
-    virtual void work() = 0;
+    void work();
 
     void addWaitee(GoalPtr waitee);
 
@@ -164,10 +253,6 @@ public:
 
     virtual std::string key() = 0;
 
-    void amDone(ExitCode result, std::optional<Error> ex = {});
-
-    virtual void cleanup() { }
-
     /**
      * @brief Hint for the scheduler, which concurrency limit applies.
      * @see JobCategory
@@ -177,4 +262,13 @@ public:
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);
 
+}
+
+template<typename... ArgTypes>
+struct std::coroutine_traits<nix::Goal::Co, ArgTypes...> {
+    using promise_type = nix::Goal::promise_type;
+};
+
+nix::Goal::Co nix::Goal::init_wrapper() {
+    co_return init();
 }
