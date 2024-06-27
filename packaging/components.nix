@@ -27,23 +27,6 @@ in
   nix-expr-c = callPackage ../src/libexpr-c/package.nix { };
 
   nix-flake = callPackage ../src/libflake/package.nix { };
-  nix-flake-c = callPackage ../src/libflake-c/package.nix { };
-
-  nix-store = callPackage ../src/libstore/package.nix { };
-  nix-store-test-support = callPackage ../src/libstore-test-support/package.nix { };
-  nix-store-test = callPackage ../src/libstore-test/package.nix { };
-  nix-store-c = callPackage ../src/libstore-c/package.nix { };
-
-  nix-fetchers = callPackage ../src/libfetchers/package.nix { };
-  nix-fetchers-test = callPackage ../src/libfetchers-test/package.nix { };
-  nix-fetchers-c = callPackage ../src/libfetchers-c/package.nix { };
-
-  nix-expr = callPackage ../src/libexpr/package.nix { };
-  nix-expr-test-support = callPackage ../src/libexpr-test-support/package.nix { };
-  nix-expr-test = callPackage ../src/libexpr-test/package.nix { };
-  nix-expr-c = callPackage ../src/libexpr-c/package.nix { };
-
-  nix-flake = callPackage ../src/libflake/package.nix { };
 
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { };
 

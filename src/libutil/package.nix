@@ -65,7 +65,6 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   buildInputs = [
-    boost
     brotli
     libsodium
     openssl
@@ -73,37 +72,17 @@ mkMesonDerivation (finalAttrs: {
   ;
 
   propagatedBuildInputs = [
-    boost.dev
+    boost
     libarchive
     nlohmann_json
   ];
-
-  disallowedReferences = [ boost ];
 
   preConfigure =
     # TODO: change release process to add `pre` in `.version`, remove it before tagging, and restore after.
     ''
       chmod u+w ./.version
       echo ${version} > ../../.version
-    ''
-    # Copy some boost libraries so we don't get all of Boost in our
-    # closure. https://github.com/NixOS/nixpkgs/issues/45462
-    + lib.optionalString (!stdenv.hostPlatform.isStatic) (''
-      mkdir -p $out/lib
-      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
-      rm -f $out/lib/*.a
-    '' + lib.optionalString stdenv.hostPlatform.isLinux ''
-      chmod u+w $out/lib/*.so.*
-      patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
-    '' + lib.optionalString stdenv.hostPlatform.isDarwin ''
-      for LIB in $out/lib/*.dylib; do
-        chmod u+w $LIB
-        install_name_tool -id $LIB $LIB
-        install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
-      done
-      install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
-    ''
-  );
+    '';
 
   mesonFlags = [
     (lib.mesonEnable "cpuid" stdenv.hostPlatform.isx86_64)
@@ -119,20 +98,6 @@ mkMesonDerivation (finalAttrs: {
   };
 
   enableParallelBuilding = true;
-
-  postInstall =
-    # Remove absolute path to boost libs that ends up in `Libs.private`
-    # by default, and would clash with out `disallowedReferences`. Part
-    # of the https://github.com/NixOS/nixpkgs/issues/45462 workaround.
-    ''
-      sed -i "$out/lib/pkgconfig/nix-util.pc" -e 's, ${lib.getLib boost}[^ ]*,,g'
-    ''
-    + lib.optionalString stdenv.isDarwin ''
-      install_name_tool \
-      -change ${boost}/lib/libboost_context.dylib \
-      $out/lib/libboost_context.dylib \
-      $out/lib/libnixutil.dylib
-    '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 

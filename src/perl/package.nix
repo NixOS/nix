@@ -6,11 +6,6 @@
 , ninja
 , pkg-config
 , nix-store
-, curl
-, bzip2
-, xz
-, boost
-, libsodium
 , darwin
 , versionSuffix ? ""
 }:
@@ -45,14 +40,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
 
   buildInputs = [
     nix-store
-    curl
-    bzip2
-    xz
-    perl
-    boost
-  ]
-  ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
-  ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
+  ];
 
   # `perlPackages.Test2Harness` is marked broken for Darwin
   doCheck = !stdenv.isDarwin;

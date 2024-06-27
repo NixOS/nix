@@ -400,6 +400,6 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-libraries_private = ['-lboost_container']
+libraries_private = []
 
 subdir('meson-utils/export')

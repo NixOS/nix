@@ -52,6 +52,19 @@ scope: {
     enableLargeConfig = true;
   };
 
+  # Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
+  boost = (pkgs.boost.override {
+    extraB2Args = [
+      "--with-container"
+      "--with-context"
+      "--with-coroutine"
+    ];
+  }).overrideAttrs (old: {
+    # Need to remove `--with-*` to use `--with-libraries=...`
+    buildPhase = pkgs.lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
+    installPhase = pkgs.lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
+  });
+
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
     src = inputs.libgit2;
     version = inputs.libgit2.lastModifiedDate;

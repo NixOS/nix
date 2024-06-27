@@ -70,18 +70,13 @@ mkDerivation (finalAttrs: {
     pkg-config
   ];
 
-  buildInputs = [
-    boost
-  ];
-
   propagatedBuildInputs = [
     nix-util
     nix-store
     nix-fetchers
+    boost
     nlohmann_json
   ] ++ lib.optional enableGC boehmgc;
-
-  disallowedReferences = [ boost ];
 
   preConfigure =
     # "Inline" .version so it's not a symlink, and includes the suffix
@@ -103,14 +98,6 @@ mkDerivation (finalAttrs: {
   };
 
   enableParallelBuilding = true;
-
-  postInstall =
-    # Remove absolute path to boost libs that ends up in `Libs.private`
-    # by default, and would clash with out `disallowedReferences`. Part
-    # of the https://github.com/NixOS/nixpkgs/issues/45462 workaround.
-    ''
-      sed -i "$out/lib/pkgconfig/nix-expr.pc" -e 's, ${lib.getLib boost}[^ ]*,,g'
-    '';
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 

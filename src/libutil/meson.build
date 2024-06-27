@@ -254,12 +254,7 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-# Part of how we copy boost libraries to a separate installation to
-# reduce closure size. These libraries will be copied to our `$out/bin`,
-# and these `-l` flags will pick them up there.
-#
-# https://github.com/NixOS/nixpkgs/issues/45462
-libraries_private = ['-lboost_context', '-lboost_coroutine']
+libraries_private = []
 if host_machine.system() == 'windows'
   # `libraries_private` cannot contain ad-hoc dependencies (from
   # `find_library), so we need to do this manually
