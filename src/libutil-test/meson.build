@@ -17,11 +17,11 @@ cxx = meson.get_compiler('cpp')
 subdir('build-utils-meson/deps-lists')
 
 deps_private_maybe_subproject = [
-]
-deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-util-c'),
   dependency('nix-util-test-support'),
+]
+deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 

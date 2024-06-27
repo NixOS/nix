@@ -17,15 +17,10 @@ cxx = meson.get_compiler('cpp')
 subdir('build-utils-meson/deps-lists')
 
 deps_private_maybe_subproject = [
-]
-deps_public_maybe_subproject = [
-  dependency('nix-util'),
-  dependency('nix-util-c'),
-  dependency('nix-util-test-support'),
-  dependency('nix-store'),
-  dependency('nix-store-c'),
   dependency('nix-store-test-support'),
   dependency('nix-fetchers'),
+]
+deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
@@ -43,8 +38,6 @@ add_project_arguments(
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
   '-include', 'config-store.hh',
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
   language : 'cpp',
 )
 

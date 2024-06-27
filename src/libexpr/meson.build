@@ -55,6 +55,9 @@ if bdw_gc.found()
 endif
 configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 
+toml11 = dependency('toml11', version : '>=3.7.0', method : 'cmake')
+deps_other += toml11
+
 config_h = configure_file(
   configuration : configdata,
   output : 'config-expr.hh',
@@ -117,8 +120,7 @@ generated_headers = []
 foreach header : [
   'imported-drv-to-derivation.nix',
   'fetchurl.nix',
-  'flake/call-flake.nix',
-  'primops/derivation.nix',
+  'call-flake.nix',
 ]
   generated_headers += custom_target(
     command : [ 'bash', '-c', '{ echo \'R"__NIX_STR(\' && cat @INPUT@ && echo \')__NIX_STR"\'; } > "$1"', '_ignored_argv0', '@OUTPUT@' ],
@@ -142,11 +144,6 @@ sources = files(
   'nixexpr.cc',
   'paths.cc',
   'primops.cc',
-  'primops/context.cc',
-  'primops/fetchClosure.cc',
-  'primops/fetchMercurial.cc',
-  'primops/fetchTree.cc',
-  'primops/fromTOML.cc',
   'print-ambiguous.cc',
   'print.cc',
   'search-path.cc',
@@ -186,6 +183,8 @@ headers = [config_h] + files(
   'value.hh',
   'value/context.hh',
 )
+
+subdir('primops')
 
 this_library = library(
   'nixexpr',

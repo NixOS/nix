@@ -30,7 +30,7 @@ nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
 libgit2 = dependency('libgit2')
-deps_public += libgit2
+deps_private += libgit2
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.

@@ -79,9 +79,11 @@ mkMesonDerivation (finalAttrs: {
 
   preConfigure =
     # TODO: change release process to add `pre` in `.version`, remove it before tagging, and restore after.
+    # Do the meson utils, without modification.
     ''
       chmod u+w ./.version
       echo ${version} > ../../.version
+      cp -r ${../../build-utils-meson} build-utils-meson
     '';
 
   mesonFlags = [

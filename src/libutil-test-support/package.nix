@@ -62,9 +62,11 @@ mkDerivation (finalAttrs: {
   ];
 
   preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix
+    # "Inline" .version so it's not a symlink, and includes the suffix.
+    # Do the meson utils, without modification.
     ''
       echo ${version} > .version
+      cp -r ${../../build-utils-meson} build-utils-meson
     '';
 
   mesonFlags = [

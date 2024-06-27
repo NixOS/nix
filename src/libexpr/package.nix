@@ -5,6 +5,9 @@
 , meson
 , ninja
 , pkg-config
+, bison
+, flex
+, cmake # for resolving toml11 dep
 
 , nix-util
 , nix-store
@@ -12,6 +15,7 @@
 , boost
 , boehmgc
 , nlohmann_json
+, toml11
 
 # Configuration Options
 
@@ -57,8 +61,12 @@ mkDerivation (finalAttrs: {
     fileset = fileset.unions [
       ./meson.build
       ./meson.options
+      ./primops/meson.build
       (fileset.fileFilter (file: file.hasExt "cc") ./.)
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
+      ./lexer.l
+      ./parser.y
+      (fileset.fileFilter (file: file.hasExt "nix") ./.)
     ];
   };
 
@@ -68,6 +76,13 @@ mkDerivation (finalAttrs: {
     meson
     ninja
     pkg-config
+    bison
+    flex
+    cmake
+  ];
+
+  buildInputs = [
+    toml11
   ];
 
   propagatedBuildInputs = [
@@ -79,9 +94,11 @@ mkDerivation (finalAttrs: {
   ] ++ lib.optional enableGC boehmgc;
 
   preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix
+    # "Inline" .version so it's not a symlink, and includes the suffix.
+    # Do the meson utils, without modification.
     ''
       echo ${version} > .version
+      cp -r ${../../build-utils-meson} build-utils-meson
     '';
 
   mesonFlags = [
