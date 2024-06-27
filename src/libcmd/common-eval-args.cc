@@ -15,7 +15,20 @@
 namespace nix {
 
 EvalSettings evalSettings {
-    settings.readOnlyMode
+    settings.readOnlyMode,
+    {
+        {
+            "flake",
+            [](ref<Store> store, std::string_view rest) {
+                experimentalFeatureSettings.require(Xp::Flakes);
+                // FIXME `parseFlakeRef` should take a `std::string_view`.
+                auto flakeRef = parseFlakeRef(std::string { rest }, {}, true, false);
+                debug("fetching flake search path element '%s''", rest);
+                auto storePath = flakeRef.resolve(store).fetchTree(store).first;
+                return store->toRealPath(storePath);
+            },
+        },
+    },
 };
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);

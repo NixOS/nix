@@ -18,6 +18,7 @@ makefiles = \
   src/libfetchers/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
+  src/libflake/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
   src/libutil-c/local.mk \
@@ -45,7 +46,8 @@ makefiles += \
   tests/unit/libstore-support/local.mk \
   tests/unit/libfetchers/local.mk \
   tests/unit/libexpr/local.mk \
-  tests/unit/libexpr-support/local.mk
+  tests/unit/libexpr-support/local.mk \
+  tests/unit/libflake/local.mk
 endif
 
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
