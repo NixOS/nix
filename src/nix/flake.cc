@@ -1243,25 +1243,30 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
+                    std::optional<std::string> description;
+                    if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
+                        if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
+                            description = aDescription->getString();
+                    }
+                    
                     if (json) {
-                        std::optional<std::string> description;
-                        if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
-                            if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
-                                description = aDescription->getString();
-                        }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
                         if (description)
                             j.emplace("description", *description);
                     } else {
-                        logger->cout("%s: %s '%s'",
-                            headerPrefix,
+                        auto type =
                             attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
                             attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
                             attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
-                            "package",
-                            name);
+                            "package";
+                        if (description) {
+                            logger->cout("%s: %s '%s' - '%s'", headerPrefix, type, name, *description);
+                        }
+                        else {
+                            logger->cout("%s: %s '%s'", headerPrefix, type, name);
+                        }
                     }
                 };
 
