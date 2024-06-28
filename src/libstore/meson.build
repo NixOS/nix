@@ -396,6 +396,7 @@ this_library = library(
   include_directories : include_dirs,
   cpp_args : cpp_args,
   link_args: linker_export_flags,
+  prelink : true, # For C++ static initializers
   install : true,
 )
 

@@ -193,6 +193,7 @@ this_library = library(
   lexer_tab,
   generated_headers,
   dependencies : deps_public + deps_private + deps_other,
+  prelink : true, # For C++ static initializers
   install : true,
 )
 
