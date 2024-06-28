@@ -5,6 +5,7 @@
 , meson
 , ninja
 , pkg-config
+, unixtools
 
 , nix-util
 , boost
@@ -19,6 +20,8 @@
 # Configuration Options
 
 , versionSuffix ? ""
+
+, embeddedSandboxShell ? stdenv.hostPlatform.isStatic
 
 # Check test coverage of Nix. Probably want to use with at least
 # one of `doCheck` or `doInstallCheck` enabled.
@@ -66,7 +69,7 @@ mkDerivation (finalAttrs: {
     meson
     ninja
     pkg-config
-  ];
+  ] ++ lib.optional embeddedSandboxShell unixtools.hexdump;
 
   buildInputs = [
     boost
@@ -96,7 +99,7 @@ mkDerivation (finalAttrs: {
 
   mesonFlags = [
     (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
-    (lib.mesonBool "embedded-sandbox-shell" stdenv.hostPlatform.isStatic)
+    (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
   ] ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
   ];

@@ -99,15 +99,6 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-
-enable_embedded_sandbox_shell = get_option('embedded-sandbox-shell')
-if enable_embedded_sandbox_shell
-  # This one goes in config.h
-  # The path to busybox is passed as a -D flag when compiling this_library.
-  # Idk why, ask the old buildsystem.
-  configdata.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
-endif
-
 generated_headers = []
 foreach header : [
   'schema.sql',
@@ -122,7 +113,13 @@ foreach header : [
   )
 endforeach
 
-if enable_embedded_sandbox_shell
+busybox = find_program(get_option('sandbox-shell'), required : false)
+
+if get_option('embedded-sandbox-shell')
+  # This one goes in config.h
+  # The path to busybox is passed as a -D flag when compiling this_library.
+  # Idk why, ask the old buildsystem.
+  configdata.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(
     'embedded-sandbox-shell.gen.hh',
@@ -371,11 +368,15 @@ cpp_str_defines += {
   'LSOF': lsof_path
 }
 
-#if busybox.found()
+if get_option('embedded-sandbox-shell')
   cpp_str_defines += {
-#    'SANDBOX_SHELL': busybox.full_path()
+    'SANDBOX_SHELL': '__embedded_sandbox_shell__'
   }
-#endif
+elif busybox.found()
+  cpp_str_defines += {
+    'SANDBOX_SHELL': busybox.full_path()
+  }
+endif
 
 cpp_args = []
 

@@ -33,7 +33,7 @@
 , rapidcheck
 , sqlite
 , toml11
-, util-linux
+, unixtools
 , xz
 
 , busybox-sandbox-shell ? null
@@ -195,7 +195,7 @@ in {
     man # for testing `nix-* --help`
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
-  ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
+  ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
   ;
 
   buildInputs = lib.optionals doBuild [
