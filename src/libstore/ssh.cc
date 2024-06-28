@@ -194,4 +194,14 @@ Path SSHMaster::startMaster()
 
 #endif
 
+void SSHMaster::Connection::trySetBufferSize(size_t size)
+{
+#ifdef F_SETPIPE_SZ
+    // convert type
+    int pipesize = size;
+    fcntl(in.get(), F_SETPIPE_SZ, pipesize);
+    fcntl(out.get(), F_SETPIPE_SZ, pipesize);
+#endif
+}
+
 }
