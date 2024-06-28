@@ -37,12 +37,12 @@ struct FlakeSettings : public Config
     Setting<std::string> commitLockFileSummary{
         this,
         "",
-        "commit-lockfile-summary",
+        "commit-lock-file-summary",
         R"(
           The commit summary to use when committing changed flake lock files. If
           empty, the summary is generated based on the action performed.
         )",
-        {},
+        {"commit-lockfile-summary"},
         true,
         Xp::Flakes};
 };
