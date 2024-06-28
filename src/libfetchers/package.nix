@@ -38,7 +38,7 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-flake";
+  pname = "nix-fetchers";
   inherit version;
 
   src = fileset.toSource {
