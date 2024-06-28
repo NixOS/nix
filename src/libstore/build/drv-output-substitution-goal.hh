@@ -28,30 +28,6 @@ class DrvOutputSubstitutionGoal : public Goal {
     DrvOutput id;
 
     /**
-     * The realisation corresponding to the given output id.
-     * Will be filled once we can get it.
-     */
-    std::shared_ptr<const Realisation> outputInfo;
-
-    /**
-     * The remaining substituters.
-     */
-    std::list<ref<Store>> subs;
-
-    /**
-     * The current substituter.
-     */
-    std::shared_ptr<Store> sub;
-
-    struct DownloadState
-    {
-        MuxablePipe outPipe;
-        std::promise<std::shared_ptr<const Realisation>> promise;
-    };
-
-    std::shared_ptr<DownloadState> downloadState;
-
-    /**
      * Whether a substituter failed.
      */
     bool substituterFailed = false;
@@ -63,10 +39,7 @@ public:
     GoalState state;
 
     Co init() override;
-    Co tryNext();
-    Co realisationFetched();
-    Co outPathValid();
-    Co finished();
+    Co realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
     void timedOut(Error && ex) override { abort(); };
 

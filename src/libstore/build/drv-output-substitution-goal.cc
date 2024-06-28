@@ -28,112 +28,108 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         co_return amDone(ecSuccess);
     }
 
-    subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
-    co_return tryNext();
-}
+    auto subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
-Goal::Co DrvOutputSubstitutionGoal::tryNext()
-{
-    trace("trying next substituter");
+    for (auto sub : subs) {
+        trace("trying next substituter");
 
-    if (subs.size() == 0) {
-        /* None left.  Terminate this goal and let someone else deal
-           with it. */
-        debug("derivation output '%s' is required, but there is no substituter that can provide it", id.to_string());
+        /* The callback of the curl download below can outlive `this` (if
+           some other error occurs), so it must not touch `this`. So put
+           the shared state in a separate refcounted object. */
+        std::shared_ptr<MuxablePipe> outPipe;
+    #ifndef _WIN32
+        outPipe->create();
+    #else
+        outPipe->createAsyncPipe(worker.ioport.get());
+    #endif
 
-        if (substituterFailed) {
-            worker.failedSubstitutions++;
-            worker.updateProgress();
+        std::shared_ptr<std::promise<std::shared_ptr<const Realisation>>> promise;
+
+        sub->queryRealisation(
+            id,
+            { [outPipe(outPipe), promise(promise)](std::future<std::shared_ptr<const Realisation>> res) {
+                try {
+                    Finally updateStats([&]() { outPipe->writeSide.close(); });
+                    promise->set_value(res.get());
+                } catch (...) {
+                    promise->set_exception(std::current_exception());
+                }
+            } });
+
+        worker.childStarted(shared_from_this(), {
+    #ifndef _WIN32
+            outPipe->readSide.get()
+    #else
+            &outPipe
+    #endif
+        }, true, false);
+
+        co_await SuspendGoal{};
+
+        worker.childTerminated(this);
+
+        /*
+         * The realisation corresponding to the given output id.
+         * Will be filled once we can get it.
+         */
+        std::shared_ptr<const Realisation> outputInfo;
+
+        try {
+            outputInfo = promise->get_future().get();
+        } catch (std::exception & e) {
+            printError(e.what());
+            substituterFailed = true;
         }
 
-        /* Hack: don't indicate failure if there were no substituters.
-           In that case the calling derivation should just do a
-           build. */
-        co_return amDone(substituterFailed ? ecFailed : ecNoSubstituters);
+        if (!outputInfo) continue;
+
+        bool failed = false;
+
+        for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
+            if (depId != id) {
+                if (auto localOutputInfo = worker.store.queryRealisation(depId);
+                    localOutputInfo && localOutputInfo->outPath != depPath) {
+                    warn(
+                        "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
+                        "Local:  %s\n"
+                        "Remote: %s",
+                        sub->getUri(),
+                        depId.to_string(),
+                        worker.store.printStorePath(localOutputInfo->outPath),
+                        worker.store.printStorePath(depPath)
+                    );
+                    failed = true;
+                    break;
+                }
+                addWaitee(worker.makeDrvOutputSubstitutionGoal(depId));
+            }
+        }
+
+        if (failed) continue;
+
+        co_return realisationFetched(outputInfo, sub);
     }
 
-    sub = subs.front();
-    subs.pop_front();
+    /* None left.  Terminate this goal and let someone else deal
+       with it. */
+    debug("derivation output '%s' is required, but there is no substituter that can provide it", id.to_string());
 
-    // FIXME: Make async
-    // outputInfo = sub->queryRealisation(id);
+    if (substituterFailed) {
+        worker.failedSubstitutions++;
+        worker.updateProgress();
+    }
 
-    /* The callback of the curl download below can outlive `this` (if
-       some other error occurs), so it must not touch `this`. So put
-       the shared state in a separate refcounted object. */
-    downloadState = std::make_shared<DownloadState>();
-#ifndef _WIN32
-    downloadState->outPipe.create();
-#else
-    downloadState->outPipe.createAsyncPipe(worker.ioport.get());
-#endif
-
-    sub->queryRealisation(
-        id,
-        { [downloadState(downloadState)](std::future<std::shared_ptr<const Realisation>> res) {
-            try {
-                Finally updateStats([&]() { downloadState->outPipe.writeSide.close(); });
-                downloadState->promise.set_value(res.get());
-            } catch (...) {
-                downloadState->promise.set_exception(std::current_exception());
-            }
-        } });
-
-    worker.childStarted(shared_from_this(), {
-#ifndef _WIN32
-        downloadState->outPipe.readSide.get()
-#else
-        &downloadState->outPipe
-#endif
-    }, true, false);
-
-    co_await SuspendGoal{};
-    co_return realisationFetched();
+    /* Hack: don't indicate failure if there were no substituters.
+       In that case the calling derivation should just do a
+       build. */
+    co_return amDone(substituterFailed ? ecFailed : ecNoSubstituters);
 }
 
-Goal::Co DrvOutputSubstitutionGoal::realisationFetched()
-{
-    worker.childTerminated(this);
-
-    try {
-        outputInfo = downloadState->promise.get_future().get();
-    } catch (std::exception & e) {
-        printError(e.what());
-        substituterFailed = true;
-    }
-
-    if (!outputInfo) {
-        co_return tryNext();
-    }
-
-    for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
-        if (depId != id) {
-            if (auto localOutputInfo = worker.store.queryRealisation(depId);
-                localOutputInfo && localOutputInfo->outPath != depPath) {
-                warn(
-                    "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
-                    "Local:  %s\n"
-                    "Remote: %s",
-                    sub->getUri(),
-                    depId.to_string(),
-                    worker.store.printStorePath(localOutputInfo->outPath),
-                    worker.store.printStorePath(depPath)
-                );
-                co_return tryNext();
-            }
-            addWaitee(worker.makeDrvOutputSubstitutionGoal(depId));
-        }
-    }
-
+Goal::Co DrvOutputSubstitutionGoal::realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub) {
     addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
     if (!waitees.empty()) co_await SuspendGoal{};
-    co_return outPathValid();
-}
 
-Goal::Co DrvOutputSubstitutionGoal::outPathValid()
-{
-    assert(outputInfo);
     trace("output path substituted");
 
     if (nrFailed > 0) {
@@ -142,11 +138,7 @@ Goal::Co DrvOutputSubstitutionGoal::outPathValid()
     }
 
     worker.store.registerDrvOutput(*outputInfo);
-    co_return finished();
-}
 
-Goal::Co DrvOutputSubstitutionGoal::finished()
-{
     trace("finished");
     co_return amDone(ecSuccess);
 }
@@ -160,7 +152,7 @@ std::string DrvOutputSubstitutionGoal::key()
 
 void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)
 {
-    if (fd == downloadState->outPipe.readSide.get()) worker.wakeUp(shared_from_this());
+    worker.wakeUp(shared_from_this());
 }
 
 
