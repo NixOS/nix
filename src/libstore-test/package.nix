@@ -9,6 +9,7 @@
 , nix-store
 , nix-store-c
 , nix-store-test-support
+, sqlite
 
 , rapidcheck
 , gtest
@@ -64,6 +65,7 @@ mkDerivation (finalAttrs: {
     nix-store
     nix-store-c
     nix-store-test-support
+    sqlite
     rapidcheck
     gtest
   ];
@@ -94,10 +96,15 @@ mkDerivation (finalAttrs: {
 
   passthru = {
     tests = {
-      run = runCommand "${finalAttrs.pname}-run" {
-      } ''
+      run = let
+        # Inline some drv files shared with the libexpr tests
+        data = runCommand "${finalAttrs.pname}-test-data" {} ''
+          cp -r --no-preserve=mode ${./data} $out
+          cp -r --remove-destination ${../../tests/functional/derivation}/* $out/derivation/
+        '';
+      in runCommand "${finalAttrs.pname}-run" {} ''
         PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
-        export _NIX_TEST_UNIT_DATA=${./data}
+        export _NIX_TEST_UNIT_DATA=${data}
         nix-store-test
         touch $out
       '';

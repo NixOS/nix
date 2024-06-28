@@ -61,6 +61,9 @@ headers = [config_h] + files(
   'nix_api_store.h',
 )
 
+# TODO don't install this once tests don't use it.
+headers += files('nix_api_store_internal.h')
+
 subdir('build-utils-meson/export-all-symbols')
 
 this_library = library(
