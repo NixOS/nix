@@ -681,6 +681,7 @@ Goal::Co DerivationGoal::tryToBuild()
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
+        co_await SuspendGoal{};
         co_return tryToBuild();
     }
 
