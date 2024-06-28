@@ -20,7 +20,6 @@ Co::~Co() {
     std::clog << "destroying coroutine" << std::endl;
     if (handle) {
         assert(handle);
-        std::clog << "destroying coroutine for " << handle.promise().loc.function_name() << std::endl;
         handle.promise().alive = false;
         // assert(handle.done());
         handle.destroy();
@@ -53,7 +52,6 @@ std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h
         assert(c);
         auto& goal = p.goal;
         goal.top_co = std::move(c);
-        goal.trace(fmt("jumping to %s", goal.top_co->handle.promise().loc.function_name()));
         return goal.top_co->handle;
     // we are done, give control back to caller of top_co.resume()
     } else {

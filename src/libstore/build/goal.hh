@@ -109,6 +109,12 @@ public:
      * Suspend our goal and wait until we get work()-ed again.
      */
     struct SuspendGoal {};
+    struct SuspendGoalAwaiter {
+        bool wait;
+        bool await_ready() { return !wait; }
+        void await_suspend(std::coroutine_handle<> handle) {}
+        void await_resume() {}
+    };
     struct [[nodiscard]] Done {
         private:
         Done() {}
@@ -135,22 +141,16 @@ public:
         bool await_ready() { return false; };
         std::coroutine_handle<> await_suspend(handle_type handle);
         void await_resume() {};
-
     };
     struct promise_type {
-        ~promise_type() {
-            goal.trace(fmt("destroying promise %p for %s", this, loc.function_name()));
-        }
         // Either this is who called us, or it is who we will tail-call.
         // It is what we "jump" to once we are done.
         std::optional<Co> continuation;
         Goal& goal;
-        std::source_location loc;
         bool alive = true;
 
-        promise_type(Goal& goal, std::source_location loc = std::source_location::current()) : goal(goal), loc(loc) {
-            goal.trace(fmt("creating promise %p for %s", this, loc.function_name()));
-        };
+        template<typename... ArgTypes>
+        promise_type(Goal& goal, ArgTypes...) : goal(goal) {}
 
         struct final_awaiter {
             bool await_ready() noexcept { return false; };;
@@ -162,7 +162,6 @@ public:
             // top_co isn't set to us yet,
             // we've merely constructed the frame and now the
             // caller is free to do whatever they wish to us.
-            goal.trace(fmt("suspend promise %p for %s", this, loc.function_name()));
             return {};
         };
         final_awaiter final_suspend() noexcept { return {}; };
@@ -178,7 +177,9 @@ public:
         void unhandled_exception() { throw; };
 
         Co&& await_transform(Co&& co) { return static_cast<Co&&>(co); }
-        std::suspend_always await_transform(SuspendGoal) { return {}; };
+        // FIXME: maybe only await when there are children
+        // SuspendGoalAwaiter await_transform(SuspendGoal) { return SuspendGoalAwaiter{!goal.waitees.empty()}; };
+        SuspendGoalAwaiter await_transform(SuspendGoal) { return SuspendGoalAwaiter{true}; };
     };
     /**
      * The coroutine being currently executed.
