@@ -29,7 +29,7 @@
 
 [string]: ./values.md#type-string
 [path]: ./values.md#type-path
-[number]: ./values.md#type-number
+[number]: ./values.md#type-float <!-- TODO(@rhendric, #10970): rationalize this -->
 [list]: ./values.md#list
 [attribute set]: ./values.md#attribute-set
 

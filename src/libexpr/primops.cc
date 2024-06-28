@@ -732,7 +732,8 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
       Each attribute set in the list `startSet` and the list returned by `operator` must have an attribute `key`, which must support equality comparison.
       The value of `key` can be one of the following types:
 
-      - [Number](@docroot@/language/values.md#type-number)
+      - [Int](@docroot@/language/values.md#type-int)
+      - [Float](@docroot@/language/values.md#type-float)
       - [Boolean](@docroot@/language/values.md#type-boolean)
       - [String](@docroot@/language/values.md#type-string)
       - [Path](@docroot@/language/values.md#type-path)
