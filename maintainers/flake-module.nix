@@ -15,7 +15,7 @@
           excludes = [
             # We don't want to format test data
             # ''tests/(?!nixos/).*\.nix''
-            ''^src/[^/]*-test/data/.*$''
+            ''^src/[^/]*-tests/data/.*$''
 
             # Don't format vendored code
             ''^doc/manual/redirects\.js$''
