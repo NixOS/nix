@@ -24,7 +24,7 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 }
 
 
-PathSubstitutionGoal::Done PathSubstitutionGoal::done(
+Goal::Co PathSubstitutionGoal::done(
     ExitCode result,
     BuildResult::Status status,
     std::optional<std::string> errorMsg)

@@ -1520,7 +1520,7 @@ SingleDrvOutputs DerivationGoal::assertPathValidity()
 }
 
 
-Goal::Done DerivationGoal::done(
+Goal::Co DerivationGoal::done(
     BuildResult::Status status,
     SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
