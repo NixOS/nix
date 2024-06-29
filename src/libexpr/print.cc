@@ -278,7 +278,7 @@ private:
             storePath = state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation");
         }
 
-        /* This unforutately breaks printing nested values because of
+        /* This unfortunately breaks printing nested values because of
            how the pretty printer is used (when pretting printing and warning
            to same terminal / std stream). */
 #if 0

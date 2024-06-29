@@ -250,4 +250,35 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const StoreDirConfig & 
     }
 }
 
+
+WorkerProto::ClientHandshakeInfo WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    WorkerProto::ClientHandshakeInfo res;
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 33) {
+        res.daemonNixVersion = readString(conn.from);
+    }
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 35) {
+        res.remoteTrustsUs = WorkerProto::Serialise<std::optional<    TrustedFlag>>::read(store, conn);
+    } else {
+        // We don't know the answer; protocol to old.
+        res.remoteTrustsUs = std::nullopt;
+    }
+
+    return res;
+}
+
+void WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::write(const StoreDirConfig & store, WriteConn conn, const WorkerProto::ClientHandshakeInfo & info)
+{
+    if (GET_PROTOCOL_MINOR(conn.version) >= 33) {
+        assert(info.daemonNixVersion);
+        conn.to << *info.daemonNixVersion;
+    }
+
+    if (GET_PROTOCOL_MINOR(conn.version) >= 35) {
+        WorkerProto::write(store, conn, info.remoteTrustsUs);
+    }
+}
+
 }

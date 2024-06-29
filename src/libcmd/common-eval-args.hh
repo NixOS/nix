@@ -12,8 +12,14 @@ namespace nix {
 
 class Store;
 class EvalState;
+struct EvalSettings;
 class Bindings;
 struct SourcePath;
+
+/**
+ * @todo Get rid of global setttings variables
+ */
+extern EvalSettings evalSettings;
 
 struct MixEvalArgs : virtual Args, virtual MixRepair
 {

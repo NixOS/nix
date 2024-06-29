@@ -5,7 +5,6 @@
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "gc-small-vector.hh"
-#include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
 #include "path-references.hh"
@@ -78,7 +77,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     if (drvs.empty()) return {};
 
-    if (isIFD && !evalSettings.enableImportFromDerivation)
+    if (isIFD && !settings.enableImportFromDerivation)
         error<EvalError>(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             drvs.begin()->to_string(*store)
@@ -780,15 +779,14 @@ static RegisterPrimOp primop_break({
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
-        if (state.debugRepl && !state.debugTraces.empty()) {
+        if (state.canDebug()) {
             auto error = Error(ErrorInfo {
                 .level = lvlInfo,
                 .msg = HintFmt("breakpoint reached"),
                 .pos = state.positions[pos],
             });
 
-            auto & dt = state.debugTraces.front();
-            state.runDebugRepl(&error, dt.env, dt.expr);
+            state.runDebugRepl(&error);
         }
 
         // Return the value we were passed.
@@ -807,7 +805,7 @@ static RegisterPrimOp primop_abort({
         NixStringContext context;
         auto s = state.coerceToString(pos, *args[0], context,
                 "while evaluating the error message passed to builtins.abort").toOwned();
-        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).debugThrow();
+        state.error<Abort>("evaluation aborted with the following error message: '%1%'", s).setIsFromExpr().debugThrow();
     }
 });
 
@@ -826,7 +824,7 @@ static RegisterPrimOp primop_throw({
       NixStringContext context;
       auto s = state.coerceToString(pos, *args[0], context,
               "while evaluating the error message passed to builtin.throw").toOwned();
-      state.error<ThrownError>(s).debugThrow();
+      state.error<ThrownError>(s).setIsFromExpr().debugThrow();
     }
 });
 
@@ -902,7 +900,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     MaintainCount trylevel(state.trylevel);
 
     ReplExitStatus (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
-    if (state.debugRepl && evalSettings.ignoreExceptionsDuringTry)
+    if (state.debugRepl && state.settings.ignoreExceptionsDuringTry)
     {
         /* to prevent starting the repl from exceptions withing a tryEval, null it. */
         savedDebugRepl = state.debugRepl;
@@ -951,7 +949,7 @@ static RegisterPrimOp primop_tryEval({
 static void prim_getEnv(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     std::string name(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.getEnv"));
-    v.mkString(evalSettings.restrictEval || evalSettings.pureEval ? "" : getEnv(name).value_or(""));
+    v.mkString(state.settings.restrictEval || state.settings.pureEval ? "" : getEnv(name).value_or(""));
 }
 
 static RegisterPrimOp primop_getEnv({
@@ -1018,9 +1016,8 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
         printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", ValuePrinter(state, *args[0]));
-    if (evalSettings.builtinsTraceDebugger && state.debugRepl && !state.debugTraces.empty()) {
-        const DebugTrace & last = state.debugTraces.front();
-        state.runDebugRepl(nullptr, last.env, last.expr);
+    if (state.settings.builtinsTraceDebugger) {
+        state.runDebugRepl(nullptr);
     }
     state.forceValue(*args[1], pos);
     v = *args[1];
@@ -1041,6 +1038,55 @@ static RegisterPrimOp primop_trace({
       [`break`](@docroot@/language/builtins.md#builtins-break)).
     )",
     .fun = prim_trace,
+});
+
+static void prim_warn(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    // We only accept a string argument for now. The use case for pretty printing a value is covered by `trace`.
+    // By rejecting non-strings we allow future versions to add more features without breaking existing code.
+    auto msgStr = state.forceString(*args[0], pos, "while evaluating the first argument; the message passed to builtins.warn");
+
+    {
+        BaseError msg(std::string{msgStr});
+        msg.atPos(state.positions[pos]);
+        auto info = msg.info();
+        info.level = lvlWarn;
+        info.isFromExpr = true;
+        logWarning(info);
+    }
+
+    if (state.settings.builtinsAbortOnWarn) {
+        // Not an EvalError or subclass, which would cause the error to be stored in the eval cache.
+        state.error<EvalBaseError>("aborting to reveal stack trace of warning, as abort-on-warn is set").setIsFromExpr().debugThrow();
+    }
+    if (state.settings.builtinsTraceDebugger || state.settings.builtinsDebuggerOnWarn) {
+        state.runDebugRepl(nullptr);
+    }
+    state.forceValue(*args[1], pos);
+    v = *args[1];
+}
+
+static RegisterPrimOp primop_warn({
+    .name = "__warn",
+    .args = {"e1", "e2"},
+    .doc = R"(
+      Evaluate *e1*, which must be a string and print iton standard error as a warning.
+      Then return *e2*.
+      This function is useful for non-critical situations where attention is advisable.
+
+      If the
+      [`debugger-on-trace`](@docroot@/command-ref/conf-file.md#conf-debugger-on-trace)
+      or [`debugger-on-warn`](@docroot@/command-ref/conf-file.md#conf-debugger-on-warn)
+      option is set to `true` and the `--debugger` flag is given, the
+      interactive debugger will be started when `warn` is called (like
+      [`break`](@docroot@/language/builtins.md#builtins-break)).
+
+      If the
+      [`abort-on-warn`](@docroot@/command-ref/conf-file.md#conf-abort-on-warn)
+      option is set, the evaluation will be aborted after the warning is printed.
+      This is useful to reveal the stack trace of the warning, when the context is non-interactive and a debugger can not be launched.
+    )",
+    .fun = prim_warn,
 });
 
 
@@ -1116,12 +1162,34 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 }
 
+/**
+ * Early validation for the derivation name, for better error message.
+ * It is checked again when constructing store paths.
+ *
+ * @todo Check that the `.drv` suffix also fits.
+ */
+static void checkDerivationName(EvalState & state, std::string_view drvName)
+{
+    try {
+        checkName(drvName);
+    } catch (BadStorePathName & e) {
+        // "Please pass a different name": Users may not be aware that they can
+        //     pass a different one, in functions like `fetchurl` where the name
+        //     is optional.
+        // Note that Nixpkgs generally won't trigger this, because `mkDerivation`
+        // sanitizes the name.
+        state.error<EvalError>("invalid derivation name: %s. Please pass a different '%s'.", Uncolored(e.message()), "name").debugThrow();
+    }
+}
+
 static void derivationStrictInternal(
     EvalState & state,
     const std::string & drvName,
     const Bindings * attrs,
     Value & v)
 {
+    checkDerivationName(state, drvName);
+
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
     std::optional<json> jsonObject;
@@ -1162,7 +1230,7 @@ static void derivationStrictInternal(
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") {
                 // back compat, new name is "nar"
-                ingestionMethod = FileIngestionMethod::Recursive;
+                ingestionMethod = ContentAddressMethod::Raw::NixArchive;
             } else try {
                 ingestionMethod = ContentAddressMethod::parse(s);
             } catch (UsageError &) {
@@ -1170,9 +1238,9 @@ static void derivationStrictInternal(
                     "invalid value '%s' for 'outputHashMode' attribute", s
                 ).atPos(v).debugThrow();
             }
-            if (ingestionMethod == TextIngestionMethod {})
+            if (ingestionMethod == ContentAddressMethod::Raw::Text)
                 experimentalFeatureSettings.require(Xp::DynamicDerivations);
-            if (ingestionMethod == FileIngestionMethod::Git)
+            if (ingestionMethod == ContentAddressMethod::Raw::Git)
                 experimentalFeatureSettings.require(Xp::GitHashing);
         };
 
@@ -1261,6 +1329,20 @@ static void derivationStrictInternal(
                         handleOutputs(ss);
                     }
 
+                    if (i->name == state.sAllowedReferences)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedReferences'; use 'outputChecks.<output>.allowedReferences' instead", drvName);
+                    if (i->name == state.sAllowedRequisites)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedRequisites'; use 'outputChecks.<output>.allowedRequisites' instead", drvName);
+                    if (i->name == state.sDisallowedReferences)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedReferences'; use 'outputChecks.<output>.disallowedReferences' instead", drvName);
+                    if (i->name == state.sDisallowedRequisites)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedRequisites'; use 'outputChecks.<output>.disallowedRequisites' instead", drvName);
+                    if (i->name == state.sMaxSize)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxSize'; use 'outputChecks.<output>.maxSize' instead", drvName);
+                    if (i->name == state.sMaxClosureSize)
+                        warn("In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxClosureSize'; use 'outputChecks.<output>.maxClosureSize' instead", drvName);
+
+
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
                     drv.env.emplace(key, s);
@@ -1330,7 +1412,7 @@ static void derivationStrictInternal(
 
     /* Check whether the derivation name is valid. */
     if (isDerivation(drvName) &&
-        !(ingestionMethod == ContentAddressMethod { TextIngestionMethod { } } &&
+        !(ingestionMethod == ContentAddressMethod::Raw::Text &&
           outputs.size() == 1 &&
           *(outputs.begin()) == "out"))
     {
@@ -1352,7 +1434,7 @@ static void derivationStrictInternal(
 
         auto h = newHashAllowEmpty(*outputHash, outputHashAlgo);
 
-        auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
+        auto method = ingestionMethod.value_or(ContentAddressMethod::Raw::Flat);
 
         DerivationOutput::CAFixed dof {
             .ca = ContentAddress {
@@ -1371,7 +1453,7 @@ static void derivationStrictInternal(
                 .atPos(v).debugThrow();
 
         auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
-        auto method = ingestionMethod.value_or(FileIngestionMethod::Recursive);
+        auto method = ingestionMethod.value_or(ContentAddressMethod::Raw::NixArchive);
 
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
@@ -1517,7 +1599,7 @@ static RegisterPrimOp primop_toPath({
    corner cases. */
 static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    if (evalSettings.pureEval)
+    if (state.settings.pureEval)
         state.error<EvalError>(
             "'%s' is not allowed in pure evaluation mode",
             "builtins.storePath"
@@ -2147,7 +2229,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
         })
         : ({
             StringSource s { contents };
-            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, refs, state.repair);
+            state.store->addToStoreFromDump(s, name, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, refs, state.repair);
         });
 
     /* Note: we don't need to add `context' to the context of the
@@ -2330,7 +2412,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value * * arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(state, pos, path.baseName(), path, args[0], FileIngestionMethod::Recursive, std::nullopt, v, context);
+    addPath(state, pos, path.baseName(), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -2393,7 +2475,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
     std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
-    ContentAddressMethod method = FileIngestionMethod::Recursive;
+    auto method = ContentAddressMethod::Raw::NixArchive;
     std::optional<Hash> expectedHash;
     NixStringContext context;
 
@@ -2409,8 +2491,8 @@ static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value
             state.forceFunction(*(filterFun = attr.value), attr.pos, "while evaluating the `filter` parameter passed to builtins.path");
         else if (n == "recursive")
             method = state.forceBool(*attr.value, attr.pos, "while evaluating the `recursive` attribute passed to builtins.path")
-                ? FileIngestionMethod::Recursive
-                : FileIngestionMethod::Flat;
+                ? ContentAddressMethod::Raw::NixArchive
+                : ContentAddressMethod::Raw::Flat;
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `sha256` attribute passed to builtins.path"), HashAlgorithm::SHA256);
         else
@@ -4015,17 +4097,23 @@ static RegisterPrimOp primop_convertHash({
 
 struct RegexCache
 {
-    // TODO use C++20 transparent comparison when available
-    std::unordered_map<std::string_view, std::regex> cache;
-    std::list<std::string> keys;
+    struct State
+    {
+        // TODO use C++20 transparent comparison when available
+        std::unordered_map<std::string_view, std::regex> cache;
+        std::list<std::string> keys;
+    };
+
+    Sync<State> state_;
 
     std::regex get(std::string_view re)
     {
-        auto it = cache.find(re);
-        if (it != cache.end())
+        auto state(state_.lock());
+        auto it = state->cache.find(re);
+        if (it != state->cache.end())
             return it->second;
-        keys.emplace_back(re);
-        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
+        state->keys.emplace_back(re);
+        return state->cache.emplace(state->keys.back(), std::regex(state->keys.back(), std::regex::extended)).first->second;
     }
 };
 
@@ -4495,7 +4583,7 @@ void EvalState::createBaseEnv()
         )",
     });
 
-    if (!evalSettings.pureEval) {
+    if (!settings.pureEval) {
         v.mkInt(time(0));
     }
     addConstant("__currentTime", v, {
@@ -4522,8 +4610,8 @@ void EvalState::createBaseEnv()
         .impureOnly = true,
     });
 
-    if (!evalSettings.pureEval)
-        v.mkString(evalSettings.getCurrentSystem());
+    if (!settings.pureEval)
+        v.mkString(settings.getCurrentSystem());
     addConstant("__currentSystem", v, {
         .type = nString,
         .doc = R"(
@@ -4603,7 +4691,7 @@ void EvalState::createBaseEnv()
 
 #ifndef _WIN32 // TODO implement on Windows
     // Miscellaneous
-    if (evalSettings.enableNativeCode) {
+    if (settings.enableNativeCode) {
         addPrimOp({
             .name = "__importNative",
             .arity = 2,
@@ -4626,7 +4714,7 @@ void EvalState::createBaseEnv()
           error if `--trace-verbose` is enabled. Then return *e2*. This function
           is useful for debugging.
         )",
-        .fun = evalSettings.traceVerbose ? prim_trace : prim_second,
+        .fun = settings.traceVerbose ? prim_trace : prim_second,
     });
 
     /* Add a value containing the current Nix expression search path. */

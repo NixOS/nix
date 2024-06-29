@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 nix eval --expr 'assert 1 + 2 == 3; true'
 

@@ -89,6 +89,11 @@ struct ErrorInfo {
     HintFmt msg;
     std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
+    /**
+     * Some messages are generated directly by expressions; notably `builtins.warn`, `abort`, `throw`.
+     * These may be rendered differently, so that users can distinguish them.
+     */
+    bool isFromExpr = false;
 
     /**
      * Exit status.
@@ -150,6 +155,7 @@ public:
         : err(e)
     { }
 
+    /** The error message without "error: " prefixed to it. */
     std::string message() {
         return err.msg.str();
     }

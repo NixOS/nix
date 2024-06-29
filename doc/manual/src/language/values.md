@@ -6,19 +6,60 @@
 
   *Strings* can be written in three ways.
 
-  The most common way is to enclose the string between double quotes,
-  e.g., `"foo bar"`. Strings can span multiple lines. The special
-  characters `"` and `\` and the character sequence `${` must be
-  escaped by prefixing them with a backslash (`\`). Newlines, carriage
-  returns and tabs can be written as `\n`, `\r` and `\t`,
-  respectively.
-
-  You can include the results of other expressions into a string by enclosing them in `${ }`, a feature known as [string interpolation].
+  The most common way is to enclose the string between double quotes, e.g., `"foo bar"`.
+  Strings can span multiple lines.
+  The results of other expressions can be included into a string by enclosing them in `${ }`, a feature known as [string interpolation].
 
   [string interpolation]: ./string-interpolation.md
 
-  The second way to write string literals is as an *indented string*,
-  which is enclosed between pairs of *double single-quotes*, like so:
+  The following must be escaped to represent them within a string, by prefixing with a backslash (`\`):
+
+  - Double quote (`"`)
+
+    > **Example**
+    >
+    > ```nix
+    > "\""
+    > ```
+    >
+    >    "\""
+
+  - Backslash (`\`)
+
+    > **Example**
+    >
+    > ```nix
+    > "\\"
+    > ```
+    >
+    >    "\\"
+
+  - Dollar sign followed by an opening curly bracket (`${`) – "dollar-curly"
+
+    > **Example**
+    >
+    > ```nix
+    > "\${"
+    > ```
+    >
+    >    "\${"
+
+  The newline, carriage return, and tab characters can be written as `\n`, `\r` and `\t`, respectively.
+
+  A "double-dollar-curly" (`$${`) can be written literally.
+
+  > **Example**
+  >
+  > ```nix
+  > "$${"
+  > ```
+  >
+  >    "$\${"
+
+  String values are output on the terminal with Nix-specific escaping.
+  Strings written to files will contain the characters encoded by the escaping.
+
+  The second way to write string literals is as an *indented string*, which is enclosed between pairs of *double single-quotes* (`''`), like so:
 
   ```nix
   ''
@@ -40,18 +81,71 @@
   "This is the first line.\nThis is the second line.\n  This is the third line.\n"
   ```
 
-  Note that the whitespace and newline following the opening `''` is
-  ignored if there is no non-whitespace text on the initial line.
+  > **Note**
+  >
+  > Whitespace and newline following the opening `''` is ignored if there is no non-whitespace text on the initial line.
+
+  > **Warning**
+  >
+  > Prefixed tab characters are not stripped.
+  >
+  > > **Example**
+  > >
+  > > The following indented string is prefixed with tabs:
+  > >
+  > > ''
+  > > 	all:
+  > > 		@echo hello
+  > > ''
+  > >
+  > >     "\tall:\n\t\t@echo hello\n"
 
   Indented strings support [string interpolation].
 
-  Since `${` and `''` have special meaning in indented strings, you
-  need a way to quote them. `$` can be escaped by prefixing it with
-  `''` (that is, two single quotes), i.e., `''$`. `''` can be escaped
-  by prefixing it with `'`, i.e., `'''`. `$` removes any special
-  meaning from the following `$`. Linefeed, carriage-return and tab
-  characters can be written as `''\n`, `''\r`, `''\t`, and `''\`
-  escapes any other character.
+  The following must be escaped to represent them in an indented string:
+
+  - `$` is escaped by prefixing it with two single quotes (`''`)
+
+    > **Example**
+    >
+    > ```nix
+    > ''
+    >   ''$
+    > ''
+    > ```
+    >
+    >     "$\n"
+
+  - `''` is escaped by prefixing it with one single quote (`'`)
+
+    > **Example**
+    >
+    > ```nix
+    > ''
+    >   '''
+    > ''
+    > ```
+    >
+    >     "''\n"
+
+  These special characters are escaped as follows:
+  - Linefeed (`\n`): `''\n`
+  - Carriage return (`\r`): `''\r`
+  - Tab (`\t`): `''\t`
+
+  `''\` escapes any other character.
+
+  A "double-dollar-curly" (`$${`) can be written literally.
+
+  > **Example**
+  >
+  > ```nix
+  > ''
+  >   $${
+  > ''
+  > ```
+  >
+  >     "$\${\n"
 
   Indented strings are primarily useful in that they allow multi-line
   string literals to follow the indentation of the enclosing Nix
@@ -167,7 +261,7 @@ function and the fifth being a set.
 
 Note that lists are only lazy in values, and they are strict in length.
 
-Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#builtins-elemAt). 
+Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#builtins-elemAt).
 
 ## Attribute Set
 

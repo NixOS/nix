@@ -1,6 +1,7 @@
 #include "eval-settings.hh"
 #include "common-eval-args.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "filetransfer.hh"
 #include "eval.hh"
 #include "fetchers.hh"
@@ -12,6 +13,25 @@
 #include "fetch-to-store.hh"
 
 namespace nix {
+
+EvalSettings evalSettings {
+    settings.readOnlyMode,
+    {
+        {
+            "flake",
+            [](ref<Store> store, std::string_view rest) {
+                experimentalFeatureSettings.require(Xp::Flakes);
+                // FIXME `parseFlakeRef` should take a `std::string_view`.
+                auto flakeRef = parseFlakeRef(std::string { rest }, {}, true, false);
+                debug("fetching flake search path element '%s''", rest);
+                auto storePath = flakeRef.resolve(store).fetchTree(store).first;
+                return store->toRealPath(storePath);
+            },
+        },
+    },
+};
+
+static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 MixEvalArgs::MixEvalArgs()
 {

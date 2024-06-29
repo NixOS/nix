@@ -259,7 +259,7 @@ static void main_nix_build(int argc, char * * argv)
     auto store = openStore();
     auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-    auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, store);
+    auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, evalSettings, store);
     state->repair = myArgs.repair;
     if (myArgs.repair) buildMode = bmRepair;
 
@@ -478,9 +478,7 @@ static void main_nix_build(int argc, char * * argv)
         // Set the environment.
         auto env = getEnv();
 
-        auto tmp = getEnvNonEmpty("TMPDIR");
-        if (!tmp)
-            tmp = getEnvNonEmpty("XDG_RUNTIME_DIR").value_or("/tmp");
+        auto tmp = getEnvNonEmpty("TMPDIR").value_or("/tmp");
 
         if (pure) {
             decltype(env) newEnv;
@@ -492,7 +490,7 @@ static void main_nix_build(int argc, char * * argv)
             env["__ETC_PROFILE_SOURCED"] = "1";
         }
 
-        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = *tmp;
+        env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmp;
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 

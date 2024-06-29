@@ -1,4 +1,5 @@
 #include "profiles.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "users.hh"
@@ -38,6 +39,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
     auto profileName = std::string(baseNameOf(profile));
 
     for (auto & i : std::filesystem::directory_iterator{profileDir}) {
+        checkInterrupt();
         if (auto n = parseName(profileName, i.path().filename().string())) {
             auto & path = i.path();
             gens.push_back({

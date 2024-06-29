@@ -137,6 +137,11 @@ static void fetchTree(
             attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
+        // fetchTree should fetch git repos with shallow = true by default
+        if (type == "git" && !params.isFetchGit && !attrs.contains("shallow")) {
+            attrs.emplace("shallow", Explicit<bool>{true});
+        }
+
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>(
@@ -166,10 +171,10 @@ static void fetchTree(
         }
     }
 
-    if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
+    if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isLocked()) {
+    if (state.settings.pureEval && !input.isLocked()) {
         auto fetcher = "fetchTree";
         if (params.isFetchGit)
             fetcher = "fetchGit";
@@ -320,6 +325,8 @@ static RegisterPrimOp primop_fetchTree({
 
         - `ref` (String, optional)
 
+          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
           A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
 
           Default: `"HEAD"`
@@ -333,8 +340,9 @@ static RegisterPrimOp primop_fetchTree({
         - `shallow` (Bool, optional)
 
           Make a shallow clone when fetching the Git tree.
+          When this is enabled, the options `ref` and `allRefs` have no effect anymore.
 
-          Default: `false`
+          Default: `true`
 
         - `submodules` (Bool, optional)
 
@@ -344,8 +352,11 @@ static RegisterPrimOp primop_fetchTree({
 
         - `allRefs` (Bool, optional)
 
-          If set to `true`, always fetch the entire repository, even if the latest commit is still in the cache.
-          Otherwise, only the latest commit is fetched if it is not already cached.
+          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
+          Whether to fetch all references (eg. branches and tags) of the repository.
+          With this argument being true, it's possible to load a `rev` from *any* `ref`.
+          (Without setting this option, only `rev`s from the specified `ref` are supported).
 
           Default: `false`
 
@@ -420,7 +431,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     state.forceValue(*args[0], pos);
 
-    if (args[0]->type() == nAttrs) {
+    bool isArgAttrs = args[0]->type() == nAttrs;
+    bool nameAttrPassed = false;
+
+    if (isArgAttrs) {
 
         for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
@@ -428,8 +442,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
                 url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
             else if (n == "sha256")
                 expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), HashAlgorithm::SHA256);
-            else if (n == "name")
+            else if (n == "name") {
+                nameAttrPassed = true;
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
+            }
             else
                 state.error<EvalError>("unsupported argument '%s' to '%s'", n, who)
                 .atPos(pos).debugThrow();
@@ -442,14 +458,27 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
     if (who == "fetchTarball")
-        url = evalSettings.resolvePseudoUrl(*url);
+        url = state.settings.resolvePseudoUrl(*url);
 
     state.checkURI(*url);
 
     if (name == "")
         name = baseNameOf(*url);
 
-    if (evalSettings.pureEval && !expectedHash)
+    try {
+        checkName(name);
+    } catch (BadStorePathName & e) {
+        auto resolution =
+            nameAttrPassed ? HintFmt("Please change the value for the 'name' attribute passed to '%s', so that it can create a valid store path.", who) :
+            isArgAttrs ? HintFmt("Please add a valid 'name' attribute to the argument for '%s', so that it can create a valid store path.", who) :
+            HintFmt("Please pass an attribute set with 'url' and 'name' attributes to '%s',  so that it can create a valid store path.", who);
+
+        state.error<EvalError>(
+            std::string("invalid store path name when fetching URL '%s': %s. %s"), *url, Uncolored(e.message()), Uncolored(resolution.str()))
+        .atPos(pos).debugThrow();
+    }
+
+    if (state.settings.pureEval && !expectedHash)
         state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who).atPos(pos).debugThrow();
 
     // early exit if pinned and already in the store
@@ -457,7 +486,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
-                .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+                .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
                 .hash = *expectedHash,
                 .references = {}
             });
@@ -599,6 +628,8 @@ static RegisterPrimOp primop_fetchGit({
 
         [Git reference]: https://git-scm.com/book/en/v2/Git-Internals-Git-References
 
+        This option has no effect once `shallow` cloning is enabled.
+
         By default, the `ref` value is prefixed with `refs/heads/`.
         As of 2.3.0, Nix will not prefix `refs/heads/` if `ref` starts with `refs/`.
 
@@ -616,12 +647,14 @@ static RegisterPrimOp primop_fetchGit({
       - `shallow` (default: `false`)
 
         Make a shallow clone when fetching the Git tree.
-
+        When this is enabled, the options `ref` and `allRefs` have no effect anymore.
       - `allRefs`
 
-        Whether to fetch all references of the repository.
-        With this argument being true, it's possible to load a `rev` from *any* `ref`
+        Whether to fetch all references (eg. branches and tags) of the repository.
+        With this argument being true, it's possible to load a `rev` from *any* `ref`.
         (by default only `rev`s from the specified `ref` are supported).
+
+        This option has no effect once `shallow` cloning is enabled.
 
       - `verifyCommit` (default: `true` if `publicKey` or `publicKeys` are provided, otherwise `false`)
 

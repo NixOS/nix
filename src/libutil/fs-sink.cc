@@ -1,7 +1,7 @@
 #include <fcntl.h>
 
 #include "error.hh"
-#include "config.hh"
+#include "config-global.hh"
 #include "fs-sink.hh"
 
 #if _WIN32

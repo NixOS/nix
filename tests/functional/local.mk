@@ -17,12 +17,13 @@ nix_tests = \
   flakes/build-paths.sh \
   flakes/flake-in-submodule.sh \
   flakes/prefetch.sh \
+  flakes/eval-cache.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
   legacy-ssh-store.sh \
   lang.sh \
-  lang-test-infra.sh \
+  characterisation-test-infra.sh \
   experimental-features.sh \
   fetchMercurial.sh \
   gc-auto.sh \
@@ -105,6 +106,7 @@ nix_tests = \
   eval-store.sh \
   why-depends.sh \
   derivation-json.sh \
+  derivation-advanced-attributes.sh \
   import-derivation.sh \
   nix_path.sh \
   case-hack.sh \

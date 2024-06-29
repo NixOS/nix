@@ -7,6 +7,7 @@
 #include "eval-settings.hh"
 #include "flake/flake.hh"
 #include "get-drvs.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "outputs-spec.hh"
@@ -770,6 +771,8 @@ struct CmdFlakeCheck : FlakeCommand
                             || name == "flakeModules"
                             || name == "herculesCI"
                             || name == "homeConfigurations"
+                            || name == "homeModule"
+                            || name == "homeModules"
                             || name == "nixopsConfigurations"
                             )
                             // Known but unchecked community attribute
@@ -867,6 +870,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             createDirs(to);
 
             for (auto & entry : std::filesystem::directory_iterator{from}) {
+                checkInterrupt();
                 auto from2 = entry.path().string();
                 auto to2 = to + "/" + entry.path().filename().string();
                 auto st = lstat(from2);
@@ -1176,7 +1180,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 // If we don't recognize it, it's probably content
                 return true;
             } catch (EvalError & e) {
-                // Some attrs may contain errors, eg. legacyPackages of
+                // Some attrs may contain errors, e.g. legacyPackages of
                 // nixpkgs. We still want to recurse into it, instead of
                 // skipping it at all.
                 return true;

@@ -53,7 +53,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     // whitelist. Ah well.
     state.checkURI(url);
 
-    if (evalSettings.pureEval && !rev)
+    if (state.settings.pureEval && !rev)
         throw Error("in pure evaluation mode, 'fetchMercurial' requires a Mercurial revision");
 
     fetchers::Attrs attrs;

@@ -6,6 +6,7 @@
 
 #include "serve-protocol.hh"
 #include "serve-protocol-impl.hh"
+#include "serve-protocol-connection.hh"
 #include "build-result.hh"
 #include "file-descriptor.hh"
 #include "tests/protocol.hh"
@@ -54,15 +55,15 @@ VERSIONED_CHARACTERIZATION_TEST(
     defaultVersion,
     (std::tuple<ContentAddress, ContentAddress, ContentAddress> {
         ContentAddress {
-            .method = TextIngestionMethod {},
+            .method = ContentAddressMethod::Raw::Text,
             .hash = hashString(HashAlgorithm::SHA256, "Derive(...)"),
         },
         ContentAddress {
-            .method = FileIngestionMethod::Flat,
+            .method = ContentAddressMethod::Raw::Flat,
             .hash = hashString(HashAlgorithm::SHA1, "blob blob..."),
         },
         ContentAddress {
-            .method = FileIngestionMethod::Recursive,
+            .method = ContentAddressMethod::Raw::NixArchive,
             .hash = hashString(HashAlgorithm::SHA256, "(...)"),
         },
     }))
@@ -279,7 +280,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                 *LibStoreTest::store,
                 "foo",
                 FixedOutputInfo {
-                    .method = FileIngestionMethod::Recursive,
+                    .method = FileIngestionMethod::NixArchive,
                     .hash = hashString(HashAlgorithm::SHA256, "(...)"),
                     .references = {
                         .others = {
@@ -397,7 +398,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         std::nullopt,
         std::optional {
             ContentAddress {
-                .method = FileIngestionMethod::Flat,
+                .method = ContentAddressMethod::Raw::Flat,
                 .hash = hashString(HashAlgorithm::SHA1, "blob blob..."),
             },
         },

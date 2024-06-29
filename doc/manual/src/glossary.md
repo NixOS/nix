@@ -12,7 +12,7 @@
   For how Nix uses content addresses, see:
 
     - [Content-Addressing File System Objects](@docroot@/store/file-system-object/content-address.md)
-    - [content-addressed store object](#gloss-content-addressed-store-object)
+    - [Content-Addressing Store Objects](@docroot@/store/store-object/content-address.md)
     - [content-addressed derivation](#gloss-content-addressed-derivation)
 
   Software Heritage's writing on [*Intrinsic and Extrinsic identifiers*](https://www.softwareheritage.org/2020/07/09/intrinsic-vs-extrinsic-identifiers) is also a good introduction to the value of content-addressing over other referencing schemes.
@@ -71,10 +71,9 @@
   [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
   attribute set to `true`.
 
-- [fixed-output derivation]{#gloss-fixed-output-derivation}
+- [fixed-output derivation]{#gloss-fixed-output-derivation} (FOD)
 
-  A derivation which includes the
-  [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
+  A [derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute, and where the [`builder`](@docroot@/language/derivations.md#attr-builder) executable has access to the network.
 
 - [store]{#gloss-store}
 
@@ -137,8 +136,11 @@
 
 - [content-addressed store object]{#gloss-content-addressed-store-object}
 
-  A [store object] whose [store path] is determined by its contents.
+  A [store object] which is [content-addressed](#gloss-content-address),
+  i.e. whose [store path] is determined by its contents.
   This includes derivations, the outputs of [content-addressed derivations](#gloss-content-addressed-derivation), and the outputs of [fixed-output derivations](#gloss-fixed-output-derivation).
+
+  See [Content-Addressing Store Objects](@docroot@/store/store-object/content-address.md) for details.
 
 - [substitute]{#gloss-substitute}
 

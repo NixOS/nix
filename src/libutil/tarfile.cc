@@ -79,7 +79,8 @@ TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> com
     }
 
     if (!raw) {
-        archive_read_support_format_all(archive);
+        archive_read_support_format_tar(archive);
+        archive_read_support_format_zip(archive);
     } else {
         archive_read_support_format_raw(archive);
         archive_read_support_format_empty(archive);
@@ -96,7 +97,8 @@ TarArchive::TarArchive(const Path & path)
     , buffer(defaultBufferSize)
 {
     archive_read_support_filter_all(archive);
-    archive_read_support_format_all(archive);
+    archive_read_support_format_tar(archive);
+    archive_read_support_format_zip(archive);
     archive_read_set_option(archive, NULL, "mac-ext", NULL);
     check(archive_read_open_filename(archive, path.c_str(), 16384), "failed to open archive: %s");
 }

@@ -35,14 +35,14 @@ enum struct FileSerialisationMethod : uint8_t {
      * See `file-system-object/content-address.md#serial-nix-archive` in
      * the manual.
      */
-    Recursive,
+    NixArchive,
 };
 
 /**
  * Parse a `FileSerialisationMethod` by name. Choice of:
  *
  *  - `flat`: `FileSerialisationMethod::Flat`
- *  - `nar`: `FileSerialisationMethod::Recursive`
+ *  - `nar`: `FileSerialisationMethod::NixArchive`
  *
  * Opposite of `renderFileSerialisationMethod`.
  */
@@ -107,15 +107,17 @@ enum struct FileIngestionMethod : uint8_t {
     Flat,
 
     /**
-     * Hash `FileSerialisationMethod::Recursive` serialisation.
+     * Hash `FileSerialisationMethod::NixArchive` serialisation.
      *
      * See `file-system-object/content-address.md#serial-flat` in the
      * manual.
      */
-    Recursive,
+    NixArchive,
 
     /**
      * Git hashing.
+     *
+     * Part of `ExperimentalFeature::GitHashing`.
      *
      * See `file-system-object/content-address.md#serial-git` in the
      * manual.
@@ -127,7 +129,7 @@ enum struct FileIngestionMethod : uint8_t {
  * Parse a `FileIngestionMethod` by name. Choice of:
  *
  *  - `flat`: `FileIngestionMethod::Flat`
- *  - `nar`: `FileIngestionMethod::Recursive`
+ *  - `nar`: `FileIngestionMethod::NixArchive`
  *  - `git`: `FileIngestionMethod::Git`
  *
  * Opposite of `renderFileIngestionMethod`.
@@ -143,14 +145,15 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method);
 
 /**
  * Compute the hash of the given file system object according to the
- * given method.
+ * given method, and for some ingestion methods, the size of the
+ * serialisation.
  *
  * Unlike the other `hashPath`, this works on an arbitrary
  * `FileIngestionMethod` instead of `FileSerialisationMethod`, but
- * doesn't return the size as this is this is not a both simple and
+ * may not return the size as this is this is not a both simple and
  * useful defined for a merkle format.
  */
-Hash hashPath(
+std::pair<Hash, std::optional<uint64_t>> hashPath(
     const SourcePath & path,
     FileIngestionMethod method, HashAlgorithm ha,
     PathFilter & filter = defaultPathFilter);

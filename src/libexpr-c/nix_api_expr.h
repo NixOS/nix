@@ -29,14 +29,23 @@ extern "C" {
  * @see nix_state_create
  */
 typedef struct EvalState EvalState; // nix::EvalState
-/**
- * @brief Represents a value in the Nix language.
+
+/** @brief A Nix language value, or thunk that may evaluate to a value.
  *
- * Owned by the garbage collector.
- * @struct Value
+ * Values are the primary objects manipulated in the Nix language.
+ * They are considered to be immutable from a user's perspective, but the process of evaluating a value changes its
+ * ValueType if it was a thunk. After a value has been evaluated, its ValueType does not change.
+ *
+ * Evaluation in this context refers to the process of evaluating a single value object, also called "forcing" the
+ * value; see `nix_value_force`.
+ *
+ * The evaluator manages its own memory, but your use of the C API must follow the reference counting rules.
+ *
  * @see value_manip
+ * @see nix_value_incref, nix_value_decref
  */
-typedef void Value; // nix::Value
+typedef struct nix_value nix_value;
+[[deprecated("use nix_value instead")]] typedef nix_value Value;
 
 // Function prototypes
 /**
@@ -65,7 +74,7 @@ nix_err nix_libexpr_init(nix_c_context * context);
  * @return NIX_OK if the evaluation was successful, an error code otherwise.
  */
 nix_err nix_expr_eval_from_string(
-    nix_c_context * context, EvalState * state, const char * expr, const char * path, Value * value);
+    nix_c_context * context, EvalState * state, const char * expr, const char * path, nix_value * value);
 
 /**
  * @brief Calls a Nix function with an argument.
@@ -79,7 +88,7 @@ nix_err nix_expr_eval_from_string(
  * @see nix_init_apply() for a similar function that does not performs the call immediately, but stores it as a thunk.
  *      Note the different argument order.
  */
-nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, Value * arg, Value * value);
+nix_err nix_value_call(nix_c_context * context, EvalState * state, nix_value * fn, nix_value * arg, nix_value * value);
 
 /**
  * @brief Calls a Nix function with multiple arguments.
@@ -98,7 +107,7 @@ nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, V
  * @see NIX_VALUE_CALL           For a macro that wraps this function for convenience.
  */
 nix_err nix_value_call_multi(
-    nix_c_context * context, EvalState * state, Value * fn, size_t nargs, Value ** args, Value * value);
+    nix_c_context * context, EvalState * state, nix_value * fn, size_t nargs, nix_value ** args, nix_value * value);
 
 /**
  * @brief Calls a Nix function with multiple arguments.
@@ -114,25 +123,20 @@ nix_err nix_value_call_multi(
  *
  * @see nix_value_call_multi
  */
-#define NIX_VALUE_CALL(context, state, value, fn, ...)                  \
-  do {                                                                  \
-    Value * args_array[] = {__VA_ARGS__};                               \
-    size_t nargs = sizeof(args_array) / sizeof(args_array[0]);          \
-    nix_value_call_multi(context, state, fn, nargs, args_array, value); \
-  } while (0)
+#define NIX_VALUE_CALL(context, state, value, fn, ...)                      \
+    do {                                                                    \
+        nix_value * args_array[] = {__VA_ARGS__};                           \
+        size_t nargs = sizeof(args_array) / sizeof(args_array[0]);          \
+        nix_value_call_multi(context, state, fn, nargs, args_array, value); \
+    } while (0)
 
 /**
  * @brief Forces the evaluation of a Nix value.
  *
- * The Nix interpreter is lazy, and not-yet-evaluated Values can be
+ * The Nix interpreter is lazy, and not-yet-evaluated values can be
  * of type NIX_TYPE_THUNK instead of their actual value.
  *
- * This function converts these Values into their final type.
- *
- * @note You don't need this function for basic API usage, since all functions
- * that return a value call it for you. The only place you will see a
- * NIX_TYPE_THUNK is in the arguments that are passed to a PrimOp function
- * you supplied to nix_alloc_primop.
+ * This function mutates such a `nix_value`, so that, if successful, it has its final type.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
@@ -141,7 +145,7 @@ nix_err nix_value_call_multi(
  * @return NIX_OK if the force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force(nix_c_context * context, EvalState * state, Value * value);
+nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * value);
 
 /**
  * @brief Forces the deep evaluation of a Nix value.
@@ -157,7 +161,7 @@ nix_err nix_value_force(nix_c_context * context, EvalState * state, Value * valu
  * @return NIX_OK if the deep force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, Value * value);
+nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_value * value);
 
 /**
  * @brief Create a new Nix language evaluator state.
@@ -191,6 +195,11 @@ void nix_state_free(EvalState * state);
  * you're done with a value returned by the evaluator.
  * @{
  */
+
+// TODO: Deprecate nix_gc_incref in favor of the type-specific reference counting functions?
+//       e.g. nix_value_incref.
+//       It gives implementors more flexibility, and adds safety, so that generated
+//       bindings can be used without fighting the host type system (where applicable).
 /**
  * @brief Increment the garbage collector reference counter for the given object.
  *

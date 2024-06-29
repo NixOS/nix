@@ -383,29 +383,19 @@ void deletePath(const fs::path & path)
     deletePath(path, dummy);
 }
 
-
-Paths createDirs(const Path & path)
+void createDir(const Path & path, mode_t mode)
 {
-    Paths created;
-#ifndef _WIN32
-    if (path == "/") return created;
-#endif
+    if (mkdir(path.c_str(), mode) == -1)
+        throw SysError("creating directory '%1%'", path);
+}
 
-    auto type = fs::symlink_status(path).type();
-    if (type == fs::file_type::not_found) {
-        created = createDirs(dirOf(path));
-        fs::create_directory(path);
-        type = fs::symlink_status(path).type();
-        created.push_back(path);
+void createDirs(const Path & path)
+{
+    try {
+        fs::create_directories(path);
+    } catch (fs::filesystem_error & e) {
+        throw SysError("creating directory '%1%'", path);
     }
-
-    if (type == fs::file_type::symlink)
-        type = fs::status(path).type();
-
-    if (type != fs::file_type::directory)
-        throw Error("'%1%' is not a directory", path);
-
-    return created;
 }
 
 
@@ -515,7 +505,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
 #ifndef _WIN32
-    closeOnExec(fd.get());
+    unix::closeOnExec(fd.get());
 #endif
     return {std::move(fd), tmpl};
 }
@@ -543,29 +533,69 @@ void replaceSymlink(const Path & target, const Path & link)
     }
 }
 
-#ifndef _WIN32
-static void setWriteTime(const fs::path & p, const struct stat & st)
+void setWriteTime(
+    const std::filesystem::path & path,
+    time_t accessedTime,
+    time_t modificationTime,
+    std::optional<bool> optIsSymlink)
 {
-    struct timeval times[2];
-    times[0] = {
-        .tv_sec = st.st_atime,
-        .tv_usec = 0,
+#ifndef _WIN32
+    struct timeval times[2] = {
+        {
+            .tv_sec = accessedTime,
+            .tv_usec = 0,
+        },
+        {
+            .tv_sec = modificationTime,
+            .tv_usec = 0,
+        },
     };
-    times[1] = {
-        .tv_sec = st.st_mtime,
-        .tv_usec = 0,
-    };
-    if (lutimes(p.c_str(), times) != 0)
-        throw SysError("changing modification time of '%s'", p);
-}
 #endif
+
+    auto nonSymlink = [&]{
+        bool isSymlink = optIsSymlink
+            ? *optIsSymlink
+            : fs::is_symlink(path);
+
+        if (!isSymlink) {
+#ifdef _WIN32
+            // FIXME use `fs::last_write_time`.
+            //
+            // Would be nice to use std::filesystem unconditionally, but
+            // doesn't support access time just modification time.
+            //
+            // System clock vs File clock issues also make that annoying.
+            warn("Changing file times is not yet implemented on Windows, path is '%s'", path);
+#else
+            if (utimes(path.c_str(), times) == -1) {
+
+                throw SysError("changing modification time of '%s' (not a symlink)", path);
+            }
+#endif
+        } else {
+            throw Error("Cannot modification time of symlink '%s'", path);
+        }
+    };
+
+#if HAVE_LUTIMES
+    if (lutimes(path.c_str(), times) == -1) {
+        if (errno == ENOSYS)
+            nonSymlink();
+        else
+            throw SysError("changing modification time of '%s'", path);
+    }
+#else
+    nonSymlink();
+#endif
+}
+
+void setWriteTime(const fs::path & path, const struct stat & st)
+{
+    setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
+}
 
 void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
 {
-#ifndef _WIN32
-    // TODO: Rewrite the `is_*` to use `symlink_status()`
-    auto statOfFrom = lstat(from);
-#endif
     auto fromStatus = fs::symlink_status(from);
 
     // Mark the directory as writable so that we can delete its children
@@ -585,9 +615,7 @@ void copyFile(const fs::path & from, const fs::path & to, bool andDelete)
         throw Error("file '%s' has an unsupported type", from);
     }
 
-#ifndef _WIN32
-    setWriteTime(to, statOfFrom);
-#endif
+    setWriteTime(to, lstat(from));
     if (andDelete) {
         if (!fs::is_symlink(fromStatus))
             fs::permissions(from, fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);

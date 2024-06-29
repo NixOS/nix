@@ -82,8 +82,7 @@ std::optional<StorePath> PackageInfo::queryDrvPath() const
         } else
             drvPath = {std::nullopt};
     }
-    drvPath.value_or(std::nullopt);
-    return *drvPath;
+    return drvPath.value_or(std::nullopt);
 }
 
 

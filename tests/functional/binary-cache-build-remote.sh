@@ -2,7 +2,9 @@
 
 source common.sh
 
-clearStore
+TODO_NixOS
+
+clearStoreIfPossible
 clearCacheCache
 
 # Fails without remote builders
@@ -12,7 +14,7 @@ clearCacheCache
 outPath=$(nix-build --store "file://$cacheDir" --builders 'auto - - 1 1' -j0 dependencies.nix)
 
 # Test that the path exactly exists in the destination store.
-nix path-info --store "file://$cacheDir" $outPath
+nix path-info --store "file://$cacheDir" "$outPath"
 
 # Succeeds without any build capability because no-op
 nix-build --store "file://$cacheDir" -j0 dependencies.nix

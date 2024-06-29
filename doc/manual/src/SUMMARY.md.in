@@ -121,9 +121,11 @@
   - [Documentation](contributing/documentation.md)
   - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
+  - [JSON guideline](contributing/json-guideline.md)
   - [C++ style guide](contributing/cxx.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.23 (2024-06-03)](release-notes/rl-2.23.md)
   - [Release 2.22 (2024-04-23)](release-notes/rl-2.22.md)
   - [Release 2.21 (2024-03-11)](release-notes/rl-2.21.md)
   - [Release 2.20 (2024-01-29)](release-notes/rl-2.20.md)

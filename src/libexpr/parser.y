@@ -25,7 +25,6 @@
 #include "nixexpr.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
-#include "globals.hh"
 #include "parser-state.hh"
 
 #define YYLTYPE ::nix::ParserLocation
@@ -40,6 +39,7 @@ Expr * parseExprFromBuf(
     Pos::Origin origin,
     const SourcePath & basePath,
     SymbolTable & symbols,
+    const EvalSettings & settings,
     PosTable & positions,
     const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols);
@@ -294,7 +294,7 @@ path_start
     $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
   }
   | HPATH {
-    if (evalSettings.pureEval) {
+    if (state->settings.pureEval) {
         throw Error(
             "the path '%s' can not be resolved in pure mode",
             std::string_view($1.p, $1.l)
@@ -429,6 +429,7 @@ Expr * parseExprFromBuf(
     Pos::Origin origin,
     const SourcePath & basePath,
     SymbolTable & symbols,
+    const EvalSettings & settings,
     PosTable & positions,
     const ref<SourceAccessor> rootFS,
     const Expr::AstSymbols & astSymbols)
@@ -441,6 +442,7 @@ Expr * parseExprFromBuf(
         .origin = positions.addOrigin(origin, length),
         .rootFS = rootFS,
         .s = astSymbols,
+        .settings = settings,
     };
 
     yylex_init(&scanner);

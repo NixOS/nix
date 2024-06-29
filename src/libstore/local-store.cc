@@ -233,7 +233,7 @@ LocalStore::LocalStore(const Params & params)
         struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
         if (!gr)
             printError("warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
-        else {
+        else if (!readOnly) {
             struct stat st;
             if (stat(realStoreDir.get().c_str(), &st))
                 throw SysError("getting attributes of path '%1%'", realStoreDir);
@@ -1155,7 +1155,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     auto fim = specified.method.getFileIngestionMethod();
                     switch (fim) {
                     case FileIngestionMethod::Flat:
-                    case FileIngestionMethod::Recursive:
+                    case FileIngestionMethod::NixArchive:
                     {
                         HashModuloSink caSink {
                             specified.hash.algo,
@@ -1253,7 +1253,7 @@ StorePath LocalStore::addToStoreFromDump(
     std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
 
-    bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
+    bool methodsMatch = static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod();
 
     /* If the methods don't match, our streaming hash of the dump is the
        wrong sort, and we need to rehash. */
@@ -1282,7 +1282,7 @@ StorePath LocalStore::addToStoreFromDump(
             ? dumpHash
             : hashPath(
                 PosixSourceAccessor::createAtRoot(tempPath),
-                hashMethod.getFileIngestionMethod(), hashAlgo),
+                hashMethod.getFileIngestionMethod(), hashAlgo).first,
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1314,7 +1314,7 @@ StorePath LocalStore::addToStoreFromDump(
                 auto fim = hashMethod.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                     restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
                     break;
                 case FileIngestionMethod::Git:
@@ -1330,7 +1330,7 @@ StorePath LocalStore::addToStoreFromDump(
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
             auto narHash = std::pair { dumpHash, size };
-            if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+            if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
@@ -1417,12 +1417,13 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         printInfo("checking link hashes...");
 
         for (auto & link : std::filesystem::directory_iterator{linksDir}) {
+            checkInterrupt();
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of '%s'", name);
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 PosixSourceAccessor::createAtRoot(link.path()),
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::NixArchive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     link.path(), name, hash);
@@ -1509,6 +1510,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        invalid states.
      */
     for (auto & i : std::filesystem::directory_iterator{realStoreDir.to_string()}) {
+        checkInterrupt();
         try {
             storePathsInStoreDir.insert({i.path().filename().string()});
         } catch (BadStorePath &) { }
