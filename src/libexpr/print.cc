@@ -345,11 +345,13 @@ private:
 
             auto prettyPrint = shouldPrettyPrintAttrs(sorted);
 
+            size_t currentAttrsPrinted = 0;
+
             for (auto & i : sorted) {
                 printSpace(prettyPrint);
 
                 if (attrsPrinted >= options.maxAttrs) {
-                    printElided(sorted.size() - attrsPrinted, "attribute", "attributes");
+                    printElided(sorted.size() - currentAttrsPrinted, "attribute", "attributes");
                     break;
                 }
 
@@ -358,6 +360,7 @@ private:
                 print(*i.second, depth + 1);
                 output << ";";
                 attrsPrinted++;
+                currentAttrsPrinted++;
             }
 
             decreaseIndent();
