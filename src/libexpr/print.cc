@@ -405,11 +405,14 @@ private:
             output << "[";
             auto listItems = v.listItems();
             auto prettyPrint = shouldPrettyPrintList(listItems);
+
+            size_t currentListItemsPrinted = 0;
+
             for (auto elem : listItems) {
                 printSpace(prettyPrint);
 
                 if (totalListItemsPrinted >= options.maxListItems) {
-                    printElided(listItems.size() - totalListItemsPrinted, "item", "items");
+                    printElided(listItems.size() - currentListItemsPrinted, "item", "items");
                     break;
                 }
 
@@ -419,6 +422,7 @@ private:
                     printNullptr();
                 }
                 totalListItemsPrinted++;
+                currentListItemsPrinted++;
             }
 
             decreaseIndent();
