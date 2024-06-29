@@ -164,7 +164,7 @@ private:
     PrintOptions options;
     std::optional<ValuesSeen> seen;
     size_t totalAttrsPrinted = 0;
-    size_t listItemsPrinted = 0;
+    size_t totalListItemsPrinted = 0;
     std::string indent;
 
     void increaseIndent()
@@ -408,8 +408,8 @@ private:
             for (auto elem : listItems) {
                 printSpace(prettyPrint);
 
-                if (listItemsPrinted >= options.maxListItems) {
-                    printElided(listItems.size() - listItemsPrinted, "item", "items");
+                if (totalListItemsPrinted >= options.maxListItems) {
+                    printElided(listItems.size() - totalListItemsPrinted, "item", "items");
                     break;
                 }
 
@@ -418,7 +418,7 @@ private:
                 } else {
                     printNullptr();
                 }
-                listItemsPrinted++;
+                totalListItemsPrinted++;
             }
 
             decreaseIndent();
@@ -592,7 +592,7 @@ public:
     void print(Value & v)
     {
         totalAttrsPrinted = 0;
-        listItemsPrinted = 0;
+        totalListItemsPrinted = 0;
         indent.clear();
 
         if (options.trackRepeated) {
