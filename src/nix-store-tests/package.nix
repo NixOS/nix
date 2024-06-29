@@ -40,7 +40,7 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-store-test";
+  pname = "nix-store-tests";
   inherit version;
 
   src = fileset.toSource {
@@ -105,7 +105,7 @@ mkDerivation (finalAttrs: {
       in runCommand "${finalAttrs.pname}-run" {} ''
         PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
         export _NIX_TEST_UNIT_DATA=${data}
-        nix-store-test
+        nix-store-tests
         touch $out
       '';
     };

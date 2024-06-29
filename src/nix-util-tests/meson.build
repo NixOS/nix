@@ -1,4 +1,4 @@
-project('nix-fetchers-test', 'cpp',
+project('nix-util-tests', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -17,8 +17,9 @@ cxx = meson.get_compiler('cpp')
 subdir('build-utils-meson/deps-lists')
 
 deps_private_maybe_subproject = [
-  dependency('nix-store-test-support'),
-  dependency('nix-fetchers'),
+  dependency('nix-util'),
+  dependency('nix-util-c'),
+  dependency('nix-util-test-support'),
 ]
 deps_public_maybe_subproject = [
 ]
@@ -36,15 +37,34 @@ add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
   '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-store.hh',
+  '-include', 'config-util.h',
   language : 'cpp',
 )
 
 subdir('build-utils-meson/diagnostics')
 
 sources = files(
-  'public-key.cc',
+  'args.cc',
+  'canon-path.cc',
+  'chunked-vector.cc',
+  'closure.cc',
+  'compression.cc',
+  'config.cc',
+  'file-content-address.cc',
+  'git.cc',
+  'hash.cc',
+  'hilite.cc',
+  'json-utils.cc',
+  'logging.cc',
+  'lru-cache.cc',
+  'nix_api_util.cc',
+  'pool.cc',
+  'references.cc',
+  'spawn.cc',
+  'suggestions.cc',
+  'tests.cc',
+  'url.cc',
+  'xml-writer.cc',
 )
 
 include_dirs = [include_directories('.')]

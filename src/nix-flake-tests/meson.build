@@ -1,4 +1,4 @@
-project('nix-store-test', 'cpp',
+project('nix-flake-tests', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -17,9 +17,8 @@ cxx = meson.get_compiler('cpp')
 subdir('build-utils-meson/deps-lists')
 
 deps_private_maybe_subproject = [
-  dependency('nix-store'),
-  dependency('nix-store-c'),
-  dependency('nix-store-test-support'),
+  dependency('nix-expr-test-support'),
+  dependency('nix-flake'),
 ]
 deps_public_maybe_subproject = [
 ]
@@ -27,16 +26,10 @@ subdir('build-utils-meson/subprojects')
 
 subdir('build-utils-meson/export-all-symbols')
 
-sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
-deps_private += sqlite
-
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
 
 gtest = dependency('gtest', main : true)
-deps_private += gtest
-
-gtest = dependency('gmock')
 deps_private += gtest
 
 add_project_arguments(
@@ -44,31 +37,15 @@ add_project_arguments(
   # It would be nice for our headers to be idempotent instead.
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
+  '-include', 'config-expr.hh',
   language : 'cpp',
 )
 
 subdir('build-utils-meson/diagnostics')
 
 sources = files(
-  'common-protocol.cc',
-  'content-address.cc',
-  'derivation-advanced-attrs.cc',
-  'derivation.cc',
-  'derived-path.cc',
-  'downstream-placeholder.cc',
-  'machines.cc',
-  'nar-info-disk-cache.cc',
-  'nar-info.cc',
-  'nix_api_store.cc',
-  'outputs-spec.cc',
-  'path-info.cc',
-  'path.cc',
-  'references.cc',
-  'serve-protocol.cc',
-  'store-reference.cc',
-  'worker-protocol.cc',
+  'flakeref.cc',
+  'url-name.cc',
 )
 
 include_dirs = [include_directories('.')]

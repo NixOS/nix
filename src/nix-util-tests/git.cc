@@ -88,7 +88,7 @@ TEST_F(GitTest, blob_write) {
 /**
  * This data is for "shallow" tree tests. However, we use "real" hashes
  * so that we can check our test data in a small shell script test test
- * (`src/libutil-test/data/git/check-data.sh`).
+ * (`src/nix-util-tests/data/git/check-data.sh`).
  */
 const static Tree tree = {
     {

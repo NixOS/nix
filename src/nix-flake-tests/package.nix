@@ -6,8 +6,7 @@
 , ninja
 , pkg-config
 
-, nix-expr
-, nix-expr-c
+, nix-flake
 , nix-expr-test-support
 
 , rapidcheck
@@ -39,7 +38,7 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-expr-test";
+  pname = "nix-flake-tests";
   inherit version;
 
   src = fileset.toSource {
@@ -61,8 +60,7 @@ mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
-    nix-expr
-    nix-expr-c
+    nix-flake
     nix-expr-test-support
     rapidcheck
     gtest
@@ -98,7 +96,7 @@ mkDerivation (finalAttrs: {
       } ''
         PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
         export _NIX_TEST_UNIT_DATA=${./data}
-        nix-expr-test
+        nix-flake-tests
         touch $out
       '';
     };

@@ -60,10 +60,10 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ```
 
 The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `src/${library_name_without-nix}-test`.
-Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `src/libexpr-test/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/libexpr-test-support/tests/value/context.{hh,cc}`.
+Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `src/nix-expr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/nix-expr-test-support/tests/value/context.{hh,cc}`.
 
 Data for unit tests is stored in a `data` subdir of the directory for each unit test executable.
-For example, `libnixstore` code is in `src/libstore`, and its test data is in `src/libstore-test/data`.
+For example, `libnixstore` code is in `src/libstore`, and its test data is in `src/nix-store-tests/data`.
 The path to the `src/${library_name_without-nix}-test/data` directory is passed to the unit test executable with the environment variable `_NIX_TEST_UNIT_DATA`.
 Note that each executable only gets the data for its tests.
 

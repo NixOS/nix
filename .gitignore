@@ -49,22 +49,22 @@ perl/Makefile.config
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
 /src/libexpr/tests
-/src/libexpr-test/libnixexpr-tests
+/src/nix-expr-tests/libnixexpr-tests
 
 # /src/libfetchers
-/src/libfetchers-test/libnixfetchers-tests
+/src/nix-fetchers-tests/libnixfetchers-tests
 
 # /src/libflake
-/src/libflake-test/libnixflake-tests
+/src/nix-flake-tests/libnixflake-tests
 
 # /src/libstore/
 *.gen.*
 /src/libstore/tests
-/src/libstore-test/libnixstore-tests
+/src/nix-store-tests/libnixstore-tests
 
 # /src/libutil/
 /src/libutil/tests
-/src/libutil-test/libnixutil-tests
+/src/nix-util-tests/libnixutil-tests
 
 /src/nix/nix
 

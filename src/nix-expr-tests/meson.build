@@ -1,4 +1,4 @@
-project('nix-expr-test', 'cpp',
+project('nix-expr-tests', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',

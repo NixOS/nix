@@ -1,4 +1,4 @@
-project('nix-flake-test', 'cpp',
+project('nix-fetchers-tests', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -17,8 +17,8 @@ cxx = meson.get_compiler('cpp')
 subdir('build-utils-meson/deps-lists')
 
 deps_private_maybe_subproject = [
-  dependency('nix-expr-test-support'),
-  dependency('nix-flake'),
+  dependency('nix-store-test-support'),
+  dependency('nix-fetchers'),
 ]
 deps_public_maybe_subproject = [
 ]
@@ -37,15 +37,14 @@ add_project_arguments(
   # It would be nice for our headers to be idempotent instead.
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
+  '-include', 'config-store.hh',
   language : 'cpp',
 )
 
 subdir('build-utils-meson/diagnostics')
 
 sources = files(
-  'flakeref.cc',
-  'url-name.cc',
+  'public-key.cc',
 )
 
 include_dirs = [include_directories('.')]

@@ -41,21 +41,21 @@ INPUT                  = \
   @src@/libcmd \
   @src@/libexpr \
   @src@/libexpr/flake \
-  @src@/libexpr-test \
-  @src@/libexpr-test/value \
-  @src@/libexpr-test-support/test \
-  @src@/libexpr-test-support/test/value \
+  @src@/nix-expr-tests \
+  @src@/nix-expr-tests/value \
+  @src@/nix-expr-test-support/test \
+  @src@/nix-expr-test-support/test/value \
   @src@/libexpr/value \
   @src@/libfetchers \
   @src@/libmain \
   @src@/libstore \
   @src@/libstore/build \
   @src@/libstore/builtins \
-  @src@/libstore-test \
-  @src@/libstore-test-support/test \
+  @src@/nix-store-tests \
+  @src@/nix-store-test-support/test \
   @src@/libutil \
-  @src@/libutil-test \
-  @src@/libutil-test-support/test \
+  @src@/nix-util-tests \
+  @src@/nix-util-test-support/test \
   @src@/nix \
   @src@/nix-env \
   @src@/nix-store

@@ -6,8 +6,9 @@
 , ninja
 , pkg-config
 
-, nix-fetchers
-, nix-store-test-support
+, nix-util
+, nix-util-c
+, nix-util-test-support
 
 , rapidcheck
 , gtest
@@ -38,7 +39,7 @@ let
 in
 
 mkDerivation (finalAttrs: {
-  pname = "nix-fetchers-test";
+  pname = "nix-util-tests";
   inherit version;
 
   src = fileset.toSource {
@@ -60,8 +61,9 @@ mkDerivation (finalAttrs: {
   ];
 
   buildInputs = [
-    nix-fetchers
-    nix-store-test-support
+    nix-util
+    nix-util-c
+    nix-util-test-support
     rapidcheck
     gtest
   ];
@@ -96,7 +98,7 @@ mkDerivation (finalAttrs: {
       } ''
         PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
         export _NIX_TEST_UNIT_DATA=${./data}
-        nix-fetchers-test
+        nix-util-tests
         touch $out
       '';
     };
