@@ -76,8 +76,25 @@ there is no risk of any build-system wildcards for the library accidentally pick
 
 ### Running tests
 
-You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`.
-Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable, e.g. `GTEST_FILTER='ErrorTraceTest.*' make check`.
+You can run the whole testsuite with `meson test` from the Meson build directory, or the tests for a specific component with `meson test nix-store-tests`.
+A environment variables that Google Test accepts are also worth knowing:
+
+1. [`GTEST_FILTER`](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests)
+
+   This is used for finer-grained filtering of which tests to run.
+
+
+2. [`GTEST_BRIEF`](https://google.github.io/googletest/advanced.html#suppressing-test-passes)
+
+   This is used to avoid logging passing tests.
+
+Putting the two together, one might run
+
+```bash
+GTEST_BREIF=1 GTEST_FILTER='ErrorTraceTest.*' meson test nix-expr-tests -v
+```
+
+for short but comprensive output.
 
 ### Characterisation testing { #characaterisation-testing-unit }
 
@@ -86,7 +103,7 @@ See [functional characterisation testing](#characterisation-testing-functional) 
 Like with the functional characterisation, `_NIX_TEST_ACCEPT=1` is also used.
 For example:
 ```shell-session
-$ _NIX_TEST_ACCEPT=1 make libstore-tests_RUN
+$ _NIX_TEST_ACCEPT=1 meson test nix-store-tests -v
 ...
 [  SKIPPED ] WorkerProtoTest.string_read
 [  SKIPPED ] WorkerProtoTest.string_write

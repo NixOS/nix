@@ -81,4 +81,11 @@ this_exe = executable(
   install : true,
 )
 
-test(meson.project_name(), this_exe, env : ['_NIX_TEST_UNIT_DATA=' + meson.current_source_dir() + '/data'])
+test(
+  meson.project_name(),
+  this_exe,
+  env : {
+    '_NIX_TEST_UNIT_DATA': meson.current_source_dir() / 'data',
+  },
+  protocol : 'gtest',
+)
