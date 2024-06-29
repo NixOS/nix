@@ -163,7 +163,7 @@ private:
     EvalState & state;
     PrintOptions options;
     std::optional<ValuesSeen> seen;
-    size_t attrsPrinted = 0;
+    size_t totalAttrsPrinted = 0;
     size_t listItemsPrinted = 0;
     std::string indent;
 
@@ -350,7 +350,7 @@ private:
             for (auto & i : sorted) {
                 printSpace(prettyPrint);
 
-                if (attrsPrinted >= options.maxAttrs) {
+                if (totalAttrsPrinted >= options.maxAttrs) {
                     printElided(sorted.size() - currentAttrsPrinted, "attribute", "attributes");
                     break;
                 }
@@ -359,7 +359,7 @@ private:
                 output << " = ";
                 print(*i.second, depth + 1);
                 output << ";";
-                attrsPrinted++;
+                totalAttrsPrinted++;
                 currentAttrsPrinted++;
             }
 
@@ -591,7 +591,7 @@ public:
 
     void print(Value & v)
     {
-        attrsPrinted = 0;
+        totalAttrsPrinted = 0;
         listItemsPrinted = 0;
         indent.clear();
 
