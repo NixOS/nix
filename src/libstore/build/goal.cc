@@ -173,8 +173,7 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
     }
 }
 
-
-Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
+Co Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
     trace("done");
     assert(exitCode == ecBusy);
@@ -196,6 +195,9 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
     worker.removeGoal(shared_from_this());
 
     cleanup();
+
+    // won't return to caller because of logic in final_awaiter
+    co_return Return{};
 }
 
 

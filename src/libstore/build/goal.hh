@@ -109,16 +109,7 @@ public:
      * Suspend our goal and wait until we get work()-ed again.
      */
     struct SuspendGoal {};
-    struct SuspendGoalAwaiter {
-        bool wait;
-        bool await_ready() { return !wait; }
-        void await_suspend(std::coroutine_handle<> handle) {}
-        void await_resume() {}
-    };
-    struct [[nodiscard]] Done {
-        private:
-        Done() {}
-    };
+    struct Return {};
     struct promise_type;
     using handle_type = std::coroutine_handle<promise_type>;
     // FIXME: Allocate explicitly on stack since HALO thing doesn't really work,
@@ -165,21 +156,12 @@ public:
             return {};
         };
         final_awaiter final_suspend() noexcept { return {}; };
-        // Same as returning void, but makes it clear that we're done.
-        // Should ideally call `done` rather than `done` giving you a `Done`.
-        // `final_suspend` will be called after this (since we're returning),
-        // and that will give us a `final_awaiter`, which will stop the coroutine
-        // from executing since `exitCode != ecBusy`.
-        void return_value(Done) {
-            assert(goal.exitCode != ecBusy);
-        }
+        void return_value(Return) {}
         void return_value(Co&&);
         void unhandled_exception() { throw; };
 
         Co&& await_transform(Co&& co) { return static_cast<Co&&>(co); }
-        // FIXME: maybe only await when there are children
-        // SuspendGoalAwaiter await_transform(SuspendGoal) { return SuspendGoalAwaiter{!goal.waitees.empty()}; };
-        SuspendGoalAwaiter await_transform(SuspendGoal) { return SuspendGoalAwaiter{true}; };
+        std::suspend_always await_transform(SuspendGoal) { return {}; };
     };
     /**
      * The coroutine being currently executed.
@@ -192,7 +174,7 @@ public:
     virtual Co init() = 0;
     inline Co init_wrapper();
 
-    Done amDone(ExitCode result, std::optional<Error> ex = {});
+    Co amDone(ExitCode result, std::optional<Error> ex = {});
 
     virtual void cleanup() { }
 

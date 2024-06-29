@@ -76,7 +76,7 @@ struct PathSubstitutionGoal : public Goal
      */
     std::optional<ContentAddress> ca;
 
-    Done done(
+    Co done(
         ExitCode result,
         BuildResult::Status status,
         std::optional<std::string> errorMsg = {});
