@@ -96,6 +96,7 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+        cachixArgs: '-v'
     - id: prepare-installer
       run: scripts/prepare-installer-for-github-actions
 
