@@ -1,5 +1,6 @@
 { lib
 , stdenv
+, mkMesonDerivation
 , releaseTools
 
 , meson
@@ -38,22 +39,22 @@ let
     else stdenv.mkDerivation;
 in
 
-mkDerivation (finalAttrs: {
+mkMesonDerivation (finalAttrs: {
   pname = "nix-util";
   inherit version;
 
-  src = fileset.toSource {
-    root = ./.;
-    fileset = fileset.unions [
-      ./meson.build
-      ./meson.options
-      ./linux/meson.build
-      ./unix/meson.build
-      ./windows/meson.build
-      (fileset.fileFilter (file: file.hasExt "cc") ./.)
-      (fileset.fileFilter (file: file.hasExt "hh") ./.)
-    ];
-  };
+  workDir = ./.;
+  fileset = fileset.unions [
+    ../../.version
+    ./.version
+    ./meson.build
+    ./meson.options
+    ./linux/meson.build
+    ./unix/meson.build
+    ./windows/meson.build
+    (fileset.fileFilter (file: file.hasExt "cc") ./.)
+    (fileset.fileFilter (file: file.hasExt "hh") ./.)
+  ];
 
   outputs = [ "out" "dev" ];
 
@@ -80,9 +81,10 @@ mkDerivation (finalAttrs: {
   disallowedReferences = [ boost ];
 
   preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix
+    # TODO: change release process to add `pre` in `.version`, remove it before tagging, and restore after.
     ''
-      echo ${version} > .version
+      chmod u+w ./.version
+      echo ${version} > ../../.version
     ''
     # Copy some boost libraries so we don't get all of Boost in our
     # closure. https://github.com/NixOS/nixpkgs/issues/45462
