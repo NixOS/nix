@@ -49,7 +49,9 @@ struct EvalSettings : Config
           $NIX_STATE_DIR/profiles/per-user/root/channels
           ```
 
-          It can be overridden with the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH) or the [`-I` command line option](@docroot@/command-ref/opt-common.md#opt-I).
+          It can be overridden with the [`-I` command line option](@docroot@/command-ref/opt-common.md#opt-I).
+
+          Due to a bug in Nix versions ≥2.13 and <2.24, `nix-path` overrides the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH) when set.
 
           > **Note**
           >
