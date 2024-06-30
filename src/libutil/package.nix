@@ -81,9 +81,14 @@ mkMesonDerivation (finalAttrs: {
   disallowedReferences = [ boost ];
 
   preConfigure =
+    # TODO: change release process to add `pre` in `.version`, remove it before tagging, and restore after.
+    ''
+      chmod u+w ./.version
+      echo ${version} > ../../.version
+    ''
     # Copy some boost libraries so we don't get all of Boost in our
     # closure. https://github.com/NixOS/nixpkgs/issues/45462
-    lib.optionalString (!stdenv.hostPlatform.isStatic) (''
+    + lib.optionalString (!stdenv.hostPlatform.isStatic) (''
       mkdir -p $out/lib
       cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
       rm -f $out/lib/*.a
