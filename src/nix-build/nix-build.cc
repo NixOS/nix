@@ -585,7 +585,7 @@ static void main_nix_build(int argc, char * * argv)
                 shellEscape(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                shellEscape(dirOf(*shell)),
+                shellEscape(dirOf(*shell).string()),
                 shellEscape(*shell),
                 (getenv("TZ") ? (std::string("export TZ=") + shellEscape(getenv("TZ")) + "; ") : ""),
                 envCommand);

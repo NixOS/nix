@@ -137,7 +137,7 @@ static auto rCmdRun = registerCommand<CmdRun>("run");
 void chrootHelper(int argc, char * * argv)
 {
     int p = 1;
-    std::string storeDir = argv[p++];
+    std::filesystem::path storeDir = argv[p++];
     std::string realStoreDir = argv[p++];
     std::string system = argv[p++];
     std::string cmd = argv[p++];
@@ -167,9 +167,9 @@ void chrootHelper(int argc, char * * argv)
 
         Path tmpDir = createTempDir();
 
-        createDirs(tmpDir + storeDir);
+        createDirs(tmpDir / storeDir);
 
-        if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
+        if (mount(realStoreDir.c_str(), (tmpDir / storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
         for (auto entry : std::filesystem::directory_iterator{"/"}) {

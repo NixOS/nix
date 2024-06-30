@@ -118,6 +118,11 @@ protected:
             , arity(1)
         { }
 
+        Handler(std::optional<std::filesystem::path> * dest)
+            : fun([=](std::vector<std::string> ss) { *dest = std::filesystem::path { ss[0] }; })
+            , arity(1)
+        { }
+
         template<class T>
         Handler(T * dest, const T & val)
             : fun([dest, val](std::vector<std::string> ss) { *dest = val; })

@@ -359,13 +359,13 @@ EvalState::~EvalState()
 void EvalState::allowPath(const Path & path)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-        rootFS2->allowPrefix(CanonPath(path));
+        rootFS2->allowPrefix(CanonPath(path.string()));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-        rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath)));
+        rootFS2->allowPrefix(CanonPath(store->toRealPath(storePath).string()));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
@@ -1970,7 +1970,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.error<EvalError>("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow();
-        v.mkPath(state.rootPath(CanonPath(canonPath(str()))));
+        v.mkPath(state.rootPath(CanonPath(canonPath(str()).string())));
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2738,7 +2738,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         auto r = *rOpt;
 
         Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
+        if (pathExists(res)) return rootPath(CanonPath(canonPath(res).string()));
     }
 
     if (hasPrefix(path, "nix/"))

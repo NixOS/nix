@@ -428,10 +428,10 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 for (auto it = begin; it != end; it++) {
                     auto & [name, profileElement] = *it;
                     for (auto & storePath : profileElement.storePaths) {
-                        if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
+                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
                             return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
                         }
-                        if (conflictError.fileB.starts_with(store->printStorePath(storePath))) {
+                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
                             return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
                         }
                     }

@@ -115,13 +115,13 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         printInfo("found Nix in '%s'", where);
 
-        if (hasPrefix(where, "/run/current-system"))
+        if (hasPrefix(where.string(), "/run/current-system"))
             throw Error("Nix on NixOS must be upgraded via 'nixos-rebuild'");
 
         Path profileDir = dirOf(where);
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
-        while (canonPath(profileDir).find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
+        while (canonPath(profileDir).string().find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
             profileDir = readLink(profileDir);
 
         printInfo("found profile '%s'", profileDir);
@@ -129,7 +129,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Path userEnv = canonPath(profileDir, true);
 
         if (baseNameOf(where) != "bin" ||
-            !hasSuffix(userEnv, "user-environment"))
+            !hasSuffix(userEnv.string(), "user-environment"))
             throw Error("directory '%s' does not appear to be part of a Nix profile", where);
 
         if (!store->isValidPath(store->parseStorePath(userEnv)))
@@ -152,8 +152,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         state->eval(state->parseExprFromString(res.data, state->rootPath(CanonPath("/no-such-path"))), *v);
         Bindings & bindings(*state->allocBindings(0));
         auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
-
-        return store->parseStorePath(state->forceString(*v2, noPos, "while evaluating the path tho latest nix version"));
+        auto p = PathView{state->forceString(*v2, noPos, "while evaluating the path tho latest nix version")};
+        return store->parseStorePath(p);
     }
 };
 

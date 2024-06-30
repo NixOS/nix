@@ -100,11 +100,11 @@ struct CmdConfigCheck : StoreCommand
             try {
                 Path userEnv = canonPath(profileDir, true);
 
-                if (store->isStorePath(userEnv) && hasSuffix(userEnv, "user-environment")) {
-                    while (profileDir.find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
+                if (store->isStorePath(userEnv) && hasSuffix(userEnv.string(), "user-environment")) {
+                    while (profileDir.string().find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
                         profileDir = absPath(readLink(profileDir), dirOf(profileDir));
 
-                    if (profileDir.find("/profiles/") == std::string::npos)
+                    if (profileDir.string().find("/profiles/") == std::string::npos)
                         dirs.insert(dir);
                 }
             } catch (SystemError &) {

@@ -50,7 +50,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 
 std::tuple<StorePath, Hash> prefetchFile(
         ref<Store> store,
-        std::string_view url,
+        PathView url,
         std::optional<std::string> name,
         HashAlgorithm hashAlgo,
         std::optional<Hash> expectedHash,
@@ -110,7 +110,7 @@ std::tuple<StorePath, Hash> prefetchFile(
         if (unpack) {
             Activity act(*logger, lvlChatty, actUnknown,
                 fmt("unpacking '%s'", url));
-            auto unpacked = (tmpDir.path() / "unpacked").string();
+            auto unpacked = tmpDir.path() / "unpacked";
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
 

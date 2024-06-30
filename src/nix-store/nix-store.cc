@@ -491,7 +491,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1) throw UsageError("'--print-env' requires one derivation store path");
 
     Path drvPath = opArgs.front();
-    Derivation drv = store->derivationFromPath(store->parseStorePath(drvPath));
+    Derivation drv = store->derivationFromPath(store->parseStorePath(drvPath.string()));
 
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */

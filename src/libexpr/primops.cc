@@ -134,7 +134,7 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, st
         if (!context.empty() && path.accessor == state.rootFS) {
             auto rewrites = state.realiseContext(context);
             auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
-            path = {path.accessor, CanonPath(realPath)};
+            path = {path.accessor, CanonPath(realPath.string())};
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
@@ -1611,7 +1611,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
     if (!state.store->isStorePath(path.abs()))
-        path = CanonPath(canonPath(path.abs(), true));
+        path = CanonPath(canonPath(PathView{path.abs()}, true).string());
     if (!state.store->isInStore(path.abs()))
         state.error<EvalError>("path '%1%' is not in the Nix store", path)
             .atPos(pos).debugThrow();
@@ -1737,7 +1737,7 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value * * args, Valu
         auto path = state.coerceToString(pos, *args[0], context,
             "while evaluating the first argument passed to 'builtins.dirOf'",
             false, false);
-        auto dir = dirOf(*path);
+        auto dir = dirOf(PathView{*path}).string();
         v.mkString(dir, context);
     }
 }
@@ -2356,7 +2356,8 @@ static void addPath(
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
             auto rewrites = state.realiseContext(context);
-            path = {state.rootFS, CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context))};
+            auto realPath = state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context);
+            path = {state.rootFS, CanonPath(realPath.string())};
 
             try {
                 auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
@@ -2370,7 +2371,7 @@ static void addPath(
         std::unique_ptr<PathFilter> filter;
         if (filterFun)
             filter = std::make_unique<PathFilter>([&](const Path & p) {
-                auto p2 = CanonPath(p);
+                auto p2 = CanonPath(p.string());
                 return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
             });
 
@@ -4662,7 +4663,7 @@ void EvalState::createBaseEnv()
         )",
     });
 
-    v.mkString(store->storeDir);
+    v.mkString(store->storeDir.string());
     addConstant("__storeDir", v, {
         .type = nString,
         .doc = R"(

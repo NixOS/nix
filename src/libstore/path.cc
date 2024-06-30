@@ -75,7 +75,7 @@ StorePath StorePath::random(std::string_view name)
     return StorePath(Hash::random(HashAlgorithm::SHA1), name);
 }
 
-StorePath StoreDirConfig::parseStorePath(std::string_view path) const
+StorePath StoreDirConfig::parseStorePath(PathView path) const
 {
     // On Windows, `/nix/store` is not a canonical path. More broadly it
     // is unclear whether this function should be using the native
@@ -92,6 +92,15 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
     if (dirOf(p) != storeDir)
         throw BadStorePath("path '%s' is not in the Nix store", p);
     return StorePath(baseNameOf(p));
+}
+
+std::set<StorePath> StoreDirConfig::parseStorePathSet(PathSet paths) const
+{
+    std::set<StorePath> result;
+    for (auto &p : paths) {
+        result.insert(parseStorePath(p.string()));
+    }
+    return result;
 }
 
 std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
@@ -111,6 +120,15 @@ bool StoreDirConfig::isStorePath(PathView path) const
 std::string StoreDirConfig::printStorePath(const StorePath & path) const
 {
     return (storeDir + "/").append(path.to_string());
+}
+
+std::set<std::string> StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
+{
+    std::set<std::string> result;
+    for (auto & p : paths)
+        result.insert(printStorePath(p));
+
+    return result;
 }
 
 }
