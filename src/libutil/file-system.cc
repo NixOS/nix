@@ -127,7 +127,7 @@ Path dirOf(const PathView path)
 }
 
 
-std::string_view baseNameOf(std::string_view path)
+std::string_view baseNameOf(PathView path)
 {
     if (path.empty())
         return "";

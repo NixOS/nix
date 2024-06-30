@@ -67,7 +67,7 @@ TEST_F(GitTest, blob_read) {
         StringSink out;
         RegularFileSink out2 { out };
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Blob);
-        parseBlob(out2, "", in, BlobMode::Regular, mockXpSettings);
+        parseBlob(out2, CanonPath{""}, in, BlobMode::Regular, mockXpSettings);
 
         auto expected = readFile(goldenMaster("hello-world.bin"));
 
@@ -132,8 +132,8 @@ TEST_F(GitTest, tree_read) {
         NullFileSystemObjectSink out;
         Tree got;
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Tree);
-        parseTree(out, "", in, [&](auto & name, auto entry) {
-            auto name2 = name;
+        parseTree(out, CanonPath{""}, in, [&](auto & name, auto entry) {
+            auto name2 = std::string{name.rel()};
             if (entry.mode == Mode::Directory)
                 name2 += '/';
             got.insert_or_assign(name2, std::move(entry));
@@ -210,14 +210,14 @@ TEST_F(GitTest, both_roundrip) {
 
     MemorySink sinkFiles2 { *files2 };
 
-    std::function<void(const Path, const Hash &, BlobMode)> mkSinkHook;
+    std::function<void(const CanonPath, const Hash &, BlobMode)> mkSinkHook;
     mkSinkHook = [&](auto prefix, auto & hash, auto blobMode) {
         StringSource in { cas[hash] };
         parse(
             sinkFiles2, prefix, in, blobMode,
-            [&](const Path & name, const auto & entry) {
+            [&](const CanonPath & name, const auto & entry) {
                 mkSinkHook(
-                    prefix + "/" + name,
+                    prefix / name,
                     entry.hash,
                     // N.B. this cast would not be acceptable in real
                     // code, because it would make an assert reachable,
@@ -227,7 +227,7 @@ TEST_F(GitTest, both_roundrip) {
             mockXpSettings);
     };
 
-    mkSinkHook("", root.hash, BlobMode::Regular);
+    mkSinkHook(CanonPath{""}, root.hash, BlobMode::Regular);
 
     ASSERT_EQ(*files, *files2);
 }

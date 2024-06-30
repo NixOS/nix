@@ -14,7 +14,7 @@ namespace nix {
 
 void copyRecursive(
     SourceAccessor & accessor, const CanonPath & from,
-    FileSystemObjectSink & sink, const Path & to)
+    FileSystemObjectSink & sink, const CanonPath & to)
 {
     auto stat = accessor.lstat(from);
 
@@ -43,7 +43,7 @@ void copyRecursive(
         for (auto & [name, _] : accessor.readDirectory(from)) {
             copyRecursive(
                 accessor, from / name,
-                sink, to + "/" + name);
+                sink, to / name);
             break;
         }
         break;
@@ -69,17 +69,9 @@ static RestoreSinkSettings restoreSinkSettings;
 static GlobalConfig::Register r1(&restoreSinkSettings);
 
 
-void RestoreSink::createDirectory(const Path & path)
+void RestoreSink::createDirectory(const CanonPath & path)
 {
-    Path p = dstPath + path;
-    if (
-#ifndef _WIN32 // TODO abstract mkdir perms for Windows
-        mkdir(p.c_str(), 0777) == -1
-#else
-        !CreateDirectoryW(pathNG(p).c_str(), NULL)
-#endif
-        )
-        throw NativeSysError("creating directory '%1%'", p);
+    std::filesystem::create_directory(dstPath / path.rel());
 };
 
 struct RestoreRegularFile : CreateRegularFileSink {
@@ -90,13 +82,14 @@ struct RestoreRegularFile : CreateRegularFileSink {
     void preallocateContents(uint64_t size) override;
 };
 
-void RestoreSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
-    Path p = dstPath + path;
+    std::cout << "SCREAM!!!====== " << dstPath / path.rel() << std::endl;
+    std::filesystem::path p = dstPath / path.rel();
     RestoreRegularFile crf;
     crf.fd =
 #ifdef _WIN32
-        CreateFileW(pathNG(path).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+        CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
 #else
         open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
 #endif
@@ -141,14 +134,14 @@ void RestoreRegularFile::operator () (std::string_view data)
     writeFull(fd.get(), data);
 }
 
-void RestoreSink::createSymlink(const Path & path, const std::string & target)
+void RestoreSink::createSymlink(const CanonPath & path, const std::string & target)
 {
-    Path p = dstPath + path;
+    std::filesystem::path p = dstPath / path.rel();
     nix::createSymlink(target, p);
 }
 
 
-void RegularFileSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void RegularFileSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     struct CRF : CreateRegularFileSink {
         RegularFileSink & back;
@@ -163,7 +156,7 @@ void RegularFileSink::createRegularFile(const Path & path, std::function<void(Cr
 }
 
 
-void NullFileSystemObjectSink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void NullFileSystemObjectSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
     struct : CreateRegularFileSink {
         void operator () (std::string_view data) override {}

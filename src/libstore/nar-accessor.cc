@@ -71,9 +71,9 @@ struct NarAccessor : public SourceAccessor
             : acc(acc), source(source)
         { }
 
-        NarMember & createMember(const Path & path, NarMember member)
+        NarMember & createMember(const CanonPath & path, NarMember member)
         {
-            size_t level = std::count(path.begin(), path.end(), '/');
+            size_t level = std::count(path.rel().begin(), path.rel().end(), '/');
             while (parents.size() > level) parents.pop();
 
             if (parents.empty()) {
@@ -83,14 +83,14 @@ struct NarAccessor : public SourceAccessor
             } else {
                 if (parents.top()->stat.type != Type::tDirectory)
                     throw Error("NAR file missing parent directory of path '%s'", path);
-                auto result = parents.top()->children.emplace(baseNameOf(path), std::move(member));
+                auto result = parents.top()->children.emplace(baseNameOf(path.rel()), std::move(member));
                 auto & ref = result.first->second;
                 parents.push(&ref);
                 return ref;
             }
         }
 
-        void createDirectory(const Path & path) override
+        void createDirectory(const CanonPath & path) override
         {
             createMember(path, NarMember{ .stat = {
                 .type = Type::tDirectory,
@@ -100,7 +100,7 @@ struct NarAccessor : public SourceAccessor
             } });
         }
 
-        void createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func) override
+        void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
         {
             auto & nm = createMember(path, NarMember{ .stat = {
                 .type = Type::tRegular,
@@ -112,7 +112,7 @@ struct NarAccessor : public SourceAccessor
             func(nmc);
         }
 
-        void createSymlink(const Path & path, const std::string & target) override
+        void createSymlink(const CanonPath & path, const std::string & target) override
         {
             createMember(path,
                 NarMember{
