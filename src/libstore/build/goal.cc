@@ -17,14 +17,9 @@ void Co::operator=(Co&& rhs) {
     rhs.handle = nullptr;
 }
 Co::~Co() {
-    std::clog << "destroying coroutine" << std::endl;
     if (handle) {
-        assert(handle);
         handle.promise().alive = false;
-        // assert(handle.done());
         handle.destroy();
-    } else {
-        std::clog << "empty coroutine destroyed" << std::endl;
     }
 }
 
