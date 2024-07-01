@@ -112,12 +112,14 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
             static_cast<std::align_val_t>(alignof(EvalState)));
         auto * p2 = static_cast<EvalState *>(p);
         new (p) EvalState {
+            .fetchSettings = nix::fetchers::Settings{},
             .settings = nix::EvalSettings{
                 nix::settings.readOnlyMode,
             },
             .state = nix::EvalState(
                 nix::LookupPath::parse(lookupPath),
                 store->ptr,
+                p2->fetchSettings,
                 p2->settings),
         };
         loadConfFile(p2->settings);

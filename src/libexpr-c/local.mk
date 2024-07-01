@@ -15,7 +15,7 @@ libexprc_CXXFLAGS += $(INCLUDE_libutil) $(INCLUDE_libutilc) \
                      $(INCLUDE_libstore) $(INCLUDE_libstorec) \
                      $(INCLUDE_libexpr) $(INCLUDE_libexprc)
 
-libexprc_LIBS = libutil libutilc libstore libstorec libexpr
+libexprc_LIBS = libutil libutilc libstore libstorec libfetchers libexpr
 
 libexprc_LDFLAGS += $(THREAD_LDFLAGS)
 

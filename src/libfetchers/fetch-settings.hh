@@ -9,11 +9,11 @@
 
 #include <sys/types.h>
 
-namespace nix {
+namespace nix::fetchers {
 
-struct FetchSettings : public Config
+struct Settings : public Config
 {
-    FetchSettings();
+    Settings();
 
     Setting<StringMap> accessTokens{this, {}, "access-tokens",
         R"(
@@ -84,9 +84,14 @@ struct FetchSettings : public Config
           `narHash` attribute is specified,
           e.g. `github:NixOS/patchelf/7c2f768bf9601268a4e71c2ebe91e2011918a70f?narHash=sha256-PPXqKY2hJng4DBVE0I4xshv/vGLUskL7jl53roB8UdU%3D`.
         )"};
-};
 
-// FIXME: don't use a global variable.
-extern FetchSettings fetchSettings;
+    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
+        R"(
+          Path or URI of the global flake registry.
+
+          When empty, disables the global flake registry.
+        )",
+        {}, true, Xp::Flakes};
+};
 
 }

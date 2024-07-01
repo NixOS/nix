@@ -1,5 +1,4 @@
 #include "users.hh"
-#include "config-global.hh"
 #include "globals.hh"
 #include "profiles.hh"
 #include "eval.hh"

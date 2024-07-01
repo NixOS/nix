@@ -217,9 +217,11 @@ static constexpr size_t BASE_ENV_SIZE = 128;
 EvalState::EvalState(
     const LookupPath & _lookupPath,
     ref<Store> store,
+    const fetchers::Settings & fetchSettings,
     const EvalSettings & settings,
     std::shared_ptr<Store> buildStore)
-    : settings{settings}
+    : fetchSettings{fetchSettings}
+    , settings{settings}
     , sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))

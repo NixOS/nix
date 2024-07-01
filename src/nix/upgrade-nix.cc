@@ -147,7 +147,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto req = FileTransferRequest((std::string&) settings.upgradeNixStorePathUrl);
         auto res = getFileTransfer()->download(req);
 
-        auto state = std::make_unique<EvalState>(LookupPath{}, store, evalSettings);
+        auto state = std::make_unique<EvalState>(LookupPath{}, store, fetchSettings, evalSettings);
         auto v = state->allocValue();
         state->eval(state->parseExprFromString(res.data, state->rootPath(CanonPath("/no-such-path"))), *v);
         Bindings & bindings(*state->allocBindings(0));
