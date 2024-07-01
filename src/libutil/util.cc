@@ -207,7 +207,7 @@ void ignoreException(Verbosity lvl)
         try {
             throw;
         } catch (std::exception & e) {
-            printMsg(lvl, "error (ignored): %1%", e.what());
+            printMsg(lvl, "exception thrown but ignored: %1%", e.what());
         }
     } catch (...) { }
 }
