@@ -86,14 +86,18 @@ mkMesonDerivation (finalAttrs: {
   passthru = {
     tests = {
       run = let
-        # Inline some drv files shared with the libexpr tests
-        data = runCommand "${finalAttrs.pname}-test-data" {} ''
-          cp -r --no-preserve=mode ${./data} $out
-          cp -r --remove-destination ${../../tests/functional/derivation}/* $out/derivation/
-        '';
+        # Some data is shared with the functional tests: they create it,
+        # we consume it.
+        data = lib.fileset.toSource {
+          root = ../..;
+          fileset = lib.fileset.unions [
+            ./data
+            ../../tests/functional/derivation
+          ];
+        };
       in runCommand "${finalAttrs.pname}-run" {} ''
         PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
-        export _NIX_TEST_UNIT_DATA=${data}
+        export _NIX_TEST_UNIT_DATA=${data + "/src/nix-store-test/data"}
         nix-store-tests
         touch $out
       '';
