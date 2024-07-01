@@ -18,25 +18,12 @@
 # Configuration Options
 
 , versionSuffix ? ""
-
-# Check test coverage of Nix. Probably want to use with at least
-# one of `doCheck` or `doInstallCheck` enabled.
-, withCoverageChecks ? false
 }:
 
 let
   inherit (lib) fileset;
 
   version = lib.fileContents ./.version + versionSuffix;
-
-  mkDerivation =
-    if withCoverageChecks
-    then
-      # TODO support `finalAttrs` args function in
-      # `releaseTools.coverageAnalysis`.
-      argsFun:
-         releaseTools.coverageAnalysis (let args = argsFun args; in args)
-    else stdenv.mkDerivation;
 in
 
 mkMesonDerivation (finalAttrs: {
@@ -45,6 +32,8 @@ mkMesonDerivation (finalAttrs: {
 
   workDir = ./.;
   fileset = fileset.unions [
+    ../../build-utils-meson
+    ./build-utils-meson
     ../../.version
     ./.version
     ./meson.build
@@ -78,12 +67,14 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   preConfigure =
-    # TODO: change release process to add `pre` in `.version`, remove it before tagging, and restore after.
+    # "Inline" .version so it's not a symlink, and includes the suffix.
     # Do the meson utils, without modification.
+    #
+    # TODO: change release process to add `pre` in `.version`, remove it
+    # before tagging, and restore after.
     ''
       chmod u+w ./.version
       echo ${version} > ../../.version
-      cp -r ${../../build-utils-meson} build-utils-meson
     '';
 
   mesonFlags = [
@@ -103,8 +94,7 @@ mkMesonDerivation (finalAttrs: {
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
-  # TODO Always true after https://github.com/NixOS/nixpkgs/issues/318564
-  strictDeps = !withCoverageChecks;
+  strictDeps = true;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
@@ -112,8 +102,4 @@ mkMesonDerivation (finalAttrs: {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
 
-} // lib.optionalAttrs withCoverageChecks {
-  lcovFilter = [ "*/boost/*" "*-tab.*" ];
-
-  hardeningDisable = [ "fortify" ];
 })

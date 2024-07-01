@@ -1,5 +1,6 @@
 { lib
 , stdenv
+, mkMesonDerivation
 , releaseTools
 
 , meson
@@ -15,40 +16,28 @@
 # Configuration Options
 
 , versionSuffix ? ""
-
-# Check test coverage of Nix. Probably want to use with with at least
-# one of `doCheck` or `doInstallCheck` enabled.
-, withCoverageChecks ? false
-
 }:
 
 let
   inherit (lib) fileset;
 
   version = lib.fileContents ./.version + versionSuffix;
-
-  mkDerivation =
-    if withCoverageChecks
-    then
-      # TODO support `finalAttrs` args function in
-      # `releaseTools.coverageAnalysis`.
-      argsFun:
-         releaseTools.coverageAnalysis (let args = argsFun args; in args)
-    else stdenv.mkDerivation;
 in
 
-mkDerivation (finalAttrs: {
+mkMesonDerivation (finalAttrs: {
   pname = "nix-fetchers";
   inherit version;
 
-  src = fileset.toSource {
-    root = ./.;
-    fileset = fileset.unions [
-      ./meson.build
-      (fileset.fileFilter (file: file.hasExt "cc") ./.)
-      (fileset.fileFilter (file: file.hasExt "hh") ./.)
-    ];
-  };
+  workDir = ./.;
+  fileset = fileset.unions [
+    ../../build-utils-meson
+    ./build-utils-meson
+    ../../.version
+    ./.version
+    ./meson.build
+    (fileset.fileFilter (file: file.hasExt "cc") ./.)
+    (fileset.fileFilter (file: file.hasExt "hh") ./.)
+  ];
 
   outputs = [ "out" "dev" ];
 
@@ -72,8 +61,8 @@ mkDerivation (finalAttrs: {
     # "Inline" .version so it's not a symlink, and includes the suffix.
     # Do the meson utils, without modification.
     ''
-      echo ${version} > .version
-      cp -r ${../../build-utils-meson} build-utils-meson
+      chmod u+w ./.version
+      echo ${version} > ../../.version
     '';
 
   env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
@@ -86,7 +75,7 @@ mkDerivation (finalAttrs: {
 
   # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
   # to work with `strictDeps`.
-  strictDeps = !withCoverageChecks;
+  strictDeps = true;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
@@ -94,8 +83,4 @@ mkDerivation (finalAttrs: {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
 
-} // lib.optionalAttrs withCoverageChecks {
-  lcovFilter = [ "*-tab.*" ];
-
-  hardeningDisable = ["fortify"];
 })
