@@ -927,7 +927,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         std::string_view relTargetLeft(relTarget);
         while (hasPrefix(relTargetLeft, "../")) {
             if (dir == pendingDirs.rend())
-                throw Error("invalid hard link target '%s'", target);
+                throw Error("invalid hard link target '%s' for path '%s'", target, path);
             ++dir;
             relTargetLeft = relTargetLeft.substr(3);
         }
@@ -940,13 +940,14 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
         for (auto & c : CanonPath(relTargetLeft)) {
             if (auto builder = std::get_if<git_treebuilder *>(&curDir)) {
+                assert(*builder);
                 if (!(entry = git_treebuilder_get(*builder, std::string(c).c_str())))
-                    throw Error("cannot find hard link target '%s'", target);
+                    throw Error("cannot find hard link target '%s' for path '%s'", target, path);
                 curDir = *git_tree_entry_id(entry);
             } else if (auto oid = std::get_if<git_oid>(&curDir)) {
                 tree = lookupObject(*repo, *oid, GIT_OBJECT_TREE);
                 if (!(entry = git_tree_entry_byname((const git_tree *) &*tree, std::string(c).c_str())))
-                    throw Error("cannot find hard link target '%s'", target);
+                    throw Error("cannot find hard link target '%s' for path '%s'", target, path);
                 curDir = *git_tree_entry_id(entry);
             }
         }
