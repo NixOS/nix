@@ -369,10 +369,10 @@ struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
                         auto checkNames = evalChecks->getAttrs();
                         for (auto & checkName : checkNames) {
                             // FIXME: update activity
-                            auto b = evalChecks->getAttr(checkName)->getBool();
+                            auto cursor = evalChecks->getAttr(checkName);
+                            auto b = cursor->getBool();
                             if (!b)
-                                // FIXME: show full attrpath
-                                reportError(Error("Evaluation check '%s' failed.", state->symbols[checkName]));
+                                reportError(Error("Evaluation check '%s' failed.", flake_schemas::toAttrPathStr(cursor)));
                         }
                     }
 
