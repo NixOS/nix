@@ -38,24 +38,25 @@ Co promise_type::get_return_object() {
 // thus it must be destroyed.
 std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h) noexcept {
     auto& p = h.promise();
-    p.goal.trace("in final_awaiter");
+    assert(p.goal);
+    p.goal->trace("in final_awaiter");
     // we are still on-going
-    if (p.goal.exitCode == ecBusy) {
-        p.goal.trace("we're busy");
+    if (p.goal->exitCode == ecBusy) {
+        p.goal->trace("we're busy");
         assert(p.alive); // sanity check to make sure it's not been destructed prematurely
-        assert(p.goal.top_co);
-        assert(p.goal.top_co->handle == h);
+        assert(p.goal->top_co);
+        assert(p.goal->top_co->handle == h);
         // we move continuation to the top,
         // note: previous top_co is actually h, so by moving into it,
         // we're calling the destructor on h, DON'T use h and p after this!
         auto c = std::move(p.continuation);
         assert(c);
         auto& goal = p.goal;
-        goal.top_co = std::move(c);
-        return goal.top_co->handle;
+        goal->top_co = std::move(c);
+        return goal->top_co->handle;
     // we are done, give control back to caller of top_co.resume()
     } else {
-        p.goal.top_co = {};
+        p.goal->top_co = {};
         return std::noop_coroutine();
     }
 }
@@ -70,11 +71,15 @@ std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h
 // the handle to which is on our stack.
 // We thus give it to our previous continuation.
 void promise_type::return_value(Co&& next) {
-    goal.trace("return_value(Co&&)");
+    goal->trace("return_value(Co&&)");
     // we save our old continuation
     auto old_continuation = std::move(continuation);
     // we set our continuation to next
     continuation = std::move(next);
+    // next must not have a goal already
+    assert(!continuation->handle.promise().goal);
+    // next's goal is set to our goal
+    continuation->handle.promise().goal = goal;
     // next must be continuation-less
     assert(!continuation->handle.promise().continuation);
     // next's continuation is set to the old continuation
@@ -90,17 +95,18 @@ void promise_type::return_value(Co&& next) {
 // When we `co_await Co_returning_function()`, this function is called on the resultant Co of
 // the _called_ function, and C++ automatically passes the caller in.
 // We don't use this caller, because we make use of the invariant that top_co == caller.
-std::coroutine_handle<> Co::await_suspend(handle_type caller) {
+std::coroutine_handle<> nix::Goal::Co::await_suspend(handle_type caller) {
     assert(handle); // we must be a valid coroutine
     auto& p = handle.promise();
     assert(!p.continuation); // we must have no continuation
-    assert(p.goal.top_co); // top_co invariant must be maintained
-    assert(p.goal.top_co->handle == caller); // top_co invariant must be maintained
-    p.continuation = std::move(p.goal.top_co); // we set our continuation to be top_co (i.e. caller)
-    p.goal.top_co = std::move(*this); // we set top_co to ourselves
-    return handle; // we execute ourselves
+    assert(!p.goal); // we must not have a goal yet
+    auto goal = caller.promise().goal;
+    assert(goal);
+    p.goal = goal;
+    p.continuation = std::move(goal->top_co); // we set our continuation to be top_co (i.e. caller)
+    goal->top_co = std::move(*this); // we set top_co to ourselves, don't use this anymore after this!
+    return p.goal->top_co->handle; // we execute ourselves
 }
-
 
 bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) const {
     std::string s1 = a->key();

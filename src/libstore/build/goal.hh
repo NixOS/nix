@@ -133,15 +133,30 @@ public:
         std::coroutine_handle<> await_suspend(handle_type handle);
         void await_resume() {};
     };
+    // Used on initial suspend, doesn't do anything useful,
+    // but asserts that everything has been set correctly.
+    struct InitialSuspend {
+        handle_type handle;
+
+        bool await_ready() { return false; };
+        void await_suspend(handle_type handle_) {
+            handle = handle_;
+        }
+        void await_resume() {
+            assert(handle);
+            assert(handle.promise().goal); // Caller must have set our goal
+            assert(handle.promise().goal->top_co); // Caller must have set top_co
+            assert(handle.promise().goal->top_co->handle == handle); // top_co must be us
+        }
+    };;
     struct promise_type {
         // Either this is who called us, or it is who we will tail-call.
         // It is what we "jump" to once we are done.
         std::optional<Co> continuation;
-        Goal& goal;
+        Goal* goal;
         bool alive = true;
 
-        template<typename... ArgTypes>
-        promise_type(Goal& goal, ArgTypes...) : goal(goal) {}
+        promise_type() {}
 
         struct final_awaiter {
             bool await_ready() noexcept { return false; };;
@@ -149,7 +164,7 @@ public:
             void await_resume() noexcept { assert(false); };
         };
         Co get_return_object();
-        std::suspend_always initial_suspend() { 
+        InitialSuspend initial_suspend() {
             // top_co isn't set to us yet,
             // we've merely constructed the frame and now the
             // caller is free to do whatever they wish to us.
@@ -197,7 +212,10 @@ public:
 
     Goal(Worker & worker, DerivedPath path)
         : worker(worker), top_co(init_wrapper())
-    { }
+    {
+        assert(!top_co->handle.promise().goal);
+        top_co->handle.promise().goal = this;
+    }
 
     virtual ~Goal()
     {
