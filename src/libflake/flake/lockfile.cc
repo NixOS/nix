@@ -10,7 +10,8 @@
 
 namespace nix::flake {
 
-FlakeRef getFlakeRef(
+static FlakeRef getFlakeRef(
+    const fetchers::Settings & fetchSettings,
     const nlohmann::json & json,
     const char * attr,
     const char * info)
@@ -26,15 +27,17 @@ FlakeRef getFlakeRef(
                     attrs.insert_or_assign(k.first, k.second);
             }
         }
-        return FlakeRef::fromAttrs(attrs);
+        return FlakeRef::fromAttrs(fetchSettings, attrs);
     }
 
     throw Error("attribute '%s' missing in lock file", attr);
 }
 
-LockedNode::LockedNode(const nlohmann::json & json)
-    : lockedRef(getFlakeRef(json, "locked", "info")) // FIXME: remove "info"
-    , originalRef(getFlakeRef(json, "original", nullptr))
+LockedNode::LockedNode(
+    const fetchers::Settings & fetchSettings,
+    const nlohmann::json & json)
+    : lockedRef(getFlakeRef(fetchSettings, json, "locked", "info")) // FIXME: remove "info"
+    , originalRef(getFlakeRef(fetchSettings, json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
     if (!lockedRef.input.isLocked())
@@ -84,7 +87,9 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
     return doFind(root, path, visited);
 }
 
-LockFile::LockFile(std::string_view contents, std::string_view path)
+LockFile::LockFile(
+    const fetchers::Settings & fetchSettings,
+    std::string_view contents, std::string_view path)
 {
     auto json = nlohmann::json::parse(contents);
 
@@ -113,7 +118,7 @@ LockFile::LockFile(std::string_view contents, std::string_view path)
                     auto jsonNode2 = nodes.find(inputKey);
                     if (jsonNode2 == nodes.end())
                         throw Error("lock file references missing node '%s'", inputKey);
-                    auto input = make_ref<LockedNode>(*jsonNode2);
+                    auto input = make_ref<LockedNode>(fetchSettings, *jsonNode2);
                     k = nodeMap.insert_or_assign(inputKey, input).first;
                     getInputs(*input, *jsonNode2);
                 }

@@ -10,6 +10,8 @@ namespace nix::fetchers {
 
 struct Registry
 {
+    const Settings & settings;
+
     enum RegistryType {
         Flag = 0,
         User = 1,
@@ -29,11 +31,13 @@ struct Registry
 
     std::vector<Entry> entries;
 
-    Registry(RegistryType type)
-        : type(type)
+    Registry(const Settings & settings, RegistryType type)
+        : settings{settings}
+        , type{type}
     { }
 
     static std::shared_ptr<Registry> read(
+        const Settings & settings,
         const Path & path, RegistryType type);
 
     void write(const Path & path);
@@ -48,13 +52,13 @@ struct Registry
 
 typedef std::vector<std::shared_ptr<Registry>> Registries;
 
-std::shared_ptr<Registry> getUserRegistry();
+std::shared_ptr<Registry> getUserRegistry(const Settings & settings);
 
-std::shared_ptr<Registry> getCustomRegistry(const Path & p);
+std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const Path & p);
 
 Path getUserRegistryPath();
 
-Registries getRegistries(ref<Store> store);
+Registries getRegistries(const Settings & settings, ref<Store> store);
 
 void overrideRegistry(
     const Input & from,

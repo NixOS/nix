@@ -48,19 +48,19 @@ public:
 
     FlakeRef getFlakeRef()
     {
-        return parseFlakeRef(flakeUrl, absPath(".")); //FIXME
+        return parseFlakeRef(fetchSettings, flakeUrl, absPath(".")); //FIXME
     }
 
     LockedFlake lockFlake()
     {
-        return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
+        return flake::lockFlake(flakeSettings, *getEvalState(), getFlakeRef(), lockFlags);
     }
 
     std::vector<FlakeRef> getFlakeRefsForCompletion() override
     {
         return {
             // Like getFlakeRef but with expandTilde calld first
-            parseFlakeRef(expandTilde(flakeUrl), absPath("."))
+            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), absPath("."))
         };
     }
 };
@@ -848,7 +848,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         auto evalState = getEvalState();
 
-        auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
+        auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(
+            fetchSettings, templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
             evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),

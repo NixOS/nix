@@ -19,6 +19,7 @@
 #include "users.hh"
 #include "network-proxy.hh"
 #include "eval-cache.hh"
+#include "flake/flake.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -242,7 +243,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     evalSettings.restrictEval = false;
     evalSettings.pureEval = false;
-    EvalState state({}, openStore("dummy://"), evalSettings);
+    EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
 
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
@@ -362,6 +363,7 @@ void mainWrapped(int argc, char * * argv)
 
     initNix();
     initGC();
+    flake::initLib(flakeSettings);
 
     #if __linux__
     if (isRootUser()) {
@@ -418,7 +420,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::FetchTree,
         };
         evalSettings.pureEval = false;
-        EvalState state({}, openStore("dummy://"), evalSettings);
+        EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
         auto builtinsJson = nlohmann::json::object();
         for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
             auto b = nlohmann::json::object();

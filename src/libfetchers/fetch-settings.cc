@@ -1,14 +1,9 @@
 #include "fetch-settings.hh"
-#include "config-global.hh"
 
-namespace nix {
+namespace nix::fetchers {
 
-FetchSettings::FetchSettings()
+Settings::Settings()
 {
 }
-
-FetchSettings fetchSettings;
-
-static GlobalConfig::Register rFetchSettings(&fetchSettings);
 
 }

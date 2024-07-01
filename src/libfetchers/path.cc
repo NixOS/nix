@@ -7,14 +7,16 @@ namespace nix::fetchers {
 
 struct PathInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "path") return {};
 
         if (url.authority && *url.authority != "")
             throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
 
-        Input input;
+        Input input{settings};
         input.attrs.insert_or_assign("type", "path");
         input.attrs.insert_or_assign("path", url.path);
 
@@ -54,11 +56,13 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
     {
         getStrAttr(attrs, "path");
 
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
         return input;
     }

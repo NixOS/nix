@@ -12,6 +12,16 @@ class EvalState;
 
 namespace flake {
 
+struct Settings;
+
+/**
+ * Initialize `libnixflake`
+ *
+ * So far, this registers the `builtins.getFlake` primop, which depends
+ * on the choice of `flake:Settings`.
+ */
+void initLib(const Settings & settings);
+
 struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
@@ -57,7 +67,7 @@ struct ConfigFile
 
     std::map<std::string, ConfigValue> settings;
 
-    void apply();
+    void apply(const Settings & settings);
 };
 
 /**
@@ -194,6 +204,7 @@ struct LockFlags
 };
 
 LockedFlake lockFlake(
+    const Settings & settings,
     EvalState & state,
     const FlakeRef & flakeRef,
     const LockFlags & lockFlags);

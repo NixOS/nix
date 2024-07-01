@@ -42,21 +42,21 @@ add_project_arguments(
 subdir('build-utils-meson/diagnostics')
 
 sources = files(
-  'flake-settings.cc',
   'flake/config.cc',
   'flake/flake.cc',
   'flake/flakeref.cc',
-  'flake/url-name.cc',
   'flake/lockfile.cc',
+  'flake/settings.cc',
+  'flake/url-name.cc',
 )
 
 include_dirs = [include_directories('.')]
 
 headers = files(
-  'flake-settings.hh',
   'flake/flake.hh',
   'flake/flakeref.hh',
   'flake/lockfile.hh',
+  'flake/settings.hh',
   'flake/url-name.hh',
 )
 
