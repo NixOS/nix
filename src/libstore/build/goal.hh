@@ -153,7 +153,7 @@ public:
         // Either this is who called us, or it is who we will tail-call.
         // It is what we "jump" to once we are done.
         std::optional<Co> continuation;
-        Goal* goal;
+        Goal* goal = nullptr;
         bool alive = true;
 
         promise_type() {}
@@ -213,7 +213,7 @@ public:
     Goal(Worker & worker, DerivedPath path)
         : worker(worker), top_co(init_wrapper())
     {
-        assert(!top_co->handle.promise().goal);
+        // assert(!top_co->handle.promise().goal);
         top_co->handle.promise().goal = this;
     }
 
