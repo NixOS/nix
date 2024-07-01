@@ -45,7 +45,7 @@ struct FileSystemObjectSink
  * An extension of `FileSystemObjectSink` that supports file types
  * that are not supported by Nix's FSO model.
  */
-struct ExtendedFileSystemObjectSink : FileSystemObjectSink
+struct ExtendedFileSystemObjectSink : virtual FileSystemObjectSink
 {
     /**
      * Create a hard link. The target must be the path of a previously
