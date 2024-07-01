@@ -9,6 +9,8 @@ using namespace eval_cache;
 std::tuple<ref<eval_cache::EvalCache>, ref<AttrCursor>>
 call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::optional<FlakeRef> defaultSchemasFlake);
 
+std::vector<Symbol> toAttrPath(ref<AttrCursor> cursor);
+
 std::string toAttrPathStr(ref<AttrCursor> cursor);
 
 void forEachOutput(

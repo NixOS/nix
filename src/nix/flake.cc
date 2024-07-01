@@ -784,7 +784,15 @@ struct CmdFlakeShow : FlakeCommand, MixJSON, flake_schemas::MixFlakeSchemas
                         forEachChild([&](Symbol attrName, ref<eval_cache::AttrCursor> node, bool isLast)
                         {
                             auto j = nlohmann::json::object();
-                            visit(node, j);
+                            try {
+                                visit(node, j);
+                            } catch (EvalError & e) {
+                                // FIXME: make it a flake schema attribute whether to ignore evaluation errors.
+                                if (node->root->state.symbols[flake_schemas::toAttrPath(node)[0]] == "legacyPackages")
+                                    j.emplace("failed", true);
+                                else
+                                    throw;
+                            }
                             children.emplace(state->symbols[attrName], std::move(j));
                         });
                         obj.emplace("children", std::move(children));

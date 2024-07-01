@@ -53,11 +53,10 @@ cat >flake.nix <<EOF
 }
 EOF
 nix flake show --json --legacy --all-systems > show-output.json
-jq < show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
-#assert show_output.legacyPackages.output.children.${builtins.currentSystem}.AAAAAASomeThingsFailToEvaluate == { };
+assert show_output.legacyPackages.output.children.${builtins.currentSystem}.children.AAAAAASomeThingsFailToEvaluate.failed;
 assert show_output.legacyPackages.output.children.${builtins.currentSystem}.children.simple.derivationName == "simple";
 true
 '
