@@ -36,14 +36,14 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         /* The callback of the curl download below can outlive `this` (if
            some other error occurs), so it must not touch `this`. So put
            the shared state in a separate refcounted object. */
-        std::shared_ptr<MuxablePipe> outPipe;
+        auto outPipe = std::make_shared<MuxablePipe>();
     #ifndef _WIN32
         outPipe->create();
     #else
         outPipe->createAsyncPipe(worker.ioport.get());
     #endif
 
-        std::shared_ptr<std::promise<std::shared_ptr<const Realisation>>> promise;
+        auto promise = std::make_shared<std::promise<std::shared_ptr<const Realisation>>>();
 
         sub->queryRealisation(
             id,
