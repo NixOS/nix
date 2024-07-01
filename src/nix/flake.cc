@@ -349,7 +349,7 @@ struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
                 throw e;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreException();
+                    logError({.msg = e.info().msg});
                     hasErrors = true;
                 }
                 else
@@ -377,8 +377,6 @@ struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
                     }
 
                     if (auto drv = flake_schemas::derivation(leaf)) {
-                        drv->getAttr(state->sName)->getString();
-
                         if (auto isFlakeCheck = leaf->maybeGetAttr("isFlakeCheck")) {
                             if (isFlakeCheck->getBool()) {
                                 auto drvPath = drv->forceDerivation();
