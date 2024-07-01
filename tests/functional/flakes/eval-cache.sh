@@ -36,4 +36,4 @@ expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
 # Conditional error should not be cached
 expect 1 nix build "$flake1Dir#ifd" --option allow-import-from-derivation false 2>&1 \
   | grepQuiet 'error: cannot build .* during evaluation because the option '\''allow-import-from-derivation'\'' is disabled'
-nix build "$flake1Dir#ifd"
+nix build --no-link "$flake1Dir#ifd"
