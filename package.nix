@@ -52,6 +52,10 @@
 # Whether to build Nix. Useful to skip for tasks like testing existing pre-built versions of Nix
 , doBuild ? true
 
+# Run the unit tests as part of the build. See `installUnitTests` for an
+# alternative to this.
+, doCheck ? __forDefaults.canRunInstalled
+
 # Run the functional tests as part of the build.
 , doInstallCheck ? test-client != null || __forDefaults.canRunInstalled
 
@@ -84,6 +88,11 @@
 # - readline
 , readlineFlavor ? if stdenv.hostPlatform.isWindows then "readline" else "editline"
 
+# Whether to install unit tests. This is useful when cross compiling
+# since we cannot run them natively during the build, but can do so
+# later.
+, installUnitTests ? doBuild && !__forDefaults.canExecuteHost
+
 # For running the functional tests against a pre-built Nix. Probably
 # want to use in conjunction with `doBuild = false;`.
 , test-daemon ? null
@@ -109,7 +118,7 @@ let
   # things which should instead be gotten via `finalAttrs` in order to
   # work with overriding.
   attrs = {
-    inherit doBuild doInstallCheck;
+    inherit doBuild doCheck doInstallCheck;
   };
 
   mkDerivation =
@@ -125,10 +134,15 @@ in
 mkDerivation (finalAttrs: let
 
   inherit (finalAttrs)
+    doCheck
     doInstallCheck
     ;
 
   doBuild = !finalAttrs.dontBuild;
+
+  # Either running the unit tests during the build, or installing them
+  # to be run later, requiresthe unit tests to be built.
+  buildUnitTests = doCheck || installUnitTests;
 
 in {
   inherit pname version;
@@ -163,6 +177,8 @@ in {
           ./scripts/local.mk
         ] ++ lib.optionals enableManual [
           ./doc/manual
+        ] ++ lib.optionals buildUnitTests [
+          ./tests/unit
         ] ++ lib.optionals doInstallCheck [
           ./tests/functional
         ]));
@@ -175,6 +191,8 @@ in {
     # If we are doing just build or just docs, the one thing will use
     # "out". We only need additional outputs if we are doing both.
     ++ lib.optional (doBuild && enableManual) "doc"
+    ++ lib.optional installUnitTests "check"
+    ++ lib.optional doCheck "testresults"
     ;
 
   nativeBuildInputs = [
@@ -212,6 +230,9 @@ in {
     ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [
     lowdown
+  ] ++ lib.optionals buildUnitTests [
+    gtest
+    rapidcheck
   ] ++ lib.optional stdenv.isLinux libseccomp
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
@@ -228,16 +249,22 @@ in {
   ] ++ lib.optional enableGC boehmgc;
 
   dontBuild = !attrs.doBuild;
+  doCheck = attrs.doCheck;
 
   configureFlags = [
     (lib.enableFeature doBuild "build")
+    (lib.enableFeature buildUnitTests "unit-tests")
     (lib.enableFeature doInstallCheck "functional-tests")
     (lib.enableFeature enableManual "doc-gen")
     (lib.enableFeature enableGC "gc")
     (lib.enableFeature enableMarkdown "markdown")
+    (lib.enableFeature installUnitTests "install-unit-tests")
     (lib.withFeatureAs true "readline-flavor" readlineFlavor)
   ] ++ lib.optionals (!forDevShell) [
     "--sysconfdir=/etc"
+  ] ++ lib.optionals installUnitTests [
+    "--with-check-bin-dir=${builtins.placeholder "check"}/bin"
+    "--with-check-lib-dir=${builtins.placeholder "check"}/lib"
   ] ++ lib.optionals (doBuild) [
     "--with-boost=${boost}/lib"
   ] ++ lib.optionals (doBuild && stdenv.isLinux) [
@@ -318,6 +345,10 @@ in {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
     mainProgram = "nix";
     broken = !(lib.all (a: a) [
+      # We cannot run or install unit tests if we don't build them or
+      # Nix proper (which they depend on).
+      (installUnitTests -> doBuild)
+      (doCheck -> doBuild)
       # The build process for the manual currently requires extracting
       # data from the Nix executable we are trying to document.
       (enableManual -> doBuild)

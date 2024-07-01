@@ -38,6 +38,18 @@ makefiles += \
 endif
 endif
 
+ifeq ($(ENABLE_UNIT_TESTS), yes)
+makefiles += \
+  tests/unit/libutil/local.mk \
+  tests/unit/libutil-support/local.mk \
+  tests/unit/libstore/local.mk \
+  tests/unit/libstore-support/local.mk \
+  tests/unit/libfetchers/local.mk \
+  tests/unit/libexpr/local.mk \
+  tests/unit/libexpr-support/local.mk \
+  tests/unit/libflake/local.mk
+endif
+
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
 ifdef HOST_UNIX
 makefiles += \
@@ -90,6 +102,13 @@ include mk/lib.mk
 #
 # These must be defined after `mk/lib.mk`. Otherwise the first rule
 # incorrectly becomes the default target.
+
+ifneq ($(ENABLE_UNIT_TESTS), yes)
+.PHONY: check
+check:
+	@echo "Unit tests are disabled. Configure without '--disable-unit-tests', or avoid calling 'make check'."
+	@exit 1
+endif
 
 ifneq ($(ENABLE_FUNCTIONAL_TESTS), yes)
 .PHONY: installcheck
