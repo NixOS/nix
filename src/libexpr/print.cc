@@ -163,8 +163,8 @@ private:
     EvalState & state;
     PrintOptions options;
     std::optional<ValuesSeen> seen;
-    size_t attrsPrinted = 0;
-    size_t listItemsPrinted = 0;
+    size_t totalAttrsPrinted = 0;
+    size_t totalListItemsPrinted = 0;
     std::string indent;
 
     void increaseIndent()
@@ -345,11 +345,13 @@ private:
 
             auto prettyPrint = shouldPrettyPrintAttrs(sorted);
 
+            size_t currentAttrsPrinted = 0;
+
             for (auto & i : sorted) {
                 printSpace(prettyPrint);
 
-                if (attrsPrinted >= options.maxAttrs) {
-                    printElided(sorted.size() - attrsPrinted, "attribute", "attributes");
+                if (totalAttrsPrinted >= options.maxAttrs) {
+                    printElided(sorted.size() - currentAttrsPrinted, "attribute", "attributes");
                     break;
                 }
 
@@ -357,7 +359,8 @@ private:
                 output << " = ";
                 print(*i.second, depth + 1);
                 output << ";";
-                attrsPrinted++;
+                totalAttrsPrinted++;
+                currentAttrsPrinted++;
             }
 
             decreaseIndent();
@@ -402,11 +405,14 @@ private:
             output << "[";
             auto listItems = v.listItems();
             auto prettyPrint = shouldPrettyPrintList(listItems);
+
+            size_t currentListItemsPrinted = 0;
+
             for (auto elem : listItems) {
                 printSpace(prettyPrint);
 
-                if (listItemsPrinted >= options.maxListItems) {
-                    printElided(listItems.size() - listItemsPrinted, "item", "items");
+                if (totalListItemsPrinted >= options.maxListItems) {
+                    printElided(listItems.size() - currentListItemsPrinted, "item", "items");
                     break;
                 }
 
@@ -415,7 +421,8 @@ private:
                 } else {
                     printNullptr();
                 }
-                listItemsPrinted++;
+                totalListItemsPrinted++;
+                currentListItemsPrinted++;
             }
 
             decreaseIndent();
@@ -588,8 +595,8 @@ public:
 
     void print(Value & v)
     {
-        attrsPrinted = 0;
-        listItemsPrinted = 0;
+        totalAttrsPrinted = 0;
+        totalListItemsPrinted = 0;
         indent.clear();
 
         if (options.trackRepeated) {

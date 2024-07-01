@@ -78,7 +78,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     if (drvs.empty()) return {};
 
     if (isIFD && !settings.enableImportFromDerivation)
-        error<EvalError>(
+        error<EvalBaseError>(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             drvs.begin()->to_string(*store)
         ).debugThrow();

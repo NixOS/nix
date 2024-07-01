@@ -145,4 +145,5 @@ in
 
   functional_root = runNixOSTestFor "x86_64-linux" ./functional/as-root.nix;
 
+  user-sandboxing = runNixOSTestFor "x86_64-linux" ./user-sandboxing;
 }

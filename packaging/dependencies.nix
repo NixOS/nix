@@ -10,6 +10,33 @@
   stdenv,
   versionSuffix,
 }:
+let
+  inherit (pkgs) lib;
+
+  localSourceLayer = finalAttrs: prevAttrs:
+    let
+      root = ../.;
+      workDirPath =
+        # Ideally we'd pick finalAttrs.workDir, but for now `mkDerivation` has
+        # the requirement that everything except passthru and meta must be
+        # serialized by mkDerivation, which doesn't work for this.
+        prevAttrs.workDir;
+
+      workDirSubpath = lib.path.removePrefix root workDirPath;
+      sources = assert prevAttrs.fileset._type == "fileset"; prevAttrs.fileset;
+      src = lib.fileset.toSource { fileset = sources; inherit root; };
+
+    in
+    {
+      sourceRoot = "${src.name}/" + workDirSubpath;
+      inherit src;
+
+      # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
+      fileset = null;
+      workDir = null;
+    };
+
+in
 scope: {
   inherit stdenv versionSuffix;
 
@@ -55,6 +82,8 @@ scope: {
       CONFIG_ASH_TEST y
     '';
   });
+
+  mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
 
   inherit (inputs) flake-schemas;
 }

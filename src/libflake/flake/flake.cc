@@ -9,6 +9,7 @@
 #include "fetchers.hh"
 #include "finally.hh"
 #include "fetch-settings.hh"
+#include "flake-settings.hh"
 #include "value-to-json.hh"
 #include "local-fs-store.hh"
 
@@ -344,7 +345,7 @@ LockedFlake lockFlake(
 {
     experimentalFeatureSettings.require(Xp::Flakes);
 
-    auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
+    auto useRegistries = lockFlags.useRegistries.value_or(flakeSettings.useRegistries);
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply();
@@ -687,7 +688,7 @@ LockedFlake lockFlake(
                             if (lockFlags.commitLockFile) {
                                 std::string cm;
 
-                                cm = fetchSettings.commitLockFileSummary.get();
+                                cm = flakeSettings.commitLockFileSummary.get();
 
                                 if (cm == "") {
                                     cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
@@ -742,7 +743,7 @@ LockedFlake lockFlake(
 {
     FlakeCache flakeCache;
 
-    auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
+    auto useRegistries = lockFlags.useRegistries.value_or(flakeSettings.useRegistries);
 
     return lockFlake(state, topRef, lockFlags, getFlake(state, topRef, useRegistries, flakeCache), flakeCache);
 }
@@ -829,7 +830,7 @@ static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, V
             LockFlags {
                 .updateLockFile = false,
                 .writeLockFile = false,
-                .useRegistries = !state.settings.pureEval && fetchSettings.useRegistries,
+                .useRegistries = !state.settings.pureEval && flakeSettings.useRegistries,
                 .allowUnlocked = !state.settings.pureEval,
             }),
         v);

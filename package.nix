@@ -32,6 +32,7 @@
 , pkg-config
 , rapidcheck
 , sqlite
+, toml11
 , util-linux
 , xz
 
@@ -227,6 +228,10 @@ in {
     libsodium
     openssl
     sqlite
+    (toml11.overrideAttrs (old: {
+      # TODO change in Nixpkgs, Windows works fine.
+      meta.platforms = lib.platforms.all;
+    }))
     xz
     ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [
