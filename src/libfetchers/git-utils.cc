@@ -931,6 +931,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             ++dir;
             relTargetLeft = relTargetLeft.substr(3);
         }
+        if (dir == pendingDirs.rend())
+            throw Error("invalid hard link target '%s' for path '%s'", target, path);
 
         // Look up the remainder of the target, starting at the
         // top-most `git_treebuilder`.

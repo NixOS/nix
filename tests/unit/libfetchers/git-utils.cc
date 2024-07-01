@@ -87,4 +87,24 @@ TEST_F(GitUtilsTest, sink_basic)
     ASSERT_EQ(accessor->readFile(CanonPath("links/foo")), "hello world");
 };
 
+TEST_F(GitUtilsTest, sink_hardlink)
+{
+    auto repo = openRepo();
+    auto sink = repo->getFileSystemObjectSink();
+
+    sink->createDirectory("foo-1.1");
+
+    sink->createRegularFile(
+        "foo-1.1/hello", [](CreateRegularFileSink & fileSink) { writeString(fileSink, "hello world", false); });
+
+    try {
+        sink->createHardlink("foo-1.1/link", CanonPath("hello"));
+        FAIL() << "Expected an exception";
+    } catch (const nix::Error & e) {
+        ASSERT_THAT(e.msg(), testing::HasSubstr("invalid hard link target"));
+        ASSERT_THAT(e.msg(), testing::HasSubstr("/hello"));
+        ASSERT_THAT(e.msg(), testing::HasSubstr("foo-1.1/link"));
+    }
+};
+
 } // namespace nix
