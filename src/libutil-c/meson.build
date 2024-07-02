@@ -14,68 +14,16 @@ project('nix-util-c', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# See note in ../nix-util/meson.build
-deps_private = [ ]
-
-# See note in ../nix-util/meson.build
-deps_public = [ ]
-
-# See note in ../nix-util/meson.build
-deps_other = [ ]
+subdir('build-utils-meson/deps-lists')
 
 configdata = configuration_data()
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.h',
-  # '-include', 'config-store.h',
-  '-Wno-deprecated-declarations',
-  '-Wimplicit-fallthrough',
-  '-Werror=switch',
-  '-Werror=switch-enum',
-  '-Werror=unused-result',
-  '-Wdeprecated-copy',
-  '-Wignored-qualifiers',
-  # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
-  # at ~1% overhead in `nix search`.
-  #
-  # FIXME: remove when we get meson 1.4.0 which will default this to on for us:
-  # https://mesonbuild.com/Release-notes-for-1-4-0.html#ndebug-setting-now-controls-c-stdlib-assertions
-  '-D_GLIBCXX_ASSERTIONS=1',
-  language : 'cpp',
-)
-
-sources = files(
-  'nix_api_util.cc',
-)
-
-include_dirs = [include_directories('.')]
-
-headers = files(
-  'nix_api_util.h',
-  'nix_api_util_internal.h',
-)
-
-if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
-  # Windows DLLs are stricter about symbol visibility than Unix shared
-  # objects --- see https://gcc.gnu.org/wiki/Visibility for details.
-  # This is a temporary sledgehammer to export everything like on Unix,
-  # and not detail with this yet.
-  #
-  # TODO do not do this, and instead do fine-grained export annotations.
-  linker_export_flags = ['-Wl,--export-all-symbols']
-else
-  linker_export_flags = []
-endif
-
-nix_util = dependency('nix-util')
-if nix_util.type_name() == 'internal'
-  # subproject sadly no good for pkg-config module
-  deps_other += nix_util
-else
-  deps_public += nix_util
-endif
+deps_private_maybe_subproject = [
+  dependency('nix-util'),
+]
+deps_public_maybe_subproject = [
+]
+subdir('build-utils-meson/subprojects')
 
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
@@ -85,12 +33,42 @@ config_h = configure_file(
   output : 'config-util.h',
 )
 
+add_project_arguments(
+  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
+  # It would be nice for our headers to be idempotent instead.
+
+  # From C++ libraries, only for internals
+  '-include', 'config-util.hh',
+
+  # From C libraries, for our public, installed headers too
+  '-include', 'config-util.h',
+  language : 'cpp',
+)
+
+subdir('build-utils-meson/diagnostics')
+
+sources = files(
+  'nix_api_util.cc',
+)
+
+include_dirs = [include_directories('.')]
+
+headers = [config_h] + files(
+  'nix_api_util.h',
+)
+
+# TODO don't install this once tests don't use it.
+headers += files('nix_api_util_internal.h')
+
+subdir('build-utils-meson/export-all-symbols')
+
 this_library = library(
   'nixutilc',
   sources,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args: linker_export_flags,
+  prelink : true, # For C++ static initializers
   install : true,
 )
 
@@ -98,21 +76,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-import('pkgconfig').generate(
-  this_library,
-  filebase : meson.project_name(),
-  name : 'Nix',
-  description : 'Nix Package Manager',
-  subdirs : ['nix'],
-  extra_cflags : ['-std=c++2a'],
-  requires : deps_public,
-  requires_private : deps_private,
-  libraries_private : libraries_private,
-)
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_dirs,
-  link_with : this_library,
-  compile_args : ['-std=c++2a'],
-  dependencies : [],
-))
+subdir('build-utils-meson/export')

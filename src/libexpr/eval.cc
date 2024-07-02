@@ -293,7 +293,7 @@ EvalState::EvalState(
     )}
     , callFlakeInternal{internalFS->addFile(
         CanonPath("call-flake.nix"),
-        #include "flake/call-flake.nix.gen.hh"
+        #include "call-flake.nix.gen.hh"
     )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)

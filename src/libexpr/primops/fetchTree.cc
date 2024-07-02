@@ -1,4 +1,4 @@
-#include "libfetchers/attrs.hh"
+#include "attrs.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"

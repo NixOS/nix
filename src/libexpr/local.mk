@@ -47,4 +47,4 @@ $(foreach i, $(wildcard src/libexpr/value/*.hh), \
 
 $(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh
 
-$(d)/eval.cc: $(d)/primops/derivation.nix.gen.hh $(d)/fetchurl.nix.gen.hh $(d)/flake/call-flake.nix.gen.hh
+$(d)/eval.cc: $(d)/primops/derivation.nix.gen.hh $(d)/fetchurl.nix.gen.hh $(d)/call-flake.nix.gen.hh

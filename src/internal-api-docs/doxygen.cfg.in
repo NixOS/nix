@@ -38,27 +38,27 @@ GENERATE_LATEX         = NO
 # so they can expand variables despite configure variables.
 
 INPUT                  = \
-  @src@/src/libcmd \
-  @src@/src/libexpr \
-  @src@/src/libexpr/flake \
-  @src@/tests/unit/libexpr \
-  @src@/tests/unit/libexpr/value \
-  @src@/tests/unit/libexpr/test \
-  @src@/tests/unit/libexpr/test/value \
-  @src@/src/libexpr/value \
-  @src@/src/libfetchers \
-  @src@/src/libmain \
-  @src@/src/libstore \
-  @src@/src/libstore/build \
-  @src@/src/libstore/builtins \
-  @src@/tests/unit/libstore \
-  @src@/tests/unit/libstore/test \
-  @src@/src/libutil \
-  @src@/tests/unit/libutil \
-  @src@/tests/unit/libutil/test \
-  @src@/src/nix \
-  @src@/src/nix-env \
-  @src@/src/nix-store
+  @src@/libcmd \
+  @src@/libexpr \
+  @src@/libexpr/flake \
+  @src@/nix-expr-tests \
+  @src@/nix-expr-tests/value \
+  @src@/nix-expr-test-support/test \
+  @src@/nix-expr-test-support/test/value \
+  @src@/libexpr/value \
+  @src@/libfetchers \
+  @src@/libmain \
+  @src@/libstore \
+  @src@/libstore/build \
+  @src@/libstore/builtins \
+  @src@/nix-store-tests \
+  @src@/nix-store-test-support/test \
+  @src@/libutil \
+  @src@/nix-util-tests \
+  @src@/nix-util-test-support/test \
+  @src@/nix \
+  @src@/nix-env \
+  @src@/nix-store
 
 # If the MACRO_EXPANSION tag is set to YES, doxygen will expand all macro names
 # in the source code. If set to NO, only conditional compilation will be
