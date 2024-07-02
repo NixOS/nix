@@ -1366,19 +1366,8 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
     if (opFlags.size() > 0)
         throw UsageError("unknown flag '%1%'", opFlags.front());
 
-    if (opArgs.size() == 1 && opArgs.front() == "old") {
-        deleteOldGenerations(globals.profile, globals.dryRun);
-    } else if (opArgs.size() == 1 && opArgs.front().find('d') != std::string::npos) {
-        auto t = parseOlderThanTimeSpec(opArgs.front());
-        deleteGenerationsOlderThan(globals.profile, t, globals.dryRun);
-    } else if (opArgs.size() == 1 && opArgs.front().find('+') != std::string::npos) {
-        if (opArgs.front().size() < 2)
-            throw Error("invalid number of generations '%1%'", opArgs.front());
-        auto str_max = opArgs.front().substr(1);
-        auto max = string2Int<GenerationNumber>(str_max);
-        if (!max)
-            throw Error("invalid number of generations to keep '%1%'", opArgs.front());
-        deleteGenerationsGreaterThan(globals.profile, *max, globals.dryRun);
+    if (opArgs.size() == 1) {
+        deleteUnusedGenerations(globals.profile, opArgs.front(), globals.dryRun);
     } else {
         std::set<GenerationNumber> gens;
         for (auto & i : opArgs) {
@@ -1387,7 +1376,7 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
             else
                 throw UsageError("invalid generation number '%1%'", i);
         }
-        deleteGenerations(globals.profile, gens, globals.dryRun);
+        deleteNumberedGenerations(globals.profile, gens, globals.dryRun);
     }
 }
 
