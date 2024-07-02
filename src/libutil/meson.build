@@ -143,6 +143,7 @@ add_project_arguments(
   '-Wimplicit-fallthrough',
   '-Werror=switch',
   '-Werror=switch-enum',
+  '-Werror=unused-result',
   '-Wdeprecated-copy',
   '-Wignored-qualifiers',
   # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
