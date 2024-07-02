@@ -28,6 +28,8 @@ let
       test-daemon = daemon;
 
       doBuild = false;
+
+      inherit (inputs) flake-schemas;
     };
 
   # Technically we could just return `pkgs.nixComponents`, but for Hydra it's

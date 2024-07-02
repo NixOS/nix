@@ -435,6 +435,12 @@ if test "$embedded_sandbox_shell" = yes; then
   AC_DEFINE(HAVE_EMBEDDED_SANDBOX_SHELL, 1, [Include the sandbox shell in the Nix binary.])
 fi
 
+
+AC_ARG_WITH(default-flake-schemas, AS_HELP_STRING([--with-default-flake-schemas=PATH],[path of the default flake schemas flake]),
+  default_flake_schemas=$withval,
+  [AC_MSG_FAILURE([--with-default-flake-schemas is missing])])
+AC_SUBST(default_flake_schemas)
+
 ])
 
 
