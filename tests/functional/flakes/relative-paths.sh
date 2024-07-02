@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source ./common.sh
 
 requireGit
@@ -7,10 +9,10 @@ subflake0=$rootFlake/sub0
 subflake1=$rootFlake/sub1
 subflake2=$rootFlake/sub2
 
-rm -rf $rootFlake
-mkdir -p $rootFlake $subflake0 $subflake1 $subflake2
+rm -rf "$rootFlake"
+mkdir -p "$rootFlake" "$subflake0" "$subflake1" "$subflake2"
 
-cat > $rootFlake/flake.nix <<EOF
+cat > "$rootFlake/flake.nix" <<EOF
 {
   inputs.sub0.url = "./sub0";
   outputs = { self, sub0 }: {
@@ -20,7 +22,7 @@ cat > $rootFlake/flake.nix <<EOF
 }
 EOF
 
-cat > $subflake0/flake.nix <<EOF
+cat > "$subflake0/flake.nix" <<EOF
 {
   outputs = { self }: {
     x = 7;
@@ -28,10 +30,10 @@ cat > $subflake0/flake.nix <<EOF
 }
 EOF
 
-[[ $(nix eval $rootFlake#x) = 2 ]]
-[[ $(nix eval $rootFlake#y) = 14 ]]
+[[ $(nix eval "$rootFlake#x") = 2 ]]
+[[ $(nix eval "$rootFlake#y") = 14 ]]
 
-cat > $subflake1/flake.nix <<EOF
+cat > "$subflake1/flake.nix" <<EOF
 {
   inputs.root.url = "../";
   outputs = { self, root }: {
@@ -41,14 +43,14 @@ cat > $subflake1/flake.nix <<EOF
 }
 EOF
 
-[[ $(nix eval $rootFlake?dir=sub1#y) = 6 ]]
+[[ $(nix eval "$rootFlake?dir=sub1#y") = 6 ]]
 
-git init $rootFlake
-git -C $rootFlake add flake.nix sub0/flake.nix sub1/flake.nix
+git init "$rootFlake"
+git -C "$rootFlake" add flake.nix sub0/flake.nix sub1/flake.nix
 
-[[ $(nix eval $subflake1#y) = 6 ]]
+[[ $(nix eval "$subflake1#y") = 6 ]]
 
-cat > $subflake2/flake.nix <<EOF
+cat > "$subflake2/flake.nix" <<EOF
 {
   inputs.root.url = "../";
   inputs.sub1.url = "../sub1";
@@ -59,19 +61,19 @@ cat > $subflake2/flake.nix <<EOF
 }
 EOF
 
-git -C $rootFlake add flake.nix sub2/flake.nix
+git -C "$rootFlake" add flake.nix sub2/flake.nix
 
-[[ $(nix eval $subflake2#y) = 15 ]]
+[[ $(nix eval "$subflake2#y") = 15 ]]
 
 # Make sure there are no content locks for relative path flakes.
-(! grep "$TEST_ROOT" $subflake2/flake.lock)
-(! grep "$NIX_STORE_DIR" $subflake2/flake.lock)
-(! grep narHash $subflake2/flake.lock)
+(! grep "$TEST_ROOT" "$subflake2/flake.lock")
+(! grep "$NIX_STORE_DIR" "$subflake2/flake.lock")
+(! grep narHash "$subflake2/flake.lock")
 
 # Test circular relative path flakes. FIXME: doesn't work at the moment.
 if false; then
 
-cat > $rootFlake/flake.nix <<EOF
+cat > "$rootFlake/flake.nix" <<EOF
 {
   inputs.sub1.url = "./sub1";
   inputs.sub2.url = "./sub1";
@@ -83,7 +85,7 @@ cat > $rootFlake/flake.nix <<EOF
 }
 EOF
 
-[[ $(nix eval $rootFlake#x) = 30 ]]
-[[ $(nix eval $rootFlake#z) = 90 ]]
+[[ $(nix eval "$rootFlake#x") = 30 ]]
+[[ $(nix eval "$rootFlake#z") = 90 ]]
 
 fi

@@ -9,7 +9,7 @@ cd flake-regressions
 
 status=0
 
-flakes=$(ls -d tests/*/*/* | sort | head -n50)
+flakes=$(find tests -mindepth 3 -maxdepth 3 -type d -not -path '*/.*' | sort | head -n50)
 
 echo "Running flake tests..."
 
@@ -21,7 +21,7 @@ for flake in $flakes; do
         continue
     fi
 
-    if ! REGENERATE=0 ./eval-flake.sh $flake; then
+    if ! REGENERATE=0 ./eval-flake.sh "$flake"; then
         status=1
         echo "❌ $flake"
     else
