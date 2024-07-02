@@ -48,28 +48,32 @@ FlakeRef FlakeRef::resolve(ref<Store> store) const
 }
 
 FlakeRef parseFlakeRef(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
     bool isFlake)
 {
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing, isFlake);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake);
     if (fragment != "")
         throw Error("unexpected fragment '%s' in flake reference '%s'", fragment, url);
     return flakeRef;
 }
 
 std::optional<FlakeRef> maybeParseFlakeRef(
-    const std::string & url, const std::optional<Path> & baseDir)
+    const fetchers::Settings & fetchSettings,
+    const std::string & url,
+    const std::optional<Path> & baseDir)
 {
     try {
-        return parseFlakeRef(url, baseDir);
+        return parseFlakeRef(fetchSettings, url, baseDir);
     } catch (Error &) {
         return {};
     }
 }
 
 std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
@@ -166,7 +170,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         parsedURL.query.insert_or_assign("shallow", "1");
 
                     return std::make_pair(
-                        FlakeRef(fetchers::Input::fromURL(parsedURL), getOr(parsedURL.query, "dir", "")),
+                        FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL), getOr(parsedURL.query, "dir", "")),
                         fragment);
                 }
 
@@ -185,13 +189,14 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     attrs.insert_or_assign("type", "path");
     attrs.insert_or_assign("path", path);
 
-    return std::make_pair(FlakeRef(fetchers::Input::fromAttrs(std::move(attrs)), ""), fragment);
+    return std::make_pair(FlakeRef(fetchers::Input::fromAttrs(fetchSettings, std::move(attrs)), ""), fragment);
 };
 
 
 /* Check if 'url' is a flake ID. This is an abbreviated syntax for
     'flake:<flake-id>?ref=<ref>&rev=<rev>'. */
-std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
+static std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     bool isFlake
 )
@@ -213,7 +218,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
         };
 
         return std::make_pair(
-            FlakeRef(fetchers::Input::fromURL(parsedURL, isFlake), ""),
+            FlakeRef(fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake), ""),
             percentDecode(match.str(6)));
     }
 
@@ -221,6 +226,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
 }
 
 std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool isFlake
@@ -236,7 +242,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     std::string fragment;
     std::swap(fragment, parsedURL.fragment);
 
-    auto input = fetchers::Input::fromURL(parsedURL, isFlake);
+    auto input = fetchers::Input::fromURL(fetchSettings, parsedURL, isFlake);
     input.parent = baseDir;
 
     return std::make_pair(
@@ -245,6 +251,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
@@ -254,31 +261,34 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
     std::smatch match;
 
-    if (auto res = parseFlakeIdRef(url, isFlake)) {
+    if (auto res = parseFlakeIdRef(fetchSettings, url, isFlake)) {
         return *res;
-    } else if (auto res = parseURLFlakeRef(url, baseDir, isFlake)) {
+    } else if (auto res = parseURLFlakeRef(fetchSettings, url, baseDir, isFlake)) {
         return *res;
     } else {
-        return parsePathFlakeRefWithFragment(url, baseDir, allowMissing, isFlake);
+        return parsePathFlakeRefWithFragment(fetchSettings, url, baseDir, allowMissing, isFlake);
     }
 }
 
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
+    const fetchers::Settings & fetchSettings,
     const std::string & url, const std::optional<Path> & baseDir)
 {
     try {
-        return parseFlakeRefWithFragment(url, baseDir);
+        return parseFlakeRefWithFragment(fetchSettings, url, baseDir);
     } catch (Error & e) {
         return {};
     }
 }
 
-FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
+FlakeRef FlakeRef::fromAttrs(
+    const fetchers::Settings & fetchSettings,
+    const fetchers::Attrs & attrs)
 {
     auto attrs2(attrs);
     attrs2.erase("dir");
     return FlakeRef(
-        fetchers::Input::fromAttrs(std::move(attrs2)),
+        fetchers::Input::fromAttrs(fetchSettings, std::move(attrs2)),
         fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
@@ -289,13 +299,16 @@ std::pair<StorePath, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
 }
 
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
     bool isFlake)
 {
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(url);
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, baseDir, allowMissing, isFlake);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(
+        fetchSettings,
+        std::string { prefix }, baseDir, allowMissing, isFlake);
     return {std::move(flakeRef), fragment, std::move(extendedOutputsSpec)};
 }
 

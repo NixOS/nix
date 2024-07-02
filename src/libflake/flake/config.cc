@@ -1,6 +1,6 @@
 #include "users.hh"
 #include "config-global.hh"
-#include "flake-settings.hh"
+#include "flake/settings.hh"
 #include "flake.hh"
 
 #include <nlohmann/json.hpp>
@@ -30,7 +30,7 @@ static void writeTrustedList(const TrustedList & trustedList)
     writeFile(path, nlohmann::json(trustedList).dump());
 }
 
-void ConfigFile::apply()
+void ConfigFile::apply(const Settings & flakeSettings)
 {
     std::set<std::string> whitelist{"bash-prompt", "bash-prompt-prefix", "bash-prompt-suffix", "flake-registry", "commit-lock-file-summary", "commit-lockfile-summary"};
 
@@ -51,7 +51,7 @@ void ConfigFile::apply()
         else
             assert(false);
 
-        if (!whitelist.count(baseName) && !nix::flakeSettings.acceptFlakeConfig) {
+        if (!whitelist.count(baseName) && !flakeSettings.acceptFlakeConfig) {
             bool trusted = false;
             auto trustedList = readTrustedList();
             auto tlname = get(trustedList, name);

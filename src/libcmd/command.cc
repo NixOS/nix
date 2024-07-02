@@ -132,7 +132,7 @@ ref<EvalState> EvalCommand::getEvalState()
             #else
             std::make_shared<EvalState>(
             #endif
-                lookupPath, getEvalStore(), evalSettings, getStore())
+                lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore())
             ;
 
         evalState->repair = repair;

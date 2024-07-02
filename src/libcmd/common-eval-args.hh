@@ -11,15 +11,30 @@
 namespace nix {
 
 class Store;
+
+namespace fetchers { struct Settings; }
+
 class EvalState;
 struct EvalSettings;
 class Bindings;
 struct SourcePath;
 
+namespace flake { struct Settings; }
+
+/**
+ * @todo Get rid of global setttings variables
+ */
+extern fetchers::Settings fetchSettings;
+
 /**
  * @todo Get rid of global setttings variables
  */
 extern EvalSettings evalSettings;
+
+/**
+ * @todo Get rid of global setttings variables
+ */
+extern flake::Settings flakeSettings;
 
 struct MixEvalArgs : virtual Args, virtual MixRepair
 {

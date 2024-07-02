@@ -1525,7 +1525,7 @@ static int main_nix_env(int argc, char * * argv)
 
         auto store = openStore();
 
-        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, evalSettings));
+        globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
         globals.state->repair = myArgs.repair;
 
         globals.instSource.nixExprPath = std::make_shared<SourcePath>(
