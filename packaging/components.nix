@@ -29,6 +29,7 @@ in
   nix-flake-tests = callPackage ../tests/unit/libflake/package.nix { };
 
   nix-main = callPackage ../src/libmain/package.nix { };
+  nix-main-c = callPackage ../src/libmain-c/package.nix { };
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
