@@ -10,6 +10,7 @@
 struct nix_c_context
 {
     nix_err last_err_code = NIX_OK;
+    /** The last error message. Always check last_err_code. This may not have been cleared, so that clearing is fast. */
     std::optional<std::string> last_err = {};
     std::optional<nix::ErrorInfo> info = {};
     std::string name = "";

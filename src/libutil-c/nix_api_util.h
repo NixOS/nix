@@ -221,7 +221,9 @@ const char * nix_version_get();
  * @param[out] n optional: a pointer to an unsigned int that is set to the
  * length of the error.
  * @return nullptr if no error message was ever set,
- *         a borrowed pointer to the error message otherwise.
+ *         a borrowed pointer to the error message otherwise, which is valid
+ *         until the next call to a Nix function, or until the context is
+ *         destroyed.
  */
 const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, unsigned int * n);
 
@@ -282,12 +284,33 @@ nix_err nix_err_code(const nix_c_context * read_context);
  *
  * All other use is internal to the API.
  *
- * @param context context to write the error message to, or NULL
+ * @param context context to write the error message to, required unless C++ exceptions are supported
  * @param err The error code to set and return
- * @param msg The error message to set.
+ * @param msg The error message to set. This string is copied.
  * @returns the error code set
  */
 nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
+
+/**
+ * @brief Clear the error message from a nix context.
+ *
+ * This is performed implicitly by all functions that accept a context, so
+ * this won't be necessary in most cases.
+ * However, if you want to clear the error message without calling another
+ * function, you can use this.
+ *
+ * Example use case: a higher order function that helps with error handling,
+ * to make it more robust in the following scenario:
+ *
+ * 1. A previous call failed, and the error was caught and handled.
+ * 2. The context is reused with our error handling helper function.
+ * 3. The callback passed to the helper function doesn't actually make a call to
+ *    a Nix function.
+ * 4. The handled error is raised again, from an unrelated call.
+ *
+ * This failure can be avoided by clearing the error message after handling it.
+ */
+void nix_clear_err(nix_c_context * context);
 
 /**
  *  @}
