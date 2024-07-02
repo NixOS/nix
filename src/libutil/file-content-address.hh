@@ -12,25 +12,37 @@ struct SourcePath;
 /**
  * An enumeration of the ways we can serialize file system
  * objects.
+ *
+ * See `file-system-object/content-address.md#serial` in the manual for
+ * a user-facing description of this concept, but note that this type is also
+ * used for storing or sending copies; not just for addressing.
+ * Note also that there are other content addressing methods that don't
+ * correspond to a serialisation method.
  */
 enum struct FileSerialisationMethod : uint8_t {
     /**
      * Flat-file. The contents of a single file exactly.
+     *
+     * See `file-system-object/content-address.md#serial-flat` in the
+     * manual.
      */
     Flat,
 
     /**
      * Nix Archive. Serializes the file-system object in
      * Nix Archive format.
+     *
+     * See `file-system-object/content-address.md#serial-nix-archive` in
+     * the manual.
      */
-    Recursive,
+    NixArchive,
 };
 
 /**
  * Parse a `FileSerialisationMethod` by name. Choice of:
  *
  *  - `flat`: `FileSerialisationMethod::Flat`
- *  - `nar`: `FileSerialisationMethod::Recursive`
+ *  - `nar`: `FileSerialisationMethod::NixArchive`
  *
  * Opposite of `renderFileSerialisationMethod`.
  */
@@ -81,33 +93,34 @@ HashResult hashPath(
 /**
  * An enumeration of the ways we can ingest file system
  * objects, producing a hash or digest.
+ *
+ * See `file-system-object/content-address.md` in the manual for a
+ * user-facing description of this concept.
  */
 enum struct FileIngestionMethod : uint8_t {
     /**
      * Hash `FileSerialisationMethod::Flat` serialisation.
+     *
+     * See `file-system-object/content-address.md#serial-flat` in the
+     * manual.
      */
     Flat,
 
     /**
-     * Hash `FileSerialisationMethod::Git` serialisation.
+     * Hash `FileSerialisationMethod::NixArchive` serialisation.
+     *
+     * See `file-system-object/content-address.md#serial-flat` in the
+     * manual.
      */
-    Recursive,
+    NixArchive,
 
     /**
-     * Git hashing. In particular files are hashed as git "blobs", and
-     * directories are hashed as git "trees".
+     * Git hashing.
      *
-     * Unlike `Flat` and `Recursive`, this is not a hash of a single
-     * serialisation but a [Merkle
-     * DAG](https://en.wikipedia.org/wiki/Merkle_tree) of multiple
-     * rounds of serialisation and hashing.
+     * Part of `ExperimentalFeature::GitHashing`.
      *
-     * @note Git's data model is slightly different, in that a plain
-     * file doesn't have an executable bit, directory entries do
-     * instead. We decide treat a bare file as non-executable by fiat,
-     * as we do with `FileIngestionMethod::Flat` which also lacks this
-     * information. Thus, Git can encode some but all of Nix's "File
-     * System Objects", and this sort of hashing is likewise partial.
+     * See `file-system-object/content-address.md#serial-git` in the
+     * manual.
      */
     Git,
 };
@@ -116,7 +129,7 @@ enum struct FileIngestionMethod : uint8_t {
  * Parse a `FileIngestionMethod` by name. Choice of:
  *
  *  - `flat`: `FileIngestionMethod::Flat`
- *  - `nar`: `FileIngestionMethod::Recursive`
+ *  - `nar`: `FileIngestionMethod::NixArchive`
  *  - `git`: `FileIngestionMethod::Git`
  *
  * Opposite of `renderFileIngestionMethod`.
@@ -132,14 +145,15 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method);
 
 /**
  * Compute the hash of the given file system object according to the
- * given method.
+ * given method, and for some ingestion methods, the size of the
+ * serialisation.
  *
  * Unlike the other `hashPath`, this works on an arbitrary
  * `FileIngestionMethod` instead of `FileSerialisationMethod`, but
- * doesn't return the size as this is this is not a both simple and
+ * may not return the size as this is this is not a both simple and
  * useful defined for a merkle format.
  */
-Hash hashPath(
+std::pair<Hash, std::optional<uint64_t>> hashPath(
     const SourcePath & path,
     FileIngestionMethod method, HashAlgorithm ha,
     PathFilter & filter = defaultPathFilter);

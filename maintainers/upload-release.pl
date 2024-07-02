@@ -243,6 +243,7 @@ write_file("$tmpDir/fallback-paths.nix",
     "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
     "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
     "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
+    "  riscv64-linux = \"" . getStorePath("buildCross.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
     "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
     "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
     "}\n");

@@ -6,7 +6,11 @@
 
 namespace nix {
 
-SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD)
+SSHMaster::SSHMaster(
+    std::string_view host,
+    std::string_view keyFile,
+    std::string_view sshPublicHostKey,
+    bool useMaster, bool compress, Descriptor logFD)
     : host(host)
     , fakeSSH(host == "localhost")
     , keyFile(keyFile)

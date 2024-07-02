@@ -25,7 +25,7 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo) {
         store,
         "foo",
         FixedOutputInfo {
-            .method = FileIngestionMethod::Recursive,
+            .method = FileIngestionMethod::NixArchive,
             .hash = hashString(HashAlgorithm::SHA256, "(...)"),
 
             .references = {

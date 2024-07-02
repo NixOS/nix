@@ -6,6 +6,7 @@
 #include "print.hh"
 
 #include <cstdlib>
+#include <sstream>
 
 namespace nix {
 

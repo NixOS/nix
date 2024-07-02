@@ -25,11 +25,11 @@ Each of *paths* is processed as follows:
 
 If no substitutes are available and no store derivation is given, realisation fails.
 
-[store paths]: @docroot@/glossary.md#gloss-store-path
+[store paths]: @docroot@/store/store-path.md
 [valid]: @docroot@/glossary.md#gloss-validity
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 [output paths]: @docroot@/glossary.md#gloss-output-path
-[store objects]: @docroot@/glossary.md#gloss-store-object
+[store objects]: @docroot@/store/store-object.md
 [closure]: @docroot@/glossary.md#gloss-closure
 [substituters]: @docroot@/command-ref/conf-file.md#conf-substituters
 [content-addressed derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
@@ -42,23 +42,26 @@ For non-derivation arguments, the argument itself is printed.
 
 # Options
 
-  - `--dry-run`\
-    Print on standard error a description of what packages would be
-    built or downloaded, without actually performing the operation.
+- `--dry-run`
 
-  - `--ignore-unknown`\
-    If a non-derivation path does not have a substitute, then silently
-    ignore it.
+  Print on standard error a description of what packages would be
+  built or downloaded, without actually performing the operation.
 
-  - `--check`\
-    This option allows you to check whether a derivation is
-    deterministic. It rebuilds the specified derivation and checks
-    whether the result is bitwise-identical with the existing outputs,
-    printing an error if that’s not the case. The outputs of the
-    specified derivation must already exist. When used with `-K`, if an
-    output path is not identical to the corresponding output from the
-    previous build, the new output path is left in
-    `/nix/store/name.check.`
+- `--ignore-unknown`
+
+  If a non-derivation path does not have a substitute, then silently
+  ignore it.
+
+- `--check`
+
+  This option allows you to check whether a derivation is
+  deterministic. It rebuilds the specified derivation and checks
+  whether the result is bitwise-identical with the existing outputs,
+  printing an error if that’s not the case. The outputs of the
+  specified derivation must already exist. When used with `-K`, if an
+  output path is not identical to the corresponding output from the
+  previous build, the new output path is left in
+  `/nix/store/name.check.`
 
 {{#include ./opt-common.md}}
 

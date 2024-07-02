@@ -1,3 +1,4 @@
+#include "config-global.hh"
 #include "eval.hh"
 #include "installable-flake.hh"
 #include "command-installable-value.hh"
@@ -14,6 +15,7 @@
 
 #include <iterator>
 #include <memory>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
@@ -237,7 +239,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto getEnvShPath = ({
         StringSource source { getEnvSh };
         evalStore->addToStoreFromDump(
-            source, "get-env.sh", FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, {});
+            source, "get-env.sh", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, {});
     });
 
     drv.args = {store->printStorePath(getEnvShPath)};
@@ -610,7 +612,7 @@ struct CmdDevelop : Common, MixEnvironment
         }
 
         else {
-            script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n" + script;
+            script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\nshopt -u expand_aliases\n" + script + "\nshopt -s expand_aliases\n";
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
                     shellEscape(developSettings.bashPrompt.get()));

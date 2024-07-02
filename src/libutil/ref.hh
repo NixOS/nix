@@ -77,6 +77,8 @@ public:
         return ref<T2>((std::shared_ptr<T2>) p);
     }
 
+    ref<T> & operator=(ref<T> const & rhs) = default;
+
     bool operator == (const ref<T> & other) const
     {
         return p == other.p;

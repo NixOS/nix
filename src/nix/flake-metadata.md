@@ -2,10 +2,10 @@ R""(
 
 # Examples
 
-* Show what `nixpkgs` resolves to:
+* Show what `dwarffs` resolves to:
 
   ```console
-  # nix flake metadata nixpkgs
+  # nix flake metadata dwarffs
   Resolved URL:  github:edolstra/dwarffs
   Locked URL:    github:edolstra/dwarffs/f691e2c991e75edb22836f1dbe632c40324215c5
   Description:   A filesystem that fetches DWARF debug info from the Internet on demand

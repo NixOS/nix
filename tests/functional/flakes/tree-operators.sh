@@ -41,5 +41,5 @@ nix build --out-link $TEST_ROOT/result $flake1Dir#shOnly
 (! find $TEST_ROOT/result/ -type f | grep -v '.sh$')
 
 nix build --out-link $TEST_ROOT/result $flake1Dir#lang
-[[ -e $TEST_ROOT/result/framework.sh ]]
+[[ -e $TEST_ROOT/result/dir1 ]]
 (! [[ -e $TEST_ROOT/result/readDir ]])

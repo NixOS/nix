@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 if [[ -n ${CONTENT_ADDRESSED:-} ]]; then
     shellDotNix="$PWD/ca-shell.nix"

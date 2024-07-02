@@ -3,11 +3,12 @@
 #include "environment-variables.hh"
 #include "terminal.hh"
 #include "util.hh"
-#include "config.hh"
+#include "config-global.hh"
 #include "source-path.hh"
 #include "position.hh"
 
 #include <atomic>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <iostream>
 

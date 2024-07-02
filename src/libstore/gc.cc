@@ -162,6 +162,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     /* Read the `temproots' directory for per-process temporary root
        files. */
     for (auto & i : std::filesystem::directory_iterator{tempRootsDir}) {
+        checkInterrupt();
         auto name = i.path().filename().string();
         if (name[0] == '.') {
             // Ignore hidden files. Some package managers (notably portage) create
@@ -228,8 +229,10 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             type = std::filesystem::symlink_status(path).type();
 
         if (type == std::filesystem::file_type::directory) {
-            for (auto & i : std::filesystem::directory_iterator{path})
+            for (auto & i : std::filesystem::directory_iterator{path}) {
+                checkInterrupt();
                 findRoots(i.path().string(), i.symlink_status().type(), roots);
+            }
         }
 
         else if (type == std::filesystem::file_type::symlink) {
@@ -781,7 +784,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 throw Error(
                     "Cannot delete path '%1%' since it is still alive. "
                     "To find out why, use: "
-                    "nix-store --query --roots",
+                    "nix-store --query --roots and nix-store --query --referrers",
                     printStorePath(i));
         }
 

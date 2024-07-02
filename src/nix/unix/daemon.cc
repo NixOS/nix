@@ -10,6 +10,7 @@
 #include "serialise.hh"
 #include "archive.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "derivations.hh"
 #include "finally.hh"
 #include "legacy.hh"
@@ -58,7 +59,7 @@ struct AuthorizationSettings : Config {
         this, {"root"}, "trusted-users",
         R"(
           A list of user names, separated by whitespace.
-          These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned [NARs](@docroot@/glossary.md#gloss-nar).
+          These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned realisations or unsigned input-addressed store objects.
 
           You can also specify groups by prefixing names with `@`.
           For instance, `@wheel` means all users in the `wheel` group.
@@ -295,7 +296,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         if (getEnv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
             throw Error("unexpected systemd environment variables");
         fdSocket = SD_LISTEN_FDS_START;
-        closeOnExec(fdSocket.get());
+        unix::closeOnExec(fdSocket.get());
     }
 
     //  Otherwise, create and bind to a Unix domain socket.
@@ -323,7 +324,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 throw SysError("accepting connection");
             }
 
-            closeOnExec(remote.get());
+            unix::closeOnExec(remote.get());
 
             PeerInfo peer { .pidKnown = false };
             TrustedFlag trusted;

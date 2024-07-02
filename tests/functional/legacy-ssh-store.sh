@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 store_uri="ssh://localhost?remote-store=$TEST_ROOT/other-store"

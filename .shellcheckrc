@@ -1,0 +1,4 @@
+external-sources=true
+source-path=SCRIPTDIR
+# Hack for scripts in e.g. tests/functional/ca
+source-path=SCRIPTDIR/..

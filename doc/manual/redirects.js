@@ -1,7 +1,7 @@
 // redirect rules for URL fragments (client-side) to prevent link rot.
 // this must be done on the client side, as web servers do not see the fragment part of the URL.
 // it will only work with JavaScript enabled in the browser, but this is the best we can do here.
-// see ./_redirects for path redirects (client-side)
+// see src/_redirects for path redirects (server-side)
 
 // redirects are declared as follows:
 // each entry has as its key a path matching the requested URL path, relative to the mdBook document root.
@@ -285,15 +285,15 @@ const redirects = {
     "ch-basic-package-mgmt": "package-management/basic-package-mgmt.html",
     "ssec-binary-cache-substituter": "package-management/binary-cache-substituter.html",
     "sec-channels": "command-ref/nix-channel.html",
-    "ssec-copy-closure": "package-management/copy-closure.html",
+    "ssec-copy-closure": "command-ref/nix-copy-closure.html",
     "sec-garbage-collection": "package-management/garbage-collection.html",
     "ssec-gc-roots": "package-management/garbage-collector-roots.html",
     "chap-package-management": "package-management/index.html",
     "sec-profiles": "package-management/profiles.html",
-    "ssec-s3-substituter": "package-management/s3-substituter.html",
-    "ssec-s3-substituter-anonymous-reads": "package-management/s3-substituter.html#anonymous-reads-to-your-s3-compatible-binary-cache",
-    "ssec-s3-substituter-authenticated-reads": "package-management/s3-substituter.html#authenticated-reads-to-your-s3-binary-cache",
-    "ssec-s3-substituter-authenticated-writes": "package-management/s3-substituter.html#authenticated-writes-to-your-s3-compatible-binary-cache",
+    "ssec-s3-substituter": "store/types/s3-substituter.html",
+    "ssec-s3-substituter-anonymous-reads": "store/types/s3-substituter.html#anonymous-reads-to-your-s3-compatible-binary-cache",
+    "ssec-s3-substituter-authenticated-reads": "store/types/s3-substituter.html#authenticated-reads-to-your-s3-binary-cache",
+    "ssec-s3-substituter-authenticated-writes": "store/types/s3-substituter.html#authenticated-writes-to-your-s3-compatible-binary-cache",
     "sec-sharing-packages": "package-management/sharing-packages.html",
     "ssec-ssh-substituter": "package-management/ssh-substituter.html",
     "chap-quick-start": "quick-start.html",

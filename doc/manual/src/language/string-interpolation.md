@@ -43,6 +43,47 @@ configureFlags = "
 Note that Nix expressions and strings can be arbitrarily nested;
 in this case the outer string contains various interpolated expressions that themselves contain strings (e.g., `"-thread"`), some of which in turn contain interpolated expressions (e.g., `${mesa}`).
 
+To write a literal `${` in an regular string, escape it with a backslash (`\`).
+
+> **Example**
+>
+> ```nix
+> "echo \${PATH}"
+> ```
+>
+>     "echo ${PATH}"
+
+To write a literal `${` in an indented string, escape it with two single quotes (`''`).
+
+> **Example**
+>
+> ```nix
+> ''
+>   echo ''${PATH}
+> ''
+> ```
+>
+>     "echo ${PATH}\n"
+
+`$${` can be written literally in any string.
+
+> **Example**
+>
+> In Make, `$` in file names or recipes is represented as `$$`, see [GNU `make`: Basics of Variable Reference](https://www.gnu.org/software/make/manual/html_node/Reference.html#Basics-of-Variable-References).
+> This can be expressed directly in the Nix language strings:
+>
+> ```nix
+> ''
+>   MAKEVAR = Hello
+>   all:
+>   	@export BASHVAR=world; echo $(MAKEVAR) $${BASHVAR}
+> ''
+> ```
+>
+>     "MAKEVAR = Hello\nall:\n\t@export BASHVAR=world; echo $(MAKEVAR) $\${BASHVAR}\n"
+
+See the [documentation on strings][string] for details.
+
 ### Path
 
 Rather than writing
@@ -107,9 +148,9 @@ An expression that is interpolated must evaluate to one of the following:
 
 A string interpolates to itself.
 
-A path in an interpolated expression is first copied into the Nix store, and the resulting string is the [store path] of the newly created [store object](@docroot@/glossary.md#gloss-store-object).
+A path in an interpolated expression is first copied into the Nix store, and the resulting string is the [store path] of the newly created [store object](@docroot@/store/store-object.md).
 
-[store path]: @docroot@/glossary.md#gloss-store-path
+[store path]: @docroot@/store/store-path.md
 
 > **Example**
 >

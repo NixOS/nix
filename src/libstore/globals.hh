@@ -910,7 +910,7 @@ public:
         "substituters",
         R"(
           A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
-          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
+          A substituter is an additional [store](@docroot@/glossary.md#gloss-store) from which Nix can obtain [store objects](@docroot@/store/store-object.md) instead of building them.
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
@@ -1262,6 +1262,16 @@ public:
           store paths of the latest Nix release.
         )"
     };
+
+    Setting<uint64_t> warnLargePathThreshold{
+        this,
+        std::numeric_limits<uint64_t>::max(),
+        "warn-large-path-threshold",
+        R"(
+          Warn when copying a path larger than this number of bytes to the Nix store
+          (as determined by its NAR serialisation).
+        )"
+    };
 };
 
 
@@ -1274,7 +1284,13 @@ extern Settings settings;
  */
 void initPlugins();
 
-void loadConfFile();
+/**
+ * Load the configuration (from `nix.conf`, `NIX_CONFIG`, etc.) into the
+ * given configuration object.
+ *
+ * Usually called with `globalConfig`.
+ */
+void loadConfFile(AbstractConfig & config);
 
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();

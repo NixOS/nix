@@ -4,6 +4,7 @@
 #include "pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-connection.hh"
 #include "serve-protocol-impl.hh"
 #include "build-result.hh"
 #include "store-api.hh"
@@ -28,26 +29,23 @@ struct LegacySSHStore::Connection : public ServeProto::BasicClientConnection
     bool good = true;
 };
 
-
-LegacySSHStore::LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
+LegacySSHStore::LegacySSHStore(
+    std::string_view scheme,
+    std::string_view host,
+    const Params & params)
     : StoreConfig(params)
-    , CommonSSHStoreConfig(params)
+    , CommonSSHStoreConfig(scheme, host, params)
     , LegacySSHStoreConfig(params)
     , Store(params)
-    , host(host)
     , connections(make_ref<Pool<Connection>>(
         std::max(1, (int) maxConnections),
         [this]() { return openConnection(); },
         [](const ref<Connection> & r) { return r->good; }
         ))
-    , master(
-        host,
-        sshKey,
-        sshPublicHostKey,
+    , master(createSSHMaster(
         // Use SSH master only if using more than 1 connection.
         connections->capacity() > 1,
-        compress,
-        logFD)
+        logFD))
 {
 }
 
@@ -76,7 +74,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
         conn->sshConn->in.close();
         {
             NullSink nullSink;
-            conn->from.drainInto(nullSink);
+            tee.drainInto(nullSink);
         }
         throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
             host, chomp(saved.s));
@@ -105,24 +103,26 @@ void LegacySSHStore::queryPathInfoUncached(const StorePath & path,
 
         debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
-        conn->to << ServeProto::Command::QueryPathInfos << PathSet{printStorePath(path)};
-        conn->to.flush();
+        auto infos = conn->queryPathInfos(*this, {path});
 
-        auto p = readString(conn->from);
-        if (p.empty()) return callback(nullptr);
-        auto path2 = parseStorePath(p);
-        assert(path == path2);
-        auto info = std::make_shared<ValidPathInfo>(
-            path,
-            ServeProto::Serialise<UnkeyedValidPathInfo>::read(*this, *conn));
+        switch (infos.size()) {
+        case 0:
+            return callback(nullptr);
+        case 1: {
+            auto & [path2, info] = *infos.begin();
 
-        if (info->narHash == Hash::dummy)
-            throw Error("NAR hash is now mandatory");
+            if (info.narHash == Hash::dummy)
+                throw Error("NAR hash is now mandatory");
 
-        auto s = readString(conn->from);
-        assert(s == "");
-
-        callback(std::move(info));
+            assert(path == path2);
+            return callback(std::make_shared<ValidPathInfo>(
+                std::move(path),
+                std::move(info)
+            ));
+        }
+        default:
+            throw Error("More path infos returned than queried");
+        }
     } catch (...) { callback.rethrow(); }
 }
 
@@ -156,41 +156,38 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source,
         }
         conn->to.flush();
 
+        if (readInt(conn->from) != 1)
+            throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), host);
+
     } else {
 
-        conn->to
-            << ServeProto::Command::ImportPaths
-            << 1;
-        try {
-            copyNAR(source, conn->to);
-        } catch (...) {
-            conn->good = false;
-            throw;
-        }
-        conn->to
-            << exportMagic
-            << printStorePath(info.path);
-        ServeProto::write(*this, *conn, info.references);
-        conn->to
-            << (info.deriver ? printStorePath(*info.deriver) : "")
-            << 0
-            << 0;
-        conn->to.flush();
+        conn->importPaths(*this, [&](Sink & sink) {
+            try {
+                copyNAR(source, sink);
+            } catch (...) {
+                conn->good = false;
+                throw;
+            }
+            sink
+                << exportMagic
+                << printStorePath(info.path);
+            ServeProto::write(*this, *conn, info.references);
+            sink
+                << (info.deriver ? printStorePath(*info.deriver) : "")
+                << 0
+                << 0;
+        });
 
     }
-
-    if (readInt(conn->from) != 1)
-        throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), host);
 }
 
 
 void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
 {
     auto conn(connections->get());
-
-    conn->to << ServeProto::Command::DumpStorePath << printStorePath(path);
-    conn->to.flush();
-    copyNAR(conn->from, sink);
+    conn->narFromPath(*this, path, [&](auto & source) {
+        copyNAR(source, sink);
+    });
 }
 
 
@@ -214,7 +211,7 @@ BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const Bas
 
     conn->putBuildDerivationRequest(*this, drvPath, drv, buildSettings());
 
-    return ServeProto::Serialise<BuildResult>::read(*this, *conn);
+    return conn->getBuildDerivationResponse(*this);
 }
 
 

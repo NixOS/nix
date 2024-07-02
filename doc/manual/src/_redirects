@@ -1,5 +1,5 @@
 # redirect rules for paths (server-side) to prevent link rot.
-# see ./redirects.js for redirects based on URL fragments (client-side)
+# see ../redirects.js for redirects based on URL fragments (client-side)
 #
 # concrete user story this supports:
 # - user finds URL to the manual for Nix x.y
@@ -39,3 +39,5 @@
 /json/* /protocols/json/:splat 301!
 
 /release-notes/release-notes /release-notes 301!
+
+/package-management/copy-closure /command-ref/nix-copy-closure 301!

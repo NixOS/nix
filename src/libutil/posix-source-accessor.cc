@@ -90,14 +90,14 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static Sync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
+    static SharedSync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
 
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
 
     {
-        auto cache(_cache.lock());
+        auto cache(_cache.read());
         auto i = cache->find(absPath);
         if (i != cache->end()) return i->second;
     }
@@ -133,6 +133,7 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
     assertNoSymlinks(path);
     DirEntries res;
     for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
+        checkInterrupt();
         auto type = [&]() -> std::optional<Type> {
             std::filesystem::file_type nativeType;
             try {

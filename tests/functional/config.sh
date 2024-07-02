@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Isolate the home for this test.
@@ -25,6 +27,8 @@ nix registry remove userhome-with-xdg
 [ -e "$TEST_ROOT/confighome/nix" ]
 # Assert the .config folder hasn't been created.
 [ ! -e "$HOME/.config" ]
+
+TODO_NixOS # Very specific test setup not compatible with the NixOS test environment?
 
 # Test that files are loaded from XDG by default
 export XDG_CONFIG_HOME=$TEST_ROOT/confighome

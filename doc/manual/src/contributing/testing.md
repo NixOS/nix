@@ -60,7 +60,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ```
 
 The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `tests/unit/${library_name_without-nix}`.
-Given a interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `tests/unit/libexpr/tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `tests/unit/libexpr-support/tests/value/context.{hh,cc}`.
+Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `tests/unit/libexpr/tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `tests/unit/libexpr-support/tests/value/context.{hh,cc}`.
 
 Data for unit tests is stored in a `data` subdir of the directory for each unit test executable.
 For example, `libnixstore` code is in `src/libstore`, and its test data is in `tests/unit/libstore/data`.
@@ -113,6 +113,8 @@ On other platforms they wouldn't be run at all.
 
 The functional tests reside under the `tests/functional` directory and are listed in `tests/functional/local.mk`.
 Each test is a bash script.
+
+Functional tests are run during `installCheck` in the `nix` package build, as well as separately from the build, in VM tests.
 
 ### Running the whole test suite
 
@@ -252,13 +254,30 @@ Regressions are caught, and improvements always show up in code review.
 
 To ensure that characterisation testing doesn't make it harder to intentionally change these interfaces, there always must be an easy way to regenerate the expected output, as we do with `_NIX_TEST_ACCEPT=1`.
 
+### Running functional tests on NixOS
+
+We run the functional tests not just in the build, but also in VM tests.
+This helps us ensure that Nix works correctly on NixOS, and environments that have similar characteristics that are hard to reproduce in a build environment.
+
+The recommended way to run these tests during development is:
+
+```shell
+nix build .#hydraJobs.tests.functional_user.quickBuild
+```
+
+The `quickBuild` attribute configures the test to use a `nix` package that's built without integration tests, so that you can iterate on the tests without performing recompilations due to the changed sources for `installCheck`.
+
+Generally, this build is sufficient, but in nightly or CI we also test the attributes `functional_root` and `functional_trusted`, in which the test suite is run with different levels of authorization.
+
 ## Integration tests
 
 The integration tests are defined in the Nix flake under the `hydraJobs.tests` attribute.
 These tests include everything that needs to interact with external services or run Nix in a non-trivial distributed setup.
 Because these tests are expensive and require more than what the standard github-actions setup provides, they only run on the master branch (on <https://hydra.nixos.org/jobset/nix/master>).
 
-You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-build -A hydraJobs.tests.{testName}`
+You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-build -A hydraJobs.tests.{testName}`.
+
+If you are testing a build of `nix` that you haven't compiled yet, you may iterate faster by appending the `quickBuild` attribute: `nix build .#hydraJobs.tests.{testName}.quickBuild`.
 
 ## Installer tests
 

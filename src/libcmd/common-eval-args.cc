@@ -1,6 +1,7 @@
 #include "eval-settings.hh"
 #include "common-eval-args.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "filetransfer.hh"
 #include "eval.hh"
 #include "fetchers.hh"
@@ -13,6 +14,25 @@
 
 namespace nix {
 
+EvalSettings evalSettings {
+    settings.readOnlyMode,
+    {
+        {
+            "flake",
+            [](ref<Store> store, std::string_view rest) {
+                experimentalFeatureSettings.require(Xp::Flakes);
+                // FIXME `parseFlakeRef` should take a `std::string_view`.
+                auto flakeRef = parseFlakeRef(std::string { rest }, {}, true, false);
+                debug("fetching flake search path element '%s''", rest);
+                auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
+                return SourcePath(accessor);
+            },
+        },
+    },
+};
+
+static GlobalConfig::Register rEvalSettings(&evalSettings);
+
 MixEvalArgs::MixEvalArgs()
 {
     addFlag({
@@ -20,7 +40,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "expr"},
-        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr(expr)}); }}
+        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr{expr}}); }}
     });
 
     addFlag({
@@ -28,7 +48,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the string *string* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "string"},
-        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString(s)}); }},
+        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString{s}}); }},
     });
 
     addFlag({
@@ -36,7 +56,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the contents of file *path* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "path"},
-        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile(path)}); }},
+        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile{path}}); }},
         .completer = completePath
     });
 

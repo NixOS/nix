@@ -120,12 +120,11 @@ Derivations can declare some infrequently used optional attributes.
     configuration setting.
 
   - [`outputHash`]{#adv-attr-outputHash}; [`outputHashAlgo`]{#adv-attr-outputHashAlgo}; [`outputHashMode`]{#adv-attr-outputHashMode}\
-    These attributes declare that the derivation is a so-called
-    *fixed-output derivation*, which means that a cryptographic hash of
-    the output is already known in advance. When the build of a
-    fixed-output derivation finishes, Nix computes the cryptographic
-    hash of the output and compares it to the hash declared with these
-    attributes. If there is a mismatch, the build fails.
+    These attributes declare that the derivation is a so-called *fixed-output derivation* (FOD), which means that a cryptographic hash of the output is already known in advance.
+
+    As opposed to regular derivations, the [`builder`] executable of a fixed-output derivation has access to the network.
+    Nix computes a cryptographic hash of its output and compares that to the hash declared with these attributes.
+    If there is a mismatch, the derivation fails.
 
     The rationale for fixed-output derivations is derivations such as
     those produced by the `fetchurl` function. This function downloads a
@@ -197,33 +196,40 @@ Derivations can declare some infrequently used optional attributes.
     `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format.
 
     The `outputHashMode` attribute determines how the hash is computed.
-    It must be one of the following two values:
+    It must be one of the following values:
 
-      - `"flat"`\
-        The output must be a non-executable regular file. If it isn’t,
-        the build fails. The hash is simply computed over the contents
-        of that file (so it’s equal to what Unix commands like
-        `sha256sum` or `sha1sum` produce).
+      - [`"flat"`](@docroot@/store/store-object/content-address.md#method-flat)
 
         This is the default.
 
-      - `"recursive"` or `"nar"`\
-        The hash is computed over the [NAR archive](@docroot@/glossary.md#gloss-nar) dump of the output
-        (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
-        this case, the output can be anything, including a directory
-        tree.
+      - [`"recursive"` or `"nar"`](@docroot@/store/store-object/content-address.md#method-nix-archive)
 
-    `"recursive"` is the traditional way of indicating this,
-    and is supported since 2005 (virtually the entire history of Nix).
-    `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
-    however support for it is only added in Nix version 2.21.
+        > **Compatibility**
+        >
+        > `"recursive"` is the traditional way of indicating this,
+        > and is supported since 2005 (virtually the entire history of Nix).
+        > `"nar"` is more clear, and consistent with other parts of Nix (such as the CLI),
+        > however support for it is only added in Nix version 2.21.
+
+      - [`"text"`](@docroot@/store/store-object/content-address.md#method-text)
+
+        > **Warning**
+        >
+        > The use of this method for derivation outputs is part of the [`dynamic-derivations`][xp-feature-dynamic-derivations] experimental feature.
+
+      - [`"git"`](@docroot@/store/store-object/content-address.md#method-git)
+
+        > **Warning**
+        >
+        > This method is part of the [`git-hashing`][xp-feature-git-hashing] experimental feature.
 
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
+
     > **Warning**
     > This attribute is part of an [experimental feature](@docroot@/contributing/experimental-features.md).
     >
     > To use this attribute, you must enable the
-    > [`ca-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) experimental feature.
+    > [`ca-derivations`][xp-feature-ca-derivations] experimental feature.
     > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
     >
     > ```
@@ -272,7 +278,9 @@ Derivations can declare some infrequently used optional attributes.
 
     > **Note**
     >
-    > If set to `false`, the [`builder`](./derivations.md#attr-builder) should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
+    > If set to `false`, the [`builder`] should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
+
+    [`builder`]: ./derivations.md#attr-builder
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation
@@ -294,6 +302,12 @@ Derivations can declare some infrequently used optional attributes.
     (associative) arrays. For example, the attribute `hardening.format = true`
     ends up as the Bash associative array element `${hardening[format]}`.
 
+    > **Warning**
+    >
+    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
+    will have no effect.
+
   - [`outputChecks`]{#adv-attr-outputChecks}\
     When using [structured attributes](#adv-attr-structuredAttrs), the `outputChecks`
     attribute allows defining checks per-output.
@@ -303,7 +317,7 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
     the following attributes are available:
 
-    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/glossary.md#gloss-store-object).
+    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/store/store-object.md).
     - `maxClosureSize` defines the maximum size of the output's closure.
     - `ignoreSelfRefs` controls whether self-references should be considered when
       checking for allowed references/requisites.
@@ -355,3 +369,7 @@ Derivations can declare some infrequently used optional attributes.
   ```
 
   ensures that the derivation can only be built on a machine with the `kvm` feature.
+
+[xp-feature-ca-derivations]: @docroot@/contributing/experimental-features.md#xp-feature-ca-derivations
+[xp-feature-dynamic-derivations]: @docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations
+[xp-feature-git-hashing]: @docroot@/contributing/experimental-features.md#xp-feature-git-hashing

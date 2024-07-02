@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Tests that:
@@ -13,6 +15,8 @@ source common.sh
 
 requireGit
 
+TODO_NixOS
+
 clearStore
 
 # Submodules can't be fetched locally by default.
@@ -25,8 +29,8 @@ rootRepo=$TEST_ROOT/rootRepo
 subRepo=$TEST_ROOT/submodule
 
 
-createGitRepo $subRepo
-cat > $subRepo/flake.nix <<EOF
+createGitRepo "$subRepo"
+cat > "$subRepo"/flake.nix <<EOF
 {
     outputs = { self }: {
         sub = import ./sub.nix;
@@ -34,28 +38,28 @@ cat > $subRepo/flake.nix <<EOF
     };
 }
 EOF
-echo '"expression in submodule"' > $subRepo/sub.nix
-git -C $subRepo add flake.nix sub.nix
-git -C $subRepo commit -m Initial
+echo '"expression in submodule"' > "$subRepo"/sub.nix
+git -C "$subRepo" add flake.nix sub.nix
+git -C "$subRepo" commit -m Initial
 
-createGitRepo $rootRepo
+createGitRepo "$rootRepo"
 
-git -C $rootRepo submodule init
-git -C $rootRepo submodule add $subRepo submodule
-echo '"expression in root repo"' > $rootRepo/root.nix
-git -C $rootRepo add root.nix
-git -C $rootRepo commit -m "Add root.nix"
+git -C "$rootRepo" submodule init
+git -C "$rootRepo" submodule add "$subRepo" submodule
+echo '"expression in root repo"' > "$rootRepo"/root.nix
+git -C "$rootRepo" add root.nix
+git -C "$rootRepo" commit -m "Add root.nix"
 
 flakeref=git+file://$rootRepo\?submodules=1\&dir=submodule
 
 # Flake can live inside a submodule and can be accessed via ?dir=submodule
-[[ $(nix eval --json $flakeref#sub ) = '"expression in submodule"' ]]
+[[ $(nix eval --json "$flakeref#sub" ) = '"expression in submodule"' ]]
 
 # The flake can access content outside of the submodule
-[[ $(nix eval --json $flakeref#root ) = '"expression in root repo"' ]]
+[[ $(nix eval --json "$flakeref#root" ) = '"expression in root repo"' ]]
 
 # Check that dirtying a submodule makes the entire thing dirty.
-[[ $(nix flake metadata --json $flakeref | jq -r .locked.rev) != null ]]
-echo '"foo"' > $rootRepo/submodule/sub.nix
-[[ $(nix eval --json $flakeref#sub ) = '"foo"' ]]
-[[ $(nix flake metadata --json $flakeref | jq -r .locked.rev) = null ]]
+[[ $(nix flake metadata --json "$flakeref" | jq -r .locked.rev) != null ]]
+echo '"foo"' > "$rootRepo"/submodule/sub.nix
+[[ $(nix eval --json "$flakeref#sub" ) = '"foo"' ]]
+[[ $(nix flake metadata --json "$flakeref" | jq -r .locked.rev) = null ]]

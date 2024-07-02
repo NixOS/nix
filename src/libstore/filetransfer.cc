@@ -1,5 +1,6 @@
 #include "filetransfer.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "store-api.hh"
 #include "s3.hh"
 #include "compression.hh"
@@ -580,7 +581,12 @@ struct curlFileTransfer : public FileTransfer
         #endif
 
         #if __linux__
-        unshareFilesystem();
+        try {
+            tryUnshareFilesystem();
+        } catch (nix::Error & e) {
+            e.addTrace({}, "in download thread");
+            throw;
+        }
         #endif
 
         std::map<CURL *, std::shared_ptr<TransferItem>> items;

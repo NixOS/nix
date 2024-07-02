@@ -3,13 +3,12 @@
 #include "hash.hh"
 #include "primops.hh"
 #include "print-options.hh"
-#include "shared.hh"
+#include "exit.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
-#include "globals.hh"
 #include "eval-inline.hh"
 #include "filetransfer.hh"
 #include "function-trace.hh"
@@ -22,38 +21,33 @@
 #include "url.hh"
 #include "fetch-to-store.hh"
 #include "tarball.hh"
-#include "flake/flakeref.hh"
 #include "parser-tab.hh"
 
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <sstream>
 #include <cstring>
 #include <optional>
 #include <unistd.h>
 #include <sys/time.h>
 #include <fstream>
 #include <functional>
-#include <iostream>
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
 
 #ifndef _WIN32 // TODO use portable implementation
-# include <sys/resource.h>
+#  include <sys/resource.h>
 #endif
 
 #if HAVE_BOEHMGC
 
-#define GC_INCLUDE_NEW
+#  define GC_INCLUDE_NEW
 
-#include <gc/gc.h>
-#include <gc/gc_cpp.h>
-#include <gc/gc_allocator.h>
-
-#include <boost/coroutine2/coroutine.hpp>
-#include <boost/coroutine2/protected_fixedsize_stack.hpp>
-#include <boost/context/stack_context.hpp>
+#  include <gc/gc.h>
+#  include <gc/gc_cpp.h>
+#  include <gc/gc_allocator.h>
 
 #endif
 
@@ -206,53 +200,6 @@ bool Value::isTrivial() const
 }
 
 
-#if HAVE_BOEHMGC
-/* Called when the Boehm GC runs out of memory. */
-static void * oomHandler(size_t requested)
-{
-    /* Convert this to a proper C++ exception. */
-    throw std::bad_alloc();
-}
-
-class BoehmGCStackAllocator : public StackAllocator {
-    boost::coroutines2::protected_fixedsize_stack stack {
-        // We allocate 8 MB, the default max stack size on NixOS.
-        // A smaller stack might be quicker to allocate but reduces the stack
-        // depth available for source filter expressions etc.
-        std::max(boost::context::stack_traits::default_size(), static_cast<std::size_t>(8 * 1024 * 1024))
-    };
-
-    // This is specific to boost::coroutines2::protected_fixedsize_stack.
-    // The stack protection page is included in sctx.size, so we have to
-    // subtract one page size from the stack size.
-    std::size_t pfss_usable_stack_size(boost::context::stack_context &sctx) {
-        return sctx.size - boost::context::stack_traits::page_size();
-    }
-
-  public:
-    boost::context::stack_context allocate() override {
-        auto sctx = stack.allocate();
-
-        // Stacks generally start at a high address and grow to lower addresses.
-        // Architectures that do the opposite are rare; in fact so rare that
-        // boost_routine does not implement it.
-        // So we subtract the stack size.
-        GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
-        return sctx;
-    }
-
-    void deallocate(boost::context::stack_context sctx) override {
-        GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
-        stack.deallocate(sctx);
-    }
-
-};
-
-static BoehmGCStackAllocator boehmGCStackAllocator;
-
-#endif
-
-
 static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 {
     if (name.symbol) {
@@ -270,90 +217,15 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     }
 }
 
-#if HAVE_BOEHMGC
-/* Disable GC while this object lives. Used by CoroutineContext.
- *
- * Boehm keeps a count of GC_disable() and GC_enable() calls,
- * and only enables GC when the count matches.
- */
-class BoehmDisableGC {
-public:
-    BoehmDisableGC() {
-        GC_disable();
-    };
-    ~BoehmDisableGC() {
-        GC_enable();
-    };
-};
-#endif
-
-static bool gcInitialised = false;
-
-void initGC()
-{
-    if (gcInitialised) return;
-
-#if HAVE_BOEHMGC
-    /* Initialise the Boehm garbage collector. */
-
-    /* Don't look for interior pointers. This reduces the odds of
-       misdetection a bit. */
-    GC_set_all_interior_pointers(0);
-
-    /* We don't have any roots in data segments, so don't scan from
-       there. */
-    GC_set_no_dls(1);
-
-    GC_INIT();
-
-    GC_set_oom_fn(oomHandler);
-
-    StackAllocator::defaultAllocator = &boehmGCStackAllocator;
-
-
-#if NIX_BOEHM_PATCH_VERSION != 1
-    printTalkative("Unpatched BoehmGC, disabling GC inside coroutines");
-    /* Used to disable GC when entering coroutines on macOS */
-    create_coro_gc_hook = []() -> std::shared_ptr<void> {
-        return std::make_shared<BoehmDisableGC>();
-    };
-#endif
-
-    /* Set the initial heap size to something fairly big (25% of
-       physical RAM, up to a maximum of 384 MiB) so that in most cases
-       we don't need to garbage collect at all.  (Collection has a
-       fairly significant overhead.)  The heap size can be overridden
-       through libgc's GC_INITIAL_HEAP_SIZE environment variable.  We
-       should probably also provide a nix.conf setting for this.  Note
-       that GC_expand_hp() causes a lot of virtual, but not physical
-       (resident) memory to be allocated.  This might be a problem on
-       systems that don't overcommit. */
-    if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
-        size_t size = 32 * 1024 * 1024;
-#if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
-        size_t maxSize = 384 * 1024 * 1024;
-        long pageSize = sysconf(_SC_PAGESIZE);
-        long pages = sysconf(_SC_PHYS_PAGES);
-        if (pageSize != -1)
-            size = (pageSize * pages) / 4; // 25% of RAM
-        if (size > maxSize) size = maxSize;
-#endif
-        debug("setting initial heap size to %1% bytes", size);
-        GC_expand_hp(size);
-    }
-
-#endif
-
-    gcInitialised = true;
-}
-
 static constexpr size_t BASE_ENV_SIZE = 128;
 
 EvalState::EvalState(
     const LookupPath & _lookupPath,
     ref<Store> store,
+    const EvalSettings & settings,
     std::shared_ptr<Store> buildStore)
-    : sWith(symbols.create("<with>"))
+    : settings{settings}
+    , sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
     , sType(symbols.create("type"))
@@ -373,6 +245,12 @@ EvalState::EvalState(
     , sRight(symbols.create("right"))
     , sWrong(symbols.create("wrong"))
     , sStructuredAttrs(symbols.create("__structuredAttrs"))
+    , sAllowedReferences(symbols.create("allowedReferences"))
+    , sAllowedRequisites(symbols.create("allowedRequisites"))
+    , sDisallowedReferences(symbols.create("disallowedReferences"))
+    , sDisallowedRequisites(symbols.create("disallowedRequisites"))
+    , sMaxSize(symbols.create("maxSize"))
+    , sMaxClosureSize(symbols.create("maxClosureSize"))
     , sBuilder(symbols.create("builder"))
     , sArgs(symbols.create("args"))
     , sContentAddressed(symbols.create("__contentAddressed"))
@@ -403,10 +281,10 @@ EvalState::EvalState(
     , repair(NoRepair)
     , emptyBindings(0)
     , rootFS(
-        evalSettings.restrictEval || evalSettings.pureEval
+        settings.restrictEval || settings.pureEval
         ? ref<SourceAccessor>(AllowListSourceAccessor::create(getFSSourceAccessor(), {},
-            [](const CanonPath & path) -> RestrictedPathError {
-                auto modeInformation = evalSettings.pureEval
+            [&settings](const CanonPath & path) -> RestrictedPathError {
+                auto modeInformation = settings.pureEval
                     ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
@@ -437,14 +315,14 @@ EvalState::EvalState(
     , baseEnv(allocEnv(BASE_ENV_SIZE))
 #endif
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
-    , virtualPathMarker(settings.nixStore + "/lazylazy0000000000000000")
+    , virtualPathMarker(store->storeDir + "/lazylazy0000000000000000")
 {
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
-    assert(gcInitialised);
+    assertGCInitialized();
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
@@ -458,10 +336,10 @@ EvalState::EvalState(
     vStringUnknown.mkString("unknown");
 
     /* Initialise the Nix expression search path. */
-    if (!evalSettings.pureEval) {
+    if (!settings.pureEval) {
         for (auto & i : _lookupPath.elements)
             lookupPath.elements.emplace_back(LookupPath::Elem {i});
-        for (auto & i : evalSettings.nixPath.get())
+        for (auto & i : settings.nixPath.get())
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
     }
 
@@ -539,9 +417,9 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
 
 void EvalState::checkURI(const std::string & uri)
 {
-    if (!evalSettings.restrictEval) return;
+    if (!settings.restrictEval) return;
 
-    if (isAllowedURI(uri, evalSettings.allowedUris.get())) return;
+    if (isAllowedURI(uri, settings.allowedUris.get())) return;
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
@@ -586,7 +464,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 
     constantInfos.push_back({name2, info});
 
-    if (!(evalSettings.pureEval && info.impureOnly)) {
+    if (!(settings.pureEval && info.impureOnly)) {
         /* Check the type, if possible.
 
            We might know the type of a thunk in advance, so be allowed
@@ -790,6 +668,24 @@ public:
         inDebugger = false;
     }
 };
+
+bool EvalState::canDebug()
+{
+    return debugRepl && !debugTraces.empty();
+}
+
+void EvalState::runDebugRepl(const Error * error)
+{
+    if (!canDebug())
+        return;
+
+    assert(!debugTraces.empty());
+    const DebugTrace & last = debugTraces.front();
+    const Env & env = last.env;
+    const Expr & expr = last.expr;
+
+    runDebugRepl(error, env, expr);
+}
 
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
@@ -1533,11 +1429,11 @@ public:
 
 void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos)
 {
-    if (callDepth > evalSettings.maxCallDepth)
+    if (callDepth > settings.maxCallDepth)
         error<EvalError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
     CallDepth _level(callDepth);
 
-    auto trace = evalSettings.traceFunctionCalls
+    auto trace = settings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
         : nullptr;
 
@@ -2445,21 +2341,21 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    auto i = srcToStore.find(path);
+    auto dstPathCached = get(*srcToStore.lock(), path);
 
-    auto dstPath = i != srcToStore.end()
-        ? i->second
+    auto dstPath = dstPathCached
+        ? *dstPathCached
         : [&]() {
             auto dstPath = fetchToStore(
                 *store,
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 computeBaseName(path),
-                FileIngestionMethod::Recursive,
+                ContentAddressMethod::Raw::NixArchive,
                 nullptr,
                 repair);
             allowPath(dstPath);
-            srcToStore.insert_or_assign(path, dstPath);
+            srcToStore.lock()->try_emplace(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
             return dstPath;
         }();
@@ -2927,7 +2823,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         return {corepkgsFS, CanonPath(path.substr(3))};
 
     error<ThrownError>(
-        evalSettings.pureEval
+        settings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
         path
@@ -2941,14 +2837,18 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
     auto i = lookupPathResolved.find(value);
     if (i != lookupPathResolved.end()) return i->second;
 
-    std::optional<SourcePath> res;
+    auto finish = [&](SourcePath res) {
+        debug("resolved search path element '%s' to '%s'", value, res);
+        lookupPathResolved.emplace(value, res);
+        return res;
+    };
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto accessor = fetchers::downloadTarball(
                 EvalSettings::resolvePseudoUrl(value)).accessor;
             registerAccessor(accessor);
-            res.emplace(SourcePath(accessor));
+            return finish(SourcePath(accessor));
         } catch (Error & e) {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
@@ -2956,15 +2856,17 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         }
     }
 
-    else if (hasPrefix(value, "flake:")) {
-        experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
-        debug("fetching flake search path element '%s''", value);
-        auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
-        res.emplace(SourcePath(accessor));
+    if (auto colPos = value.find(':'); colPos != value.npos) {
+        auto scheme = value.substr(0, colPos);
+        auto rest = value.substr(colPos + 1);
+        if (auto * hook = get(settings.lookupPathHooks, scheme)) {
+            auto res = (*hook)(store, rest);
+            if (res)
+                return finish(std::move(*res));
+        }
     }
 
-    else {
+    {
         auto path = rootPath(value);
 
         /* Allow access to paths in the search path. */
@@ -2981,7 +2883,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         }
 
         if (path.pathExists())
-            res.emplace(path);
+            return finish(std::move(path));
         else {
             logWarning({
                 .msg = HintFmt("Nix search path entry '%1%' does not exist, ignoring", value)
@@ -2989,11 +2891,8 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         }
     }
 
-    if (res)
-        debug("resolved search path element '%s' to '%s'", value, *res);
-
-    lookupPathResolved.emplace(value, res);
-    return res;
+    debug("failed to resolve search path element '%s'", value);
+    return std::nullopt;
 }
 
 
@@ -3004,7 +2903,7 @@ Expr * EvalState::parse(
     const SourcePath & basePath,
     std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, positions, rootFS, exprSymbols);
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, rootFS, exprSymbols);
 
     result->bindVars(*this, staticEnv);
 

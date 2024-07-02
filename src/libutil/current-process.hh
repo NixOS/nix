@@ -17,12 +17,10 @@ namespace nix {
  */
 unsigned int getMaxCPU();
 
-#ifndef _WIN32 // TODO implement on Windows, if needed.
 /**
  * Change the stack size.
  */
-void setStackSize(rlim_t stackSize);
-#endif
+void setStackSize(size_t stackSize);
 
 /**
  * Restore the original inherited Unix process context (such as signal

@@ -1,0 +1,22 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-defaults",
+    "out": "/nix/store/1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults",
+    "system": "my-system"
+  },
+  "inputDrvs": {},
+  "inputSrcs": [],
+  "name": "advanced-attributes-defaults",
+  "outputs": {
+    "out": {
+      "path": "/nix/store/1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults"
+    }
+  },
+  "system": "my-system"
+}

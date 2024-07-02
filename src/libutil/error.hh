@@ -89,6 +89,11 @@ struct ErrorInfo {
     HintFmt msg;
     std::shared_ptr<Pos> pos;
     std::list<Trace> traces;
+    /**
+     * Some messages are generated directly by expressions; notably `builtins.warn`, `abort`, `throw`.
+     * These may be rendered differently, so that users can distinguish them.
+     */
+    bool isFromExpr = false;
 
     /**
      * Exit status.
@@ -150,6 +155,7 @@ public:
         : err(e)
     { }
 
+    /** The error message without "error: " prefixed to it. */
     std::string message() {
         return err.msg.str();
     }
@@ -206,11 +212,11 @@ MakeError(SystemError, Error);
  *
  * Throw this, but prefer not to catch this, and catch `SystemError`
  * instead. This allows implementations to freely switch between this
- * and `WinError` without breaking catch blocks.
+ * and `windows::WinError` without breaking catch blocks.
  *
  * However, it is permissible to catch this and rethrow so long as
  * certain conditions are not met (e.g. to catch only if `errNo =
- * EFooBar`). In that case, try to also catch the equivalent `WinError`
+ * EFooBar`). In that case, try to also catch the equivalent `windows::WinError`
  * code.
  *
  * @todo Rename this to `PosixError` or similar. At this point Windows
@@ -248,7 +254,9 @@ public:
 };
 
 #ifdef _WIN32
-class WinError;
+namespace windows {
+    class WinError;
+}
 #endif
 
 /**
@@ -258,7 +266,7 @@ class WinError;
  */
 using NativeSysError =
 #ifdef _WIN32
-    WinError
+    windows::WinError
 #else
     SysError
 #endif

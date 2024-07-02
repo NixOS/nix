@@ -60,55 +60,63 @@ All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
 `nix-instantiate`.
 
-  - `--command` *cmd*\
-    In the environment of the derivation, run the shell command *cmd*.
-    This command is executed in an interactive shell. (Use `--run` to
-    use a non-interactive shell instead.) However, a call to `exit` is
-    implicitly added to the command, so the shell will exit after
-    running the command. To prevent this, add `return` at the end;
-    e.g.  `--command "echo Hello; return"` will print `Hello` and then
-    drop you into the interactive shell. This can be useful for doing
-    any additional initialisation.
+- `--command` *cmd*
 
-  - `--run` *cmd*\
-    Like `--command`, but executes the command in a non-interactive
-    shell. This means (among other things) that if you hit Ctrl-C while
-    the command is running, the shell exits.
+  In the environment of the derivation, run the shell command *cmd*.
+  This command is executed in an interactive shell. (Use `--run` to
+  use a non-interactive shell instead.) However, a call to `exit` is
+  implicitly added to the command, so the shell will exit after
+  running the command. To prevent this, add `return` at the end;
+  e.g.  `--command "echo Hello; return"` will print `Hello` and then
+  drop you into the interactive shell. This can be useful for doing
+  any additional initialisation.
 
-  - `--exclude` *regexp*\
-    Do not build any dependencies whose store path matches the regular
-    expression *regexp*. This option may be specified multiple times.
+- `--run` *cmd*
 
-  - `--pure`\
-    If this flag is specified, the environment is almost entirely
-    cleared before the interactive shell is started, so you get an
-    environment that more closely corresponds to the “real” Nix build. A
-    few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-    retained.
+  Like `--command`, but executes the command in a non-interactive
+  shell. This means (among other things) that if you hit Ctrl-C while
+  the command is running, the shell exits.
 
-  - `--packages` / `-p` *packages*…\
-    Set up an environment in which the specified packages are present.
-    The command line arguments are interpreted as attribute names inside
-    the Nix Packages collection. Thus, `nix-shell --packages libjpeg openjdk`
-    will start a shell in which the packages denoted by the attribute
-    names `libjpeg` and `openjdk` are present.
+- `--exclude` *regexp*
 
-  - `-i` *interpreter*\
-    The chained script interpreter to be invoked by `nix-shell`. Only
-    applicable in `#!`-scripts (described below).
+  Do not build any dependencies whose store path matches the regular
+  expression *regexp*. This option may be specified multiple times.
 
-  - `--keep` *name*\
-    When a `--pure` shell is started, keep the listed environment
-    variables.
+- `--pure`
+
+  If this flag is specified, the environment is almost entirely
+  cleared before the interactive shell is started, so you get an
+  environment that more closely corresponds to the “real” Nix build. A
+  few variables, in particular `HOME`, `USER` and `DISPLAY`, are
+  retained.
+
+- `--packages` / `-p` *packages*…
+
+  Set up an environment in which the specified packages are present.
+  The command line arguments are interpreted as attribute names inside
+  the Nix Packages collection. Thus, `nix-shell --packages libjpeg openjdk`
+  will start a shell in which the packages denoted by the attribute
+  names `libjpeg` and `openjdk` are present.
+
+- `-i` *interpreter*
+
+  The chained script interpreter to be invoked by `nix-shell`. Only
+  applicable in `#!`-scripts (described below).
+
+- `--keep` *name*
+
+  When a `--pure` shell is started, keep the listed environment
+  variables.
 
 {{#include ./opt-common.md}}
 
 # Environment variables
 
-  - `NIX_BUILD_SHELL`\
-    Shell used to start the interactive environment. Defaults to the
-    `bash` found in `<nixpkgs>`, falling back to the `bash` found in
-    `PATH` if not found.
+- `NIX_BUILD_SHELL`
+
+  Shell used to start the interactive environment. Defaults to the
+  `bash` found in `<nixpkgs>`, falling back to the `bash` found in
+  `PATH` if not found.
 
 {{#include ./env-common.md}}
 
@@ -202,14 +210,14 @@ For example, here is a Python script that depends on Python and the
 
 ```python
 #! /usr/bin/env nix-shell
-#! nix-shell -i python --packages python pythonPackages.prettytable
+#! nix-shell -i python3 --packages python3 python3Packages.prettytable
 
 import prettytable
 
 # Print a simple table.
 t = prettytable.PrettyTable(["N", "N^2"])
 for n in range(1, 10): t.add_row([n, n * n])
-print t
+print(t)
 ```
 
 Similarly, the following is a Perl script that specifies that it

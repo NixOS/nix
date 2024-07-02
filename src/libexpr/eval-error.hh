@@ -15,27 +15,39 @@ class EvalState;
 template<class T>
 class EvalErrorBuilder;
 
-class EvalError : public Error
+/**
+ * Base class for all errors that occur during evaluation.
+ *
+ * Most subclasses should inherit from `EvalError` instead of this class.
+ */
+class EvalBaseError : public Error
 {
     template<class T>
     friend class EvalErrorBuilder;
 public:
     EvalState & state;
 
-    EvalError(EvalState & state, ErrorInfo && errorInfo)
+    EvalBaseError(EvalState & state, ErrorInfo && errorInfo)
         : Error(errorInfo)
         , state(state)
     {
     }
 
     template<typename... Args>
-    explicit EvalError(EvalState & state, const std::string & formatString, const Args &... formatArgs)
+    explicit EvalBaseError(EvalState & state, const std::string & formatString, const Args &... formatArgs)
         : Error(formatString, formatArgs...)
         , state(state)
     {
     }
 };
 
+/**
+ * `EvalError` is the base class for almost all errors that occur during evaluation.
+ *
+ * All instances of `EvalError` should show a degree of purity that allows them to be
+ * cached in pure mode. This means that they should not depend on the configuration or the overall environment.
+ */
+MakeError(EvalError, EvalBaseError);
 MakeError(ParseError, Error);
 MakeError(AssertionError, EvalError);
 MakeError(ThrownError, AssertionError);
@@ -43,7 +55,6 @@ MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, EvalError);
 MakeError(MissingArgumentError, EvalError);
-MakeError(CachedEvalError, EvalError);
 MakeError(InfiniteRecursionError, EvalError);
 
 struct InvalidPathError : public EvalError
@@ -90,6 +101,8 @@ public:
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withFrame(const Env & e, const Expr & ex);
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & addTrace(PosIdx pos, HintFmt hint);
+
+    [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & setIsFromExpr();
 
     template<typename... Args>
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> &

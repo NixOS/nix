@@ -1,10 +1,12 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 set -u
 
 requireGit
 
-clearStore
+clearStoreIfPossible
 
 rootRepo=$TEST_ROOT/gitSubmodulesRoot
 subRepo=$TEST_ROOT/gitSubmodulesSub

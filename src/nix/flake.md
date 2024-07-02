@@ -134,7 +134,9 @@ The following generic flake reference attributes are supported:
   repository or tarball. The default is the root directory of the
   flake.
 
-* `narHash`: The hash of the NAR serialisation (in SRI format) of the
+* `narHash`: The hash of the
+  [Nix Archive (NAR) serialisation][Nix Archive]
+  (in SRI format) of the
   contents of the flake. This is useful for flake types such as
   tarballs that lack a unique content identifier such as a Git commit
   hash.
@@ -423,8 +425,9 @@ The following attributes are supported in `flake.nix`:
   * `lastModified`: The commit time of the revision `rev` as an integer
     denoting the number of seconds since 1970.
 
-  * `narHash`: The SHA-256 (in SRI format) of the NAR serialization of
-    the flake's source tree.
+  * `narHash`: The SHA-256 (in SRI format) of the
+    [Nix Archive (NAR) serialisation][Nix Archive]
+    NAR serialization of the flake's source tree.
 
   The value returned by the `outputs` function must be an attribute
   set. The attributes can have arbitrary values; however, various
@@ -714,4 +717,5 @@ will not look at the lock files of dependencies. However, lock file
 generation itself *does* use the lock files of dependencies by
 default.
 
+[Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 )""

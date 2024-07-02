@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 requireGit
@@ -5,7 +7,7 @@ requireGit
 
 enableFeatures "verified-fetches"
 
-clearStore
+clearStoreIfPossible
 
 repo="$TEST_ROOT/git"
 

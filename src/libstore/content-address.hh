@@ -5,7 +5,6 @@
 #include "hash.hh"
 #include "path.hh"
 #include "file-content-address.hh"
-#include "comparator.hh"
 #include "variant-wrapper.hh"
 
 namespace nix {
@@ -13,24 +12,6 @@ namespace nix {
 /*
  * Content addressing method
  */
-
-/* We only have one way to hash text with references, so this is a single-value
-   type, mainly useful with std::variant.
-*/
-
-/**
- * The single way we can serialize "text" file system objects.
- *
- * Somewhat obscure, used by \ref Derivation derivations and
- * `builtins.toFile` currently.
- *
- * TextIngestionMethod is identical to FileIngestionMethod::Fixed except that
- * the former may not have self-references and is tagged `text:${algo}:${hash}`
- * rather than `fixed:${algo}:${hash}`.  The contents of the store path are
- * ingested and hashed identically, aside from the slightly different tag and
- * restriction on self-references.
- */
-struct TextIngestionMethod : std::monostate { };
 
 /**
  * Compute the prefix to the hash algorithm which indicates how the
@@ -48,14 +29,51 @@ std::string_view makeFileIngestionPrefix(FileIngestionMethod m);
  */
 struct ContentAddressMethod
 {
-    typedef std::variant<
-        TextIngestionMethod,
-        FileIngestionMethod
-    > Raw;
+    enum struct Raw {
+        /**
+         * Calculate a store path using the `FileIngestionMethod::Flat`
+         * hash of the file system objects, and references.
+         *
+         * See `store-object/content-address.md#method-flat` in the
+         * manual.
+         */
+        Flat,
+
+        /**
+         * Calculate a store path using the
+         * `FileIngestionMethod::NixArchive` hash of the file system
+         * objects, and references.
+         *
+         * See `store-object/content-address.md#method-flat` in the
+         * manual.
+         */
+        NixArchive,
+
+        /**
+         * Calculate a store path using the `FileIngestionMethod::Git`
+         * hash of the file system objects, and references.
+         *
+         * Part of `ExperimentalFeature::GitHashing`.
+         *
+         * See `store-object/content-address.md#method-git` in the
+         * manual.
+         */
+        Git,
+
+        /**
+         * Calculate a store path using the `FileIngestionMethod::Flat`
+         * hash of the file system objects, and references, but in a
+         * different way than `ContentAddressMethod::Raw::Flat`.
+         *
+         * See `store-object/content-address.md#method-text` in the
+         * manual.
+         */
+        Text,
+    };
 
     Raw raw;
 
-    GENERATE_CMP(ContentAddressMethod, me->raw);
+    auto operator <=>(const ContentAddressMethod &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
 
@@ -141,7 +159,7 @@ struct ContentAddress
      */
     Hash hash;
 
-    GENERATE_CMP(ContentAddress, me->method, me->hash);
+    auto operator <=>(const ContentAddress &) const = default;
 
     /**
      * Compute the content-addressability assertion
@@ -200,7 +218,7 @@ struct StoreReferences
      */
     size_t size() const;
 
-    GENERATE_CMP(StoreReferences, me->self, me->others);
+    auto operator <=>(const StoreReferences &) const = default;
 };
 
 // This matches the additional info that we need for makeTextPath
@@ -217,7 +235,7 @@ struct TextInfo
      */
     StorePathSet references;
 
-    GENERATE_CMP(TextInfo, me->hash, me->references);
+    auto operator <=>(const TextInfo &) const = default;
 };
 
 struct FixedOutputInfo
@@ -237,7 +255,7 @@ struct FixedOutputInfo
      */
     StoreReferences references;
 
-    GENERATE_CMP(FixedOutputInfo, me->hash, me->references);
+    auto operator <=>(const FixedOutputInfo &) const = default;
 };
 
 /**
@@ -254,7 +272,7 @@ struct ContentAddressWithReferences
 
     Raw raw;
 
-    GENERATE_CMP(ContentAddressWithReferences, me->raw);
+    auto operator <=>(const ContentAddressWithReferences &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressWithReferences);
 

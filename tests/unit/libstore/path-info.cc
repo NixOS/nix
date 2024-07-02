@@ -19,12 +19,20 @@ class PathInfoTest : public CharacterizationTest, public LibStoreTest
     }
 };
 
-static UnkeyedValidPathInfo makePathInfo(const Store & store, bool includeImpureInfo) {
+static UnkeyedValidPathInfo makeEmpty()
+{
+    return {
+        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+    };
+}
+
+static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo)
+{
     UnkeyedValidPathInfo info = ValidPathInfo {
         store,
         "foo",
         FixedOutputInfo {
-            .method = FileIngestionMethod::Recursive,
+            .method = FileIngestionMethod::NixArchive,
             .hash = hashString(HashAlgorithm::SHA256, "(...)"),
 
             .references = {
@@ -50,22 +58,21 @@ static UnkeyedValidPathInfo makePathInfo(const Store & store, bool includeImpure
     return info;
 }
 
-#define JSON_TEST(STEM, PURE)                                             \
+#define JSON_TEST(STEM, OBJ, PURE)                                        \
     TEST_F(PathInfoTest, PathInfo_ ## STEM ## _from_json) {               \
         readTest(#STEM, [&](const auto & encoded_) {                      \
             auto encoded = json::parse(encoded_);                         \
             UnkeyedValidPathInfo got = UnkeyedValidPathInfo::fromJSON(    \
                 *store,                                                   \
                 encoded);                                                 \
-            auto expected = makePathInfo(*store, PURE);                   \
+            auto expected = OBJ;                                          \
             ASSERT_EQ(got, expected);                                     \
         });                                                               \
     }                                                                     \
                                                                           \
     TEST_F(PathInfoTest, PathInfo_ ## STEM ## _to_json) {                 \
         writeTest(#STEM, [&]() -> json {                                  \
-            return makePathInfo(*store, PURE)                             \
-                .toJSON(*store, PURE, HashFormat::SRI);                   \
+            return OBJ.toJSON(*store, PURE, HashFormat::SRI);             \
         }, [](const auto & file) {                                        \
             return json::parse(readFile(file));                           \
         }, [](const auto & file, const auto & got) {                      \
@@ -73,7 +80,10 @@ static UnkeyedValidPathInfo makePathInfo(const Store & store, bool includeImpure
         });                                                               \
     }
 
-JSON_TEST(pure, false)
-JSON_TEST(impure, true)
+JSON_TEST(empty_pure, makeEmpty(), false)
+JSON_TEST(empty_impure, makeEmpty(), true)
+
+JSON_TEST(pure, makeFull(*store, false), false)
+JSON_TEST(impure, makeFull(*store, true), true)
 
 }

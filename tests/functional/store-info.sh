@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 STORE_INFO=$(nix store info 2>&1)
@@ -13,5 +15,7 @@ fi
 
 expect 127 NIX_REMOTE=unix:$PWD/store nix store info || \
     fail "nix store info on a non-existent store should fail"
+
+TODO_NixOS
 
 [[ "$(echo "$STORE_INFO_JSON" | jq -r ".url")" == "${NIX_REMOTE:-local}" ]]

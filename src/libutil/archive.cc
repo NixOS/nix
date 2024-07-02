@@ -6,7 +6,7 @@
 #include <strings.h> // for strcasecmp
 
 #include "archive.hh"
-#include "config.hh"
+#include "config-global.hh"
 #include "posix-source-accessor.hh"
 #include "source-path.hh"
 #include "file-system.hh"
@@ -312,15 +312,6 @@ void copyNAR(Source & source, Sink & sink)
     TeeSource wrapper { source, sink };
 
     parseDump(parseSink, wrapper);
-}
-
-
-void copyPath(const Path & from, const Path & to)
-{
-    auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(from, sink);
-    });
-    restorePath(to, *source);
 }
 
 
