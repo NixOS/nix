@@ -1,8 +1,8 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/main/common-args.hh"
-#include "nix/util/args/root.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/args/root.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/logging.hh"
 #include "nix/main/loggers.hh"

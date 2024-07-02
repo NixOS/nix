@@ -56,7 +56,9 @@ subdir('nix-meson-build-support/common')
 subdir('nix-meson-build-support/asan-options')
 
 sources = files(
+  'args.cc',
   'common-args.cc',
+  'configuration.cc',
   'loggers.cc',
   'plugin.cc',
   'progress-bar.cc',
