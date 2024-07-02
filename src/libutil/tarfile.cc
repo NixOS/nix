@@ -165,7 +165,7 @@ void unpackTarfile(const Path & tarFile, const Path & destDir)
     extract_archive(archive, destDir);
 }
 
-time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSink)
+time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & parseSink)
 {
     time_t lastModified = 0;
 
@@ -185,7 +185,12 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
 
         lastModified = std::max(lastModified, archive_entry_mtime(entry));
 
-        switch (archive_entry_filetype(entry)) {
+        if (auto target = archive_entry_hardlink(entry)) {
+            parseSink.createHardlink(path, CanonPath(target));
+            continue;
+        }
+
+        switch (auto type = archive_entry_filetype(entry)) {
 
         case AE_IFDIR:
             parseSink.createDirectory(path);
@@ -222,7 +227,7 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         }
 
         default:
-            throw Error("file '%s' in tarball has unsupported file type", path);
+            throw Error("file '%s' in tarball has unsupported file type %d", path, type);
         }
     }
 

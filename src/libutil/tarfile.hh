@@ -41,6 +41,6 @@ void unpackTarfile(Source & source, const Path & destDir);
 
 void unpackTarfile(const Path & tarFile, const Path & destDir);
 
-time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSink);
+time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & parseSink);
 
 }
