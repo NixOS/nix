@@ -11,7 +11,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/finally.hh"
 #include "nix/cmd/legacy.hh"

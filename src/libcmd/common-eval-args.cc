@@ -2,7 +2,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/main/shared.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/expr/eval.hh"
 #include "nix/fetchers/fetchers.hh"

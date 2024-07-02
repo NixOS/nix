@@ -1,5 +1,5 @@
 #pragma once
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 
 namespace nix {
 struct CompatibilitySettings : public Config
