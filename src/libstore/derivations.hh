@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "json-impls.hh"
 #include "path.hh"
 #include "types.hh"
 #include "hash.hh"
@@ -9,9 +10,14 @@
 #include "derived-path-map.hh"
 #include "sync.hh"
 #include "comparator.hh"
+#include "split.hh"
+#include "common-protocol-impl.hh"
 #include "variant-wrapper.hh"
+#include <nlohmann/json.hpp>
+#include "derivation-options.hh"
 
 #include <map>
+#include <optional>
 #include <variant>
 
 
@@ -289,6 +295,8 @@ struct BasicDerivation
     StringPairs env;
     std::string name;
 
+    DerivationOptions options;
+
     BasicDerivation() = default;
     virtual ~BasicDerivation() { };
 
@@ -314,13 +322,13 @@ struct BasicDerivation
     static std::string_view nameFromPath(const StorePath & storePath);
 
     GENERATE_CMP(BasicDerivation,
-        me->outputs,
-        me->inputSrcs,
-        me->platform,
-        me->builder,
-        me->args,
-        me->env,
-        me->name);
+            me->outputs,
+            me->inputSrcs,
+            me->platform,
+            me->builder,
+            me->args,
+            me->env,
+            me->name);
 };
 
 class Store;
@@ -368,6 +376,16 @@ struct Derivation : BasicDerivation
      */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
 
+    StringSet getRequiredSystemFeatures() const;
+
+    bool canBuildLocally(Store & localStore) const;
+
+    bool willBuildLocally(Store & localStore) const;
+
+    bool substitutesAllowed() const;
+
+    bool useUidRange() const;
+
     Derivation() = default;
     Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
     Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
@@ -379,8 +397,8 @@ struct Derivation : BasicDerivation
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     GENERATE_CMP(Derivation,
-        static_cast<const BasicDerivation &>(*me),
-        me->inputDrvs);
+            static_cast<const BasicDerivation &>(*me),
+            me->inputDrvs);
 };
 
 
@@ -516,3 +534,6 @@ std::string hashPlaceholder(const OutputNameView outputName);
 extern const Hash impureOutputHash;
 
 }
+
+JSON_IMPL(DerivationOptions);
+JSON_IMPL(DerivationOptions::OutputChecks);

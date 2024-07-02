@@ -10,13 +10,12 @@ namespace nix {
 
 class ParsedDerivation
 {
-    StorePath drvPath;
-    BasicDerivation & drv;
+    const StringPairs & env;
     std::unique_ptr<nlohmann::json> structuredAttrs;
 
 public:
 
-    ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv);
+    ParsedDerivation(const StringPairs & env);
 
     ~ParsedDerivation();
 
@@ -31,17 +30,8 @@ public:
 
     std::optional<Strings> getStringsAttr(const std::string & name) const;
 
-    StringSet getRequiredSystemFeatures() const;
-
-    bool canBuildLocally(Store & localStore) const;
-
-    bool willBuildLocally(Store & localStore) const;
-
-    bool substitutesAllowed() const;
-
-    bool useUidRange() const;
-
-    std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
+    std::optional<nlohmann::json>
+    prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths, const BasicDerivation & drv);
 };
 
 std::string writeStructuredAttrsShell(const nlohmann::json & json);

@@ -13,6 +13,22 @@
   "inputDrvs": {},
   "inputSrcs": [],
   "name": "advanced-attributes-defaults",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "allowedReferences": null,
+    "allowedRequisites": null,
+    "disallowedReferences": null,
+    "disallowedRequisites": null,
+    "ignoreSelfRefs": true,
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "outputChecks": {},
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
       "path": "/nix/store/1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults"

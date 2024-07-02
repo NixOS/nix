@@ -12,6 +12,22 @@
   "inputDrvs": {},
   "inputSrcs": [],
   "name": "advanced-attributes-structured-attrs-defaults",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "allowedReferences": null,
+    "allowedRequisites": null,
+    "disallowedReferences": null,
+    "disallowedRequisites": null,
+    "ignoreSelfRefs": false,
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "outputChecks": {},
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "dev": {
       "path": "/nix/store/8bazivnbipbyi569623skw5zm91z6kc2-advanced-attributes-structured-attrs-defaults-dev"

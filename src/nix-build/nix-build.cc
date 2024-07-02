@@ -528,9 +528,9 @@ static void main_nix_build(int argc, char * * argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            ParsedDerivation parsedDrv(packageInfo.requireDrvPath(), drv);
+            ParsedDerivation parsedDrv(drv.env);
 
-            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs)) {
+            if (auto structAttrs = parsedDrv.prepareStructuredAttrs(*store, inputs, drv)) {
                 auto json = structAttrs.value();
                 structuredAttrsRC = writeStructuredAttrsShell(json);
 

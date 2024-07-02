@@ -226,6 +226,8 @@ Derivation makeSimpleDrv(const Store & store) {
             "WOLF",
         },
     };
+    drv.options = DerivationOptions::fromEnv(drv.env);
+
     return drv;
 }
 
@@ -284,6 +286,8 @@ Derivation makeDynDepDerivation(const Store & store) {
             "WOLF",
         },
     };
+    drv.options = DerivationOptions::fromEnv(drv.env);
+
     return drv;
 }
 

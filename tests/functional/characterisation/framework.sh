@@ -63,7 +63,7 @@ function characterisationTestExit() {
             echo ''
             echo 'You can rerun this test with:'
             echo ''
-            echo "    _NIX_TEST_ACCEPT=1 make tests/functional/${TEST_NAME}.test"
+            echo "    _NIX_TEST_ACCEPT=1 make tests/functional/${TEST_NAME}.sh.test"
             echo ''
             echo 'to regenerate the files containing the expected output,'
             echo 'and then view the git diff to decide whether a change is'
