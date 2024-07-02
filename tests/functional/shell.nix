@@ -47,6 +47,13 @@ let pkgs = rec {
     outputs = ["dev" "out"];
   };
 
+  shellDrvFakeBash4 = mkDerivation {
+    name = "shellDrvFakeBash4";
+    builder = "/does/not/exist";
+    inherit stdenv;
+    PATH="${fakeBash4}/bin:${path}";
+  };
+
   # Used by nix-shell -p
   runCommand = name: args: buildCommand: mkDerivation (args // {
     inherit name buildCommand stdenv;
@@ -76,6 +83,12 @@ let pkgs = rec {
     mkdir -p $out/bin
     echo 'printf %s "$*"' > $out/bin/ruby
     chmod a+rx $out/bin/ruby
+  '';
+
+  fakeBash4 = runCommand "fakeBash4" {} ''
+    mkdir -p $out/bin
+    echo 'echo 4' > $out/bin/bash
+    chmod a+rx $out/bin/bash
   '';
 
   inherit pkgs;
