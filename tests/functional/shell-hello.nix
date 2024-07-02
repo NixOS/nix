@@ -55,4 +55,26 @@ rec {
         chmod +x $out/bin/hello
       '';
   };
+
+  # execs env from PATH, so that we can probe the environment
+  # does not allow arguments, because we don't need them
+  env = mkDerivation {
+    name = "env";
+    outputs = [ "out" ];
+    buildCommand =
+      ''
+        mkdir -p $out/bin
+
+        cat > $out/bin/env <<EOF
+        #! ${shell}
+        if [ $# -ne 0 ]; then
+          echo "env: Unexpected arguments ($#): $@" 1>&2
+          exit 1
+        fi
+        exec env
+        EOF
+        chmod +x $out/bin/env
+      '';
+  };
+
 }
