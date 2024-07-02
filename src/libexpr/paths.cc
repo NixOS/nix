@@ -121,7 +121,8 @@ std::string EvalState::rewriteVirtualPaths(std::string_view s, std::string_view 
 
             warn(
                 std::string(warning), // FIXME: should accept a string_view
-                positions[pos], accessor->second->showPath(CanonPath::root));
+                positions[pos],
+                accessor->second->showPath(CanonPath::root));
 
             res.append(fetchToStore(*store, {accessor->second}, FetchMode::DryRun).hashPart());
         } catch (...) {

@@ -39,7 +39,9 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value ** args, Value 
         auto n = state.symbols[attr.name];
         if (n == "path")
             path.emplace(state.coerceToPath(
-                attr.pos, *attr.value, context,
+                attr.pos,
+                *attr.value,
+                context,
                 "while evaluating the 'path' attribute passed to 'builtins.filterPath'"));
         else if (n == "filter") {
             state.forceValue(*attr.value, pos);
