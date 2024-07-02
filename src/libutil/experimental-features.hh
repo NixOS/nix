@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "config-abstract.hh"
 #include "error.hh"
 #include "types.hh"
 

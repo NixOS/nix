@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "types.hh"
+#include "experimental-feature-settings.hh"
 #include "serialise.hh"
 #include "hash.hh"
 #include "source-path.hh"

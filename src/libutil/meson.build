@@ -130,18 +130,16 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'archive.cc',
-  'args.cc',
   'canon-path.cc',
   'compression.cc',
   'compute-levels.cc',
-  'config.cc',
-  'config-global.cc',
   'current-process.cc',
   'english.cc',
   'environment-variables.cc',
   'error.cc',
   'executable-path.cc',
   'exit.cc',
+  'experimental-feature-settings.cc',
   'experimental-features.cc',
   'file-content-address.cc',
   'file-descriptor.cc',
@@ -183,11 +181,8 @@ if not cxx.has_header('widechar_width.h', required : false)
 endif
 
 headers = [config_h] + files(
-  'abstract-setting-to-json.hh',
   'ansicolor.hh',
   'archive.hh',
-  'args.hh',
-  'args/root.hh',
   'callback.hh',
   'canon-path.hh',
   'checked-arithmetic.hh',
@@ -197,9 +192,7 @@ headers = [config_h] + files(
   'compression.hh',
   'compute-levels.hh',
   'config-abstract.hh',
-  'config-global.hh',
-  'config-impl.hh',
-  'config.hh',
+  'config-abstract.hh',
   'current-process.hh',
   'english.hh',
   'environment-variables.hh',
