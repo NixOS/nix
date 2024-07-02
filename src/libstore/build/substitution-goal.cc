@@ -3,6 +3,7 @@
 #include "nar-info.hh"
 #include "finally.hh"
 #include "signals.hh"
+#include <coroutine>
 
 namespace nix {
 
@@ -12,12 +13,10 @@ PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker &
     , repair(repair)
     , ca(ca)
 {
-    state = &PathSubstitutionGoal::init;
     name = fmt("substitution of '%s'", worker.store.printStorePath(this->storePath));
     trace("created");
     maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }
-
 
 PathSubstitutionGoal::~PathSubstitutionGoal()
 {
@@ -25,7 +24,7 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 }
 
 
-void PathSubstitutionGoal::done(
+Goal::Co PathSubstitutionGoal::done(
     ExitCode result,
     BuildResult::Status status,
     std::optional<std::string> errorMsg)
@@ -35,17 +34,11 @@ void PathSubstitutionGoal::done(
         debug(*errorMsg);
         buildResult.errorMsg = *errorMsg;
     }
-    amDone(result);
+    return amDone(result);
 }
 
 
-void PathSubstitutionGoal::work()
-{
-    (this->*state)();
-}
-
-
-void PathSubstitutionGoal::init()
+Goal::Co PathSubstitutionGoal::init()
 {
     trace("init");
 
@@ -53,8 +46,7 @@ void PathSubstitutionGoal::init()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
-        done(ecSuccess, BuildResult::AlreadyValid);
-        return;
+        co_return done(ecSuccess, BuildResult::AlreadyValid);
     }
 
     if (settings.readOnlyMode)
@@ -62,11 +54,13 @@ void PathSubstitutionGoal::init()
 
     subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
-    tryNext();
+    trace("calling tryNext");
+
+    co_return tryNext();
 }
 
 
-void PathSubstitutionGoal::tryNext()
+Goal::Co PathSubstitutionGoal::tryNext()
 {
     trace("trying next substituter");
 
@@ -76,20 +70,18 @@ void PathSubstitutionGoal::tryNext()
         /* None left.  Terminate this goal and let someone else deal
            with it. */
 
-        /* Hack: don't indicate failure if there were no substituters.
-           In that case the calling derivation should just do a
-           build. */
-        done(
-            substituterFailed ? ecFailed : ecNoSubstituters,
-            BuildResult::NoSubstituters,
-            fmt("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath)));
-
         if (substituterFailed) {
             worker.failedSubstitutions++;
             worker.updateProgress();
         }
 
-        return;
+        /* Hack: don't indicate failure if there were no substituters.
+           In that case the calling derivation should just do a
+           build. */
+        co_return done(
+            substituterFailed ? ecFailed : ecNoSubstituters,
+            BuildResult::NoSubstituters,
+            fmt("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath)));
     }
 
     sub = subs.front();
@@ -102,29 +94,42 @@ void PathSubstitutionGoal::tryNext()
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {
-        tryNext();
-        return;
+        co_return tryNext();
     }
 
+    // Horrible, horrible code.
+    // Needed because we can't `co_*` inside a catch-clause.
+    // `std::variant` would be cleaner perhaps.
+    int i = 0;
+    std::optional<Error> e;
     try {
         // FIXME: make async
         info = sub->queryPathInfo(subPath ? *subPath : storePath);
     } catch (InvalidPath &) {
-        tryNext();
-        return;
-    } catch (SubstituterDisabled &) {
-        if (settings.tryFallback) {
-            tryNext();
-            return;
-        }
-        throw;
-    } catch (Error & e) {
-        if (settings.tryFallback) {
-            logError(e.info());
-            tryNext();
-            return;
-        }
-        throw;
+        i = 1;
+    } catch (SubstituterDisabled & e_) {
+        i = 2;
+        e = e_;
+    } catch (Error & e_) {
+        i = 3;
+        e = e_;
+    }
+    switch (i) {
+        case 0:
+            break;
+        case 1:
+            co_return tryNext();
+        case 2:
+            if (settings.tryFallback) {
+                co_return tryNext();
+            }
+            throw *e;
+        case 3:
+            if (settings.tryFallback) {
+                logError(e->info());
+                co_return tryNext();
+            }
+            throw *e;
     }
 
     if (info->path != storePath) {
@@ -135,8 +140,7 @@ void PathSubstitutionGoal::tryNext()
         } else {
             printError("asked '%s' for '%s' but got '%s'",
                 sub->getUri(), worker.store.printStorePath(storePath), sub->printStorePath(info->path));
-            tryNext();
-            return;
+            co_return tryNext();
         }
     }
 
@@ -159,8 +163,7 @@ void PathSubstitutionGoal::tryNext()
     {
         warn("ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
             worker.store.printStorePath(storePath), sub->getUri());
-        tryNext();
-        return;
+        co_return tryNext();
     }
 
     /* To maintain the closure invariant, we first have to realise the
@@ -169,35 +172,33 @@ void PathSubstitutionGoal::tryNext()
         if (i != storePath) /* ignore self-references */
             addWaitee(worker.makePathSubstitutionGoal(i));
 
-    if (waitees.empty()) /* to prevent hang (no wake-up event) */
-        referencesValid();
-    else
-        state = &PathSubstitutionGoal::referencesValid;
+    if (!waitees.empty()) co_await SuspendGoal{};
+    co_return referencesValid();
 }
 
 
-void PathSubstitutionGoal::referencesValid()
+Goal::Co PathSubstitutionGoal::referencesValid()
 {
     trace("all references realised");
 
     if (nrFailed > 0) {
-        done(
+        co_return done(
             nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
             BuildResult::DependencyFailed,
             fmt("some references of path '%s' could not be realised", worker.store.printStorePath(storePath)));
-        return;
     }
 
     for (auto & i : info->references)
         if (i != storePath) /* ignore self-references */
             assert(worker.store.isValidPath(i));
 
-    state = &PathSubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());
+    co_await SuspendGoal{};
+    co_return tryToRun();
 }
 
 
-void PathSubstitutionGoal::tryToRun()
+Goal::Co PathSubstitutionGoal::tryToRun()
 {
     trace("trying to run");
 
@@ -206,7 +207,7 @@ void PathSubstitutionGoal::tryToRun()
        prevents infinite waiting. */
     if (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
         worker.waitForBuildSlot(shared_from_this());
-        return;
+        co_await SuspendGoal{};
     }
 
     maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
@@ -247,11 +248,12 @@ void PathSubstitutionGoal::tryToRun()
 #endif
     }, true, false);
 
-    state = &PathSubstitutionGoal::finished;
+    co_await SuspendGoal{};
+    co_return finished();
 }
 
 
-void PathSubstitutionGoal::finished()
+Goal::Co PathSubstitutionGoal::finished()
 {
     trace("substitute finished");
 
@@ -275,9 +277,7 @@ void PathSubstitutionGoal::finished()
         }
 
         /* Try the next substitute. */
-        state = &PathSubstitutionGoal::tryNext;
-        worker.wakeUp(shared_from_this());
-        return;
+        co_return tryNext();
     }
 
     worker.markContentsGood(storePath);
@@ -300,7 +300,7 @@ void PathSubstitutionGoal::finished()
 
     worker.updateProgress();
 
-    done(ecSuccess, BuildResult::Substituted);
+    co_return done(ecSuccess, BuildResult::Substituted);
 }
 
 

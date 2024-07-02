@@ -1,13 +1,15 @@
 #pragma once
 ///@file
 
+#include "worker.hh"
 #include "store-api.hh"
 #include "goal.hh"
 #include "muxable-pipe.hh"
+#include <coroutine>
+#include <future>
+#include <source_location>
 
 namespace nix {
-
-class Worker;
 
 struct PathSubstitutionGoal : public Goal
 {
@@ -68,15 +70,13 @@ struct PathSubstitutionGoal : public Goal
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
-    typedef void (PathSubstitutionGoal::*GoalState)();
-    GoalState state;
 
     /**
      * Content address for recomputing store path
      */
     std::optional<ContentAddress> ca;
 
-    void done(
+    Co done(
         ExitCode result,
         BuildResult::Status status,
         std::optional<std::string> errorMsg = {});
@@ -96,17 +96,15 @@ public:
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
     }
 
-    void work() override;
-
     /**
      * The states.
      */
-    void init();
-    void tryNext();
-    void gotInfo();
-    void referencesValid();
-    void tryToRun();
-    void finished();
+    Co init() override;
+    Co tryNext();
+    Co gotInfo();
+    Co referencesValid();
+    Co tryToRun();
+    Co finished();
 
     /**
      * Callback used by the worker to write to the log.

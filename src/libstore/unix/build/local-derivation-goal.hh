@@ -192,7 +192,7 @@ struct LocalDerivationGoal : public DerivationGoal
     /**
      * The additional states.
      */
-    void tryLocalBuild() override;
+    Goal::Co tryLocalBuild() override;
 
     /**
      * Start building a derivation.
