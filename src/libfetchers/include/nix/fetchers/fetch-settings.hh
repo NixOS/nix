@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/util/types.hh"
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 
 #include <map>
 #include <limits>
