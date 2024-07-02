@@ -2,6 +2,7 @@
 ///@file
 
 #include "config.hh"
+#include "source-path.hh"
 
 namespace nix {
 
@@ -17,11 +18,8 @@ struct EvalSettings : Config
      *
      * The return value is (a) whether the entry was valid, and, if so,
      * what does it map to.
-     *
-     * @todo Return (`std::optional` of) `SourceAccssor` or something
-     * more structured instead of mere `std::string`?
      */
-    using LookupPathHook = std::optional<std::string>(ref<Store> store, std::string_view);
+    using LookupPathHook = std::optional<SourcePath>(ref<Store> store, std::string_view);
 
     /**
      * Map from "scheme" to a `LookupPathHook`.

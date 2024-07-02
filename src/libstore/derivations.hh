@@ -313,6 +313,12 @@ struct BasicDerivation
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
+    /**
+     * Apply string rewrites to the `env`, `args` and `builder`
+     * fields.
+     */
+    void applyRewrites(const StringMap & rewrites);
+
     GENERATE_CMP(BasicDerivation,
         me->outputs,
         me->inputSrcs,

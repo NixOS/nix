@@ -27,6 +27,8 @@ struct PathInputScheme : InputScheme
                 else
                     throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
             }
+            else if (name == "lock")
+                input.attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
 
@@ -51,16 +53,24 @@ struct PathInputScheme : InputScheme
             "revCount",
             "lastModified",
             "narHash",
+            "lock",
         };
     }
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         getStrAttr(attrs, "path");
+        maybeGetBoolAttr(attrs, "lock");
 
         Input input;
         input.attrs = attrs;
         return input;
+    }
+
+    bool getLockAttr(const Input & input) const
+    {
+        // FIXME: make the default "true"?
+        return maybeGetBoolAttr(input.attrs, "lock").value_or(false);
     }
 
     ParsedURL toURL(const Input & input) const override
@@ -75,11 +85,6 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    std::optional<Path> getSourcePath(const Input & input) const override
-    {
-        return getStrAttr(input.attrs, "path");
-    }
-
     void putFile(
         const Input & input,
         const CanonPath & path,
@@ -89,7 +94,7 @@ struct PathInputScheme : InputScheme
         writeFile((CanonPath(getAbsPath(input)) / path).abs(), contents);
     }
 
-    std::optional<std::string> isRelative(const Input & input) const
+    std::optional<std::string> isRelative(const Input & input) const override
     {
         auto path = getStrAttr(input.attrs, "path");
         if (hasPrefix(path, "/"))
@@ -113,49 +118,42 @@ struct PathInputScheme : InputScheme
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
     {
-        Input input(_input);
-        std::string absPath;
-        auto path = getStrAttr(input.attrs, "path");
+        auto absPath = getAbsPath(input);
+        auto input2(input);
+        input2.attrs.emplace("path", (std::string) absPath.abs());
 
-        if (path[0] != '/') {
-            if (!input.parent)
-                throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
+        if (getLockAttr(input2)) {
 
-            auto parent = canonPath(*input.parent);
+            auto storePath = store->maybeParseStorePath(absPath.abs());
 
-            // the path isn't relative, prefix it
-            absPath = nix::absPath(path, parent);
+            if (!storePath || storePath->name() != input.getName() || !store->isValidPath(*storePath)) {
+                Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
+                storePath = store->addToStore(input.getName(), {getFSSourceAccessor(), absPath});
+                auto narHash = store->queryPathInfo(*storePath)->narHash;
+                input2.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
+            } else
+                input2.attrs.erase("narHash");
 
-            // for security, ensure that if the parent is a store path, it's inside it
-            if (store->isInStore(parent)) {
-                auto storePath = store->printStorePath(store->toStorePath(parent).first);
-                if (!isDirOrInDir(absPath, storePath))
-                    throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
-            }
-        } else
-            absPath = path;
+            input2.attrs.erase("lastModified");
 
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
+            #if 0
+            // FIXME: produce a better error message if the path does
+            // not exist in the source directory.
+            auto makeNotAllowedError = [absPath](const CanonPath & path) -> RestrictedPathError
+            {
+                return RestrictedPathError("path '%s' does not exist'", absPath + path);
+            };
+            #endif
 
-        // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store->maybeParseStorePath(absPath);
+            return {makeStorePathAccessor(store, *storePath), std::move(input2)};
 
-        if (storePath)
-            store->addTempRoot(*storePath);
-
-        time_t mtime = 0;
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
-            // FIXME: try to substitute storePath.
-            auto src = sinkToSource([&](Sink & sink) {
-                mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
-            });
-            storePath = store->addToStoreFromDump(*src, "source");
+        } else {
+            auto accessor = makeFSSourceAccessor(std::filesystem::path(absPath.abs()));
+            accessor->setPathDisplay(absPath.abs());
+            return {accessor, std::move(input2)};
         }
-        input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
-
-        return {makeStorePathAccessor(store, *storePath), std::move(input)};
     }
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
