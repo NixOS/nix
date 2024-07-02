@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/configuration.hh"
+#include "nix/util/experimental-feature-settings.hh"
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"

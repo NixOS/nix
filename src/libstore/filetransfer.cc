@@ -1,6 +1,6 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/finally.hh"

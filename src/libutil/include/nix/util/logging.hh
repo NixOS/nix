@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/util/error.hh"
-#include "nix/util/configuration.hh"
+#include "nix/util/config-abstract.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/finally.hh"
 
@@ -43,31 +43,14 @@ typedef enum {
 
 typedef uint64_t ActivityId;
 
-struct LoggerSettings : Config
+template<template<typename> class R>
+struct LoggerSettings
 {
-    Setting<bool> showTrace{
-        this,
-        false,
-        "show-trace",
-        R"(
-          Whether Nix should print out a stack trace in case of Nix
-          expression evaluation errors.
-        )"};
-
-    Setting<Path> jsonLogPath{
-        this,
-        "",
-        "json-log-path",
-        R"(
-          A file or unix socket to which JSON records of Nix's log output are
-          written, in the same format as `--log-format internal-json`
-          (without the `@nix ` prefixes on each line).
-          Concurrent writes to the same file by multiple Nix processes are not supported and
-          may result in interleaved or corrupted log records.
-        )"};
+    R<bool> showTrace;
+    R<Path> jsonLogPath;
 };
 
-extern LoggerSettings loggerSettings;
+extern LoggerSettings<config::PlainValue> loggerSettings;
 
 class Logger
 {
