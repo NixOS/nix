@@ -99,43 +99,110 @@ struct Goal : public std::enable_shared_from_this<Goal>
      */
     ExitCode exitCode = ecBusy;
 
-public:
+protected:
     /**
      * Build result.
      */
     BuildResult buildResult;
+public:
 
-    /*
-     * Suspend our goal and wait until we get work()-ed again.
+    /**
+     * Suspend our goal and wait until we get @ref work()-ed again.
+     * `co_await`-able by @ref Co.
      */
     struct SuspendGoal {};
+
+    /**
+     * Return from the current coroutine and suspend our goal
+     * if we're not busy anymore, or jump to the next coroutine
+     * set to be executed/resumed.
+     */
     struct Return {};
+
+    // forward declaration of promise_type, see below
     struct promise_type;
+
+    /**
+     * Handle to coroutine using @ref Co and @ref promise_type.
+     */
     using handle_type = std::coroutine_handle<promise_type>;
-    // FIXME: Allocate explicitly on stack since HALO thing doesn't really work,
-    // specifically, there's no way to uphold the requirements when trying to do
-    // tail-calls without using a trampoline AFAICT.
-    // NOTES:
-    // These are good resources for understanding how coroutines work:
-    // https://lewissbaker.github.io/
-    // https://www.chiark.greenend.org.uk/~sgtatham/quasiblog/coroutines-c++20/
-    // https://www.scs.stanford.edu/~dm/blog/c++-coroutines.html
+
+    /**
+     * C++20 coroutine wrapper for use in goal logic.
+     * Coroutines are functions that use `co_await`/`co_return` (and `co_yield`, but not supported by @ref Co).
+     *
+     * @ref Co is meant to be used by methods of subclasses of @ref Goal.
+     * The main functionality provided by `Co` is
+     * - `co_await SuspendGoal{}`: Suspends the goal.
+     * - `co_await f()`: Waits until `f()` finishes.
+     * - `co_return f()`: Tail-calls `f()`.
+     * - `co_return Return{}`: Ends coroutine.
+     *
+     * The idea is that you implement the goal logic using coroutines,
+     * and do the core thing a goal can do, suspension, when you have
+     * children you're waiting for.
+     * Coroutines allow you to resume the work cleanly.
+     *
+     * @note Below follows a brief explanation of C++20 coroutines.
+     *       When you `Co f()`, a `std::coroutine_handle<promise_type>` is created,
+     *       alongside its @ref promise_type.
+     *       There are suspension points at the beginning of the coroutine,
+     *       at every `co_await`, and at the final (possibly implicit) `co_return`.
+     *       Once suspended, you can resume the `std::coroutine_handle` by doing `coroutine_handle.resume()`.
+     *       Suspension points are implemented by passing a struct to the compiler
+     *       that implements `await_sus`pend.
+     *       `await_suspend` can either say "cancel suspension", in which case execution resumes,
+     *       "suspend", in which case control is passed back to the caller of `coroutine_handle.resume()`
+     *       or the place where the coroutine function is initially executed in the case of the initial
+     *       suspension, or `await_suspend` can specify another coroutine to jump to, which is
+     *       how tail calls are implemented.
+     *
+     * @note Resources:
+     *       - https://lewissbaker.github.io/
+     *       - https://www.chiark.greenend.org.uk/~sgtatham/quasiblog/coroutines-c++20/
+     *       - https://www.scs.stanford.edu/~dm/blog/c++-coroutines.html
+     *
+     * @todo Allocate explicitly on stack since HALO thing doesn't really work,
+     *       specifically, there's no way to uphold the requirements when trying to do
+     *       tail-calls without using a trampoline AFAICT.
+     */
     struct [[nodiscard]] Co {
+        /**
+         * The underlying handle.
+         */
         handle_type handle;
+
         explicit Co(handle_type handle) : handle(handle) {};
-        Co(const Co&) = delete;
-        Co &operator=(const Co&) = delete;
         void operator=(Co&&);
         Co(Co&& rhs);
         ~Co();
 
         bool await_ready() { return false; };
+        /**
+         * When we `co_await` another @ref Co-returning coroutine,
+         * we tell the caller of `caller_coroutine.resume()` to switch to our coroutine (@ref handle).
+         * To make sure we return to the original coroutine, we set it as the continuation of our
+         * coroutine. In @ref promise_type::final_awaiter we check if it's set and if so we return to it.
+         *
+         * To explain in more understandable terms:
+         * When we `co_await Co_returning_function()`, this function is called on the resultant @ref Co of
+         * the _called_ function, and C++ automatically passes the caller in.
+         *
+         * `goal` field of @ref promise_type is also set here by copying it from the caller.
+         */
         std::coroutine_handle<> await_suspend(handle_type handle);
         void await_resume() {};
     };
-    // Used on initial suspend, doesn't do anything useful,
-    // but asserts that everything has been set correctly.
+
+    /**
+     * Used on initial suspend, does the same as @ref std::suspend_always,
+     * but asserts that everything has been set correctly.
+     */
     struct InitialSuspend {
+        /**
+         * Handle of coroutine that does the
+         * initial suspend
+         */
         handle_type handle;
 
         bool await_ready() { return false; };
@@ -144,51 +211,132 @@ public:
         }
         void await_resume() {
             assert(handle);
-            assert(handle.promise().goal); // Caller must have set our goal
-            assert(handle.promise().goal->top_co); // Caller must have set top_co
-            assert(handle.promise().goal->top_co->handle == handle); // top_co must be us
+            assert(handle.promise().goal); // goal must be set
+            assert(handle.promise().goal->top_co); // top_co of goal must be set
+            assert(handle.promise().goal->top_co->handle == handle); // top_co of goal must be us
         }
-    };;
+    };
+
+    /**
+     * Promise type for coroutines defined using @ref Co.
+     * Attached to coroutine handle.
+     */
     struct promise_type {
-        // Either this is who called us, or it is who we will tail-call.
-        // It is what we "jump" to once we are done.
+        /**
+         * Either this is who called us, or it is who we will tail-call.
+         * It is what we "jump" to once we are done.
+         */
         std::optional<Co> continuation;
+
+        /**
+         * The goal that we're a part of.
+         * Set either in @ref Co::await_suspend or in constructor of @ref Goal.
+         */
         Goal* goal = nullptr;
+
+        /**
+         * Is set to false when destructed to ensure we don't use a
+         * destructed coroutine by accident
+         */
         bool alive = true;
 
-        promise_type() {}
-
+        /**
+         * The awaiter used by @ref final_suspend.
+         */
         struct final_awaiter {
-            bool await_ready() noexcept { return false; };;
-            std::coroutine_handle<> await_suspend(handle_type) noexcept;
+            bool await_ready() noexcept { return false; };
+            /**
+             * Here we execute our continuation, by passing it back to the caller.
+             * C++ compiler will create code that takes that and executes it promptly.
+             * `h` is the handle for the coroutine that is finishing execution,
+             * thus it must be destroyed.
+             */
+            std::coroutine_handle<> await_suspend(handle_type h) noexcept;
             void await_resume() noexcept { assert(false); };
         };
+
+        /**
+         * Called by compiler generated code to construct the @ref Co
+         * that is returned from a @ref Co-returning coroutine.
+         */
         Co get_return_object();
-        InitialSuspend initial_suspend() {
-            // top_co isn't set to us yet,
-            // we've merely constructed the frame and now the
-            // caller is free to do whatever they wish to us.
-            return {};
-        };
+
+        /**
+         * Called by compiler generated code before body of coroutine.
+         * We use this opportunity to set the @ref goal field
+         * and `top_co` field of @ref Goal.
+         */
+        InitialSuspend initial_suspend() { return {}; };
+
+        /**
+         * Called on `co_return`. Creates @ref final_awaiter which
+         * either jumps to continuation or suspends goal.
+         */
         final_awaiter final_suspend() noexcept { return {}; };
+
+        /**
+         * Does nothing, but provides an opportunity for
+         * @ref final_suspend to happen.
+         */
         void return_value(Return) {}
+
+        /**
+         * When "returning" another coroutine, what happens is that
+         * we set it as our own continuation, thus once the final suspend
+         * happens, we transfer control to it.
+         * The original continuation we had is set as the continuation
+         * of the coroutine passed in.
+         * @ref final_suspend is called after this, and @ref final_awaiter will
+         * pass control off to @ref continuation.
+         *
+         * If we already have a continuation, that continuation is set as
+         * the continuation of the new continuation. Thus, the continuation
+         * passed to @ref return_value must not have a continuation set.
+         */
         void return_value(Co&&);
+
+        /**
+         * If an exception is thrown inside a coroutine,
+         * we re-throw it in the context of the "resumer" of the continuation.
+         */
         void unhandled_exception() { throw; };
 
+        /**
+         * Allows awaiting a @ref Co.
+         */
         Co&& await_transform(Co&& co) { return static_cast<Co&&>(co); }
+
+        /**
+         * Allows awaiting a @ref SuspendGoal.
+         * Always suspends.
+         */
         std::suspend_always await_transform(SuspendGoal) { return {}; };
     };
+
     /**
      * The coroutine being currently executed.
-     * You MUST update this when switching the coroutine being executed!
+     * MUST be updated when switching the coroutine being executed.
      * This is used both for memory management and to resume the last
      * coroutine executed.
+     * Destroying this should destroy all coroutines created for this goal.
      */
     std::optional<Co> top_co;
 
+    /**
+     * The entry point for the goal
+     */
     virtual Co init() = 0;
+
+    /**
+     * Wrapper around @ref init since virtual functions
+     * can't be used in constructors.
+     */
     inline Co init_wrapper();
 
+    /**
+     * Signals that the goal is done.
+     * The coroutine that is returned will suspend eternally.
+     */
     Co amDone(ExitCode result, std::optional<Error> ex = {});
 
     virtual void cleanup() { }
@@ -213,7 +361,9 @@ public:
     Goal(Worker & worker, DerivedPath path)
         : worker(worker), top_co(init_wrapper())
     {
-        // assert(!top_co->handle.promise().goal);
+        // top_co shouldn't have a goal already, should be nullptr.
+        assert(!top_co->handle.promise().goal);
+        // we set it such that top_co can pass it down to its subcoroutines.
         top_co->handle.promise().goal = this;
     }
 
