@@ -340,6 +340,7 @@ const redirects = {
     "lists": "#list",
     "strings": "#string",
     "attribute-sets": "#attribute-set",
+    "type-number": "#type-int",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",

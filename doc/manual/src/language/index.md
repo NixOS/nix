@@ -154,7 +154,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   An [integer](@docroot@/language/values.md#type-number)
+   An [integer](@docroot@/language/values.md#type-int)
 
   </td>
  </tr>
@@ -166,7 +166,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [floating point number](@docroot@/language/values.md#type-number)
+   A [floating point number](@docroot@/language/values.md#type-float)
 
   </td>
  </tr>
