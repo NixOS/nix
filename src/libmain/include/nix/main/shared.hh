@@ -3,8 +3,8 @@
 
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/processes.hh"
-#include "nix/util/args.hh"
-#include "nix/util/args/root.hh"
+#include "nix/main/args.hh"
+#include "nix/main/args/root.hh"
 #include "nix/main/common-args.hh"
 #include "nix/store/path.hh"
 #include "nix/store/derived-path.hh"
