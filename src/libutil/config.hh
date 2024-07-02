@@ -215,16 +215,28 @@ protected:
 };
 
 /**
+ * Settings, like command-line arguments, have a "handler" which is
+ * executed when the value is set, including the default value.
+ * The handler may cause arbitrary side-effects.
+ */
+template<typename T>
+struct SettingHandler
+{
+    std::function<void(T &)> fun = [](T & val) {};
+};
+
+/**
  * A setting of type T.
  */
 template<typename T>
-class BaseSetting : public AbstractSetting
+class Setting : public AbstractSetting
 {
 protected:
 
     T value;
     const T defaultValue;
     const bool documentDefault;
+    const SettingHandler<T> handler;
 
     /**
      * Parse the string into a `T`.
@@ -245,30 +257,48 @@ protected:
 
 public:
 
-    BaseSetting(const T & def,
-        const bool documentDefault,
+    Setting(
+        Config * options,
+        const T & def,
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {},
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        const bool documentDefault = true,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        SettingHandler<T> handler = {}
+    )
         : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
-    { }
+        , handler(handler)
+    {
+        options->addSetting(this);
+        handler.fun(value);
+    }
 
     operator const T &() const { return value; }
     operator T &() { return value; }
     const T & get() const { return value; }
+
     template<typename U>
     bool operator ==(const U & v2) const { return value == v2; }
+
     template<typename U>
     bool operator !=(const U & v2) const { return value != v2; }
+
     template<typename U>
     void operator =(const U & v) { assign(v); }
-    virtual void assign(const T & v) { value = v; }
+
+    virtual void assign(const T & v) {
+        value = v;
+        handler.fun(value);
+    }
+
+    void operator =(const T & v) { assign(v); }
+
     template<typename U>
-    void setDefault(const U & v) { if (!overridden) value = v; }
+    void setDefault(const U & v) { if (!overridden) assign(v); }
 
     /**
      * Require any experimental feature the setting depends on
@@ -293,7 +323,7 @@ public:
     virtual void override(const T & v)
     {
         overridden = true;
-        value = v;
+        assign(v);
     }
 
     std::string to_string() const override;
@@ -304,32 +334,13 @@ public:
 };
 
 template<typename T>
-std::ostream & operator <<(std::ostream & str, const BaseSetting<T> & opt)
+std::ostream & operator <<(std::ostream & str, const Setting<T> & opt)
 {
     return str << static_cast<const T &>(opt);
 }
 
 template<typename T>
-bool operator ==(const T & v1, const BaseSetting<T> & v2) { return v1 == static_cast<const T &>(v2); }
-
-template<typename T>
-class Setting : public BaseSetting<T>
-{
-public:
-    Setting(Config * options,
-        const T & def,
-        const std::string & name,
-        const std::string & description,
-        const std::set<std::string> & aliases = {},
-        const bool documentDefault = true,
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
-    {
-        options->addSetting(this);
-    }
-
-    void operator =(const T & v) { this->assign(v); }
-};
+bool operator ==(const T & v1, const Setting<T> & v2) { return v1 == static_cast<const T &>(v2); }
 
 /**
  * A special setting for Paths. These are automatically canonicalised
@@ -338,7 +349,7 @@ public:
  * It is mandatory to specify a path; i.e. the empty string is not
  * permitted.
  */
-class PathSetting : public BaseSetting<Path>
+class PathSetting : public Setting<Path>
 {
 public:
 
@@ -360,7 +371,7 @@ public:
  *
  * `std::optional` is used instead of the empty string for clarity.
  */
-class OptionalPathSetting : public BaseSetting<std::optional<Path>>
+class OptionalPathSetting : public Setting<std::optional<Path>>
 {
 public:
 
