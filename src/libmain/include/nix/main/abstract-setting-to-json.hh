@@ -2,7 +2,7 @@
 ///@file
 
 #include <nlohmann/json.hpp>
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 #include "nix/util/json-utils.hh"
 
 namespace nix {

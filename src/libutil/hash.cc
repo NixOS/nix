@@ -6,10 +6,9 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
-#include "nix/util/args.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/archive.hh"
-#include "nix/util/configuration.hh"
+#include "nix/util/experimental-feature-settings.hh"
 #include "nix/util/split.hh"
 #include "nix/util/base-n.hh"
 #include "nix/util/base-nix-32.hh"

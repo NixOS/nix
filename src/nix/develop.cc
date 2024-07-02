@@ -1,4 +1,4 @@
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/expr/eval.hh"
 #include "nix/cmd/installable-flake.hh"
 #include "nix/cmd/command-installable-value.hh"

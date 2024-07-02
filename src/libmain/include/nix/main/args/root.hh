@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nix/util/args.hh"
+#include "nix/main/args.hh"
 
 namespace nix {
 

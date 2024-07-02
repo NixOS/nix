@@ -6,7 +6,7 @@
 #include <strings.h> // for strcasecmp
 
 #include "nix/util/signals.hh"
-#include "nix/util/configuration.hh"
+#include "nix/util/config-abstract.hh"
 #include "nix/util/hash.hh"
 
 #include "nix/util/git.hh"

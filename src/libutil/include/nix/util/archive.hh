@@ -2,10 +2,22 @@
 ///@file
 
 #include "nix/util/types.hh"
+#include "nix/util/config-abstract.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/fs-sink.hh"
 
 namespace nix {
+
+template<template<typename> class R>
+struct ArchiveSettings
+{
+    R<bool> useCaseHack;
+};
+
+const extern ArchiveSettings<config::PlainValue> archiveSettingsDefaults;
+
+// FIXME: don't use a global variable.
+extern ArchiveSettings<config::PlainValue> archiveSettings;
 
 /**
  * dumpPath creates a Nix archive of the specified path.

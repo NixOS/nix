@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/file-system.hh"
 

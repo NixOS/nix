@@ -7,7 +7,7 @@
 #include <sys/types.h>
 
 #include "nix/util/types.hh"
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/users.hh"

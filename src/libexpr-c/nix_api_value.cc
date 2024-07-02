@@ -1,5 +1,5 @@
 #include "nix/expr/attr-set.hh"
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 #include "nix/expr/eval.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/path.hh"

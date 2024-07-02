@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <string>
 
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 
 namespace nix {
 // Forward declarations

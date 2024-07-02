@@ -1,5 +1,5 @@
 #include "nix/store/globals.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/build/hook-instance.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/build/child.hh"
