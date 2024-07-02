@@ -158,7 +158,12 @@ protected:
 
 };
 
-MakeError(SQLiteBusy, SQLiteError);
+struct SQLiteBusy : SQLiteError
+{
+    SQLiteBusy(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, HintFmt && hf)
+      : SQLiteError(path, errMsg, errNo, extendedErrNo, offset, std::move(hf))
+    { err.level = lvlWarn; }
+};
 
 void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
 
