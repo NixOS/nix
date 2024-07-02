@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 #include "nix/util/source-path.hh"
 
 namespace nix {

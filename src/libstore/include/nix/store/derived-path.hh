@@ -3,8 +3,8 @@
 
 #include "nix/store/path.hh"
 #include "nix/store/outputs-spec.hh"
-#include "nix/util/configuration.hh"
 #include "nix/util/ref.hh"
+#include "nix/util/experimental-feature-settings.hh"
 
 #include <variant>
 
