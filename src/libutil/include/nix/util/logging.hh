@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/util/error.hh"
-#include "nix/util/configuration.hh"
+#include "nix/util/config-abstract.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/finally.hh"
 
@@ -41,17 +41,13 @@ typedef enum {
 
 typedef uint64_t ActivityId;
 
-struct LoggerSettings : Config
+template<template<typename> class R>
+struct LoggerSettings
 {
-    Setting<bool> showTrace{
-        this, false, "show-trace",
-        R"(
-          Whether Nix should print out a stack trace in case of Nix
-          expression evaluation errors.
-        )"};
+    R<bool> showTrace;
 };
 
-extern LoggerSettings loggerSettings;
+extern LoggerSettings<config::PlainValue> loggerSettings;
 
 class Logger
 {

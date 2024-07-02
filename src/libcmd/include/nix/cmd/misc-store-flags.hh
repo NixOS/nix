@@ -1,4 +1,4 @@
-#include "nix/util/args.hh"
+#include "nix/main/args.hh"
 #include "nix/store/content-address.hh"
 
 namespace nix::flag {
