@@ -1,4 +1,4 @@
-#include "nix/util/args/root.hh"
+#include "nix/main/args/root.hh"
 #include "nix/util/current-process.hh"
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"

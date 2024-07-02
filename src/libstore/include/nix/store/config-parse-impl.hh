@@ -5,7 +5,7 @@
 
 #include "nix/store/config-parse.hh"
 #include "nix/util/util.hh"
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 
 namespace nix::config {
 
