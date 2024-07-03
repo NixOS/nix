@@ -275,9 +275,6 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 }
 
 
-void PathSubstitutionGoal::handleChildOutput(Descriptor fd, std::string_view data) {}
-
-
 void PathSubstitutionGoal::handleEOF(Descriptor fd)
 {
     worker.wakeUp(shared_from_this());
