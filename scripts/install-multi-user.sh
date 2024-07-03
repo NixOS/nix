@@ -23,10 +23,10 @@ readonly RED='\033[31m'
 # installer allows overriding build user count to speed up installation
 # as creating each user takes non-trivial amount of time on macos
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
-readonly NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 # each system specific installer must set these:
 #   NIX_FIRST_BUILD_UID
+#   NIX_BUILD_GROUP_ID
 #   NIX_BUILD_USER_NAME_TEMPLATE
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
@@ -530,9 +530,7 @@ It seems the build group $NIX_BUILD_GROUP_NAME already exists, but
 with the UID $primary_group_id. This script can't really handle
 that right now, so I'm going to give up.
 
-You can fix this by editing this script and changing the
-NIX_BUILD_GROUP_ID variable near the top to from $NIX_BUILD_GROUP_ID
-to $primary_group_id and re-run.
+You can export NIX_BUILD_GROUP_ID=$primary_group_id and re-run.
 EOF
         else
             row "            Exists" "Yes"
