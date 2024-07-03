@@ -66,6 +66,9 @@ in
     # Check that we got redirected to the immutable URL.
     assert info["locked"]["url"] == "http://localhost/stable/${nixpkgs.rev}.tar.gz"
 
+    # Check that we got a fingerprint for caching.
+    assert info["fingerprint"]
+
     # Check that we got the rev and revCount attributes.
     assert info["revision"] == "${nixpkgs.rev}"
     assert info["revCount"] == 1234
