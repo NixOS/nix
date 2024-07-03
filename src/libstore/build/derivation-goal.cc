@@ -115,7 +115,9 @@ void DerivationGoal::killChild()
 void DerivationGoal::timedOut(Error && ex)
 {
     killChild();
-    auto _ = done(BuildResult::TimedOut, {}, std::move(ex));
+    // We're not inside a coroutine, hence we can't use co_return here.
+    // Thus we ignore the return value.
+    [[maybe_unused]] Done _ = done(BuildResult::TimedOut, {}, std::move(ex));
 }
 
 void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
@@ -152,7 +154,7 @@ Goal::Co DerivationGoal::getDerivation()
 
     addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
 
-    co_await SuspendGoal{};
+    co_await Suspend{};
     co_return loadDerivation();
 }
 
@@ -265,7 +267,7 @@ Goal::Co DerivationGoal::haveDerivation()
             }
         }
 
-    if (!waitees.empty()) co_await SuspendGoal{}; /* to prevent hang (no wake-up event) */
+    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
     co_return outputsSubstitutionTried();
 }
 
@@ -396,7 +398,7 @@ Goal::Co DerivationGoal::gaveUpOnSubstitution()
         addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i)));
     }
 
-    if (!waitees.empty()) co_await SuspendGoal{}; /* to prevent hang (no wake-up event) */
+    if (!waitees.empty()) co_await Suspend{}; /* to prevent hang (no wake-up event) */
     co_return inputsRealised();
 }
 
@@ -457,7 +459,7 @@ Goal::Co DerivationGoal::repairClosure()
     if (waitees.empty()) {
         co_return done(BuildResult::AlreadyValid, assertPathValidity());
     } else {
-        co_await SuspendGoal{};
+        co_await Suspend{};
         co_return closureRepaired();
     }
 }
@@ -553,7 +555,7 @@ Goal::Co DerivationGoal::inputsRealised()
                 pathResolved, wantedOutputs, buildMode);
             addWaitee(resolvedDrvGoal);
 
-            co_await SuspendGoal{};
+            co_await Suspend{};
             co_return resolvedFinished();
         }
 
@@ -619,7 +621,7 @@ Goal::Co DerivationGoal::inputsRealised()
        slot to become available, since we don't need one if there is a
        build hook. */
     worker.wakeUp(shared_from_this());
-    co_await SuspendGoal{};
+    co_await Suspend{};
     co_return tryToBuild();
 }
 
@@ -681,7 +683,7 @@ Goal::Co DerivationGoal::tryToBuild()
             actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                 fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
         worker.waitForAWhile(shared_from_this());
-        co_await SuspendGoal{};
+        co_await Suspend{};
         co_return tryToBuild();
     }
 
@@ -726,7 +728,7 @@ Goal::Co DerivationGoal::tryToBuild()
                 actLock.reset();
                 buildResult.startTime = time(0); // inexact
                 started();
-                co_await SuspendGoal{};
+                co_await Suspend{};
                 co_return buildDone();
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
@@ -736,7 +738,7 @@ Goal::Co DerivationGoal::tryToBuild()
                         fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
                 worker.waitForAWhile(shared_from_this());
                 outputLocks.unlock();
-                co_await SuspendGoal{};
+                co_await Suspend{};
                 co_return tryToBuild();
             case rpDecline:
                 /* We should do it ourselves. */
@@ -747,7 +749,7 @@ Goal::Co DerivationGoal::tryToBuild()
     actLock.reset();
 
     worker.wakeUp(shared_from_this());
-    co_await SuspendGoal{};;
+    co_await Suspend{};
     co_return tryLocalBuild();
 }
 
@@ -1314,7 +1316,9 @@ void DerivationGoal::handleChildOutput(Descriptor fd, std::string_view data)
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
             killChild();
-            auto _ = done(
+            // We're not inside a coroutine, hence we can't use co_return here.
+            // Thus we ignore the return value.
+            [[maybe_unused]] Done _ = done(
                 BuildResult::LogLimitExceeded, {},
                 Error("%s killed after writing more than %d bytes of log output",
                     getName(), settings.maxLogSize));
@@ -1520,7 +1524,7 @@ SingleDrvOutputs DerivationGoal::assertPathValidity()
 }
 
 
-Goal::Co DerivationGoal::done(
+Goal::Done DerivationGoal::done(
     BuildResult::Status status,
     SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)

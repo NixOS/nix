@@ -24,7 +24,7 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 }
 
 
-Goal::Co PathSubstitutionGoal::done(
+Goal::Done PathSubstitutionGoal::done(
     ExitCode result,
     BuildResult::Status status,
     std::optional<std::string> errorMsg)
@@ -133,7 +133,7 @@ Goal::Co PathSubstitutionGoal::init()
             if (i != storePath) /* ignore self-references */
                 addWaitee(worker.makePathSubstitutionGoal(i));
 
-        if (!waitees.empty()) co_await SuspendGoal{};
+        if (!waitees.empty()) co_await Suspend{};
 
         // FIXME: consider returning boolean instead of passing in reference
         bool out = false; // is mutated by tryToRun
@@ -173,7 +173,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
             assert(worker.store.isValidPath(i));
 
     worker.wakeUp(shared_from_this());
-    co_await SuspendGoal{};
+    co_await Suspend{};
 
     trace("trying to run");
 
@@ -182,7 +182,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
        prevents infinite waiting. */
     if (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
         worker.waitForBuildSlot(shared_from_this());
-        co_await SuspendGoal{};
+        co_await Suspend{};
     }
 
     auto maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
@@ -223,7 +223,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, 
 #endif
     }, true, false);
 
-    co_await SuspendGoal{};
+    co_await Suspend{};
 
     trace("substitute finished");
 

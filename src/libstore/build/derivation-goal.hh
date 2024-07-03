@@ -329,7 +329,7 @@ struct DerivationGoal : public Goal
 
     void started();
 
-    Co done(
+    Done done(
         BuildResult::Status status,
         SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});

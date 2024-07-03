@@ -6,7 +6,7 @@ namespace nix {
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;
 using handle_type = nix::Goal::handle_type;
-using SuspendGoal = nix::Goal::SuspendGoal;
+using Suspend = nix::Goal::Suspend;
 
 Co::Co(Co&& rhs) {
     this->handle = rhs.handle;
@@ -30,42 +30,55 @@ Co promise_type::get_return_object() {
 
 std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h) noexcept {
     auto& p = h.promise();
-    assert(p.goal);
-    p.goal->trace("in final_awaiter");
-    // we are still on-going
-    if (p.goal->exitCode == ecBusy) {
-        p.goal->trace("we're busy");
-        assert(p.alive); // sanity check to make sure it's not been destructed prematurely
-        assert(p.goal->top_co);
-        assert(p.goal->top_co->handle == h);
+    auto goal = p.goal;
+    assert(goal);
+    goal->trace("in final_awaiter");
+    auto c = std::move(p.continuation);
+
+    if (c) {
+        // We still have a continuation, i.e. work to do.
+        // We assert that the goal is still busy.
+        assert(goal->exitCode == ecBusy);
+        assert(goal->top_co); // Goal must have an active coroutine.
+        assert(goal->top_co->handle == h); // The active coroutine must be us.
+        assert(p.alive); // We must not have been destructed.
+
         // we move continuation to the top,
         // note: previous top_co is actually h, so by moving into it,
         // we're calling the destructor on h, DON'T use h and p after this!
-        auto c = std::move(p.continuation);
-        assert(c);
-        auto& goal = p.goal;
+
+        // We move our continuation into `top_co`, i.e. the marker for the active continuation.
+        // By doing this we destruct the old `top_co`, i.e. us, so `h` can't be used anymore.
+        // Be careful not to access freed memory!
         goal->top_co = std::move(c);
+
+        // We resume `top_co`.
         return goal->top_co->handle;
-    // we are done, give control back to caller of top_co.resume()
     } else {
+        // We have no continuation, i.e. no more work to do,
+        // so the goal must not be busy anymore.
+        assert(goal->exitCode != ecBusy);
+
+        // We reset `top_co` for good measure.
         p.goal->top_co = {};
+
+        // We jump to the noop coroutine, which doesn't do anything and immediately suspends.
+        // This passes control back to the caller of goal.work().
         return std::noop_coroutine();
     }
 }
 
 void promise_type::return_value(Co&& next) {
     goal->trace("return_value(Co&&)");
-    // we save our old continuation
+    // Save old continuation.
     auto old_continuation = std::move(continuation);
-    // we set our continuation to next
+    // We set next as our continuation.
     continuation = std::move(next);
-    // next must not have a goal already
+    // We set next's goal, and thus it must not have one already.
     assert(!continuation->handle.promise().goal);
-    // next's goal is set to our goal
     continuation->handle.promise().goal = goal;
-    // next must be continuation-less
+    // Nor can next have a continuation, as we set it to our old one.
     assert(!continuation->handle.promise().continuation);
-    // next's continuation is set to the old continuation
     continuation->handle.promise().continuation = std::move(old_continuation);
 }
 
@@ -153,9 +166,10 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
     }
 }
 
-Co Goal::amDone(ExitCode result, std::optional<Error> ex)
+Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
     trace("done");
+    assert(top_co);
     assert(exitCode == ecBusy);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure);
     exitCode = result;
@@ -176,8 +190,12 @@ Co Goal::amDone(ExitCode result, std::optional<Error> ex)
 
     cleanup();
 
+    // We drop the continuation.
+    // In `final_awaiter` this will signal that there is no more work to be done.
+    top_co->handle.promise().continuation = {};
+
     // won't return to caller because of logic in final_awaiter
-    co_return Return{};
+    return Done{};
 }
 
 

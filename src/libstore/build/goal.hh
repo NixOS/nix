@@ -110,7 +110,7 @@ public:
      * Suspend our goal and wait until we get @ref work()-ed again.
      * `co_await`-able by @ref Co.
      */
-    struct SuspendGoal {};
+    struct Suspend {};
 
     /**
      * Return from the current coroutine and suspend our goal
@@ -118,6 +118,17 @@ public:
      * set to be executed/resumed.
      */
     struct Return {};
+
+    /**
+     * `co_return`-ing this will end the goal.
+     * If you're not inside a coroutine, you can safely discard this.
+     */
+    struct [[nodiscard]] Done {
+        private:
+        Done(){}
+
+        friend Goal;
+    };
 
     // forward declaration of promise_type, see below
     struct promise_type;
@@ -133,7 +144,7 @@ public:
      *
      * @ref Co is meant to be used by methods of subclasses of @ref Goal.
      * The main functionality provided by `Co` is
-     * - `co_await SuspendGoal{}`: Suspends the goal.
+     * - `co_await Suspend{}`: Suspends the goal.
      * - `co_await f()`: Waits until `f()` finishes.
      * - `co_return f()`: Tail-calls `f()`.
      * - `co_return Return{}`: Ends coroutine.
@@ -283,6 +294,12 @@ public:
         void return_value(Return) {}
 
         /**
+         * Does nothing, but provides an opportunity for
+         * @ref final_suspend to happen.
+         */
+        void return_value(Done) {}
+
+        /**
          * When "returning" another coroutine, what happens is that
          * we set it as our own continuation, thus once the final suspend
          * happens, we transfer control to it.
@@ -309,10 +326,10 @@ public:
         Co&& await_transform(Co&& co) { return static_cast<Co&&>(co); }
 
         /**
-         * Allows awaiting a @ref SuspendGoal.
+         * Allows awaiting a @ref Suspend.
          * Always suspends.
          */
-        std::suspend_always await_transform(SuspendGoal) { return {}; };
+        std::suspend_always await_transform(Suspend) { return {}; };
     };
 
     /**
@@ -337,9 +354,10 @@ public:
 
     /**
      * Signals that the goal is done.
-     * The coroutine that is returned will suspend eternally.
+     * `co_return` the result. If you're not inside a coroutine, you can ignore
+     * the return value safely.
      */
-    Co amDone(ExitCode result, std::optional<Error> ex = {});
+    Done amDone(ExitCode result, std::optional<Error> ex = {});
 
     virtual void cleanup() { }
 

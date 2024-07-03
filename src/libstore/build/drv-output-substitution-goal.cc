@@ -66,7 +66,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     #endif
         }, true, false);
 
-        co_await SuspendGoal{};
+        co_await Suspend{};
 
         worker.childTerminated(this);
 
@@ -130,7 +130,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 Goal::Co DrvOutputSubstitutionGoal::realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub) {
     addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
-    if (!waitees.empty()) co_await SuspendGoal{};
+    if (!waitees.empty()) co_await Suspend{};
 
     trace("output path substituted");
 
