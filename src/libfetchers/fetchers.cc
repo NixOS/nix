@@ -419,7 +419,7 @@ namespace nlohmann {
 using namespace nix;
 
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
-    fetchers::PublicKey res = {  };
+    fetchers::PublicKey res = { };
     if (auto type = optionalValueAt(json, "type"))
         res.type = getString(*type);
 
