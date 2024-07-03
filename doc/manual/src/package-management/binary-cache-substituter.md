@@ -19,7 +19,7 @@ whatever port you like:
 $ nix-serve -p 8080
 ```
 
-To check whether it works, try the following on the client:
+To check whether it works, try the following on the client (replace `avalon` with `localhost` if you run the server locally):
 
 ```console
 $ curl http://avalon:8080/nix-cache-info
