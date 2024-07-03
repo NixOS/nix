@@ -11,6 +11,8 @@ subproject('libstore')
 subproject('libfetchers')
 subproject('libexpr')
 subproject('libflake')
+subproject('libmain')
+subproject('libcmd')
 
 # Docs
 subproject('internal-api-docs')
