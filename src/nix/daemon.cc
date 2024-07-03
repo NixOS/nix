@@ -209,9 +209,9 @@ static PeerInfo getPeerInfo(int remote)
 
 #elif defined(LOCAL_PEERCRED)
 
-#if !defined(SOL_LOCAL)
-#define SOL_LOCAL 0
-#endif
+# if !defined(SOL_LOCAL)
+# define SOL_LOCAL 0
+# endif
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
