@@ -290,11 +290,11 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     }
     if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
-    parse(sink, source, CanonPath{""});
+    parse(sink, source, CanonPath::root);
 }
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(const std::filesystem::path & path, Source & source)
 {
     RestoreSink sink;
     sink.dstPath = path;

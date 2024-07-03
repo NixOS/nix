@@ -67,7 +67,7 @@ TEST_F(GitTest, blob_read) {
         StringSink out;
         RegularFileSink out2 { out };
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Blob);
-        parseBlob(out2, CanonPath{""}, in, BlobMode::Regular, mockXpSettings);
+        parseBlob(out2, CanonPath::root, in, BlobMode::Regular, mockXpSettings);
 
         auto expected = readFile(goldenMaster("hello-world.bin"));
 
@@ -132,7 +132,7 @@ TEST_F(GitTest, tree_read) {
         NullFileSystemObjectSink out;
         Tree got;
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Tree);
-        parseTree(out, CanonPath{""}, in, [&](auto & name, auto entry) {
+        parseTree(out, CanonPath::root, in, [&](auto & name, auto entry) {
             auto name2 = std::string{name.rel()};
             if (entry.mode == Mode::Directory)
                 name2 += '/';
@@ -227,7 +227,7 @@ TEST_F(GitTest, both_roundrip) {
             mockXpSettings);
     };
 
-    mkSinkHook(CanonPath{""}, root.hash, BlobMode::Regular);
+    mkSinkHook(CanonPath::root, root.hash, BlobMode::Regular);
 
     ASSERT_EQ(*files, *files2);
 }

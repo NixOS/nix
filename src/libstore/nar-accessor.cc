@@ -73,7 +73,9 @@ struct NarAccessor : public SourceAccessor
 
         NarMember & createMember(const CanonPath & path, NarMember member)
         {
-            size_t level = std::count(path.rel().begin(), path.rel().end(), '/');
+            size_t level = 0;
+            for (auto _ : path) ++level;
+
             while (parents.size() > level) parents.pop();
 
             if (parents.empty()) {
@@ -83,7 +85,7 @@ struct NarAccessor : public SourceAccessor
             } else {
                 if (parents.top()->stat.type != Type::tDirectory)
                     throw Error("NAR file missing parent directory of path '%s'", path);
-                auto result = parents.top()->children.emplace(baseNameOf(path.rel()), std::move(member));
+                auto result = parents.top()->children.emplace(*path.baseName(), std::move(member));
                 auto & ref = result.first->second;
                 parents.push(&ref);
                 return ref;
