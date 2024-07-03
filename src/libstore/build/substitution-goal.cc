@@ -18,6 +18,7 @@ PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker &
     maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }
 
+
 PathSubstitutionGoal::~PathSubstitutionGoal()
 {
     cleanup();
