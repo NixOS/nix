@@ -202,7 +202,11 @@ static PeerInfo getPeerInfo(int remote)
 
 #if defined(SO_PEERCRED)
 
-    ucred cred;
+# if defined(__OpenBSD__)
+   struct sockpeercred cred;
+# else
+   ucred cred;
+# endif
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
@@ -210,9 +214,9 @@ static PeerInfo getPeerInfo(int remote)
 
 #elif defined(LOCAL_PEERCRED)
 
-#if !defined(SOL_LOCAL)
-#define SOL_LOCAL 0
-#endif
+# if !defined(SOL_LOCAL)
+# define SOL_LOCAL 0
+# endif
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
