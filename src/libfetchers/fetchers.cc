@@ -260,6 +260,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     auto [accessor, final] = scheme->getAccessor(store, *this);
 
+    assert(!accessor->fingerprint);
     accessor->fingerprint = scheme->getFingerprint(store, final);
 
     return {accessor, std::move(final)};
