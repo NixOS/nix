@@ -59,7 +59,7 @@ struct HookInstance;
 #endif
 
 /**
- * The worker class.
+ * Coordinates one or more realisations and their interdependencies.
  */
 class Worker
 {

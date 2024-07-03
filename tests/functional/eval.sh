@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 testStdinHeredoc=$(nix eval -f - <<EOF
 {

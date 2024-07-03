@@ -242,7 +242,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     evalSettings.restrictEval = false;
     evalSettings.pureEval = false;
-    EvalState state({}, openStore("dummy://"));
+    EvalState state({}, openStore("dummy://"), evalSettings);
 
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
@@ -420,7 +420,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::FetchTree,
         };
         evalSettings.pureEval = false;
-        EvalState state({}, openStore("dummy://"));
+        EvalState state({}, openStore("dummy://"), evalSettings);
         auto res = nlohmann::json::object();
         res["builtins"] = ({
             auto builtinsJson = nlohmann::json::object();

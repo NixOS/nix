@@ -11,7 +11,7 @@ namespace nix {
 TEST(FileSerialisationMethod, testRoundTripPrintParse_1) {
     for (const FileSerialisationMethod fim : {
         FileSerialisationMethod::Flat,
-        FileSerialisationMethod::Recursive,
+        FileSerialisationMethod::NixArchive,
     }) {
         EXPECT_EQ(parseFileSerialisationMethod(renderFileSerialisationMethod(fim)), fim);
     }
@@ -37,7 +37,7 @@ TEST(FileSerialisationMethod, testParseFileSerialisationMethodOptException) {
 TEST(FileIngestionMethod, testRoundTripPrintParse_1) {
     for (const FileIngestionMethod fim : {
         FileIngestionMethod::Flat,
-        FileIngestionMethod::Recursive,
+        FileIngestionMethod::NixArchive,
         FileIngestionMethod::Git,
     }) {
         EXPECT_EQ(parseFileIngestionMethod(renderFileIngestionMethod(fim)), fim);

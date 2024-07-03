@@ -68,7 +68,7 @@ struct CmdHashBase : Command
         switch (mode) {
         case FileIngestionMethod::Flat:
             return "print cryptographic hash of a regular file";
-        case FileIngestionMethod::Recursive:
+        case FileIngestionMethod::NixArchive:
             return "print cryptographic hash of the NAR serialisation of a path";
         case FileIngestionMethod::Git:
             return "print cryptographic hash of the Git serialisation of a path";
@@ -91,7 +91,7 @@ struct CmdHashBase : Command
             Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
             switch (mode) {
             case FileIngestionMethod::Flat:
-            case FileIngestionMethod::Recursive:
+            case FileIngestionMethod::NixArchive:
             {
                 auto hashSink = makeSink();
                 dumpPath(path2, *hashSink, (FileSerialisationMethod) mode);
@@ -126,7 +126,7 @@ struct CmdHashBase : Command
 struct CmdHashPath : CmdHashBase
 {
     CmdHashPath()
-        : CmdHashBase(FileIngestionMethod::Recursive)
+        : CmdHashBase(FileIngestionMethod::NixArchive)
     {
         addFlag(flag::hashAlgo("algo", &hashAlgo));
         addFlag(flag::fileIngestionMethod(&mode));
@@ -311,7 +311,7 @@ static int compatNixHash(int argc, char * * argv)
     });
 
     if (op == opHash) {
-        CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
+        CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::NixArchive);
         if (!hashAlgo.has_value()) hashAlgo = HashAlgorithm::MD5;
         cmd.hashAlgo = hashAlgo.value();
         cmd.hashFormat = hashFormat;

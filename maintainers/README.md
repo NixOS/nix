@@ -30,7 +30,6 @@ We aim to achieve this by improving the contributor experience and attracting mo
 ## Members
 
 - Eelco Dolstra (@edolstra) – Team lead
-- Théophane Hufschmitt (@thufschmitt)
 - Valentin Gagarin (@fricklerhandwerk)
 - Thomas Bereknyei (@tomberek)
 - Robert Hensing (@roberth)

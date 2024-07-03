@@ -1,4 +1,5 @@
 #include "globals.hh"
+#include "config-global.hh"
 #include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
@@ -123,12 +124,12 @@ Settings::Settings()
     };
 }
 
-void loadConfFile()
+void loadConfFile(AbstractConfig & config)
 {
     auto applyConfigFile = [&](const Path & path) {
         try {
             std::string contents = readFile(path);
-            globalConfig.applyConfig(contents, path);
+            config.applyConfig(contents, path);
         } catch (SystemError &) { }
     };
 
@@ -136,7 +137,7 @@ void loadConfFile()
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    globalConfig.resetOverridden();
+    config.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
@@ -145,7 +146,7 @@ void loadConfFile()
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
     if (nixConfEnv.has_value()) {
-        globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
+        config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
 
 }
@@ -437,7 +438,7 @@ void initLibStore(bool loadConfig) {
     initLibUtil();
 
     if (loadConfig)
-        loadConfFile();
+        loadConfFile(globalConfig);
 
     preloadNSS();
 

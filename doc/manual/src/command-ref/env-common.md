@@ -10,7 +10,7 @@ Most Nix commands interpret the following environment variables:
 - <span id="env-NIX_PATH">[`NIX_PATH`](#env-NIX_PATH)</span>
 
   A colon-separated list of directories used to look up the location of Nix
-  expressions using [paths](@docroot@/language/values.md#type-path)
+  expressions using [paths](@docroot@/language/types.md#type-path)
   enclosed in angle brackets (i.e., `<path>`),
   e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
   [`-I` option](@docroot@/command-ref/opt-common.md#opt-I).

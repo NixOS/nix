@@ -4,7 +4,7 @@ source common.sh
 
 set -o pipefail
 
-source lang/framework.sh
+source characterisation/framework.sh
 
 # specialize function a bit
 function diffAndAccept() {
@@ -139,32 +139,4 @@ for i in lang/eval-okay-*.nix; do
     fi
 done
 
-if test -n "${_NIX_TEST_ACCEPT-}"; then
-    if (( "$badDiff" )); then
-        echo 'Output did mot match, but accepted output as the persisted expected output.'
-        echo 'That means the next time the tests are run, they should pass.'
-    else
-        echo 'NOTE: Environment variable _NIX_TEST_ACCEPT is defined,'
-        echo 'indicating the unexpected output should be accepted as the expected output going forward,'
-        echo 'but no tests had unexpected output so there was no expected output to update.'
-    fi
-    if (( "$badExitCode" )); then
-        exit "$badExitCode"
-    else
-        skipTest "regenerating golden masters"
-    fi
-else
-    if (( "$badDiff" )); then
-        echo ''
-        echo 'You can rerun this test with:'
-        echo ''
-        echo '    _NIX_TEST_ACCEPT=1 make tests/functional/lang.sh.test'
-        echo ''
-        echo 'to regenerate the files containing the expected output,'
-        echo 'and then view the git diff to decide whether a change is'
-        echo 'good/intentional or bad/unintentional.'
-        echo 'If the diff contains arbitrary or impure information,'
-        echo 'please improve the normalization that the test applies to the output.'
-    fi
-    exit $(( "$badExitCode" + "$badDiff" ))
-fi
+characterisationTestExit

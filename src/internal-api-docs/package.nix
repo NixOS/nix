@@ -1,7 +1,5 @@
 { lib
 , stdenv
-, releaseTools
-, fileset
 
 , meson
 , ninja
@@ -11,6 +9,10 @@
 
 , versionSuffix ? ""
 }:
+
+let
+  inherit (lib) fileset;
+in
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "nix-internal-api-docs";
@@ -45,6 +47,11 @@ stdenv.mkDerivation (finalAttrs: {
     ''
       echo ${finalAttrs.version} > .version
     '';
+
+  postInstall = ''
+    mkdir -p ''${!outputDoc}/nix-support
+    echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
+  '';
 
   enableParallelBuilding = true;
 

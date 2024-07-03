@@ -149,11 +149,6 @@ AC_ARG_ENABLE(unit-tests, AS_HELP_STRING([--disable-unit-tests],[Do not build th
   ENABLE_UNIT_TESTS=$enableval, ENABLE_UNIT_TESTS=$ENABLE_BUILD)
 AC_SUBST(ENABLE_UNIT_TESTS)
 
-# Build external API docs by default
-AC_ARG_ENABLE(external_api_docs, AS_HELP_STRING([--enable-external-api-docs],[Build API docs for Nix's C interface]),
-  external_api_docs=$enableval, external_api_docs=yes)
-AC_SUBST(external_api_docs)
-
 AS_IF(
   [test "$ENABLE_BUILD" == "no" && test "$ENABLE_UNIT_TESTS" == "yes"],
   [AC_MSG_ERROR([Cannot enable unit tests when building overall is disabled. Please do not pass '--enable-unit-tests' or do not pass '--disable-build'.])])
@@ -170,10 +165,6 @@ AC_SUBST(ENABLE_DOC_GEN)
 AS_IF(
   [test "$ENABLE_BUILD" == "no" && test "$ENABLE_DOC_GEN" == "yes"],
   [AC_MSG_ERROR([Cannot enable generated docs when building overall is disabled. Please do not pass '--enable-doc-gen' or do not pass '--disable-build'.])])
-
-AC_ARG_ENABLE(external-api-docs, AS_HELP_STRING([--enable-external-api-docs],[Build API docs for Nix's external unstable C interfaces]),
-  ENABLE_EXTERNAL_API_DOCS=$enableval, ENABLE_EXTERNAL_API_DOCS=no)
-AC_SUBST(ENABLE_EXTERNAL_API_DOCS)
 
 AS_IF(
   [test "$ENABLE_FUNCTIONAL_TESTS" == "yes" || test "$ENABLE_DOC_GEN" == "yes"],
@@ -408,6 +399,11 @@ AS_CASE(["$enable_markdown"],
 # Look for libgit2.
 PKG_CHECK_MODULES([LIBGIT2], [libgit2])
 
+
+# Look for toml11, a required dependency.
+AC_LANG_PUSH(C++)
+AC_CHECK_HEADER([toml.hpp], [], [AC_MSG_ERROR([toml11 is not found.])])
+AC_LANG_POP(C++)
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])

@@ -2,6 +2,8 @@
 
 source ./common.sh
 
+TODO_NixOS
+
 requireGit
 
 clearStore
@@ -17,11 +19,15 @@ flake7Dir=$TEST_ROOT/flake7
 nonFlakeDir=$TEST_ROOT/nonFlake
 badFlakeDir=$TEST_ROOT/badFlake
 flakeGitBare=$TEST_ROOT/flakeGitBare
+lockfileSummaryFlake=$TEST_ROOT/lockfileSummaryFlake
 
-for repo in "$flake1Dir" "$flake2Dir" "$flake3Dir" "$flake7Dir" "$nonFlakeDir"; do
+for repo in "$flake1Dir" "$flake2Dir" "$flake3Dir" "$flake7Dir" "$nonFlakeDir" "$lockfileSummaryFlake"; do
     # Give one repo a non-main initial branch.
     extraArgs=
     if [[ "$repo" == "$flake2Dir" ]]; then
+      extraArgs="--initial-branch=main"
+    fi
+    if [[ "$repo" == "$lockfileSummaryFlake" ]]; then
       extraArgs="--initial-branch=main"
     fi
 
@@ -642,3 +648,37 @@ expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock
 [[ $($nonFlakeDir/shebang-inline-expr.sh baz) = "foo"$'\n'"baz" ]]
 [[ $($nonFlakeDir/shebang-file.sh baz) = "foo"$'\n'"baz" ]]
 expect 1 $nonFlakeDir/shebang-reject.sh 2>&1 | grepQuiet -F 'error: unsupported unquoted character in nix shebang: *. Use double backticks to escape?'
+
+# Test that the --commit-lock-file-summary flag and its alias work
+cat > "$lockfileSummaryFlake/flake.nix" <<EOF
+{
+  inputs = {
+    flake1.url = "git+file://$flake1Dir";
+  };
+
+  description = "lockfileSummaryFlake";
+
+  outputs = inputs: rec {
+    packages.$system.default = inputs.flake1.packages.$system.foo;
+  };
+}
+EOF
+
+git -C "$lockfileSummaryFlake" add flake.nix
+git -C "$lockfileSummaryFlake" commit -m 'Add lockfileSummaryFlake'
+
+testSummary="test summary 1"
+nix flake lock "$lockfileSummaryFlake" --commit-lock-file --commit-lock-file-summary "$testSummary"
+[[ -e "$lockfileSummaryFlake/flake.lock" ]]
+[[ -z $(git -C "$lockfileSummaryFlake" diff main || echo failed) ]]
+[[ "$(git -C "$lockfileSummaryFlake" log --format=%s -n 1)" = "$testSummary" ]]
+
+git -C "$lockfileSummaryFlake" rm :/:flake.lock
+git -C "$lockfileSummaryFlake" commit -m "remove flake.lock"
+testSummary="test summary 2"
+# NOTE(cole-h): We use `--option` here because Nix settings do not currently support flag-ifying the
+# alias of a setting: https://github.com/NixOS/nix/issues/10989
+nix flake lock "$lockfileSummaryFlake" --commit-lock-file --option commit-lockfile-summary "$testSummary"
+[[ -e "$lockfileSummaryFlake/flake.lock" ]]
+[[ -z $(git -C "$lockfileSummaryFlake" diff main || echo failed) ]]
+[[ "$(git -C "$lockfileSummaryFlake" log --format=%s -n 1)" = "$testSummary" ]]

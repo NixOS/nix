@@ -150,7 +150,7 @@ StorePath writeDerivation(Store & store,
         })
         : ({
             StringSource s { contents };
-            store.addToStoreFromDump(s, suffix, FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, references, repair);
+            store.addToStoreFromDump(s, suffix, FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, references, repair);
         });
 }
 
@@ -274,7 +274,7 @@ static DerivationOutput parseDerivationOutput(
 {
     if (hashAlgoStr != "") {
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
-        if (method == TextIngestionMethod {})
+        if (method == ContentAddressMethod::Raw::Text)
             xpSettings.require(Xp::DynamicDerivations);
         const auto hashAlgo = parseHashAlgo(hashAlgoStr);
         if (hashS == "impure") {
@@ -1249,7 +1249,7 @@ DerivationOutput DerivationOutput::fromJSON(
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
         auto & method_ = getString(valueAt(json, "method"));
         ContentAddressMethod method = ContentAddressMethod::parse(method_);
-        if (method == TextIngestionMethod {})
+        if (method == ContentAddressMethod::Raw::Text)
             xpSettings.require(Xp::DynamicDerivations);
 
         auto & hashAlgo_ = getString(valueAt(json, "hashAlgo"));

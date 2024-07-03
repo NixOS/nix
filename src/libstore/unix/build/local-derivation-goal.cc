@@ -504,7 +504,13 @@ void LocalDerivationGoal::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
-
+    if (useChroot) {
+        /* If sandboxing is enabled, put the actual TMPDIR underneath
+           an inaccessible root-owned directory, to prevent outside
+           access. */
+        tmpDir = tmpDir + "/build";
+        createDir(tmpDir, 0700);
+    }
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
@@ -672,15 +678,19 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
-        deletePath(chrootRootDir);
+        chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
+        autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
 
-        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootRootDir);
+        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
-        // FIXME: make this 0700
+        if (mkdir(chrootParentDir.c_str(), 0700) == -1)
+            throw SysError("cannot create '%s'", chrootRootDir);
+
+        chrootRootDir = chrootParentDir + "/root";
+
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
@@ -2489,7 +2499,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 auto fim = outputHash.method.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                 {
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
@@ -2531,7 +2541,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             {
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
             }
@@ -2554,7 +2564,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 rewriteOutput(outputRewrites);
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
@@ -2904,6 +2914,24 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
         };
 
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (get(*structuredAttrs, "allowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "allowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxClosureSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
+            }
             if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
                 if (auto output = get(*outputChecks, outputName)) {
                     Checks checks;

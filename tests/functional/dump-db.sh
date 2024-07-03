@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 needLocalStore "--dump-db requires a local store"
 
 clearStore

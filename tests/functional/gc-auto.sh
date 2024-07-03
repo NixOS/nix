@@ -4,6 +4,8 @@ source common.sh
 
 needLocalStore "“min-free” and “max-free” are daemon options"
 
+TODO_NixOS
+
 clearStore
 
 garbage1=$(nix store add-path --name garbage1 ./nar-access.sh)

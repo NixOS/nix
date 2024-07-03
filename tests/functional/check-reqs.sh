@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 RESULT=$TEST_ROOT/result
 
