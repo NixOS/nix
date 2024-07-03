@@ -239,3 +239,51 @@ If neither is present, an error is thrown.
 >                 3| in
 >                 4| "${a}"
 >                  |  ^
+
+## Strings with context
+
+An interpolated string keeps a reference to the derivations that were interpolated.
+This context is propagated across operators like `+` and string interpolation.
+This is useful when you are creating a script string and what to track all the derivation dependencies that such a script would have.
+This feature is what makes Nix extremely good ergonomic at writing packages, as
+the author of a package does not have to explicitly keep track of dependencies of the
+expressions that they write. Instead string interpolation keeps track of these dependencies
+for you.
+
+### Examples
+
+```
+nix-repl> :lf nixpkgs
+nix-repl> pkgs = legacyPackages.aarch64-darwin
+nix-repl> s1 = "${pkgs.hello}/bin/hello"
+nix-repl> s2 = "${pkgs.coreutils}/bin/yes"
+nix-repl> :p builtins.getContext s1
+{ "/nix/store/qv7ff3f1xjgax460wl62pr8d2z0jcb9l-hello-2.12.1.drv" = { outputs = [ "out" ]; }; }
+nix-repl> :p builtins.getContext s2
+{ "/nix/store/hkpjm293kzap6cnsacdrljgys3ilhm7k-coreutils-9.3.drv" = { outputs = [ "out" ]; }; }
+:p builtins.getContext (s1 + s2)
+{ "/nix/store/hkpjm293kzap6cnsacdrljgys3ilhm7k-coreutils-9.3.drv" = { outputs = [ "out" ]; }; "/nix/store/qv7ff3f1xjgax460wl62pr8d2z0jcb9l-hello-2.12.1.drv" = { outputs = [ "out" ]; }; }
+ :p builtins.getContext ("${s1}  ; ${s2}")
+{ "/nix/store/hkpjm293kzap6cnsacdrljgys3ilhm7k-coreutils-9.3.drv" = { outputs = [ "out" ]; }; "/nix/store/qv7ff3f1xjgax460wl62pr8d2z0jcb9l-hello-2.12.1.drv" = { outputs = [ "out" ]; }; }
+```
+
+If we use this when defining a derivation, the script will track the dependencies for us.
+We do not need to explicitly add a `cowsay` and `coreutils` dependency to our derivation
+but they are added due to string interpolation instead.
+```
+nix-repl> myPackage = pkgs.runCommand "my-example" {
+ # no need to pass cowsay as an explicit dependency here
+} ''
+   ${pkgs.cowsay}/bin/cowsay hello world > ./cowsaid
+   ${pkgs.coreutils}/bin/sha256sum ./cowsaid > $out
+''
+nix-repl> myPackage
+«derivation /nix/store/zqpdwircij06g8lii5hwagzzkblg7w42-my-example.drv»
+nix-repl> builtins.getContext myPackage.buildCommand
+{ "/nix/store/1knzy69lcyyx0gs9vjbzqz9039jd288b-cowsay-3.7.0.drv" = { ... }; "/nix/store/hkpjm293kzap6cnsacdrljgys3ilhm7k-coreutils-9.3.drv" = { ... }; }
+nix-repl> :b myPackage
+
+This derivation produced the following outputs:
+  out -> /nix/store/bdr8gjz8k1i43cs4hd0b8w4lh7105ciq-my-example
+```
+
