@@ -143,7 +143,7 @@ public:
      * children you're waiting for.
      * Coroutines allow you to resume the work cleanly.
      *
-     * @note Below follows a brief explanation of C++20 coroutines.
+     * @note Brief explanation of C++20 coroutines:
      *       When you `Co f()`, a `std::coroutine_handle<promise_type>` is created,
      *       alongside its @ref promise_type.
      *       There are suspension points at the beginning of the coroutine,
@@ -165,6 +165,8 @@ public:
      * @todo Allocate explicitly on stack since HALO thing doesn't really work,
      *       specifically, there's no way to uphold the requirements when trying to do
      *       tail-calls without using a trampoline AFAICT.
+     *
+     * @todo Support returning data natively
      */
     struct [[nodiscard]] Co {
         /**

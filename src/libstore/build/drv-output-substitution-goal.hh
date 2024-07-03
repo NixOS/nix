@@ -27,11 +27,6 @@ class DrvOutputSubstitutionGoal : public Goal {
      */
     DrvOutput id;
 
-    /**
-     * Whether a substituter failed.
-     */
-    bool substituterFailed = false;
-
 public:
     DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 

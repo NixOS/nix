@@ -30,6 +30,8 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
     auto subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
+    bool substituterFailed = false;
+
     for (auto sub : subs) {
         trace("trying next substituter");
 

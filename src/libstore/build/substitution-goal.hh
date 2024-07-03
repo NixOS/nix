@@ -19,30 +19,9 @@ struct PathSubstitutionGoal : public Goal
     StorePath storePath;
 
     /**
-     * The path the substituter refers to the path as. This will be
-     * different when the stores have different names.
+     * Whether to try to repair a valid path.
      */
-    std::optional<StorePath> subPath;
-
-    /**
-     * The remaining substituters.
-     */
-    std::list<ref<Store>> subs;
-
-    /**
-     * The current substituter.
-     */
-    std::shared_ptr<Store> sub;
-
-    /**
-     * Whether a substituter failed.
-     */
-    bool substituterFailed = false;
-
-    /**
-     * Path info returned by the substituter's query info operation.
-     */
-    std::shared_ptr<const ValidPathInfo> info;
+    RepairFlag repair;
 
     /**
      * Pipe for the substituter's standard output.
@@ -54,22 +33,8 @@ struct PathSubstitutionGoal : public Goal
      */
     std::thread thr;
 
-    std::promise<void> promise;
-
-    /**
-     * Whether to try to repair a valid path.
-     */
-    RepairFlag repair;
-
-    /**
-     * Location where we're downloading the substitute.  Differs from
-     * storePath when doing a repair.
-     */
-    Path destPath;
-
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
-
 
     /**
      * Content address for recomputing store path
@@ -100,10 +65,8 @@ public:
      * The states.
      */
     Co init() override;
-    Co tryNext();
     Co gotInfo();
-    Co referencesValid();
-    Co tryToRun();
+    Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool& substituterFailed);
     Co finished();
 
     /**
