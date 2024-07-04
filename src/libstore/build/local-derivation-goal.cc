@@ -496,12 +496,12 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    topTmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
     if (useChroot) {
         /* If sandboxing is enabled, put the actual TMPDIR underneath
            an inaccessible root-owned directory, to prevent outside
            access. */
-        tmpDir = tmpDir + "/build";
+        tmpDir = topTmpDir + "/build";
         createDir(tmpDir, 0700);
     }
     chownToBuilder(tmpDir);
@@ -2946,7 +2946,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 
 void LocalDerivationGoal::deleteTmpDir(bool force)
 {
-    if (tmpDir != "") {
+    if (topTmpDir != "") {
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
@@ -2954,7 +2954,8 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
             chmod(tmpDir.c_str(), 0755);
         }
         else
-            deletePath(tmpDir);
+            deletePath(topTmpDir);
+        topTmpDir = "";
         tmpDir = "";
     }
 }
