@@ -26,9 +26,15 @@ struct LocalDerivationGoal : public DerivationGoal
     std::optional<Path> cgroup;
 
     /**
-     * The temporary directory.
+     * The temporary directory used for the build.
      */
     Path tmpDir;
+
+    /**
+     * The top-level temporary directory. `tmpDir` is either equal to
+     * or a child of this directory.
+     */
+    Path topTmpDir;
 
     /**
      * The path of the temporary directory in the sandbox.
