@@ -30,7 +30,7 @@ subdir('build-utils-meson/export-all-symbols')
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
 
-gtest = dependency('gtest', main : true)
+gtest = dependency('gtest')
 deps_private += gtest
 
 gtest = dependency('gmock')
@@ -77,7 +77,6 @@ this_exe = executable(
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
   link_args: linker_export_flags + ['-lrapidcheck'],
-  # get main from gtest
   install : true,
 )
 

@@ -69,7 +69,7 @@ headers = [config_h] + files(
   'nix_api_value.h',
 )
 
-# TODO don't install this once tests don't use it.
+# TODO move this header to libexpr, maybe don't use it in tests?
 headers += files('nix_api_expr_internal.h')
 
 subdir('build-utils-meson/export-all-symbols')

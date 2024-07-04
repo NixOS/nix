@@ -1,7 +1,6 @@
 { lib
 , stdenv
 , mkMesonDerivation
-, releaseTools
 
 , meson
 , ninja

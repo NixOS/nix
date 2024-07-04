@@ -118,7 +118,8 @@ busybox = find_program(get_option('sandbox-shell'), required : false)
 if get_option('embedded-sandbox-shell')
   # This one goes in config.h
   # The path to busybox is passed as a -D flag when compiling this_library.
-  # Idk why, ask the old buildsystem.
+  # This solution is inherited from the old make buildsystem
+  # TODO: do this differently?
   configdata.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(

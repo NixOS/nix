@@ -20,7 +20,7 @@ deps_private = [ ]
 # C library, whose public interface --- including public but not private
 # dependencies --- will also likewise soon be stable.
 #
-# N.B. For distributions that care about "ABI" stablity and not just
+# N.B. For distributions that care about "ABI" stability and not just
 # "API" stability, the private dependencies also matter as they can
 # potentially affect the public ABI.
 deps_public = [ ]
