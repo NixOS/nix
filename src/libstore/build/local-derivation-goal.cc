@@ -497,12 +497,22 @@ void LocalDerivationGoal::startBuilder()
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir("", "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+#if __APPLE__
+    if (false) {
+#else
     if (useChroot) {
+#endif
         /* If sandboxing is enabled, put the actual TMPDIR underneath
            an inaccessible root-owned directory, to prevent outside
-           access. */
+           access.
+
+           On macOS, we don't use an actual chroot, so this isn't
+           possible. Any mitigation along these lines would have to be
+           done directly in the sandbox profile. */
         tmpDir = topTmpDir + "/build";
         createDir(tmpDir, 0700);
+    } else {
+        tmpDir = topTmpDir;
     }
     chownToBuilder(tmpDir);
 
