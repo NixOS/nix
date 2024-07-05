@@ -644,6 +644,15 @@ public:
      */
     bool eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
+    /**
+     * Like `eqValues`, but throws an `AssertionError` if not equal.
+     *
+     * WARNING:
+     * Callers should call `eqValues` first and report if `assertEqValues` behaves
+     * incorrectly. (e.g. if it doesn't throw if eqValues returns false or vice versa)
+     */
+    void assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
+
     bool isFunctor(Value & fun);
 
     // FIXME: use std::span
