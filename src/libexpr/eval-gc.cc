@@ -2,6 +2,7 @@
 #include "environment-variables.hh"
 #include "serialise.hh"
 #include "eval-gc.hh"
+#include "file-system.hh"
 
 #if HAVE_BOEHMGC
 
@@ -143,6 +144,38 @@ public:
     };
 };
 
+static size_t getFreeMem()
+{
+    /* On Linux, use the `MemAvailable` or `MemFree` fields from
+       /proc/cpuinfo. */
+#  if __linux__
+    {
+        std::unordered_map<std::string, std::string> fields;
+        for (auto & line : tokenizeString<std::vector<std::string>>(readFile("/proc/meminfo"), "\n")) {
+            auto colon = line.find(':');
+            if (colon == line.npos) continue;
+            fields.emplace(line.substr(0, colon), trim(line.substr(colon + 1)));
+        }
+
+        auto i = fields.find("MemAvailable");
+        if (i == fields.end())
+            i = fields.find("MemFree");
+        if (i != fields.end()) {
+            auto kb = tokenizeString<std::vector<std::string>>(i->second, " ");
+            if (kb.size() == 2 && kb[1] == "kB")
+                return string2Int<size_t>(kb[0]).value_or(0) * 1024;
+        }
+    }
+#  endif
+
+    /* On non-Linux systems, conservatively assume that 25% of memory is free. */
+    long pageSize = sysconf(_SC_PAGESIZE);
+    long pages = sysconf(_SC_PHYS_PAGES);
+    if (pageSize != -1)
+        return (pageSize * pages) / 4;
+    return 0;
+}
+
 static inline void initGCReal()
 {
     /* Initialise the Boehm garbage collector. */
@@ -179,8 +212,8 @@ static inline void initGCReal()
         "BoehmGC version does not support GC while coroutine exists. GC will be disabled inside coroutines. Consider updating bdw-gc to 8.2.4 or later."
 #  endif
 
-    /* Set the initial heap size to something fairly big (25% of
-       physical RAM, up to a maximum of 384 MiB) so that in most cases
+    /* Set the initial heap size to something fairly big (80% of
+       free RAM, up to a maximum of 8 GiB) so that in most cases
        we don't need to garbage collect at all.  (Collection has a
        fairly significant overhead.)  The heap size can be overridden
        through libgc's GC_INITIAL_HEAP_SIZE environment variable.  We
@@ -191,13 +224,10 @@ static inline void initGCReal()
     if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
         size_t size = 32 * 1024 * 1024;
 #  if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
-        size_t maxSize = 384 * 1024 * 1024;
-        long pageSize = sysconf(_SC_PAGESIZE);
-        long pages = sysconf(_SC_PHYS_PAGES);
-        if (pageSize != -1)
-            size = (pageSize * pages) / 4; // 25% of RAM
-        if (size > maxSize)
-            size = maxSize;
+        size_t maxSize = 8ULL * 1024 * 1024 * 1024;
+        auto free = getFreeMem();
+        debug("free memory is %d bytes", free);
+        size = std::min((size_t) (free * 0.8), maxSize);
 #  endif
         debug("setting initial heap size to %1% bytes", size);
         GC_expand_hp(size);
