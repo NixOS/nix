@@ -51,6 +51,8 @@ let
     "nix-expr-tests"
     "nix-flake"
     "nix-flake-tests"
+    "nix-main"
+    "nix-cmd"
   ];
 in
 {
