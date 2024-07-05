@@ -81,13 +81,13 @@ struct MemorySink : FileSystemObjectSink
 
     MemorySink(MemorySourceAccessor & dst) : dst(dst) { }
 
-    void createDirectory(const Path & path) override;
+    void createDirectory(const CanonPath & path) override;
 
     void createRegularFile(
-        const Path & path,
+        const CanonPath & path,
         std::function<void(CreateRegularFileSink &)>) override;
 
-    void createSymlink(const Path & path, const std::string & target) override;
+    void createSymlink(const CanonPath & path, const std::string & target) override;
 };
 
 }

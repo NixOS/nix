@@ -124,9 +124,9 @@ SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents
 
 using File = MemorySourceAccessor::File;
 
-void MemorySink::createDirectory(const Path & path)
+void MemorySink::createDirectory(const CanonPath & path)
 {
-    auto * f = dst.open(CanonPath{path}, File { File::Directory { } });
+    auto * f = dst.open(path, File { File::Directory { } });
     if (!f)
         throw Error("file '%s' cannot be made because some parent file is not a directory", path);
 
@@ -146,9 +146,9 @@ struct CreateMemoryRegularFile : CreateRegularFileSink {
     void preallocateContents(uint64_t size) override;
 };
 
-void MemorySink::createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> func)
+void MemorySink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
-    auto * f = dst.open(CanonPath{path}, File { File::Regular {} });
+    auto * f = dst.open(path, File { File::Regular {} });
     if (!f)
         throw Error("file '%s' cannot be made because some parent file is not a directory", path);
     if (auto * rp = std::get_if<File::Regular>(&f->raw)) {
@@ -173,9 +173,9 @@ void CreateMemoryRegularFile::operator () (std::string_view data)
     regularFile.contents += data;
 }
 
-void MemorySink::createSymlink(const Path & path, const std::string & target)
+void MemorySink::createSymlink(const CanonPath & path, const std::string & target)
 {
-    auto * f = dst.open(CanonPath{path}, File { File::Symlink { } });
+    auto * f = dst.open(path, File { File::Symlink { } });
     if (!f)
         throw Error("file '%s' cannot be made because some parent file is not a directory", path);
     if (auto * s = std::get_if<File::Symlink>(&f->raw))

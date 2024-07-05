@@ -27,11 +27,11 @@
 | Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | right         | 14         |
 
-[string]: ./values.md#type-string
-[path]: ./values.md#type-path
-[number]: ./values.md#type-number
-[list]: ./values.md#list
-[attribute set]: ./values.md#attribute-set
+[string]: ./types.md#type-string
+[path]: ./types.md#type-path
+[number]: ./types.md#type-float <!-- TODO(@rhendric, #10970): rationalize this -->
+[list]: ./types.md#list
+[attribute set]: ./types.md#attribute-set
 
 ## Attribute selection
 
@@ -42,7 +42,7 @@
 Select the attribute denoted by attribute path *attrpath* from [attribute set] *attrset*.
 If the attribute doesn’t exist, return the *expr* after `or` if provided, otherwise abort evaluation.
 
-An attribute path is a dot-separated list of [attribute names](./values.md#attribute-set).
+An attribute path is a dot-separated list of [attribute names](./types.md#attribute-set).
 
 > **Syntax**
 >
@@ -61,7 +61,7 @@ The result is a [Boolean] value.
 
 See also: [`builtins.hasAttr`](@docroot@/language/builtins.md#builtins-hasAttr)
 
-[Boolean]: ./values.md#type-boolean
+[Boolean]: ./types.md#type-boolean
 
 [Has attribute]: #has-attribute
 
@@ -172,7 +172,7 @@ All comparison operators are implemented in terms of `<`, and the following equi
 - Numbers are type-compatible, see [arithmetic] operators.
 - Floating point numbers only differ up to a limited precision.
 
-[function]: ./constructs.md#functions
+[function]: ./syntax.md#functions
 
 [Equality]: #equality
 

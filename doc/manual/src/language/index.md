@@ -53,7 +53,7 @@ This is an incomplete overview of language features, by example.
   <td>
 
 
-   *Basic values ([primitives](@docroot@/language/values.md#primitives))*
+   *Basic values ([primitives](@docroot@/language/types.md#primitives))*
 
 
   </td>
@@ -71,7 +71,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [string](@docroot@/language/values.md#type-string)
+   A [string](@docroot@/language/types.md#type-string)
 
   </td>
  </tr>
@@ -102,7 +102,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [comment](@docroot@/language/constructs.md#comments).
+   A [comment](@docroot@/language/syntax.md#comments).
 
   </td>
  </tr>
@@ -130,7 +130,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Booleans](@docroot@/language/values.md#type-boolean)
+   [Booleans](@docroot@/language/types.md#type-boolean)
 
   </td>
  </tr>
@@ -142,7 +142,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Null](@docroot@/language/values.md#type-null) value
+   [Null](@docroot@/language/types.md#type-null) value
 
   </td>
  </tr>
@@ -154,7 +154,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   An [integer](@docroot@/language/values.md#type-number)
+   An [integer](@docroot@/language/types.md#type-int)
 
   </td>
  </tr>
@@ -166,7 +166,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [floating point number](@docroot@/language/values.md#type-number)
+   A [floating point number](@docroot@/language/types.md#type-float)
 
   </td>
  </tr>
@@ -178,7 +178,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   An absolute [path](@docroot@/language/values.md#type-path)
+   An absolute [path](@docroot@/language/types.md#type-path)
 
   </td>
  </tr>
@@ -190,7 +190,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [path](@docroot@/language/values.md#type-path) relative to the file containing this Nix expression
+   A [path](@docroot@/language/types.md#type-path) relative to the file containing this Nix expression
 
   </td>
  </tr>
@@ -202,7 +202,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A home [path](@docroot@/language/values.md#type-path). Evaluates to the `"<user's home directory>/.config"`.
+   A home [path](@docroot@/language/types.md#type-path). Evaluates to the `"<user's home directory>/.config"`.
 
   </td>
  </tr>
@@ -238,7 +238,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   An [attribute set](@docroot@/language/values.md#attribute-set) with attributes named `x` and `y`
+   An [attribute set](@docroot@/language/types.md#attribute-set) with attributes named `x` and `y`
 
   </td>
  </tr>
@@ -262,7 +262,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [recursive set](@docroot@/language/constructs.md#recursive-sets), equivalent to `{ x = "foo"; y = "foobar"; }`.
+   A [recursive set](@docroot@/language/syntax.md#recursive-sets), equivalent to `{ x = "foo"; y = "foobar"; }`.
 
   </td>
  </tr>
@@ -278,7 +278,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Lists](@docroot@/language/values.md#list) with three elements.
+   [Lists](@docroot@/language/types.md#list) with three elements.
 
   </td>
  </tr>
@@ -362,7 +362,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Attribute selection](@docroot@/language/values.md#attribute-set) (evaluates to `1`)
+   [Attribute selection](@docroot@/language/types.md#attribute-set) (evaluates to `1`)
 
   </td>
  </tr>
@@ -374,7 +374,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Attribute selection](@docroot@/language/values.md#attribute-set) with default (evaluates to `3`)
+   [Attribute selection](@docroot@/language/types.md#attribute-set) with default (evaluates to `3`)
 
   </td>
  </tr>
@@ -410,7 +410,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Conditional expression](@docroot@/language/constructs.md#conditionals).
+   [Conditional expression](@docroot@/language/syntax.md#conditionals).
 
   </td>
  </tr>
@@ -422,7 +422,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Assertion](@docroot@/language/constructs.md#assertions) check (evaluates to `"yes!"`).
+   [Assertion](@docroot@/language/syntax.md#assertions) check (evaluates to `"yes!"`).
 
   </td>
  </tr>
@@ -434,7 +434,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   Variable definition. See [`let`-expressions](@docroot@/language/constructs.md#let-expressions).
+   Variable definition. See [`let`-expressions](@docroot@/language/syntax.md#let-expressions).
 
   </td>
  </tr>
@@ -448,7 +448,7 @@ This is an incomplete overview of language features, by example.
 
    Add all attributes from the given set to the scope (evaluates to `1`).
 
-   See [`with`-expressions](@docroot@/language/constructs.md#with-expressions) for details and shadowing caveats.
+   See [`with`-expressions](@docroot@/language/syntax.md#with-expressions) for details and shadowing caveats.
 
   </td>
  </tr>
@@ -462,7 +462,7 @@ This is an incomplete overview of language features, by example.
 
    Adds the variables to the current scope (attribute set or `let` binding).
    Desugars to `pkgs = pkgs; src = src;`.
-   See [Inheriting attributes](@docroot@/language/constructs.md#inheriting-attributes).
+   See [Inheriting attributes](@docroot@/language/syntax.md#inheriting-attributes).
 
   </td>
  </tr>
@@ -476,14 +476,14 @@ This is an incomplete overview of language features, by example.
 
    Adds the attributes, from the attribute set in parentheses, to the current scope (attribute set or `let` binding).
    Desugars to `lib = pkgs.lib; stdenv = pkgs.stdenv;`.
-   See [Inheriting attributes](@docroot@/language/constructs.md#inheriting-attributes).
+   See [Inheriting attributes](@docroot@/language/syntax.md#inheriting-attributes).
 
   </td>
  </tr>
  <tr>
   <td>
 
-   *[Functions](@docroot@/language/constructs.md#functions) (lambdas)*
+   *[Functions](@docroot@/language/syntax.md#functions) (lambdas)*
 
   </td>
   <td>
@@ -500,7 +500,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [function](@docroot@/language/constructs.md#functions) that expects an integer and returns it increased by 1.
+   A [function](@docroot@/language/syntax.md#functions) that expects an integer and returns it increased by 1.
 
   </td>
  </tr>
@@ -512,7 +512,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   Curried [function](@docroot@/language/constructs.md#functions), equivalent to `x: (y: x + y)`. Can be used like a function that takes two arguments and returns their sum.
+   Curried [function](@docroot@/language/syntax.md#functions), equivalent to `x: (y: x + y)`. Can be used like a function that takes two arguments and returns their sum.
 
   </td>
  </tr>
@@ -524,7 +524,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [function](@docroot@/language/constructs.md#functions) call (evaluates to 101)
+   A [function](@docroot@/language/syntax.md#functions) call (evaluates to 101)
 
   </td>
  </tr>
@@ -536,7 +536,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [function](@docroot@/language/constructs.md#functions) bound to a variable and subsequently called by name (evaluates to 103)
+   A [function](@docroot@/language/syntax.md#functions) bound to a variable and subsequently called by name (evaluates to 103)
 
   </td>
  </tr>
@@ -548,7 +548,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [function](@docroot@/language/constructs.md#functions) that expects a set with required attributes `x` and `y` and concatenates them
+   A [function](@docroot@/language/syntax.md#functions) that expects a set with required attributes `x` and `y` and concatenates them
 
   </td>
  </tr>
@@ -560,7 +560,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [function](@docroot@/language/constructs.md#functions) that expects a set with required attribute `x` and optional `y`, using `"bar"` as default value for `y`
+   A [function](@docroot@/language/syntax.md#functions) that expects a set with required attribute `x` and optional `y`, using `"bar"` as default value for `y`
 
   </td>
  </tr>
@@ -572,7 +572,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [function](@docroot@/language/constructs.md#functions) that expects a set with required attributes `x` and `y` and ignores any other attributes
+   A [function](@docroot@/language/syntax.md#functions) that expects a set with required attributes `x` and `y` and ignores any other attributes
 
   </td>
  </tr>
@@ -586,7 +586,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   A [function](@docroot@/language/constructs.md#functions) that expects a set with required attributes `x` and `y`, and binds the whole set to `args`
+   A [function](@docroot@/language/syntax.md#functions) that expects a set with required attributes `x` and `y`, and binds the whole set to `args`
 
   </td>
  </tr>

@@ -742,11 +742,12 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
       Each attribute set in the list `startSet` and the list returned by `operator` must have an attribute `key`, which must support equality comparison.
       The value of `key` can be one of the following types:
 
-      - [Number](@docroot@/language/values.md#type-number)
-      - [Boolean](@docroot@/language/values.md#type-boolean)
-      - [String](@docroot@/language/values.md#type-string)
-      - [Path](@docroot@/language/values.md#type-path)
-      - [List](@docroot@/language/values.md#list)
+      - [Int](@docroot@/language/types.md#type-int)
+      - [Float](@docroot@/language/types.md#type-float)
+      - [Boolean](@docroot@/language/types.md#type-boolean)
+      - [String](@docroot@/language/types.md#type-string)
+      - [Path](@docroot@/language/types.md#type-path)
+      - [List](@docroot@/language/types.md#list)
 
       The result is produced by calling the `operator` on each `item` that has not been called yet, including newly added items, until no new items are added.
       Items are compared by their `key` attribute.
@@ -1751,7 +1752,7 @@ static RegisterPrimOp primop_baseNameOf({
     .name = "baseNameOf",
     .args = {"x"},
     .doc = R"(
-      Return the *base name* of either a [path value](@docroot@/language/values.md#type-path) *x* or a string *x*, depending on which type is passed, and according to the following rules.
+      Return the *base name* of either a [path value](@docroot@/language/types.md#type-path) *x* or a string *x*, depending on which type is passed, and according to the following rules.
 
       For a path value, the *base name* is considered to be the part of the path after the last directory separator, including any file extensions.
       This is the simple case, as path values don't have trailing slashes.
@@ -1891,7 +1892,7 @@ static RegisterPrimOp primop_findFile(PrimOp {
     .doc = R"(
       Find *lookup-path* in *search-path*.
 
-      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes:
+      A search path is represented list of [attribute sets](./types.md#attribute-set) with two attributes:
       - `prefix` is a relative path.
       - `path` denotes a file system location
       The exact syntax depends on the command line interface.
@@ -1912,7 +1913,7 @@ static RegisterPrimOp primop_findFile(PrimOp {
         }
         ```
 
-      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match:
+      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/types.md#type-path) of the match:
 
       - If *lookup-path* matches `prefix`, then the remainder of *lookup-path* (the "suffix") is searched for within the directory denoted by `path`.
         Note that the `path` may need to be downloaded at this point to look inside.
@@ -2345,7 +2346,7 @@ static RegisterPrimOp primop_toFile({
       ```
 
       Note that `${configFile}` is a
-      [string interpolation](@docroot@/language/values.md#type-string), so the result of the
+      [string interpolation](@docroot@/language/types.md#type-string), so the result of the
       expression `configFile`
       (i.e., a path like `/nix/store/m7p7jfny445k...-foo.conf`) will be
       spliced into the resulting string.
@@ -4609,7 +4610,7 @@ void EvalState::createBaseEnv()
           It can be returned by
           [comparison operators](@docroot@/language/operators.md#Comparison)
           and used in
-          [conditional expressions](@docroot@/language/constructs.md#Conditionals).
+          [conditional expressions](@docroot@/language/syntax.md#Conditionals).
 
           The name `true` is not special, and can be shadowed:
 
@@ -4629,7 +4630,7 @@ void EvalState::createBaseEnv()
           It can be returned by
           [comparison operators](@docroot@/language/operators.md#Comparison)
           and used in
-          [conditional expressions](@docroot@/language/constructs.md#Conditionals).
+          [conditional expressions](@docroot@/language/syntax.md#Conditionals).
 
           The name `false` is not special, and can be shadowed:
 

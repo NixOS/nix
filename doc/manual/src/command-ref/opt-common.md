@@ -143,7 +143,7 @@ Most Nix commands accept the following command-line options:
 
   This option is accepted by `nix-env`, `nix-instantiate`, `nix-shell` and `nix-build`.
   When evaluating Nix expressions, the expression evaluator will automatically try to call functions that it encounters.
-  It can automatically call functions for which every argument has a [default value](@docroot@/language/constructs.md#functions) (e.g., `{ argName ?  defaultValue }: ...`).
+  It can automatically call functions for which every argument has a [default value](@docroot@/language/syntax.md#functions) (e.g., `{ argName ?  defaultValue }: ...`).
 
   With `--arg`, you can also call functions that have arguments without a default value (or override a default value).
   That is, if the evaluator encounters a function with an argument named *name*, it will call it with value *value*.

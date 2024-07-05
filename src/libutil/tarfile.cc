@@ -178,6 +178,7 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         auto path = archive_entry_pathname(entry);
         if (!path)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
+        auto cpath = CanonPath{path};
         if (r == ARCHIVE_WARN)
             warn(archive_error_string(archive.archive));
         else
@@ -188,11 +189,11 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         switch (archive_entry_filetype(entry)) {
 
         case AE_IFDIR:
-            parseSink.createDirectory(path);
+            parseSink.createDirectory(cpath);
             break;
 
         case AE_IFREG: {
-            parseSink.createRegularFile(path, [&](auto & crf) {
+            parseSink.createRegularFile(cpath, [&](auto & crf) {
                 if (archive_entry_mode(entry) & S_IXUSR)
                     crf.isExecutable();
 
@@ -216,7 +217,7 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         case AE_IFLNK: {
             auto target = archive_entry_symlink(entry);
 
-            parseSink.createSymlink(path, target);
+            parseSink.createSymlink(cpath, target);
 
             break;
         }
