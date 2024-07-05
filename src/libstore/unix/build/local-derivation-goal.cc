@@ -503,13 +503,23 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+#if __APPLE__
+    if (false) {
+#else
     if (useChroot) {
+#endif
         /* If sandboxing is enabled, put the actual TMPDIR underneath
            an inaccessible root-owned directory, to prevent outside
-           access. */
-        tmpDir = tmpDir + "/build";
+           access.
+
+           On macOS, we don't use an actual chroot, so this isn't
+           possible. Any mitigation along these lines would have to be
+           done directly in the sandbox profile. */
+        tmpDir = topTmpDir + "/build";
         createDir(tmpDir, 0700);
+    } else {
+        tmpDir = topTmpDir;
     }
     chownToBuilder(tmpDir);
 
@@ -2962,7 +2972,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 
 void LocalDerivationGoal::deleteTmpDir(bool force)
 {
-    if (tmpDir != "") {
+    if (topTmpDir != "") {
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
@@ -2970,7 +2980,8 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
             chmod(tmpDir.c_str(), 0755);
         }
         else
-            deletePath(tmpDir);
+            deletePath(topTmpDir);
+        topTmpDir = "";
         tmpDir = "";
     }
 }
