@@ -189,6 +189,7 @@ json=$(nix flake metadata flake1 --json | jq .)
 [[ -d $(echo "$json" | jq -r .path) ]]
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C "$flake1Dir" log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
+[[ -n $(echo "$json" | jq -r .fingerprint) ]]
 
 echo foo > "$flake1Dir/foo"
 git -C "$flake1Dir" add $flake1Dir/foo
