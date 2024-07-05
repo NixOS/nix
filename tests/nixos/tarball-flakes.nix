@@ -74,7 +74,7 @@ in
     assert info["revision"] == "${nixpkgs.rev}"
     assert info["revCount"] == 1234
 
-    # Check that a 0-byte cached (304) result works.
+    # Check that a 0-byte HTTP 304 "Not modified" result works.
     machine.succeed("nix flake metadata --refresh --json http://localhost/tags/latest.tar.gz")
 
     # Check that fetching with rev/revCount/narHash succeeds.

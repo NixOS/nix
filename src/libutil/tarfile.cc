@@ -67,6 +67,17 @@ int getArchiveFilterCodeByName(const std::string & method)
     return code;
 }
 
+static void enableSupportedFormats(struct archive * archive)
+{
+    archive_read_support_format_tar(archive);
+    archive_read_support_format_zip(archive);
+
+    /* Enable support for empty files so we don't throw an exception
+       for empty HTTP 304 "Not modified" responses. See
+       downloadTarball(). */
+    archive_read_support_format_empty(archive);
+}
+
 TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> compression_method)
     : archive{archive_read_new()}
     , source{&source}
@@ -78,11 +89,9 @@ TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> com
         archive_read_support_filter_by_code(archive, getArchiveFilterCodeByName(*compression_method));
     }
 
-    if (!raw) {
-        archive_read_support_format_tar(archive);
-        archive_read_support_format_zip(archive);
-        archive_read_support_format_empty(archive);
-    } else {
+    if (!raw)
+        enableSupportedFormats(archive);
+    else {
         archive_read_support_format_raw(archive);
         archive_read_support_format_empty(archive);
     }
@@ -98,9 +107,7 @@ TarArchive::TarArchive(const Path & path)
     , buffer(defaultBufferSize)
 {
     archive_read_support_filter_all(archive);
-    archive_read_support_format_tar(archive);
-    archive_read_support_format_zip(archive);
-    archive_read_support_format_empty(archive);
+    enableSupportedFormats(archive);
     archive_read_set_option(archive, NULL, "mac-ext", NULL);
     check(archive_read_open_filename(archive, path.c_str(), 16384), "failed to open archive: %s");
 }
