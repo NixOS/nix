@@ -53,6 +53,7 @@ let
     "nix-flake-tests"
     "nix-main"
     "nix-cmd"
+    "nix-ng"
   ];
 in
 {

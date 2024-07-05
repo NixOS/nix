@@ -15,6 +15,9 @@ subproject('libflake')
 subproject('libmain')
 subproject('libcmd')
 
+# Executables
+subproject('nix')
+
 # Docs
 subproject('internal-api-docs')
 subproject('external-api-docs')
