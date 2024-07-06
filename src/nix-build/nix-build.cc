@@ -26,6 +26,7 @@
 #include "legacy.hh"
 #include "users.hh"
 #include "network-proxy.hh"
+#include "compatibility-settings.hh"
 
 using namespace nix;
 using namespace std::string_literals;
@@ -100,7 +101,13 @@ static SourcePath resolveShellExprPath(SourcePath path)
     auto resolvedOrDir = resolveExprPath(path, false);
     if (resolvedOrDir.resolveSymlinks().lstat().type == SourceAccessor::tDirectory) {
         if ((resolvedOrDir / "shell.nix").pathExists()) {
-            return resolvedOrDir / "shell.nix";
+            if (compatibilitySettings.nixShellAlwaysLooksForShellNix) {
+                return resolvedOrDir / "shell.nix";
+            } else {
+                warn("Skipping '%1%', because the setting '%2%' is disabled. This is a deprecated behavior. Consider enabling '%2%'.",
+                    resolvedOrDir / "shell.nix",
+                    "nix-shell-always-looks-for-shell-nix");
+            }
         }
         if ((resolvedOrDir / "default.nix").pathExists()) {
             return resolvedOrDir / "default.nix";
@@ -302,11 +309,17 @@ static void main_nix_build(int argc, char * * argv)
         fromArgs = true;
         remainingArgs = {joined.str()};
     } else if (!fromArgs && remainingArgs.empty()) {
-        remainingArgs = {"."};
+        if (isNixShell && !compatibilitySettings.nixShellAlwaysLooksForShellNix && std::filesystem::exists("shell.nix")) {
+            // If we're in 2.3 compatibility mode, we need to look for shell.nix
+            // now, because it won't be done later.
+            remainingArgs = {"shell.nix"};
+        } else {
+            remainingArgs = {"."};
 
-        // Instead of letting it throw later, we throw here to give a more relevant error message
-        if (isNixShell && !std::filesystem::exists("shell.nix") && !std::filesystem::exists("default.nix"))
-            throw Error("no argument specified and no '%s' or '%s' file found in the working directory", "shell.nix", "default.nix");
+            // Instead of letting it throw later, we throw here to give a more relevant error message
+            if (isNixShell && !std::filesystem::exists("shell.nix") && !std::filesystem::exists("default.nix"))
+                throw Error("no argument specified and no '%s' or '%s' file found in the working directory", "shell.nix", "default.nix");
+        }
     }
 
     if (isNixShell)
