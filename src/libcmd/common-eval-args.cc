@@ -202,7 +202,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
         auto v = state.allocValue();
         std::visit(overloaded {
             [&](const AutoArgExpr & arg) {
-                state.mkThunk_(*v, state.parseExprFromString(arg.expr, true ? state.rootPath(absPath(getCommandBaseDir())) : state.rootPath(".")));
+                state.mkThunk_(*v, state.parseExprFromString(arg.expr, compatibilitySettings.nixShellShebangArgumentsRelativeToScript ? state.rootPath(absPath(getCommandBaseDir())) : state.rootPath(".")));
             },
             [&](const AutoArgString & arg) {
                 v->mkString(arg.s);

@@ -293,7 +293,7 @@ static void main_nix_build(int argc, char * * argv)
     state->repair = myArgs.repair;
     if (myArgs.repair) buildMode = bmRepair;
 
-    if (inShebang) {
+    if (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript) {
         myArgs.setBaseDir(absPath(dirOf(script)));
     }
     auto autoArgs = myArgs.getAutoArgs(*state);
@@ -345,7 +345,7 @@ static void main_nix_build(int argc, char * * argv)
             if (fromArgs)
                 exprs.push_back(state->parseExprFromString(
                     std::move(i),
-                    inShebang ? lookupFileArg(*state, baseDir) : state->rootPath(".")
+                    (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript) ? lookupFileArg(*state, baseDir) : state->rootPath(".")
                 ));
             else {
                 auto absolute = i;

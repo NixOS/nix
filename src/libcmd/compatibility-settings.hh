@@ -14,6 +14,15 @@ struct CompatibilitySettings : public Config
 
         You may set this to `false` to revert to the Nix 2.3 behavior.
     )"};
+
+    Setting<bool> nixShellShebangArgumentsRelativeToScript{
+        this, true, "nix-shell-shebang-arguments-relative-to-script", R"(
+        Before Nix 2.24, the arguments in a `nix-shell` shebang - as well as `--arg` - were relative to working directory.
+
+        Since Nix 2.24, the arguments are relative to the [base directory](@docroot@/glossary.md#gloss-base-directory) defined as the script's directory.
+
+        You may set this to `false` to revert to the Nix 2.3 behavior.
+    )"};
 };
 
 };
