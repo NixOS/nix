@@ -315,11 +315,11 @@ static void main_nix_build(int argc, char * * argv)
                        relative to the script. */
                     auto baseDir = inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i;
 
-                    exprs.push_back(
-                        state->parseExprFromFile(
-                            resolveExprPath(
-                                lookupFileArg(*state,
-                                    baseDir))));
+                    auto sourcePath = lookupFileArg(*state,
+                                    baseDir);
+                    auto resolvedPath = resolveExprPath(sourcePath);
+
+                    exprs.push_back(state->parseExprFromFile(resolvedPath));
                 }
             }
         }
