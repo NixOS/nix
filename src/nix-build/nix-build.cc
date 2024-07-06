@@ -310,14 +310,17 @@ static void main_nix_build(int argc, char * * argv)
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
                 if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
                     drvs.push_back(PackageInfo(*state, evalStore, absolute));
-                else
+                else {
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
+                    auto baseDir = inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i;
+
                     exprs.push_back(
                         state->parseExprFromFile(
                             resolveExprPath(
                                 lookupFileArg(*state,
-                                    inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i))));
+                                    baseDir))));
+                }
             }
         }
 
