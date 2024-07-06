@@ -93,7 +93,7 @@ static std::vector<std::string> shellwords(const std::string & s)
 static void main_nix_build(int argc, char * * argv)
 {
     auto dryRun = false;
-    auto runEnv = std::regex_search(argv[0], std::regex("nix-shell$"));
+    auto isNixShell = std::regex_search(argv[0], std::regex("nix-shell$"));
     auto pure = false;
     auto fromArgs = false;
     auto packages = false;
@@ -107,7 +107,7 @@ static void main_nix_build(int argc, char * * argv)
     std::string envCommand; // interactive shell
     Strings envExclude;
 
-    auto myName = runEnv ? "nix-shell" : "nix-build";
+    auto myName = isNixShell ? "nix-shell" : "nix-build";
 
     auto inShebang = false;
     std::string script;
@@ -132,7 +132,7 @@ static void main_nix_build(int argc, char * * argv)
     // Heuristic to see if we're invoked as a shebang script, namely,
     // if we have at least one argument, it's the name of an
     // executable file, and it starts with "#!".
-    if (runEnv && argc > 1) {
+    if (isNixShell && argc > 1) {
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
@@ -186,9 +186,9 @@ static void main_nix_build(int argc, char * * argv)
             dryRun = true;
 
         else if (*arg == "--run-env") // obsolete
-            runEnv = true;
+            isNixShell = true;
 
-        else if (runEnv && (*arg == "--command" || *arg == "--run")) {
+        else if (isNixShell && (*arg == "--command" || *arg == "--run")) {
             if (*arg == "--run")
                 interactive = false;
             envCommand = getArg(*arg, arg, end) + "\nexit";
@@ -206,7 +206,7 @@ static void main_nix_build(int argc, char * * argv)
         else if (*arg == "--pure") pure = true;
         else if (*arg == "--impure") pure = false;
 
-        else if (runEnv && (*arg == "--packages" || *arg == "-p"))
+        else if (isNixShell && (*arg == "--packages" || *arg == "-p"))
             packages = true;
 
         else if (inShebang && *arg == "-i") {
@@ -266,7 +266,7 @@ static void main_nix_build(int argc, char * * argv)
     auto autoArgs = myArgs.getAutoArgs(*state);
 
     auto autoArgsWithInNixShell = autoArgs;
-    if (runEnv) {
+    if (isNixShell) {
         auto newArgs = state->buildBindings(autoArgsWithInNixShell->size() + 1);
         newArgs.alloc("inNixShell").mkBool(true);
         for (auto & i : *autoArgs) newArgs.insert(i);
@@ -282,13 +282,13 @@ static void main_nix_build(int argc, char * * argv)
         fromArgs = true;
         left = {joined.str()};
     } else if (!fromArgs) {
-        if (left.empty() && runEnv && pathExists("shell.nix"))
+        if (left.empty() && isNixShell && pathExists("shell.nix"))
             left = {"shell.nix"};
         if (left.empty())
             left = {"default.nix"};
     }
 
-    if (runEnv)
+    if (isNixShell)
         setEnv("IN_NIX_SHELL", pure ? "pure" : "impure");
 
     PackageInfos drvs;
@@ -330,7 +330,7 @@ static void main_nix_build(int argc, char * * argv)
 
         std::function<bool(const Value & v)> takesNixShellAttr;
         takesNixShellAttr = [&](const Value & v) {
-            if (!runEnv) {
+            if (!isNixShell) {
                 return false;
             }
             bool add = false;
@@ -381,7 +381,7 @@ static void main_nix_build(int argc, char * * argv)
             store->buildPaths(paths, buildMode, evalStore);
     };
 
-    if (runEnv) {
+    if (isNixShell) {
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
 
