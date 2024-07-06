@@ -45,6 +45,17 @@ let pkgs = rec {
     TEST_inNixShell = if inNixShell then "true" else "false";
     inherit stdenv;
     outputs = ["dev" "out"];
+  } // {
+    shellHook = abort "Ignore non-drv shellHook attr";
+  };
+
+  # https://github.com/NixOS/nix/issues/5431
+  # See nix-shell.sh
+  polo = mkDerivation {
+    name = "polo";
+    shellHook = ''
+      echo Polo
+    '';
   };
 
   # Used by nix-shell -p

@@ -90,6 +90,26 @@ static std::vector<std::string> shellwords(const std::string & s)
     return res;
 }
 
+/**
+ * Like `resolveExprPath`, but prefers `shell.nix` instead of `default.nix`,
+ * and if `path` was a directory, it checks eagerly whether `shell.nix` or
+ * `default.nix` exist, throwing an error if they don't.
+ */
+static SourcePath resolveShellExprPath(SourcePath path)
+{
+    auto resolvedOrDir = resolveExprPath(path, false);
+    if (resolvedOrDir.resolveSymlinks().lstat().type == SourceAccessor::tDirectory) {
+        if ((resolvedOrDir / "shell.nix").pathExists()) {
+            return resolvedOrDir / "shell.nix";
+        }
+        if ((resolvedOrDir / "default.nix").pathExists()) {
+            return resolvedOrDir / "default.nix";
+        }
+        throw Error("neither '%s' nor '%s' found in '%s'", "shell.nix", "default.nix", resolvedOrDir);
+    }
+    return resolvedOrDir;
+}
+
 static void main_nix_build(int argc, char * * argv)
 {
     auto dryRun = false;
@@ -281,11 +301,12 @@ static void main_nix_build(int argc, char * * argv)
         joined << "]; } \"\"";
         fromArgs = true;
         remainingArgs = {joined.str()};
-    } else if (!fromArgs) {
-        if (remainingArgs.empty() && isNixShell && pathExists("shell.nix"))
-            remainingArgs = {"shell.nix"};
-        if (remainingArgs.empty())
-            remainingArgs = {"default.nix"};
+    } else if (!fromArgs && remainingArgs.empty()) {
+        remainingArgs = {"."};
+
+        // Instead of letting it throw later, we throw here to give a more relevant error message
+        if (isNixShell && !std::filesystem::exists("shell.nix") && !std::filesystem::exists("default.nix"))
+            throw Error("no argument specified and no '%s' or '%s' file found in the working directory", "shell.nix", "default.nix");
     }
 
     if (isNixShell)
@@ -317,7 +338,8 @@ static void main_nix_build(int argc, char * * argv)
 
                     auto sourcePath = lookupFileArg(*state,
                                     baseDir);
-                    auto resolvedPath = resolveExprPath(sourcePath);
+                    auto resolvedPath =
+                        isNixShell ? resolveShellExprPath(sourcePath) : resolveExprPath(sourcePath);
 
                     exprs.push_back(state->parseExprFromFile(resolvedPath));
                 }
