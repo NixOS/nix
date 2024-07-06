@@ -334,8 +334,13 @@ static void main_nix_build(int argc, char * * argv)
         exprs = {state->parseStdin()};
     else
         for (auto i : remainingArgs) {
+            auto baseDir = inShebang && !packages ? absPath(dirOf(script)) : i;
+
             if (fromArgs)
-                exprs.push_back(state->parseExprFromString(std::move(i), state->rootPath(".")));
+                exprs.push_back(state->parseExprFromString(
+                    std::move(i),
+                    inShebang ? lookupFileArg(*state, baseDir) : state->rootPath(".")
+                ));
             else {
                 auto absolute = i;
                 try {
