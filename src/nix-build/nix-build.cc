@@ -100,7 +100,7 @@ static void main_nix_build(int argc, char * * argv)
     // Same condition as bash uses for interactive shells
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
     Strings attrPaths;
-    Strings left;
+    Strings remainingArgs;
     BuildMode buildMode = bmNormal;
     bool readStdin = false;
 
@@ -246,7 +246,7 @@ static void main_nix_build(int argc, char * * argv)
             return false;
 
         else
-            left.push_back(*arg);
+            remainingArgs.push_back(*arg);
 
         return true;
     });
@@ -276,16 +276,16 @@ static void main_nix_build(int argc, char * * argv)
     if (packages) {
         std::ostringstream joined;
         joined << "{...}@args: with import <nixpkgs> args; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
-        for (const auto & i : left)
+        for (const auto & i : remainingArgs)
             joined << '(' << i << ") ";
         joined << "]; } \"\"";
         fromArgs = true;
-        left = {joined.str()};
+        remainingArgs = {joined.str()};
     } else if (!fromArgs) {
-        if (left.empty() && isNixShell && pathExists("shell.nix"))
-            left = {"shell.nix"};
-        if (left.empty())
-            left = {"default.nix"};
+        if (remainingArgs.empty() && isNixShell && pathExists("shell.nix"))
+            remainingArgs = {"shell.nix"};
+        if (remainingArgs.empty())
+            remainingArgs = {"default.nix"};
     }
 
     if (isNixShell)
@@ -299,7 +299,7 @@ static void main_nix_build(int argc, char * * argv)
     if (readStdin)
         exprs = {state->parseStdin()};
     else
-        for (auto i : left) {
+        for (auto i : remainingArgs) {
             if (fromArgs)
                 exprs.push_back(state->parseExprFromString(std::move(i), state->rootPath(".")));
             else {
