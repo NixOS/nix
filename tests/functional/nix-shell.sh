@@ -21,6 +21,10 @@ output=$(nix-shell --pure "$shellDotNix" -A shellDrv --run \
 
 [ "$output" = " - foo - bar - true" ]
 
+output=$(nix-shell --pure "$shellDotNix" -A shellDrv --option nix-shell-always-looks-for-shell-nix false --run \
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $TEST_inNixShell"')
+[ "$output" = " - foo - bar - true" ]
+
 # Test --keep
 output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR "$shellDotNix" -A shellDrv --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $SELECTED_IMPURE_VAR"')
@@ -100,6 +104,11 @@ echo 'abort "do not load default.nix!"' > $TEST_ROOT/lookup-test/default.nix
 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' | grepQuiet "it works"
 # https://github.com/NixOS/nix/issues/4529
 nix-shell -I "testRoot=$TEST_ROOT" '<testRoot/lookup-test>' -A shellDrv --run 'echo "it works"' | grepQuiet "it works"
+
+expectStderr 1 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' --option nix-shell-always-looks-for-shell-nix false \
+  | grepQuiet -F "do not load default.nix!" # we did, because we chose to enable legacy behavior
+expectStderr 1 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' --option nix-shell-always-looks-for-shell-nix false \
+  | grepQuiet "Skipping .*lookup-test/shell\.nix.*, because the setting .*nix-shell-always-looks-for-shell-nix.* is disabled. This is a deprecated behavior\. Consider enabling .*nix-shell-always-looks-for-shell-nix.*"
 
 (
   cd $TEST_ROOT/empty;

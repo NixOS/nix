@@ -97,6 +97,7 @@ headers = [config_h] + files(
   'command-installable-value.hh',
   'command.hh',
   'common-eval-args.hh',
+  'compatibility-settings.hh',
   'editor-for.hh',
   'installable-attr-path.hh',
   'installable-derived-path.hh',
