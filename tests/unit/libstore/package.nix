@@ -19,6 +19,7 @@
 # Configuration Options
 
 , version
+, filesetToSource
 }:
 
 let
@@ -86,7 +87,7 @@ mkMesonDerivation (finalAttrs: {
       run = let
         # Some data is shared with the functional tests: they create it,
         # we consume it.
-        data = lib.fileset.toSource {
+        data = filesetToSource {
           root = ../..;
           fileset = lib.fileset.unions [
             ./data

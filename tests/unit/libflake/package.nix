@@ -17,6 +17,7 @@
 # Configuration Options
 
 , version
+, resolvePath
 }:
 
 let
@@ -82,7 +83,7 @@ mkMesonDerivation (finalAttrs: {
       run = runCommand "${finalAttrs.pname}-run" {
       } ''
         PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
-        export _NIX_TEST_UNIT_DATA=${./data}
+        export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
         nix-flake-tests
         touch $out
       '';
