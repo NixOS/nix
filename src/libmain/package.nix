@@ -7,6 +7,8 @@
 , ninja
 , pkg-config
 
+, openssl
+
 , nix-util
 , nix-store
 
@@ -47,6 +49,7 @@ mkMesonDerivation (finalAttrs: {
   propagatedBuildInputs = [
     nix-util
     nix-store
+    openssl
   ];
 
   preConfigure =
