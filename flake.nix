@@ -25,7 +25,6 @@
 
     let
       inherit (nixpkgs) lib;
-      inherit (lib) fileset;
 
       officialRelease = false;
 
