@@ -1,5 +1,6 @@
 { lib
 , stdenv
+, mkMesonDerivation
 , perl
 , perlPackages
 , meson
@@ -8,38 +9,44 @@
 , nix-store
 , darwin
 , versionSuffix ? ""
+, curl
+, bzip2
+, libsodium
 }:
 
 let
   inherit (lib) fileset;
 in
 
-perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
+perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
   pname = "nix-perl";
   version = lib.fileContents ./.version + versionSuffix;
 
-  src = fileset.toSource {
-    root = ./.;
-    fileset = fileset.unions ([
-      ./MANIFEST
-      ./lib
-      ./meson.build
-      ./meson.options
-    ] ++ lib.optionals finalAttrs.doCheck [
-      ./.yath.rc.in
-      ./t
-    ]);
-  };
+  workDir = ./.;
+  fileset = fileset.unions ([
+    ./.version
+    ../../.version
+    ./MANIFEST
+    ./lib
+    ./meson.build
+    ./meson.options
+  ] ++ lib.optionals finalAttrs.doCheck [
+    ./.yath.rc.in
+    ./t
+  ]);
 
   nativeBuildInputs = [
     meson
     ninja
     pkg-config
     perl
+    curl
   ];
 
   buildInputs = [
     nix-store
+    bzip2
+    libsodium
   ];
 
   # `perlPackages.Test2Harness` is marked broken for Darwin
@@ -52,6 +59,7 @@ perl.pkgs.toPerlModule (stdenv.mkDerivation (finalAttrs: {
   preConfigure =
     # "Inline" .version so its not a symlink, and includes the suffix
     ''
+      chmod u+w .version
       echo ${finalAttrs.version} > .version
     '';
 
