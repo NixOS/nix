@@ -40,6 +40,7 @@ let
 in
 scope: {
   inherit stdenv versionSuffix;
+  version = lib.fileContents ../.version + versionSuffix;
 
   libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";

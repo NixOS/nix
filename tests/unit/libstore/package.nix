@@ -18,13 +18,11 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
 }:
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 in
 
 mkMesonDerivation (finalAttrs: {

@@ -8,7 +8,7 @@
 , pkg-config
 , nix-store
 , darwin
-, versionSuffix ? ""
+, version
 , curl
 , bzip2
 , libsodium
@@ -20,7 +20,7 @@ in
 
 perl.pkgs.toPerlModule (mkMesonDerivation (finalAttrs: {
   pname = "nix-perl";
-  version = lib.fileContents ./.version + versionSuffix;
+  inherit version;
 
   workDir = ./.;
   fileset = fileset.unions ([
