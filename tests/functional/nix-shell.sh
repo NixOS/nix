@@ -72,8 +72,9 @@ chmod a+rx $TEST_ROOT/shell.shebang.expr
 ! $TEST_ROOT/shell.shebang.expr bar
 cp shell.nix config.nix $TEST_ROOT
 # Should succeed
+echo "cwd: $PWD"
 output=$($TEST_ROOT/shell.shebang.expr bar)
-[ "$output" = '-e load(ARGV.shift) -- '"$TEST_ROOT"'/shell.shebang.expr bar' ]
+[ "$output" = foo ]
 
 # Test nix-shell shebang mode again with metacharacters in the filename.
 # First word of filename is chosen to not match any file in the test root.

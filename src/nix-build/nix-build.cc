@@ -183,6 +183,9 @@ static void main_nix_build(int argc, char * * argv)
     struct MyArgs : LegacyArgs, MixEvalArgs
     {
         using LegacyArgs::LegacyArgs;
+        void setBaseDir(Path baseDir) {
+            commandBaseDir = baseDir;
+        }
     };
 
     MyArgs myArgs(myName, [&](Strings::iterator & arg, const Strings::iterator & end) {
@@ -290,6 +293,9 @@ static void main_nix_build(int argc, char * * argv)
     state->repair = myArgs.repair;
     if (myArgs.repair) buildMode = bmRepair;
 
+    if (inShebang) {
+        myArgs.setBaseDir(absPath(dirOf(script)));
+    }
     auto autoArgs = myArgs.getAutoArgs(*state);
 
     auto autoArgsWithInNixShell = autoArgs;

@@ -43,6 +43,7 @@ let pkgs = rec {
     ASCII_PERCENT = "%";
     ASCII_AT = "@";
     TEST_inNixShell = if inNixShell then "true" else "false";
+    FOO = fooContents;
     inherit stdenv;
     outputs = ["dev" "out"];
   } // {
