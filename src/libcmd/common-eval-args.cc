@@ -11,6 +11,8 @@
 #include "command.hh"
 #include "tarball.hh"
 #include "fetch-to-store.hh"
+#include "compatibility-settings.hh"
+#include "eval-settings.hh"
 
 namespace nix {
 
@@ -32,6 +34,11 @@ EvalSettings evalSettings {
 };
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);
+
+CompatibilitySettings compatibilitySettings {};
+
+static GlobalConfig::Register rCompatibilitySettings(&compatibilitySettings);
+
 
 MixEvalArgs::MixEvalArgs()
 {
