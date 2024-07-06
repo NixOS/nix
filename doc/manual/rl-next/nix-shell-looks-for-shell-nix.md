@@ -7,6 +7,8 @@ issues:
 - 4529
 - 5431
 - 11053
+prs:
+- 11057
 ---
 
 `nix-shell $x` now looks for `$x/shell.nix` when `$x` resolves to a directory.
