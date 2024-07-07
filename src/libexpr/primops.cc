@@ -1872,7 +1872,7 @@ static RegisterPrimOp primop_findFile(PrimOp {
       - If the suffix is found inside that directory, then the entry is a match.
         The combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
 
-      [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath):
+      [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](#builtins-nixPath):
 
       ```nix
       <nixpkgs>
@@ -4519,7 +4519,7 @@ void EvalState::createBaseEnv()
     addConstant("builtins", v, {
         .type = nAttrs,
         .doc = R"(
-          Contains all the [built-in functions](@docroot@/language/builtins.md) and values.
+          Contains all the built-in functions and values.
 
           Since built-in functions were added over time, [testing for attributes](./operators.md#has-attribute) in `builtins` can be used for graceful fallback on older Nix installations:
 

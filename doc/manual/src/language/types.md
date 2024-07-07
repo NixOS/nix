@@ -37,7 +37,7 @@ A _boolean_ in the Nix language is one of _true_ or _false_.
 
 <!-- TODO: mention the top-level environment -->
 
-These values are available as attributes of [`builtins`](builtin-constants.md#builtins-builtins) as [`builtins.true`](builtin-constants.md#builtins-true) and [`builtins.false`](builtin-constants.md#builtins-false).
+These values are available as attributes of [`builtins`](builtins.md#builtins-builtins) as [`builtins.true`](builtins.md#builtins-true) and [`builtins.false`](builtins.md#builtins-false).
 The function [`builtins.isBool`](builtins.md#builtins-isBool) can be used to determine if a value is a boolean.
 
 ### String {#type-string}
@@ -60,7 +60,7 @@ There is a single value of type _null_ in the Nix language.
 
 <!-- TODO: mention the top-level environment -->
 
-This value is available as an attribute on the [`builtins`](builtin-constants.md#builtins-builtins) attribute set as [`builtins.null`](builtin-constants.md#builtins-null).
+This value is available as an attribute on the [`builtins`](builtins.md#builtins-builtins) attribute set as [`builtins.null`](builtins.md#builtins-null).
 
 ## Compound values
 
