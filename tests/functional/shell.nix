@@ -56,6 +56,7 @@ let pkgs = rec {
   # See nix-shell.sh
   polo = mkDerivation {
     name = "polo";
+    inherit stdenv;
     shellHook = ''
       echo Polo
     '';
