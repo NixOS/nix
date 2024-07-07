@@ -116,7 +116,7 @@ $TEST_ROOT/shell.shebang.nix
 
 mkdir $TEST_ROOT/lookup-test $TEST_ROOT/empty
 
-cp $shellDotNix $TEST_ROOT/lookup-test/shell.nix
+echo "import $shellDotNix" > $TEST_ROOT/lookup-test/shell.nix
 cp config.nix $TEST_ROOT/lookup-test/
 echo 'abort "do not load default.nix!"' > $TEST_ROOT/lookup-test/default.nix
 
@@ -138,10 +138,10 @@ expectStderr 1 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it work
 expectStderr 1 nix-shell -I "testRoot=$TEST_ROOT" '<testRoot/empty>' |
   grepQuiet "error.*neither .*shell\.nix.* nor .*default\.nix.* found in .*/empty"
 
-cat >$TEST_ROOT/lookup-test/shebangscript <<"EOF"
-#!/usr/bin/env nix-shell
+cat >$TEST_ROOT/lookup-test/shebangscript <<EOF
+#!$(type -P env) nix-shell
 #!nix-shell -A shellDrv -i bash
-[[ $VAR_FROM_NIX == bar ]]
+[[ \$VAR_FROM_NIX == bar ]]
 echo "script works"
 EOF
 chmod +x $TEST_ROOT/lookup-test/shebangscript
@@ -152,7 +152,7 @@ $TEST_ROOT/lookup-test/shebangscript | grepQuiet "script works"
 mkdir $TEST_ROOT/marco{,/polo}
 echo 'abort "marco/shell.nix must not be used, but its mere existence used to cause #5431"' > $TEST_ROOT/marco/shell.nix
 cat >$TEST_ROOT/marco/polo/default.nix <<EOF
-#!/usr/bin/env nix-shell
+#!$(type -P env) nix-shell
 (import $TEST_ROOT/lookup-test/shell.nix {}).polo
 EOF
 chmod a+x $TEST_ROOT/marco/polo/default.nix

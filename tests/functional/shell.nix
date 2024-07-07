@@ -26,6 +26,9 @@ let pkgs = rec {
     fun() {
       echo blabla
     }
+    runHook() {
+      eval "''${!1}"
+    }
   '';
 
   stdenv = mkDerivation {
@@ -54,6 +57,7 @@ let pkgs = rec {
   # See nix-shell.sh
   polo = mkDerivation {
     name = "polo";
+    inherit stdenv;
     shellHook = ''
       echo Polo
     '';
