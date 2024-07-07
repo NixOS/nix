@@ -26,6 +26,9 @@ let pkgs = rec {
     fun() {
       echo blabla
     }
+    runHook() {
+      eval "''${!1}"
+    }
   '';
 
   stdenv = mkDerivation {
