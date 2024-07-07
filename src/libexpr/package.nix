@@ -20,7 +20,7 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
 
 # Whether to use garbage collection for the Nix language evaluator.
 #
@@ -36,8 +36,6 @@
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 in
 
 mkMesonDerivation (finalAttrs: {

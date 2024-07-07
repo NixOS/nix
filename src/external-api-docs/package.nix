@@ -7,7 +7,7 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
 }:
 
 let
@@ -16,7 +16,7 @@ in
 
 mkMesonDerivation (finalAttrs: {
   pname = "nix-external-api-docs";
-  version = lib.fileContents ./.version + versionSuffix;
+  inherit version;
 
   workDir = ./.;
   fileset =

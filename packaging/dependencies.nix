@@ -14,9 +14,16 @@
 let
   inherit (pkgs) lib;
 
+  root = ../.;
+
+  # Nixpkgs implements this by returning a subpath into the fetched Nix sources.
+  resolvePath = p: p;
+
+  # Indirection for Nixpkgs to override when package.nix files are vendored
+  filesetToSource = lib.fileset.toSource;
+
   localSourceLayer = finalAttrs: prevAttrs:
     let
-      root = ../.;
       workDirPath =
         # Ideally we'd pick finalAttrs.workDir, but for now `mkDerivation` has
         # the requirement that everything except passthru and meta must be
@@ -40,6 +47,7 @@ let
 in
 scope: {
   inherit stdenv versionSuffix;
+  version = lib.fileContents ../.version + versionSuffix;
 
   libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";
@@ -102,6 +110,8 @@ scope: {
   toml11 = pkgs.toml11.overrideAttrs (old: {
     meta.platforms = lib.platforms.all;
   });
+
+  inherit resolvePath filesetToSource;
 
   mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
 }

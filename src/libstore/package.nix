@@ -20,15 +20,13 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
 
 , embeddedSandboxShell ? stdenv.hostPlatform.isStatic
 }:
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 in
 
 mkMesonDerivation (finalAttrs: {
