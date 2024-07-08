@@ -508,17 +508,51 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
+        auto checkNixOSConfigurationToplevel = [&](Value & v, const PosIdx pos) {
+            Bindings & bindings(*state->allocBindings(0));
+            auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v).first;
+            state->forceValue(*vToplevel, pos);
+            if (!state->isDerivation(*vToplevel))
+                throw Error("attribute 'config.system.build.toplevel' is not a derivation");
+        };
+
         auto checkNixOSConfiguration = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
                 Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking NixOS configuration '%s'", attrPath));
-                Bindings & bindings(*state->allocBindings(0));
-                auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v).first;
-                state->forceValue(*vToplevel, pos);
-                if (!state->isDerivation(*vToplevel))
-                    throw Error("attribute 'config.system.build.toplevel' is not a derivation");
+                checkNixOSConfigurationToplevel(v, pos);
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the NixOS configuration '%s'", attrPath));
+                reportError(e);
+            }
+        };
+
+        auto checkConfiguration = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+            try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking configuration '%s'", attrPath));
+                state->forceAttrs(v, pos, "");
+                auto sType = state->symbols.create("_type");
+                auto aType = v.attrs->get(sType);
+                if (aType && aType->name == sType) {
+                    auto aTypeValue = state->forceStringNoCtx(*aType->value, aType->pos, "");
+                    if (aTypeValue == "configuration") {
+                        auto sClass = state->symbols.create("class");
+                        auto aClass = v.attrs->get(sClass);
+                        if (aClass && aClass->name == sClass) {
+                            auto aClassValue = state->forceStringNoCtx(*aClass->value, aClass->pos, "");
+                            // Check for v.class == "nixos". This exists mostly for compatibility
+                            // with configurations migrated from nixosConfigurations.
+                            if (aClassValue == "nixos") {
+                                checkNixOSConfigurationToplevel(v, pos);
+                            }
+                        }
+                        return; // OK
+                    }
+                }
+                throw Error("attribute set is not a configuration");
+            } catch (Error & e) {
+                e.addTrace(resolve(pos), HintFmt("while checking the configuration '%s'", attrPath));
                 reportError(e);
             }
         };
@@ -596,6 +630,7 @@ struct CmdFlakeCheck : FlakeCommand
                             name == "overlay" ? "overlays.default" :
                             name == "devShell" ? "devShells.<system>.default" :
                             name == "nixosModule" ? "nixosModules.default" :
+                            name == "nixosConfigurations" ? "configurations.<system>.<name>" :
                             "";
                         if (replacement != "")
                             warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
@@ -725,6 +760,21 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs())
                                 checkNixOSConfiguration(fmt("%s.%s", name, state->symbols[attr.name]),
                                     *attr.value, attr.pos);
+                        }
+
+                        else if (name == "configurations") {
+                            state->forceAttrs(vOutput, pos, "");
+                            for (auto & attr : *vOutput.attrs) {
+                                const auto & attr_name = state->symbols[attr.name];
+                                checkSystemName(attr_name, attr.pos);
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    state->forceAttrs(*attr.value, attr.pos, "");
+                                    for (auto & attr2 : *attr.value->attrs)
+                                        checkConfiguration(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                };
+                            }
                         }
 
                         else if (name == "hydraJobs")
@@ -1159,6 +1209,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         || attrPathS[0] == "checks"
                         || attrPathS[0] == "devShells"
                         || attrPathS[0] == "legacyPackages"
+                        || attrPathS[0] == "configurations"
                         || attrPathS[0] == "packages")
                     && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
                     for (const auto &subAttr : visitor2->getAttrs()) {
@@ -1262,6 +1313,26 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     }
                 };
 
+                auto showConfiguration = [&]()
+                {
+                    auto aType = visitor.maybeGetAttr("_type");
+                    if (!aType || aType->getString() != "configuration")
+                        state->error<EvalError>("not a configuration definition").debugThrow();
+
+                    std::optional<std::string> optClass;
+                    if (auto aClass = visitor.maybeGetAttr("class"))
+                        optClass = aClass->getString();
+
+                    if (json) {
+                        j.emplace("type", "configuration");
+                        if (optClass)
+                            j.emplace("class", *optClass);
+                    } else if (optClass)
+                        logger->cout("%s: %s configuration", headerPrefix, *optClass);
+                    else
+                        logger->cout("%s: configuration", headerPrefix);
+                };
+
                 if (attrPath.size() == 0
                     || (attrPath.size() == 1 && (
                             attrPathS[0] == "defaultPackage"
@@ -1275,6 +1346,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPathS[0] == "checks"
                             || attrPathS[0] == "packages"
+                            || attrPathS[0] == "configurations"
                             || attrPathS[0] == "devShells"
                             || attrPathS[0] == "apps"))
                     )
@@ -1284,7 +1356,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                 else if (
                     (attrPath.size() == 2 && (attrPathS[0] == "defaultPackage" || attrPathS[0] == "devShell" || attrPathS[0] == "formatter"))
-                    || (attrPath.size() == 3 && (attrPathS[0] == "checks" || attrPathS[0] == "packages" || attrPathS[0] == "devShells"))
+                    || (attrPath.size() == 3 && (attrPathS[0] == "checks" || attrPathS[0] == "packages" || attrPathS[0] == "configurations" || attrPathS[0] == "devShells"))
                     )
                 {
                     if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
@@ -1294,7 +1366,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
-                        if (visitor.isDerivation())
+                        if (attrPathS[0] == "configurations")
+                            showConfiguration();
+                        else if (visitor.isDerivation())
                             showDerivation();
                         else
                             throw Error("expected a derivation");
