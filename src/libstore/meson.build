@@ -99,18 +99,14 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
+subdir('build-utils-meson/generate-header')
+
 generated_headers = []
 foreach header : [
   'schema.sql',
   'ca-specific-schema.sql',
 ]
-  generated_headers += custom_target(
-    command : [ 'bash', '-c', '{ echo \'R"__NIX_STR(\' && cat @INPUT@ && echo \')__NIX_STR"\'; } > "$1"', '_ignored_argv0', '@OUTPUT@' ],
-    input : header,
-    output : '@PLAINNAME@.gen.hh',
-    install : true,
-    install_dir : get_option('includedir') / 'nix',
-  )
+  generated_headers += gen_header.process(header)
 endforeach
 
 busybox = find_program(get_option('sandbox-shell'), required : false)

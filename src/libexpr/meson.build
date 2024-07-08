@@ -116,19 +116,16 @@ lexer_tab = custom_target(
   install_dir : get_option('includedir') / 'nix',
 )
 
+subdir('build-utils-meson/generate-header')
+
 generated_headers = []
 foreach header : [
   'imported-drv-to-derivation.nix',
   'fetchurl.nix',
   'call-flake.nix',
 ]
-  generated_headers += custom_target(
-    command : [ 'bash', '-c', '{ echo \'R"__NIX_STR(\' && cat @INPUT@ && echo \')__NIX_STR"\'; } > "$1"', '_ignored_argv0', '@OUTPUT@' ],
-    input : header,
-    output : '@PLAINNAME@.gen.hh',
-  )
+  generated_headers += gen_header.process(header)
 endforeach
-
 
 sources = files(
   'attr-path.cc',
