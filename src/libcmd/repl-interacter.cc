@@ -18,7 +18,7 @@ extern "C" {
 #include "finally.hh"
 #include "repl-interacter.hh"
 #include "file-system.hh"
-#include "libcmd/repl.hh"
+#include "repl.hh"
 
 namespace nix {
 

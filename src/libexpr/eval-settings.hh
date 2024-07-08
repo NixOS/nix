@@ -72,7 +72,7 @@ struct EvalSettings : Config
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtin-constants.md#builtins-findFile).
+          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtins.md#builtins-findFile).
 
           The default value is
 
@@ -93,7 +93,7 @@ struct EvalSettings : Config
         this, "", "eval-system",
         R"(
           This option defines
-          [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+          [`builtins.currentSystem`](@docroot@/language/builtins.md#builtins-currentSystem)
           in the Nix language if it is set as a non-empty string.
           Otherwise, if it is defined as the empty string (the default), the value of the
           [`system` ](#conf-system)
@@ -114,7 +114,7 @@ struct EvalSettings : Config
         R"(
           If set to `true`, the Nix evaluator will not allow access to any
           files outside of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath),
+          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath),
           or to URIs outside of
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
         )"};
@@ -125,10 +125,10 @@ struct EvalSettings : Config
 
           - Restrict file system and network access to files specified by cryptographic hash
           - Disable impure constants:
-            - [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
-            - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
-            - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
-            - [`builtins.storePath`](@docroot@/language/builtin-constants.md#builtins-storePath)
+            - [`builtins.currentSystem`](@docroot@/language/builtins.md#builtins-currentSystem)
+            - [`builtins.currentTime`](@docroot@/language/builtins.md#builtins-currentTime)
+            - [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath)
+            - [`builtins.storePath`](@docroot@/language/builtins.md#builtins-storePath)
         )"
         };
 

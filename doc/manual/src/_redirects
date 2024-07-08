@@ -29,6 +29,7 @@
 /expressions/* /language/:splat 301!
 /language/values /language/types 301!
 /language/constructs /language/syntax 301!
+/language/builtin-constants /language/builtins 301!
 
 /installation/installation /installation 301!
 

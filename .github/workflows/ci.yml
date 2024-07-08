@@ -205,7 +205,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix build -L .#hydraJobs.build.{nix-fetchers,nix-store,nix-util}.$(nix-instantiate --eval --expr builtins.currentSystem | sed -e 's/"//g')
+      # Only meson packages that don't have a tests.run derivation.
+      # Those that have it are already built and tested as part of nix flake check.
+      - run: nix build -L .#hydraJobs.build.{nix-cmd,nix-main}.$(nix-instantiate --eval --expr builtins.currentSystem | sed -e 's/"//g')
 
   flake_regressions:
     needs: vm_tests

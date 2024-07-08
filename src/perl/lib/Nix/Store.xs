@@ -1,5 +1,5 @@
-#include "config-util.h"
-#include "config-store.h"
+#include "config-util.hh"
+#include "config-store.hh"
 
 #include "EXTERN.h"
 #include "perl.h"

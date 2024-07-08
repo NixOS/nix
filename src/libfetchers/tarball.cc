@@ -360,13 +360,20 @@ struct TarballInputScheme : CurlInputScheme
         if (result.lastModified && !input.attrs.contains("lastModified"))
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
-        auto narHash = getTarballCache()->treeHashToNarHash(result.treeHash).to_string(HashFormat::SRI, true);
-
-        input.attrs.insert_or_assign("narHash", narHash);
-
-        result.accessor->fingerprint = narHash;
+        input.attrs.insert_or_assign("narHash",
+            getTarballCache()->treeHashToNarHash(result.treeHash).to_string(HashFormat::SRI, true));
 
         return {result.accessor, input};
+    }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto narHash = input.getNarHash())
+            return narHash->to_string(HashFormat::SRI, true);
+        else if (auto rev = input.getRev())
+            return rev->gitRev();
+        else
+            return std::nullopt;
     }
 };
 

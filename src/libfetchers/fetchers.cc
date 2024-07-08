@@ -247,9 +247,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     auto [accessor, final] = scheme->getAccessor(store, *this);
 
-    if (!accessor->fingerprint)
-        // FIXME: remove getFingerprint()?
-        accessor->fingerprint = scheme->getFingerprint(store, final);
+    assert(!accessor->fingerprint);
+    accessor->fingerprint = scheme->getFingerprint(store, final);
 
     return {accessor, std::move(final)};
 }
@@ -384,7 +383,7 @@ namespace nlohmann {
 using namespace nix;
 
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
-    fetchers::PublicKey res = {  };
+    fetchers::PublicKey res = { };
     if (auto type = optionalValueAt(json, "type"))
         res.type = getString(*type);
 

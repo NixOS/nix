@@ -14,38 +14,15 @@ project('nix-util', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# These are private dependencies with pkg-config files. What private
-# means is that the dependencies are used by the library but they are
-# *not* used (e.g. `#include`-ed) in any installed header file, and only
-# in regular source code (`*.cc`) or private, uninstalled headers. They
-# are thus part of the *implementation* of the library, but not its
-# *interface*.
-#
-# See `man pkg-config` for some details.
-deps_private = [ ]
-
-# These are public dependencies with pkg-config files. Public is the
-# opposite of private: these dependencies are used in installed header
-# files. They are part of the interface (and implementation) of the
-# library.
-#
-# N.B. This concept is mostly unrelated to our own concept of a public
-# (stable) API, for consumption outside of the Nix repository.
-# `libnixutil` is an unstable C++ library, whose public interface is
-# likewise unstable. `libutilc` conversely is a hopefully-soon stable
-# C library, whose public interface --- including public but not private
-# dependencies --- will also likewise soon be stable.
-#
-# N.B. For distributions that care about "ABI" stablity and not just
-# "API" stability, the private dependencies also matter as they can
-# potentially affect the public ABI.
-deps_public = [ ]
-
-# These are dependencencies without pkg-config files. Ideally they are
-# just private, but they may also be public (e.g. boost).
-deps_other = [ ]
+subdir('build-utils-meson/deps-lists')
 
 configdata = configuration_data()
+
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
+]
+subdir('build-utils-meson/subprojects')
 
 # Check for each of these functions, and create a define like `#define
 # HAVE_LUTIMES 1`. The `#define` is unconditional, 0 for not found and 1
@@ -71,12 +48,7 @@ foreach funcspec : check_funcs
   configdata.set(define_name, define_value)
 endforeach
 
-# This is only conditional to work around
-# https://github.com/mesonbuild/meson/issues/13293. It should be
-# unconditional.
-if not (host_machine.system() == 'windows' and cxx.get_id() == 'gcc')
-  deps_private += dependency('threads')
-endif
+subdir('build-utils-meson/threads')
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
@@ -132,28 +104,17 @@ deps_public += nlohmann_json
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-util.h',
+  output : 'config-util.hh',
 )
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.h',
-  '-Wno-deprecated-declarations',
-  '-Wimplicit-fallthrough',
-  '-Werror=switch',
-  '-Werror=switch-enum',
-  '-Werror=unused-result',
-  '-Wdeprecated-copy',
-  '-Wignored-qualifiers',
-  # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
-  # at ~1% overhead in `nix search`.
-  #
-  # FIXME: remove when we get meson 1.4.0 which will default this to on for us:
-  # https://mesonbuild.com/Release-notes-for-1-4-0.html#ndebug-setting-now-controls-c-stdlib-assertions
-  '-D_GLIBCXX_ASSERTIONS=1',
+  '-include', 'config-util.hh',
   language : 'cpp',
 )
+
+subdir('build-utils-meson/diagnostics')
 
 sources = files(
   'archive.cc',
@@ -280,17 +241,7 @@ else
   subdir('unix')
 endif
 
-if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
-  # Windows DLLs are stricter about symbol visibility than Unix shared
-  # objects --- see https://gcc.gnu.org/wiki/Visibility for details.
-  # This is a temporary sledgehammer to export everything like on Unix,
-  # and not detail with this yet.
-  #
-  # TODO do not do this, and instead do fine-grained export annotations.
-  linker_export_flags = ['-Wl,--export-all-symbols']
-else
-  linker_export_flags = []
-endif
+subdir('build-utils-meson/export-all-symbols')
 
 this_library = library(
   'nixutil',
@@ -298,38 +249,17 @@ this_library = library(
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args: linker_export_flags,
+  prelink : true, # For C++ static initializers
   install : true,
 )
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-# Part of how we copy boost libraries to a separate installation to
-# reduce closure size. These libraries will be copied to our `$out/bin`,
-# and these `-l` flags will pick them up there.
-#
-# https://github.com/NixOS/nixpkgs/issues/45462
-libraries_private = ['-lboost_context', '-lboost_coroutine']
+libraries_private = []
 if host_machine.system() == 'windows'
   # `libraries_private` cannot contain ad-hoc dependencies (from
   # `find_library), so we need to do this manually
   libraries_private += ['-lws2_32']
 endif
 
-import('pkgconfig').generate(
-  this_library,
-  filebase : meson.project_name(),
-  name : 'Nix',
-  description : 'Nix Package Manager',
-  subdirs : ['nix'],
-  extra_cflags : ['-std=c++2a'],
-  requires : deps_public,
-  requires_private : deps_private,
-  libraries_private : libraries_private,
-)
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_dirs,
-  link_with : this_library,
-  compile_args : ['-std=c++2a'],
-  dependencies : [],
-))
+subdir('build-utils-meson/export')
