@@ -87,3 +87,22 @@ assert show_output.legacyPackages.${builtins.currentSystem}.AAAAAASomeThingsFail
 assert show_output.legacyPackages.${builtins.currentSystem}.simple.name == "simple";
 true
 '
+
+cat >flake.nix<<EOF
+{
+  outputs = inputs: {
+    packages.$system = {
+      aNoDescription = import ./simple.nix;
+      bOneLineDescription = import ./simple.nix // { meta.description = "one line"; };
+      cMultiLineDescription = import ./simple.nix // { meta.description = ''
+        line one
+        line two
+      ''; };
+    };
+  };
+}
+EOF
+nix flake show > ./show-output.txt
+test "$(awk -F '[:] ' '/aNoDescription/{print $NF}' ./show-output.txt)" = "package 'simple'"
+test "$(awk -F '[:] ' '/bOneLineDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - 'one line'"
+test "$(awk -F '[:] ' '/cMultiLineDescription/{print $NF}' ./show-output.txt)" = "package 'simple' - 'line one'"
