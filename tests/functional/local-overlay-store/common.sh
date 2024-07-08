@@ -1,4 +1,5 @@
-source ../common/vars-and-functions.sh
+source ../common/vars.sh
+source ../common/functions.sh
 
 TODO_NixOS
 
