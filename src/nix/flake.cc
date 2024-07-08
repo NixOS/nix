@@ -1262,7 +1262,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
                             "package";
                         if (description) {
-                            logger->cout("%s: %s '%s' - '%s'", headerPrefix, type, name, *description);
+                            // Handle new lines in descriptions.
+                            auto index = description->find('\n');
+                            std::string_view sanitized_description(description->data(), index != std::string::npos ? index : description->size());
+
+                            logger->cout("%s: %s '%s' - '%s'", headerPrefix, type, name, sanitized_description);
                         }
                         else {
                             logger->cout("%s: %s '%s'", headerPrefix, type, name);
