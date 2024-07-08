@@ -21,7 +21,7 @@ configdata = configuration_data()
 # TODO rename, because it will conflict with downstream projects
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
-configdata.set_quoted('SYSTEM', host_machine.system())
+configdata.set_quoted('SYSTEM', host_machine.cpu_family() + '-' + host_machine.system())
 
 deps_private_maybe_subproject = [
 ]

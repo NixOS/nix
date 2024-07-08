@@ -211,6 +211,9 @@
                 "${nixpkgsPrefix}${pkgName}-${testName}" = test;
               })
             )
+          // lib.optionalAttrs (nixpkgs.stdenv.hostPlatform == nixpkgs.stdenv.buildPlatform) {
+            "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
+          }
         )
       // devFlake.checks.${system} or {}
       );
@@ -324,6 +327,7 @@
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-functional-tests.baseNativeBuildInputs
             ++ lib.optional
               (!stdenv.buildPlatform.canExecute stdenv.hostPlatform
                  # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
