@@ -14,6 +14,9 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 
     const std::string name() override { return "HTTP Binary Cache Store"; }
 
+    const Setting<bool> negotiate{this, false, "negotiate",
+        "Whether to do kerberos negotiate when talking to the http binary cache."};
+
     std::string doc() override
     {
         return
@@ -149,10 +152,12 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        return FileTransferRequest(
+        auto request = FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
             ? path
             : cacheUri + "/" + path);
+        request.negotiate = negotiate;
+        return request;
 
     }
 
