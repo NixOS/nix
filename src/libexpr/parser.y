@@ -74,6 +74,14 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
     });
 }
 
+#define SET_DOC_POS(lambda, pos) setDocPosition(state->lexerState, lambda, state->at(pos))
+static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, PosIdx start) {
+    auto it = lexerState.positionToDocComment.find(start);
+    if (it != lexerState.positionToDocComment.end()) {
+        lambda->setDocComment(it->second);
+    }
+}
+
 
 %}
 
@@ -119,6 +127,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
 
+
 %right IMPL
 %left OR
 %left AND
@@ -140,18 +149,28 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3); }
+    { auto me = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, state->validateFormals($2), $5); }
+    { auto me = new ExprLambda(CUR_POS, state->validateFormals($2), $5);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
   | '{' formals '}' '@' ID ':' expr_function
     {
       auto arg = state->symbols.create($5);
-      $$ = new ExprLambda(CUR_POS, arg, state->validateFormals($2, CUR_POS, arg), $7);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($2, CUR_POS, arg), $7);
+      $$ = me;
+      SET_DOC_POS(me, @1);
     }
   | ID '@' '{' formals '}' ':' expr_function
     {
       auto arg = state->symbols.create($1);
-      $$ = new ExprLambda(CUR_POS, arg, state->validateFormals($4, CUR_POS, arg), $7);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($4, CUR_POS, arg), $7);
+      $$ = me;
+      SET_DOC_POS(me, @1);
     }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
@@ -312,7 +331,20 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; state->addAttr($$, std::move(*$2), $4, state->at(@2)); delete $2; }
+  : binds attrpath '=' expr ';' {
+      $$ = $1;
+
+      auto pos = state->at(@2);
+      {
+        auto it = state->lexerState.positionToDocComment.find(pos);
+        if (it != state->lexerState.positionToDocComment.end()) {
+          $4->setDocComment(it->second);
+        }
+      }
+
+      state->addAttr($$, std::move(*$2), $4, pos);
+      delete $2;
+    }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & [i, iPos] : *$3) {
@@ -435,17 +467,22 @@ Expr * parseExprFromBuf(
     const Expr::AstSymbols & astSymbols)
 {
     yyscan_t scanner;
+    LexerState lexerState {
+        .positions = positions,
+        .origin = positions.addOrigin(origin, length),
+    };
     ParserState state {
+        .lexerState = lexerState,
         .symbols = symbols,
         .positions = positions,
         .basePath = basePath,
-        .origin = positions.addOrigin(origin, length),
+        .origin = lexerState.origin,
         .rootFS = rootFS,
         .s = astSymbols,
         .settings = settings,
     };
 
-    yylex_init(&scanner);
+    yylex_init_extra(&lexerState, &scanner);
     Finally _destroy([&] { yylex_destroy(scanner); });
 
     yy_scan_buffer(text, length, scanner);

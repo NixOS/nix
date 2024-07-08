@@ -1,0 +1,11 @@
+Nix <nix version>
+Type :? for help.
+Added <number omitted> variables.
+
+Function compact
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:18:20
+
+    boom
+
+

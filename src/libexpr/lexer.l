@@ -5,7 +5,7 @@
 %option stack
 %option nodefault
 %option nounput noyy_top_state
-
+%option extra-type="::nix::LexerState *"
 
 %s DEFAULT
 %x STRING
@@ -23,6 +23,12 @@
 #include "nixexpr.hh"
 #include "parser-tab.hh"
 
+// !!! FIXME !!!
+#define YY_EXTRA_TYPE ::nix::LexerState *
+int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
+YY_EXTRA_TYPE yyget_extra ( yyscan_t yyscanner );
+#undef YY_EXTRA_TYPE
+
 using namespace nix;
 
 namespace nix {
@@ -35,9 +41,23 @@ static void initLoc(YYLTYPE * loc)
     loc->first_column = loc->last_column = 0;
 }
 
-static void adjustLoc(YYLTYPE * loc, const char * s, size_t len)
+static void adjustLoc(yyscan_t yyscanner, YYLTYPE * loc, const char * s, size_t len)
 {
     loc->stash();
+
+    LexerState & lexerState = *yyget_extra(yyscanner);
+
+    if (lexerState.docCommentDistance == 1) {
+        // Preceding token was a doc comment.
+        ParserLocation doc;
+        doc.first_column = lexerState.lastDocCommentLoc.first_column;
+        ParserLocation docEnd;
+        docEnd.first_column = lexerState.lastDocCommentLoc.last_column;
+        DocComment docComment{lexerState.at(doc), lexerState.at(docEnd)};
+        PosIdx locPos = lexerState.at(*loc);
+        lexerState.positionToDocComment.emplace(locPos, docComment);
+    }
+    lexerState.docCommentDistance++;
 
     loc->first_column = loc->last_column;
     loc->last_column += len;
@@ -79,7 +99,7 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
 #define YY_USER_INIT initLoc(yylloc)
-#define YY_USER_ACTION adjustLoc(yylloc, yytext, yyleng);
+#define YY_USER_ACTION adjustLoc(yyscanner, yylloc, yytext, yyleng);
 
 #define PUSH_STATE(state) yy_push_state(state, yyscanner)
 #define POP_STATE() yy_pop_state(yyscanner)
@@ -279,9 +299,33 @@ or          { return OR_KW; }
 {SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }
 {URI}       { yylval->uri = {yytext, (size_t) yyleng}; return URI; }
 
-[ \t\r\n]+    /* eat up whitespace */
-\#[^\r\n]*    /* single-line comments */
-\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */
+%{
+// Doc comment rule
+//
+//   \/\*\*                            /**
+//         [^/*]                       reject /**/ (empty comment) and /***
+//              ([^*]|\*+[^*/])*\*+\/  same as the long comment rule
+//              (             )*       zero or more non-ending sequences
+//                              \*     end(1)
+//                                 \/  end(2)
+%}
+\/\*\*[^/*]([^*]|\*+[^*/])*\*+\/  /* doc comments */ {
+    LexerState & lexerState = *yyget_extra(yyscanner);
+    lexerState.docCommentDistance = 0;
+    lexerState.lastDocCommentLoc.first_line = yylloc->first_line;
+    lexerState.lastDocCommentLoc.first_column = yylloc->first_column;
+    lexerState.lastDocCommentLoc.last_column = yylloc->last_column;
+}
+
+
+%{
+// The following rules have docCommentDistance--
+// This compensates for the docCommentDistance++ which happens by default to
+// make all the other rules invalidate the doc comment.
+%}
+[ \t\r\n]+    /* eat up whitespace */ { yyget_extra(yyscanner)->docCommentDistance--; }
+\#[^\r\n]*    /* single-line comments */ { yyget_extra(yyscanner)->docCommentDistance--; }
+\/\*([^*]|\*+[^*/])*\*+\/  /* long comments */ { yyget_extra(yyscanner)->docCommentDistance--; }
 
 {ANY}       {
               /* Don't return a negative number, as this will cause

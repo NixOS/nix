@@ -559,6 +559,67 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .doc = doc,
             };
     }
+    if (v.isLambda()) {
+        auto exprLambda = v.payload.lambda.fun;
+
+        std::stringstream s(std::ios_base::out);
+        std::string name;
+        auto pos = positions[exprLambda->getPos()];
+        std::string docStr;
+
+        if (exprLambda->name) {
+            name = symbols[exprLambda->name];
+        }
+
+        if (exprLambda->docComment) {
+            auto begin = positions[exprLambda->docComment.begin];
+            auto end = positions[exprLambda->docComment.end];
+            auto docCommentStr = begin.getSnippetUpTo(end);
+
+            // Strip "/**" and "*/"
+            constexpr size_t prefixLen = 3;
+            constexpr size_t suffixLen = 2;
+            docStr = docCommentStr.substr(prefixLen, docCommentStr.size() - prefixLen - suffixLen);
+            if (docStr.empty())
+                return {};
+            // Turn the now missing "/**" into indentation
+            docStr = "   " + docStr;
+            // Strip indentation (for the whole, potentially multi-line string)
+            docStr = stripIndentation(docStr);
+        }
+
+        if (name.empty()) {
+            s << "Function ";
+        }
+        else {
+            s << "Function **" << name << "**";
+            if (pos)
+                s << "\\\n  … " ;
+            else
+                s << "\\\n";
+        }
+        if (pos) {
+            s << "defined at " << pos;
+        }
+        if (!docStr.empty()) {
+            s << "\n\n";
+        }
+
+        s << docStr;
+
+        s << '\0'; // for making a c string below
+        std::string ss = s.str();
+
+        return Doc {
+            .pos = pos,
+            .name = name,
+            .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
+            .args = {},
+            .doc =
+                // FIXME: this leaks; make the field std::string?
+                strdup(ss.data()),
+        };
+    }
     return {};
 }
 

@@ -583,6 +583,20 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
     return fmt("%1% at %2%", id, state.positions[pos]);
 }
 
+void ExprLambda::setDocComment(DocComment docComment) {
+    if (!this->docComment) {
+        this->docComment = docComment;
+
+        // Curried functions are defined by putting a function directly
+        // in the body of another function. To render docs for those, we
+        // need to propagate the doc comment to the innermost function.
+        //
+        // If we have our own comment, we've already propagated it, so this
+        // belongs in the same conditional.
+        body->setDocComment(docComment);
+    }
+};
+
 
 
 /* Position table. */

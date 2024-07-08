@@ -1,0 +1,29 @@
+Nix <nix version>
+Type :? for help.
+Added <number omitted> variables.
+
+Function nonStrict
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:36:70
+
+    My syntax is not strict, but I'm strict anyway.
+
+Function strict
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:37:63
+
+    I don't have to be strict, but I am anyway.
+
+Function strictPre
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:39:48
+
+    Here's one way to do this
+
+Function strictPost
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:40:53
+
+    Here's another way to do this
+
+
