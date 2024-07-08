@@ -190,18 +190,13 @@ This section covers syntax and semantics of the Nix language.
 
 ### Path {#path-literal}
 
-  *Paths* are distinct from strings and can be expressed by path literals such as `./builder.sh`.
-
-  Paths are suitable for referring to local files, and are often preferable over strings.
-  - Path values do not contain trailing slashes, `.` and `..`, as they are resolved when evaluating a path literal.
-  - Path literals are automatically resolved relative to their [base directory](@docroot@/glossary.md#gloss-base-directory).
-  - The files referred to by path values are automatically copied into the Nix store when used in a string interpolation or concatenation.
-  - Tooling can recognize path literals and provide additional features, such as autocompletion, refactoring automation and jump-to-file.
+  *Paths* can be expressed by path literals such as `./builder.sh`.
 
   A path literal must contain at least one slash to be recognised as such.
   For instance, `builder.sh` is not a path:
   it's parsed as an expression that selects the attribute `sh` from the variable `builder`.
 
+  Path literals are resolved relative to their [base directory](@docroot@/glossary.md#gloss-base-directory).
   Path literals may also refer to absolute paths by starting with a slash.
 
   > **Note**
@@ -214,15 +209,6 @@ This section covers syntax and semantics of the Nix language.
   If the first component of a path is a `~`, it is interpreted such that the rest of the path were relative to the user's home directory.
   For example, `~/foo` would be equivalent to `/home/edolstra/foo` for a user whose home directory is `/home/edolstra`.
   Path literals that start with `~` are not allowed in [pure](@docroot@/command-ref/conf-file.md#conf-pure-eval) evaluation.
-
-  Paths can be used in [string interpolation] and string concatenation.
-  For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` from the same directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
-
-  Note that the Nix language assumes that all input files will remain _unchanged_ while evaluating a Nix expression.
-  For example, assume you used a file path in an interpolated string during a `nix repl` session.
-  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents. Use `:r` to reset the repl as needed.
-
-  [store path]: @docroot@/store/store-path.md
 
   Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 
