@@ -1261,12 +1261,23 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
                             attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
                             "package";
-                        if (description) {
-                            // Handle new lines in descriptions.
-                            auto index = description->find('\n');
-                            std::string_view sanitized_description(description->data(), index != std::string::npos ? index : description->size());
+                        if (description && !description->empty()) {
+                            // Trim the string and only display the first line of the description.
+                            auto trimmed = nix::trim(*description);
+                            auto newLinePos = trimmed.find('\n');
+                            auto length = newLinePos != std::string::npos ? newLinePos : trimmed.size();
 
-                            logger->cout("%s: %s '%s' - '%s'", headerPrefix, type, name, sanitized_description);
+                            // If the string is too long then resize add ellipses
+                            std::string desc;
+                            if (length > 80) {
+                                trimmed.resize(80);
+                                desc = trimmed.append("...");
+                            }
+                            else {
+                                desc = trimmed.substr(0, length);
+                            }
+
+                            logger->cout("%s: %s '%s' - '%s'", headerPrefix, type, name, desc);
                         }
                         else {
                             logger->cout("%s: %s '%s'", headerPrefix, type, name);
