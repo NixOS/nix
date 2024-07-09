@@ -253,11 +253,21 @@ badExitCode=0
 nixVersion="$(nix eval --impure --raw --expr 'builtins.nixVersion' --extra-experimental-features nix-command)"
 
 runRepl () {
+
+  # That is right, we are also filtering out the testdir _without underscores_.
+  # This is crazy, but without it, GHA will fail to run the tests, showing paths
+  # _with_ underscores in the set -x log, but _without_ underscores in the 
+  # supposed nix repl output. I have looked in a number of places, but I cannot
+  # find a mechanism that could cause this to happen.
+  local testDirNoUnderscores
+  testDirNoUnderscores="${testDir//_/}"
+
   # TODO: pass arguments to nix repl; see lang.sh
   nix repl 2>&1 \
     | stripColors \
     | sed \
       -e "s@$testDir@/path/to/tests/functional@g" \
+      -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
       -e "s@$nixVersion@<nix version>@g" \
       -e "s@Added [0-9]* variables@Added <number omitted> variables@g" \
     | grep -vF $'warning: you don\'t have Internet access; disabling some network-dependent features' \
