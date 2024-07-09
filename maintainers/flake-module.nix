@@ -499,7 +499,6 @@
             ''^misc/bash/completion\.sh$''
             ''^misc/fish/completion\.fish$''
             ''^misc/zsh/completion\.zsh$''
-            ''^scripts/check-hydra-status\.sh$''
             ''^scripts/create-darwin-volume\.sh$''
             ''^scripts/install-darwin-multi-user\.sh$''
             ''^scripts/install-multi-user\.sh$''
