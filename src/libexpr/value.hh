@@ -7,7 +7,6 @@
 
 #include "symbol-table.hh"
 #include "value/context.hh"
-#include "input-accessor.hh"
 #include "source-path.hh"
 #include "print-options.hh"
 
@@ -23,6 +22,7 @@ class BindingsBuilder;
 
 
 typedef enum {
+    tUninitialized = 0,
     tInt = 1,
     tBool,
     tString,
@@ -166,7 +166,7 @@ public:
 struct Value
 {
 private:
-    InternalType internalType;
+    InternalType internalType = tUninitialized;
 
     friend std::string showType(const Value & v);
 
@@ -216,7 +216,7 @@ public:
     };
 
     struct Path {
-        InputAccessor * accessor;
+        SourceAccessor * accessor;
         const char * path;
     };
 
@@ -270,6 +270,7 @@ public:
     inline ValueType type(bool invalidIsThunk = false) const
     {
         switch (internalType) {
+            case tUninitialized: break;
             case tInt: return nInt;
             case tBool: return nBool;
             case tString: return nString;
@@ -292,6 +293,16 @@ public:
     {
         payload = newPayload;
         internalType = newType;
+    }
+
+    /**
+     * A value becomes valid when it is initialized. We don't use this
+     * in the evaluator; only in the bindings, where the slight extra
+     * cost is warranted because of inexperienced callers.
+     */
+    inline bool isValid() const
+    {
+        return internalType != tUninitialized;
     }
 
     inline void mkInt(NixInt n)
@@ -323,7 +334,7 @@ public:
     void mkPath(const SourcePath & path);
     void mkPath(std::string_view path);
 
-    inline void mkPath(InputAccessor * accessor, const char * path)
+    inline void mkPath(SourceAccessor * accessor, const char * path)
     {
         finishValue(tPath, { .path = { .accessor = accessor, .path = path } });
     }
@@ -438,7 +449,7 @@ public:
         return std::string_view(payload.string.c_str);
     }
 
-    const char * const c_str() const
+    const char * c_str() const
     {
         assert(internalType == tString);
         return payload.string.c_str;

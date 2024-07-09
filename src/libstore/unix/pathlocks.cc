@@ -14,9 +14,7 @@
 
 namespace nix {
 
-using namespace nix::unix;
-
-AutoCloseFD unix::openLockFile(const Path & path, bool create)
+AutoCloseFD openLockFile(const Path & path, bool create)
 {
     AutoCloseFD fd;
 
@@ -28,20 +26,20 @@ AutoCloseFD unix::openLockFile(const Path & path, bool create)
 }
 
 
-void unix::deleteLockFile(const Path & path, int fd)
+void deleteLockFile(const Path & path, Descriptor desc)
 {
     /* Get rid of the lock file.  Have to be careful not to introduce
        races.  Write a (meaningless) token to the file to indicate to
        other processes waiting on this lock that the lock is stale
        (deleted). */
     unlink(path.c_str());
-    writeFull(fd, "d");
+    writeFull(desc, "d");
     /* Note that the result of unlink() is ignored; removing the lock
        file is an optimisation, not a necessity. */
 }
 
 
-bool unix::lockFile(int fd, LockType lockType, bool wait)
+bool lockFile(Descriptor desc, LockType lockType, bool wait)
 {
     int type;
     if (lockType == ltRead) type = LOCK_SH;
@@ -50,7 +48,7 @@ bool unix::lockFile(int fd, LockType lockType, bool wait)
     else abort();
 
     if (wait) {
-        while (flock(fd, type) != 0) {
+        while (flock(desc, type) != 0) {
             checkInterrupt();
             if (errno != EINTR)
                 throw SysError("acquiring/releasing lock");
@@ -58,7 +56,7 @@ bool unix::lockFile(int fd, LockType lockType, bool wait)
                 return false;
         }
     } else {
-        while (flock(fd, type | LOCK_NB) != 0) {
+        while (flock(desc, type | LOCK_NB) != 0) {
             checkInterrupt();
             if (errno == EWOULDBLOCK) return false;
             if (errno != EINTR)
@@ -149,16 +147,16 @@ void PathLocks::unlock()
 }
 
 
-FdLock::FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg)
-    : fd(fd)
+FdLock::FdLock(Descriptor desc, LockType lockType, bool wait, std::string_view waitMsg)
+    : desc(desc)
 {
     if (wait) {
-        if (!lockFile(fd, lockType, false)) {
+        if (!lockFile(desc, lockType, false)) {
             printInfo("%s", waitMsg);
-            acquired = lockFile(fd, lockType, true);
+            acquired = lockFile(desc, lockType, true);
         }
     } else
-        acquired = lockFile(fd, lockType, false);
+        acquired = lockFile(desc, lockType, false);
 }
 
 

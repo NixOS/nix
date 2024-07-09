@@ -26,7 +26,8 @@ copyAttr () {
     # Note: to copy CA derivations, we need to copy the realisations, which
     # currently requires naming the installables, not just the derivation output
     # path.
-    nix copy --to file://$cacheDir "${args[@]}"
+
+    nix copy --to "file://$cacheDir" "${args[@]}"
 }
 
 testRemoteCacheFor () {
@@ -35,7 +36,7 @@ testRemoteCacheFor () {
     copyAttr "$derivationPath" 1
     clearStore
     # Check nothing gets built.
-    buildAttr "$derivationPath" 1 --option substituters file://$cacheDir --no-require-sigs |& grepQuietInverse " will be built:"
+    buildAttr "$derivationPath" 1 --option substituters "file://$cacheDir" --no-require-sigs |& grepQuietInverse " will be built:"
 }
 
 testRemoteCache () {

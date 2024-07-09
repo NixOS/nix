@@ -57,7 +57,9 @@ std::tuple<StorePath, Hash> prefetchFile(
         bool unpack,
         bool executable)
 {
-    auto ingestionMethod = unpack || executable ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+    ContentAddressMethod method = unpack || executable
+        ? ContentAddressMethod::Raw::NixArchive
+        : ContentAddressMethod::Raw::Flat;
 
     /* Figure out a name in the Nix store. */
     if (!name) {
@@ -73,11 +75,10 @@ std::tuple<StorePath, Hash> prefetchFile(
        the store. */
     if (expectedHash) {
         hashAlgo = expectedHash->algo;
-        storePath = store->makeFixedOutputPath(*name, FixedOutputInfo {
-            .method = ingestionMethod,
-            .hash = *expectedHash,
-            .references = {},
-        });
+        storePath = store->makeFixedOutputPathFromCA(*name, ContentAddressWithReferences::fromParts(
+            method,
+            *expectedHash,
+            {}));
         if (store->isValidPath(*storePath))
             hash = expectedHash;
         else
@@ -87,7 +88,7 @@ std::tuple<StorePath, Hash> prefetchFile(
     if (!storePath) {
 
         AutoDelete tmpDir(createTempDir(), true);
-        Path tmpFile = (Path) tmpDir + "/tmp";
+        std::filesystem::path tmpFile = tmpDir.path() / "tmp";
 
         /* Download the file. */
         {
@@ -95,7 +96,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             if (executable)
                 mode = 0700;
 
-            AutoCloseFD fd = toDescriptor(open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, mode));
+            AutoCloseFD fd = toDescriptor(open(tmpFile.string().c_str(), O_WRONLY | O_CREAT | O_EXCL, mode));
             if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
 
             FdSink sink(fd.get());
@@ -109,26 +110,27 @@ std::tuple<StorePath, Hash> prefetchFile(
         if (unpack) {
             Activity act(*logger, lvlChatty, actUnknown,
                 fmt("unpacking '%s'", url));
-            Path unpacked = (Path) tmpDir + "/unpacked";
+            auto unpacked = (tmpDir.path() / "unpacked").string();
             createDirs(unpacked);
-            unpackTarfile(tmpFile, unpacked);
+            unpackTarfile(tmpFile.string(), unpacked);
 
+            auto entries = std::filesystem::directory_iterator{unpacked};
             /* If the archive unpacks to a single file/directory, then use
                that as the top-level. */
-            auto entries = readDirectory(unpacked);
-            if (entries.size() == 1)
-                tmpFile = unpacked + "/" + entries[0].name;
-            else
+            tmpFile = entries->path();
+            auto fileCount = std::distance(entries, std::filesystem::directory_iterator{});
+            if (fileCount != 1) {
+                /* otherwise, use the directory itself */
                 tmpFile = unpacked;
+            }
         }
 
         Activity act(*logger, lvlChatty, actUnknown,
             fmt("adding '%s' to the store", url));
 
-        auto [accessor, canonPath] = PosixSourceAccessor::createAtRoot(tmpFile);
         auto info = store->addToStoreSlow(
-            *name, accessor, canonPath,
-            ingestionMethod, hashAlgo, {}, expectedHash);
+            *name, PosixSourceAccessor::createAtRoot(tmpFile),
+            method, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);
         hash = info.ca->hash;
@@ -193,7 +195,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
           startProgressBar();
 
         auto store = openStore();
-        auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
+        auto state = std::make_unique<EvalState>(myArgs.lookupPath, store, evalSettings);
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 

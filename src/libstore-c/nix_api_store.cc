@@ -19,6 +19,16 @@ nix_err nix_libstore_init(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_libstore_init_no_load_config(nix_c_context * context)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::initLibStore(false);
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_err nix_init_plugins(nix_c_context * context)
 {
     if (context)

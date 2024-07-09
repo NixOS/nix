@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # XXX: This shouldn’t be, but #4813 cause this test to fail
@@ -12,6 +14,8 @@ checkBuildTempDirRemoved ()
 
 # written to build temp directories to verify created by this instance
 checkBuildId=$(date +%s%N)
+
+TODO_NixOS
 
 clearStore
 
@@ -44,7 +48,10 @@ test_custom_build_dir() {
       --no-out-link --keep-failed --option build-dir "$TEST_ROOT/custom-build-dir" 2> $TEST_ROOT/log || status=$?
   [ "$status" = "100" ]
   [[ 1 == "$(count "$customBuildDir/nix-build-"*)" ]]
-  local buildDir="$customBuildDir/nix-build-"*
+  local buildDir="$customBuildDir/nix-build-"*""
+  if [[ -e $buildDir/build ]]; then
+      buildDir=$buildDir/build
+  fi
   grep $checkBuildId $buildDir/checkBuildId
 }
 test_custom_build_dir
@@ -73,6 +80,8 @@ nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
 grep 'may not be deterministic' $TEST_ROOT/log
 [ "$status" = "104" ]
 if checkBuildTempDirRemoved $TEST_ROOT/log; then false; fi
+
+TODO_NixOS
 
 clearStore
 

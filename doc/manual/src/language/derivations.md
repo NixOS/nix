@@ -12,12 +12,12 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 ### Required
 
-- [`name`]{#attr-name} ([String](@docroot@/language/values.md#type-string))
+- [`name`]{#attr-name} ([String](@docroot@/language/types.md#type-string))
 
   A symbolic name for the derivation.
   It is added to the [store path] of the corresponding [store derivation] as well as to its [output paths](@docroot@/glossary.md#gloss-output-path).
 
-  [store path]: @docroot@/glossary.md#gloss-store-path
+  [store path]: @docroot@/store/store-path.md
 
   > **Example**
   >
@@ -31,7 +31,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > The store derivation's path will be `/nix/store/<hash>-hello.drv`.
   > The [output](#attr-outputs) paths will be of the form `/nix/store/<hash>-hello[-<output>]`
 
-- [`system`]{#attr-system} ([String](@docroot@/language/values.md#type-string))
+- [`system`]{#attr-system} ([String](@docroot@/language/types.md#type-string))
 
   The system type on which the [`builder`](#attr-builder) executable is meant to be run.
 
@@ -64,9 +64,9 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > }
   > ```
   >
-  > [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) has the value of the [`system` configuration option], and defaults to the system type of the current Nix installation.
+  > [`builtins.currentSystem`](@docroot@/language/builtins.md#builtins-currentSystem) has the value of the [`system` configuration option], and defaults to the system type of the current Nix installation.
 
-- [`builder`]{#attr-builder} ([Path](@docroot@/language/values.md#type-path) | [String](@docroot@/language/values.md#type-string))
+- [`builder`]{#attr-builder} ([Path](@docroot@/language/types.md#type-path) | [String](@docroot@/language/types.md#type-string))
 
   Path to an executable that will perform the build.
 
@@ -113,7 +113,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 ### Optional
 
-- [`args`]{#attr-args} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string))
+- [`args`]{#attr-args} ([List](@docroot@/language/types.md#list) of [String](@docroot@/language/types.md#type-string))
 
   Default: `[ ]`
 
@@ -132,7 +132,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > };
   > ```
 
-- [`outputs`]{#attr-outputs} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string))
+- [`outputs`]{#attr-outputs} ([List](@docroot@/language/types.md#list) of [String](@docroot@/language/types.md#type-string))
 
   Default: `[ "out" ]`
 
@@ -141,7 +141,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
   By default, a derivation produces a single output called `out`.
   However, derivations can produce multiple outputs.
-  This allows the associated [store objects](@docroot@/glossary.md#gloss-store-object) and their [closures](@docroot@/glossary.md#gloss-closure) to be copied or garbage-collected separately.
+  This allows the associated [store objects](@docroot@/store/store-object.md) and their [closures](@docroot@/glossary.md#gloss-closure) to be copied or garbage-collected separately.
 
   > **Example**
   >

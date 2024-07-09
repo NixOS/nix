@@ -34,21 +34,19 @@ class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
 public:
 
-    SSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    SSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(params)
+        , CommonSSHStoreConfig(scheme, host, params)
         , SSHStoreConfig(params)
         , Store(params)
         , RemoteStore(params)
-        , host(host)
-        , master(
-            host,
-            sshKey,
-            sshPublicHostKey,
+        , master(createSSHMaster(
             // Use SSH master only if using more than 1 connection.
-            connections->capacity() > 1,
-            compress)
+            connections->capacity() > 1))
     {
     }
 
@@ -108,7 +106,16 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
     {
     }
 
-    const std::string name() override { return "Experimental SSH Store with filesytem mounted"; }
+    MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
+        : StoreConfig(params)
+        , RemoteStoreConfig(params)
+        , CommonSSHStoreConfig(scheme, host, params)
+        , SSHStoreConfig(params)
+        , LocalFSStoreConfig(params)
+    {
+    }
+
+    const std::string name() override { return "Experimental SSH Store with filesystem mounted"; }
 
     std::string doc() override
     {
@@ -141,10 +148,13 @@ class MountedSSHStore : public virtual MountedSSHStoreConfig, public virtual SSH
 {
 public:
 
-    MountedSSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    MountedSSHStore(
+        std::string_view scheme,
+        std::string_view host,
+        const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(params)
+        , CommonSSHStoreConfig(scheme, host, params)
         , SSHStoreConfig(params)
         , LocalFSStoreConfig(params)
         , MountedSSHStoreConfig(params)

@@ -18,9 +18,12 @@ struct DummyStoreConfig : virtual StoreConfig {
 
 struct DummyStore : public virtual DummyStoreConfig, public virtual Store
 {
-    DummyStore(const std::string scheme, const std::string uri, const Params & params)
+    DummyStore(std::string_view scheme, std::string_view authority, const Params & params)
         : DummyStore(params)
-    { }
+    {
+        if (!authority.empty())
+            throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
+    }
 
     DummyStore(const Params & params)
         : StoreConfig(params)
@@ -61,8 +64,8 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     virtual StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
-        FileSerialisationMethod dumpMethod = FileSerialisationMethod::Recursive,
-        ContentAddressMethod hashMethod = FileIngestionMethod::Recursive,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override

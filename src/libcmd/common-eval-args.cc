@@ -1,6 +1,7 @@
 #include "eval-settings.hh"
 #include "common-eval-args.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "filetransfer.hh"
 #include "eval.hh"
 #include "fetchers.hh"
@@ -10,8 +11,34 @@
 #include "command.hh"
 #include "tarball.hh"
 #include "fetch-to-store.hh"
+#include "compatibility-settings.hh"
+#include "eval-settings.hh"
 
 namespace nix {
+
+EvalSettings evalSettings {
+    settings.readOnlyMode,
+    {
+        {
+            "flake",
+            [](ref<Store> store, std::string_view rest) {
+                experimentalFeatureSettings.require(Xp::Flakes);
+                // FIXME `parseFlakeRef` should take a `std::string_view`.
+                auto flakeRef = parseFlakeRef(std::string { rest }, {}, true, false);
+                debug("fetching flake search path element '%s''", rest);
+                auto storePath = flakeRef.resolve(store).fetchTree(store).first;
+                return store->toRealPath(storePath);
+            },
+        },
+    },
+};
+
+static GlobalConfig::Register rEvalSettings(&evalSettings);
+
+CompatibilitySettings compatibilitySettings {};
+
+static GlobalConfig::Register rCompatibilitySettings(&compatibilitySettings);
+
 
 MixEvalArgs::MixEvalArgs()
 {
@@ -20,7 +47,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "expr"},
-        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr(expr)}); }}
+        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr{expr}}); }}
     });
 
     addFlag({
@@ -28,7 +55,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the string *string* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "string"},
-        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString(s)}); }},
+        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString{s}}); }},
     });
 
     addFlag({
@@ -36,7 +63,7 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the contents of file *path* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "path"},
-        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile(path)}); }},
+        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile{path}}); }},
         .completer = completePath
     });
 
@@ -54,7 +81,7 @@ MixEvalArgs::MixEvalArgs()
         .description = R"(
   Add *path* to the Nix search path. The Nix search path is
   initialized from the colon-separated [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH) environment
-  variable, and is used to look up the location of Nix expressions using [paths](@docroot@/language/values.md#type-path) enclosed in angle
+  variable, and is used to look up the location of Nix expressions using [paths](@docroot@/language/types.md#type-path) enclosed in angle
   brackets (i.e., `<nixpkgs>`).
 
   For instance, passing
@@ -125,7 +152,7 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) {
-            searchPath.elements.emplace_back(SearchPath::Elem::parse(s));
+            lookupPath.elements.emplace_back(LookupPath::Elem::parse(s));
         }}
     });
 

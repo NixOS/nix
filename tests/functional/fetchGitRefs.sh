@@ -1,8 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 requireGit
 
-clearStore
+clearStoreIfPossible
 
 repo="$TEST_ROOT/git"
 
@@ -12,7 +14,7 @@ git init "$repo"
 git -C "$repo" config user.email "foobar@example.com"
 git -C "$repo" config user.name "Foobar"
 
-echo utrecht > "$repo"/hello
+echo utrecht > "$repo/hello"
 git -C "$repo" add hello
 git -C "$repo" commit -m 'Bla1'
 

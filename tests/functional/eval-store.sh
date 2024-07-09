@@ -1,4 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
+
+TODO_NixOS
 
 # Using `--eval-store` with the daemon will eventually copy everything
 # to the build store, invalidating most of the tests here

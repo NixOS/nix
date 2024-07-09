@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
 (! nix-instantiate --eval --restrict-eval ./restricted.nix)

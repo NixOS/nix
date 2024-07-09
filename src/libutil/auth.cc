@@ -4,6 +4,7 @@
 #include "util.hh"
 #include "processes.hh"
 #include "environment-variables.hh"
+#include "config-global.hh"
 #include "config-impl.hh"
 #include "abstract-setting-to-json.hh"
 
@@ -131,9 +132,9 @@ struct NixAuthSource : AuthSource
         : authDir(std::filesystem::path(getDataDir()) / "nix" / "auth")
     {
         if (pathExists(authDir))
-            for (auto & file : readDirectory(authDir)) {
-                if (hasSuffix(file.name, "~")) continue;
-                auto path = authDir / file.name;
+            for (auto & file : std::filesystem::directory_iterator{authDir}) {
+                if (hasSuffix(file.path().filename().string(), "~")) continue;
+                auto path = authDir / file.path().filename();
                 auto authData = AuthData::parseGitAuthData(readFile(path));
                 if (!authData.password)
                     warn("authentication file '%s' does not contain a password, skipping", path);

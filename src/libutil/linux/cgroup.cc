@@ -1,4 +1,5 @@
 #include "cgroup.hh"
+#include "signals.hh"
 #include "util.hh"
 #include "file-system.hh"
 #include "finally.hh"
@@ -47,26 +48,27 @@ std::map<std::string, std::string> getCgroups(const Path & cgroupFile)
     return cgroups;
 }
 
-static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
+static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool returnStats)
 {
     if (!pathExists(cgroup)) return {};
 
-    auto procsFile = cgroup + "/cgroup.procs";
+    auto procsFile = cgroup / "cgroup.procs";
 
     if (!pathExists(procsFile))
         throw Error("'%s' is not a cgroup", cgroup);
 
     /* Use the fast way to kill every process in a cgroup, if
        available. */
-    auto killFile = cgroup + "/cgroup.kill";
+    auto killFile = cgroup / "cgroup.kill";
     if (pathExists(killFile))
         writeFile(killFile, "1");
 
     /* Otherwise, manually kill every process in the subcgroups and
        this cgroup. */
-    for (auto & entry : readDirectory(cgroup)) {
-        if (entry.type != DT_DIR) continue;
-        destroyCgroup(cgroup + "/" + entry.name, false);
+    for (auto & entry : std::filesystem::directory_iterator{cgroup}) {
+        checkInterrupt();
+        if (entry.symlink_status().type() != std::filesystem::file_type::directory) continue;
+        destroyCgroup(cgroup / entry.path().filename(), false);
     }
 
     int round = 1;
@@ -111,7 +113,7 @@ static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
     CgroupStats stats;
 
     if (returnStats) {
-        auto cpustatPath = cgroup + "/cpu.stat";
+        auto cpustatPath = cgroup / "cpu.stat";
 
         if (pathExists(cpustatPath)) {
             for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {

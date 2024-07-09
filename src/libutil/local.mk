@@ -40,3 +40,5 @@ $(foreach i, $(wildcard $(d)/signature/*.hh), \
 ifeq ($(HAVE_LIBCPUID), 1)
   libutil_LDFLAGS += -lcpuid
 endif
+
+$(eval $(call install-file-in, $(buildprefix)$(d)/nix-util.pc, $(libdir)/pkgconfig, 0644))

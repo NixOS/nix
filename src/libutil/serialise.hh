@@ -284,6 +284,26 @@ struct LengthSink : Sink
 };
 
 /**
+ * A wrapper source that counts the number of bytes read from it.
+ */
+struct LengthSource : Source
+{
+    Source & next;
+
+    LengthSource(Source & next) : next(next)
+    { }
+
+    uint64_t total = 0;
+
+    size_t read(char * data, size_t len) override
+    {
+        auto n = next.read(data, len);
+        total += n;
+        return n;
+    }
+};
+
+/**
  * Convert a function into a sink.
  */
 struct LambdaSink : Sink

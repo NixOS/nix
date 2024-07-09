@@ -27,8 +27,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::atPos(Value & value, PosIdx fallback)
 template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withTrace(PosIdx pos, const std::string_view text)
 {
-    error.err.traces.push_front(
-        Trace{.pos = error.state.positions[pos], .hint = HintFmt(std::string(text))});
+    error.addTrace(error.state.positions[pos], text);
     return *this;
 }
 
@@ -72,14 +71,16 @@ EvalErrorBuilder<T>::addTrace(PosIdx pos, std::string_view formatString, const A
 }
 
 template<class T>
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::setIsFromExpr()
+{
+    error.err.isFromExpr = true;
+    return *this;
+}
+
+template<class T>
 void EvalErrorBuilder<T>::debugThrow()
 {
-    if (error.state.debugRepl && !error.state.debugTraces.empty()) {
-        const DebugTrace & last = error.state.debugTraces.front();
-        const Env * env = &last.env;
-        const Expr * expr = &last.expr;
-        error.state.runDebugRepl(&error, *env, *expr);
-    }
+    error.state.runDebugRepl(&error);
 
     // `EvalState` is the only class that can construct an `EvalErrorBuilder`,
     // and it does so in dynamic storage. This is the final method called on
@@ -91,6 +92,7 @@ void EvalErrorBuilder<T>::debugThrow()
     throw error;
 }
 
+template class EvalErrorBuilder<EvalBaseError>;
 template class EvalErrorBuilder<EvalError>;
 template class EvalErrorBuilder<AssertionError>;
 template class EvalErrorBuilder<ThrownError>;
@@ -99,7 +101,6 @@ template class EvalErrorBuilder<TypeError>;
 template class EvalErrorBuilder<UndefinedVarError>;
 template class EvalErrorBuilder<MissingArgumentError>;
 template class EvalErrorBuilder<InfiniteRecursionError>;
-template class EvalErrorBuilder<CachedEvalError>;
 template class EvalErrorBuilder<InvalidPathError>;
 
 }

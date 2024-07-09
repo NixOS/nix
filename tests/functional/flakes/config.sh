@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 cp ../simple.nix ../simple.builder.sh ../config.nix $TEST_HOME
@@ -26,6 +28,7 @@ EOF
 # Without --accept-flake-config, the post hook should not run.
 nix build < /dev/null
 (! [[ -f post-hook-ran ]])
+TODO_NixOS
 clearStore
 
 nix build --accept-flake-config

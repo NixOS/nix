@@ -1,8 +1,10 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 set -o pipefail
 
-source lang/framework.sh
+source characterisation/framework.sh
 
 # specialize function a bit
 function diffAndAccept() {
@@ -24,12 +26,24 @@ nix-instantiate --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grepQuietIn
 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grepQuietInverse Hello
 expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' | grepQuiet Hello
 expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello %" (throw "Foo")' | grepQuiet 'Hello %'
+# Relies on parsing the expression derivation as a derivation, can't use --eval
+expectStderr 1 nix-instantiate --show-trace lang/non-eval-fail-bad-drvPath.nix | grepQuiet "store path '8qlfcic10lw5304gqm8q45nr7g7jl62b-cachix-1.7.3-bin' is not a valid derivation path"
+
 
 nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
   2>&1 | grepQuiet -E 'trace: { x = «potential infinite recursion»; }'
 
 nix-instantiate --eval -E 'let x = { repeating = x; tracing = builtins.trace x true; }; in x.tracing'\
   2>&1 | grepQuiet -F 'trace: { repeating = «repeated»; tracing = «potential infinite recursion»; }'
+
+nix-instantiate --eval -E 'builtins.warn "Hello" 123' 2>&1 | grepQuiet 'warning: Hello'
+nix-instantiate --eval -E 'builtins.addErrorContext "while doing ${"something"} interesting" (builtins.warn "Hello" 123)' 2>/dev/null | grepQuiet 123
+
+# warn does not accept non-strings for now
+expectStderr 1 nix-instantiate --eval -E 'let x = builtins.warn { x = x; } true; in x' \
+  | grepQuiet "expected a string but found a set"
+expectStderr 1 nix-instantiate --eval --abort-on-warn -E 'builtins.warn "Hello" 123' | grepQuiet Hello
+NIX_ABORT_ON_WARN=1 expectStderr 1 nix-instantiate --eval -E 'builtins.addErrorContext "while doing ${"something"} interesting" (builtins.warn "Hello" 123)' | grepQuiet "while doing something interesting"
 
 set +x
 
@@ -72,7 +86,7 @@ for i in lang/eval-fail-*.nix; do
         if [[ -e "lang/$i.flags" ]]; then
             sed -e 's/#.*//' < "lang/$i.flags"
         else
-            # note that show-trace is also set by init.sh
+            # note that show-trace is also set by common/init.sh
             echo "--eval --strict --show-trace"
         fi
     )"
@@ -124,32 +138,4 @@ for i in lang/eval-okay-*.nix; do
     fi
 done
 
-if test -n "${_NIX_TEST_ACCEPT-}"; then
-    if (( "$badDiff" )); then
-        echo 'Output did mot match, but accepted output as the persisted expected output.'
-        echo 'That means the next time the tests are run, they should pass.'
-    else
-        echo 'NOTE: Environment variable _NIX_TEST_ACCEPT is defined,'
-        echo 'indicating the unexpected output should be accepted as the expected output going forward,'
-        echo 'but no tests had unexpected output so there was no expected output to update.'
-    fi
-    if (( "$badExitCode" )); then
-        exit "$badExitCode"
-    else
-        skipTest "regenerating golden masters"
-    fi
-else
-    if (( "$badDiff" )); then
-        echo ''
-        echo 'You can rerun this test with:'
-        echo ''
-        echo '    _NIX_TEST_ACCEPT=1 make tests/functional/lang.sh.test'
-        echo ''
-        echo 'to regenerate the files containing the expected output,'
-        echo 'and then view the git diff to decide whether a change is'
-        echo 'good/intentional or bad/unintentional.'
-        echo 'If the diff contains arbitrary or impure information,'
-        echo 'please improve the normalization that the test applies to the output.'
-    fi
-    exit $(( "$badExitCode" + "$badDiff" ))
-fi
+characterisationTestExit

@@ -3,11 +3,12 @@
 #include <cstring>
 #include <climits>
 
-#include "libcmd/repl-interacter.hh"
+#include "repl-interacter.hh"
 #include "repl.hh"
 
 #include "ansicolor.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "eval.hh"
 #include "eval-cache.hh"
 #include "eval-inline.hh"
@@ -77,7 +78,7 @@ struct NixRepl
 
     std::unique_ptr<ReplInteracter> interacter;
 
-    NixRepl(const SearchPath & searchPath, nix::ref<Store> store,ref<EvalState> state,
+    NixRepl(const LookupPath & lookupPath, nix::ref<Store> store,ref<EvalState> state,
             std::function<AnnotatedValues()> getValues);
     virtual ~NixRepl() = default;
 
@@ -122,7 +123,7 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
+NixRepl::NixRepl(const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
             std::function<NixRepl::AnnotatedValues()> getValues)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
@@ -137,12 +138,13 @@ void runNix(Path program, const Strings & args,
 {
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
-
+    //isInteractive avoid grabling interactive commands
     runProgram2(RunOptions {
         .program = settings.nixBinDir+ "/" + program,
         .args = args,
         .environment = subprocessEnv,
         .input = input,
+        .isInteractive = true,
     });
 
     return;
@@ -259,11 +261,14 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
-            for (auto & entry : readDirectory(dir == "" ? "/" : dir)) {
-                if (entry.name[0] != '.' && hasPrefix(entry.name, prefix2))
-                    completions.insert(prev + dir + "/" + entry.name);
+            for (auto & entry : std::filesystem::directory_iterator{dir == "" ? "/" : dir}) {
+                checkInterrupt();
+                auto name = entry.path().filename().string();
+                if (name[0] != '.' && hasPrefix(name, prefix2))
+                    completions.insert(prev + entry.path().string());
             }
         } catch (Error &) {
+        } catch (std::filesystem::filesystem_error &) {
         }
     } else if ((dot = cur.rfind('.')) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
@@ -302,6 +307,8 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             // Quietly ignore evaluation errors.
         } catch (BadURL & e) {
             // Quietly ignore BadURL flake-related errors.
+        } catch (FileNotFound & e) {
+            // Quietly ignore non-existent file beeing `import`-ed.
         }
     }
 
@@ -508,7 +515,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
         // runProgram redirects stdout to a StringSink,
         // using runProgram2 to allow editors to display their UI
-        runProgram2(RunOptions { .program = editor, .searchPath = true, .args = args });
+        runProgram2(RunOptions { .program = editor, .lookupPath = true, .args = args , .isInteractive = true });
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -784,11 +791,11 @@ void NixRepl::evalString(std::string s, Value & v)
 
 
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
-   const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
+   const LookupPath & lookupPath, nix::ref<Store> store, ref<EvalState> state,
    std::function<AnnotatedValues()> getValues)
 {
     return std::make_unique<NixRepl>(
-        searchPath,
+        lookupPath,
         openStore(),
         state,
         getValues
@@ -804,9 +811,9 @@ ReplExitStatus AbstractNixRepl::runSimple(
         NixRepl::AnnotatedValues values;
         return values;
     };
-    SearchPath searchPath = {};
+    LookupPath lookupPath = {};
     auto repl = std::make_unique<NixRepl>(
-            searchPath,
+            lookupPath,
             openStore(),
             evalState,
             getValues

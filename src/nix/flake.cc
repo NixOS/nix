@@ -7,6 +7,7 @@
 #include "eval-settings.hh"
 #include "flake/flake.hh"
 #include "get-drvs.hh"
+#include "signals.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "outputs-spec.hh"
@@ -232,6 +233,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["lastModified"] = *lastModified;
             j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
+            if (auto fingerprint = lockedFlake.getFingerprint(store))
+                j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
             logger->cout("%s", j.dump());
         } else {
             logger->cout(
@@ -264,6 +267,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
+            if (auto fingerprint = lockedFlake.getFingerprint(store))
+                logger->cout(
+                    ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s",
+                    fingerprint->to_string(HashFormat::Base16, false));
 
             if (!lockedFlake.lockFile.root->inputs.empty())
                 logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
@@ -454,11 +461,6 @@ struct CmdFlakeCheck : FlakeCommand
                 if (v.payload.lambda.fun->hasFormals()
                     || !argHasName(v.payload.lambda.fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
-                auto body = dynamic_cast<ExprLambda *>(v.payload.lambda.fun->body);
-                if (!body
-                    || body->hasFormals()
-                    || !argHasName(body->arg, "prev"))
-                    throw Error("overlay does not take an argument named 'prev'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
             } catch (Error & e) {
@@ -775,6 +777,8 @@ struct CmdFlakeCheck : FlakeCommand
                             || name == "flakeModules"
                             || name == "herculesCI"
                             || name == "homeConfigurations"
+                            || name == "homeModule"
+                            || name == "homeModules"
                             || name == "nixopsConfigurations"
                             )
                             // Known but unchecked community attribute
@@ -871,9 +875,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         {
             createDirs(to);
 
-            for (auto & entry : readDirectory(from)) {
-                auto from2 = from + "/" + entry.name;
-                auto to2 = to + "/" + entry.name;
+            for (auto & entry : std::filesystem::directory_iterator{from}) {
+                checkInterrupt();
+                auto from2 = entry.path().string();
+                auto to2 = to + "/" + entry.path().filename().string();
                 auto st = lstat(from2);
                 if (S_ISDIR(st.st_mode))
                     copyDir(from2, to2);
@@ -1181,7 +1186,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 // If we don't recognize it, it's probably content
                 return true;
             } catch (EvalError & e) {
-                // Some attrs may contain errors, eg. legacyPackages of
+                // Some attrs may contain errors, e.g. legacyPackages of
                 // nixpkgs. We still want to recurse into it, instead of
                 // skipping it at all.
                 return true;

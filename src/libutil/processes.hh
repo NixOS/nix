@@ -3,6 +3,7 @@
 
 #include "types.hh"
 #include "error.hh"
+#include "file-descriptor.hh"
 #include "logging.hh"
 #include "ansicolor.hh"
 
@@ -11,8 +12,6 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <signal.h>
-
-#include <boost/lexical_cast.hpp>
 
 #include <atomic>
 #include <functional>
@@ -25,26 +24,36 @@ namespace nix {
 struct Sink;
 struct Source;
 
-#ifndef _WIN32
 class Pid
 {
+#ifndef _WIN32
     pid_t pid = -1;
     bool separatePG = false;
     int killSignal = SIGKILL;
+#else
+    AutoCloseFD pid = INVALID_DESCRIPTOR;
+#endif
 public:
     Pid();
+#ifndef _WIN32
     Pid(pid_t pid);
-    ~Pid();
     void operator =(pid_t pid);
     operator pid_t();
+#else
+    Pid(AutoCloseFD pid);
+    void operator =(AutoCloseFD pid);
+#endif
+    ~Pid();
     int kill();
     int wait();
 
+    // TODO: Implement for Windows
+#ifndef _WIN32
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);
     pid_t release();
-};
 #endif
+};
 
 
 #ifndef _WIN32
@@ -80,14 +89,14 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
  * Run a program and return its stdout in a string (i.e., like the
  * shell backtick operator).
  */
-std::string runProgram(Path program, bool searchPath = false,
+std::string runProgram(Path program, bool lookupPath = false,
     const Strings & args = Strings(),
     const std::optional<std::string> & input = {}, bool isInteractive = false);
 
 struct RunOptions
 {
     Path program;
-    bool searchPath = true;
+    bool lookupPath = true;
     Strings args;
 #ifndef _WIN32
     std::optional<uid_t> uid;
@@ -118,8 +127,6 @@ public:
     { }
 };
 
-#ifndef _WIN32
-
 /**
  * Convert the exit status of a child as returned by wait() into an
  * error string.
@@ -127,7 +134,5 @@ public:
 std::string statusToString(int status);
 
 bool statusOk(int status);
-
-#endif
 
 }

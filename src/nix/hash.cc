@@ -68,7 +68,7 @@ struct CmdHashBase : Command
         switch (mode) {
         case FileIngestionMethod::Flat:
             return "print cryptographic hash of a regular file";
-        case FileIngestionMethod::Recursive:
+        case FileIngestionMethod::NixArchive:
             return "print cryptographic hash of the NAR serialisation of a path";
         case FileIngestionMethod::Git:
             return "print cryptographic hash of the Git serialisation of a path";
@@ -87,30 +87,29 @@ struct CmdHashBase : Command
                     return std::make_unique<HashSink>(hashAlgo);
             };
 
-            auto [accessor_, canonPath] = PosixSourceAccessor::createAtRoot(path);
-            auto & accessor = accessor_;
+            auto path2 = PosixSourceAccessor::createAtRoot(path);
             Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
             switch (mode) {
             case FileIngestionMethod::Flat:
-            case FileIngestionMethod::Recursive:
+            case FileIngestionMethod::NixArchive:
             {
                 auto hashSink = makeSink();
-                dumpPath(accessor, canonPath, *hashSink, (FileSerialisationMethod) mode);
+                dumpPath(path2, *hashSink, (FileSerialisationMethod) mode);
                 h = hashSink->finish().first;
                 break;
             }
             case FileIngestionMethod::Git: {
                 std::function<git::DumpHook> hook;
-                hook = [&](const CanonPath & path) -> git::TreeEntry {
+                hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
-                    auto mode = dump(accessor, path, *hashSink, hook);
+                    auto mode = dump(path, *hashSink, hook);
                     auto hash = hashSink->finish().first;
                     return {
                         .mode = mode,
                         .hash = hash,
                     };
                 };
-                h = hook(canonPath).hash;
+                h = hook(path2).hash;
                 break;
             }
             }
@@ -127,7 +126,7 @@ struct CmdHashBase : Command
 struct CmdHashPath : CmdHashBase
 {
     CmdHashPath()
-        : CmdHashBase(FileIngestionMethod::Recursive)
+        : CmdHashBase(FileIngestionMethod::NixArchive)
     {
         addFlag(flag::hashAlgo("algo", &hashAlgo));
         addFlag(flag::fileIngestionMethod(&mode));
@@ -182,7 +181,7 @@ struct CmdToBase : Command
 
     void run() override
     {
-        warn("The old format conversion sub commands of `nix hash` where deprecated in favor of `nix hash convert`.");
+        warn("The old format conversion sub commands of `nix hash` were deprecated in favor of `nix hash convert`.");
         for (auto s : args)
             logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }
@@ -312,7 +311,7 @@ static int compatNixHash(int argc, char * * argv)
     });
 
     if (op == opHash) {
-        CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
+        CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::NixArchive);
         if (!hashAlgo.has_value()) hashAlgo = HashAlgorithm::MD5;
         cmd.hashAlgo = hashAlgo.value();
         cmd.hashFormat = hashFormat;

@@ -225,8 +225,8 @@ struct GitArchiveInputScheme : InputScheme
 
         auto cache = getCache();
 
-        Attrs treeHashKey{{"_what", "gitRevToTreeHash"}, {"rev", rev->gitRev()}};
-        Attrs lastModifiedKey{{"_what", "gitRevToLastModified"}, {"rev", rev->gitRev()}};
+        Cache::Key treeHashKey{"gitRevToTreeHash", {{"rev", rev->gitRev()}}};
+        Cache::Key lastModifiedKey{"gitRevToLastModified", {{"rev", rev->gitRev()}}};
 
         if (auto treeHashAttrs = cache->lookup(treeHashKey)) {
             if (auto lastModifiedAttrs = cache->lookup(lastModifiedKey)) {
@@ -272,7 +272,7 @@ struct GitArchiveInputScheme : InputScheme
         return {std::move(input), tarballInfo};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto [input, tarballInfo] = downloadArchive(store, _input);
 
@@ -433,9 +433,15 @@ struct GitLabInputScheme : GitArchiveInputScheme
                 store->toRealPath(
                     downloadFile(store, url, "source", headers).storePath)));
 
-        return RefInfo {
-            .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
-        };
+        if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
+          return RefInfo {
+              .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
+          };
+        } if (json.is_array() && json.size() == 0) {
+            throw Error("No commits returned by GitLab API -- does the git ref really exist?");
+        } else {
+            throw Error("Unexpected response received from GitLab: %s", json);
+        }
     }
 
     DownloadUrl getDownloadUrl(const Input & input) const override

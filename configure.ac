@@ -63,7 +63,6 @@ AC_SYS_LARGEFILE
 
 
 # Solaris-specific stuff.
-AC_STRUCT_DIRENT_D_TYPE
 case "$host_os" in
   solaris*)
     # Solaris requires -lsocket -lnsl for network functions
@@ -150,11 +149,6 @@ AC_ARG_ENABLE(unit-tests, AS_HELP_STRING([--disable-unit-tests],[Do not build th
   ENABLE_UNIT_TESTS=$enableval, ENABLE_UNIT_TESTS=$ENABLE_BUILD)
 AC_SUBST(ENABLE_UNIT_TESTS)
 
-# Build external API docs by default
-AC_ARG_ENABLE(external_api_docs, AS_HELP_STRING([--enable-external-api-docs],[Build API docs for Nix's C interface]),
-  external_api_docs=$enableval, external_api_docs=yes)
-AC_SUBST(external_api_docs)
-
 AS_IF(
   [test "$ENABLE_BUILD" == "no" && test "$ENABLE_UNIT_TESTS" == "yes"],
   [AC_MSG_ERROR([Cannot enable unit tests when building overall is disabled. Please do not pass '--enable-unit-tests' or do not pass '--disable-build'.])])
@@ -171,15 +165,6 @@ AC_SUBST(ENABLE_DOC_GEN)
 AS_IF(
   [test "$ENABLE_BUILD" == "no" && test "$ENABLE_DOC_GEN" == "yes"],
   [AC_MSG_ERROR([Cannot enable generated docs when building overall is disabled. Please do not pass '--enable-doc-gen' or do not pass '--disable-build'.])])
-
-# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
-AC_ARG_ENABLE(internal-api-docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
-  ENABLE_INTERNAL_API_DOCS=$enableval, ENABLE_INTERNAL_API_DOCS=no)
-AC_SUBST(ENABLE_INTERNAL_API_DOCS)
-
-AC_ARG_ENABLE(external-api-docs, AS_HELP_STRING([--enable-external-api-docs],[Build API docs for Nix's external unstable C interfaces]),
-  ENABLE_EXTERNAL_API_DOCS=$enableval, ENABLE_EXTERNAL_API_DOCS=no)
-AC_SUBST(ENABLE_EXTERNAL_API_DOCS)
 
 AS_IF(
   [test "$ENABLE_FUNCTIONAL_TESTS" == "yes" || test "$ENABLE_DOC_GEN" == "yes"],
@@ -314,9 +299,20 @@ case "$host_os" in
                                 ]))
     if test "x$enable_seccomp_sandboxing" != "xno"; then
       PKG_CHECK_MODULES([LIBSECCOMP], [libseccomp],
-                        [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS"])
+                        [CXXFLAGS="$LIBSECCOMP_CFLAGS $CXXFLAGS" CFLAGS="$LIBSECCOMP_CFLAGS $CFLAGS"])
       have_seccomp=1
       AC_DEFINE([HAVE_SECCOMP], [1], [Whether seccomp is available and should be used for sandboxing.])
+      AC_COMPILE_IFELSE([
+        AC_LANG_SOURCE([[
+          #include <seccomp.h>
+          #ifndef __SNR_fchmodat2
+          # error "Missing support for fchmodat2"
+          #endif
+        ]])
+      ], [], [
+        echo "libseccomp is missing __SNR_fchmodat2. Please provide libseccomp 2.5.5 or later"
+        exit 1
+      ])
     else
       have_seccomp=
     fi
@@ -359,6 +355,14 @@ if test "$gc" = yes; then
   PKG_CHECK_MODULES([BDW_GC], [bdw-gc])
   CXXFLAGS="$BDW_GC_CFLAGS $CXXFLAGS"
   AC_DEFINE(HAVE_BOEHMGC, 1, [Whether to use the Boehm garbage collector.])
+
+  # See `fixupBoehmStackPointer`, for the integration between Boehm GC
+  # and Boost coroutines.
+  old_CFLAGS="$CFLAGS"
+  # Temporary set `-pthread` just for the next check
+  CFLAGS="$CFLAGS -pthread"
+  AC_CHECK_FUNCS([pthread_attr_get_np pthread_getattr_np])
+  CFLAGS="$old_CFLAGS"
 fi
 
 AS_IF([test "$ENABLE_UNIT_TESTS" == "yes"],[
@@ -395,6 +399,11 @@ AS_CASE(["$enable_markdown"],
 # Look for libgit2.
 PKG_CHECK_MODULES([LIBGIT2], [libgit2])
 
+
+# Look for toml11, a required dependency.
+AC_LANG_PUSH(C++)
+AC_CHECK_HEADER([toml.hpp], [], [AC_MSG_ERROR([toml11 is not found.])])
+AC_LANG_POP(C++)
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])

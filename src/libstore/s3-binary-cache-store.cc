@@ -132,6 +132,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
+    res->allowSystemProxy = true;
     res->region = region;
     if (!scheme.empty()) {
         res->scheme = Aws::Http::SchemeMapper::FromString(scheme.c_str());
@@ -213,7 +214,7 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
           support it.
 
           > **Note**
-          > 
+          >
           > HTTPS should be used if the cache might contain sensitive
           > information.
         )"};
@@ -224,7 +225,7 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
           Do not specify this setting if you're using Amazon S3.
 
           > **Note**
-          > 
+          >
           > This endpoint must support HTTPS and will use path-based
           > addressing instead of virtual host based addressing.
         )"};
@@ -269,8 +270,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const std::string & uriScheme,
-        const std::string & bucketName,
+        std::string_view uriScheme,
+        std::string_view bucketName,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
@@ -281,6 +282,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
     {
+        if (bucketName.empty())
+            throw UsageError("`%s` store requires a bucket name in its Store URI", uriScheme);
         diskCache = getNarInfoDiskCache();
     }
 

@@ -1,6 +1,7 @@
 #include "file-content-address.hh"
 #include "archive.hh"
 #include "git.hh"
+#include "source-path.hh"
 
 namespace nix {
 
@@ -9,7 +10,7 @@ static std::optional<FileSerialisationMethod> parseFileSerialisationMethodOpt(st
     if (input == "flat") {
         return FileSerialisationMethod::Flat;
     } else if (input == "nar") {
-        return FileSerialisationMethod::Recursive;
+        return FileSerialisationMethod::NixArchive;
     } else {
         return std::nullopt;
     }
@@ -44,7 +45,7 @@ std::string_view renderFileSerialisationMethod(FileSerialisationMethod method)
     switch (method) {
     case FileSerialisationMethod::Flat:
         return "flat";
-    case FileSerialisationMethod::Recursive:
+    case FileSerialisationMethod::NixArchive:
         return "nar";
     default:
         assert(false);
@@ -56,7 +57,7 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method)
 {
     switch (method) {
     case FileIngestionMethod::Flat:
-    case FileIngestionMethod::Recursive:
+    case FileIngestionMethod::NixArchive:
         return renderFileSerialisationMethod(
             static_cast<FileSerialisationMethod>(method));
     case FileIngestionMethod::Git:
@@ -68,17 +69,17 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method)
 
 
 void dumpPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     Sink & sink,
     FileSerialisationMethod method,
     PathFilter & filter)
 {
     switch (method) {
     case FileSerialisationMethod::Flat:
-        accessor.readFile(path, sink);
+        path.readFile(sink);
         break;
-    case FileSerialisationMethod::Recursive:
-        accessor.dumpPath(path, sink, filter);
+    case FileSerialisationMethod::NixArchive:
+        path.dumpPath(sink, filter);
         break;
     }
 }
@@ -93,7 +94,7 @@ void restorePath(
     case FileSerialisationMethod::Flat:
         writeFile(path, source);
         break;
-    case FileSerialisationMethod::Recursive:
+    case FileSerialisationMethod::NixArchive:
         restorePath(path, source);
         break;
     }
@@ -101,27 +102,29 @@ void restorePath(
 
 
 HashResult hashPath(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     FileSerialisationMethod method, HashAlgorithm ha,
     PathFilter & filter)
 {
     HashSink sink { ha };
-    dumpPath(accessor, path, sink, method, filter);
+    dumpPath(path, sink, method, filter);
     return sink.finish();
 }
 
 
-Hash hashPath(
-    SourceAccessor & accessor, const CanonPath & path,
+std::pair<Hash, std::optional<uint64_t>> hashPath(
+    const SourcePath & path,
     FileIngestionMethod method, HashAlgorithm ht,
     PathFilter & filter)
 {
     switch (method) {
     case FileIngestionMethod::Flat:
-    case FileIngestionMethod::Recursive:
-        return hashPath(accessor, path, (FileSerialisationMethod) method, ht, filter).first;
+    case FileIngestionMethod::NixArchive: {
+        auto res = hashPath(path, (FileSerialisationMethod) method, ht, filter);
+        return {res.first, {res.second}};
+    }
     case FileIngestionMethod::Git:
-        return git::dumpHash(ht, accessor, path, filter).hash;
+        return {git::dumpHash(ht, path, filter).hash, std::nullopt};
     }
     assert(false);
 }

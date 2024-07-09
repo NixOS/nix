@@ -67,7 +67,7 @@ TEST_F(GitTest, blob_read) {
         StringSink out;
         RegularFileSink out2 { out };
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Blob);
-        parseBlob(out2, "", in, BlobMode::Regular, mockXpSettings);
+        parseBlob(out2, CanonPath::root, in, BlobMode::Regular, mockXpSettings);
 
         auto expected = readFile(goldenMaster("hello-world.bin"));
 
@@ -132,8 +132,8 @@ TEST_F(GitTest, tree_read) {
         NullFileSystemObjectSink out;
         Tree got;
         ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Tree);
-        parseTree(out, "", in, [&](auto & name, auto entry) {
-            auto name2 = name;
+        parseTree(out, CanonPath::root, in, [&](auto & name, auto entry) {
+            auto name2 = std::string{name.rel()};
             if (entry.mode == Mode::Directory)
                 name2 += '/';
             got.insert_or_assign(name2, std::move(entry));
@@ -154,8 +154,8 @@ TEST_F(GitTest, tree_write) {
 TEST_F(GitTest, both_roundrip) {
     using File = MemorySourceAccessor::File;
 
-    MemorySourceAccessor files;
-    files.root = File::Directory {
+    auto files = make_ref<MemorySourceAccessor>();
+    files->root = File::Directory {
         .contents {
             {
                 "foo",
@@ -189,12 +189,12 @@ TEST_F(GitTest, both_roundrip) {
     std::map<Hash, std::string> cas;
 
     std::function<DumpHook> dumpHook;
-    dumpHook = [&](const CanonPath & path) {
+    dumpHook = [&](const SourcePath & path) {
         StringSink s;
         HashSink hashSink { HashAlgorithm::SHA1 };
         TeeSink s2 { s, hashSink };
         auto mode = dump(
-            files, path, s2, dumpHook,
+            path, s2, dumpHook,
             defaultPathFilter, mockXpSettings);
         auto hash = hashSink.finish().first;
         cas.insert_or_assign(hash, std::move(s.s));
@@ -204,20 +204,20 @@ TEST_F(GitTest, both_roundrip) {
         };
     };
 
-    auto root = dumpHook(CanonPath::root);
+    auto root = dumpHook({files});
 
-    MemorySourceAccessor files2;
+    auto files2 = make_ref<MemorySourceAccessor>();
 
-    MemorySink sinkFiles2 { files2 };
+    MemorySink sinkFiles2 { *files2 };
 
-    std::function<void(const Path, const Hash &, BlobMode)> mkSinkHook;
+    std::function<void(const CanonPath, const Hash &, BlobMode)> mkSinkHook;
     mkSinkHook = [&](auto prefix, auto & hash, auto blobMode) {
         StringSource in { cas[hash] };
         parse(
             sinkFiles2, prefix, in, blobMode,
-            [&](const Path & name, const auto & entry) {
+            [&](const CanonPath & name, const auto & entry) {
                 mkSinkHook(
-                    prefix + "/" + name,
+                    prefix / name,
                     entry.hash,
                     // N.B. this cast would not be acceptable in real
                     // code, because it would make an assert reachable,
@@ -227,9 +227,9 @@ TEST_F(GitTest, both_roundrip) {
             mockXpSettings);
     };
 
-    mkSinkHook("", root.hash, BlobMode::Regular);
+    mkSinkHook(CanonPath::root, root.hash, BlobMode::Regular);
 
-    ASSERT_EQ(files, files2);
+    ASSERT_EQ(*files, *files2);
 }
 
 TEST(GitLsRemote, parseSymrefLineWithReference) {

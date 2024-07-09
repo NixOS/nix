@@ -1,4 +1,4 @@
-#include "source-accessor.hh"
+#include "source-path.hh"
 #include "fs-sink.hh"
 #include "variant-wrapper.hh"
 
@@ -69,7 +69,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
      */
     File * open(const CanonPath & path, std::optional<File> create);
 
-    CanonPath addFile(CanonPath path, std::string && contents);
+    SourcePath addFile(CanonPath path, std::string && contents);
 };
 
 /**
@@ -81,13 +81,13 @@ struct MemorySink : FileSystemObjectSink
 
     MemorySink(MemorySourceAccessor & dst) : dst(dst) { }
 
-    void createDirectory(const Path & path) override;
+    void createDirectory(const CanonPath & path) override;
 
     void createRegularFile(
-        const Path & path,
+        const CanonPath & path,
         std::function<void(CreateRegularFileSink &)>) override;
 
-    void createSymlink(const Path & path, const std::string & target) override;
+    void createSymlink(const CanonPath & path, const std::string & target) override;
 };
 
 }

@@ -5,6 +5,7 @@
 
 #include "types.hh"
 #include "environment-variables.hh"
+#include "file-system.hh"
 
 namespace nix {
 
@@ -12,7 +13,7 @@ namespace nix {
  * The path to the unit test data directory. See the contributing guide
  * in the manual for further details.
  */
-static Path getUnitTestData() {
+static inline Path getUnitTestData() {
     return getEnv("_NIX_TEST_UNIT_DATA").value();
 }
 
@@ -21,7 +22,7 @@ static Path getUnitTestData() {
  * against them. See the contributing guide in the manual for further
  * details.
  */
-static bool testAccept() {
+static inline bool testAccept() {
     return getEnv("_NIX_TEST_ACCEPT") == "1";
 }
 

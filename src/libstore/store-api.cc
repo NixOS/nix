@@ -8,7 +8,6 @@
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
-#include "url.hh"
 #include "references.hh"
 #include "archive.hh"
 #include "callback.hh"
@@ -20,12 +19,8 @@
 #include "signals.hh"
 #include "users.hh"
 
-#ifndef _WIN32
-# include "remote-store.hh"
-#endif
-
+#include <filesystem>
 #include <nlohmann/json.hpp>
-#include <regex>
 
 using json = nlohmann::json;
 
@@ -54,7 +49,7 @@ Path Store::followLinksToStore(std::string_view _path) const
 {
     Path path = absPath(std::string(_path));
     while (!isInStore(path)) {
-        if (!isLink(path)) break;
+        if (!std::filesystem::is_symlink(path)) break;
         auto target = readLink(path);
         path = absPath(target, dirOf(path));
     }
@@ -127,7 +122,7 @@ StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const Fixed
     if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
         throw Error("Git file ingestion must use SHA-1 hash");
 
-    if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::Recursive) {
+    if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::NixArchive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
         if (!info.references.empty()) {
@@ -167,14 +162,15 @@ StorePath StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const
 
 std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & path,
+    const SourcePath & path,
     ContentAddressMethod method,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
     PathFilter & filter) const
 {
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
+    auto [h, size] = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
+    if (size && *size >= settings.warnLargePathThreshold)
+        warn("hashed large path '%s' (%s)", path, renderSize(*size));
     return {
         makeFixedOutputPathFromCA(
             name,
@@ -192,8 +188,7 @@ std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
 
 StorePath Store::addToStore(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & path,
+    const SourcePath & path,
     ContentAddressMethod method,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
@@ -205,18 +200,22 @@ StorePath Store::addToStore(
     case FileIngestionMethod::Flat:
         fsm = FileSerialisationMethod::Flat;
         break;
-    case FileIngestionMethod::Recursive:
-        fsm = FileSerialisationMethod::Recursive;
+    case FileIngestionMethod::NixArchive:
+        fsm = FileSerialisationMethod::NixArchive;
         break;
     case FileIngestionMethod::Git:
         // Use NAR; Git is not a serialization method
-        fsm = FileSerialisationMethod::Recursive;
+        fsm = FileSerialisationMethod::NixArchive;
         break;
     }
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(accessor, path, sink, fsm, filter);
+        dumpPath(path, sink, fsm, filter);
     });
-    return addToStoreFromDump(*source, name, fsm, method, hashAlgo, references, repair);
+    LengthSource lengthSource(*source);
+    auto storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
+    if (lengthSource.total >= settings.warnLargePathThreshold)
+        warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
+    return storePath;
 }
 
 void Store::addMultipleToStore(
@@ -343,8 +342,7 @@ digraph graphname {
 */
 ValidPathInfo Store::addToStoreSlow(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & srcPath,
+    const SourcePath & srcPath,
     ContentAddressMethod method, HashAlgorithm hashAlgo,
     const StorePathSet & references,
     std::optional<Hash> expectedCAHash)
@@ -358,7 +356,7 @@ ValidPathInfo Store::addToStoreSlow(
     RegularFileSink fileSink { caHashSink };
     TeeSink unusualHashTee { narHashSink, caHashSink };
 
-    auto & narSink = method == FileIngestionMethod::Recursive && hashAlgo != HashAlgorithm::SHA256
+    auto & narSink = method == ContentAddressMethod::Raw::NixArchive && hashAlgo != HashAlgorithm::SHA256
         ? static_cast<Sink &>(unusualHashTee)
         : narHashSink;
 
@@ -366,7 +364,7 @@ ValidPathInfo Store::addToStoreSlow(
        srcPath. The fact that we use scratchpadSink as a temporary buffer here
        is an implementation detail. */
     auto fileSource = sinkToSource([&](Sink & scratchpadSink) {
-        accessor.dumpPath(srcPath, scratchpadSink);
+        srcPath.dumpPath(scratchpadSink);
     });
 
     /* tapped provides the same data as fileSource, but we also write all the
@@ -386,15 +384,14 @@ ValidPathInfo Store::addToStoreSlow(
        finish. */
     auto [narHash, narSize] = narHashSink.finish();
 
-    auto hash = method == FileIngestionMethod::Recursive && hashAlgo == HashAlgorithm::SHA256
+    auto hash = method == ContentAddressMethod::Raw::NixArchive && hashAlgo == HashAlgorithm::SHA256
         ? narHash
-        : method == FileIngestionMethod::Git
-        ? git::dumpHash(hashAlgo, accessor, srcPath).hash
+        : method == ContentAddressMethod::Raw::Git
+        ? git::dumpHash(hashAlgo, srcPath).hash
         : caHashSink.finish().first;
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
-
 
     ValidPathInfo info {
         *this,
@@ -412,7 +409,7 @@ ValidPathInfo Store::addToStoreSlow(
 
     if (!isValidPath(info.path)) {
         auto source = sinkToSource([&](Sink & scratchpadSink) {
-            accessor.dumpPath(srcPath, scratchpadSink);
+            srcPath.dumpPath(scratchpadSink);
         });
         addToStore(info, *source);
     }
@@ -1269,159 +1266,70 @@ Derivation Store::readInvalidDerivation(const StorePath & drvPath)
 
 }
 
-#ifndef _WIN32
-# include "local-store.hh"
-# include "uds-remote-store.hh"
-#endif
+
+#include "local-store.hh"
+#include "uds-remote-store.hh"
 
 
 namespace nix {
 
-/* Split URI into protocol+hierarchy part and its parameter set. */
-std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_)
-{
-    auto uri(uri_);
-    Store::Params params;
-    auto q = uri.find('?');
-    if (q != std::string::npos) {
-        params = decodeQuery(uri.substr(q + 1));
-        uri = uri_.substr(0, q);
-    }
-    return {uri, params};
-}
-
-#ifdef _WIN32 // Unused on Windows because the next `#ifndef`
-[[maybe_unused]]
-#endif
-static bool isNonUriPath(const std::string & spec)
-{
-    return
-        // is not a URL
-        spec.find("://") == std::string::npos
-        // Has at least one path separator, and so isn't a single word that
-        // might be special like "auto"
-        && spec.find("/") != std::string::npos;
-}
-
-std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
-{
-    // TODO reenable on Windows once we have `LocalStore` and
-    // `UDSRemoteStore`.
-    #ifndef _WIN32
-    if (uri == "" || uri == "auto") {
-        auto stateDir = getOr(params, "state", settings.nixStateDir);
-        if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-            return std::make_shared<LocalStore>(params);
-        else if (pathExists(settings.nixDaemonSocketFile))
-            return std::make_shared<UDSRemoteStore>(params);
-        #if __linux__
-        else if (!pathExists(stateDir)
-            && params.empty()
-            && !isRootUser()
-            && !getEnv("NIX_STORE_DIR").has_value()
-            && !getEnv("NIX_STATE_DIR").has_value())
-        {
-            /* If /nix doesn't exist, there is no daemon socket, and
-               we're not root, then automatically set up a chroot
-               store in ~/.local/share/nix/root. */
-            auto chrootStore = getDataDir() + "/nix/root";
-            if (!pathExists(chrootStore)) {
-                try {
-                    createDirs(chrootStore);
-                } catch (Error & e) {
-                    return std::make_shared<LocalStore>(params);
-                }
-                warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-            } else
-                debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-            Store::Params params2;
-            params2["root"] = chrootStore;
-            return std::make_shared<LocalStore>(params2);
-        }
-        #endif
-        else
-            return std::make_shared<LocalStore>(params);
-    } else if (uri == "daemon") {
-        return std::make_shared<UDSRemoteStore>(params);
-    } else if (uri == "local") {
-        return std::make_shared<LocalStore>(params);
-    } else if (isNonUriPath(uri)) {
-        Store::Params params2 = params;
-        params2["root"] = absPath(uri);
-        return std::make_shared<LocalStore>(params2);
-    } else {
-        return nullptr;
-    }
-    #else
-    return nullptr;
-    #endif
-}
-
-// The `parseURL` function supports both IPv6 URIs as defined in
-// RFC2732, but also pure addresses. The latter one is needed here to
-// connect to a remote store via SSH (it's possible to do e.g. `ssh root@::1`).
-//
-// This function now ensures that a usable connection string is available:
-// * If the store to be opened is not an SSH store, nothing will be done.
-// * If the URL looks like `root@[::1]` (which is allowed by the URL parser and probably
-//   needed to pass further flags), it
-//   will be transformed into `root@::1` for SSH (same for `[::1]` -> `::1`).
-// * If the URL looks like `root@::1` it will be left as-is.
-// * In any other case, the string will be left as-is.
-static std::string extractConnStr(const std::string &proto, const std::string &connStr)
-{
-    if (proto.rfind("ssh") != std::string::npos) {
-        std::smatch result;
-        std::regex v6AddrRegex("^((.*)@)?\\[(.*)\\]$");
-
-        if (std::regex_match(connStr, result, v6AddrRegex)) {
-            if (result[1].matched) {
-                return result.str(1) + result.str(3);
-            }
-            return result.str(3);
-        }
-    }
-
-    return connStr;
-}
-
-ref<Store> openStore(const std::string & uri_,
+ref<Store> openStore(const std::string & uri,
     const Store::Params & extraParams)
 {
-    auto params = extraParams;
-    try {
-        auto parsedUri = parseURL(uri_);
-        params.insert(parsedUri.query.begin(), parsedUri.query.end());
+    return openStore(StoreReference::parse(uri, extraParams));
+}
 
-        auto baseURI = extractConnStr(
-            parsedUri.scheme,
-            parsedUri.authority.value_or("") + parsedUri.path
-        );
+ref<Store> openStore(StoreReference && storeURI)
+{
+    auto & params = storeURI.params;
 
-        for (auto implem : *Implementations::registered) {
-            if (implem.uriSchemes.count(parsedUri.scheme)) {
-                auto store = implem.create(parsedUri.scheme, baseURI, params);
-                if (store) {
-                    experimentalFeatureSettings.require(store->experimentalFeature());
-                    store->init();
-                    store->warnUnknownSettings();
-                    return ref<Store>(store);
-                }
+    auto store = std::visit(overloaded {
+        [&](const StoreReference::Auto &) -> std::shared_ptr<Store> {
+            auto stateDir = getOr(params, "state", settings.nixStateDir);
+            if (access(stateDir.c_str(), R_OK | W_OK) == 0)
+                return std::make_shared<LocalStore>(params);
+            else if (pathExists(settings.nixDaemonSocketFile))
+                return std::make_shared<UDSRemoteStore>(params);
+            #if __linux__
+            else if (!pathExists(stateDir)
+                && params.empty()
+                && !isRootUser()
+                && !getEnv("NIX_STORE_DIR").has_value()
+                && !getEnv("NIX_STATE_DIR").has_value())
+            {
+                /* If /nix doesn't exist, there is no daemon socket, and
+                   we're not root, then automatically set up a chroot
+                   store in ~/.local/share/nix/root. */
+                auto chrootStore = getDataDir() + "/nix/root";
+                if (!pathExists(chrootStore)) {
+                    try {
+                        createDirs(chrootStore);
+                    } catch (SystemError & e) {
+                        return std::make_shared<LocalStore>(params);
+                    }
+                    warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
+                } else
+                    debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
+                return std::make_shared<LocalStore>("local", chrootStore, params);
             }
-        }
-    }
-    catch (BadURL &) {
-        auto [uri, uriParams] = splitUriAndParams(uri_);
-        params.insert(uriParams.begin(), uriParams.end());
+            #endif
+            else
+                return std::make_shared<LocalStore>(params);
+        },
+        [&](const StoreReference::Specified & g) {
+            for (auto implem : *Implementations::registered)
+                if (implem.uriSchemes.count(g.scheme))
+                    return implem.create(g.scheme, g.authority, params);
 
-        if (auto store = openFromNonUri(uri, params)) {
-            experimentalFeatureSettings.require(store->experimentalFeature());
-            store->warnUnknownSettings();
-            return ref<Store>(store);
-        }
-    }
+            throw Error("don't know how to open Nix store with scheme '%s'", g.scheme);
+        },
+    }, storeURI.variant);
 
-    throw Error("don't know how to open Nix store '%s'", uri_);
+    experimentalFeatureSettings.require(store->experimentalFeature());
+    store->warnUnknownSettings();
+    store->init();
+
+    return ref<Store> { store };
 }
 
 std::list<ref<Store>> getDefaultSubstituters()

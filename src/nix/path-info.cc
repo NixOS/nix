@@ -139,21 +139,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
     void printSize(uint64_t value)
     {
-        if (!humanReadable) {
+        if (humanReadable)
+            std::cout << fmt("\t%s", renderSize(value, true));
+        else
             std::cout << fmt("\t%11d", value);
-            return;
-        }
-
-        static const std::array<char, 9> idents{{
-            ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
-        }};
-        size_t power = 0;
-        double res = value;
-        while (res > 1024 && power < idents.size()) {
-            ++power;
-            res /= 1024;
-        }
-        std::cout << fmt("\t%6.1f%c", res, idents.at(power));
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override

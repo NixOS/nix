@@ -1,4 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
+
+TODO_NixOS
 
 clearStore
 
@@ -6,8 +10,8 @@ drvPath=$(nix-instantiate dependencies.nix)
 outPath=$(nix-store -rvv "$drvPath")
 
 # Set a GC root.
-rm -f "$NIX_STATE_DIR"/gcroots/foo
-ln -sf $outPath "$NIX_STATE_DIR"/gcroots/foo
+rm -f "$NIX_STATE_DIR/gcroots/foo"
+ln -sf $outPath "$NIX_STATE_DIR/gcroots/foo"
 
 [ "$(nix-store -q --roots $outPath)" = "$NIX_STATE_DIR/gcroots/foo -> $outPath" ]
 
@@ -40,7 +44,7 @@ cat $outPath/reference-to-input-2/bar
 # Check that the derivation has been GC'd.
 if test -e $drvPath; then false; fi
 
-rm "$NIX_STATE_DIR"/gcroots/foo
+rm "$NIX_STATE_DIR/gcroots/foo"
 
 nix-collect-garbage
 

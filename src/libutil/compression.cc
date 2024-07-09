@@ -263,8 +263,13 @@ struct BrotliCompressionSink : ChunkedCompressionSink
             checkInterrupt();
 
             if (!BrotliEncoderCompressStream(
-                    state, data.data() ? BROTLI_OPERATION_PROCESS : BROTLI_OPERATION_FINISH, &avail_in, &next_in,
-                    &avail_out, &next_out, nullptr))
+                    state,
+                    data.data() ? BROTLI_OPERATION_PROCESS : BROTLI_OPERATION_FINISH,
+                    &avail_in,
+                    &next_in,
+                    &avail_out,
+                    &next_out,
+                    nullptr))
                 throw CompressionError("error while compressing brotli compression");
 
             if (avail_out < sizeof(outbuf) || avail_in == 0) {
@@ -280,8 +285,8 @@ struct BrotliCompressionSink : ChunkedCompressionSink
 
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel, int level)
 {
-    std::vector<std::string> la_supports = {"bzip2", "compress", "grzip", "gzip", "lrzip", "lz4",
-                                            "lzip",  "lzma",     "lzop",  "xz",   "zstd"};
+    std::vector<std::string> la_supports = {
+        "bzip2", "compress", "grzip", "gzip", "lrzip", "lz4", "lzip", "lzma", "lzop", "xz", "zstd"};
     if (std::find(la_supports.begin(), la_supports.end(), method) != la_supports.end()) {
         return make_ref<ArchiveCompressionSink>(nextSink, method, parallel, level);
     }

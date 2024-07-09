@@ -66,7 +66,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             an impure derivation cannot also be
             [content-addressed](#xp-feature-ca-derivations).
 
-            This is a more explicit alternative to using [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime).
+            This is a more explicit alternative to using [`builtins.currentTime`](@docroot@/language/builtins.md#builtins-currentTime).
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/42",
     },
@@ -282,7 +282,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .tag = Xp::MountedSSHStore,
         .name = "mounted-ssh-store",
         .description = R"(
-            Allow the use of the [`mounted SSH store`](@docroot@/command-ref/new-cli/nix3-help-stores.html#experimental-ssh-store-with-filesytem-mounted).
+            Allow the use of the [`mounted SSH store`](@docroot@/command-ref/new-cli/nix3-help-stores.html#experimental-ssh-store-with-filesystem-mounted).
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/43",
     },

@@ -92,10 +92,10 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
-    ref<InputAccessor> accessor;
+    ref<SourceAccessor> accessor;
     std::string s;
     Value v;
-    ExprPath(ref<InputAccessor> accessor, std::string s) : accessor(accessor), s(std::move(s))
+    ExprPath(ref<SourceAccessor> accessor, std::string s) : accessor(accessor), s(std::move(s))
     {
         v.mkPath(&*accessor, this->s.c_str());
     }

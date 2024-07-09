@@ -1,4 +1,5 @@
 #include "posix-source-accessor.hh"
+#include "source-path.hh"
 #include "signals.hh"
 #include "sync.hh"
 
@@ -17,11 +18,11 @@ PosixSourceAccessor::PosixSourceAccessor()
     : PosixSourceAccessor(std::filesystem::path {})
 { }
 
-std::pair<PosixSourceAccessor, CanonPath> PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
+SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
 {
     std::filesystem::path path2 = absPath(path.string());
     return {
-        PosixSourceAccessor { path2.root_path() },
+        make_ref<PosixSourceAccessor>(path2.root_path()),
         CanonPath { path2.relative_path().string() },
     };
 }
@@ -89,14 +90,14 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static Sync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
+    static SharedSync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
 
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
 
     {
-        auto cache(_cache.lock());
+        auto cache(_cache.read());
         auto i = cache->find(absPath);
         if (i != cache->end()) return i->second;
     }
@@ -131,16 +132,34 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
 {
     assertNoSymlinks(path);
     DirEntries res;
-    for (auto & entry : nix::readDirectory(makeAbsPath(path).string())) {
-        std::optional<Type> type;
-        switch (entry.type) {
-        case DT_REG: type = Type::tRegular; break;
-    #ifndef _WIN32
-        case DT_LNK: type = Type::tSymlink; break;
-    #endif
-        case DT_DIR: type = Type::tDirectory; break;
-        }
-        res.emplace(entry.name, type);
+    for (auto & entry : std::filesystem::directory_iterator{makeAbsPath(path)}) {
+        checkInterrupt();
+        auto type = [&]() -> std::optional<Type> {
+            std::filesystem::file_type nativeType;
+            try {
+                nativeType = entry.symlink_status().type();
+            } catch (std::filesystem::filesystem_error & e) {
+                // We cannot always stat the child. (Ideally there is no
+                // stat because the native directory entry has the type
+                // already, but this isn't always the case.)
+                if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
+                    return std::nullopt;
+                else throw;
+            }
+
+            // cannot exhaustively enumerate because implementation-specific
+            // additional file types are allowed.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+            switch (nativeType) {
+            case std::filesystem::file_type::regular: return Type::tRegular; break;
+            case std::filesystem::file_type::symlink: return Type::tSymlink; break;
+            case std::filesystem::file_type::directory: return Type::tDirectory; break;
+            default: return tMisc;
+            }
+#pragma GCC diagnostic pop
+        }();
+        res.emplace(entry.path().filename().string(), type);
     }
     return res;
 }
@@ -166,4 +185,14 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     }
 }
 
+ref<SourceAccessor> getFSSourceAccessor()
+{
+    static auto rootFS = make_ref<PosixSourceAccessor>();
+    return rootFS;
+}
+
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root)
+{
+    return make_ref<PosixSourceAccessor>(std::move(root));
+}
 }

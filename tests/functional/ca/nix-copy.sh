@@ -15,13 +15,13 @@ testOneCopy () {
     rm -rf "$REMOTE_STORE_DIR"
 
     attrPath="$1"
-    nix copy --to $REMOTE_STORE "$attrPath" --file ./content-addressed.nix
+    nix copy --to "$REMOTE_STORE" "$attrPath" --file ./content-addressed.nix
 
     ensureCorrectlyCopied "$attrPath"
 
     # Ensure that we can copy back what we put in the store
     clearStore
-    nix copy --from $REMOTE_STORE \
+    nix copy --from "$REMOTE_STORE" \
         --file ./content-addressed.nix "$attrPath" \
         --no-check-sigs
 }

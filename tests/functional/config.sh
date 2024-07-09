@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Isolate the home for this test.
@@ -25,6 +27,8 @@ nix registry remove userhome-with-xdg
 [ -e "$TEST_ROOT/confighome/nix" ]
 # Assert the .config folder hasn't been created.
 [ ! -e "$HOME/.config" ]
+
+TODO_NixOS # Very specific test setup not compatible with the NixOS test environment?
 
 # Test that files are loaded from XDG by default
 export XDG_CONFIG_HOME=$TEST_ROOT/confighome
@@ -67,3 +71,8 @@ exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2
 val=$(nix config show | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)
 val2=$(nix config show warn-dirty)
 [[ $val == $val2 ]]
+
+# Test unit prefixes.
+[[ $(nix config show --min-free 64K min-free) = 65536 ]]
+[[ $(nix config show --min-free 1M min-free) = 1048576 ]]
+[[ $(nix config show --min-free 2G min-free) = 2147483648 ]]

@@ -53,7 +53,7 @@ SourceAccessor::Stat SourceAccessor::lstat(const CanonPath & path)
     if (auto st = maybeLstat(path))
         return *st;
     else
-        throw Error("path '%s' does not exist", showPath(path));
+        throw FileNotFound("path '%s' does not exist", showPath(path));
 }
 
 void SourceAccessor::setPathDisplay(std::string displayPrefix, std::string displaySuffix)

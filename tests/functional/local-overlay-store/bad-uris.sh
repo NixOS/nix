@@ -1,4 +1,5 @@
 source common.sh
+source ../common/init.sh
 
 requireEnvironment
 setupConfig
@@ -13,6 +14,8 @@ storeBadUpper="local-overlay://?root=$storeBRoot&lower-store=$storeA&upper-layer
 declare -a storesBad=(
     "$storeBadRoot" "$storeBadLower" "$storeBadUpper"
 )
+
+TODO_NixOS
 
 for i in "${storesBad[@]}"; do
     echo $i

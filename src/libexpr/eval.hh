@@ -3,13 +3,14 @@
 
 #include "attr-set.hh"
 #include "eval-error.hh"
+#include "eval-gc.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
-#include "input-accessor.hh"
+#include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
 
@@ -29,12 +30,15 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+struct EvalSettings;
 class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
-struct MemoryInputAccessor;
-
+struct MemorySourceAccessor;
+namespace eval_cache {
+    class EvalCache;
+}
 
 /**
  * Function that implements a primop.
@@ -143,12 +147,6 @@ std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
-/**
- * Initialise the Boehm GC, if applicable.
- */
-void initGC();
-
-
 struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
@@ -161,19 +159,20 @@ struct DebugTrace {
     bool isError;
 };
 
-// Don't want Windows function
-#undef SearchPath
-
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
+        sRight, sWrong, sStructuredAttrs,
+        sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites,
+        sMaxSize, sMaxClosureSize,
+        sBuilder, sArgs,
         sContentAddressed, sImpure,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
@@ -229,18 +228,18 @@ public:
     /**
      * The accessor for the root filesystem.
      */
-    const ref<InputAccessor> rootFS;
+    const ref<SourceAccessor> rootFS;
 
     /**
      * The in-memory filesystem for <nix/...> paths.
      */
-    const ref<MemoryInputAccessor> corepkgsFS;
+    const ref<MemorySourceAccessor> corepkgsFS;
 
     /**
      * In-memory filesystem for internal, non-user-callable Nix
      * expressions like call-flake.nix.
      */
-    const ref<MemoryInputAccessor> internalFS;
+    const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
 
@@ -276,6 +275,18 @@ public:
             return std::shared_ptr<const StaticEnv>();;
     }
 
+    /** Whether a debug repl can be started. If `false`, `runDebugRepl(error)` will return without starting a repl. */
+    bool canDebug();
+
+    /** Use front of `debugTraces`; see `runDebugRepl(error,env,expr)` */
+    void runDebugRepl(const Error * error);
+
+    /**
+     * Run a debug repl with the given error, environment and expression.
+     * @param error The error to debug, may be nullptr.
+     * @param env The environment to debug, matching the expression.
+     * @param expr The expression to debug, matching the environment.
+     */
     void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
 
     template<class T, typename... Args>
@@ -285,11 +296,16 @@ public:
         return *new EvalErrorBuilder<T>(*this, args...);
     }
 
+    /**
+     * A cache for evaluation caches, so as to reuse the same root value if possible
+     */
+    std::map<const Hash, ref<eval_cache::EvalCache>> evalCaches;
+
 private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    std::map<SourcePath, StorePath> srcToStore;
+    Sync<std::map<SourcePath, StorePath>> srcToStore;
 
     /**
      * A cache from path names to parse trees.
@@ -311,9 +327,9 @@ private:
 #endif
     FileEvalCache fileEvalCache;
 
-    SearchPath searchPath;
+    LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> searchPathResolved;
+    std::map<std::string, std::optional<std::string>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -335,12 +351,13 @@ private:
 public:
 
     EvalState(
-        const SearchPath & _searchPath,
+        const LookupPath & _lookupPath,
         ref<Store> store,
+        const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    SearchPath getSearchPath() { return searchPath; }
+    LookupPath getLookupPath() { return lookupPath; }
 
     /**
      * Return a `SourcePath` that refers to `path` in the root
@@ -409,7 +426,7 @@ public:
      * Look up a file in the search path.
      */
     SourcePath findFile(const std::string_view path);
-    SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const LookupPath & lookupPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
      * Try to resolve a search path value (not the optional key part).
@@ -418,8 +435,8 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathPath(
-        const SearchPath::Path & elem,
+    std::optional<std::string> resolveLookupPathPath(
+        const LookupPath::Path & elem,
         bool initAccessControl = false);
 
     /**
@@ -541,6 +558,11 @@ public:
      * we ensure the string corresponds to it.
      */
     SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
+
+#if HAVE_BOEHMGC
+    /** A GC root for the baseEnv reference. */
+    std::shared_ptr<Env *> baseEnvP;
+#endif
 
 public:
 
@@ -828,8 +850,10 @@ std::string showType(const Value & v);
 
 /**
  * If `path` refers to a directory, then append "/default.nix".
+ *
+ * @param addDefaultNix Whether to append "/default.nix" after resolving symlinks.
  */
-SourcePath resolveExprPath(SourcePath path);
+SourcePath resolveExprPath(SourcePath path, bool addDefaultNix = true);
 
 /**
  * Whether a URI is allowed, assuming restrictEval is enabled

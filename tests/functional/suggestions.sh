@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 cd "$TEST_HOME"
 

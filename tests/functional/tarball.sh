@@ -1,6 +1,8 @@
+#!/usr/bin/env bash
+
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 rm -rf $TEST_HOME
 
@@ -52,6 +54,18 @@ test_tarball() {
     # with the content-addressing
     (! nix-instantiate --eval -E "fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; name = \"foo\"; }")
 
+    store_path=$(nix store prefetch-file --json "file://$tarball" | jq -r .storePath)
+    if ! cmp -s "$store_path" "$tarball"; then
+        echo "prefetched tarball differs from original: $store_path vs $tarball" >&2
+        exit 1
+    fi
+    store_path2=$(nix store prefetch-file --json --unpack "file://$tarball" | jq -r .storePath)
+    diff_output=$(diff -r "$store_path2" "$tarroot")
+    if [ -n "$diff_output" ]; then
+        echo "prefetched tarball differs from original: $store_path2 vs $tarroot" >&2
+        echo "$diff_output"
+        exit 1
+    fi
 }
 
 test_tarball '' cat

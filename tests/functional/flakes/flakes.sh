@@ -1,4 +1,8 @@
+#!/usr/bin/env bash
+
 source ./common.sh
+
+TODO_NixOS
 
 requireGit
 
@@ -15,11 +19,15 @@ flake7Dir=$TEST_ROOT/flake7
 nonFlakeDir=$TEST_ROOT/nonFlake
 badFlakeDir=$TEST_ROOT/badFlake
 flakeGitBare=$TEST_ROOT/flakeGitBare
+lockfileSummaryFlake=$TEST_ROOT/lockfileSummaryFlake
 
-for repo in "$flake1Dir" "$flake2Dir" "$flake3Dir" "$flake7Dir" "$nonFlakeDir"; do
+for repo in "$flake1Dir" "$flake2Dir" "$flake3Dir" "$flake7Dir" "$nonFlakeDir" "$lockfileSummaryFlake"; do
     # Give one repo a non-main initial branch.
     extraArgs=
     if [[ "$repo" == "$flake2Dir" ]]; then
+      extraArgs="--initial-branch=main"
+    fi
+    if [[ "$repo" == "$lockfileSummaryFlake" ]]; then
       extraArgs="--initial-branch=main"
     fi
 
@@ -187,6 +195,7 @@ json=$(nix flake metadata flake1 --json | jq .)
 [[ -d $(echo "$json" | jq -r .path) ]]
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C "$flake1Dir" log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
+[[ -n $(echo "$json" | jq -r .fingerprint) ]]
 
 echo foo > "$flake1Dir/foo"
 git -C "$flake1Dir" add $flake1Dir/foo
@@ -230,6 +239,17 @@ nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"$flake1Dir\").pack
 
 # 'getFlake' on a locked flakeref should succeed even in pure mode.
 nix build -o "$TEST_ROOT/result" --expr "(builtins.getFlake \"git+file://$flake1Dir?rev=$hash2\").packages.$system.default"
+
+# Regression test for dirOf on the root of the flake.
+[[ $(nix eval --json flake1#parent) = \""$NIX_STORE_DIR"\" ]]
+
+# Regression test for baseNameOf on the root of the flake.
+[[ $(nix eval --raw flake1#baseName) =~ ^[a-z0-9]+-source$ ]]
+
+# Test that the root of a tree returns a path named /nix/store/<hash1>-<hash2>-source.
+# This behavior is *not* desired, but has existed for a while.
+# Issue #10627 what to do about it.
+[[ $(nix eval --raw flake1#root) =~ ^.*/[a-z0-9]+-[a-z0-9]+-source$ ]]
 
 # Building a flake with an unlocked dependency should fail in pure mode.
 (! nix build -o "$TEST_ROOT/result" flake2#bar --no-registries)
@@ -629,3 +649,37 @@ expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock
 [[ $($nonFlakeDir/shebang-inline-expr.sh baz) = "foo"$'\n'"baz" ]]
 [[ $($nonFlakeDir/shebang-file.sh baz) = "foo"$'\n'"baz" ]]
 expect 1 $nonFlakeDir/shebang-reject.sh 2>&1 | grepQuiet -F 'error: unsupported unquoted character in nix shebang: *. Use double backticks to escape?'
+
+# Test that the --commit-lock-file-summary flag and its alias work
+cat > "$lockfileSummaryFlake/flake.nix" <<EOF
+{
+  inputs = {
+    flake1.url = "git+file://$flake1Dir";
+  };
+
+  description = "lockfileSummaryFlake";
+
+  outputs = inputs: rec {
+    packages.$system.default = inputs.flake1.packages.$system.foo;
+  };
+}
+EOF
+
+git -C "$lockfileSummaryFlake" add flake.nix
+git -C "$lockfileSummaryFlake" commit -m 'Add lockfileSummaryFlake'
+
+testSummary="test summary 1"
+nix flake lock "$lockfileSummaryFlake" --commit-lock-file --commit-lock-file-summary "$testSummary"
+[[ -e "$lockfileSummaryFlake/flake.lock" ]]
+[[ -z $(git -C "$lockfileSummaryFlake" diff main || echo failed) ]]
+[[ "$(git -C "$lockfileSummaryFlake" log --format=%s -n 1)" = "$testSummary" ]]
+
+git -C "$lockfileSummaryFlake" rm :/:flake.lock
+git -C "$lockfileSummaryFlake" commit -m "remove flake.lock"
+testSummary="test summary 2"
+# NOTE(cole-h): We use `--option` here because Nix settings do not currently support flag-ifying the
+# alias of a setting: https://github.com/NixOS/nix/issues/10989
+nix flake lock "$lockfileSummaryFlake" --commit-lock-file --option commit-lockfile-summary "$testSummary"
+[[ -e "$lockfileSummaryFlake/flake.lock" ]]
+[[ -z $(git -C "$lockfileSummaryFlake" diff main || echo failed) ]]
+[[ "$(git -C "$lockfileSummaryFlake" log --format=%s -n 1)" = "$testSummary" ]]

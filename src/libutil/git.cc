@@ -8,7 +8,6 @@
 #include "signals.hh"
 #include "config.hh"
 #include "hash.hh"
-#include "posix-source-accessor.hh"
 
 #include "git.hh"
 #include "serialise.hh"
@@ -54,7 +53,7 @@ static std::string getString(Source & source, int n)
 
 void parseBlob(
     FileSystemObjectSink & sink,
-    const Path & sinkPath,
+    const CanonPath & sinkPath,
     Source & source,
     BlobMode blobMode,
     const ExperimentalFeatureSettings & xpSettings)
@@ -117,7 +116,7 @@ void parseBlob(
 
 void parseTree(
     FileSystemObjectSink & sink,
-    const Path & sinkPath,
+    const CanonPath & sinkPath,
     Source & source,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings)
@@ -148,7 +147,7 @@ void parseTree(
         Hash hash(HashAlgorithm::SHA1);
         std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-        hook(name, TreeEntry {
+        hook(CanonPath{name}, TreeEntry {
             .mode = mode,
             .hash = hash,
         });
@@ -172,7 +171,7 @@ ObjectType parseObjectType(
 
 void parse(
     FileSystemObjectSink & sink,
-    const Path & sinkPath,
+    const CanonPath & sinkPath,
     Source & source,
     BlobMode rootModeIfBlob,
     std::function<SinkHook> hook,
@@ -209,7 +208,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
 
 void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook)
 {
-    parse(sink, "", source, BlobMode::Regular, [&](Path name, TreeEntry entry) {
+    parse(sink, CanonPath::root, source, BlobMode::Regular, [&](CanonPath name, TreeEntry entry) {
         auto [accessor, from] = hook(entry.hash);
         auto stat = accessor->lstat(from);
         auto gotOpt = convertMode(stat.type);
@@ -269,18 +268,18 @@ void dumpTree(const Tree & entries, Sink & sink,
 
 
 Mode dump(
-    SourceAccessor & accessor, const CanonPath & path,
+    const SourcePath & path,
     Sink & sink,
     std::function<DumpHook> hook,
     PathFilter & filter,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    auto st = accessor.lstat(path);
+    auto st = path.lstat();
 
     switch (st.type) {
     case SourceAccessor::tRegular:
     {
-        accessor.readFile(path, sink, [&](uint64_t size) {
+        path.readFile(sink, [&](uint64_t size) {
             dumpBlobPrefix(size, sink, xpSettings);
         });
         return st.isExecutable
@@ -291,9 +290,9 @@ Mode dump(
     case SourceAccessor::tDirectory:
     {
         Tree entries;
-        for (auto & [name, _] : accessor.readDirectory(path)) {
+        for (auto & [name, _] : path.readDirectory()) {
             auto child = path / name;
-            if (!filter(child.abs())) continue;
+            if (!filter(child.path.abs())) continue;
 
             auto entry = hook(child);
 
@@ -309,7 +308,7 @@ Mode dump(
 
     case SourceAccessor::tSymlink:
     {
-        auto target = accessor.readLink(path);
+        auto target = path.readLink();
         dumpBlobPrefix(target.size(), sink, xpSettings);
         sink(target);
         return Mode::Symlink;
@@ -323,13 +322,14 @@ Mode dump(
 
 
 TreeEntry dumpHash(
-        HashAlgorithm ha,
-        SourceAccessor & accessor, const CanonPath & path, PathFilter & filter)
+    HashAlgorithm ha,
+    const SourcePath & path,
+    PathFilter & filter)
 {
     std::function<DumpHook> hook;
-    hook = [&](const CanonPath & path) -> TreeEntry {
+    hook = [&](const SourcePath & path) -> TreeEntry {
         auto hashSink = HashSink(ha);
-        auto mode = dump(accessor, path, hashSink, hook, filter);
+        auto mode = dump(path, hashSink, hook, filter);
         auto hash = hashSink.finish().first;
         return {
             .mode = mode,

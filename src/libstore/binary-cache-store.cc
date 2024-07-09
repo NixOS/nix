@@ -18,6 +18,7 @@
 #include <future>
 #include <regex>
 #include <fstream>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
@@ -321,7 +322,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
         if (static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod())
             caHash = hashString(HashAlgorithm::SHA256, dump2.s);
         switch (dumpMethod) {
-        case FileSerialisationMethod::Recursive:
+        case FileSerialisationMethod::NixArchive:
             // The dump is already NAR in this case, just use it.
             nar = dump2.s;
             break;
@@ -338,7 +339,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
     } else {
         // Otherwise, we have to do th same hashing as NAR so our single
         // hash will suffice for both purposes.
-        if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256)
+        if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256)
             unsupported("addToStoreFromDump");
     }
     StringSource narDump { nar };
@@ -442,8 +443,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
 
 StorePath BinaryCacheStore::addToStore(
     std::string_view name,
-    SourceAccessor & accessor,
-    const CanonPath & path,
+    const SourcePath & path,
     ContentAddressMethod method,
     HashAlgorithm hashAlgo,
     const StorePathSet & references,
@@ -454,10 +454,10 @@ StorePath BinaryCacheStore::addToStore(
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
+    auto h = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter).first;
 
     auto source = sinkToSource([&](Sink & sink) {
-        accessor.dumpPath(path, sink, filter);
+        path.dumpPath(sink, filter);
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {

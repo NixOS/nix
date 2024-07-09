@@ -75,14 +75,12 @@ void dumpString(std::string_view s, Sink & sink);
 
 void parseDump(FileSystemObjectSink & sink, Source & source);
 
-void restorePath(const Path & path, Source & source);
+void restorePath(const std::filesystem::path & path, Source & source);
 
 /**
  * Read a NAR from 'source' and write it to 'sink'.
  */
 void copyNAR(Source & source, Sink & sink);
-
-void copyPath(const Path & from, const Path & to);
 
 
 inline constexpr std::string_view narVersionMagic1 = "nix-archive-1";

@@ -1,3 +1,4 @@
+#include "config-global.hh"
 #include "eval.hh"
 #include "installable-flake.hh"
 #include "command-installable-value.hh"
@@ -14,6 +15,7 @@
 
 #include <iterator>
 #include <memory>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
@@ -237,7 +239,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto getEnvShPath = ({
         StringSource source { getEnvSh };
         evalStore->addToStoreFromDump(
-            source, "get-env.sh", FileSerialisationMethod::Flat, TextIngestionMethod {}, HashAlgorithm::SHA256, {});
+            source, "get-env.sh", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256, {});
     });
 
     drv.args = {store->printStorePath(getEnvShPath)};
@@ -336,8 +338,8 @@ struct Common : InstallableCommand, MixProfile
     std::string makeRcScript(
         ref<Store> store,
         const BuildEnvironment & buildEnvironment,
-        const Path & tmpDir,
-        const Path & outputsDir = absPath(".") + "/outputs")
+        const std::filesystem::path & tmpDir,
+        const std::filesystem::path & outputsDir = std::filesystem::path { absPath(".") } / "outputs")
     {
         // A list of colon-separated environment variables that should be
         // prepended to, rather than overwritten, in order to keep the shell usable.
@@ -376,13 +378,19 @@ struct Common : InstallableCommand, MixProfile
         StringMap rewrites;
         if (buildEnvironment.providesStructuredAttrs()) {
             for (auto & [outputName, from] : BuildEnvironment::getAssociative(outputs->second)) {
-                rewrites.insert({from, outputsDir + "/" + outputName});
+                rewrites.insert({
+                    from,
+                    (outputsDir / outputName).string()
+                });
             }
         } else {
             for (auto & outputName : BuildEnvironment::getStrings(outputs->second)) {
                 auto from = buildEnvironment.vars.find(outputName);
                 assert(from != buildEnvironment.vars.end());
-                rewrites.insert({BuildEnvironment::getString(from->second), outputsDir + "/" + outputName});
+                rewrites.insert({
+                    BuildEnvironment::getString(from->second),
+                    (outputsDir / outputName).string(),
+                });
             }
         }
 
@@ -405,7 +413,7 @@ struct Common : InstallableCommand, MixProfile
 
         if (buildEnvironment.providesStructuredAttrs()) {
             fixupStructuredAttrs(
-                "sh",
+                PATHNG_LITERAL("sh"),
                 "NIX_ATTRS_SH_FILE",
                 buildEnvironment.getAttrsSH(),
                 rewrites,
@@ -413,7 +421,7 @@ struct Common : InstallableCommand, MixProfile
                 tmpDir
             );
             fixupStructuredAttrs(
-                "json",
+                PATHNG_LITERAL("json"),
                 "NIX_ATTRS_JSON_FILE",
                 buildEnvironment.getAttrsJSON(),
                 rewrites,
@@ -430,19 +438,21 @@ struct Common : InstallableCommand, MixProfile
      * that's accessible from the interactive shell session.
      */
     void fixupStructuredAttrs(
-        const std::string & ext,
+        PathViewNG::string_view ext,
         const std::string & envVar,
         const std::string & content,
         StringMap & rewrites,
         const BuildEnvironment & buildEnvironment,
-        const Path & tmpDir)
+        const std::filesystem::path & tmpDir)
     {
-        auto targetFilePath = tmpDir + "/.attrs." + ext;
-        writeFile(targetFilePath, content);
+        auto targetFilePath = tmpDir / PATHNG_LITERAL(".attrs.");
+        targetFilePath += ext;
+
+        writeFile(targetFilePath.string(), content);
 
         auto fileInBuilderEnv = buildEnvironment.vars.find(envVar);
         assert(fileInBuilderEnv != buildEnvironment.vars.end());
-        rewrites.insert({BuildEnvironment::getString(fileInBuilderEnv->second), targetFilePath});
+        rewrites.insert({BuildEnvironment::getString(fileInBuilderEnv->second), targetFilePath.string()});
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -578,7 +588,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         AutoDelete tmpDir(createTempDir("", "nix-develop"), true);
 
-        auto script = makeRcScript(store, buildEnvironment, (Path) tmpDir);
+        auto script = makeRcScript(store, buildEnvironment, tmpDir);
 
         if (verbosity >= lvlDebug)
             script += "set -x\n";
@@ -602,7 +612,7 @@ struct CmdDevelop : Common, MixEnvironment
         }
 
         else {
-            script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n" + script;
+            script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\nshopt -u expand_aliases\n" + script + "\nshopt -s expand_aliases\n";
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
                     shellEscape(developSettings.bashPrompt.get()));
@@ -687,7 +697,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, UseSearchPath::Use, shell, args, buildEnvironment.getSystem());
+        runProgramInStore(store, UseLookupPath::Use, shell, args, buildEnvironment.getSystem());
 #endif
     }
 };

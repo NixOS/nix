@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 source common.sh
 
 # Tests miscellaneous commands.
@@ -10,6 +12,9 @@ source common.sh
 
 # Can we ask for the version number?
 nix-env --version | grep "$version"
+
+nix_env=$(type -P nix-env)
+(PATH=""; ! $nix_env --help 2>&1 ) | grepQuiet -F "The 'man' command was not found, but it is needed for 'nix-env' and some other 'nix-*' commands' help text. Perhaps you could install the 'man' command?"
 
 # Usage errors.
 expect 1 nix-env --foo 2>&1 | grep "no operation"
@@ -30,3 +35,12 @@ expectStderr 1 nix-instantiate --eval -E '[]' -A 'x' | grepQuiet "should be a se
 expectStderr 1 nix-instantiate --eval -E '{}' -A '1' | grepQuiet "should be a list"
 expectStderr 1 nix-instantiate --eval -E '{}' -A '.' | grepQuiet "empty attribute name"
 expectStderr 1 nix-instantiate --eval -E '[]' -A '1' | grepQuiet "out of range"
+
+# Unknown setting warning
+# NOTE(cole-h): behavior is different depending on the order, which is why we test an unknown option
+# before and after the `'{}'`!
+out="$(expectStderr 0 nix-instantiate --option foobar baz --expr '{}')"
+[[ "$(echo "$out" | grep foobar | wc -l)" = 1 ]]
+
+out="$(expectStderr 0 nix-instantiate '{}' --option foobar baz --expr )"
+[[ "$(echo "$out" | grep foobar | wc -l)" = 1 ]]

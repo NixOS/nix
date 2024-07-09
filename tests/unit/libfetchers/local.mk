@@ -4,7 +4,7 @@ programs += libfetchers-tests
 
 libfetchers-tests_NAME = libnixfetchers-tests
 
-libfetchers-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data
+libfetchers-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data GTEST_OUTPUT=xml:$$testresults/libfetchers-tests.xml
 
 libfetchers-tests_DIR := $(d)
 
@@ -30,3 +30,8 @@ libfetchers-tests_LIBS = \
     libfetchers libstore libutil
 
 libfetchers-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
+
+ifdef HOST_WINDOWS
+  # Increase the default reserved stack size to 65 MB so Nix doesn't run out of space
+  libfetchers-tests_LDFLAGS += -Wl,--stack,$(shell echo $$((65 * 1024 * 1024)))
+endif

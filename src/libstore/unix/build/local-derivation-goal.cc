@@ -14,7 +14,6 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
-#include "personality.hh"
 #include "current-process.hh"
 #include "child.hh"
 #include "unix-domain-socket.hh"
@@ -40,6 +39,7 @@
 
 /* Includes required for chroot support. */
 #if __linux__
+# include "fchmodat2-compat.hh"
 # include <sys/ioctl.h>
 # include <net/if.h>
 # include <netinet/ip.h>
@@ -54,6 +54,7 @@
 # endif
 # define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 # include "cgroup.hh"
+# include "personality.hh"
 #endif
 
 #if __APPLE__
@@ -78,7 +79,7 @@ void handleDiffHook(
         try {
             auto diffRes = runProgram(RunOptions {
                 .program = diffHook,
-                .searchPath = true,
+                .lookupPath = true,
                 .args = {tryA, tryB, drvPath, tmpDir},
                 .uid = uid,
                 .gid = gid,
@@ -178,6 +179,10 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 
 void LocalDerivationGoal::tryLocalBuild()
 {
+#if __APPLE__
+    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
+#endif
+
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         state = &DerivationGoal::tryToBuild;
@@ -282,7 +287,7 @@ static void movePath(const Path & src, const Path & dst)
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    renameFile(src, dst);
+    std::filesystem::rename(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -369,7 +374,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.toRealPath(status.known->path);
             if (pathExists(chrootRootDir + p))
-                renameFile((chrootRootDir + p), p);
+                std::filesystem::rename((chrootRootDir + p), p);
         }
 
     return diskFull;
@@ -418,7 +423,9 @@ static void doBind(const Path & source, const Path & target, bool optional = fal
     } else if (S_ISLNK(st.st_mode)) {
         // Symlinks can (apparently) not be bind-mounted, so just copy it
         createDirs(dirOf(target));
-        copyFile(source, target, /* andDelete */ false);
+        copyFile(
+            std::filesystem::path(source),
+            std::filesystem::path(target), false);
     } else {
         createDirs(dirOf(target));
         writeFile(target, "");
@@ -496,14 +503,26 @@ void LocalDerivationGoal::startBuilder()
             settings.thisSystem,
             concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
 
-#if __APPLE__
-    additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
-#endif
-
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+#if __APPLE__
+    if (false) {
+#else
+    if (useChroot) {
+#endif
+        /* If sandboxing is enabled, put the actual TMPDIR underneath
+           an inaccessible root-owned directory, to prevent outside
+           access.
 
+           On macOS, we don't use an actual chroot, so this isn't
+           possible. Any mitigation along these lines would have to be
+           done directly in the sandbox profile. */
+        tmpDir = topTmpDir + "/build";
+        createDir(tmpDir, 0700);
+    } else {
+        tmpDir = topTmpDir;
+    }
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
@@ -671,15 +690,19 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
-        deletePath(chrootRootDir);
+        chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
+        autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
 
-        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootRootDir);
+        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
-        // FIXME: make this 0700
+        if (mkdir(chrootParentDir.c_str(), 0700) == -1)
+            throw SysError("cannot create '%s'", chrootRootDir);
+
+        chrootRootDir = chrootParentDir + "/root";
+
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
@@ -1313,8 +1336,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
 
     StorePath addToStore(
         std::string_view name,
-        SourceAccessor & accessor,
-        const CanonPath & srcPath,
+        const SourcePath & srcPath,
         ContentAddressMethod method,
         HashAlgorithm hashAlgo,
         const StorePathSet & references,
@@ -1506,7 +1528,7 @@ void LocalDerivationGoal::startDaemon()
                 throw SysError("accepting connection");
             }
 
-            closeOnExec(remote.get());
+            unix::closeOnExec(remote.get());
 
             debug("received daemon connection");
 
@@ -1678,6 +1700,10 @@ void setupSeccomp()
             throw SysError("unable to add seccomp rule");
 
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmodat), 1,
+                SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), NIX_SYSCALL_FCHMODAT2, 1,
                 SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
             throw SysError("unable to add seccomp rule");
     }
@@ -1958,9 +1984,11 @@ void LocalDerivationGoal::runChild()
         std::set<int> fdsToKeep{STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
         if (authTunnel)
             fdsToKeep.insert(authTunnel->clientFd.get());
-        closeMostFDs(fdsToKeep);
+        unix::closeMostFDs(fdsToKeep);
 
-        setPersonality(drv->platform);
+#if __linux__
+        linux::setPersonality(drv->platform);
+#endif
 
         /* Disable core dumps by default. */
         struct rlimit limit = { 0, RLIM_INFINITY };
@@ -2488,24 +2516,23 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
             auto got = [&]{
-                PosixSourceAccessor accessor;
                 auto fim = outputHash.method.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                 {
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
-                        accessor, CanonPath { actualPath },
+                        {getFSSourceAccessor(), CanonPath(actualPath)},
                         caSink,
                         (FileSerialisationMethod) fim);
                     return caSink.finish().first;
                 }
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(
-                        outputHash.hashAlgo, accessor,
-                        CanonPath { tmpDir + "/tmp" }).hash;
+                        outputHash.hashAlgo,
+                        {getFSSourceAccessor(), CanonPath(tmpDir + "/tmp")}).hash;
                 }
                 }
                 assert(false);
@@ -2532,10 +2559,9 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             }
 
             {
-                PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
-                    accessor, CanonPath { actualPath },
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
             }
@@ -2556,10 +2582,9 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput(outputRewrites);
-                PosixSourceAccessor accessor;
                 HashResult narHashAndSize = hashPath(
-                    accessor, CanonPath { actualPath },
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
@@ -2575,8 +2600,11 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 // Replace the output by a fresh copy of itself to make sure
                 // that there's no stale file descriptor pointing to it
                 Path tmpOutput = actualPath + ".tmp";
-                copyFile(actualPath, tmpOutput, true);
-                renameFile(tmpOutput, actualPath);
+                copyFile(
+                    std::filesystem::path(actualPath),
+                    std::filesystem::path(tmpOutput), true);
+
+                std::filesystem::rename(tmpOutput, actualPath);
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.ca.method,
@@ -2906,6 +2934,24 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
         };
 
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (get(*structuredAttrs, "allowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "allowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxClosureSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
+            }
             if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
                 if (auto output = get(*outputChecks, outputName)) {
                     Checks checks;
@@ -2954,7 +3000,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 
 void LocalDerivationGoal::deleteTmpDir(bool force)
 {
-    if (tmpDir != "") {
+    if (topTmpDir != "") {
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff. */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
@@ -2962,7 +3008,8 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
             chmod(tmpDir.c_str(), 0755);
         }
         else
-            deletePath(tmpDir);
+            deletePath(topTmpDir);
+        topTmpDir = "";
         tmpDir = "";
     }
 }

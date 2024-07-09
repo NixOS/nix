@@ -268,8 +268,6 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
         verbosity = lvlError;
     }
 
-    bool argsSeen = false;
-
     // Heuristic to see if we're invoked as a shebang script, namely,
     // if we have at least one argument, it's the name of an
     // executable file, and it starts with "#!".
@@ -336,10 +334,6 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 throw UsageError("unrecognised flag '%1%'", arg);
         }
         else {
-            if (!argsSeen) {
-                argsSeen = true;
-                initialFlagsProcessed();
-            }
             pos = rewriteArgs(cmdline, pos);
             pendingArgs.push_back(*pos++);
             if (processArgs(pendingArgs, false))
@@ -349,8 +343,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
     processArgs(pendingArgs, true);
 
-    if (!argsSeen)
-        initialFlagsProcessed();
+    initialFlagsProcessed();
 
     /* Now that we are done parsing, make sure that any experimental
      * feature required by the flags is enabled */

@@ -1,4 +1,6 @@
-source ../common.sh
+source ../common/vars-and-functions.sh
+
+TODO_NixOS
 
 # The new Linux mount interface does not seem to support remounting
 # OverlayFS mount points.
@@ -31,15 +33,14 @@ requireEnvironment () {
 }
 
 addConfig () {
-    echo "$1" >> "$NIX_CONF_DIR/nix.conf"
+    echo "$1" >> "$test_nix_conf"
 }
 
 setupConfig () {
   addConfig "require-drop-supplementary-groups = false"
   addConfig "build-users-group = "
+  enableFeatures "local-overlay-store"
 }
-
-enableFeatures "local-overlay-store"
 
 setupStoreDirs () {
   # Attempt to create store dirs on tmpfs volume.

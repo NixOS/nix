@@ -17,13 +17,13 @@ struct Source;
 /**
  * Operating System capability
  */
-typedef
+using Descriptor =
 #if _WIN32
     HANDLE
 #else
     int
 #endif
-    Descriptor;
+    ;
 
 const Descriptor INVALID_DESCRIPTOR =
 #if _WIN32
@@ -41,7 +41,7 @@ const Descriptor INVALID_DESCRIPTOR =
 static inline Descriptor toDescriptor(int fd)
 {
 #ifdef _WIN32
-    return (HANDLE) _get_osfhandle(fd);
+    return reinterpret_cast<HANDLE>(_get_osfhandle(fd));
 #else
     return fd;
 #endif
@@ -56,7 +56,7 @@ static inline Descriptor toDescriptor(int fd)
 static inline int fromDescriptorReadOnly(Descriptor fd)
 {
 #ifdef _WIN32
-    return _open_osfhandle((intptr_t) fd, _O_RDONLY);
+    return _open_osfhandle(reinterpret_cast<intptr_t>(fd), _O_RDONLY);
 #else
     return fd;
 #endif
@@ -140,6 +140,7 @@ public:
 };
 
 #ifndef _WIN32 // Not needed on Windows, where we don't fork
+namespace unix {
 
 /**
  * Close all file descriptors except those listed in the given set.
@@ -152,13 +153,16 @@ void closeMostFDs(const std::set<Descriptor> & exceptions);
  */
 void closeOnExec(Descriptor fd);
 
+} // namespace unix
 #endif
 
-#ifdef _WIN32
-# if _WIN32_WINNT >= 0x0600
+#if defined(_WIN32) && _WIN32_WINNT >= 0x0600
+namespace windows {
+
 Path handleToPath(Descriptor handle);
 std::wstring handleToFileName(Descriptor handle);
-# endif
+
+} // namespace windows
 #endif
 
 MakeError(EndOfFile, Error);

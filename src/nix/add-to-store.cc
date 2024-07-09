@@ -12,7 +12,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 {
     Path path;
     std::optional<std::string> namePart;
-    ContentAddressMethod caMethod = FileIngestionMethod::Recursive;
+    ContentAddressMethod caMethod = ContentAddressMethod::Raw::NixArchive;
     HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
 
     CmdAddToStore()
@@ -41,9 +41,9 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto storePath = dryRun
             ? store->computeStorePath(
-                *namePart, accessor, path2, caMethod, hashAlgo, {}).first
+                *namePart, {accessor, path2}, caMethod, hashAlgo, {}).first
             : store->addToStoreSlow(
-                *namePart, accessor, path2, caMethod, hashAlgo, {}).path;
+                *namePart, {accessor, path2}, caMethod, hashAlgo, {}).path;
 
         logger->cout("%s", store->printStorePath(storePath));
     }
@@ -68,7 +68,7 @@ struct CmdAddFile : CmdAddToStore
 {
     CmdAddFile()
     {
-        caMethod = FileIngestionMethod::Flat;
+        caMethod = ContentAddressMethod::Raw::Flat;
     }
 
     std::string description() override
