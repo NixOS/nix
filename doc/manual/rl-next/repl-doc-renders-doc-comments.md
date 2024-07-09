@@ -45,7 +45,7 @@ Examples
 ```
 
 Known limitations:
-- It currently only works for functions. We plan to extend this to attributes, which may contain arbitrary values.
+- It does not render documentation for "formals", such as `{ /** the value to return */ x, ... }: x`.
 - Some extensions to markdown are not yet supported, as you can see in the example above.
 
 We'd like to acknowledge Yingchi Long for proposing a proof of concept for this functionality in [#9054](https://github.com/NixOS/nix/pull/9054), as well as @sternenseemann and Johannes Kirschbauer for their contributions, proposals, and their work on [RFC 145].

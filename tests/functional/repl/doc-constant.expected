@@ -1,0 +1,102 @@
+Nix <nix version>
+Type :? for help.
+Added <number omitted> variables.
+
+error: value does not have documentation
+
+Attribute version
+
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:29:3
+
+    Immovably fixed.
+
+Attribute empty
+
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:32:3
+
+    Unchangeably constant.
+
+error:
+       … while evaluating the attribute 'attr.undocument'
+         at /path/to/tests/functional/repl/doc-comments.nix:32:3:
+           31|   /** Unchangeably constant. */
+           32|   lib.attr.empty = { };
+             |   ^
+           33|
+
+       error: attribute 'undocument' missing
+       at «string»:1:1:
+            1| lib.attr.undocument
+             | ^
+       Did you mean undocumented?
+
+Attribute constant
+
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:26:3
+
+    Firmly rigid.
+
+Attribute version
+
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:29:3
+
+    Immovably fixed.
+
+Attribute empty
+
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:32:3
+
+    Unchangeably constant.
+
+Attribute undocumented
+
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:34:3
+
+    No documentation found.
+
+error: undefined variable 'missing'
+       at «string»:1:1:
+            1| missing
+             | ^
+
+error: undefined variable 'constanz'
+       at «string»:1:1:
+            1| constanz
+             | ^
+
+error: undefined variable 'missing'
+       at «string»:1:1:
+            1| missing.attr
+             | ^
+
+error: attribute 'missing' missing
+       at «string»:1:1:
+            1| lib.missing
+             | ^
+
+error: attribute 'missing' missing
+       at «string»:1:1:
+            1| lib.missing.attr
+             | ^
+
+error:
+       … while evaluating the attribute 'attr.undocumental'
+         at /path/to/tests/functional/repl/doc-comments.nix:32:3:
+           31|   /** Unchangeably constant. */
+           32|   lib.attr.empty = { };
+             |   ^
+           33|
+
+       error: attribute 'undocumental' missing
+       at «string»:1:1:
+            1| lib.attr.undocumental
+             | ^
+       Did you mean undocumented?
+
+

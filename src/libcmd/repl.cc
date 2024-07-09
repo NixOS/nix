@@ -27,6 +27,7 @@
 #include "local-fs-store.hh"
 #include "print.hh"
 #include "ref.hh"
+#include "value.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -616,6 +617,33 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":doc") {
         Value v;
+
+        auto expr = parseString(arg);
+        std::string fallbackName;
+        PosIdx fallbackPos;
+        DocComment fallbackDoc;
+        if (auto select = dynamic_cast<ExprSelect *>(expr)) {
+            Value vAttrs;
+            auto name = select->evalExceptFinalSelect(*state, *env, vAttrs);
+            fallbackName = state->symbols[name];
+
+            state->forceAttrs(vAttrs, noPos, "while evaluating an attribute set to look for documentation");
+            auto attrs = vAttrs.attrs();
+            assert(attrs);
+            auto attr = attrs->get(name);
+            if (!attr) {
+                // Trigger the normal error
+                evalString(arg, v);
+            }
+            if (attr->pos) {
+                fallbackPos = attr->pos;
+                fallbackDoc = state->getDocCommentForPos(fallbackPos);
+            }
+
+        } else {
+            evalString(arg, v);
+        }
+
         evalString(arg, v);
         if (auto doc = state->getDoc(v)) {
             std::string markdown;
@@ -633,6 +661,19 @@ ProcessLineResult NixRepl::processLine(std::string line)
             markdown += stripIndentation(doc->doc);
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
+        } else if (fallbackPos) {
+            std::stringstream ss;
+            ss << "Attribute `" << fallbackName << "`\n\n";
+            ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
+            if (fallbackDoc) {
+                ss << fallbackDoc.getInnerText(state->positions);
+            } else {
+                ss << "No documentation found.\n\n";
+            }
+
+            auto markdown = ss.str();
+            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+
         } else
             throw Error("value does not have documentation");
     }

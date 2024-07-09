@@ -202,6 +202,17 @@ struct ExprSelect : Expr
     ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
+
+    /**
+     * Evaluate the `a.b.c` part of `a.b.c.d`. This exists mostly for the purpose of :doc in the repl.
+     *
+     * @param[out] v The attribute set that should contain the last attribute name (if it exists).
+     * @return The last attribute name in `attrPath`
+     * 
+     * @note This does *not* evaluate the final attribute, and does not fail if that's the only attribute that does not exist.
+     */
+    Symbol evalExceptFinalSelect(EvalState & state, Env & env, Value & attrs);
+
     COMMON_METHODS
 };
 

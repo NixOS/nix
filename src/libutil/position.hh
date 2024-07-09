@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
 
 #include "source-path.hh"
 
@@ -64,6 +65,13 @@ struct Pos
     auto operator<=>(const Pos & rhs) const = default;
 
     std::string getSnippetUpTo(const Pos & end) const;
+
+    /**
+     * Get the SourcePath, if the source was loaded from a file.
+     */
+    std::optional<SourcePath> getSourcePath() const {
+        return *std::get_if<SourcePath>(&origin);
+    }
 
     struct LinesIterator {
         using difference_type = size_t;

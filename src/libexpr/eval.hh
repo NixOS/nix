@@ -130,6 +130,8 @@ struct Constant
     typedef std::map<std::string, Value *> ValMap;
 #endif
 
+typedef std::map<PosIdx, DocComment> DocCommentMap;
+
 struct Env
 {
     Env * up;
@@ -328,6 +330,12 @@ private:
     typedef std::map<SourcePath, Value> FileEvalCache;
 #endif
     FileEvalCache fileEvalCache;
+
+    /**
+     * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
+     * Grouped by file.
+     */
+    std::map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
@@ -770,6 +778,8 @@ public:
         const SourcePath & path,
         std::string_view pathArg,
         PosIdx pos);
+
+    DocComment getDocCommentForPos(PosIdx pos);
 
 private:
 

@@ -1,0 +1,15 @@
+:l doc-comments.nix
+:doc constant
+:doc lib.version
+:doc lib.attr.empty
+:doc lib.attr.undocument
+:doc (import ./doc-comments.nix).constant
+:doc (import ./doc-comments.nix).lib.version
+:doc (import ./doc-comments.nix).lib.attr.empty
+:doc (import ./doc-comments.nix).lib.attr.undocumented
+:doc missing
+:doc constanz
+:doc missing.attr
+:doc lib.missing
+:doc lib.missing.attr
+:doc lib.attr.undocumental
