@@ -42,27 +42,16 @@ $(eval $(call install-symlink, $(bindir)/nix, $(libexecdir)/nix/build-remote))
 
 src/nix-env/user-env.cc: src/nix-env/buildenv.nix.gen.hh
 
-src/nix/develop.cc: src/nix/get-env.sh.gen.hh
+$(d)/develop.cc: $(d)/get-env.sh.gen.hh
 
 src/nix-channel/nix-channel.cc: src/nix-channel/unpack-channel.nix.gen.hh
 
-src/nix/main.cc: \
+$(d)/main.cc: \
   doc/manual/generate-manpage.nix.gen.hh \
   doc/manual/utils.nix.gen.hh doc/manual/generate-settings.nix.gen.hh \
   doc/manual/generate-store-info.nix.gen.hh \
-  src/nix/generated-doc/help-stores.md
+  $(d)/help-stores.md.gen.hh
 
-src/nix/generated-doc/files/%.md: doc/manual/src/command-ref/files/%.md
-	@mkdir -p $$(dirname $@)
-	@cp $< $@
+$(d)/profile.cc: $(d)/profile.md
 
-src/nix/profile.cc: src/nix/profile.md src/nix/generated-doc/files/profiles.md.gen.hh
-
-src/nix/generated-doc/help-stores.md: doc/manual/src/store/types/index.md.in
-	@mkdir -p $$(dirname $@)
-	@echo 'R"(' >> $@.tmp
-	@echo >> $@.tmp
-	@cat $^ >> $@.tmp
-	@echo >> $@.tmp
-	@echo ')"' >> $@.tmp
-	@mv $@.tmp $@
+$(d)/profile.md: $(d)/profiles.md.gen.hh

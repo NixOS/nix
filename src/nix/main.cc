@@ -333,7 +333,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "generated-doc/help-stores.md"
+          #include "help-stores.md.gen.hh"
           ;
     }
 
