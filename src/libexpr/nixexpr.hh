@@ -60,6 +60,8 @@ struct DocComment {
      */
     operator bool() const { return static_cast<bool>(begin); }
 
+    std::string getInnerText(const PosTable & positions) const;
+
 };
 
 /**

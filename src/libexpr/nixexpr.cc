@@ -641,4 +641,22 @@ size_t SymbolTable::totalSize() const
     return n;
 }
 
+std::string DocComment::getInnerText(const PosTable & positions) const {
+    auto beginPos = positions[begin];
+    auto endPos = positions[end];
+    auto docCommentStr = beginPos.getSnippetUpTo(endPos);
+
+    // Strip "/**" and "*/"
+    constexpr size_t prefixLen = 3;
+    constexpr size_t suffixLen = 2;
+    std::string docStr = docCommentStr.substr(prefixLen, docCommentStr.size() - prefixLen - suffixLen);
+    if (docStr.empty())
+        return {};
+    // Turn the now missing "/**" into indentation
+    docStr = "   " + docStr;
+    // Strip indentation (for the whole, potentially multi-line string)
+    docStr = stripIndentation(docStr);
+    return docStr;
+}
+
 }

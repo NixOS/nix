@@ -572,20 +572,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
         }
 
         if (exprLambda->docComment) {
-            auto begin = positions[exprLambda->docComment.begin];
-            auto end = positions[exprLambda->docComment.end];
-            auto docCommentStr = begin.getSnippetUpTo(end);
-
-            // Strip "/**" and "*/"
-            constexpr size_t prefixLen = 3;
-            constexpr size_t suffixLen = 2;
-            docStr = docCommentStr.substr(prefixLen, docCommentStr.size() - prefixLen - suffixLen);
-            if (docStr.empty())
-                return {};
-            // Turn the now missing "/**" into indentation
-            docStr = "   " + docStr;
-            // Strip indentation (for the whole, potentially multi-line string)
-            docStr = stripIndentation(docStr);
+            docStr = exprLambda->docComment.getInnerText(positions);
         }
 
         if (name.empty()) {
