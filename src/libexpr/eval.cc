@@ -579,7 +579,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             s << "Function ";
         }
         else {
-            s << "Function **" << name << "**";
+            s << "Function `" << name << "`";
             if (pos)
                 s << "\\\n  … " ;
             else
