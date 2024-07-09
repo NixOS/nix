@@ -27,6 +27,8 @@ diff -u baz.cat-nar $storePath/foo/baz
 nix store cat $storePath/foo/baz > baz.cat-nar
 diff -u baz.cat-nar $storePath/foo/baz
 
+TODO_NixOS
+
 # Check that 'nix store cat' fails on invalid store paths.
 invalidPath="$(dirname $storePath)/99999999999999999999999999999999-foo"
 cp -r $storePath $invalidPath

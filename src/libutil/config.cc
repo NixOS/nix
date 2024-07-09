@@ -91,7 +91,14 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
 }
 
 
-static void applyConfigInner(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
+/**
+ * Parse configuration in `contents`, and also the configuration files included from there, with their location specified relative to `path`.
+ *
+ * `contents` and `path` represent the file that is being parsed.
+ * The result is only an intermediate list of key-value pairs of strings.
+ * More parsing according to the settings-specific semantics is being done by `loadConfFile` in `libstore/globals.cc`.
+*/
+static void parseConfigFiles(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
@@ -125,7 +132,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
             if (pathExists(p)) {
                 try {
                     std::string includedContents = readFile(p);
-                    applyConfigInner(includedContents, p, parsedContents);
+                    parseConfigFiles(includedContents, p, parsedContents);
                 } catch (SystemError &) {
                     // TODO: Do we actually want to ignore this? Or is it better to fail?
                 }
@@ -153,7 +160,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
 void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
     std::vector<std::pair<std::string, std::string>> parsedContents;
 
-    applyConfigInner(contents, path, parsedContents);
+    parseConfigFiles(contents, path, parsedContents);
 
     // First apply experimental-feature related settings
     for (const auto & [name, value] : parsedContents)
@@ -442,67 +449,6 @@ void OptionalPathSetting::operator =(const std::optional<Path> & v)
 {
     this->assign(v);
 }
-
-bool GlobalConfig::set(const std::string & name, const std::string & value)
-{
-    for (auto & config : *configRegistrations)
-        if (config->set(name, value)) return true;
-
-    unknownSettings.emplace(name, value);
-
-    return false;
-}
-
-void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
-{
-    for (auto & config : *configRegistrations)
-        config->getSettings(res, overriddenOnly);
-}
-
-void GlobalConfig::resetOverridden()
-{
-    for (auto & config : *configRegistrations)
-        config->resetOverridden();
-}
-
-nlohmann::json GlobalConfig::toJSON()
-{
-    auto res = nlohmann::json::object();
-    for (const auto & config : *configRegistrations)
-        res.update(config->toJSON());
-    return res;
-}
-
-std::string GlobalConfig::toKeyValue()
-{
-    std::string res;
-    std::map<std::string, Config::SettingInfo> settings;
-    globalConfig.getSettings(settings);
-    for (const auto & s : settings)
-        res += fmt("%s = %s\n", s.first, s.second.value);
-    return res;
-}
-
-void GlobalConfig::convertToArgs(Args & args, const std::string & category)
-{
-    for (auto & config : *configRegistrations)
-        config->convertToArgs(args, category);
-}
-
-GlobalConfig globalConfig;
-
-GlobalConfig::ConfigRegistrations * GlobalConfig::configRegistrations;
-
-GlobalConfig::Register::Register(Config * config)
-{
-    if (!configRegistrations)
-        configRegistrations = new ConfigRegistrations;
-    configRegistrations->emplace_back(config);
-}
-
-ExperimentalFeatureSettings experimentalFeatureSettings;
-
-static GlobalConfig::Register rSettings(&experimentalFeatureSettings);
 
 bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature) const
 {

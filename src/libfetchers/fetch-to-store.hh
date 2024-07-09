@@ -18,7 +18,7 @@ StorePath fetchToStore(
     const SourcePath & path,
     FetchMode mode,
     std::string_view name = "source",
-    ContentAddressMethod method = FileIngestionMethod::Recursive,
+    ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,
     PathFilter * filter = nullptr,
     RepairFlag repair = NoRepair);
 

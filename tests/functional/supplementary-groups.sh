@@ -7,6 +7,8 @@ requireSandboxSupport
 if ! command -p -v unshare; then skipTest "Need unshare"; fi
 needLocalStore "The test uses --store always so we would just be bypassing the daemon"
 
+TODO_NixOS
+
 unshare --mount --map-root-user bash <<EOF
   source common.sh
 

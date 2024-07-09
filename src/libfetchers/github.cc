@@ -433,7 +433,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
                 store->toRealPath(
                     downloadFile(store, url, "source", headers).storePath)));
 
-        if (json.is_array() && json.size() == 1 && json[0]["id"] != nullptr) {
+        if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
           return RefInfo {
               .rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)
           };

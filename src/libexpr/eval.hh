@@ -3,6 +3,7 @@
 
 #include "attr-set.hh"
 #include "eval-error.hh"
+#include "eval-gc.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
@@ -29,6 +30,7 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+struct EvalSettings;
 class EvalState;
 class StorePath;
 struct SingleDerivedPath;
@@ -37,7 +39,6 @@ struct MemorySourceAccessor;
 namespace eval_cache {
     class EvalCache;
 }
-
 
 /**
  * Function that implements a primop.
@@ -146,12 +147,6 @@ std::string printValue(EvalState & state, Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
-/**
- * Initialise the Boehm GC, if applicable.
- */
-void initGC();
-
-
 struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
@@ -167,13 +162,17 @@ struct DebugTrace {
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
+        sRight, sWrong, sStructuredAttrs,
+        sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites,
+        sMaxSize, sMaxClosureSize,
+        sBuilder, sArgs,
         sContentAddressed, sImpure,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
@@ -354,6 +353,7 @@ public:
     EvalState(
         const LookupPath & _lookupPath,
         ref<Store> store,
+        const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
@@ -850,8 +850,10 @@ std::string showType(const Value & v);
 
 /**
  * If `path` refers to a directory, then append "/default.nix".
+ *
+ * @param addDefaultNix Whether to append "/default.nix" after resolving symlinks.
  */
-SourcePath resolveExprPath(SourcePath path);
+SourcePath resolveExprPath(SourcePath path, bool addDefaultNix = true);
 
 /**
  * Whether a URI is allowed, assuming restrictEval is enabled

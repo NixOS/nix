@@ -10,7 +10,7 @@ static std::optional<FileSerialisationMethod> parseFileSerialisationMethodOpt(st
     if (input == "flat") {
         return FileSerialisationMethod::Flat;
     } else if (input == "nar") {
-        return FileSerialisationMethod::Recursive;
+        return FileSerialisationMethod::NixArchive;
     } else {
         return std::nullopt;
     }
@@ -45,7 +45,7 @@ std::string_view renderFileSerialisationMethod(FileSerialisationMethod method)
     switch (method) {
     case FileSerialisationMethod::Flat:
         return "flat";
-    case FileSerialisationMethod::Recursive:
+    case FileSerialisationMethod::NixArchive:
         return "nar";
     default:
         assert(false);
@@ -57,7 +57,7 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method)
 {
     switch (method) {
     case FileIngestionMethod::Flat:
-    case FileIngestionMethod::Recursive:
+    case FileIngestionMethod::NixArchive:
         return renderFileSerialisationMethod(
             static_cast<FileSerialisationMethod>(method));
     case FileIngestionMethod::Git:
@@ -78,7 +78,7 @@ void dumpPath(
     case FileSerialisationMethod::Flat:
         path.readFile(sink);
         break;
-    case FileSerialisationMethod::Recursive:
+    case FileSerialisationMethod::NixArchive:
         path.dumpPath(sink, filter);
         break;
     }
@@ -94,7 +94,7 @@ void restorePath(
     case FileSerialisationMethod::Flat:
         writeFile(path, source);
         break;
-    case FileSerialisationMethod::Recursive:
+    case FileSerialisationMethod::NixArchive:
         restorePath(path, source);
         break;
     }
@@ -119,7 +119,7 @@ std::pair<Hash, std::optional<uint64_t>> hashPath(
 {
     switch (method) {
     case FileIngestionMethod::Flat:
-    case FileIngestionMethod::Recursive: {
+    case FileIngestionMethod::NixArchive: {
         auto res = hashPath(path, (FileSerialisationMethod) method, ht, filter);
         return {res.first, {res.second}};
     }

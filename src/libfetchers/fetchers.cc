@@ -260,6 +260,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     auto [accessor, final] = scheme->getAccessor(store, *this);
 
+    assert(!accessor->fingerprint);
     accessor->fingerprint = scheme->getFingerprint(store, final);
 
     return {accessor, std::move(final)};
@@ -305,7 +306,7 @@ StorePath Input::computeStorePath(Store & store) const
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
     return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .method = FileIngestionMethod::Recursive,
+        .method = FileIngestionMethod::NixArchive,
         .hash = *narHash,
         .references = {},
     });
@@ -418,7 +419,7 @@ namespace nlohmann {
 using namespace nix;
 
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json) {
-    fetchers::PublicKey res = {  };
+    fetchers::PublicKey res = { };
     if (auto type = optionalValueAt(json, "type"))
         res.type = getString(*type);
 

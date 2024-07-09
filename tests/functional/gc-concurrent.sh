@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 lockFifo1=$TEST_ROOT/test1.fifo
@@ -20,8 +22,8 @@ outPath3=$(nix-store -r $drvPath3)
 touch $outPath3.lock
 
 rm -f "$NIX_STATE_DIR"/gcroots/foo*
-ln -s $drvPath2 "$NIX_STATE_DIR"/gcroots/foo
-ln -s $outPath3 "$NIX_STATE_DIR"/gcroots/foo2
+ln -s $drvPath2 "$NIX_STATE_DIR/gcroots/foo"
+ln -s $outPath3 "$NIX_STATE_DIR/gcroots/foo2"
 
 # Start build #1 in the background.  It starts immediately.
 nix-store -rvv "$drvPath1" &

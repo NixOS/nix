@@ -7,6 +7,7 @@
 #include "eval.hh"
 #include "globals.hh"
 #include "util.hh"
+#include "eval-settings.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -42,56 +43,56 @@ nix_err nix_libexpr_init(nix_c_context * context)
 }
 
 nix_err nix_expr_eval_from_string(
-    nix_c_context * context, EvalState * state, const char * expr, const char * path, Value * value)
+    nix_c_context * context, EvalState * state, const char * expr, const char * path, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         nix::Expr * parsedExpr = state->state.parseExprFromString(expr, state->state.rootPath(nix::CanonPath(path)));
-        state->state.eval(parsedExpr, *(nix::Value *) value);
-        state->state.forceValue(*(nix::Value *) value, nix::noPos);
+        state->state.eval(parsedExpr, value->value);
+        state->state.forceValue(value->value, nix::noPos);
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, Value * arg, Value * value)
+nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, nix_value * arg, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        state->state.callFunction(*(nix::Value *) fn, *(nix::Value *) arg, *(nix::Value *) value, nix::noPos);
-        state->state.forceValue(*(nix::Value *) value, nix::noPos);
+        state->state.callFunction(fn->value, arg->value, value->value, nix::noPos);
+        state->state.forceValue(value->value, nix::noPos);
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_call_multi(nix_c_context * context, EvalState * state, Value * fn, size_t nargs, Value ** args, Value * value)
+nix_err nix_value_call_multi(nix_c_context * context, EvalState * state, nix_value * fn, size_t nargs, nix_value ** args, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        state->state.callFunction(*(nix::Value *) fn, nargs, (nix::Value * *)args, *(nix::Value *) value, nix::noPos);
-        state->state.forceValue(*(nix::Value *) value, nix::noPos);
+        state->state.callFunction(fn->value, nargs, (nix::Value * *)args, value->value, nix::noPos);
+        state->state.forceValue(value->value, nix::noPos);
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_force(nix_c_context * context, EvalState * state, Value * value)
+nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        state->state.forceValue(*(nix::Value *) value, nix::noPos);
+        state->state.forceValue(value->value, nix::noPos);
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, Value * value)
+nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        state->state.forceValueDeep(*(nix::Value *) value);
+        state->state.forceValueDeep(value->value);
     }
     NIXC_CATCH_ERRS
 }
@@ -106,7 +107,21 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
             for (size_t i = 0; lookupPath_c[i] != nullptr; i++)
                 lookupPath.push_back(lookupPath_c[i]);
 
-        return new EvalState{nix::EvalState(nix::LookupPath::parse(lookupPath), store->ptr)};
+        void * p = ::operator new(
+            sizeof(EvalState),
+            static_cast<std::align_val_t>(alignof(EvalState)));
+        auto * p2 = static_cast<EvalState *>(p);
+        new (p) EvalState {
+            .settings = nix::EvalSettings{
+                nix::settings.readOnlyMode,
+            },
+            .state = nix::EvalState(
+                nix::LookupPath::parse(lookupPath),
+                store->ptr,
+                p2->settings),
+        };
+        loadConfFile(p2->settings);
+        return p2;
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -180,6 +195,15 @@ nix_err nix_gc_decref(nix_c_context * context, const void *)
 }
 void nix_gc_now() {}
 #endif
+
+nix_err nix_value_incref(nix_c_context * context, nix_value *x)
+{
+    return nix_gc_incref(context, (const void *) x);
+}
+nix_err nix_value_decref(nix_c_context * context, nix_value *x)
+{
+    return nix_gc_decref(context, (const void *) x);
+}
 
 void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd))
 {

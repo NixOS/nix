@@ -3,11 +3,12 @@
 #include <cstring>
 #include <climits>
 
-#include "libcmd/repl-interacter.hh"
+#include "repl-interacter.hh"
 #include "repl.hh"
 
 #include "ansicolor.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "eval.hh"
 #include "eval-cache.hh"
 #include "eval-inline.hh"
