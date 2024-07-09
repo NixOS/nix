@@ -14,6 +14,10 @@
 %x INPATH_SLASH
 %x PATH_START
 
+%top {
+#include "parser-tab.hh" // YYSTYPE
+#include "parser-state.hh"
+}
 
 %{
 #ifdef __clang__
@@ -22,47 +26,18 @@
 
 #include "nixexpr.hh"
 #include "parser-tab.hh"
+#include "lexer-helpers.hh"
 
-// !!! FIXME !!!
-#define YY_EXTRA_TYPE ::nix::LexerState *
-int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
-YY_EXTRA_TYPE yyget_extra ( yyscan_t yyscanner );
-#undef YY_EXTRA_TYPE
+namespace nix {
+  struct LexerState;
+}
 
 using namespace nix;
+using namespace nix::lexer::internal;
 
 namespace nix {
 
 #define CUR_POS state->at(*yylloc)
-
-static void initLoc(YYLTYPE * loc)
-{
-    loc->first_line = loc->last_line = 0;
-    loc->first_column = loc->last_column = 0;
-}
-
-static void adjustLoc(yyscan_t yyscanner, YYLTYPE * loc, const char * s, size_t len)
-{
-    loc->stash();
-
-    LexerState & lexerState = *yyget_extra(yyscanner);
-
-    if (lexerState.docCommentDistance == 1) {
-        // Preceding token was a doc comment.
-        ParserLocation doc;
-        doc.first_column = lexerState.lastDocCommentLoc.first_column;
-        ParserLocation docEnd;
-        docEnd.first_column = lexerState.lastDocCommentLoc.last_column;
-        DocComment docComment{lexerState.at(doc), lexerState.at(docEnd)};
-        PosIdx locPos = lexerState.at(*loc);
-        lexerState.positionToDocComment.emplace(locPos, docComment);
-    }
-    lexerState.docCommentDistance++;
-
-    loc->first_column = loc->last_column;
-    loc->last_column += len;
-}
-
 
 // we make use of the fact that the parser receives a private copy of the input
 // string and can munge around in it.
