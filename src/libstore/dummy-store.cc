@@ -1,5 +1,7 @@
 #include "store-api.hh"
 #include "callback.hh"
+#include "memory-source-accessor.hh"
+#include "archive.hh"
 
 namespace nix {
 
@@ -7,6 +9,14 @@ struct DummyStoreConfig : virtual StoreConfig {
     using StoreConfig::StoreConfig;
 
     const std::string name() override { return "Dummy Store"; }
+
+    Setting<bool> readOnly{this,
+        true,
+        "read-only",
+        R"(
+          Make any sort of write fail instead of succeeding.
+          No additional memory will be used, because no information needs to be stored.
+        )"};
 
     std::string doc() override
     {
@@ -29,7 +39,10 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         : StoreConfig(params)
         , DummyStoreConfig(params)
         , Store(params)
+        , contents(make_ref<MemorySourceAccessor>())
     { }
+
+    ref<MemorySourceAccessor> contents;
 
     std::string getUri() override
     {
@@ -61,15 +74,59 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         RepairFlag repair, CheckSigsFlag checkSigs) override
     { unsupported("addToStore"); }
 
-    virtual StorePath addToStoreFromDump(
-        Source & dump,
+    StorePath addToStoreFromDump(
+        Source & source,
         std::string_view name,
         FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
         ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override
-    { unsupported("addToStore"); }
+    {
+        if (readOnly) unsupported("addToStoreFromDump");
+
+        auto temp = make_ref<MemorySourceAccessor>();
+
+        {
+            MemorySink tempSink{*temp};
+
+            // TODO factor this out into `restorePath`, same todo on it.
+            switch (dumpMethod) {
+            case FileSerialisationMethod::Recursive:
+                parseDump(tempSink, source);
+                break;
+            case FileSerialisationMethod::Flat: {
+                // Replace root dir with file so next part succeeds.
+                temp->root = MemorySourceAccessor::File::Regular {};
+                tempSink.createRegularFile("/", [&](auto & sink) {
+                   source.drainInto(sink);
+                });
+                break;
+            }
+            }
+        }
+
+        auto hash = hashPath(
+            {temp, CanonPath::root},
+            hashMethod.getFileIngestionMethod(),
+            hashAlgo).first;
+
+        auto desc = ContentAddressWithReferences::fromParts(
+            hashMethod,
+            hash,
+            {
+                .others = references,
+                // caller is not capable of creating a self-reference, because
+                // this is content-addressed without modulus
+                .self = false,
+            });
+
+        auto dstPath = makeFixedOutputPathFromCA(name, desc);
+
+        contents->open(CanonPath(printStorePath(dstPath)), std::move(temp->root) );
+
+        return dstPath;
+    }
 
     void narFromPath(const StorePath & path, Sink & sink) override
     { unsupported("narFromPath"); }
@@ -78,8 +135,10 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     { callback(nullptr); }
 
-    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
-    { unsupported("getFSAccessor"); }
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    {
+        return this->contents;
+    }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;
