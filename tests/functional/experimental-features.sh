@@ -79,12 +79,3 @@ nix --experimental-features '' --help 1>/dev/null
 nix --experimental-features '' doctor --help 1>/dev/null
 nix --experimental-features '' repl --help 1>/dev/null
 nix --experimental-features '' upgrade-nix --help 1>/dev/null
-
-# These 3 arguments are currently given to all commands, which is wrong (as not
-# all care). To deal with fixing later, we simply make them require the
-# nix-command experimental features --- it so happens that the commands we wish
-# stabilizing to do not need them anyways.
-for arg in '--print-build-logs' '--offline' '--refresh'; do
-    nix --experimental-features 'nix-command' "$arg" --help 1>/dev/null
-    expect 1 nix --experimental-features '' "$arg" --help 1>/dev/null
-done

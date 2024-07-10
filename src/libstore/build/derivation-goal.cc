@@ -994,9 +994,7 @@ void DerivationGoal::buildDone()
                     msg += line;
                     msg += "\n";
                 }
-                auto nixLogCommand = experimentalFeatureSettings.isEnabled(Xp::NixCommand)
-                    ? "nix log"
-                    : "nix-store -l";
+                auto nixLogCommand = "nix log";
                 msg += fmt("For full logs, run '" ANSI_BOLD "%s %s" ANSI_NORMAL "'.",
                     nixLogCommand,
                     worker.store.printStorePath(drvPath));
