@@ -19,7 +19,6 @@ enum struct ExperimentalFeature
 {
     CaDerivations,
     ImpureDerivations,
-    Flakes,
     FetchTree,
     NixCommand,
     GitHashing,
@@ -37,6 +36,8 @@ enum struct ExperimentalFeature
     MountedSSHStore,
     VerifiedFetches,
 };
+
+extern std::set<std::string> stabilizedFeatures;
 
 /**
  * Just because writing `ExperimentalFeature::CaDerivations` is way too long
