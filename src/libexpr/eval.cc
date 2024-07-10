@@ -2636,8 +2636,11 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         // error for this, and this function should only be called when
         // eqValues has found a difference, and it should match
         // its behavior.
+        // Note that as of writing, we make the compiler require that all enum
+        // values are handled explicitly with `case`s, _despite_ having a
+        // `default:`.
         error<EvalBaseError>(
-            "cannot compare %1% with %2%; is assertEqValues out of sync with eqValues?", showType(v1), showType(v2))
+            "BUG: cannot compare %1% with %2%; did forceValue leave a thunk, or might assertEqValues be out of sync with eqValues?", showType(v1), showType(v2))
             .debugThrow();
     }
 }
