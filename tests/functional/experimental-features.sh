@@ -11,12 +11,12 @@ source common.sh
 # # With flakes, flake options should show up
 #
 # function grep_both_ways {
-#     nix --experimental-features 'nix-command' "$@" | grepQuietInverse flake
-#     nix --experimental-features 'nix-command' "$@" | grepQuiet flake
+#     nix --experimental-features '' "$@" | grepQuietInverse flake
+#     nix --experimental-features '' "$@" | grepQuiet flake
 #
 #     # Also, the order should not matter
-#     nix "$@" --experimental-features 'nix-command' | grepQuietInverse flake
-#     nix "$@" --experimental-features 'nix-command' | grepQuiet flake
+#     nix "$@" --experimental-features '' | grepQuietInverse flake
+#     nix "$@" --experimental-features '' | grepQuiet flake
 # }
 #
 # # Simple case, the configuration effects the running command
@@ -34,7 +34,7 @@ gatedSetting=auto-allocate-uids
 
 # Experimental feature is disabled before, ignore and warn.
 NIX_CONFIG="
-  experimental-features = nix-command
+  experimental-features =
   $gatedSetting = true
 " expect 1 nix config show $gatedSetting 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
 [[ $(cat "$TEST_ROOT/stdout") = '' ]]
@@ -43,14 +43,14 @@ grepQuiet "error: could not find setting '$gatedSetting'" "$TEST_ROOT/stderr"
 # Experimental feature is disabled after, ignore and warn.
 NIX_CONFIG="
   $gatedSetting = true
-  experimental-features = nix-command
+  experimental-features =
 " expect 1 nix config show $gatedSetting 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
 [[ $(cat "$TEST_ROOT/stdout") = '' ]]
 grepQuiet "error: could not find setting '$gatedSetting'" "$TEST_ROOT/stderr"
 
 # Experimental feature is enabled before, process.
 NIX_CONFIG="
-  experimental-features = nix-command $xpFeature
+  experimental-features = $xpFeature
   $gatedSetting = true
 " nix config show $gatedSetting 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
 grepQuiet "true" "$TEST_ROOT/stdout"
@@ -58,18 +58,18 @@ grepQuiet "true" "$TEST_ROOT/stdout"
 # Experimental feature is enabled after, process.
 NIX_CONFIG="
   $gatedSetting = true
-  experimental-features = nix-command $xpFeature
+  experimental-features = $xpFeature
 " nix config show $gatedSetting 1>"$TEST_ROOT"/stdout 2>"$TEST_ROOT"/stderr
 grepQuiet "true" "$TEST_ROOT/stdout"
 grepQuietInverse "Ignoring setting '$gatedSetting'" "$TEST_ROOT/stderr"
 
 function exit_code_both_ways {
-    expect 1 nix --experimental-features 'nix-command ' "$@" 1>/dev/null
-    nix --experimental-features "nix-command $xpFeature" "$@" 1>/dev/null
+    expect 1 nix --experimental-features '' "$@" 1>/dev/null
+    nix --experimental-features "$xpFeature" "$@" 1>/dev/null
 
     # Also, the order should not matter
-    expect 1 nix "$@" --experimental-features 'nix-command' 1>/dev/null
-    nix "$@" --experimental-features "nix-command $xpFeature" 1>/dev/null
+    expect 1 nix "$@" --experimental-features '' 1>/dev/null
+    nix "$@" --experimental-features "$xpFeature" 1>/dev/null
 }
 
 exit_code_both_ways config show --auto-allocate-uids

@@ -74,7 +74,6 @@ in
       environment.variables = {
         _NIX_FORCE_HTTP = "1";
       };
-      nix.settings.experimental-features = ["nix-command" "flakes"];
     };
     setupScript = ''
     '';

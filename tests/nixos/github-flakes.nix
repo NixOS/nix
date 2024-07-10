@@ -143,7 +143,6 @@ in
           virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
           virtualisation.memorySize = 4096;
           nix.settings.substituters = lib.mkForce [ ];
-          nix.extraOptions = "experimental-features = nix-command";
           networking.hosts.${(builtins.head nodes.github.networking.interfaces.eth1.ipv4.addresses).address} =
             [ "channels.nixos.org" "api.github.com" "github.com" ];
           security.pki.certificateFiles = [ "${cert}/ca.crt" ];

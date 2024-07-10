@@ -386,7 +386,7 @@ struct ExperimentalFeatureSettings : Config {
           Example:
 
           ```
-          experimental-features = nix-command
+          experimental-features = ca-derivations
           ```
 
           The following experimental features are available:

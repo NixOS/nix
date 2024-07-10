@@ -3,7 +3,7 @@
 source ./common.sh
 
 # Without the dynamic-derivations XP feature, we don't have the builtin.
-nix --experimental-features 'nix-command' eval --impure  --expr \
+nix --experimental-features '' eval --impure  --expr \
     'assert ! (builtins ? outputOf); ""'
 
 # Test that a string is required.
@@ -12,14 +12,14 @@ nix --experimental-features 'nix-command' eval --impure  --expr \
 # object that could be coerced to a string. We might liberalise this in
 # the future so it does work, but there are some design questions to
 # resolve first. Adding a test so we don't liberalise it by accident.
-expectStderr 1 nix --experimental-features 'nix-command dynamic-derivations' eval --impure --expr \
+expectStderr 1 nix --experimental-features 'dynamic-derivations' eval --impure --expr \
     'builtins.outputOf (import ../dependencies.nix {}) "out"' \
     | grepQuiet "expected a string but found a set"
 
 # Test that "DrvDeep" string contexts are not supported at this time
 #
 # Like the above, this is a restriction we could relax later.
-expectStderr 1 nix --experimental-features 'nix-command dynamic-derivations' eval --impure --expr \
+expectStderr 1 nix --experimental-features 'dynamic-derivations' eval --impure --expr \
     'builtins.outputOf (import ../dependencies.nix {}).drvPath "out"' \
     | grepQuiet "has a context which refers to a complete source and binary closure. This is not supported at this time"
 

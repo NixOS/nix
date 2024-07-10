@@ -13,7 +13,7 @@ rm -f $TEST_ROOT/result
 
 export unreachable=$(nix store add-path ./recursive.sh)
 
-NIX_BIN_DIR=$(dirname $(type -p nix)) nix --extra-experimental-features 'nix-command recursive-nix' build -o $TEST_ROOT/result -L --impure --file ./recursive.nix
+NIX_BIN_DIR=$(dirname $(type -p nix)) nix --extra-experimental-features 'recursive-nix' build -o $TEST_ROOT/result -L --impure --file ./recursive.nix
 
 [[ $(cat $TEST_ROOT/result/inner1) =~ blaat ]]
 

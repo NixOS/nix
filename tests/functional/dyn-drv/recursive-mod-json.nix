@@ -11,7 +11,7 @@ mkDerivation rec {
   drv = builtins.unsafeDiscardOutputDependency (import ./text-hashed-output.nix).hello.drvPath;
 
   buildCommand = ''
-    export NIX_CONFIG='experimental-features = nix-command ca-derivations'
+    export NIX_CONFIG='experimental-features = ca-derivations'
 
     PATH=${builtins.getEnv "EXTRA_PATH"}:$PATH
 

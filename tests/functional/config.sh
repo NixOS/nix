@@ -59,7 +59,7 @@ var=$(nix config show | grep '^fsync-metadata =' | cut -d '=' -f 2 | xargs)
 
 # Test that it's possible to load config from the environment
 prev=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
-export NIX_CONFIG="cores = 4242"$'\n'"experimental-features = nix-command"
+export NIX_CONFIG="cores = 4242"$'\n'
 exp_cores=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
 exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2 | xargs)
 [[ $prev != $exp_cores ]]

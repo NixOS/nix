@@ -123,7 +123,7 @@ startDaemon() {
     fi
     # Start the daemon, wait for the socket to appear.
     rm -f $NIX_DAEMON_SOCKET_PATH
-    PATH=$DAEMON_PATH nix --extra-experimental-features 'nix-command' daemon &
+    PATH=$DAEMON_PATH nix daemon &
     _NIX_TEST_DAEMON_PID=$!
     export _NIX_TEST_DAEMON_PID
     for ((i = 0; i < 300; i++)); do

@@ -35,7 +35,7 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(doc_nix) eval --experimental-features nix-command -I nix=doc/manual --store dummy:// --impure --raw
+nix-eval = $(dummy-env) $(doc_nix) eval -I nix=doc/manual --store dummy:// --impure --raw
 
 # re-implement mdBook's include directive to make it usable for terminal output and for proper @docroot@ substitution
 define process-includes
@@ -121,7 +121,7 @@ $(d)/nix.json: $(doc_nix)
 	@mv $@.tmp $@
 
 $(d)/conf-file.json: $(doc_nix)
-	$(trace-gen) $(dummy-env) $(doc_nix) config show --json --experimental-features nix-command > $@.tmp
+	$(trace-gen) $(dummy-env) $(doc_nix) config show --json > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/contributing/experimental-feature-descriptions.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features.nix $(doc_nix)
