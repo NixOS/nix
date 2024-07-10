@@ -156,7 +156,7 @@ struct RegistrySettings : Config
 
           When empty, disables the global flake registry.
         )",
-        {}, true, Xp::Flakes};
+        {}, true};
 };
 
 RegistrySettings registrySettings;

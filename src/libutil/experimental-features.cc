@@ -71,18 +71,11 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/42",
     },
     {
-        .tag = Xp::Flakes,
-        .name = "flakes",
-        .description = R"(
-            Enable flakes. See the manual entry for [`nix
-            flake`](@docroot@/command-ref/new-cli/nix3-flake.md) for details.
-        )",
-        .trackingUrl = "https://github.com/NixOS/nix/milestone/27",
-    },
-    {
         .tag = Xp::FetchTree,
         .name = "fetch-tree",
         .description = R"(
+            *Enabled for Determinate Nix Installer users since 2.24*
+
             Enable the use of the [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) built-in function in the Nix language.
 
             `fetchTree` exposes a generic interface for fetching remote file system trees from different types of remote sources.
@@ -299,11 +292,17 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
 static_assert(
     []() constexpr {
         for (auto [index, feature] : enumerate(xpFeatureDetails))
-            if (index != (size_t)feature.tag)
+            if (index != (size_t) feature.tag)
                 return false;
         return true;
     }(),
     "array order does not match enum tag order");
+
+/**
+ * A set of previously experimental features that are now considered
+ * stable. We don't warn if users have these in `experimental-features`.
+ */
+std::set<std::string> stabilizedFeatures{"flakes"};
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)
 {

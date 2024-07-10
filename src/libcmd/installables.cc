@@ -394,9 +394,6 @@ void completeFlakeRefWithFragment(
 
 void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::string_view prefix)
 {
-    if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        return;
-
     if (prefix == "")
         completions.add(".");
 

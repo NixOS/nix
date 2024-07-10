@@ -343,8 +343,6 @@ LockedFlake lockFlake(
     const FlakeRef & topRef,
     const LockFlags & lockFlags)
 {
-    experimentalFeatureSettings.require(Xp::Flakes);
-
     FlakeCache flakeCache;
 
     auto useRegistries = lockFlags.useRegistries.value_or(flakeSettings.useRegistries);
@@ -744,8 +742,6 @@ void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
 {
-    experimentalFeatureSettings.require(Xp::Flakes);
-
     auto [lockFileStr, keyMap] = lockedFlake.lockFile.to_string();
 
     auto overrides = state.buildBindings(lockedFlake.nodePaths.size());
@@ -837,7 +833,6 @@ static RegisterPrimOp r2({
       ```
     )",
     .fun = prim_getFlake,
-    .experimentalFeature = Xp::Flakes,
 });
 
 static void prim_parseFlakeRef(
@@ -881,7 +876,6 @@ static RegisterPrimOp r3({
       ```
     )",
     .fun = prim_parseFlakeRef,
-    .experimentalFeature = Xp::Flakes,
 });
 
 
@@ -938,7 +932,6 @@ static RegisterPrimOp r4({
       ```
     )",
     .fun = prim_flakeRefToString,
-    .experimentalFeature = Xp::Flakes,
 });
 
 }

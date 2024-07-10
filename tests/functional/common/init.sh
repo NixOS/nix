@@ -12,7 +12,7 @@ if isTestOnNixOS; then
   ! test -e "$test_nix_conf"
   cat > "$test_nix_conf_dir/nix.conf" <<EOF
 # TODO: this is not needed for all tests and prevents stable commands from be tested in isolation
-experimental-features = nix-command flakes
+experimental-features = nix-command
 flake-registry = $TEST_ROOT/registry.json
 show-trace = true
 EOF
@@ -58,7 +58,6 @@ EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
 fsync-metadata = false
-extra-experimental-features = flakes
 !include nix.conf.extra.not-there
 EOF
 

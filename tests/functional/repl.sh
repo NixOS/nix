@@ -140,9 +140,9 @@ EOF
 testReplResponse '
 foo + baz
 ' "3" \
-    ./flake ./flake\#bar --experimental-features 'flakes'
+    ./flake ./flake\#bar
 
-# Test the `:reload` mechansim with flakes:
+# Test the `:reload` mechanism with flakes:
 # - Eval `./flake#changingThing`
 # - Modify the flake
 # - Re-eval it
@@ -153,7 +153,7 @@ sleep 1 # Leave the repl the time to eval 'foo'
 sed -i 's/beforeChange/afterChange/' flake/flake.nix
 echo ":reload"
 echo "changingThing"
-) | nix repl ./flake --experimental-features 'flakes')
+) | nix repl ./flake)
 echo "$replResult" | grepQuiet -s beforeChange
 echo "$replResult" | grepQuiet -s afterChange
 

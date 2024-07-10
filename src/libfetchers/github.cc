@@ -299,11 +299,6 @@ struct GitArchiveInputScheme : InputScheme
                 input.getNarHash().has_value());
     }
 
-    std::optional<ExperimentalFeature> experimentalFeature() const override
-    {
-        return Xp::Flakes;
-    }
-
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
         if (auto rev = input.getRev())

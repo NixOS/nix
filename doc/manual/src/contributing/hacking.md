@@ -14,10 +14,9 @@ The following instructions assume you already have some version of Nix installed
 
 ## Building Nix with flakes
 
-This section assumes you are using Nix with the [`flakes`] and [`nix-command`] experimental features enabled.
+This section assumes you are using Nix with the experimental feature [`nix-command`] enabled.
 See the [Building Nix](#building-nix) section for equivalent instructions using stable Nix interfaces.
 
-[`flakes`]: @docroot@/contributing/experimental-features.md#xp-feature-flakes
 [`nix-command`]: @docroot@/contributing/experimental-features.md#xp-nix-command
 
 To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:

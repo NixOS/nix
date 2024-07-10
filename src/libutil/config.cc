@@ -341,11 +341,11 @@ template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeatur
 {
     std::set<ExperimentalFeature> res;
     for (auto & s : tokenizeString<StringSet>(str)) {
-        if (auto thisXpFeature = parseExperimentalFeature(s); thisXpFeature) {
+        if (auto thisXpFeature = parseExperimentalFeature(s))
             res.insert(thisXpFeature.value());
-            if (thisXpFeature.value() == Xp::Flakes)
-                res.insert(Xp::FetchTree);
-        } else
+        else if (stabilizedFeatures.count(s))
+            debug("experimental feature '%s' is now stable", s);
+        else
             warn("unknown experimental feature '%s'", s);
     }
     return res;
