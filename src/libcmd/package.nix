@@ -20,7 +20,7 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
 
 # Whether to enable Markdown rendering in the Nix binary.
 , enableMarkdown ? !stdenv.hostPlatform.isWindows
@@ -36,8 +36,6 @@
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 in
 
 mkMesonDerivation (finalAttrs: {

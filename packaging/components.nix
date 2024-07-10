@@ -32,6 +32,9 @@ in
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
+  # Will replace `nix` once the old build system is gone.
+  nix-ng = callPackage ../src/nix/package.nix { };
+
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { };
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { };
 

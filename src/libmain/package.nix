@@ -7,18 +7,18 @@
 , ninja
 , pkg-config
 
+, openssl
+
 , nix-util
 , nix-store
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
 }:
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 in
 
 mkMesonDerivation (finalAttrs: {
@@ -47,6 +47,7 @@ mkMesonDerivation (finalAttrs: {
   propagatedBuildInputs = [
     nix-util
     nix-store
+    openssl
   ];
 
   preConfigure =

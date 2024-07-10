@@ -18,13 +18,12 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
+, filesetToSource
 }:
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 in
 
 mkMesonDerivation (finalAttrs: {
@@ -88,7 +87,7 @@ mkMesonDerivation (finalAttrs: {
       run = let
         # Some data is shared with the functional tests: they create it,
         # we consume it.
-        data = lib.fileset.toSource {
+        data = filesetToSource {
           root = ../..;
           fileset = lib.fileset.unions [
             ./data

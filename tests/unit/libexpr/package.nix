@@ -17,13 +17,12 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
+, resolvePath
 }:
 
 let
   inherit (lib) fileset;
-
-  version = lib.fileContents ./.version + versionSuffix;
 in
 
 mkMesonDerivation (finalAttrs: {
@@ -86,7 +85,7 @@ mkMesonDerivation (finalAttrs: {
       run = runCommand "${finalAttrs.pname}-run" {
       } ''
         PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
-        export _NIX_TEST_UNIT_DATA=${./data}
+        export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
         nix-expr-tests
         touch $out
       '';

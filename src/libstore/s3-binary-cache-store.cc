@@ -132,6 +132,7 @@ ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
+    res->allowSystemProxy = true;
     res->region = region;
     if (!scheme.empty()) {
         res->scheme = Aws::Http::SchemeMapper::FromString(scheme.c_str());

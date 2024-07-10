@@ -6,6 +6,7 @@ project('nix-dev-shell', 'cpp',
   subproject_dir : 'src',
 )
 
+# Internal Libraries
 subproject('libutil')
 subproject('libstore')
 subproject('libfetchers')
@@ -14,11 +15,14 @@ subproject('libflake')
 subproject('libmain')
 subproject('libcmd')
 
+# Executables
+subproject('nix')
+
 # Docs
 subproject('internal-api-docs')
 subproject('external-api-docs')
 
-# C wrappers
+# External C wrapper libraries
 subproject('libutil-c')
 subproject('libstore-c')
 subproject('libexpr-c')
