@@ -1,11 +1,5 @@
 # Store object info JSON format
 
-> **Warning**
->
-> This JSON format is currently
-> [**experimental**](@docroot@/contributing/experimental-features.md#xp-feature-nix-command)
-> and subject to change.
-
 Info about a [store object].
 
 * `path`:
