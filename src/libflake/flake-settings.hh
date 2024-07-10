@@ -17,12 +17,7 @@ struct FlakeSettings : public Config
     FlakeSettings();
 
     Setting<bool> useRegistries{
-        this,
-        true,
-        "use-registries",
-        "Whether to use flake registries to resolve flake references.",
-        {},
-        true};
+        this, true, "use-registries", "Whether to use flake registries to resolve flake references.", {}, true};
 
     Setting<bool> acceptFlakeConfig{
         this,

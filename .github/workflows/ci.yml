@@ -23,7 +23,7 @@ jobs:
         with:
           flakehub: true
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix --experimental-features 'nix-command' flake check -L
+      - run: nix flake check -L
 
   vm_tests:
     needs: tests
