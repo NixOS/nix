@@ -31,6 +31,21 @@
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParserState * state)
 
+// For efficiency, we only track offsets; not line,column coordinates
+# define YYLLOC_DEFAULT(Current, Rhs, N)                                \
+    do                                                                  \
+      if (N)                                                            \
+        {                                                               \
+          (Current).first_column = YYRHSLOC (Rhs, 1).first_column;      \
+          (Current).last_column  = YYRHSLOC (Rhs, N).last_column;       \
+        }                                                               \
+      else                                                              \
+        {                                                               \
+          (Current).first_column = (Current).last_column =              \
+            YYRHSLOC (Rhs, 0).last_column;                              \
+        }                                                               \
+    while (0)
+
 namespace nix {
 
 typedef std::map<PosIdx, DocComment> DocCommentMap;
@@ -69,7 +84,6 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * 
 {
     if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
         loc->first_column = loc->last_column;
-        loc->first_line = loc->last_line;
     }
     throw ParseError({
         .msg = HintFmt(error),

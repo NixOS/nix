@@ -4,7 +4,6 @@
 
 void nix::lexer::internal::initLoc(YYLTYPE * loc)
 {
-    loc->first_line = loc->last_line = 0;
     loc->first_column = loc->last_column = 0;
 }
 

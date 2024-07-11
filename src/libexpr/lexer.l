@@ -287,7 +287,6 @@ or          { return OR_KW; }
 \/\*\*[^/*]([^*]|\*+[^*/])*\*+\/  /* doc comments */ {
     LexerState & lexerState = *yyget_extra(yyscanner);
     lexerState.docCommentDistance = 0;
-    lexerState.lastDocCommentLoc.first_line = yylloc->first_line;
     lexerState.lastDocCommentLoc.first_column = yylloc->first_column;
     lexerState.lastDocCommentLoc.last_column = yylloc->last_column;
 }
