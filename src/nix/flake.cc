@@ -17,6 +17,7 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "flake-schemas.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -164,31 +165,6 @@ struct CmdFlakeLock : FlakeCommand
     }
 };
 
-static void enumerateOutputs(EvalState & state, Value & vFlake,
-    std::function<void(const std::string & name, Value & vProvide, const PosIdx pos)> callback)
-{
-    auto pos = vFlake.determinePos(noPos);
-    state.forceAttrs(vFlake, pos, "while evaluating a flake to get its outputs");
-
-    auto aOutputs = vFlake.attrs()->get(state.symbols.create("outputs"));
-    assert(aOutputs);
-
-    state.forceAttrs(*aOutputs->value, pos, "while evaluating the outputs of a flake");
-
-    auto sHydraJobs = state.symbols.create("hydraJobs");
-
-    /* Hack: ensure that hydraJobs is evaluated before anything
-       else. This way we can disable IFD for hydraJobs and then enable
-       it for other outputs. */
-    if (auto attr = aOutputs->value->attrs()->get(sHydraJobs))
-        callback(state.symbols[attr->name], *attr->value, attr->pos);
-
-    for (auto & attr : *aOutputs->value->attrs()) {
-        if (attr.name != sHydraJobs)
-            callback(state.symbols[attr.name], *attr.value, attr.pos);
-    }
-}
-
 struct CmdFlakeMetadata : FlakeCommand, MixJSON
 {
     std::string description() override
@@ -319,7 +295,7 @@ struct CmdFlakeInfo : CmdFlakeMetadata
     }
 };
 
-struct CmdFlakeCheck : FlakeCommand
+struct CmdFlakeCheck : FlakeCommand, flake_schemas::MixFlakeSchemas
 {
     bool build = true;
     bool checkAllSystems = false;
@@ -360,16 +336,26 @@ struct CmdFlakeCheck : FlakeCommand
         auto state = getEvalState();
 
         lockFlags.applyNixConfig = true;
-        auto flake = lockFlake();
+        auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
+        auto [cache, inventory] = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
+
+        std::vector<DerivedPath> drvPaths;
+
+        std::set<std::string> uncheckedOutputs;
+        std::set<std::string> omittedSystems;
+
+        std::function<void(ref<eval_cache::AttrCursor> node)> visit;
+
         bool hasErrors = false;
+
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreException();
+                    logError({.msg = e.info().msg});
                     hasErrors = true;
                 }
                 else
@@ -377,428 +363,70 @@ struct CmdFlakeCheck : FlakeCommand
             }
         };
 
-        std::set<std::string> omittedSystems;
-
-        // FIXME: rewrite to use EvalCache.
-
-        auto resolve = [&] (PosIdx p) {
-            return state->positions[p];
-        };
-
-        auto argHasName = [&] (Symbol arg, std::string_view expected) {
-            std::string_view name = state->symbols[arg];
-            return
-                name == expected
-                || name == "_"
-                || (hasPrefix(name, "_") && name.substr(1) == expected);
-        };
-
-        auto checkSystemName = [&](const std::string & system, const PosIdx pos) {
-            // FIXME: what's the format of "system"?
-            if (system.find('-') == std::string::npos)
-                reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos)));
-        };
-
-        auto checkSystemType = [&](const std::string & system, const PosIdx pos) {
-            if (!checkAllSystems && system != localSystem) {
-                omittedSystems.insert(system);
-                return false;
-            } else {
-                return true;
-            }
-        };
-
-        auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("checking derivation %s", attrPath));
-                auto packageInfo = getDerivation(*state, v, false);
-                if (!packageInfo)
-                    throw Error("flake attribute '%s' is not a derivation", attrPath);
-                else {
-                    // FIXME: check meta attributes
-                    auto storePath = packageInfo->queryDrvPath();
-                    if (storePath) {
-                        logger->log(lvlInfo,
-                            fmt("derivation evaluated to %s",
-                                store->printStorePath(storePath.value())));
-                    }
-                    return storePath;
-                }
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the derivation '%s'", attrPath));
-                reportError(e);
-            }
-            return std::nullopt;
-        };
-
-        std::vector<DerivedPath> drvPaths;
-
-        auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
-            try {
-                #if 0
-                // FIXME
-                auto app = App(*state, v);
-                for (auto & i : app.context) {
-                    auto [drvPathS, outputName] = NixStringContextElem::parse(i);
-                    store->parseStorePath(drvPathS);
-                }
-                #endif
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the app definition '%s'", attrPath));
-                reportError(e);
-            }
-        };
-
-        auto checkOverlay = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("checking overlay '%s'", attrPath));
-                state->forceValue(v, pos);
-                if (!v.isLambda()) {
-                    throw Error("overlay is not a function, but %s instead", showType(v));
-                }
-                if (v.payload.lambda.fun->hasFormals()
-                    || !argHasName(v.payload.lambda.fun->arg, "final"))
-                    throw Error("overlay does not take an argument named 'final'");
-                // FIXME: if we have a 'nixpkgs' input, use it to
-                // evaluate the overlay.
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the overlay '%s'", attrPath));
-                reportError(e);
-            }
-        };
-
-        auto checkModule = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("checking NixOS module '%s'", attrPath));
-                state->forceValue(v, pos);
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the NixOS module '%s'", attrPath));
-                reportError(e);
-            }
-        };
-
-        std::function<void(const std::string & attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
-
-        checkHydraJobs = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("checking Hydra job '%s'", attrPath));
-                state->forceAttrs(v, pos, "");
-
-                if (state->isDerivation(v))
-                    throw Error("jobset should not be a derivation at top-level");
-
-                for (auto & attr : *v.attrs()) {
-                    state->forceAttrs(*attr.value, attr.pos, "");
-                    auto attrPath2 = concatStrings(attrPath, ".", state->symbols[attr.name]);
-                    if (state->isDerivation(*attr.value)) {
-                        Activity act(*logger, lvlInfo, actUnknown,
-                            fmt("checking Hydra job '%s'", attrPath2));
-                        checkDerivation(attrPath2, *attr.value, attr.pos);
-                    } else
-                        checkHydraJobs(attrPath2, *attr.value, attr.pos);
-                }
-
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the Hydra jobset '%s'", attrPath));
-                reportError(e);
-            }
-        };
-
-        auto checkNixOSConfiguration = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("checking NixOS configuration '%s'", attrPath));
-                Bindings & bindings(*state->allocBindings(0));
-                auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v).first;
-                state->forceValue(*vToplevel, pos);
-                if (!state->isDerivation(*vToplevel))
-                    throw Error("attribute 'config.system.build.toplevel' is not a derivation");
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the NixOS configuration '%s'", attrPath));
-                reportError(e);
-            }
-        };
-
-        auto checkTemplate = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("checking template '%s'", attrPath));
-
-                state->forceAttrs(v, pos, "");
-
-                if (auto attr = v.attrs()->get(state->symbols.create("path"))) {
-                    if (attr->name == state->symbols.create("path")) {
-                        NixStringContext context;
-                        auto path = state->coerceToPath(attr->pos, *attr->value, context, "");
-                        if (!path.pathExists())
-                            throw Error("template '%s' refers to a non-existent path '%s'", attrPath, path);
-                        // TODO: recursively check the flake in 'path'.
-                    }
-                } else
-                    throw Error("template '%s' lacks attribute 'path'", attrPath);
-
-                if (auto attr = v.attrs()->get(state->symbols.create("description")))
-                    state->forceStringNoCtx(*attr->value, attr->pos, "");
-                else
-                    throw Error("template '%s' lacks attribute 'description'", attrPath);
-
-                for (auto & attr : *v.attrs()) {
-                    std::string_view name(state->symbols[attr.name]);
-                    if (name != "path" && name != "description" && name != "welcomeText")
-                        throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
-                }
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the template '%s'", attrPath));
-                reportError(e);
-            }
-        };
-
-        auto checkBundler = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown,
-                    fmt("checking bundler '%s'", attrPath));
-                state->forceValue(v, pos);
-                if (!v.isLambda())
-                    throw Error("bundler must be a function");
-                // TODO: check types of inputs/outputs?
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the template '%s'", attrPath));
-                reportError(e);
-            }
-        };
-
+        visit = [&](ref<eval_cache::AttrCursor> node)
         {
-            Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
+            flake_schemas::visit(
+                checkAllSystems ? std::optional<std::string>() : localSystem,
+                node,
 
-            auto vFlake = state->allocValue();
-            flake::callFlake(*state, flake, *vFlake);
-
-            enumerateOutputs(*state,
-                *vFlake,
-                [&](const std::string & name, Value & vOutput, const PosIdx pos) {
-                    Activity act(*logger, lvlInfo, actUnknown,
-                        fmt("checking flake output '%s'", name));
-
-                    try {
-                        evalSettings.enableImportFromDerivation.setDefault(name != "hydraJobs");
-
-                        state->forceValue(vOutput, pos);
-
-                        std::string_view replacement =
-                            name == "defaultPackage" ? "packages.<system>.default" :
-                            name == "defaultApp" ? "apps.<system>.default" :
-                            name == "defaultTemplate" ? "templates.default" :
-                            name == "defaultBundler" ? "bundlers.<system>.default" :
-                            name == "overlay" ? "overlays.default" :
-                            name == "devShell" ? "devShells.<system>.default" :
-                            name == "nixosModule" ? "nixosModules.default" :
-                            "";
-                        if (replacement != "")
-                            warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
-
-                        if (name == "checks") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos)) {
-                                    state->forceAttrs(*attr.value, attr.pos, "");
-                                    for (auto & attr2 : *attr.value->attrs()) {
-                                        auto drvPath = checkDerivation(
-                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                            *attr2.value, attr2.pos);
-                                        if (drvPath && attr_name == settings.thisSystem.get()) {
-                                            drvPaths.push_back(DerivedPath::Built {
-                                                .drvPath = makeConstantStorePathRef(*drvPath),
-                                                .outputs = OutputsSpec::All { },
-                                            });
-                                        }
-                                    }
-                                }
-                            }
+                [&](ref<eval_cache::AttrCursor> leaf)
+                {
+                    if (auto evalChecks = leaf->maybeGetAttr("evalChecks")) {
+                        auto checkNames = evalChecks->getAttrs();
+                        for (auto & checkName : checkNames) {
+                            // FIXME: update activity
+                            auto cursor = evalChecks->getAttr(checkName);
+                            auto b = cursor->getBool();
+                            if (!b)
+                                reportError(Error("Evaluation check '%s' failed.", flake_schemas::toAttrPathStr(cursor)));
                         }
-
-                        else if (name == "formatter") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos)) {
-                                    checkApp(
-                                        fmt("%s.%s", name, attr_name),
-                                        *attr.value, attr.pos);
-                                };
-                            }
-                        }
-
-                        else if (name == "packages" || name == "devShells") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos)) {
-                                    state->forceAttrs(*attr.value, attr.pos, "");
-                                    for (auto & attr2 : *attr.value->attrs())
-                                        checkDerivation(
-                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                            *attr2.value, attr2.pos);
-                                };
-                            }
-                        }
-
-                        else if (name == "apps") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos)) {
-                                    state->forceAttrs(*attr.value, attr.pos, "");
-                                    for (auto & attr2 : *attr.value->attrs())
-                                        checkApp(
-                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                            *attr2.value, attr2.pos);
-                                };
-                            }
-                        }
-
-                        else if (name == "defaultPackage" || name == "devShell") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos)) {
-                                    checkDerivation(
-                                        fmt("%s.%s", name, attr_name),
-                                        *attr.value, attr.pos);
-                                };
-                            }
-                        }
-
-                        else if (name == "defaultApp") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos) ) {
-                                    checkApp(
-                                        fmt("%s.%s", name, attr_name),
-                                        *attr.value, attr.pos);
-                                };
-                            }
-                        }
-
-                        else if (name == "legacyPackages") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                checkSystemName(state->symbols[attr.name], attr.pos);
-                                checkSystemType(state->symbols[attr.name], attr.pos);
-                                // FIXME: do getDerivations?
-                            }
-                        }
-
-                        else if (name == "overlay")
-                            checkOverlay(name, vOutput, pos);
-
-                        else if (name == "overlays") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs())
-                                checkOverlay(fmt("%s.%s", name, state->symbols[attr.name]),
-                                    *attr.value, attr.pos);
-                        }
-
-                        else if (name == "nixosModule")
-                            checkModule(name, vOutput, pos);
-
-                        else if (name == "nixosModules") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs())
-                                checkModule(fmt("%s.%s", name, state->symbols[attr.name]),
-                                    *attr.value, attr.pos);
-                        }
-
-                        else if (name == "nixosConfigurations") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs())
-                                checkNixOSConfiguration(fmt("%s.%s", name, state->symbols[attr.name]),
-                                    *attr.value, attr.pos);
-                        }
-
-                        else if (name == "hydraJobs")
-                            checkHydraJobs(name, vOutput, pos);
-
-                        else if (name == "defaultTemplate")
-                            checkTemplate(name, vOutput, pos);
-
-                        else if (name == "templates") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs())
-                                checkTemplate(fmt("%s.%s", name, state->symbols[attr.name]),
-                                    *attr.value, attr.pos);
-                        }
-
-                        else if (name == "defaultBundler") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos)) {
-                                    checkBundler(
-                                        fmt("%s.%s", name, attr_name),
-                                        *attr.value, attr.pos);
-                                };
-                            }
-                        }
-
-                        else if (name == "bundlers") {
-                            state->forceAttrs(vOutput, pos, "");
-                            for (auto & attr : *vOutput.attrs()) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                if (checkSystemType(attr_name, attr.pos)) {
-                                    state->forceAttrs(*attr.value, attr.pos, "");
-                                    for (auto & attr2 : *attr.value->attrs()) {
-                                        checkBundler(
-                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                            *attr2.value, attr2.pos);
-                                    }
-                                };
-                            }
-                        }
-
-                        else if (
-                            name == "lib"
-                            || name == "darwinConfigurations"
-                            || name == "darwinModules"
-                            || name == "flakeModule"
-                            || name == "flakeModules"
-                            || name == "herculesCI"
-                            || name == "homeConfigurations"
-                            || name == "homeModule"
-                            || name == "homeModules"
-                            || name == "nixopsConfigurations"
-                            )
-                            // Known but unchecked community attribute
-                            ;
-
-                        else
-                            warn("unknown flake output '%s'", name);
-
-                    } catch (Error & e) {
-                        e.addTrace(resolve(pos), HintFmt("while checking flake output '%s'", name));
-                        reportError(e);
                     }
+
+                    if (auto drv = flake_schemas::derivation(leaf)) {
+                        if (auto isFlakeCheck = leaf->maybeGetAttr("isFlakeCheck")) {
+                            if (isFlakeCheck->getBool()) {
+                                auto drvPath = drv->forceDerivation();
+                                drvPaths.push_back(DerivedPath::Built {
+                                    .drvPath = makeConstantStorePathRef(drvPath),
+                                    .outputs = OutputsSpec::All { },
+                                });
+                            }
+                        }
+                    }
+                },
+
+                [&](std::function<void(flake_schemas::ForEachChild)> forEachChild)
+                {
+                    forEachChild([&](Symbol attrName, ref<eval_cache::AttrCursor> node, bool isLast)
+                    {
+                        visit(node);
+                    });
+                },
+
+                [&](ref<eval_cache::AttrCursor> node, const std::vector<std::string> & systems) {
+                    for (auto & s : systems)
+                        omittedSystems.insert(s);
                 });
-        }
+        };
+
+        flake_schemas::forEachOutput(inventory, [&](Symbol outputName, std::shared_ptr<eval_cache::AttrCursor> output, const std::string & doc, bool isLast)
+        {
+            if (output) {
+                visit(ref(output));
+            } else
+                uncheckedOutputs.insert(state->symbols[outputName]);
+        });
+
+        if (!uncheckedOutputs.empty())
+            warn("The following flake outputs are unchecked: %s.",
+                concatStringsSep(", ", uncheckedOutputs)); // FIXME: quote
 
         if (build && !drvPaths.empty()) {
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("running %d flake checks", drvPaths.size()));
             store->buildPaths(drvPaths);
         }
+
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
 
@@ -808,7 +436,7 @@ struct CmdFlakeCheck : FlakeCommand
                 "Use '--all-systems' to check all.",
                 concatStringsSep(", ", omittedSystems)
             );
-        };
+        }
     };
 };
 
@@ -1092,7 +720,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
     }
 };
 
-struct CmdFlakeShow : FlakeCommand, MixJSON
+struct CmdFlakeShow : FlakeCommand, MixJSON, flake_schemas::MixFlakeSchemas
 {
     bool showLegacy = false;
     bool showAllSystems = false;
@@ -1125,267 +753,158 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
     void run(nix::ref<nix::Store> store) override
     {
-        evalSettings.enableImportFromDerivation.setDefault(false);
-
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        std::function<bool(
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> &attrPath,
-            const Symbol &attr)> hasContent;
+        auto [cache, inventory] = flake_schemas::call(*state, flake, getDefaultFlakeSchemas());
 
-        // For frameworks it's important that structures are as lazy as possible
-        // to prevent infinite recursions, performance issues and errors that
-        // aren't related to the thing to evaluate. As a consequence, they have
-        // to emit more attributes than strictly (sic) necessary.
-        // However, these attributes with empty values are not useful to the user
-        // so we omit them.
-        hasContent = [&](
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> &attrPath,
-            const Symbol &attr) -> bool
-        {
-            auto attrPath2(attrPath);
-            attrPath2.push_back(attr);
-            auto attrPathS = state->symbols.resolve(attrPath2);
-            const auto & attrName = state->symbols[attr];
+        if (json) {
+            std::function<void(ref<eval_cache::AttrCursor> node, nlohmann::json & obj)> visit;
 
-            auto visitor2 = visitor.getAttr(attrName);
+            visit = [&](ref<eval_cache::AttrCursor> node, nlohmann::json & obj)
+            {
+                flake_schemas::visit(
+                    showAllSystems ? std::optional<std::string>() : localSystem,
+                    node,
 
-            try {
-                if ((attrPathS[0] == "apps"
-                        || attrPathS[0] == "checks"
-                        || attrPathS[0] == "devShells"
-                        || attrPathS[0] == "legacyPackages"
-                        || attrPathS[0] == "packages")
-                    && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
-                    for (const auto &subAttr : visitor2->getAttrs()) {
-                        if (hasContent(*visitor2, attrPath2, subAttr)) {
-                            return true;
-                        }
-                    }
-                    return false;
+                    [&](ref<eval_cache::AttrCursor> leaf)
+                    {
+                        obj.emplace("leaf", true);
+
+                        if (auto what = flake_schemas::what(leaf))
+                            obj.emplace("what", what);
+
+                        if (auto shortDescription = flake_schemas::shortDescription(leaf))
+                            obj.emplace("shortDescription", shortDescription);
+
+                        if (auto drv = flake_schemas::derivation(leaf))
+                            obj.emplace("derivationName", drv->getAttr(state->sName)->getString());
+
+                        // FIXME: add more stuff
+                    },
+
+                    [&](std::function<void(flake_schemas::ForEachChild)> forEachChild)
+                    {
+                        auto children = nlohmann::json::object();
+                        forEachChild([&](Symbol attrName, ref<eval_cache::AttrCursor> node, bool isLast)
+                        {
+                            auto j = nlohmann::json::object();
+                            try {
+                                visit(node, j);
+                            } catch (EvalError & e) {
+                                // FIXME: make it a flake schema attribute whether to ignore evaluation errors.
+                                if (node->root->state.symbols[flake_schemas::toAttrPath(node)[0]] == "legacyPackages")
+                                    j.emplace("failed", true);
+                                else
+                                    throw;
+                            }
+                            children.emplace(state->symbols[attrName], std::move(j));
+                        });
+                        obj.emplace("children", std::move(children));
+                    },
+
+                    [&](ref<eval_cache::AttrCursor> node, const std::vector<std::string> & systems)
+                    {
+                        obj.emplace("filtered", true);
+                    });
+            };
+
+            auto res = nlohmann::json::object();
+
+            flake_schemas::forEachOutput(inventory, [&](Symbol outputName, std::shared_ptr<eval_cache::AttrCursor> output, const std::string & doc, bool isLast)
+            {
+                auto j = nlohmann::json::object();
+
+                if (!showLegacy && state->symbols[outputName] == "legacyPackages") {
+                    j.emplace("skipped", true);
+                } else if (output) {
+                    j.emplace("doc", doc);
+                    auto j2 = nlohmann::json::object();
+                    visit(ref(output), j2);
+                    j.emplace("output", std::move(j2));
+                } else
+                    j.emplace("unknown", true);
+
+                res.emplace(state->symbols[outputName], j);
+            });
+
+            logger->cout("%s", res.dump());
+        }
+
+        else {
+            logger->cout(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef);
+
+            std::function<void(
+                ref<eval_cache::AttrCursor> node,
+                const std::string & headerPrefix,
+                const std::string & prevPrefix)> visit;
+
+            visit = [&](
+                ref<eval_cache::AttrCursor> node,
+                const std::string & headerPrefix,
+                const std::string & prevPrefix)
+            {
+                flake_schemas::visit(
+                    showAllSystems ? std::optional<std::string>() : localSystem,
+                    node,
+
+                    [&](ref<eval_cache::AttrCursor> leaf)
+                    {
+                        auto s = headerPrefix;
+
+                        if (auto what = flake_schemas::what(leaf))
+                            s += fmt(": %s", *what);
+
+                        if (auto drv = flake_schemas::derivation(leaf))
+                            s += fmt(ANSI_ITALIC " [%s]" ANSI_NORMAL, drv->getAttr(state->sName)->getString());
+
+                        logger->cout(s);
+                    },
+
+                    [&](std::function<void(flake_schemas::ForEachChild)> forEachChild)
+                    {
+                        logger->cout(headerPrefix);
+                        forEachChild([&](Symbol attrName, ref<eval_cache::AttrCursor> node, bool isLast)
+                        {
+                            visit(node,
+                                fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, prevPrefix,
+                                    isLast ? treeLast : treeConn, state->symbols[attrName]),
+                                prevPrefix + (isLast ? treeNull : treeLine));
+                        });
+                    },
+
+                    [&](ref<eval_cache::AttrCursor> node, const std::vector<std::string> & systems)
+                    {
+                        logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
+                    });
+            };
+
+            flake_schemas::forEachOutput(inventory, [&](Symbol outputName, std::shared_ptr<eval_cache::AttrCursor> output, const std::string & doc, bool isLast)
+            {
+                auto headerPrefix = fmt(
+                    ANSI_GREEN "%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL,
+                    isLast ? treeLast : treeConn, state->symbols[outputName]);
+
+                if (!showLegacy && state->symbols[outputName] == "legacyPackages") {
+                    logger->cout(headerPrefix);
+                    logger->cout(
+                        ANSI_GREEN "%s" "%s" ANSI_NORMAL ANSI_ITALIC "%s" ANSI_NORMAL,
+                        isLast ? treeNull : treeLine,
+                        treeLast,
+                        "(skipped; use '--legacy' to show)");
+                } else if (output) {
+                    visit(ref(output), headerPrefix, isLast ? treeNull : treeLine);
+                } else {
+                    logger->cout(headerPrefix);
+                    logger->cout(
+                        ANSI_GREEN "%s" "%s" ANSI_NORMAL ANSI_ITALIC "%s" ANSI_NORMAL,
+                        isLast ? treeNull : treeLine,
+                        treeLast,
+                        "(unknown flake output)");
                 }
-
-                if ((attrPathS.size() == 1)
-                    && (attrPathS[0] == "formatter"
-                        || attrPathS[0] == "nixosConfigurations"
-                        || attrPathS[0] == "nixosModules"
-                        || attrPathS[0] == "overlays"
-                        )) {
-                    for (const auto &subAttr : visitor2->getAttrs()) {
-                        if (hasContent(*visitor2, attrPath2, subAttr)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-
-                // If we don't recognize it, it's probably content
-                return true;
-            } catch (EvalError & e) {
-                // Some attrs may contain errors, e.g. legacyPackages of
-                // nixpkgs. We still want to recurse into it, instead of
-                // skipping it at all.
-                return true;
-            }
-        };
-
-        std::function<nlohmann::json(
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> & attrPath,
-            const std::string & headerPrefix,
-            const std::string & nextPrefix)> visit;
-
-        visit = [&](
-            eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> & attrPath,
-            const std::string & headerPrefix,
-            const std::string & nextPrefix)
-            -> nlohmann::json
-        {
-            auto j = nlohmann::json::object();
-
-            auto attrPathS = state->symbols.resolve(attrPath);
-
-            Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
-
-            try {
-                auto recurse = [&]()
-                {
-                    if (!json)
-                        logger->cout("%s", headerPrefix);
-                    std::vector<Symbol> attrs;
-                    for (const auto &attr : visitor.getAttrs()) {
-                        if (hasContent(visitor, attrPath, attr))
-                            attrs.push_back(attr);
-                    }
-
-                    for (const auto & [i, attr] : enumerate(attrs)) {
-                        const auto & attrName = state->symbols[attr];
-                        bool last = i + 1 == attrs.size();
-                        auto visitor2 = visitor.getAttr(attrName);
-                        auto attrPath2(attrPath);
-                        attrPath2.push_back(attr);
-                        auto j2 = visit(*visitor2, attrPath2,
-                            fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL, nextPrefix, last ? treeLast : treeConn, attrName),
-                            nextPrefix + (last ? treeNull : treeLine));
-                        if (json) j.emplace(attrName, std::move(j2));
-                    }
-                };
-
-                auto showDerivation = [&]()
-                {
-                    auto name = visitor.getAttr(state->sName)->getString();
-                    if (json) {
-                        std::optional<std::string> description;
-                        if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
-                            if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
-                                description = aDescription->getString();
-                        }
-                        j.emplace("type", "derivation");
-                        j.emplace("name", name);
-                        if (description)
-                            j.emplace("description", *description);
-                    } else {
-                        logger->cout("%s: %s '%s'",
-                            headerPrefix,
-                            attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
-                            attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
-                            attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
-                            attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
-                            "package",
-                            name);
-                    }
-                };
-
-                if (attrPath.size() == 0
-                    || (attrPath.size() == 1 && (
-                            attrPathS[0] == "defaultPackage"
-                            || attrPathS[0] == "devShell"
-                            || attrPathS[0] == "formatter"
-                            || attrPathS[0] == "nixosConfigurations"
-                            || attrPathS[0] == "nixosModules"
-                            || attrPathS[0] == "defaultApp"
-                            || attrPathS[0] == "templates"
-                            || attrPathS[0] == "overlays"))
-                    || ((attrPath.size() == 1 || attrPath.size() == 2)
-                        && (attrPathS[0] == "checks"
-                            || attrPathS[0] == "packages"
-                            || attrPathS[0] == "devShells"
-                            || attrPathS[0] == "apps"))
-                    )
-                {
-                    recurse();
-                }
-
-                else if (
-                    (attrPath.size() == 2 && (attrPathS[0] == "defaultPackage" || attrPathS[0] == "devShell" || attrPathS[0] == "formatter"))
-                    || (attrPath.size() == 3 && (attrPathS[0] == "checks" || attrPathS[0] == "packages" || attrPathS[0] == "devShells"))
-                    )
-                {
-                    if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
-                        if (!json)
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
-                        else {
-                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
-                        }
-                    } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else
-                            throw Error("expected a derivation");
-                    }
-                }
-
-                else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        recurse();
-                }
-
-                else if (attrPath.size() > 0 && attrPathS[0] == "legacyPackages") {
-                    if (attrPath.size() == 1)
-                        recurse();
-                    else if (!showLegacy){
-                        if (!json)
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
-                        else {
-                            logger->warn(fmt("%s omitted (use '--legacy' to show)", concatStringsSep(".", attrPathS)));
-                        }
-                    } else if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
-                        if (!json)
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
-                        else {
-                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
-                        }
-                    } else {
-                        if (visitor.isDerivation())
-                            showDerivation();
-                        else if (attrPath.size() <= 2)
-                            // FIXME: handle recurseIntoAttrs
-                            recurse();
-                    }
-                }
-
-                else if (
-                    (attrPath.size() == 2 && attrPathS[0] == "defaultApp") ||
-                    (attrPath.size() == 3 && attrPathS[0] == "apps"))
-                {
-                    auto aType = visitor.maybeGetAttr("type");
-                    if (!aType || aType->getString() != "app")
-                        state->error<EvalError>("not an app definition").debugThrow();
-                    if (json) {
-                        j.emplace("type", "app");
-                    } else {
-                        logger->cout("%s: app", headerPrefix);
-                    }
-                }
-
-                else if (
-                    (attrPath.size() == 1 && attrPathS[0] == "defaultTemplate") ||
-                    (attrPath.size() == 2 && attrPathS[0] == "templates"))
-                {
-                    auto description = visitor.getAttr("description")->getString();
-                    if (json) {
-                        j.emplace("type", "template");
-                        j.emplace("description", description);
-                    } else {
-                        logger->cout("%s: template: " ANSI_BOLD "%s" ANSI_NORMAL, headerPrefix, description);
-                    }
-                }
-
-                else {
-                    auto [type, description] =
-                        (attrPath.size() == 1 && attrPathS[0] == "overlay")
-                        || (attrPath.size() == 2 && attrPathS[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :
-                        attrPath.size() == 2 && attrPathS[0] == "nixosConfigurations" ? std::make_pair("nixos-configuration", "NixOS configuration") :
-                        (attrPath.size() == 1 && attrPathS[0] == "nixosModule")
-                        || (attrPath.size() == 2 && attrPathS[0] == "nixosModules") ? std::make_pair("nixos-module", "NixOS module") :
-                        std::make_pair("unknown", "unknown");
-                    if (json) {
-                        j.emplace("type", type);
-                    } else {
-                        logger->cout("%s: " ANSI_WARNING "%s" ANSI_NORMAL, headerPrefix, description);
-                    }
-                }
-            } catch (EvalError & e) {
-                if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
-                    throw;
-            }
-
-            return j;
-        };
-
-        auto cache = openEvalCache(*state, flake);
-
-        auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
-        if (json)
-            logger->cout("%s", j.dump());
+            });
+        }
     }
 };
 

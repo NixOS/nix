@@ -193,10 +193,28 @@ struct LockFlags
     std::set<InputPath> inputUpdates;
 };
 
+Flake readFlake(
+    EvalState & state,
+    const FlakeRef & originalRef,
+    const FlakeRef & resolvedRef,
+    const FlakeRef & lockedRef,
+    const SourcePath & rootDir,
+    const InputPath & lockRootPath);
+
+/**
+ * Compute an in-memory lock file for the specified top-level flake,
+ * and optionally write it to file, if the flake is writable.
+ */
 LockedFlake lockFlake(
     EvalState & state,
     const FlakeRef & flakeRef,
     const LockFlags & lockFlags);
+
+LockedFlake lockFlake(
+    EvalState & state,
+    const FlakeRef & topRef,
+    const LockFlags & lockFlags,
+    Flake flake);
 
 void callFlake(
     EvalState & state,
