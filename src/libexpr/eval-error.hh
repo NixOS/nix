@@ -112,6 +112,12 @@ public:
      * Delete the `EvalErrorBuilder` and throw the underlying exception.
      */
     [[gnu::noinline, gnu::noreturn]] void debugThrow();
+
+    /**
+     * A programming error or fatal condition occurred. Abort the process for core dump and debugging.
+     * This does not print a proper backtrace, because unwinding the stack is destructive.
+     */
+    [[gnu::noinline, gnu::noreturn]] void panic();
 };
 
 }
