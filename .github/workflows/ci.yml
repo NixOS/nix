@@ -19,6 +19,11 @@ jobs:
     with:
       os: UbuntuLatest32Cores128G
 
+  test_aarch64-linux:
+    uses: ./.github/workflows/test.yml
+    with:
+      os: UbuntuLatest32Cores128GArm
+
   test_aarch64-darwin:
     uses: ./.github/workflows/test.yml
     with:
