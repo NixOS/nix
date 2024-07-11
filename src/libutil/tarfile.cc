@@ -67,6 +67,17 @@ int getArchiveFilterCodeByName(const std::string & method)
     return code;
 }
 
+static void enableSupportedFormats(struct archive * archive)
+{
+    archive_read_support_format_tar(archive);
+    archive_read_support_format_zip(archive);
+
+    /* Enable support for empty files so we don't throw an exception
+       for empty HTTP 304 "Not modified" responses. See
+       downloadTarball(). */
+    archive_read_support_format_empty(archive);
+}
+
 TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> compression_method)
     : archive{archive_read_new()}
     , source{&source}
@@ -78,10 +89,9 @@ TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> com
         archive_read_support_filter_by_code(archive, getArchiveFilterCodeByName(*compression_method));
     }
 
-    if (!raw) {
-        archive_read_support_format_tar(archive);
-        archive_read_support_format_zip(archive);
-    } else {
+    if (!raw)
+        enableSupportedFormats(archive);
+    else {
         archive_read_support_format_raw(archive);
         archive_read_support_format_empty(archive);
     }
@@ -97,8 +107,7 @@ TarArchive::TarArchive(const Path & path)
     , buffer(defaultBufferSize)
 {
     archive_read_support_filter_all(archive);
-    archive_read_support_format_tar(archive);
-    archive_read_support_format_zip(archive);
+    enableSupportedFormats(archive);
     archive_read_set_option(archive, NULL, "mac-ext", NULL);
     check(archive_read_open_filename(archive, path.c_str(), 16384), "failed to open archive: %s");
 }
@@ -178,6 +187,7 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         auto path = archive_entry_pathname(entry);
         if (!path)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
+        auto cpath = CanonPath{path};
         if (r == ARCHIVE_WARN)
             warn(archive_error_string(archive.archive));
         else
@@ -188,11 +198,11 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         switch (archive_entry_filetype(entry)) {
 
         case AE_IFDIR:
-            parseSink.createDirectory(path);
+            parseSink.createDirectory(cpath);
             break;
 
         case AE_IFREG: {
-            parseSink.createRegularFile(path, [&](auto & crf) {
+            parseSink.createRegularFile(cpath, [&](auto & crf) {
                 if (archive_entry_mode(entry) & S_IXUSR)
                     crf.isExecutable();
 
@@ -216,7 +226,7 @@ time_t unpackTarfileToSink(TarArchive & archive, FileSystemObjectSink & parseSin
         case AE_IFLNK: {
             auto target = archive_entry_symlink(entry);
 
-            parseSink.createSymlink(path, target);
+            parseSink.createSymlink(cpath, target);
 
             break;
         }

@@ -1,7 +1,7 @@
 { lib
 , stdenv
+, mkMesonDerivation
 , releaseTools
-, fileset
 
 , meson
 , ninja
@@ -11,40 +11,29 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
-
-# Check test coverage of Nix. Probably want to use with at least
-# one of `doCheck` or `doInstallCheck` enabled.
-, withCoverageChecks ? false
+, version
 }:
 
 let
-  version = lib.fileContents ./.version + versionSuffix;
-
-  mkDerivation =
-    if withCoverageChecks
-    then
-      # TODO support `finalAttrs` args function in
-      # `releaseTools.coverageAnalysis`.
-      argsFun:
-         releaseTools.coverageAnalysis (let args = argsFun args; in args)
-    else stdenv.mkDerivation;
+  inherit (lib) fileset;
 in
 
-mkDerivation (finalAttrs: {
+mkMesonDerivation (finalAttrs: {
   pname = "nix-util-c";
   inherit version;
 
-  src = fileset.toSource {
-    root = ./.;
-    fileset = fileset.unions [
-      ./meson.build
-      ./meson.options
-      (fileset.fileFilter (file: file.hasExt "cc") ./.)
-      (fileset.fileFilter (file: file.hasExt "hh") ./.)
-      (fileset.fileFilter (file: file.hasExt "h") ./.)
-    ];
-  };
+  workDir = ./.;
+  fileset = fileset.unions [
+    ../../build-utils-meson
+    ./build-utils-meson
+    ../../.version
+    ./.version
+    ./meson.build
+    ./meson.options
+    (fileset.fileFilter (file: file.hasExt "cc") ./.)
+    (fileset.fileFilter (file: file.hasExt "hh") ./.)
+    (fileset.fileFilter (file: file.hasExt "h") ./.)
+  ];
 
   outputs = [ "out" "dev" ];
 
@@ -54,19 +43,16 @@ mkDerivation (finalAttrs: {
     pkg-config
   ];
 
-  buildInputs = [
-    nix-util
-  ]
-  ;
-
   propagatedBuildInputs = [
     nix-util
   ];
 
   preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix
+    # "Inline" .version so it's not a symlink, and includes the suffix.
+    # Do the meson utils, without modification.
     ''
-      echo ${version} > .version
+      chmod u+w ./.version
+      echo ${version} > ../../.version
     '';
 
   mesonFlags = [
@@ -80,8 +66,7 @@ mkDerivation (finalAttrs: {
 
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
-  # TODO Always true after https://github.com/NixOS/nixpkgs/issues/318564
-  strictDeps = !withCoverageChecks;
+  strictDeps = true;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
@@ -89,8 +74,4 @@ mkDerivation (finalAttrs: {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
 
-} // lib.optionalAttrs withCoverageChecks {
-  lcovFilter = [ "*/boost/*" "*-tab.*" ];
-
-  hardeningDisable = [ "fortify" ];
 })

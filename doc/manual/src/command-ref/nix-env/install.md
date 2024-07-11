@@ -57,7 +57,7 @@ The arguments *args* map to store paths in a number of possible ways:
   easy way to copy user environment elements from one profile to
   another.
 
-- If `--from-expression` is given, *args* are [Nix language functions](@docroot@/language/constructs.md#functions) that are called with the [default Nix expression] as their single argument.
+- If `--from-expression` is given, *args* are [Nix language functions](@docroot@/language/syntax.md#functions) that are called with the [default Nix expression] as their single argument.
   The derivations returned by those function calls are installed.
   This allows derivations to be specified in an unambiguous way, which is necessary if there are multiple derivations with the same name.
 

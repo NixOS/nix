@@ -1,11 +1,10 @@
 #include "registry.hh"
 #include "tarball.hh"
 #include "users.hh"
+#include "config-global.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
-
-#include "fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -149,10 +148,25 @@ void overrideRegistry(
     flagRegistry->add(from, to, extraAttrs);
 }
 
+struct RegistrySettings : Config
+{
+    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
+        R"(
+          Path or URI of the global flake registry.
+
+          When empty, disables the global flake registry.
+        )",
+        {}, true, Xp::Flakes};
+};
+
+RegistrySettings registrySettings;
+
+static GlobalConfig::Register rRegistrySettings(&registrySettings);
+
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
     static auto reg = [&]() {
-        auto path = fetchSettings.flakeRegistry.get();
+        auto path = registrySettings.flakeRegistry.get();
         if (path == "") {
             return std::make_shared<Registry>(Registry::Global); // empty registry
         }

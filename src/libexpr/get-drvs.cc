@@ -374,21 +374,26 @@ static void getDerivations(EvalState & state, Value & vIn,
            bound to the attribute with the "lower" name should take
            precedence). */
         for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
-            debug("evaluating attribute '%1%'", state.symbols[i->name]);
-            if (!std::regex_match(std::string(state.symbols[i->name]), attrRegex))
-                continue;
-            std::string pathPrefix2 = addToPath(pathPrefix, state.symbols[i->name]);
-            if (combineChannels)
-                getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
-            else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
-                /* If the value of this attribute is itself a set,
-                   should we recurse into it?  => Only if it has a
-                   `recurseForDerivations = true' attribute. */
-                if (i->value->type() == nAttrs) {
-                    auto j = i->value->attrs()->get(state.sRecurseForDerivations);
-                    if (j && state.forceBool(*j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
-                        getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            try {
+                debug("evaluating attribute '%1%'", state.symbols[i->name]);
+                if (!std::regex_match(std::string(state.symbols[i->name]), attrRegex))
+                    continue;
+                std::string pathPrefix2 = addToPath(pathPrefix, state.symbols[i->name]);
+                if (combineChannels)
+                    getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
+                    /* If the value of this attribute is itself a set,
+                    should we recurse into it?  => Only if it has a
+                    `recurseForDerivations = true' attribute. */
+                    if (i->value->type() == nAttrs) {
+                        auto j = i->value->attrs()->get(state.sRecurseForDerivations);
+                        if (j && state.forceBool(*j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
+                            getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                    }
                 }
+            } catch (Error & e) {
+                e.addTrace(state.positions[i->pos], "while evaluating the attribute '%s'", state.symbols[i->name]);
+                throw;
             }
         }
     }

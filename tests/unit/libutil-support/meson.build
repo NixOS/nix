@@ -14,30 +14,26 @@ project('nix-util-test-support', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# See note in ../nix-util/meson.build
-deps_private = [ ]
+subdir('build-utils-meson/deps-lists')
 
-# See note in ../nix-util/meson.build
-deps_public = [ ]
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
+  dependency('nix-util'),
+]
+subdir('build-utils-meson/subprojects')
 
-# See note in ../nix-util/meson.build
-deps_other = [ ]
+rapidcheck = dependency('rapidcheck')
+deps_public += rapidcheck
 
 add_project_arguments(
-  '-Wno-deprecated-declarations',
-  '-Wimplicit-fallthrough',
-  '-Werror=switch',
-  '-Werror=switch-enum',
-  '-Wdeprecated-copy',
-  '-Wignored-qualifiers',
-  # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
-  # at ~1% overhead in `nix search`.
-  #
-  # FIXME: remove when we get meson 1.4.0 which will default this to on for us:
-  # https://mesonbuild.com/Release-notes-for-1-4-0.html#ndebug-setting-now-controls-c-stdlib-assertions
-  '-D_GLIBCXX_ASSERTIONS=1',
+  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
+  # It would be nice for our headers to be idempotent instead.
+  '-include', 'config-util.hh',
   language : 'cpp',
 )
+
+subdir('build-utils-meson/diagnostics')
 
 sources = files(
   'tests/hash.cc',
@@ -53,28 +49,7 @@ headers = files(
   'tests/string_callback.hh',
 )
 
-if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
-  # Windows DLLs are stricter about symbol visibility than Unix shared
-  # objects --- see https://gcc.gnu.org/wiki/Visibility for details.
-  # This is a temporary sledgehammer to export everything like on Unix,
-  # and not detail with this yet.
-  #
-  # TODO do not do this, and instead do fine-grained export annotations.
-  linker_export_flags = ['-Wl,--export-all-symbols']
-else
-  linker_export_flags = []
-endif
-
-nix_util = dependency('nix-util')
-if nix_util.type_name() == 'internal'
-  # subproject sadly no good for pkg-config module
-  deps_other += nix_util
-else
-  deps_public += nix_util
-endif
-
-rapidcheck = dependency('rapidcheck')
-deps_public += rapidcheck
+subdir('build-utils-meson/export-all-symbols')
 
 this_library = library(
   'nix-util-test-support',
@@ -84,6 +59,7 @@ this_library = library(
   # TODO: Remove `-lrapidcheck` when https://github.com/emil-e/rapidcheck/pull/326
   #       is available. See also ../libutil/build.meson
   link_args: linker_export_flags + ['-lrapidcheck'],
+  prelink : true, # For C++ static initializers
   install : true,
 )
 
@@ -91,20 +67,4 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
-import('pkgconfig').generate(
-  this_library,
-  filebase : meson.project_name(),
-  name : 'Nix',
-  description : 'Nix Package Manager',
-  subdirs : ['nix'],
-  extra_cflags : ['-std=c++2a'],
-  requires : deps_public,
-  requires_private : deps_private,
-)
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_dirs,
-  link_with : this_library,
-  compile_args : ['-std=c++2a'],
-  dependencies : [],
-))
+subdir('build-utils-meson/export')

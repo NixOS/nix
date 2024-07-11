@@ -160,6 +160,11 @@ inline void createDirs(PathView path)
 }
 
 /**
+ * Create a single directory.
+ */
+void createDir(const Path & path, mode_t mode = 0755);
+
+/**
  * Set the access and modification times of the given path, not
  * following symlinks.
  *

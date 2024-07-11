@@ -27,9 +27,15 @@ struct LocalDerivationGoal : public DerivationGoal
     std::optional<Path> cgroup;
 
     /**
-     * The temporary directory.
+     * The temporary directory used for the build.
      */
     Path tmpDir;
+
+    /**
+     * The top-level temporary directory. `tmpDir` is either equal to
+     * or a child of this directory.
+     */
+    Path topTmpDir;
 
     /**
      * The path of the temporary directory in the sandbox.
@@ -65,6 +71,16 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     bool useChroot = false;
 
+    /**
+     * The parent directory of `chrootRootDir`. It has permission 700
+     * and is owned by root to ensure other users cannot mess with
+     * `chrootRootDir`.
+     */
+    Path chrootParentDir;
+
+    /**
+     * The root of the chroot environment.
+     */
     Path chrootRootDir;
 
     /**

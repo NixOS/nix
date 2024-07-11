@@ -400,6 +400,11 @@ AS_CASE(["$enable_markdown"],
 PKG_CHECK_MODULES([LIBGIT2], [libgit2])
 
 
+# Look for toml11, a required dependency.
+AC_LANG_PUSH(C++)
+AC_CHECK_HEADER([toml.hpp], [], [AC_MSG_ERROR([toml11 is not found.])])
+AC_LANG_POP(C++)
+
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])
 

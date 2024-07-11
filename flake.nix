@@ -25,7 +25,6 @@
 
     let
       inherit (nixpkgs) lib;
-      inherit (lib) fileset;
 
       officialRelease = false;
 
@@ -129,157 +128,23 @@
         {
           nixStable = prev.nix;
 
-          default-busybox-sandbox-shell = final.busybox.override {
-            useMusl = true;
-            enableStatic = true;
-            enableMinimal = true;
-            extraConfig = ''
-              CONFIG_FEATURE_FANCY_ECHO y
-              CONFIG_FEATURE_SH_MATH y
-              CONFIG_FEATURE_SH_MATH_64 y
+          # A new scope, so that we can use `callPackage` to inject our own interdependencies
+          # without "polluting" the top level "`pkgs`" attrset.
+          # This also has the benefit of providing us with a distinct set of packages
+          # we can iterate over.
+          nixComponents = lib.makeScope final.nixDependencies.newScope (import ./packaging/components.nix);
 
-              CONFIG_ASH y
-              CONFIG_ASH_OPTIMIZE_FOR_SIZE y
-
-              CONFIG_ASH_ALIAS y
-              CONFIG_ASH_BASH_COMPAT y
-              CONFIG_ASH_CMDCMD y
-              CONFIG_ASH_ECHO y
-              CONFIG_ASH_GETOPTS y
-              CONFIG_ASH_INTERNAL_GLOB y
-              CONFIG_ASH_JOB_CONTROL y
-              CONFIG_ASH_PRINTF y
-              CONFIG_ASH_TEST y
-            '';
-          };
-
-          libgit2-nix = final.libgit2.overrideAttrs (attrs: {
-            src = libgit2;
-            version = libgit2.lastModifiedDate;
-            cmakeFlags = attrs.cmakeFlags or []
-              ++ [ "-DUSE_SSH=exec" ];
+          # The dependencies are in their own scope, so that they don't have to be
+          # in Nixpkgs top level `pkgs` or `nixComponents`.
+          nixDependencies = lib.makeScope final.newScope (import ./packaging/dependencies.nix {
+            inherit inputs stdenv versionSuffix;
+            pkgs = final;
           });
 
-          boehmgc-nix = final.boehmgc.override {
-            enableLargeConfig = true;
-          };
-
-          libseccomp-nix = final.libseccomp.overrideAttrs (_: rec {
-            version = "2.5.5";
-            src = final.fetchurl {
-              url = "https://github.com/seccomp/libseccomp/releases/download/v${version}/libseccomp-${version}.tar.gz";
-              hash = "sha256-JIosik2bmFiqa69ScSw0r+/PnJ6Ut23OAsHJqiX7M3U=";
-            };
-          });
-
-          # TODO: define everything here instead of top level?
-          nix-components = {
-            inherit (final)
-              nix-util
-              nix-util-test-support
-              nix-util-test
-              nix-util-c
-              nix-store
-              nix-fetchers
-              nix-perl-bindings
-              ;
-          };
-
-          nix-util = final.callPackage ./src/libutil/package.nix {
-            inherit
-              fileset
-              stdenv
-              officialRelease
-              versionSuffix
-              ;
-          };
-
-          nix-util-test-support = final.callPackage ./tests/unit/libutil-support/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-util-test = final.callPackage ./tests/unit/libutil/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-util-c = final.callPackage ./src/libutil-c/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-store = final.callPackage ./src/libstore/package.nix {
-            inherit
-              fileset
-              stdenv
-              officialRelease
-              versionSuffix
-              ;
-            libseccomp = final.libseccomp-nix;
-            busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
-          };
-
-          nix-fetchers = final.callPackage ./src/libfetchers/package.nix {
-            inherit
-              fileset
-              stdenv
-              officialRelease
-              versionSuffix
-              ;
-          };
-
-          nix =
-            final.callPackage ./package.nix {
-              inherit
-                fileset
-                stdenv
-                officialRelease
-                versionSuffix
-                ;
-              boehmgc = final.boehmgc-nix;
-              libgit2 = final.libgit2-nix;
-              libseccomp = final.libseccomp-nix;
-              busybox-sandbox-shell = final.busybox-sandbox-shell or final.default-busybox-sandbox-shell;
-            };
-
-          nix-perl-bindings = final.callPackage ./src/perl/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-internal-api-docs = final.callPackage ./src/internal-api-docs/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
-
-          nix-external-api-docs = final.callPackage ./src/external-api-docs/package.nix {
-            inherit
-              fileset
-              stdenv
-              versionSuffix
-              ;
-          };
+          nix = final.nixComponents.nix;
 
           nix_noTests = final.nix.override {
-            doCheck = false;
             doInstallCheck = false;
-            installUnitTests = false;
           };
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
@@ -296,7 +161,7 @@
       # 'nix-perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
 
-      hydraJobs = import ./maintainers/hydra.nix {
+      hydraJobs = import ./packaging/hydra.nix {
         inherit
           inputs
           binaryTarball
@@ -339,8 +204,8 @@
           #       https://github.com/NixOS/nixpkgs/issues/320448
           "static-" = nixpkgsFor.${system}.static;
         })
-        (nixpkgsPrefix: nixpkgs: 
-          flatMapAttrs nixpkgs.nix-components
+        (nixpkgsPrefix: nixpkgs:
+          flatMapAttrs nixpkgs.nixComponents
             (pkgName: pkg:
               flatMapAttrs pkg.tests or {}
               (testName: test: {
@@ -357,8 +222,8 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nix-external-api-docs;
+          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
+          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         // flatMapAttrs
@@ -373,16 +238,16 @@
           }
           (pkgName: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}" = nixpkgsFor.${system}.native.${pkgName};
-              "${pkgName}-static" = nixpkgsFor.${system}.static.${pkgName};
+              "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
+              "${pkgName}-static" = nixpkgsFor.${system}.static.nixComponents.${pkgName};
             }
             // flatMapAttrs (lib.genAttrs crossSystems (_: { })) (crossSystem: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.${pkgName};
+              "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
             })
             // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (stdenvName: {}: {
               # These attributes go right into `packages.<system>`.
-              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".${pkgName};
+              "${pkgName}-${stdenvName}" = nixpkgsFor.${system}.stdenvs."${stdenvName}Packages".nixComponents.${pkgName};
             })
           )
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
@@ -436,28 +301,29 @@
           env = {
             # Needed for Meson to find Boost.
             # https://github.com/NixOS/nixpkgs/issues/86131.
-            BOOST_INCLUDEDIR = "${lib.getDev pkgs.boost}/include";
-            BOOST_LIBRARYDIR = "${lib.getLib pkgs.boost}/lib";
+            BOOST_INCLUDEDIR = "${lib.getDev pkgs.nixDependencies.boost}/include";
+            BOOST_LIBRARYDIR = "${lib.getLib pkgs.nixDependencies.boost}/lib";
             # For `make format`, to work without installing pre-commit
             _NIX_PRE_COMMIT_HOOKS_CONFIG =
               "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
           };
 
           mesonFlags =
-            map (transformFlag "libutil") pkgs.nix-util.mesonFlags
-            ++ map (transformFlag "libstore") pkgs.nix-store.mesonFlags
-            ++ map (transformFlag "libfetchers") pkgs.nix-fetchers.mesonFlags
-            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nix-perl-bindings.mesonFlags)
+            map (transformFlag "libutil") pkgs.nixComponents.nix-util.mesonFlags
+            ++ map (transformFlag "libstore") pkgs.nixComponents.nix-store.mesonFlags
+            ++ map (transformFlag "libfetchers") pkgs.nixComponents.nix-fetchers.mesonFlags
+            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nixComponents.nix-perl-bindings.mesonFlags)
             ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
-            ++ pkgs.nix-util.nativeBuildInputs
-            ++ pkgs.nix-store.nativeBuildInputs
-            ++ pkgs.nix-fetchers.nativeBuildInputs
-            ++ lib.optionals havePerl pkgs.nix-perl-bindings.nativeBuildInputs
-            ++ pkgs.nix-internal-api-docs.nativeBuildInputs
-            ++ pkgs.nix-external-api-docs.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-util.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-store.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
+            ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
+            ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ [
+              pkgs.buildPackages.cmake
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)
@@ -468,6 +334,10 @@
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
 
           buildInputs = attrs.buildInputs or []
+            ++ [
+              pkgs.gtest
+              pkgs.rapidcheck
+            ]
             ++ lib.optional havePerl pkgs.perl
             ;
         });

@@ -64,7 +64,7 @@ using Tree = std::map<std::string, TreeEntry>;
  * Implementations may seek to memoize resources (bandwidth, storage,
  * etc.) for the same Git hash.
  */
-using SinkHook = void(const Path & name, TreeEntry entry);
+using SinkHook = void(const CanonPath & name, TreeEntry entry);
 
 /**
  * Parse the "blob " or "tree " prefix.
@@ -89,13 +89,13 @@ enum struct BlobMode : RawMode
 };
 
 void parseBlob(
-    FileSystemObjectSink & sink, const Path & sinkPath,
+    FileSystemObjectSink & sink, const CanonPath & sinkPath,
     Source & source,
     BlobMode blobMode,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 void parseTree(
-    FileSystemObjectSink & sink, const Path & sinkPath,
+    FileSystemObjectSink & sink, const CanonPath & sinkPath,
     Source & source,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
@@ -108,7 +108,7 @@ void parseTree(
  * a blob, this is ignored.
  */
 void parse(
-    FileSystemObjectSink & sink, const Path & sinkPath,
+    FileSystemObjectSink & sink, const CanonPath & sinkPath,
     Source & source,
     BlobMode rootModeIfBlob,
     std::function<SinkHook> hook,

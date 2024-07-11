@@ -1,7 +1,7 @@
 { lib
 , stdenv
+, mkMesonDerivation
 , releaseTools
-, fileset
 
 , meson
 , ninja
@@ -15,42 +15,27 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
-, officialRelease ? false
-
-# Check test coverage of Nix. Probably want to use with with at least
-# one of `doCheck` or `doInstallCheck` enabled.
-, withCoverageChecks ? false
-
-# Avoid setting things that would interfere with a functioning devShell
-, forDevShell ? false
+, version
 }:
 
 let
-  version = lib.fileContents ./.version + versionSuffix;
-
-  mkDerivation =
-    if withCoverageChecks
-    then
-      # TODO support `finalAttrs` args function in
-      # `releaseTools.coverageAnalysis`.
-      argsFun:
-         releaseTools.coverageAnalysis (let args = argsFun args; in args)
-    else stdenv.mkDerivation;
+  inherit (lib) fileset;
 in
 
-mkDerivation (finalAttrs: {
+mkMesonDerivation (finalAttrs: {
   pname = "nix-fetchers";
   inherit version;
 
-  src = fileset.toSource {
-    root = ./.;
-    fileset = fileset.unions [
-      ./meson.build
-      (fileset.fileFilter (file: file.hasExt "cc") ./.)
-      (fileset.fileFilter (file: file.hasExt "hh") ./.)
-    ];
-  };
+  workDir = ./.;
+  fileset = fileset.unions [
+    ../../build-utils-meson
+    ./build-utils-meson
+    ../../.version
+    ./.version
+    ./meson.build
+    (fileset.fileFilter (file: file.hasExt "cc") ./.)
+    (fileset.fileFilter (file: file.hasExt "hh") ./.)
+  ];
 
   outputs = [ "out" "dev" ];
 
@@ -71,9 +56,11 @@ mkDerivation (finalAttrs: {
   ];
 
   preConfigure =
-    # "Inline" .version so its not a symlink, and includes the suffix
+    # "Inline" .version so it's not a symlink, and includes the suffix.
+    # Do the meson utils, without modification.
     ''
-      echo ${version} > .version
+      chmod u+w ./.version
+      echo ${version} > ../../.version
     '';
 
   env = lib.optionalAttrs (stdenv.isLinux && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")) {
@@ -82,16 +69,11 @@ mkDerivation (finalAttrs: {
 
   enableParallelBuilding = true;
 
-  postInstall =
-    # Remove absolute path to boost libs
-    ''
-    '';
-
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
 
   # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
   # to work with `strictDeps`.
-  strictDeps = !withCoverageChecks;
+  strictDeps = true;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
@@ -99,8 +81,4 @@ mkDerivation (finalAttrs: {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
 
-} // lib.optionalAttrs withCoverageChecks {
-  lcovFilter = [ "*-tab.*" ];
-
-  hardeningDisable = ["fortify"];
 })

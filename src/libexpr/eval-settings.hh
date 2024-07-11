@@ -5,9 +5,40 @@
 
 namespace nix {
 
+class Store;
+
 struct EvalSettings : Config
 {
-    EvalSettings(bool & readOnlyMode);
+    /**
+     * Function used to interpet look path entries of a given scheme.
+     *
+     * The argument is the non-scheme part of the lookup path entry (see
+     * `LookupPathHooks` below).
+     *
+     * The return value is (a) whether the entry was valid, and, if so,
+     * what does it map to.
+     *
+     * @todo Return (`std::optional` of) `SourceAccssor` or something
+     * more structured instead of mere `std::string`?
+     */
+    using LookupPathHook = std::optional<std::string>(ref<Store> store, std::string_view);
+
+    /**
+     * Map from "scheme" to a `LookupPathHook`.
+     *
+     * Given a lookup path value (i.e. either the whole thing, or after
+     * the `<key>=`) in the form of:
+     *
+     * ```
+     * <scheme>:<arbitrary string>
+     * ```
+     *
+     * if `<scheme>` is a key in this map, then `<arbitrary string>` is
+     * passed to the hook that is the value in this map.
+     */
+    using LookupPathHooks = std::map<std::string, std::function<LookupPathHook>>;
+
+    EvalSettings(bool & readOnlyMode, LookupPathHooks lookupPathHooks = {});
 
     bool & readOnlyMode;
 
@@ -16,6 +47,8 @@ struct EvalSettings : Config
     static bool isPseudoUrl(std::string_view s);
 
     static std::string resolvePseudoUrl(std::string_view url);
+
+    LookupPathHooks lookupPathHooks;
 
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
         Enable built-in functions that allow executing native code.
@@ -41,7 +74,7 @@ struct EvalSettings : Config
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtin-constants.md#builtins-findFile).
+          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath) and can be used with [`builtins.findFile`](@docroot@/language/builtins.md#builtins-findFile).
 
           The default value is
 
@@ -62,7 +95,7 @@ struct EvalSettings : Config
         this, "", "eval-system",
         R"(
           This option defines
-          [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+          [`builtins.currentSystem`](@docroot@/language/builtins.md#builtins-currentSystem)
           in the Nix language if it is set as a non-empty string.
           Otherwise, if it is defined as the empty string (the default), the value of the
           [`system` ](#conf-system)
@@ -83,7 +116,7 @@ struct EvalSettings : Config
         R"(
           If set to `true`, the Nix evaluator will not allow access to any
           files outside of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath),
+          [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath),
           or to URIs outside of
           [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
         )"};
@@ -94,10 +127,10 @@ struct EvalSettings : Config
 
           - Restrict file system and network access to files specified by cryptographic hash
           - Disable impure constants:
-            - [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
-            - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
-            - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
-            - [`builtins.storePath`](@docroot@/language/builtin-constants.md#builtins-storePath)
+            - [`builtins.currentSystem`](@docroot@/language/builtins.md#builtins-currentSystem)
+            - [`builtins.currentTime`](@docroot@/language/builtins.md#builtins-currentTime)
+            - [`builtins.nixPath`](@docroot@/language/builtins.md#builtins-nixPath)
+            - [`builtins.storePath`](@docroot@/language/builtins.md#builtins-storePath)
         )"
         };
 
