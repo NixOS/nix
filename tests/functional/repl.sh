@@ -22,6 +22,8 @@ replUndefinedVariable="
 import $testDir/undefined-variable.nix
 "
 
+TODO_NixOS
+
 testRepl () {
     local nixArgs
     nixArgs=("$@")

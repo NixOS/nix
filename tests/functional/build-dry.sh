@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 ###################################################
 # Check that --dry-run isn't confused with read-only mode
 # https://github.com/NixOS/nix/issues/1795
@@ -35,17 +37,17 @@ clearStore
 clearCache
 
 RESULT=$TEST_ROOT/result-link
-rm -f $RESULT
+rm -f "$RESULT"
 
-nix-build dependencies.nix -o $RESULT --dry-run
+nix-build dependencies.nix -o "$RESULT" --dry-run
 
 [[ ! -h $RESULT ]] || fail "nix-build --dry-run created output link"
 
-nix build -f dependencies.nix -o $RESULT --dry-run
+nix build -f dependencies.nix -o "$RESULT" --dry-run
 
 [[ ! -h $RESULT ]] || fail "nix build --dry-run created output link"
 
-nix build -f dependencies.nix -o $RESULT
+nix build -f dependencies.nix -o "$RESULT"
 
 [[ -h $RESULT ]]
 
@@ -58,12 +60,12 @@ RES=$(nix build -f dependencies.nix --dry-run --json)
 
 if [[ -z "${NIX_TESTS_CA_BY_DEFAULT-}" ]]; then
     echo "$RES" | jq '.[0] | [
-        (.drvPath | test("'$NIX_STORE_DIR'.*\\.drv")),
-        (.outputs.out | test("'$NIX_STORE_DIR'"))
+        (.drvPath | test("'"$NIX_STORE_DIR"'.*\\.drv")),
+        (.outputs.out | test("'"$NIX_STORE_DIR"'"))
     ] | all'
 else
     echo "$RES" | jq '.[0] | [
-        (.drvPath | test("'$NIX_STORE_DIR'.*\\.drv")),
+        (.drvPath | test("'"$NIX_STORE_DIR"'.*\\.drv")),
         .outputs.out == null
     ] | all'
 fi

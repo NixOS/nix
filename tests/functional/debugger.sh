@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 # regression #9932
 echo ":env" | expect 1 nix eval --debugger --expr '(_: throw "oh snap") 42'

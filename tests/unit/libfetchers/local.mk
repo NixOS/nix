@@ -4,7 +4,7 @@ programs += libfetchers-tests
 
 libfetchers-tests_NAME = libnixfetchers-tests
 
-libfetchers-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data
+libfetchers-tests_ENV := _NIX_TEST_UNIT_DATA=$(d)/data GTEST_OUTPUT=xml:$$testresults/libfetchers-tests.xml
 
 libfetchers-tests_DIR := $(d)
 

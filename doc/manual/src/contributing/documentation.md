@@ -196,15 +196,16 @@ You can also build and view it yourself:
 [Doxygen API documentation]: https://hydra.nixos.org/job/nix/master/internal-api-docs/latest/download-by-type/doc/internal-api-docs
 
 ```console
-# nix build .#hydraJobs.internal-api-docs
-# xdg-open ./result/share/doc/nix/internal-api/html/index.html
+$ nix build .#hydraJobs.internal-api-docs
+$ xdg-open ./result/share/doc/nix/internal-api/html/index.html
 ```
 
 or inside `nix-shell` or `nix develop`:
 
-```
-# make internal-api-html
-# xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+```console
+$ mesonConfigurePhase
+$ ninja src/internal-api-docs/html
+$ xdg-open src/internal-api-docs/html/index.html
 ```
 
 ## C API documentation
@@ -216,13 +217,14 @@ You can also build and view it yourself:
 [C API documentation]: https://hydra.nixos.org/job/nix/master/external-api-docs/latest/download-by-type/doc/external-api-docs
 
 ```console
-# nix build .#hydraJobs.external-api-docs
-# xdg-open ./result/share/doc/nix/external-api/html/index.html
+$ nix build .#hydraJobs.external-api-docs
+$ xdg-open ./result/share/doc/nix/external-api/html/index.html
 ```
 
 or inside `nix-shell` or `nix develop`:
 
 ```
-# make external-api-html
-# xdg-open ./outputs/doc/share/doc/nix/external-api/html/index.html
+$ mesonConfigurePhase
+$ ninja src/external-api-docs/html
+$ xdg-open src/external-api-docs/html/index.html
 ```

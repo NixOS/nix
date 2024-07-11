@@ -10,6 +10,13 @@ namespace nix {
 struct Hash;
 
 /**
+ * Check whether a name is a valid store path name.
+ *
+ * @throws BadStorePathName if the name is invalid. The message is of the format "name %s is not valid, for this specific reason".
+ */
+void checkName(std::string_view name);
+
+/**
  * \ref StorePath "Store path" is the fundamental reference type of Nix.
  * A store paths refers to a Store object.
  *
@@ -31,8 +38,10 @@ public:
 
     StorePath() = delete;
 
+    /** @throws BadStorePath */
     StorePath(std::string_view baseName);
 
+    /** @throws BadStorePath */
     StorePath(const Hash & hash, std::string_view name);
 
     std::string_view to_string() const noexcept

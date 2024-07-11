@@ -2,10 +2,10 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
-writeSimpleFlake $TEST_HOME
-cd $TEST_HOME
+writeSimpleFlake "$TEST_HOME"
+cd "$TEST_HOME"
 mkdir -p foo/subdir
 
 echo '{ outputs = _: {}; }' > foo/flake.nix
@@ -27,11 +27,11 @@ success=("" . .# .#test ../subdir ../subdir#test "$PWD")
 failure=("path:$PWD" "../simple.nix")
 
 for i in "${success[@]}"; do
-    nix build $i || fail "flake should be found by searching up directories"
+    nix build "$i" || fail "flake should be found by searching up directories"
 done
 
 for i in "${failure[@]}"; do
-    ! nix build $i || fail "flake should not search up directories when using 'path:'"
+    ! nix build "$i" || fail "flake should not search up directories when using 'path:'"
 done
 
 popd
@@ -45,7 +45,7 @@ if [[ -n $(type -p git) ]]; then
     pushd subdir
     git init
     for i in "${success[@]}" "${failure[@]}"; do
-        ! nix build $i || fail "flake should not search past a git repository"
+        ! nix build "$i" || fail "flake should not search past a git repository"
     done
     rm -rf .git
     popd

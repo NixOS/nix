@@ -24,122 +24,138 @@ symlink.
 
 # Common query options
 
-  - `--use-output`; `-u`\
-    For each argument to the query that is a [store derivation], apply the
-    query to the output path of the derivation instead.
+- `--use-output` / `-u`
 
-  - `--force-realise`; `-f`\
-    Realise each argument to the query first (see [`nix-store --realise`](./realise.md)).
+  For each argument to the query that is a [store derivation], apply the
+  query to the output path of the derivation instead.
+
+- `--force-realise` / `-f`
+
+  Realise each argument to the query first (see [`nix-store --realise`](./realise.md)).
 
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 # Queries
 
-  - `--outputs`\
-    Prints out the [output paths] of the store
-    derivations *paths*. These are the paths that will be produced when
-    the derivation is built.
+- `--outputs`
 
-    [output paths]: @docroot@/glossary.md#gloss-output-path
+  Prints out the [output paths] of the store
+  derivations *paths*. These are the paths that will be produced when
+  the derivation is built.
 
-  - `--requisites`; `-R`\
-    Prints out the [closure] of the store path *paths*.
+  [output paths]: @docroot@/glossary.md#gloss-output-path
 
-    [closure]: @docroot@/glossary.md#gloss-closure
+- `--requisites` / `-R`
 
-    This query has one option:
+  Prints out the [closure] of the store path *paths*.
 
-      - `--include-outputs`
-        Also include the existing output paths of [store derivation]s,
-        and their closures.
+  [closure]: @docroot@/glossary.md#gloss-closure
 
-    This query can be used to implement various kinds of deployment. A
-    *source deployment* is obtained by distributing the closure of a
-    store derivation. A *binary deployment* is obtained by distributing
-    the closure of an output path. A *cache deployment* (combined
-    source/binary deployment, including binaries of build-time-only
-    dependencies) is obtained by distributing the closure of a store
-    derivation and specifying the option `--include-outputs`.
+  This query has one option:
 
-  - `--references`\
-    Prints the set of [references] of the store paths
-    *paths*, that is, their immediate dependencies. (For *all*
-    dependencies, use `--requisites`.)
+    - `--include-outputs`
+      Also include the existing output paths of [store derivation]s,
+      and their closures.
 
-    [references]: @docroot@/glossary.md#gloss-reference
+  This query can be used to implement various kinds of deployment. A
+  *source deployment* is obtained by distributing the closure of a
+  store derivation. A *binary deployment* is obtained by distributing
+  the closure of an output path. A *cache deployment* (combined
+  source/binary deployment, including binaries of build-time-only
+  dependencies) is obtained by distributing the closure of a store
+  derivation and specifying the option `--include-outputs`.
 
-  - `--referrers`\
-    Prints the set of *referrers* of the store paths *paths*, that is,
-    the store paths currently existing in the Nix store that refer to
-    one of *paths*. Note that contrary to the references, the set of
-    referrers is not constant; it can change as store paths are added or
-    removed.
+- `--references`
 
-  - `--referrers-closure`\
-    Prints the closure of the set of store paths *paths* under the
-    referrers relation; that is, all store paths that directly or
-    indirectly refer to one of *paths*. These are all the path currently
-    in the Nix store that are dependent on *paths*.
+  Prints the set of [references] of the store paths
+  *paths*, that is, their immediate dependencies. (For *all*
+  dependencies, use `--requisites`.)
 
-  - `--deriver`; `-d`\
-    Prints the [deriver] that was used to build the store paths *paths*. If
-    the path has no deriver (e.g., if it is a source file), or if the
-    deriver is not known (e.g., in the case of a binary-only
-    deployment), the string `unknown-deriver` is printed.
-    The returned deriver is not guaranteed to exist in the local store, for
-    example when *paths* were substituted from a binary cache.
-    Use `--valid-derivers` instead to obtain valid paths only.
+  [references]: @docroot@/glossary.md#gloss-reference
 
-    [deriver]: @docroot@/glossary.md#gloss-deriver
+- `--referrers`
 
-  - `--valid-derivers`\
-    Prints a set of derivation files (`.drv`) which are supposed produce
-    said paths when realized. Might print nothing, for example for source paths
-    or paths subsituted from a binary cache.
+  Prints the set of *referrers* of the store paths *paths*, that is,
+  the store paths currently existing in the Nix store that refer to
+  one of *paths*. Note that contrary to the references, the set of
+  referrers is not constant; it can change as store paths are added or
+  removed.
 
-  - `--graph`\
-    Prints the references graph of the store paths *paths* in the format
-    of the `dot` tool of AT\&T's [Graphviz
-    package](http://www.graphviz.org/). This can be used to visualise
-    dependency graphs. To obtain a build-time dependency graph, apply
-    this to a store derivation. To obtain a runtime dependency graph,
-    apply it to an output path.
+- `--referrers-closure`
 
-  - `--tree`\
-    Prints the references graph of the store paths *paths* as a nested
-    ASCII tree. References are ordered by descending closure size; this
-    tends to flatten the tree, making it more readable. The query only
-    recurses into a store path when it is first encountered; this
-    prevents a blowup of the tree representation of the graph.
+  Prints the closure of the set of store paths *paths* under the
+  referrers relation; that is, all store paths that directly or
+  indirectly refer to one of *paths*. These are all the path currently
+  in the Nix store that are dependent on *paths*.
 
-  - `--graphml`\
-    Prints the references graph of the store paths *paths* in the
-    [GraphML](http://graphml.graphdrawing.org/) file format. This can be
-    used to visualise dependency graphs. To obtain a build-time
-    dependency graph, apply this to a [store derivation]. To obtain a
-    runtime dependency graph, apply it to an output path.
+- `--deriver` / `-d`
 
-  - `--binding` *name*; `-b` *name*\
-    Prints the value of the attribute *name* (i.e., environment
-    variable) of the [store derivation]s *paths*. It is an error for a
-    derivation to not have the specified attribute.
+  Prints the [deriver] that was used to build the store paths *paths*. If
+  the path has no deriver (e.g., if it is a source file), or if the
+  deriver is not known (e.g., in the case of a binary-only
+  deployment), the string `unknown-deriver` is printed.
+  The returned deriver is not guaranteed to exist in the local store, for
+  example when *paths* were substituted from a binary cache.
+  Use `--valid-derivers` instead to obtain valid paths only.
 
-  - `--hash`\
-    Prints the SHA-256 hash of the contents of the store paths *paths*
-    (that is, the hash of the output of `nix-store --dump` on the given
-    paths). Since the hash is stored in the Nix database, this is a fast
-    operation.
+  [deriver]: @docroot@/glossary.md#gloss-deriver
 
-  - `--size`\
-    Prints the size in bytes of the contents of the store paths *paths*
-    — to be precise, the size of the output of `nix-store --dump` on
-    the given paths. Note that the actual disk space required by the
-    store paths may be higher, especially on filesystems with large
-    cluster sizes.
+- `--valid-derivers`
 
-  - `--roots`\
-    Prints the garbage collector roots that point, directly or
-    indirectly, at the store paths *paths*.
+  Prints a set of derivation files (`.drv`) which are supposed produce
+  said paths when realized. Might print nothing, for example for source paths
+  or paths subsituted from a binary cache.
+
+- `--graph`
+
+  Prints the references graph of the store paths *paths* in the format
+  of the `dot` tool of AT\&T's [Graphviz
+  package](http://www.graphviz.org/). This can be used to visualise
+  dependency graphs. To obtain a build-time dependency graph, apply
+  this to a store derivation. To obtain a runtime dependency graph,
+  apply it to an output path.
+
+- `--tree`
+
+  Prints the references graph of the store paths *paths* as a nested
+  ASCII tree. References are ordered by descending closure size; this
+  tends to flatten the tree, making it more readable. The query only
+  recurses into a store path when it is first encountered; this
+  prevents a blowup of the tree representation of the graph.
+
+- `--graphml`
+
+  Prints the references graph of the store paths *paths* in the
+  [GraphML](http://graphml.graphdrawing.org/) file format. This can be
+  used to visualise dependency graphs. To obtain a build-time
+  dependency graph, apply this to a [store derivation]. To obtain a
+  runtime dependency graph, apply it to an output path.
+
+- `--binding` *name* / `-b` *name*
+
+  Prints the value of the attribute *name* (i.e., environment
+  variable) of the [store derivation]s *paths*. It is an error for a
+  derivation to not have the specified attribute.
+
+- `--hash`
+
+  Prints the SHA-256 hash of the contents of the store paths *paths*
+  (that is, the hash of the output of `nix-store --dump` on the given
+  paths). Since the hash is stored in the Nix database, this is a fast
+  operation.
+
+- `--size`
+
+  Prints the size in bytes of the contents of the store paths *paths*
+  — to be precise, the size of the output of `nix-store --dump` on
+  the given paths. Note that the actual disk space required by the
+  store paths may be higher, especially on filesystems with large
+  cluster sizes.
+
+- `--roots`
+
+  Prints the garbage collector roots that point, directly or
+  indirectly, at the store paths *paths*.
 
 {{#include ./opt-common.md}}
 

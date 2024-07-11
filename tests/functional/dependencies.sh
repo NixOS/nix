@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 drvPath=$(nix-instantiate dependencies.nix)
 
@@ -33,7 +33,7 @@ nix-store -q --tree "$outPath" | grep '───.*dependencies-input-2'
 
 echo "output path is $outPath"
 
-text=$(cat "$outPath"/foobar)
+text=$(cat "$outPath/foobar")
 if test "$text" != "FOOBAR"; then exit 1; fi
 
 deps=$(nix-store -quR "$drvPath")
@@ -64,6 +64,8 @@ drvPath2=$(nix-instantiate dependencies.nix --argstr hashInvalidator yay)
 
 # now --valid-derivers returns both
 test "$(nix-store -q --valid-derivers "$outPath" | sort)" = "$(sort <<< "$drvPath"$'\n'"$drvPath2")"
+
+TODO_NixOS # The following --delete fails, because it seems to be still alive. This might be caused by a different test using the same path. We should try make the derivations unique, e.g. naming after tests, and adding a timestamp that's constant for that test script run.
 
 # check that nix-store --valid-derivers only returns existing drv
 nix-store --delete "$drvPath"

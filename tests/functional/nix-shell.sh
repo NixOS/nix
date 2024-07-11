@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 if [[ -n ${CONTENT_ADDRESSED:-} ]]; then
     shellDotNix="$PWD/ca-shell.nix"
@@ -19,6 +19,10 @@ export SELECTED_IMPURE_VAR=baz
 output=$(nix-shell --pure "$shellDotNix" -A shellDrv --run \
     'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $TEST_inNixShell"')
 
+[ "$output" = " - foo - bar - true" ]
+
+output=$(nix-shell --pure "$shellDotNix" -A shellDrv --option nix-shell-always-looks-for-shell-nix false --run \
+    'echo "$IMPURE_VAR - $VAR_FROM_STDENV_SETUP - $VAR_FROM_NIX - $TEST_inNixShell"')
 [ "$output" = " - foo - bar - true" ]
 
 # Test --keep
@@ -90,6 +94,55 @@ output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
 sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.nix > $TEST_ROOT/shell.shebang.nix
 chmod a+rx $TEST_ROOT/shell.shebang.nix
 $TEST_ROOT/shell.shebang.nix
+
+mkdir $TEST_ROOT/lookup-test $TEST_ROOT/empty
+
+echo "import $shellDotNix" > $TEST_ROOT/lookup-test/shell.nix
+cp config.nix $TEST_ROOT/lookup-test/
+echo 'abort "do not load default.nix!"' > $TEST_ROOT/lookup-test/default.nix
+
+nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' | grepQuiet "it works"
+# https://github.com/NixOS/nix/issues/4529
+nix-shell -I "testRoot=$TEST_ROOT" '<testRoot/lookup-test>' -A shellDrv --run 'echo "it works"' | grepQuiet "it works"
+
+expectStderr 1 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' --option nix-shell-always-looks-for-shell-nix false \
+  | grepQuiet -F "do not load default.nix!" # we did, because we chose to enable legacy behavior
+expectStderr 1 nix-shell $TEST_ROOT/lookup-test -A shellDrv --run 'echo "it works"' --option nix-shell-always-looks-for-shell-nix false \
+  | grepQuiet "Skipping .*lookup-test/shell\.nix.*, because the setting .*nix-shell-always-looks-for-shell-nix.* is disabled. This is a deprecated behavior\. Consider enabling .*nix-shell-always-looks-for-shell-nix.*"
+
+(
+  cd $TEST_ROOT/empty;
+  expectStderr 1 nix-shell | \
+    grepQuiet "error.*no argument specified and no .*shell\.nix.* or .*default\.nix.* file found in the working directory"
+)
+
+expectStderr 1 nix-shell -I "testRoot=$TEST_ROOT" '<testRoot/empty>' |
+  grepQuiet "error.*neither .*shell\.nix.* nor .*default\.nix.* found in .*/empty"
+
+cat >$TEST_ROOT/lookup-test/shebangscript <<EOF
+#!$(type -P env) nix-shell
+#!nix-shell -A shellDrv -i bash
+[[ \$VAR_FROM_NIX == bar ]]
+echo "script works"
+EOF
+chmod +x $TEST_ROOT/lookup-test/shebangscript
+
+$TEST_ROOT/lookup-test/shebangscript | grepQuiet "script works"
+
+# https://github.com/NixOS/nix/issues/5431
+mkdir $TEST_ROOT/marco{,/polo}
+echo 'abort "marco/shell.nix must not be used, but its mere existence used to cause #5431"' > $TEST_ROOT/marco/shell.nix
+cat >$TEST_ROOT/marco/polo/default.nix <<EOF
+#!$(type -P env) nix-shell
+(import $TEST_ROOT/lookup-test/shell.nix {}).polo
+EOF
+chmod a+x $TEST_ROOT/marco/polo/default.nix
+(cd $TEST_ROOT/marco && ./polo/default.nix | grepQuiet "Polo")
+
+
+#####################
+# Flake equivalents #
+#####################
 
 # Test 'nix develop'.
 nix develop -f "$shellDotNix" shellDrv -c bash -c '[[ -n $stdenv ]]'

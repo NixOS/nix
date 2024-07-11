@@ -26,10 +26,19 @@ static std::regex nameRegex { std::string { nameRegexStr } };
     TEST_F(StorePathTest, bad_ ## NAME) {                    \
         std::string_view str =                               \
             STORE_DIR HASH_PART "-" STR;                     \
-        ASSERT_THROW(                                        \
-            store->parseStorePath(str),                      \
-            BadStorePath);                                   \
+        /* ASSERT_THROW generates a duplicate goto label */  \
+        /* A lambda isolates those labels. */                \
+        [&](){                                               \
+            ASSERT_THROW(                                    \
+                store->parseStorePath(str),                  \
+                BadStorePath);                               \
+        }();                                                 \
         std::string name { STR };                            \
+        [&](){                                               \
+            ASSERT_THROW(                                    \
+                nix::checkName(name),                        \
+                BadStorePathName);                           \
+        }();                                                 \
         EXPECT_FALSE(std::regex_match(name, nameRegex));     \
     }
 
@@ -54,6 +63,7 @@ TEST_DONT_PARSE(dot_dash_a, ".-a")
             STORE_DIR HASH_PART "-" STR;                     \
         auto p = store->parseStorePath(str);                 \
         std::string name { p.name() };                       \
+        EXPECT_EQ(p.name(), STR);                            \
         EXPECT_TRUE(std::regex_match(name, nameRegex));      \
     }
 

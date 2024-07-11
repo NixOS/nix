@@ -108,7 +108,7 @@ TEST_JSON(DerivationTest, inputAddressed,
 TEST_JSON(DerivationTest, caFixedFlat,
     (DerivationOutput::CAFixed {
         .ca = {
-            .method = FileIngestionMethod::Flat,
+            .method = ContentAddressMethod::Raw::Flat,
             .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
         },
     }),
@@ -117,7 +117,7 @@ TEST_JSON(DerivationTest, caFixedFlat,
 TEST_JSON(DerivationTest, caFixedNAR,
     (DerivationOutput::CAFixed {
         .ca = {
-            .method = FileIngestionMethod::Recursive,
+            .method = ContentAddressMethod::Raw::NixArchive,
             .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
         },
     }),
@@ -126,6 +126,7 @@ TEST_JSON(DerivationTest, caFixedNAR,
 TEST_JSON(DynDerivationTest, caFixedText,
     (DerivationOutput::CAFixed {
         .ca = {
+            .method = ContentAddressMethod::Raw::Text,
             .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
         },
     }),
@@ -133,7 +134,7 @@ TEST_JSON(DynDerivationTest, caFixedText,
 
 TEST_JSON(CaDerivationTest, caFloating,
     (DerivationOutput::CAFloating {
-        .method = FileIngestionMethod::Recursive,
+        .method = ContentAddressMethod::Raw::NixArchive,
         .hashAlgo = HashAlgorithm::SHA256,
     }),
     "drv-name", "output-name")
@@ -144,7 +145,7 @@ TEST_JSON(DerivationTest, deferred,
 
 TEST_JSON(ImpureDerivationTest, impure,
     (DerivationOutput::Impure {
-        .method = FileIngestionMethod::Recursive,
+        .method = ContentAddressMethod::Raw::NixArchive,
         .hashAlgo = HashAlgorithm::SHA256,
     }),
     "drv-name", "output-name")

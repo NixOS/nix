@@ -10,6 +10,7 @@
 #include "serialise.hh"
 #include "archive.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "derivations.hh"
 #include "finally.hh"
 #include "legacy.hh"
@@ -202,7 +203,11 @@ static PeerInfo getPeerInfo(int remote)
 
 #if defined(SO_PEERCRED)
 
-    ucred cred;
+# if defined(__OpenBSD__)
+   struct sockpeercred cred;
+# else
+   ucred cred;
+# endif
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
@@ -210,9 +215,9 @@ static PeerInfo getPeerInfo(int remote)
 
 #elif defined(LOCAL_PEERCRED)
 
-#if !defined(SOL_LOCAL)
-#define SOL_LOCAL 0
-#endif
+# if !defined(SOL_LOCAL)
+# define SOL_LOCAL 0
+# endif
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
@@ -295,7 +300,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         if (getEnv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
             throw Error("unexpected systemd environment variables");
         fdSocket = SD_LISTEN_FDS_START;
-        closeOnExec(fdSocket.get());
+        unix::closeOnExec(fdSocket.get());
     }
 
     //  Otherwise, create and bind to a Unix domain socket.
@@ -323,7 +328,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 throw SysError("accepting connection");
             }
 
-            closeOnExec(remote.get());
+            unix::closeOnExec(remote.get());
 
             PeerInfo peer { .pidKnown = false };
             TrustedFlag trusted;

@@ -4,15 +4,25 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
+#include "nix_api_expr_internal.h"
 
 #include "tests/nix_api_expr.hh"
 #include "tests/string_callback.hh"
 
 #include "gmock/gmock.h"
+#include <cstddef>
 #include <cstdlib>
 #include <gtest/gtest.h>
 
 namespace nixC {
+
+TEST_F(nix_api_expr_test, as_nix_value_ptr)
+{
+    // nix_alloc_value casts nix::Value to nix_value
+    // It should be obvious from the decl that that works, but if it doesn't,
+    // the whole implementation would be utterly broken.
+    ASSERT_EQ(sizeof(nix::Value), sizeof(nix_value));
+}
 
 TEST_F(nix_api_expr_test, nix_value_get_int_invalid)
 {
@@ -138,8 +148,8 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
     int size = 10;
     ListBuilder * builder = nix_make_list_builder(ctx, state, size);
 
-    Value * intValue = nix_alloc_value(ctx, state);
-    Value * intValue2 = nix_alloc_value(ctx, state);
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_value * intValue2 = nix_alloc_value(ctx, state);
 
     // `init` and `insert` can be called in any order
     nix_init_int(ctx, intValue, 42);
@@ -194,10 +204,10 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
 
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, size);
 
-    Value * intValue = nix_alloc_value(ctx, state);
+    nix_value * intValue = nix_alloc_value(ctx, state);
     nix_init_int(ctx, intValue, 42);
 
-    Value * stringValue = nix_alloc_value(ctx, state);
+    nix_value * stringValue = nix_alloc_value(ctx, state);
     nix_init_string(ctx, stringValue, "foo");
 
     nix_bindings_builder_insert(ctx, builder, "a", intValue);
@@ -207,7 +217,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
 
     ASSERT_EQ(2, nix_get_attrs_size(ctx, value));
 
-    Value * out_value = nix_get_attr_byname(ctx, value, state, "a");
+    nix_value * out_value = nix_get_attr_byname(ctx, value, state, "a");
     ASSERT_EQ(42, nix_get_int(ctx, out_value));
     nix_gc_decref(ctx, out_value);
 
@@ -251,10 +261,10 @@ TEST_F(nix_api_expr_test, nix_value_init)
     // two = 2;
     // f = a: a * a;
 
-    Value * two = nix_alloc_value(ctx, state);
+    nix_value * two = nix_alloc_value(ctx, state);
     nix_init_int(ctx, two, 2);
 
-    Value * f = nix_alloc_value(ctx, state);
+    nix_value * f = nix_alloc_value(ctx, state);
     nix_expr_eval_from_string(
         ctx,
         state,
@@ -268,7 +278,7 @@ TEST_F(nix_api_expr_test, nix_value_init)
 
     // r = f two;
 
-    Value * r = nix_alloc_value(ctx, state);
+    nix_value * r = nix_alloc_value(ctx, state);
     nix_init_apply(ctx, r, f, two);
     assert_ctx_ok();
 
@@ -297,11 +307,11 @@ TEST_F(nix_api_expr_test, nix_value_init)
 
 TEST_F(nix_api_expr_test, nix_value_init_apply_error)
 {
-    Value * some_string = nix_alloc_value(ctx, state);
+    nix_value * some_string = nix_alloc_value(ctx, state);
     nix_init_string(ctx, some_string, "some string");
     assert_ctx_ok();
 
-    Value * v = nix_alloc_value(ctx, state);
+    nix_value * v = nix_alloc_value(ctx, state);
     nix_init_apply(ctx, v, some_string, some_string);
     assert_ctx_ok();
 
@@ -326,7 +336,7 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
     // r = f e
     // r should not throw an exception, because e is not evaluated
 
-    Value * f = nix_alloc_value(ctx, state);
+    nix_value * f = nix_alloc_value(ctx, state);
     nix_expr_eval_from_string(
         ctx,
         state,
@@ -337,9 +347,9 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
         f);
     assert_ctx_ok();
 
-    Value * e = nix_alloc_value(ctx, state);
+    nix_value * e = nix_alloc_value(ctx, state);
     {
-        Value * g = nix_alloc_value(ctx, state);
+        nix_value * g = nix_alloc_value(ctx, state);
         nix_expr_eval_from_string(
             ctx,
             state,
@@ -355,7 +365,7 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
         nix_gc_decref(ctx, g);
     }
 
-    Value * r = nix_alloc_value(ctx, state);
+    nix_value * r = nix_alloc_value(ctx, state);
     nix_init_apply(ctx, r, f, e);
     assert_ctx_ok();
 
@@ -367,7 +377,7 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
     ASSERT_EQ(1, n);
 
     // nix_get_attr_byname isn't lazy (it could have been) so it will throw the exception
-    Value * foo = nix_get_attr_byname(ctx, r, state, "foo");
+    nix_value * foo = nix_get_attr_byname(ctx, r, state, "foo");
     ASSERT_EQ(nullptr, foo);
     ASSERT_THAT(ctx->last_err.value(), testing::HasSubstr("error message for test case nix_value_init_apply_lazy_arg"));
 
@@ -378,7 +388,7 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
 
 TEST_F(nix_api_expr_test, nix_copy_value)
 {
-    Value * source = nix_alloc_value(ctx, state);
+    nix_value * source = nix_alloc_value(ctx, state);
 
     nix_init_int(ctx, source, 42);
     nix_copy_value(ctx, value, source);

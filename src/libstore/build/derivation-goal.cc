@@ -3,6 +3,7 @@
 #  include "hook-instance.hh"
 #endif
 #include "processes.hh"
+#include "config-global.hh"
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
@@ -24,6 +25,10 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#ifndef _WIN32 // TODO abstract over proc exit status
+#  include <sys/wait.h>
+#endif
 
 #include <nlohmann/json.hpp>
 
@@ -1033,7 +1038,7 @@ void DerivationGoal::buildDone()
 
         BuildResult::Status st = BuildResult::MiscFailure;
 
-#ifndef _WIN32
+#ifndef _WIN32 // TODO abstract over proc exit status
         if (hook && WIFEXITED(status) && WEXITSTATUS(status) == 101)
             st = BuildResult::TimedOut;
 

@@ -8,19 +8,27 @@
 
 namespace nix {
 
-class LibStoreTest : public virtual ::testing::Test {
-    public:
-        static void SetUpTestSuite() {
-            initLibStore(false);
-        }
+class LibStoreTest : public virtual ::testing::Test
+{
+public:
+    static void SetUpTestSuite()
+    {
+        initLibStore(false);
+    }
 
-    protected:
-        LibStoreTest()
-            : store(openStore("dummy://"))
-        { }
+protected:
+    LibStoreTest()
+        : store(openStore({
+            .variant =
+                StoreReference::Specified{
+                    .scheme = "dummy",
+                },
+            .params = {},
+        }))
+    {
+    }
 
-        ref<Store> store;
+    ref<Store> store;
 };
-
 
 } /* namespace nix */
