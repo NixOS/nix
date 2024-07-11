@@ -6,16 +6,36 @@ project('nix-dev-shell', 'cpp',
   subproject_dir : 'src',
 )
 
+# Internal Libraries
 subproject('libutil')
 subproject('libstore')
 subproject('libfetchers')
-subproject('perl')
+subproject('libexpr')
+subproject('libflake')
+subproject('libmain')
+subproject('libcmd')
+
+# Executables
+subproject('nix')
+
+# Docs
 subproject('internal-api-docs')
 subproject('external-api-docs')
 
-# C wrappers
+# External C wrapper libraries
 subproject('libutil-c')
+subproject('libstore-c')
+subproject('libexpr-c')
+
+# Language Bindings
+subproject('perl')
 
 # Testing
-subproject('libutil-test-support')
-subproject('libutil-test')
+subproject('nix-util-test-support')
+subproject('nix-util-tests')
+subproject('nix-store-test-support')
+subproject('nix-store-tests')
+subproject('nix-fetchers-tests')
+subproject('nix-expr-test-support')
+subproject('nix-expr-tests')
+subproject('nix-flake-tests')

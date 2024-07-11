@@ -1,0 +1,3 @@
+option('gc', type : 'feature',
+  description : 'enable garbage collection in the Nix expression evaluator (requires Boehm GC)',
+)

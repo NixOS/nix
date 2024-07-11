@@ -292,7 +292,7 @@ EvalState::EvalState(
     )}
     , callFlakeInternal{internalFS->addFile(
         CanonPath("call-flake.nix"),
-        #include "flake/call-flake.nix.gen.hh"
+        #include "call-flake.nix.gen.hh"
     )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
@@ -2694,7 +2694,7 @@ void EvalState::printStatistics()
 }
 
 
-SourcePath resolveExprPath(SourcePath path)
+SourcePath resolveExprPath(SourcePath path, bool addDefaultNix)
 {
     unsigned int followCount = 0, maxFollow = 1024;
 
@@ -2710,7 +2710,7 @@ SourcePath resolveExprPath(SourcePath path)
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path.resolveSymlinks().lstat().type == SourceAccessor::tDirectory)
+    if (addDefaultNix && path.resolveSymlinks().lstat().type == SourceAccessor::tDirectory)
         return path / "default.nix";
 
     return path;

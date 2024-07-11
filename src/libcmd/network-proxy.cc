@@ -1,7 +1,6 @@
 #include "network-proxy.hh"
 
 #include <algorithm>
-#include <boost/algorithm/string.hpp>
 
 #include "environment-variables.hh"
 
@@ -13,7 +12,10 @@ static StringSet getAllVariables()
 {
     StringSet variables = lowercaseVariables;
     for (const auto & variable : lowercaseVariables) {
-        variables.insert(boost::to_upper_copy(variable));
+        std::string upperVariable;
+        std::transform(
+            variable.begin(), variable.end(), upperVariable.begin(), [](unsigned char c) { return std::toupper(c); });
+        variables.insert(std::move(upperVariable));
     }
     return variables;
 }

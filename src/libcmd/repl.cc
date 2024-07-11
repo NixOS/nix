@@ -3,7 +3,7 @@
 #include <cstring>
 #include <climits>
 
-#include "libcmd/repl-interacter.hh"
+#include "repl-interacter.hh"
 #include "repl.hh"
 
 #include "ansicolor.hh"
