@@ -1,0 +1,21 @@
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+
+jobs:
+
+  tests:
+    strategy:
+      fail-fast: false
+    runs-on: ${{ inputs.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          flakehub: true
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix build
