@@ -10,23 +10,18 @@ permissions:
 
 jobs:
 
-  tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          flakehub: true
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix flake check -L
+  test_x86_64-linux:
+    uses: ./.github/workflows/test.yml
+    with:
+      os: UbuntuLatest32Cores128G
+
+  test_aarch64-darwin:
+    uses: ./.github/workflows/test.yml
+    with:
+      os: macos-latest
 
   vm_tests:
-    needs: tests
+    needs: test_x86_64-linux
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +32,7 @@ jobs:
       - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes
 
   flake_regressions:
-    needs: tests
+    needs: test_x86_64-linux
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout nix
