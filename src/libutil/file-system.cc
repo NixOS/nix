@@ -194,7 +194,7 @@ std::optional<fs::file_status> maybeSymlinkStat(const fs::path & path)
             return std::nullopt;
         return st;
     } catch (fs::filesystem_error & e) {
-        throw SystemError("getting status of '%s'", path);
+        throw SystemError(e.code().value(), "getting status of '%s'", path);
     }
 }
 
@@ -424,7 +424,7 @@ void createDirs(const Path & path)
     try {
         fs::create_directories(path);
     } catch (fs::filesystem_error & e) {
-        throw SysError("creating directory '%1%'", path);
+        throw SysError(e.code().value(), "creating directory '%1%'", path);
     }
 }
 

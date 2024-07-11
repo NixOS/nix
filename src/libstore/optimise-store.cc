@@ -26,7 +26,7 @@ static void makeWritable(const Path & path)
         std::filesystem::permissions(path, writePerms);
     }
     catch (std::filesystem::filesystem_error &e) {
-        throw SysError("changing writability of '%1%'", path);
+        throw SysError(e.code().value(), "changing writability of '%1%'", path);
     }
 }
 

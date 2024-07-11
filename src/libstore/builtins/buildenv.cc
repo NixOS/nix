@@ -53,7 +53,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 continue;
             }
         } catch (fs::filesystem_error & e) {
-            throw SysError("getting status of '%1%'", srcFile);
+            throw SysError(e.code().value(), "getting status of '%1%'", srcFile);
         }
 
         /* The files below are special-cased to that they don't show

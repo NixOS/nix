@@ -795,7 +795,7 @@ static void movePath(const Path & src, const Path & dst)
         try {
             fs::permissions(src, st.permissions() | fs::perms::owner_write, permOpts);
         } catch (const fs::filesystem_error & e) {
-            throw SysError("setting permissions on '%s'", src);
+            throw SysError(e.code().value(), "setting permissions on '%s'", src);
         }
     }
 
@@ -805,7 +805,7 @@ static void movePath(const Path & src, const Path & dst)
         try {
             fs::permissions(dst, st.permissions(), permOpts);
         } catch (const fs::filesystem_error & e) {
-            throw SysError("setting permissions on '%s'", dst);
+            throw SysError(e.code().value(), "setting permissions on '%s'", dst);
         }
     }
 }
