@@ -215,7 +215,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 static constexpr size_t BASE_ENV_SIZE = 128;
 
 EvalState::EvalState(
-    const LookupPath & _lookupPath,
+    const LookupPath & lookupPathFromArguments,
     ref<Store> store,
     const fetchers::Settings & fetchSettings,
     const EvalSettings & settings,
@@ -331,12 +331,21 @@ EvalState::EvalState(
     vStringSymlink.mkString("symlink");
     vStringUnknown.mkString("unknown");
 
-    /* Initialise the Nix expression search path. */
+    /* Construct the Nix expression search path. */
+    assert(lookupPath.elements.empty());
     if (!settings.pureEval) {
-        for (auto & i : _lookupPath.elements)
+        for (auto & i : lookupPathFromArguments.elements) {
             lookupPath.elements.emplace_back(LookupPath::Elem {i});
-        for (auto & i : settings.nixPath.get())
+        }
+        /* $NIX_PATH overriding regular settings is implemented as a hack in `applyConfig()` */
+        for (auto & i : settings.nixPath.get()) {
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
+        }
+        if (!settings.restrictEval) {
+            for (auto & i : EvalSettings::getDefaultNixPath()) {
+                lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
+            }
+        }
     }
 
     /* Allow access to all paths in the search path. */
