@@ -16,7 +16,7 @@ nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I sr
 (! nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel')
 nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel' -I src=../../src
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "was not found in the Nix search path"
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' -I src=.
 
 p=$(nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval --allowed-uris "file://$(pwd)")

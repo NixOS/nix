@@ -33,6 +33,8 @@ class Store;
 struct EvalSettings;
 class EvalState;
 class StorePath;
+struct DerivedPath;
+struct SourcePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
@@ -245,6 +247,10 @@ public:
 
     const SourcePath callFlakeInternal;
 
+    /* A map keyed by SourceAccessor::number that keeps input accessors
+       alive. */
+    std::unordered_map<size_t, ref<SourceAccessor>> sourceAccessors;
+
     /**
      * Store used to materialise .drv files.
      */
@@ -329,7 +335,7 @@ private:
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<std::string>> lookupPathResolved;
+    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -364,6 +370,29 @@ public:
      * filesystem.
      */
     SourcePath rootPath(CanonPath path);
+
+    void registerAccessor(ref<SourceAccessor> accessor);
+
+    /* Convert a path to a string representation of the format
+       `/nix/store/virtual000...<accessor-number>/<path>`. */
+    std::string encodePath(const SourcePath & path);
+
+    /* Decode a path encoded by `encodePath()`. */
+    SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
+
+    /* Rewrite virtual paths to store paths without actually
+       materializing those store paths. This is a backward
+       compatibility hack to make buggy derivation attributes like
+       `tostring ./bla` produce the same evaluation result. */
+    std::string rewriteVirtualPaths(
+        std::string_view s,
+        std::string_view warning,
+        PosIdx pos);
+
+    /* Replace all virtual paths (i.e. `/nix/store/lazylazy...`) in a
+       string by a pretty-printed rendition of the corresponding input
+       accessor (e.g. `«github:NixOS/nix/<rev>»`). */
+    std::string prettyPrintPaths(std::string_view s);
 
     /**
      * Variant which accepts relative paths too.
@@ -435,7 +464,7 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveLookupPathPath(
+    std::optional<SourcePath> resolveLookupPathPath(
         const LookupPath::Path & elem,
         bool initAccessControl = false);
 
@@ -518,10 +547,21 @@ public:
      */
     BackedStringView coerceToString(const PosIdx pos, Value & v, NixStringContext & context,
         std::string_view errorCtx,
-        bool coerceMore = false, bool copyToStore = true,
-        bool canonicalizePath = true);
+        bool coerceMore = false, bool copyToStore = true);
 
     StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
+
+    /**
+     * Compute the base name for a `SourcePath`. For non-root paths,
+     * this is just `SourcePath::baseName()`. But for root paths, for
+     * backwards compatibility, it needs to be `<hash>-source`,
+     * i.e. as if the path were copied to the Nix store. This results
+     * in a "double-copied" store path like
+     * `/nix/store/<hash1>-<hash2>-source`. We don't need to
+     * materialize /nix/store/<hash2>-source though. Still, this
+     * requires reading/hashing the path twice.
+     */
+    std::string computeBaseName(const SourcePath & path);
 
     /**
      * Path coercion.
@@ -540,7 +580,9 @@ public:
     /**
      * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
      */
-    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
+    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(
+        const PosIdx pos, Value & v,
+        std::string_view errorCtx);
 
     /**
      * Coerce to `SingleDerivedPath`.
@@ -584,6 +626,8 @@ public:
      * here too.
      */
     std::vector<std::pair<std::string, Constant>> constantInfos;
+
+    const std::string virtualPathMarker;
 
 private:
 
@@ -696,6 +740,13 @@ public:
     void mkStorePathString(const StorePath & storePath, Value & v);
 
     /**
+     * Create a string that represents a `SourcePath` as a virtual
+     * store path. It has a context that will cause the `SourcePath`
+     * to be copied to the store if needed.
+     */
+    void mkPathString(Value & v, const SourcePath & path);
+
+    /**
      * Create a string representing a `SingleDerivedPath::Built`.
      *
      * The string is the printed store path with a context containing a
@@ -765,7 +816,6 @@ public:
     bool callPathFilter(
         Value * filterFun,
         const SourcePath & path,
-        std::string_view pathArg,
         PosIdx pos);
 
 private:

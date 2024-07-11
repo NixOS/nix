@@ -31,11 +31,6 @@ struct Input
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
 
-    /**
-     * path of the parent of this input, used for relative path resolution
-     */
-    std::optional<Path> parent;
-
 public:
     /**
      * Create an `Input` from a URL.
@@ -73,6 +68,12 @@ public:
      */
     bool isLocked() const;
 
+    /**
+     * Only for relative path flakes, i.e. 'path:./foo', returns the
+     * relative path, i.e. './foo'.
+     */
+    std::optional<std::string> isRelative() const;
+
     bool operator ==(const Input & other) const;
 
     bool contains(const Input & other) const;
@@ -102,8 +103,6 @@ public:
 
     void clone(const Path & destDir) const;
 
-    std::optional<Path> getSourcePath() const;
-
     /**
      * Write a file to this input, for input types that support
      * writing. Optionally commit the change (for e.g. Git inputs).
@@ -114,8 +113,6 @@ public:
         std::optional<std::string> commitMsg) const;
 
     std::string getName() const;
-
-    StorePath computeStorePath(Store & store) const;
 
     // Convenience functions for common attributes.
     std::string getType() const;
@@ -177,8 +174,6 @@ struct InputScheme
 
     virtual void clone(const Input & input, const Path & destDir) const;
 
-    virtual std::optional<Path> getSourcePath(const Input & input) const;
-
     virtual void putFile(
         const Input & input,
         const CanonPath & path,
@@ -212,6 +207,9 @@ struct InputScheme
      */
     virtual bool isLocked(const Input & input) const
     { return false; }
+
+    virtual std::optional<std::string> isRelative(const Input & input) const
+    { return std::nullopt; }
 
     /**
      * Check the locking attributes in `final` against

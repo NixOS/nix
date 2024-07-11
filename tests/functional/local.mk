@@ -8,6 +8,7 @@ nix_tests = \
   flakes/circular.sh \
   flakes/init.sh \
   flakes/inputs.sh \
+  flakes/relative-paths.sh \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
   flakes/check.sh \
@@ -18,6 +19,9 @@ nix_tests = \
   flakes/flake-in-submodule.sh \
   flakes/prefetch.sh \
   flakes/eval-cache.sh \
+  flakes/tree-operators.sh \
+  flakes/patch.sh \
+  flakes/lazy-trees.sh \
   gc.sh \
   nix-collect-garbage-d.sh \
   remote-store.sh \
