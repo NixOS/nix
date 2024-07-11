@@ -2631,17 +2631,12 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         return;
 
     case nThunk: // Must not be left by forceValue
-    default:
-        // This should never happen, because eqValues already throws an
-        // error for this, and this function should only be called when
-        // eqValues has found a difference, and it should match
-        // its behavior.
-        // Note that as of writing, we make the compiler require that all enum
-        // values are handled explicitly with `case`s, _despite_ having a
-        // `default:`.
-        error<EvalBaseError>(
-            "BUG: cannot compare %1% with %2%; did forceValue leave a thunk, or might assertEqValues be out of sync with eqValues?", showType(v1), showType(v2))
-            .debugThrow();
+        assert(false);
+    default: // Note that we pass compiler flags that should make `default:` unreachable.
+        // Also note that this probably ran after `eqValues`, which implements
+        // the same logic more efficiently (without having to unwind stacks),
+        // so maybe `assertEqValues` and `eqValues` are out of sync. Check it for solutions.
+        error<EvalError>("assertEqValues: cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).panic();
     }
 }
 
@@ -2723,8 +2718,9 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return v1.fpoint() == v2.fpoint();
 
         case nThunk: // Must not be left by forceValue
-        default:
-            error<EvalError>("cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).debugThrow();
+            assert(false);
+        default: // Note that we pass compiler flags that should make `default:` unreachable.
+            error<EvalError>("eqValues: cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).panic();
     }
 }
 
