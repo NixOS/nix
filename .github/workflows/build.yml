@@ -7,7 +7,7 @@ on:
 
 jobs:
 
-  tests:
+  build:
     strategy:
       fail-fast: false
     runs-on: ${{ inputs.os }}
