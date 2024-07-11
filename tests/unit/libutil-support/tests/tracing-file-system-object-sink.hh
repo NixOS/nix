@@ -15,11 +15,11 @@ public:
     {
     }
 
-    void createDirectory(const Path & path) override;
+    void createDirectory(const CanonPath & path) override;
 
-    void createRegularFile(const Path & path, std::function<void(CreateRegularFileSink &)> fn);
+    void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> fn) override;
 
-    void createSymlink(const Path & path, const std::string & target);
+    void createSymlink(const CanonPath & path, const std::string & target) override;
 };
 
 /**
@@ -35,7 +35,7 @@ public:
     {
     }
 
-    void createHardlink(const Path & path, const CanonPath & target);
+    void createHardlink(const CanonPath & path, const CanonPath & target) override;
 };
 
 }

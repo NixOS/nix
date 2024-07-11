@@ -62,17 +62,18 @@ TEST_F(GitUtilsTest, sink_basic)
     //                general, and I can't imagine that "non-conventional" archives or any other source to be handled by
     //                this sink.
 
-    sink->createDirectory("foo-1.1");
+    sink->createDirectory(CanonPath("foo-1.1"));
 
-    sink->createRegularFile(
-        "foo-1.1/hello", [](CreateRegularFileSink & fileSink) { writeString(fileSink, "hello world", false); });
-    sink->createRegularFile("foo-1.1/bye", [](CreateRegularFileSink & fileSink) {
+    sink->createRegularFile(CanonPath("foo-1.1/hello"), [](CreateRegularFileSink & fileSink) {
+        writeString(fileSink, "hello world", false);
+    });
+    sink->createRegularFile(CanonPath("foo-1.1/bye"), [](CreateRegularFileSink & fileSink) {
         writeString(fileSink, "thanks for all the fish", false);
     });
-    sink->createSymlink("foo-1.1/bye-link", "bye");
-    sink->createDirectory("foo-1.1/empty");
-    sink->createDirectory("foo-1.1/links");
-    sink->createHardlink("foo-1.1/links/foo", CanonPath("foo-1.1/hello"));
+    sink->createSymlink(CanonPath("foo-1.1/bye-link"), "bye");
+    sink->createDirectory(CanonPath("foo-1.1/empty"));
+    sink->createDirectory(CanonPath("foo-1.1/links"));
+    sink->createHardlink(CanonPath("foo-1.1/links/foo"), CanonPath("foo-1.1/hello"));
 
     // sink->createHardlink("foo-1.1/links/foo-2", CanonPath("foo-1.1/hello"));
 
@@ -92,13 +93,14 @@ TEST_F(GitUtilsTest, sink_hardlink)
     auto repo = openRepo();
     auto sink = repo->getFileSystemObjectSink();
 
-    sink->createDirectory("foo-1.1");
+    sink->createDirectory(CanonPath("foo-1.1"));
 
-    sink->createRegularFile(
-        "foo-1.1/hello", [](CreateRegularFileSink & fileSink) { writeString(fileSink, "hello world", false); });
+    sink->createRegularFile(CanonPath("foo-1.1/hello"), [](CreateRegularFileSink & fileSink) {
+        writeString(fileSink, "hello world", false);
+    });
 
     try {
-        sink->createHardlink("foo-1.1/link", CanonPath("hello"));
+        sink->createHardlink(CanonPath("foo-1.1/link"), CanonPath("hello"));
         FAIL() << "Expected an exception";
     } catch (const nix::Error & e) {
         ASSERT_THAT(e.msg(), testing::HasSubstr("invalid hard link target"));

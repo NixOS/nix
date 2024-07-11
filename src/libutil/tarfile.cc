@@ -196,7 +196,7 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
         lastModified = std::max(lastModified, archive_entry_mtime(entry));
 
         if (auto target = archive_entry_hardlink(entry)) {
-            parseSink.createHardlink(path, CanonPath(target));
+            parseSink.createHardlink(cpath, CanonPath(target));
             continue;
         }
 

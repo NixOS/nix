@@ -909,9 +909,12 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         addToTree(*pathComponents.rbegin(), oid, GIT_FILEMODE_LINK);
     }
 
-    void createHardlink(const Path & path, const CanonPath & target) override
+    void createHardlink(const CanonPath & path, const CanonPath & target) override
     {
-        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+        std::vector<std::string> pathComponents;
+        for (auto & c : path)
+            pathComponents.emplace_back(c);
+
         if (!prepareDirs(pathComponents, false)) return;
 
         // We can't just look up the path from the start of the root, since
