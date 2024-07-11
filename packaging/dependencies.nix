@@ -12,9 +12,26 @@
 }:
 
 let
+  prevStdenv = stdenv;
+in
+
+let
   inherit (pkgs) lib;
 
   root = ../.;
+
+  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64
+    then darwinStdenv
+    else prevStdenv;
+
+  # Fix the following error with the default x86_64-darwin SDK:
+  #
+  #     error: aligned allocation function of type 'void *(std::size_t, std::align_val_t)' is only available on macOS 10.13 or newer
+  #
+  # Despite the use of the 10.13 deployment target here, the aligned
+  # allocation function Clang uses with this setting actually works
+  # all the way back to 10.6.
+  darwinStdenv = pkgs.overrideSDK prevStdenv { darwinMinVersion = "10.13"; };
 
   # Nixpkgs implements this by returning a subpath into the fetched Nix sources.
   resolvePath = p: p;
