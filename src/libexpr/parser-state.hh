@@ -22,20 +22,20 @@ struct StringToken
 
 struct ParserLocation
 {
-    int first_column;
-    int last_column;
+    int beginOffset;
+    int endOffset;
 
     // backup to recover from yyless(0)
-    int stashed_first_column, stashed_last_column;
+    int stashedBeginOffset, stashedEndOffset;
 
     void stash() {
-        stashed_first_column = first_column;
-        stashed_last_column = last_column;
+        stashedBeginOffset = beginOffset;
+        stashedEndOffset = endOffset;
     }
 
     void unstash() {
-        first_column = stashed_first_column;
-        last_column = stashed_last_column;
+        beginOffset = stashedBeginOffset;
+        endOffset = stashedEndOffset;
     }
 
     /** Latest doc comment position, or 0. */
@@ -308,12 +308,12 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
 
 inline PosIdx LexerState::at(const ParserLocation & loc)
 {
-    return positions.add(origin, loc.first_column);
+    return positions.add(origin, loc.beginOffset);
 }
 
 inline PosIdx ParserState::at(const ParserLocation & loc)
 {
-    return positions.add(origin, loc.first_column);
+    return positions.add(origin, loc.beginOffset);
 }
 
 }

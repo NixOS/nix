@@ -36,13 +36,13 @@
     do                                                                  \
       if (N)                                                            \
         {                                                               \
-          (Current).first_column = YYRHSLOC (Rhs, 1).first_column;      \
-          (Current).last_column  = YYRHSLOC (Rhs, N).last_column;       \
+          (Current).beginOffset = YYRHSLOC (Rhs, 1).beginOffset;        \
+          (Current).endOffset  = YYRHSLOC (Rhs, N).endOffset;           \
         }                                                               \
       else                                                              \
         {                                                               \
-          (Current).first_column = (Current).last_column =              \
-            YYRHSLOC (Rhs, 0).last_column;                              \
+          (Current).beginOffset = (Current).endOffset =                 \
+            YYRHSLOC (Rhs, 0).endOffset;                                \
         }                                                               \
     while (0)
 
@@ -83,7 +83,7 @@ using namespace nix;
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
 {
     if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
-        loc->first_column = loc->last_column;
+        loc->beginOffset = loc->endOffset;
     }
     throw ParseError({
         .msg = HintFmt(error),
