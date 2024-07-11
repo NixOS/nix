@@ -71,3 +71,15 @@ test_tarball() {
 test_tarball '' cat
 test_tarball .xz xz
 test_tarball .gz gzip
+
+# Test hard links.
+# All entries in tree.tar.gz refer to the same file, and all have the same inode when unpacked by GNU tar.
+# We don't preserve the hard links, because that's an optimization we think is not worth the complexity,
+# so we only make sure that the contents are copied correctly.
+path="$(nix flake prefetch --json "tarball+file://$(pwd)/tree.tar.gz" | jq -r .storePath)"
+[[ $(cat "$path/a/b/foo") = bar ]]
+[[ $(cat "$path/a/b/xyzzy") = bar ]]
+[[ $(cat "$path/a/yyy") = bar ]]
+[[ $(cat "$path/a/zzz") = bar ]]
+[[ $(cat "$path/c/aap") = bar ]]
+[[ $(cat "$path/fnord") = bar ]]

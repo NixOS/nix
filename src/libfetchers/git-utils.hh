@@ -7,7 +7,7 @@ namespace nix {
 
 namespace fetchers { struct PublicKey; }
 
-struct GitFileSystemObjectSink : FileSystemObjectSink
+struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
      * Flush builder and return a final Git hash.
