@@ -13,21 +13,23 @@ struct CompatibilitySettings : public Config
 
         Since Nix 2.24, `nix-shell` always looks for a `shell.nix`, whether that's in the working directory, or in a directory that was passed as an argument.
 
-        You may set this to `false` to revert to the Nix 2.3 behavior.
+        You may set this to `false` to temporarily revert to the behavior of Nix 2.23 and older.
 
-        This setting is not recommended, and will be deprecated and later removed in the future.
+        Using this setting is not recommended.
+        It will be deprecated and removed.
     )"};
 
     // Added in Nix 2.24, July 2024.
     Setting<bool> nixShellShebangArgumentsRelativeToScript{
         this, true, "nix-shell-shebang-arguments-relative-to-script", R"(
-        Before Nix 2.24, the arguments in a `nix-shell` shebang - as well as `--arg` - were relative to working directory.
+        Before Nix 2.24, relative file path expressions in arguments in a `nix-shell` shebang were resolved relative to the working directory.
 
-        Since Nix 2.24, the arguments are relative to the [base directory](@docroot@/glossary.md#gloss-base-directory) defined as the script's directory.
+        Since Nix 2.24, `nix-shell` resolves these paths in a manner that is relative to the [base directory](@docroot@/glossary.md#gloss-base-directory), defined as the script's directory.
 
-        You may set this to `false` to revert to the Nix 2.3 behavior.
+        You may set this to `false` to temporarily revert to the behavior of Nix 2.23 and older.
 
-        This setting is not recommended, and will be deprecated and later removed in the future.
+        Using this setting is not recommended.
+        It will be deprecated and removed.
     )"};
 };
 
