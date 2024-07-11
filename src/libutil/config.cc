@@ -91,7 +91,14 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
 }
 
 
-static void applyConfigInner(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
+/**
+ * Parse configuration in `contents`, and also the configuration files included from there, with their location specified relative to `path`.
+ *
+ * `contents` and `path` represent the file that is being parsed.
+ * The result is only an intermediate list of key-value pairs of strings.
+ * More parsing according to the settings-specific semantics is being done by `loadConfFile` in `libstore/globals.cc`.
+*/
+static void parseConfigFiles(const std::string & contents, const std::string & path, std::vector<std::pair<std::string, std::string>> & parsedContents) {
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
@@ -125,7 +132,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
             if (pathExists(p)) {
                 try {
                     std::string includedContents = readFile(p);
-                    applyConfigInner(includedContents, p, parsedContents);
+                    parseConfigFiles(includedContents, p, parsedContents);
                 } catch (SystemError &) {
                     // TODO: Do we actually want to ignore this? Or is it better to fail?
                 }
@@ -153,7 +160,7 @@ static void applyConfigInner(const std::string & contents, const std::string & p
 void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
     std::vector<std::pair<std::string, std::string>> parsedContents;
 
-    applyConfigInner(contents, path, parsedContents);
+    parseConfigFiles(contents, path, parsedContents);
 
     // First apply experimental-feature related settings
     for (const auto & [name, value] : parsedContents)

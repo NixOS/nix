@@ -59,15 +59,15 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > …
 > ```
 
-The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `tests/unit/${library_name_without-nix}`.
-Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `tests/unit/libexpr/tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `tests/unit/libexpr-support/tests/value/context.{hh,cc}`.
+The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `src/${library_name_without-nix}-test`.
+Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `src/nix-expr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/nix-expr-test-support/tests/value/context.{hh,cc}`.
 
 Data for unit tests is stored in a `data` subdir of the directory for each unit test executable.
-For example, `libnixstore` code is in `src/libstore`, and its test data is in `tests/unit/libstore/data`.
-The path to the `tests/unit/data` directory is passed to the unit test executable with the environment variable `_NIX_TEST_UNIT_DATA`.
+For example, `libnixstore` code is in `src/libstore`, and its test data is in `src/nix-store-tests/data`.
+The path to the `src/${library_name_without-nix}-test/data` directory is passed to the unit test executable with the environment variable `_NIX_TEST_UNIT_DATA`.
 Note that each executable only gets the data for its tests.
 
-The unit test libraries are in `tests/unit/${library_name_without-nix}-lib`.
+The unit test libraries are in `src/${library_name_without-nix}-test-support`.
 All headers are in a `tests` subdirectory so they are included with `#include "tests/"`.
 
 The use of all these separate directories for the unit tests might seem inconvenient, as for example the tests are not "right next to" the part of the code they are testing.
@@ -76,8 +76,25 @@ there is no risk of any build-system wildcards for the library accidentally pick
 
 ### Running tests
 
-You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`.
-Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable, e.g. `GTEST_FILTER='ErrorTraceTest.*' make check`.
+You can run the whole testsuite with `meson test` from the Meson build directory, or the tests for a specific component with `meson test nix-store-tests`.
+A environment variables that Google Test accepts are also worth knowing:
+
+1. [`GTEST_FILTER`](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests)
+
+   This is used for finer-grained filtering of which tests to run.
+
+
+2. [`GTEST_BRIEF`](https://google.github.io/googletest/advanced.html#suppressing-test-passes)
+
+   This is used to avoid logging passing tests.
+
+Putting the two together, one might run
+
+```bash
+GTEST_BREIF=1 GTEST_FILTER='ErrorTraceTest.*' meson test nix-expr-tests -v
+```
+
+for short but comprensive output.
 
 ### Characterisation testing { #characaterisation-testing-unit }
 
@@ -86,7 +103,7 @@ See [functional characterisation testing](#characterisation-testing-functional) 
 Like with the functional characterisation, `_NIX_TEST_ACCEPT=1` is also used.
 For example:
 ```shell-session
-$ _NIX_TEST_ACCEPT=1 make libstore-tests_RUN
+$ _NIX_TEST_ACCEPT=1 meson test nix-store-tests -v
 ...
 [  SKIPPED ] WorkerProtoTest.string_read
 [  SKIPPED ] WorkerProtoTest.string_write

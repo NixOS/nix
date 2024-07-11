@@ -4,9 +4,9 @@ String interpolation is a language feature where a [string], [path], or [attribu
 
 Such a construct is called *interpolated string*, and the expression inside is an [interpolated expression](#interpolated-expression).
 
-[string]: ./values.md#type-string
-[path]: ./values.md#type-path
-[attribute set]: ./values.md#attribute-set
+[string]: ./types.md#type-string
+[path]: ./types.md#type-path
+[attribute set]: ./types.md#attribute-set
 
 ## Examples
 

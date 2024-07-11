@@ -82,9 +82,18 @@ struct RestoreRegularFile : CreateRegularFileSink {
     void preallocateContents(uint64_t size) override;
 };
 
+static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
+{
+    auto dst = src;
+    if (!path.rel().empty())
+        dst /= path.rel();
+    return dst;
+}
+
 void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
-    std::filesystem::path p = dstPath / path.rel();
+    auto p = append(dstPath, path);
+
     RestoreRegularFile crf;
     crf.fd =
 #ifdef _WIN32
@@ -135,7 +144,7 @@ void RestoreRegularFile::operator () (std::string_view data)
 
 void RestoreSink::createSymlink(const CanonPath & path, const std::string & target)
 {
-    std::filesystem::path p = dstPath / path.rel();
+    auto p = append(dstPath, path);
     nix::createSymlink(target, p);
 }
 

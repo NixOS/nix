@@ -64,7 +64,7 @@ using Tree = std::map<std::string, TreeEntry>;
  * Implementations may seek to memoize resources (bandwidth, storage,
  * etc.) for the same Git hash.
  */
-using SinkHook = void(const std::string & name, TreeEntry entry);
+using SinkHook = void(const CanonPath & name, TreeEntry entry);
 
 /**
  * Parse the "blob " or "tree " prefix.

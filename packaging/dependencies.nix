@@ -10,8 +10,44 @@
   stdenv,
   versionSuffix,
 }:
+
+let
+  inherit (pkgs) lib;
+
+  root = ../.;
+
+  # Nixpkgs implements this by returning a subpath into the fetched Nix sources.
+  resolvePath = p: p;
+
+  # Indirection for Nixpkgs to override when package.nix files are vendored
+  filesetToSource = lib.fileset.toSource;
+
+  localSourceLayer = finalAttrs: prevAttrs:
+    let
+      workDirPath =
+        # Ideally we'd pick finalAttrs.workDir, but for now `mkDerivation` has
+        # the requirement that everything except passthru and meta must be
+        # serialized by mkDerivation, which doesn't work for this.
+        prevAttrs.workDir;
+
+      workDirSubpath = lib.path.removePrefix root workDirPath;
+      sources = assert prevAttrs.fileset._type == "fileset"; prevAttrs.fileset;
+      src = lib.fileset.toSource { fileset = sources; inherit root; };
+
+    in
+    {
+      sourceRoot = "${src.name}/" + workDirSubpath;
+      inherit src;
+
+      # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
+      fileset = null;
+      workDir = null;
+    };
+
+in
 scope: {
   inherit stdenv versionSuffix;
+  version = lib.fileContents ../.version + versionSuffix;
 
   libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";
@@ -24,6 +60,19 @@ scope: {
   boehmgc = pkgs.boehmgc.override {
     enableLargeConfig = true;
   };
+
+  # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
+  boost = (pkgs.boost.override {
+    extraB2Args = [
+      "--with-container"
+      "--with-context"
+      "--with-coroutine"
+    ];
+  }).overrideAttrs (old: {
+    # Need to remove `--with-*` to use `--with-libraries=...`
+    buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
+    installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
+  });
 
   libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
     src = inputs.libgit2;
@@ -55,4 +104,14 @@ scope: {
       CONFIG_ASH_TEST y
     '';
   });
+
+  # TODO change in Nixpkgs, Windows works fine. First commit of
+  # https://github.com/NixOS/nixpkgs/pull/322977 backported will fix.
+  toml11 = pkgs.toml11.overrideAttrs (old: {
+    meta.platforms = lib.platforms.all;
+  });
+
+  inherit resolvePath filesetToSource;
+
+  mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
 }

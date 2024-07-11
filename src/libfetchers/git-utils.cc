@@ -851,10 +851,10 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 
     void createRegularFile(
-        const Path & path,
+        const CanonPath & path,
         std::function<void(CreateRegularFileSink &)> func) override
     {
-        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+        auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
         if (!prepareDirs(pathComponents, false)) return;
 
         git_writestream * stream = nullptr;
@@ -862,11 +862,11 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             throw Error("creating a blob stream object: %s", git_error_last()->message);
 
         struct CRF : CreateRegularFileSink {
-            const Path & path;
+            const CanonPath & path;
             GitFileSystemObjectSinkImpl & back;
             git_writestream * stream;
             bool executable = false;
-            CRF(const Path & path, GitFileSystemObjectSinkImpl & back, git_writestream * stream)
+            CRF(const CanonPath & path, GitFileSystemObjectSinkImpl & back, git_writestream * stream)
                 : path(path), back(back), stream(stream)
             {}
             void operator () (std::string_view data) override
@@ -891,15 +891,15 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             : GIT_FILEMODE_BLOB);
     }
 
-    void createDirectory(const Path & path) override
+    void createDirectory(const CanonPath & path) override
     {
-        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+        auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
         (void) prepareDirs(pathComponents, true);
     }
 
-    void createSymlink(const Path & path, const std::string & target) override
+    void createSymlink(const CanonPath & path, const std::string & target) override
     {
-        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+        auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
         if (!prepareDirs(pathComponents, false)) return;
 
         git_oid oid;

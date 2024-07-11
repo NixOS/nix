@@ -38,9 +38,22 @@ let
     "nix-util"
     "nix-util-c"
     "nix-util-test-support"
-    "nix-util-test"
+    "nix-util-tests"
     "nix-store"
+    "nix-store-c"
+    "nix-store-test-support"
+    "nix-store-tests"
     "nix-fetchers"
+    "nix-fetchers-tests"
+    "nix-expr"
+    "nix-expr-c"
+    "nix-expr-test-support"
+    "nix-expr-tests"
+    "nix-flake"
+    "nix-flake-tests"
+    "nix-main"
+    "nix-cmd"
+    "nix-ng"
   ];
 in
 {
@@ -105,7 +118,7 @@ in
   installerScriptForGHA = installScriptFor [
     # Native
     self.hydraJobs.binaryTarball."x86_64-linux"
-    self.hydraJobs.binaryTarball."x86_64-darwin"
+    self.hydraJobs.binaryTarball."aarch64-darwin"
     # Cross
     self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
     self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"

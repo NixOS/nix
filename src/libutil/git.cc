@@ -147,7 +147,7 @@ void parseTree(
         Hash hash(HashAlgorithm::SHA1);
         std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-        hook(name, TreeEntry {
+        hook(CanonPath{name}, TreeEntry {
             .mode = mode,
             .hash = hash,
         });
@@ -208,7 +208,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
 
 void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook)
 {
-    parse(sink, CanonPath::root, source, BlobMode::Regular, [&](const std::string & name, TreeEntry entry) {
+    parse(sink, CanonPath::root, source, BlobMode::Regular, [&](CanonPath name, TreeEntry entry) {
         auto [accessor, from] = hook(entry.hash);
         auto stat = accessor->lstat(from);
         auto gotOpt = convertMode(stat.type);
