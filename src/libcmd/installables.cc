@@ -376,7 +376,8 @@ void completeFlakeRefWithFragment(
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
-                        completions.add(flakeRefS + "#" + prefixRoot + dropEmptyInitThenConcatStringsSep(".", evalState->symbols.resolve(attrPath2)));
+                        // FIXME: handle names with dots
+                        completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
                     }
                 }
             }
