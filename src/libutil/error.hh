@@ -127,6 +127,8 @@ protected:
 
 public:
     BaseError(const BaseError &) = default;
+    BaseError& operator=(const BaseError &) = default;
+    BaseError& operator=(BaseError &&) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
