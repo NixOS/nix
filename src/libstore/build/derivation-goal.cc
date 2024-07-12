@@ -1505,7 +1505,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
     if (!wantedOutputsLeft.empty())
         throw Error("derivation '%s' does not have wanted outputs %s",
             worker.store.printStorePath(drvPath),
-            dropEmptyInitThenConcatStringsSep(", ", quoteStrings(wantedOutputsLeft)));
+            concatStringsSep(", ", quoteStrings(wantedOutputsLeft)));
 
     bool allValid = true;
     for (auto & [_, status] : initialOutputs) {

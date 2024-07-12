@@ -5,6 +5,7 @@
 #include "regex-combinators.hh"
 #include "outputs-spec.hh"
 #include "path-regex.hh"
+#include "strings-inline.hh"
 
 namespace nix {
 
@@ -83,7 +84,7 @@ std::string OutputsSpec::to_string() const
             return "*";
         },
         [&](const OutputsSpec::Names & outputNames) -> std::string {
-            return dropEmptyInitThenConcatStringsSep(",", outputNames);
+            return concatStringsSep(",", outputNames);
         },
     }, raw);
 }

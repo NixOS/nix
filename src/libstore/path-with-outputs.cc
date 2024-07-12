@@ -1,7 +1,9 @@
+#include <regex>
+
 #include "path-with-outputs.hh"
 #include "store-api.hh"
+#include "strings.hh"
 
-#include <regex>
 
 namespace nix {
 
@@ -9,7 +11,7 @@ std::string StorePathWithOutputs::to_string(const StoreDirConfig & store) const
 {
     return outputs.empty()
         ? store.printStorePath(path)
-        : store.printStorePath(path) + "!" + dropEmptyInitThenConcatStringsSep(",", outputs);
+        : store.printStorePath(path) + "!" + concatStringsSep(",", outputs);
 }
 
 
