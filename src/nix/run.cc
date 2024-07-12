@@ -25,7 +25,7 @@ std::string chrootHelperName = "__run_in_chroot";
 
 namespace nix {
 
-void runProgramInStore(ref<Store> store,
+void execProgramInStore(ref<Store> store,
     UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,
@@ -128,7 +128,11 @@ struct CmdRun : InstallableValueCommand
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
 
-        runProgramInStore(store, UseLookupPath::DontUse, app.program, allArgs);
+        // Release our references to eval caches to ensure they are persisted to disk, because
+        // we are about to exec out of this process without running C++ destructors.
+        state->evalCaches.clear();
+
+        execProgramInStore(store, UseLookupPath::DontUse, app.program, allArgs);
     }
 };
 

@@ -701,7 +701,7 @@ struct CmdDevelop : Common, MixEnvironment
         // we are about to exec out of this process without running C++ destructors.
         getEvalState()->evalCaches.clear();
 
-        runProgramInStore(store, UseLookupPath::Use, shell, args, buildEnvironment.getSystem());
+        execProgramInStore(store, UseLookupPath::Use, shell, args, buildEnvironment.getSystem());
 #endif
     }
 };
