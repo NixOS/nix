@@ -40,6 +40,13 @@ template<class C>
 std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
+
+    for (auto & i : ss) {
+        // Make sure we don't rely on the empty item ignoring behavior
+        assert(!i.empty());
+        break;
+    }
+
     // need a cast to string_view since this is also called with Symbols
     for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
     std::string s;
