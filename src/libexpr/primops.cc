@@ -4446,7 +4446,8 @@ static void prim_compareVersions(EvalState & state, const PosIdx pos, Value * * 
 {
     auto version1 = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.compareVersions");
     auto version2 = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.compareVersions");
-    v.mkInt(compareVersions(version1, version2));
+    auto result = compareVersions(version1, version2);
+    v.mkInt(result < 0 ? -1 : result > 0 ? 1 : 0);
 }
 
 static RegisterPrimOp primop_compareVersions({
