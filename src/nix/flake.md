@@ -310,10 +310,7 @@ Currently the `type` attribute can be one of the following:
 
   The URL syntax for `gitlab` flakes is:
 
-  `gitlab:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
-
-  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
-  (`ref`), or a commit hash (`rev`) can be specified.
+  `gitlab:(/<org>)+/<repo>(\?<params>)?`
 
   Since GitLab allows for self-hosting, you can specify `host` as
   a parameter, to point to any instances other than `gitlab.com`.
@@ -321,9 +318,10 @@ Currently the `type` attribute can be one of the following:
   Some examples:
 
   * `gitlab:veloren/veloren`
-  * `gitlab:veloren/veloren/master`
-  * `gitlab:veloren/veloren/80a4d7f13492d916e47d6195be23acae8001985a`
+  * `gitlab:veloren/veloren?ref=master`
+  * `gitlab:veloren/veloren?rev=80a4d7f13492d916e47d6195be23acae8001985a`
   * `gitlab:openldap/openldap?host=git.openldap.org`
+  * `gitlab:GNOME/Incubator/papers?host:gitlab.gnome.org`
 
   When accessing a project in a (nested) subgroup, make sure to URL-encode any
   slashes, i.e. replace `/` with `%2F`:
