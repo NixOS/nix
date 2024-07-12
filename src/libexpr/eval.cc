@@ -1979,7 +1979,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     NixStringContext context;
     std::vector<BackedStringView> s;
     size_t sSize = 0;
-    NixInt n = 0;
+    NixInt n{0};
     NixFloat nf = 0;
 
     bool first = !forceString;
@@ -2023,17 +2023,22 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
         if (firstType == nInt) {
             if (vTmp.type() == nInt) {
-                n += vTmp.integer();
+                auto newN = n + vTmp.integer();
+                if (auto checked = newN.valueChecked(); checked.has_value()) {
+                    n = NixInt(*checked);
+                } else {
+                    state.error<EvalError>("integer overflow in adding %1% + %2%", n, vTmp.integer()).atPos(i_pos).debugThrow();
+                }
             } else if (vTmp.type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
-                nf = n;
+                nf = n.value;
                 nf += vTmp.fpoint();
             } else
                 state.error<EvalError>("cannot add %1% to an integer", showType(vTmp)).atPos(i_pos).withFrame(env, *this).debugThrow();
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
-                nf += vTmp.integer();
+                nf += vTmp.integer().value;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint();
             } else
@@ -2158,7 +2163,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
     try {
         forceValue(v, pos);
         if (v.type() == nInt)
-            return v.integer();
+            return v.integer().value;
         else if (v.type() != nFloat)
             error<TypeError>(
                 "expected a float but found %1%: %2%",
@@ -2345,7 +2350,7 @@ BackedStringView EvalState::coerceToString(
            shell scripting convenience, just like `null'. */
         if (v.type() == nBool && v.boolean()) return "1";
         if (v.type() == nBool && !v.boolean()) return "";
-        if (v.type() == nInt) return std::to_string(v.integer());
+        if (v.type() == nInt) return std::to_string(v.integer().value);
         if (v.type() == nFloat) return std::to_string(v.fpoint());
         if (v.type() == nNull) return "";
 
@@ -2728,9 +2733,9 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
-        return v1.integer() == v2.fpoint();
+        return v1.integer().value == v2.fpoint();
     if (v1.type() == nFloat && v2.type() == nInt)
-        return v1.fpoint() == v2.integer();
+        return v1.fpoint() == v2.integer().value;
 
     // All other types are not compatible with each other.
     if (v1.type() != v2.type()) return false;
