@@ -815,7 +815,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
                     logger->cout("Original flake URL: %s", element.source->originalRef.to_string());
                     logger->cout("Locked flake URL:   %s", element.source->lockedRef.to_string());
                 }
-                logger->cout("Store paths:        %s", dropEmptyInitThenConcatStringsSep(" ", store->printStorePathSet(element.storePaths)));
+                logger->cout("Store paths:        %s", concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
             }
         }
     }

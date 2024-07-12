@@ -22,6 +22,8 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 using json = nlohmann::json;
 
 namespace nix {
@@ -1208,7 +1210,7 @@ std::string StoreDirConfig::showPaths(const StorePathSet & paths)
 
 std::string showPaths(const PathSet & paths)
 {
-    return dropEmptyInitThenConcatStringsSep(", ", quoteStrings(paths));
+    return concatStringsSep(", ", quoteStrings(paths));
 }
 
 

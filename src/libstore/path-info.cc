@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "json-utils.hh"
 #include "comparator.hh"
+#include "strings.hh"
 
 namespace nix {
 
@@ -30,7 +31,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             "1;" + store.printStorePath(path) + ";"
             + narHash.to_string(HashFormat::Nix32, true) + ";"
             + std::to_string(narSize) + ";"
-        + dropEmptyInitThenConcatStringsSep(",", store.printStorePathSet(references));
+        + concatStringsSep(",", store.printStorePathSet(references));
 }
 
 

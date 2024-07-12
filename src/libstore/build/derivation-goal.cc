@@ -32,6 +32,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix {
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
@@ -895,7 +897,7 @@ void runPostBuildHook(
     std::map<std::string, std::string> hookEnvironment = getEnv();
 
     hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
-    hookEnvironment.emplace("OUT_PATHS", chomp(dropEmptyInitThenConcatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
     hookEnvironment.emplace("NIX_CONFIG", globalConfig.toKeyValue());
 
     struct LogSink : Sink {
