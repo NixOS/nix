@@ -116,7 +116,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2)
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
 
         auto include = false;
         auto ignoreMissing = false;
@@ -129,7 +129,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
 
         if (include) {
             if (tokens.size() != 2)
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+                throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
             auto p = absPath(tokens[1], dirOf(path));
             if (pathExists(p)) {
                 try {
@@ -145,7 +145,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
         }
 
         if (tokens[1] != "=")
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
 
         std::string name = std::move(tokens[0]);
 
