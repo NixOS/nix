@@ -17,6 +17,8 @@
 #include <regex>
 #include <iomanip>
 
+#include "strings.hh"
+
 using namespace nix;
 
 struct ProfileElementSource
@@ -472,7 +474,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 originalConflictingFilePath,
                 newConflictingFilePath,
                 originalEntryName,
-                dropEmptyInitThenConcatStringsSep(" ", newConflictingRefs),
+                concatStringsSep(" ", newConflictingRefs),
                 conflictError.priority,
                 conflictError.priority - 1,
                 conflictError.priority + 1

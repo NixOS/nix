@@ -15,6 +15,8 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 using namespace nix;
 using json = nlohmann::json;
 
@@ -96,7 +98,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             auto attrPathS = state->symbols.resolve(attrPath);
 
             Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", dropEmptyInitThenConcatStringsSep(".", attrPathS)));
+                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
                 auto recurse = [&]()
                 {

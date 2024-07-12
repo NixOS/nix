@@ -64,6 +64,8 @@
 #include <grp.h>
 #include <iostream>
 
+#include "strings.hh"
+
 namespace nix {
 
 void handleDiffHook(
@@ -840,7 +842,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
-    printMsg(lvlChatty, "using builder args '%1%'", dropEmptyInitThenConcatStringsSep(" ", drv->args));
+    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
     for (auto & i : drv->env)
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
@@ -1063,7 +1065,7 @@ void LocalDerivationGoal::startBuilder()
                 e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
                     worker.store.printStorePath(drvPath),
                     statusToString(status),
-                    dropEmptyInitThenConcatStringsSep("|", msgs));
+                    concatStringsSep("|", msgs));
                 throw;
             }
         }();
