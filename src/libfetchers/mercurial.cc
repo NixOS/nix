@@ -45,7 +45,9 @@ static std::string runHg(const Strings & args, const std::optional<std::string> 
 
 struct MercurialInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "hg+http" &&
             url.scheme != "hg+https" &&
@@ -68,7 +70,7 @@ struct MercurialInputScheme : InputScheme
 
         attrs.emplace("url", url2.to_string());
 
-        return inputFromAttrs(attrs);
+        return inputFromAttrs(settings, attrs);
     }
 
     std::string_view schemeName() const override
@@ -88,7 +90,9 @@ struct MercurialInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
     {
         parseURL(getStrAttr(attrs, "url"));
 
@@ -97,7 +101,7 @@ struct MercurialInputScheme : InputScheme
                 throw BadURL("invalid Mercurial branch/tag name '%s'", *ref);
         }
 
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
         return input;
     }
@@ -182,10 +186,10 @@ struct MercurialInputScheme : InputScheme
                 /* This is an unclean working tree. So copy all tracked
                    files. */
 
-                if (!fetchSettings.allowDirty)
+                if (!input.settings->allowDirty)
                     throw Error("Mercurial tree '%s' is unclean", actualUrl);
 
-                if (fetchSettings.warnDirty)
+                if (input.settings->warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));

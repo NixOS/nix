@@ -196,7 +196,8 @@ std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
         flake::LockFlags lockFlagsApplyConfig = lockFlags;
         // FIXME why this side effect?
         lockFlagsApplyConfig.applyNixConfig = true;
-        _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlagsApplyConfig));
+        _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(
+            flakeSettings, *state, flakeRef, lockFlagsApplyConfig));
     }
     return _lockedFlake;
 }
