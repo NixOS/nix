@@ -339,7 +339,7 @@ public:
                     (narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)
                     (info->narHash.to_string(HashFormat::Nix32, true))
                     (info->narSize)
-                    (dropEmptyInitThenConcatStringsSep(" ", info->shortRefs()))
+                    (concatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)
                     (concatStringsSep(" ", info->sigs))
                     (renderContentAddress(info->ca))

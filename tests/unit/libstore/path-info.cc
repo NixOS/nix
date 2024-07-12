@@ -26,9 +26,9 @@ static UnkeyedValidPathInfo makeEmpty()
     };
 }
 
-static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo)
+static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
 {
-    UnkeyedValidPathInfo info = ValidPathInfo {
+    ValidPathInfo info = ValidPathInfo {
         store,
         "foo",
         FixedOutputInfo {
@@ -56,6 +56,9 @@ static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo
         info.sigs = { "asdf", "qwer" };
     }
     return info;
+}
+static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo) {
+    return makeFullKeyed(store, includeImpureInfo);
 }
 
 #define JSON_TEST(STEM, OBJ, PURE)                                        \
@@ -86,4 +89,13 @@ JSON_TEST(empty_impure, makeEmpty(), true)
 JSON_TEST(pure, makeFull(*store, false), false)
 JSON_TEST(impure, makeFull(*store, true), true)
 
+TEST_F(PathInfoTest, PathInfo_full_shortRefs) {
+    ValidPathInfo it = makeFullKeyed(*store, true);
+    // it.references = unkeyed.references;
+    auto refs = it.shortRefs();
+    ASSERT_EQ(refs.size(), 2);
+    ASSERT_EQ(*refs.begin(), "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar");
+    ASSERT_EQ(*++refs.begin(), "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo");
 }
+
+} // namespace nix

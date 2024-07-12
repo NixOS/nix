@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "nar-info.hh"
 #include "store-api.hh"
+#include "strings.hh"
 
 namespace nix {
 
@@ -111,7 +112,7 @@ std::string NarInfo::to_string(const Store & store) const
     res += "NarHash: " + narHash.to_string(HashFormat::Nix32, true) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
-    res += "References: " + dropEmptyInitThenConcatStringsSep(" ", shortRefs()) + "\n";
+    res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";
 
     if (deriver)
         res += "Deriver: " + std::string(deriver->to_string()) + "\n";
