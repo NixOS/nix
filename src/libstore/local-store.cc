@@ -51,6 +51,8 @@
 
 #include <sqlite3.h>
 
+#include "strings.hh"
+
 
 namespace nix {
 
@@ -656,7 +658,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 combinedSignatures.insert(info.signatures.begin(),
                     info.signatures.end());
                 state->stmts->UpdateRealisedOutput.use()
-                    (dropEmptyInitThenConcatStringsSep(" ", combinedSignatures))
+                    (concatStringsSep(" ", combinedSignatures))
                     (info.id.strHash())
                     (info.id.outputName)
                     .exec();
@@ -675,7 +677,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 (info.id.strHash())
                 (info.id.outputName)
                 (printStorePath(info.outPath))
-                (dropEmptyInitThenConcatStringsSep(" ", info.signatures))
+                (concatStringsSep(" ", info.signatures))
                 .exec();
         }
         for (auto & [outputId, depPath] : info.dependentRealisations) {
@@ -729,7 +731,7 @@ uint64_t LocalStore::addValidPath(State & state,
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
         (info.narSize, info.narSize != 0)
         (info.ultimate ? 1 : 0, info.ultimate)
-        (dropEmptyInitThenConcatStringsSep(" ", info.sigs), !info.sigs.empty())
+        (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
         .exec();
     uint64_t id = state.db.getLastInsertedRowId();
@@ -833,7 +835,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
         (info.narSize, info.narSize != 0)
         (info.narHash.to_string(HashFormat::Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
-        (dropEmptyInitThenConcatStringsSep(" ", info.sigs), !info.sigs.empty())
+        (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
         (printStorePath(info.path))
         .exec();

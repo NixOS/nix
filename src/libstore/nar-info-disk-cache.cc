@@ -7,6 +7,8 @@
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix {
 
 static const char * schema = R"sql(
@@ -339,7 +341,7 @@ public:
                     (info->narSize)
                     (dropEmptyInitThenConcatStringsSep(" ", info->shortRefs()))
                     (info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)
-                    (dropEmptyInitThenConcatStringsSep(" ", info->sigs))
+                    (concatStringsSep(" ", info->sigs))
                     (renderContentAddress(info->ca))
                     (time(0)).exec();
 
