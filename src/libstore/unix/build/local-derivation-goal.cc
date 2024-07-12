@@ -498,10 +498,10 @@ void LocalDerivationGoal::startBuilder()
     if (!parsedDrv->canBuildLocally(worker.store))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
-            dropEmptyInitThenConcatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
+            concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
-            dropEmptyInitThenConcatStringsSep<StringSet>(", ", worker.store.systemFeatures));
+            concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
 
     /* Create a temporary directory where the build will take
        place. */
