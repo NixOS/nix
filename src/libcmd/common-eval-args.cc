@@ -11,6 +11,8 @@
 #include "command.hh"
 #include "tarball.hh"
 #include "fetch-to-store.hh"
+#include "compatibility-settings.hh"
+#include "eval-settings.hh"
 
 namespace nix {
 
@@ -32,6 +34,11 @@ EvalSettings evalSettings {
 };
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);
+
+CompatibilitySettings compatibilitySettings {};
+
+static GlobalConfig::Register rCompatibilitySettings(&compatibilitySettings);
+
 
 MixEvalArgs::MixEvalArgs()
 {
@@ -74,7 +81,7 @@ MixEvalArgs::MixEvalArgs()
         .description = R"(
   Add *path* to the Nix search path. The Nix search path is
   initialized from the colon-separated [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH) environment
-  variable, and is used to look up the location of Nix expressions using [paths](@docroot@/language/values.md#type-path) enclosed in angle
+  variable, and is used to look up the location of Nix expressions using [paths](@docroot@/language/types.md#type-path) enclosed in angle
   brackets (i.e., `<nixpkgs>`).
 
   For instance, passing

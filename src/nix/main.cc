@@ -333,7 +333,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "generated-doc/help-stores.md"
+          #include "help-stores.md.gen.hh"
           ;
     }
 
@@ -419,35 +419,28 @@ void mainWrapped(int argc, char * * argv)
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"), evalSettings);
-        auto res = nlohmann::json::object();
-        res["builtins"] = ({
-            auto builtinsJson = nlohmann::json::object();
-            for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
-                auto b = nlohmann::json::object();
-                if (!builtin.value->isPrimOp()) continue;
-                auto primOp = builtin.value->primOp();
-                if (!primOp->doc) continue;
-                b["arity"] = primOp->arity;
-                b["args"] = primOp->args;
-                b["doc"] = trim(stripIndentation(primOp->doc));
+        auto builtinsJson = nlohmann::json::object();
+        for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
+            auto b = nlohmann::json::object();
+            if (!builtin.value->isPrimOp()) continue;
+            auto primOp = builtin.value->primOp();
+            if (!primOp->doc) continue;
+            b["args"] = primOp->args;
+            b["doc"] = trim(stripIndentation(primOp->doc));
+            if (primOp->experimentalFeature)
                 b["experimental-feature"] = primOp->experimentalFeature;
-                builtinsJson[state.symbols[builtin.name]] = std::move(b);
-            }
-            std::move(builtinsJson);
-        });
-        res["constants"] = ({
-            auto constantsJson = nlohmann::json::object();
-            for (auto & [name, info] : state.constantInfos) {
-                auto c = nlohmann::json::object();
-                if (!info.doc) continue;
-                c["doc"] = trim(stripIndentation(info.doc));
-                c["type"] = showType(info.type, false);
-                c["impure-only"] = info.impureOnly;
-                constantsJson[name] = std::move(c);
-            }
-            std::move(constantsJson);
-        });
-        logger->cout("%s", res);
+            builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
+        }
+        for (auto & [name, info] : state.constantInfos) {
+            auto b = nlohmann::json::object();
+            if (!info.doc) continue;
+            b["doc"] = trim(stripIndentation(info.doc));
+            b["type"] = showType(info.type, false);
+            if (info.impureOnly)
+                b["impure-only"] = true;
+            builtinsJson[name] = std::move(b);
+        }
+        logger->cout("%s", builtinsJson);
         return;
     }
 

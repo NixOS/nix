@@ -98,7 +98,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     const std::optional<Path> & baseDir, InputPath lockRootPath);
 
 static FlakeInput parseFlakeInput(EvalState & state,
-    const std::string & inputName, Value * value, const PosIdx pos,
+    std::string_view inputName, Value * value, const PosIdx pos,
     const std::optional<Path> & baseDir, InputPath lockRootPath)
 {
     expectType(state, nAttrs, *value, pos);
@@ -178,7 +178,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
     }
 
     if (!input.follows && !input.ref)
-        input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}});
+        input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", std::string(inputName)}});
 
     return input;
 }
@@ -244,7 +244,7 @@ Flake readFlake(
             for (auto & formal : outputs->value->payload.lambda.fun->formals->formals) {
                 if (formal.name != state.sSelf)
                     flake.inputs.emplace(state.symbols[formal.name], FlakeInput {
-                        .ref = parseFlakeRef(state.symbols[formal.name])
+                        .ref = parseFlakeRef(std::string(state.symbols[formal.name]))
                     });
             }
         }
@@ -968,10 +968,20 @@ std::optional<Fingerprint> LockedFlake::getFingerprint(ref<Store> store) const
     auto fingerprint = flake.lockedRef.input.getFingerprint(store);
     if (!fingerprint) return std::nullopt;
 
+    *fingerprint += fmt(";%s;%s", flake.lockedRef.subdir, lockFile);
+
+    /* Include revCount and lastModified because they're not
+       necessarily implied by the content fingerprint (e.g. for
+       tarball flakes) but can influence the evaluation result. */
+    if (auto revCount = flake.lockedRef.input.getRevCount())
+        *fingerprint += fmt(";revCount=%d", *revCount);
+    if (auto lastModified = flake.lockedRef.input.getLastModified())
+        *fingerprint += fmt(";lastModified=%d", *lastModified);
+
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
-    return hashString(HashAlgorithm::SHA256, fmt("%s;%s;%s", *fingerprint, flake.lockedRef.subdir, lockFile));
+    return hashString(HashAlgorithm::SHA256, *fingerprint);
 }
 
 Flake::~Flake() { }

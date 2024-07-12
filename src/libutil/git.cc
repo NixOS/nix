@@ -53,7 +53,7 @@ static std::string getString(Source & source, int n)
 
 void parseBlob(
     FileSystemObjectSink & sink,
-    const Path & sinkPath,
+    const CanonPath & sinkPath,
     Source & source,
     BlobMode blobMode,
     const ExperimentalFeatureSettings & xpSettings)
@@ -116,7 +116,7 @@ void parseBlob(
 
 void parseTree(
     FileSystemObjectSink & sink,
-    const Path & sinkPath,
+    const CanonPath & sinkPath,
     Source & source,
     std::function<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings)
@@ -147,7 +147,7 @@ void parseTree(
         Hash hash(HashAlgorithm::SHA1);
         std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-        hook(name, TreeEntry {
+        hook(CanonPath{name}, TreeEntry {
             .mode = mode,
             .hash = hash,
         });
@@ -171,7 +171,7 @@ ObjectType parseObjectType(
 
 void parse(
     FileSystemObjectSink & sink,
-    const Path & sinkPath,
+    const CanonPath & sinkPath,
     Source & source,
     BlobMode rootModeIfBlob,
     std::function<SinkHook> hook,
@@ -208,7 +208,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
 
 void restore(FileSystemObjectSink & sink, Source & source, std::function<RestoreHook> hook)
 {
-    parse(sink, "", source, BlobMode::Regular, [&](Path name, TreeEntry entry) {
+    parse(sink, CanonPath::root, source, BlobMode::Regular, [&](CanonPath name, TreeEntry entry) {
         auto [accessor, from] = hook(entry.hash);
         auto stat = accessor->lstat(from);
         auto gotOpt = convertMode(stat.type);

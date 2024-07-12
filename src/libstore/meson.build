@@ -14,14 +14,7 @@ project('nix-store', 'cpp',
 
 cxx = meson.get_compiler('cpp')
 
-# See note in ../nix-util/meson.build
-deps_private = [ ]
-
-# See note in ../nix-util/meson.build
-deps_public = [ ]
-
-# See note in ../nix-util/meson.build
-deps_other = [ ]
+subdir('build-utils-meson/deps-lists')
 
 configdata = configuration_data()
 
@@ -30,13 +23,12 @@ configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 configdata.set_quoted('SYSTEM', host_machine.system())
 
-nix_util = dependency('nix-util')
-if nix_util.type_name() == 'internal'
-  # subproject sadly no good for pkg-config module
-  deps_other += nix_util
-else
-  deps_public += nix_util
-endif
+deps_private_maybe_subproject = [
+]
+deps_public_maybe_subproject = [
+  dependency('nix-util'),
+]
+subdir('build-utils-meson/subprojects')
 
 run_command('ln', '-s',
   meson.project_build_root() / '__nothing_link_target',
@@ -75,12 +67,7 @@ has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('lremovexattr')
 configdata.set('HAVE_ACL_SUPPORT', has_acl_support.to_int())
 
-# This is only conditional to work around
-# https://github.com/mesonbuild/meson/issues/13293. It should be
-# unconditional.
-if not (host_machine.system() == 'windows' and cxx.get_id() == 'gcc')
-  deps_private += dependency('threads')
-endif
+subdir('build-utils-meson/threads')
 
 boost = dependency(
   'boost',
@@ -112,27 +99,24 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-
-enable_embedded_sandbox_shell = get_option('embedded-sandbox-shell')
-if enable_embedded_sandbox_shell
-  # This one goes in config.h
-  # The path to busybox is passed as a -D flag when compiling this_library.
-  # Idk why, ask the old buildsystem.
-  configdata.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
-endif
+subdir('build-utils-meson/generate-header')
 
 generated_headers = []
-foreach header : [ 'schema.sql', 'ca-specific-schema.sql' ]
-  generated_headers += custom_target(
-    command : [ 'bash', '-c', '{ echo \'R"__NIX_STR(\' && cat @INPUT@ && echo \')__NIX_STR"\'; } > "$1"', '_ignored_argv0', '@OUTPUT@' ],
-    input : header,
-    output : '@PLAINNAME@.gen.hh',
-    install : true,
-    install_dir : get_option('includedir') / 'nix'
-  )
+foreach header : [
+  'schema.sql',
+  'ca-specific-schema.sql',
+]
+  generated_headers += gen_header.process(header)
 endforeach
 
-if enable_embedded_sandbox_shell
+busybox = find_program(get_option('sandbox-shell'), required : false)
+
+if get_option('embedded-sandbox-shell')
+  # This one goes in config.h
+  # The path to busybox is passed as a -D flag when compiling this_library.
+  # This solution is inherited from the old make buildsystem
+  # TODO: do this differently?
+  configdata.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(
     'embedded-sandbox-shell.gen.hh',
@@ -152,28 +136,18 @@ endif
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-store.h',
+  output : 'config-store.hh',
 )
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.h',
-  '-include', 'config-store.h',
-  '-Wno-deprecated-declarations',
-  '-Wimplicit-fallthrough',
-  '-Werror=switch',
-  '-Werror=switch-enum',
-  '-Wdeprecated-copy',
-  '-Wignored-qualifiers',
-  # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
-  # at ~1% overhead in `nix search`.
-  #
-  # FIXME: remove when we get meson 1.4.0 which will default this to on for us:
-  # https://mesonbuild.com/Release-notes-for-1-4-0.html#ndebug-setting-now-controls-c-stdlib-assertions
-  '-D_GLIBCXX_ASSERTIONS=1',
+  '-include', 'config-util.hh',
+  '-include', 'config-store.hh',
   language : 'cpp',
 )
+
+subdir('build-utils-meson/diagnostics')
 
 sources = files(
   'binary-cache-store.cc',
@@ -247,7 +221,7 @@ include_dirs = [
   include_directories('build'),
 ]
 
-headers = [config_h] +files(
+headers = [config_h] + files(
   'binary-cache-store.hh',
   'build-result.hh',
   'build/derivation-goal.hh',
@@ -391,11 +365,15 @@ cpp_str_defines += {
   'LSOF': lsof_path
 }
 
-#if busybox.found()
+if get_option('embedded-sandbox-shell')
   cpp_str_defines += {
-#    'SANDBOX_SHELL': busybox.full_path()
+    'SANDBOX_SHELL': '__embedded_sandbox_shell__'
   }
-#endif
+elif busybox.found()
+  cpp_str_defines += {
+    'SANDBOX_SHELL': busybox.full_path()
+  }
+endif
 
 cpp_args = []
 
@@ -405,12 +383,7 @@ foreach name, value : cpp_str_defines
   ]
 endforeach
 
-if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
-  # See note in `../nix-util/meson.build`
-  linker_export_flags = ['-Wl,--export-all-symbols']
-else
-  linker_export_flags = []
-endif
+subdir('build-utils-meson/export-all-symbols')
 
 this_library = library(
   'nixstore',
@@ -420,34 +393,12 @@ this_library = library(
   include_directories : include_dirs,
   cpp_args : cpp_args,
   link_args: linker_export_flags,
+  prelink : true, # For C++ static initializers
   install : true,
 )
 
 install_headers(headers, subdir : 'nix', preserve_path : true)
 
-requires = []
-if nix_util.type_name() == 'internal'
-  # `requires` cannot contain declared dependencies (from the
-  # subproject), so we need to do this manually
-  requires += 'nix-util'
-endif
-requires += deps_public
+libraries_private = []
 
-import('pkgconfig').generate(
-  this_library,
-  filebase : meson.project_name(),
-  name : 'Nix',
-  description : 'Nix Package Manager',
-  subdirs : ['nix'],
-  extra_cflags : ['-std=c++2a'],
-  requires : requires,
-  requires_private : deps_private,
-  libraries_private : ['-lboost_container'],
-)
-
-meson.override_dependency(meson.project_name(), declare_dependency(
-  include_directories : include_dirs,
-  link_with : this_library,
-  compile_args : ['-std=c++2a'],
-  dependencies : [nix_util],
-))
+subdir('build-utils-meson/export')

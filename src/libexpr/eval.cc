@@ -293,7 +293,7 @@ EvalState::EvalState(
     )}
     , callFlakeInternal{internalFS->addFile(
         CanonPath("call-flake.nix"),
-        #include "flake/call-flake.nix.gen.hh"
+        #include "call-flake.nix.gen.hh"
     )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
@@ -633,11 +633,11 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
         if (se.isWith && !env.values[0]->isThunk()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
-                vm[st[j.name]] = j.value;
+                vm.insert_or_assign(std::string(st[j.name]), j.value);
         } else {
             // iterate through staticenv bindings and add them.
             for (auto & i : se.vars)
-                vm[st[i.first]] = env.values[i.second];
+                vm.insert_or_assign(std::string(st[i.first]), env.values[i.second]);
         }
     }
 }
@@ -1338,7 +1338,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 if (!(j = vAttrs->attrs()->get(name))) {
                     std::set<std::string> allAttrNames;
                     for (auto & attr : *vAttrs->attrs())
-                        allAttrNames.insert(state.symbols[attr.name]);
+                        allAttrNames.insert(std::string(state.symbols[attr.name]));
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
                     state.error<EvalError>("attribute '%1%' missing", state.symbols[name])
                         .atPos(pos).withSuggestions(suggestions).withFrame(env, *this).debugThrow();
@@ -1496,7 +1496,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         if (!lambda.formals->has(i.name)) {
                             std::set<std::string> formalNames;
                             for (auto & formal : lambda.formals->formals)
-                                formalNames.insert(symbols[formal.name]);
+                                formalNames.insert(std::string(symbols[formal.name]));
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
                             error<TypeError>("function '%1%' called with unexpected argument '%2%'",
                                              (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
@@ -2650,7 +2650,7 @@ void EvalState::printStatistics()
 }
 
 
-SourcePath resolveExprPath(SourcePath path)
+SourcePath resolveExprPath(SourcePath path, bool addDefaultNix)
 {
     unsigned int followCount = 0, maxFollow = 1024;
 
@@ -2666,7 +2666,7 @@ SourcePath resolveExprPath(SourcePath path)
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
-    if (path.resolveSymlinks().lstat().type == SourceAccessor::tDirectory)
+    if (addDefaultNix && path.resolveSymlinks().lstat().type == SourceAccessor::tDirectory)
         return path / "default.nix";
 
     return path;

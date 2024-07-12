@@ -25,7 +25,6 @@
 
     let
       inherit (nixpkgs) lib;
-      inherit (lib) fileset;
 
       officialRelease = false;
 
@@ -145,9 +144,7 @@
           nix = final.nixComponents.nix;
 
           nix_noTests = final.nix.override {
-            doCheck = false;
             doInstallCheck = false;
-            installUnitTests = false;
           };
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
@@ -209,7 +206,7 @@
           #       https://github.com/NixOS/nixpkgs/issues/320448
           "static-" = nixpkgsFor.${system}.static;
         })
-        (nixpkgsPrefix: nixpkgs: 
+        (nixpkgsPrefix: nixpkgs:
           flatMapAttrs nixpkgs.nixComponents
             (pkgName: pkg:
               flatMapAttrs pkg.tests or {}
@@ -306,8 +303,8 @@
           env = {
             # Needed for Meson to find Boost.
             # https://github.com/NixOS/nixpkgs/issues/86131.
-            BOOST_INCLUDEDIR = "${lib.getDev pkgs.boost}/include";
-            BOOST_LIBRARYDIR = "${lib.getLib pkgs.boost}/lib";
+            BOOST_INCLUDEDIR = "${lib.getDev pkgs.nixDependencies.boost}/include";
+            BOOST_LIBRARYDIR = "${lib.getLib pkgs.nixDependencies.boost}/lib";
             # For `make format`, to work without installing pre-commit
             _NIX_PRE_COMMIT_HOOKS_CONFIG =
               "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml" modular.pre-commit.settings.rawConfig}";
@@ -328,6 +325,7 @@
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ [
+              pkgs.buildPackages.cmake
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)
@@ -338,6 +336,10 @@
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) pkgs.buildPackages.clang-tools;
 
           buildInputs = attrs.buildInputs or []
+            ++ [
+              pkgs.gtest
+              pkgs.rapidcheck
+            ]
             ++ lib.optional havePerl pkgs.perl
             ;
         });

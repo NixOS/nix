@@ -33,7 +33,7 @@
 , rapidcheck
 , sqlite
 , toml11
-, util-linux
+, unixtools
 , xz
 
 , busybox-sandbox-shell ? null
@@ -177,7 +177,7 @@ in {
           (fileset.difference ./src ./src/perl)
           ./COPYING
           ./scripts/local.mk
-        ] ++ lib.optionals buildUnitTests [
+        ] ++ lib.optionals enableManual [
           ./doc/manual
         ] ++ lib.optionals buildUnitTests [
           ./tests/unit
@@ -215,11 +215,10 @@ in {
     man # for testing `nix-* --help`
   ] ++ lib.optionals (doInstallCheck || enableManual) [
     jq # Also for custom mdBook preprocessor.
-  ] ++ lib.optional stdenv.hostPlatform.isLinux util-linux
+  ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
   ;
 
   buildInputs = lib.optionals doBuild [
-    boost
     brotli
     bzip2
     curl
@@ -228,10 +227,7 @@ in {
     libsodium
     openssl
     sqlite
-    (toml11.overrideAttrs (old: {
-      # TODO change in Nixpkgs, Windows works fine.
-      meta.platforms = lib.platforms.all;
-    }))
+    toml11
     xz
     ({ inherit readline editline; }.${readlineFlavor})
   ] ++ lib.optionals enableMarkdown [
@@ -250,33 +246,12 @@ in {
   ;
 
   propagatedBuildInputs = [
+    boost
     nlohmann_json
   ] ++ lib.optional enableGC boehmgc;
 
   dontBuild = !attrs.doBuild;
   doCheck = attrs.doCheck;
-
-  disallowedReferences = [ boost ];
-
-  preConfigure = lib.optionalString (doBuild && ! stdenv.hostPlatform.isStatic) (
-    ''
-      # Copy libboost_context so we don't get all of Boost in our closure.
-      # https://github.com/NixOS/nixpkgs/issues/45462
-      mkdir -p $out/lib
-      cp -pd ${boost}/lib/{libboost_context*,libboost_thread*,libboost_system*} $out/lib
-      rm -f $out/lib/*.a
-    '' + lib.optionalString stdenv.hostPlatform.isLinux ''
-      chmod u+w $out/lib/*.so.*
-      patchelf --set-rpath $out/lib:${stdenv.cc.cc.lib}/lib $out/lib/libboost_thread.so.*
-    '' + lib.optionalString stdenv.hostPlatform.isDarwin ''
-      for LIB in $out/lib/*.dylib; do
-        chmod u+w $LIB
-        install_name_tool -id $LIB $LIB
-        install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
-      done
-      install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
-    ''
-  );
 
   configureFlags = [
     (lib.enableFeature doBuild "build")
@@ -325,11 +300,6 @@ in {
     lib.optionalString stdenv.hostPlatform.isStatic ''
       mkdir -p $out/nix-support
       echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
-    '' + lib.optionalString stdenv.isDarwin ''
-      install_name_tool \
-      -change ${boost}/lib/libboost_context.dylib \
-      $out/lib/libboost_context.dylib \
-      $out/lib/libnixutil.dylib
     ''
   ) + lib.optionalString enableManual ''
     mkdir -p ''${!outputDoc}/nix-support
