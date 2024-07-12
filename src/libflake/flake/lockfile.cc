@@ -1,6 +1,7 @@
+#include <unordered_set>
+
 #include "lockfile.hh"
 #include "store-api.hh"
-#include "url-parts.hh"
 
 #include <algorithm>
 #include <iomanip>

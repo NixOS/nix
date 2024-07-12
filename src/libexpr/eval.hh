@@ -3,21 +3,21 @@
 
 #include "attr-set.hh"
 #include "eval-error.hh"
-#include "eval-gc.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
+#include "position.hh"
+#include "pos-table.hh"
 #include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
+#include "ref.hh"
 
 #include <map>
 #include <optional>
-#include <unordered_map>
-#include <mutex>
 #include <functional>
 
 namespace nix {

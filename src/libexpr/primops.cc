@@ -1,4 +1,3 @@
-#include "archive.hh"
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
 #include "eval-inline.hh"

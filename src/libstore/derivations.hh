@@ -14,7 +14,6 @@
 #include <map>
 #include <variant>
 
-
 namespace nix {
 
 struct StoreDirConfig;

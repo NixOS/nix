@@ -4,6 +4,7 @@
 
 #include "canon-path.hh"
 #include "hash.hh"
+#include "ref.hh"
 
 namespace nix {
 

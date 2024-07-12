@@ -1,8 +1,9 @@
 #pragma once
 ///@file
 
-#include "store-api.hh"
+#include <unordered_set>
 
+#include "store-api.hh"
 
 namespace nix {
 

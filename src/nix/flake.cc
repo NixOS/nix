@@ -19,7 +19,6 @@
 #include "users.hh"
 
 #include <nlohmann/json.hpp>
-#include <queue>
 #include <iomanip>
 
 using namespace nix;

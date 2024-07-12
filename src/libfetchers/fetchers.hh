@@ -11,6 +11,8 @@
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
 
+#include "ref.hh"
+
 namespace nix { class Store; class StorePath; struct SourceAccessor; }
 
 namespace nix::fetchers {

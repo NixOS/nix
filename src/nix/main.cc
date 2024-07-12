@@ -1,9 +1,8 @@
-#include <algorithm>
-
 #include "args/root.hh"
 #include "current-process.hh"
 #include "command.hh"
 #include "common-args.hh"
+#include "eval-gc.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "globals.hh"

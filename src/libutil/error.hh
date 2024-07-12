@@ -16,16 +16,12 @@
  */
 
 #include "suggestions.hh"
-#include "ref.hh"
-#include "types.hh"
 #include "fmt.hh"
 
 #include <cstring>
 #include <list>
 #include <memory>
-#include <map>
 #include <optional>
-#include <compare>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -127,6 +123,8 @@ protected:
 
 public:
     BaseError(const BaseError &) = default;
+    BaseError& operator=(const BaseError &) = default;
+    BaseError& operator=(BaseError &&) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)

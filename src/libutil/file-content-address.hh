@@ -2,8 +2,6 @@
 ///@file
 
 #include "source-accessor.hh"
-#include "fs-sink.hh"
-#include "util.hh"
 
 namespace nix {
 

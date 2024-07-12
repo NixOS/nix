@@ -2,7 +2,6 @@
 ///@file
 
 #include <cassert>
-#include <climits>
 #include <span>
 
 #include "symbol-table.hh"

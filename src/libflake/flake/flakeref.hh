@@ -1,13 +1,11 @@
 #pragma once
 ///@file
 
+#include <regex>
+
 #include "types.hh"
-#include "hash.hh"
 #include "fetchers.hh"
 #include "outputs-spec.hh"
-
-#include <regex>
-#include <variant>
 
 namespace nix {
 
