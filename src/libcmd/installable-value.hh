@@ -66,7 +66,7 @@ struct ExtraPathInfoValue : ExtraPathInfo
 };
 
 /**
- * An Installable which corresponds a Nix langauge value, in addition to
+ * An Installable which corresponds a Nix language value, in addition to
  * a collection of \ref DerivedPath "derived paths".
  */
 struct InstallableValue : Installable

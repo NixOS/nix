@@ -95,7 +95,7 @@ struct AttrDb
     {
         try {
             auto state(_state->lock());
-            if (!failed)
+            if (!failed && state->txn->active)
                 state->txn->commit();
             state->txn.reset();
         } catch (...) {
