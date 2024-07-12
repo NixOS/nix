@@ -217,8 +217,6 @@ struct StoreReferences
      * iff self is true.
      */
     size_t size() const;
-
-    auto operator <=>(const StoreReferences &) const = default;
 };
 
 // This matches the additional info that we need for makeTextPath
@@ -234,8 +232,6 @@ struct TextInfo
      * disallowed
      */
     StorePathSet references;
-
-    auto operator <=>(const TextInfo &) const = default;
 };
 
 struct FixedOutputInfo
@@ -254,8 +250,6 @@ struct FixedOutputInfo
      * References to other store objects or this one.
      */
     StoreReferences references;
-
-    auto operator <=>(const FixedOutputInfo &) const = default;
 };
 
 /**
@@ -271,8 +265,6 @@ struct ContentAddressWithReferences
     > Raw;
 
     Raw raw;
-
-    auto operator <=>(const ContentAddressWithReferences &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressWithReferences);
 
