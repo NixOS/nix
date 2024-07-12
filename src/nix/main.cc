@@ -41,6 +41,8 @@ extern std::string chrootHelperName;
 void chrootHelper(int argc, char * * argv);
 #endif
 
+#include "strings.hh"
+
 namespace nix {
 
 enum struct AliasStatus {
@@ -185,7 +187,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         auto & info = i->second;
         if (info.status == AliasStatus::Deprecated) {
             warn("'%s' is a deprecated alias for '%s'",
-                arg, dropEmptyInitThenConcatStringsSep(" ", info.replacement));
+                arg, concatStringsSep(" ", info.replacement));
         }
         pos = args.erase(pos);
         for (auto j = info.replacement.rbegin(); j != info.replacement.rend(); ++j)
