@@ -70,6 +70,24 @@ template Strings tokenizeString(std::string_view s, std::string_view separators)
 template StringSet tokenizeString(std::string_view s, std::string_view separators);
 template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
+template<class C> C splitString(std::string_view s, std::string_view separators)
+{
+    C result;
+    size_t pos = 0;
+    while (pos <= s.size()) {
+        auto end = s.find_first_of(separators, pos);
+        if (end == s.npos) end = s.size();
+        result.insert(result.end(), std::string(s, pos, end - pos));
+        pos = end + 1;
+    }
+
+    return result;
+}
+
+template Strings splitString(std::string_view s, std::string_view separators);
+template StringSet splitString(std::string_view s, std::string_view separators);
+template std::vector<std::string> splitString(std::string_view s, std::string_view separators);
+
 
 std::string chomp(std::string_view s)
 {

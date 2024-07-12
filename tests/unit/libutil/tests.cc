@@ -3,9 +3,11 @@
 #include "file-system.hh"
 #include "processes.hh"
 #include "terminal.hh"
+#include "strings.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
+#include <rapidcheck/gtest.h>
 
 #include <numeric>
 
@@ -229,6 +231,37 @@ namespace nix {
     /* ----------------------------------------------------------------------------
      * concatStringsSep
      * --------------------------------------------------------------------------*/
+
+    TEST(concatStringsSep, empty) {
+        Strings strings;
+
+        ASSERT_EQ(concatStringsSep(",", strings), "");
+    }
+
+    TEST(concatStringsSep, justOne) {
+        Strings strings;
+        strings.push_back("this");
+
+        ASSERT_EQ(concatStringsSep(",", strings), "this");
+    }
+
+    TEST(concatStringsSep, emptyString) {
+        Strings strings;
+        strings.push_back("");
+
+        ASSERT_EQ(concatStringsSep(",", strings), "");
+    }
+
+    TEST(concatStringsSep, emptyStrings) {
+        Strings strings;
+        strings.push_back("");
+        strings.push_back("");
+
+        // FIXME: This is broken! Audit all concatStringSep usages for potential
+        //        reproducibility issues that a fix could cause.
+        //        Fortunately, builtins.concatStringsSep does not use this.
+        ASSERT_EQ(concatStringsSep(",", strings), "");
+    }
 
     TEST(concatStringsSep, buildCommaSeparatedString) {
         Strings strings;
@@ -571,6 +604,18 @@ namespace nix {
         ASSERT_EQ(tokenizeString<Strings>(""), expected);
     }
 
+    TEST(tokenizeString, oneSep) {
+        Strings expected = { };
+
+        ASSERT_EQ(tokenizeString<Strings>(" "), expected);
+    }
+
+    TEST(tokenizeString, twoSep) {
+        Strings expected = { };
+
+        ASSERT_EQ(tokenizeString<Strings>(" \n"), expected);
+    }
+
     TEST(tokenizeString, tokenizeSpacesWithDefaults) {
         auto s = "foo bar baz";
         Strings expected = { "foo", "bar", "baz" };
@@ -617,6 +662,171 @@ namespace nix {
 
         ASSERT_EQ(tokenizeString<Strings>(s, ","), expected);
     }
+
+    TEST(tokenizeString, tokenizeSepAtStart) {
+        auto s = ",foo,bar,baz";
+        Strings expected = { "foo", "bar", "baz" };
+
+        ASSERT_EQ(tokenizeString<Strings>(s, ","), expected);
+    }
+
+    TEST(tokenizeString, tokenizeSepAtEnd) {
+        auto s = "foo,bar,baz,";
+        Strings expected = { "foo", "bar", "baz" };
+
+        ASSERT_EQ(tokenizeString<Strings>(s, ","), expected);
+    }
+
+    TEST(tokenizeString, tokenizeSepEmpty) {
+        auto s = "foo,,baz";
+        Strings expected = { "foo", "baz" };
+
+        ASSERT_EQ(tokenizeString<Strings>(s, ","), expected);
+    }
+
+    /* ----------------------------------------------------------------------------
+     * splitString
+     * --------------------------------------------------------------------------*/
+
+    TEST(splitString, empty) {
+        Strings expected = { "" };
+
+        ASSERT_EQ(splitString<Strings>("", " \t\n\r"), expected);
+    }
+
+    TEST(splitString, oneSep) {
+        Strings expected = { "", "" };
+
+        ASSERT_EQ(splitString<Strings>(" ", " \t\n\r"), expected);
+    }
+
+    TEST(splitString, twoSep) {
+        Strings expected = { "", "", "" };
+
+        ASSERT_EQ(splitString<Strings>(" \n", " \t\n\r"), expected);
+    }
+
+    TEST(splitString, tokenizeSpacesWithSpaces) {
+        auto s = "foo bar baz";
+        Strings expected = { "foo", "bar", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    }
+
+    TEST(splitString, tokenizeTabsWithDefaults) {
+        auto s = "foo\tbar\tbaz";
+        // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
+        Strings expected = { "foo", "bar", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    }
+
+    TEST(splitString, tokenizeTabsSpacesWithDefaults) {
+        auto s = "foo\t bar\t baz";
+        // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
+        Strings expected = { "foo", "", "bar", "", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    }
+
+    TEST(splitString, tokenizeTabsSpacesNewlineWithDefaults) {
+        auto s = "foo\t\n bar\t\n baz";
+        // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
+        Strings expected = { "foo", "", "", "bar", "", "", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    }
+
+    TEST(splitString, tokenizeTabsSpacesNewlineRetWithDefaults) {
+        auto s = "foo\t\n\r bar\t\n\r baz";
+        // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
+        Strings expected = { "foo", "", "", "", "bar", "", "", "", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+
+        auto s2 = "foo \t\n\r bar \t\n\r baz";
+        Strings expected2 = { "foo", "", "", "", "", "bar", "", "", "", "", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s2, " \t\n\r"), expected2);
+    }
+
+    TEST(splitString, tokenizeWithCustomSep) {
+        auto s = "foo\n,bar\n,baz\n";
+        Strings expected = { "foo\n", "bar\n", "baz\n" };
+
+        ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    }
+
+    TEST(splitString, tokenizeSepAtStart) {
+        auto s = ",foo,bar,baz";
+        Strings expected = { "", "foo", "bar", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    }
+
+    TEST(splitString, tokenizeSepAtEnd) {
+        auto s = "foo,bar,baz,";
+        Strings expected = { "foo", "bar", "baz", "" };
+
+        ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    }
+
+    TEST(splitString, tokenizeSepEmpty) {
+        auto s = "foo,,baz";
+        Strings expected = { "foo", "", "baz" };
+
+        ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    }
+
+    // TODO: remove when concatStringsSep is fixed
+    template<class C>
+    std::string concatStringsSep2(const std::string_view sep, const C & ss)
+    {
+        size_t size = 0;
+        bool tail = false;
+        // need a cast to string_view since this is also called with Symbols
+        for (const auto & s : ss) {
+            if (tail) size += sep.size();
+            size += std::string_view(s).size();
+            tail = true;
+        }
+        std::string s;
+        s.reserve(size);
+        tail = false;
+        for (auto & i : ss) {
+            if (tail) s += sep;
+            s += i;
+            tail = true;
+        }
+        return s;
+    }
+
+    // concatStringsSep sep . splitString sep = id   if sep is 1 char
+    RC_GTEST_PROP(
+        splitString,
+        recoveredByConcatStringsSep,
+        (const std::string & s))
+    {
+        if (!s.empty()) {
+            // See FIXME in concatStringsSep tests
+            // RC_ASSERT(
+            //     concatStringsSep(std::string(1, s[0]), splitString<Strings>(s, std::string(1, s[0]))) == s
+            // );
+            
+            // Work around the bug. Make sure it doesn't start with the separate, because that's broken.
+            RC_ASSERT(
+                concatStringsSep2(std::string(1, s[0]), splitString<Strings>(s, std::string(1, s[0]))) == s
+            );
+        }
+
+        RC_ASSERT(
+            concatStringsSep2("/", splitString<Strings>(s, "/")) == s
+        );
+        RC_ASSERT(
+            concatStringsSep2("a", splitString<Strings>(s, "a")) == s
+        );
+    }
+
 
     /* ----------------------------------------------------------------------------
      * get

@@ -28,12 +28,14 @@ MakeError(FormatError, Error);
 
 /**
  * String tokenizer.
+ *
+ * See also `splitString()`, which preserves empty strings between separators, as well as at the start and end.
  */
 template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 
 
 /**
- * Concatenate the given strings with a separator between the
+ * Concatenate the non-empty strings out of the given strings with a separator between the
  * elements.
  */
 template<class C>
@@ -41,11 +43,14 @@ std::string concatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
     // need a cast to string_view since this is also called with Symbols
-    for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
+    for (const auto & s : ss) {
+        if (size != 0) size += sep.size();
+        size += std::string_view(s).size();
+    }
     std::string s;
     s.reserve(size);
     for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
+        if (!s.empty()) s += sep;
         s += i;
     }
     return s;
