@@ -19,6 +19,8 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
+#include "strings.hh"
+
 using namespace nix;
 
 struct DevelopSettings : Config
@@ -608,7 +610,7 @@ struct CmdDevelop : Common, MixEnvironment
             std::vector<std::string> args;
             for (auto s : command)
                 args.push_back(shellEscape(s));
-            script += fmt("exec %s\n", dropEmptyInitThenConcatStringsSep(" ", args));
+            script += fmt("exec %s\n", concatStringsSep(" ", args));
         }
 
         else {
