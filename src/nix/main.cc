@@ -240,7 +240,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
    lowdown. */
 static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
-    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", dropEmptyInitThenConcatStringsSep("-", subcommand));
+    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
     evalSettings.restrictEval = false;
     evalSettings.pureEval = false;
@@ -275,7 +275,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     auto attr = vRes->attrs()->get(state.symbols.create(mdName + ".md"));
     if (!attr)
-        throw UsageError("Nix has no subcommand '%s'", dropEmptyInitThenConcatStringsSep("", subcommand));
+        throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
 
     auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
 
