@@ -35,8 +35,8 @@ public:
     ) const;
 
     static Suggestions bestMatches (
-        std::set<std::string> allMatches,
-        std::string query
+        const std::set<std::string> & allMatches,
+        std::string_view query
     );
 
     Suggestions& operator+=(const Suggestions & other);
