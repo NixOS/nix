@@ -1,3 +1,4 @@
+#include "fetch-settings.hh"
 #include "eval-settings.hh"
 #include "common-eval-args.hh"
 #include "shared.hh"
@@ -7,6 +8,7 @@
 #include "fetchers.hh"
 #include "registry.hh"
 #include "flake/flakeref.hh"
+#include "flake/settings.hh"
 #include "store-api.hh"
 #include "command.hh"
 #include "tarball.hh"
@@ -16,6 +18,10 @@
 
 namespace nix {
 
+fetchers::Settings fetchSettings;
+
+static GlobalConfig::Register rFetchSettings(&fetchSettings);
+
 EvalSettings evalSettings {
     settings.readOnlyMode,
     {
@@ -24,7 +30,7 @@ EvalSettings evalSettings {
             [](ref<Store> store, std::string_view rest) {
                 experimentalFeatureSettings.require(Xp::Flakes);
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
-                auto flakeRef = parseFlakeRef(std::string { rest }, {}, true, false);
+                auto flakeRef = parseFlakeRef(fetchSettings, std::string { rest }, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
                 auto storePath = flakeRef.resolve(store).fetchTree(store).first;
                 return store->toRealPath(storePath);
@@ -34,6 +40,12 @@ EvalSettings evalSettings {
 };
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);
+
+
+flake::Settings flakeSettings;
+
+static GlobalConfig::Register rFlakeSettings(&flakeSettings);
+
 
 CompatibilitySettings compatibilitySettings {};
 
@@ -171,8 +183,8 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(_from, absPath("."));
-            auto to = parseFlakeRef(_to, absPath("."));
+            auto from = parseFlakeRef(fetchSettings, _from, absPath("."));
+            auto to = parseFlakeRef(fetchSettings, _to, absPath("."));
             fetchers::Attrs extraAttrs;
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
@@ -230,7 +242,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
+        auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
         auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first;
         return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }

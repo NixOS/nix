@@ -61,7 +61,9 @@ struct FlakeRef
 
     FlakeRef resolve(ref<Store> store) const;
 
-    static FlakeRef fromAttrs(const fetchers::Attrs & attrs);
+    static FlakeRef fromAttrs(
+        const fetchers::Settings & fetchSettings,
+        const fetchers::Attrs & attrs);
 
     std::pair<StorePath, FlakeRef> fetchTree(ref<Store> store) const;
 };
@@ -72,6 +74,7 @@ std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
 FlakeRef parseFlakeRef(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
@@ -81,12 +84,15 @@ FlakeRef parseFlakeRef(
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
 std::optional<FlakeRef> maybeParseFlake(
-    const std::string & url, const std::optional<Path> & baseDir = {});
+    const fetchers::Settings & fetchSettings,
+    const std::string & url,
+    const std::optional<Path> & baseDir = {});
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
@@ -96,12 +102,15 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir = {});
+    const fetchers::Settings & fetchSettings,
+    const std::string & url,
+    const std::optional<Path> & baseDir = {});
 
 /**
  * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
  */
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
+    const fetchers::Settings & fetchSettings,
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,

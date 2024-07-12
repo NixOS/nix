@@ -1,6 +1,7 @@
 #ifndef NIX_API_EXPR_INTERNAL_H
 #define NIX_API_EXPR_INTERNAL_H
 
+#include "fetch-settings.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "attr-set.hh"
@@ -8,6 +9,7 @@
 
 struct EvalState
 {
+    nix::fetchers::Settings fetchSettings;
     nix::EvalSettings settings;
     nix::EvalState state;
 };

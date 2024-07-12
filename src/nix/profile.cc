@@ -154,8 +154,8 @@ struct ProfileManifest
                 }
                 if (e.value(sUrl, "") != "") {
                     element.source = ProfileElementSource {
-                        parseFlakeRef(e[sOriginalUrl]),
-                        parseFlakeRef(e[sUrl]),
+                        parseFlakeRef(fetchSettings, e[sOriginalUrl]),
+                        parseFlakeRef(fetchSettings, e[sUrl]),
                         e["attrPath"],
                         e["outputs"].get<ExtendedOutputsSpec>()
                     };
