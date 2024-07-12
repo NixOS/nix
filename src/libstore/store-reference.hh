@@ -71,7 +71,6 @@ struct StoreReference
     Params params;
 
     bool operator==(const StoreReference & rhs) const = default;
-    auto operator<=>(const StoreReference & rhs) const = default;
 
     /**
      * Render the whole store reference as a URI, including parameters.
