@@ -496,10 +496,10 @@ void LocalDerivationGoal::startBuilder()
     if (!parsedDrv->canBuildLocally(worker.store))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
-            concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
+            dropEmptyInitThenConcatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
-            concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
+            dropEmptyInitThenConcatStringsSep<StringSet>(", ", worker.store.systemFeatures));
 
     /* Create a temporary directory where the build will take
        place. */
@@ -840,7 +840,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv->builder);
-    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv->args));
+    printMsg(lvlChatty, "using builder args '%1%'", dropEmptyInitThenConcatStringsSep(" ", drv->args));
     for (auto & i : drv->env)
         printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
@@ -1063,7 +1063,7 @@ void LocalDerivationGoal::startBuilder()
                 e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
                     worker.store.printStorePath(drvPath),
                     statusToString(status),
-                    concatStringsSep("|", msgs));
+                    dropEmptyInitThenConcatStringsSep("|", msgs));
                 throw;
             }
         }();

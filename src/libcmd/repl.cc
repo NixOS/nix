@@ -625,7 +625,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
                 markdown +=
                     "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
-                    + concatStringsSep(" ", args) + "\n\n";
+                    + dropEmptyInitThenConcatStringsSep(" ", args) + "\n\n";
             }
 
             markdown += stripIndentation(doc->doc);

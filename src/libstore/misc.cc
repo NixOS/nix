@@ -464,7 +464,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
     if (!outputsLeft.empty())
         throw Error("derivation '%s' does not have an outputs %s",
             store.printStorePath(drvPath),
-            concatStringsSep(", ", quoteStrings(std::get<OutputsSpec::Names>(bfd.outputs.raw))));
+            dropEmptyInitThenConcatStringsSep(", ", quoteStrings(std::get<OutputsSpec::Names>(bfd.outputs.raw))));
     return outputMap;
 }
 

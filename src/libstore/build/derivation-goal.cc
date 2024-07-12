@@ -895,7 +895,7 @@ void runPostBuildHook(
     std::map<std::string, std::string> hookEnvironment = getEnv();
 
     hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
-    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment.emplace("OUT_PATHS", chomp(dropEmptyInitThenConcatStringsSep(" ", store.printStorePathSet(outputPaths))));
     hookEnvironment.emplace("NIX_CONFIG", globalConfig.toKeyValue());
 
     struct LogSink : Sink {
@@ -1505,7 +1505,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
     if (!wantedOutputsLeft.empty())
         throw Error("derivation '%s' does not have wanted outputs %s",
             worker.store.printStorePath(drvPath),
-            concatStringsSep(", ", quoteStrings(wantedOutputsLeft)));
+            dropEmptyInitThenConcatStringsSep(", ", quoteStrings(wantedOutputsLeft)));
 
     bool allValid = true;
     for (auto & [_, status] : initialOutputs) {

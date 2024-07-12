@@ -608,7 +608,7 @@ struct CmdDevelop : Common, MixEnvironment
             std::vector<std::string> args;
             for (auto s : command)
                 args.push_back(shellEscape(s));
-            script += fmt("exec %s\n", concatStringsSep(" ", args));
+            script += fmt("exec %s\n", dropEmptyInitThenConcatStringsSep(" ", args));
         }
 
         else {

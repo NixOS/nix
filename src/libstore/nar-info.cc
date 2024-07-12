@@ -111,7 +111,7 @@ std::string NarInfo::to_string(const Store & store) const
     res += "NarHash: " + narHash.to_string(HashFormat::Nix32, true) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
 
-    res += "References: " + concatStringsSep(" ", shortRefs()) + "\n";
+    res += "References: " + dropEmptyInitThenConcatStringsSep(" ", shortRefs()) + "\n";
 
     if (deriver)
         res += "Deriver: " + std::string(deriver->to_string()) + "\n";

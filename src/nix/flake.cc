@@ -805,7 +805,7 @@ struct CmdFlakeCheck : FlakeCommand
             warn(
                 "The check omitted these incompatible systems: %s\n"
                 "Use '--all-systems' to check all.",
-                concatStringsSep(", ", omittedSystems)
+                dropEmptyInitThenConcatStringsSep(", ", omittedSystems)
             );
         };
     };
@@ -1211,7 +1211,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             auto attrPathS = state->symbols.resolve(attrPath);
 
             Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+                fmt("evaluating '%s'", dropEmptyInitThenConcatStringsSep(".", attrPathS)));
 
             try {
                 auto recurse = [&]()
@@ -1291,7 +1291,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         if (!json)
                             logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
                         else {
-                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", dropEmptyInitThenConcatStringsSep(".", attrPathS)));
                         }
                     } else {
                         if (visitor.isDerivation())
@@ -1315,13 +1315,13 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         if (!json)
                             logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
                         else {
-                            logger->warn(fmt("%s omitted (use '--legacy' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--legacy' to show)", dropEmptyInitThenConcatStringsSep(".", attrPathS)));
                         }
                     } else if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
                         if (!json)
                             logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
                         else {
-                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", dropEmptyInitThenConcatStringsSep(".", attrPathS)));
                         }
                     } else {
                         if (visitor.isDerivation())

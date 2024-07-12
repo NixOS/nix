@@ -152,7 +152,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
 
         parsedContents.push_back({
             std::move(name),
-            concatStringsSep(" ", Strings(i, tokens.end())),
+            dropEmptyInitThenConcatStringsSep(" ", Strings(i, tokens.end())),
         });
     };
 }
@@ -318,7 +318,7 @@ template<> void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append)
 
 template<> std::string BaseSetting<Strings>::to_string() const
 {
-    return concatStringsSep(" ", value);
+    return dropEmptyInitThenConcatStringsSep(" ", value);
 }
 
 template<> StringSet BaseSetting<StringSet>::parse(const std::string & str) const
@@ -334,7 +334,7 @@ template<> void BaseSetting<StringSet>::appendOrSet(StringSet newValue, bool app
 
 template<> std::string BaseSetting<StringSet>::to_string() const
 {
-    return concatStringsSep(" ", value);
+    return dropEmptyInitThenConcatStringsSep(" ", value);
 }
 
 template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeature>>::parse(const std::string & str) const
@@ -362,7 +362,7 @@ template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() c
     StringSet stringifiedXpFeatures;
     for (const auto & feature : value)
         stringifiedXpFeatures.insert(std::string(showExperimentalFeature(feature)));
-    return concatStringsSep(" ", stringifiedXpFeatures);
+    return dropEmptyInitThenConcatStringsSep(" ", stringifiedXpFeatures);
 }
 
 template<> StringMap BaseSetting<StringMap>::parse(const std::string & str) const

@@ -96,7 +96,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             auto attrPathS = state->symbols.resolve(attrPath);
 
             Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+                fmt("evaluating '%s'", dropEmptyInitThenConcatStringsSep(".", attrPathS)));
             try {
                 auto recurse = [&]()
                 {
@@ -115,7 +115,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     auto aDescription = aMeta ? aMeta->maybeGetAttr(state->sDescription) : nullptr;
                     auto description = aDescription ? aDescription->getString() : "";
                     std::replace(description.begin(), description.end(), '\n', ' ');
-                    auto attrPath2 = concatStringsSep(".", attrPathS);
+                    auto attrPath2 = dropEmptyInitThenConcatStringsSep(".", attrPathS);
 
                     std::vector<std::smatch> attrPathMatches;
                     std::vector<std::smatch> descriptionMatches;

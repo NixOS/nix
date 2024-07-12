@@ -42,7 +42,7 @@ void NixMultiCommand::run()
         for (auto & [name, _] : commands)
             subCommandTextLines.insert(fmt("- `%s`", name));
         std::string markdownError = fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
-                commandName, concatStringsSep("\n", subCommandTextLines));
+                commandName, dropEmptyInitThenConcatStringsSep("\n", subCommandTextLines));
         throw UsageError(renderMarkdownToTerminal(markdownError));
     }
     command->second->run();

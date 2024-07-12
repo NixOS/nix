@@ -83,7 +83,7 @@ std::string OutputsSpec::to_string() const
             return "*";
         },
         [&](const OutputsSpec::Names & outputNames) -> std::string {
-            return concatStringsSep(",", outputNames);
+            return dropEmptyInitThenConcatStringsSep(",", outputNames);
         },
     }, raw);
 }

@@ -185,7 +185,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         auto & info = i->second;
         if (info.status == AliasStatus::Deprecated) {
             warn("'%s' is a deprecated alias for '%s'",
-                arg, concatStringsSep(" ", info.replacement));
+                arg, dropEmptyInitThenConcatStringsSep(" ", info.replacement));
         }
         pos = args.erase(pos);
         for (auto j = info.replacement.rbegin(); j != info.replacement.rend(); ++j)
@@ -238,7 +238,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
    lowdown. */
 static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
-    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
+    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", dropEmptyInitThenConcatStringsSep("-", subcommand));
 
     evalSettings.restrictEval = false;
     evalSettings.pureEval = false;
@@ -273,7 +273,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     auto attr = vRes->attrs()->get(state.symbols.create(mdName + ".md"));
     if (!attr)
-        throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
+        throw UsageError("Nix has no subcommand '%s'", dropEmptyInitThenConcatStringsSep("", subcommand));
 
     auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
 

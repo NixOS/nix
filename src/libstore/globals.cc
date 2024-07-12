@@ -82,7 +82,7 @@ Settings::Settings()
         Strings ss;
         for (auto & p : tokenizeString<Strings>(*s, ":"))
             ss.push_back("@" + p);
-        builders = concatStringsSep(" ", ss);
+        builders = dropEmptyInitThenConcatStringsSep(" ", ss);
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)

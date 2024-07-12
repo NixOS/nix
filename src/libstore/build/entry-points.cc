@@ -42,7 +42,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         throw std::move(*ex);
     } else if (!failed.empty()) {
         if (ex) logError(ex->info());
-        throw Error(worker.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
+        throw Error(worker.failingExitStatus(), "build of %s failed", dropEmptyInitThenConcatStringsSep(", ", quoteStrings(failed)));
     }
 }
 

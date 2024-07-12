@@ -61,7 +61,7 @@ static std::shared_ptr<Node> doFind(const ref<Node>& root, const InputPath & pat
         std::vector<std::string> cycle;
         std::transform(found, visited.cend(), std::back_inserter(cycle), printInputPath);
         cycle.push_back(printInputPath(path));
-        throw Error("follow cycle detected: [%s]", concatStringsSep(" -> ", cycle));
+        throw Error("follow cycle detected: [%s]", dropEmptyInitThenConcatStringsSep(" -> ", cycle));
     }
     visited.push_back(path);
 
@@ -367,7 +367,7 @@ void check();
 
 std::string printInputPath(const InputPath & path)
 {
-    return concatStringsSep("/", path);
+    return dropEmptyInitThenConcatStringsSep("/", path);
 }
 
 }

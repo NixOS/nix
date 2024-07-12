@@ -58,7 +58,7 @@ struct ProfileElement
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
-        return concatStringsSep(", ", names);
+        return dropEmptyInitThenConcatStringsSep(", ", names);
     }
 
     /**
@@ -472,7 +472,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 originalConflictingFilePath,
                 newConflictingFilePath,
                 originalEntryName,
-                concatStringsSep(" ", newConflictingRefs),
+                dropEmptyInitThenConcatStringsSep(" ", newConflictingRefs),
                 conflictError.priority,
                 conflictError.priority - 1,
                 conflictError.priority + 1
@@ -813,7 +813,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
                     logger->cout("Original flake URL: %s", element.source->originalRef.to_string());
                     logger->cout("Locked flake URL:   %s", element.source->lockedRef.to_string());
                 }
-                logger->cout("Store paths:        %s", concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
+                logger->cout("Store paths:        %s", dropEmptyInitThenConcatStringsSep(" ", store->printStorePathSet(element.storePaths)));
             }
         }
     }

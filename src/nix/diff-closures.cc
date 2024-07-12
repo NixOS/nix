@@ -49,7 +49,7 @@ std::string showVersions(const std::set<std::string> & versions)
     std::set<std::string> versions2;
     for (auto & version : versions)
         versions2.insert(version.empty() ? "ε" : version);
-    return concatStringsSep(", ", versions2);
+    return dropEmptyInitThenConcatStringsSep(", ", versions2);
 }
 
 void printClosureDiff(
@@ -97,7 +97,7 @@ void printClosureDiff(
                 items.push_back(fmt("%s → %s", showVersions(removed), showVersions(added)));
             if (showDelta)
                 items.push_back(fmt("%s%+.1f KiB" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, sizeDelta / 1024.0));
-            logger->cout("%s%s: %s", indent, name, concatStringsSep(", ", items));
+            logger->cout("%s%s: %s", indent, name, dropEmptyInitThenConcatStringsSep(", ", items));
         }
     }
 }

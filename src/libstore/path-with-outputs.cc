@@ -9,7 +9,7 @@ std::string StorePathWithOutputs::to_string(const StoreDirConfig & store) const
 {
     return outputs.empty()
         ? store.printStorePath(path)
-        : store.printStorePath(path) + "!" + concatStringsSep(",", outputs);
+        : store.printStorePath(path) + "!" + dropEmptyInitThenConcatStringsSep(",", outputs);
 }
 
 

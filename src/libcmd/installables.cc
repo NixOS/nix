@@ -374,7 +374,7 @@ void completeFlakeRefWithFragment(
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
-                        completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
+                        completions.add(flakeRefS + "#" + prefixRoot + dropEmptyInitThenConcatStringsSep(".", evalState->symbols.resolve(attrPath2)));
                     }
                 }
             }
@@ -630,7 +630,7 @@ static void throwBuildErrors(
                 }
                 failedPaths.insert(failedResult->path.to_string(store));
             }
-            throw Error("build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
+            throw Error("build of %s failed", dropEmptyInitThenConcatStringsSep(", ", quoteStrings(failedPaths)));
         }
     }
 }

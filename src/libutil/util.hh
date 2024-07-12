@@ -37,7 +37,7 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
  * elements.
  */
 template<class C>
-std::string concatStringsSep(const std::string_view sep, const C & ss)
+std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
     // need a cast to string_view since this is also called with Symbols
@@ -56,7 +56,7 @@ auto concatStrings(Parts && ... parts)
     -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
 {
     std::string_view views[sizeof...(parts)] = { parts... };
-    return concatStringsSep({}, views);
+    return dropEmptyInitThenConcatStringsSep({}, views);
 }
 
 

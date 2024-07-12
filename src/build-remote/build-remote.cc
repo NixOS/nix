@@ -206,15 +206,15 @@ static int main_build_remote(int argc, char * * argv)
                         error
                             % drvstr
                             % neededSystem
-                            % concatStringsSep<StringSet>(", ", requiredFeatures)
+                            % dropEmptyInitThenConcatStringsSep<StringSet>(", ", requiredFeatures)
                             % machines.size();
 
                         for (auto & m : machines)
                             error
-                                % concatStringsSep<StringSet>(", ", m.systemTypes)
+                                % dropEmptyInitThenConcatStringsSep<StringSet>(", ", m.systemTypes)
                                 % m.maxJobs
-                                % concatStringsSep<StringSet>(", ", m.supportedFeatures)
-                                % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
+                                % dropEmptyInitThenConcatStringsSep<StringSet>(", ", m.supportedFeatures)
+                                % dropEmptyInitThenConcatStringsSep<StringSet>(", ", m.mandatoryFeatures);
 
                         printMsg(couldBuildLocally ? lvlChatty : lvlWarn, error.str());
 

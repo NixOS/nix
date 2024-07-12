@@ -1208,7 +1208,7 @@ std::string StoreDirConfig::showPaths(const StorePathSet & paths)
 
 std::string showPaths(const PathSet & paths)
 {
-    return concatStringsSep(", ", quoteStrings(paths));
+    return dropEmptyInitThenConcatStringsSep(", ", quoteStrings(paths));
 }
 
 

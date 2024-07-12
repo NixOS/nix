@@ -30,7 +30,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             "1;" + store.printStorePath(path) + ";"
             + narHash.to_string(HashFormat::Nix32, true) + ";"
             + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(references));
+        + dropEmptyInitThenConcatStringsSep(",", store.printStorePathSet(references));
 }
 
 
