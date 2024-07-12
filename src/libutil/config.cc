@@ -154,7 +154,7 @@ static void parseConfigFiles(const std::string & contents, const std::string & p
 
         parsedContents.push_back({
             std::move(name),
-            dropEmptyInitThenConcatStringsSep(" ", Strings(i, tokens.end())),
+            concatStringsSep(" ", Strings(i, tokens.end())),
         });
     };
 }
