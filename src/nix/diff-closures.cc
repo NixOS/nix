@@ -6,6 +6,8 @@
 
 #include <regex>
 
+#include "strings.hh"
+
 namespace nix {
 
 struct Info
@@ -49,7 +51,7 @@ std::string showVersions(const std::set<std::string> & versions)
     std::set<std::string> versions2;
     for (auto & version : versions)
         versions2.insert(version.empty() ? "ε" : version);
-    return dropEmptyInitThenConcatStringsSep(", ", versions2);
+    return concatStringsSep(", ", versions2);
 }
 
 void printClosureDiff(
