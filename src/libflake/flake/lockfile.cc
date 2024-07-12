@@ -9,6 +9,8 @@
 #include <iterator>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix::flake {
 
 static FlakeRef getFlakeRef(
@@ -61,7 +63,7 @@ static std::shared_ptr<Node> doFind(const ref<Node>& root, const InputPath & pat
         std::vector<std::string> cycle;
         std::transform(found, visited.cend(), std::back_inserter(cycle), printInputPath);
         cycle.push_back(printInputPath(path));
-        throw Error("follow cycle detected: [%s]", dropEmptyInitThenConcatStringsSep(" -> ", cycle));
+        throw Error("follow cycle detected: [%s]", concatStringsSep(" -> ", cycle));
     }
     visited.push_back(path);
 
@@ -367,7 +369,7 @@ void check();
 
 std::string printInputPath(const InputPath & path)
 {
-    return dropEmptyInitThenConcatStringsSep("/", path);
+    return concatStringsSep("/", path);
 }
 
 }

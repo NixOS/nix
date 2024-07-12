@@ -33,6 +33,8 @@
 #include <gc/gc_cpp.h>
 #endif
 
+#include "strings.hh"
+
 namespace nix {
 
 /**
@@ -625,7 +627,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
                 markdown +=
                     "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` "
-                    + dropEmptyInitThenConcatStringsSep(" ", args) + "\n\n";
+                    + concatStringsSep(" ", args) + "\n\n";
             }
 
             markdown += stripIndentation(doc->doc);

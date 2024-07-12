@@ -3,12 +3,13 @@
 #include "hook-instance.hh"
 #include "file-system.hh"
 #include "child.hh"
+#include "strings.hh"
 
 namespace nix {
 
 HookInstance::HookInstance()
 {
-    debug("starting build hook '%s'", dropEmptyInitThenConcatStringsSep(" ", settings.buildHook.get()));
+    debug("starting build hook '%s'", concatStringsSep(" ", settings.buildHook.get()));
 
     auto buildHookArgs = settings.buildHook.get();
 

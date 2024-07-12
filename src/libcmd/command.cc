@@ -1,3 +1,5 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "markdown.hh"
 #include "store-api.hh"
@@ -6,8 +8,7 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 #include "repl.hh"
-
-#include <nlohmann/json.hpp>
+#include "strings.hh"
 
 extern char * * environ __attribute__((weak));
 
@@ -42,7 +43,7 @@ void NixMultiCommand::run()
         for (auto & [name, _] : commands)
             subCommandTextLines.insert(fmt("- `%s`", name));
         std::string markdownError = fmt("`nix %s` requires a sub-command. Available sub-commands:\n\n%s\n",
-                commandName, dropEmptyInitThenConcatStringsSep("\n", subCommandTextLines));
+                commandName, concatStringsSep("\n", subCommandTextLines));
         throw UsageError(renderMarkdownToTerminal(markdownError));
     }
     command->second->run();

@@ -27,6 +27,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings-inline.hh"
+
 namespace nix {
 
 void completeFlakeInputPath(
@@ -630,7 +632,7 @@ static void throwBuildErrors(
                 }
                 failedPaths.insert(failedResult->path.to_string(store));
             }
-            throw Error("build of %s failed", dropEmptyInitThenConcatStringsSep(", ", quoteStrings(failedPaths)));
+            throw Error("build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
         }
     }
 }

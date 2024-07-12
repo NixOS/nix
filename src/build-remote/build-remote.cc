@@ -16,6 +16,7 @@
 #include "serialise.hh"
 #include "build-result.hh"
 #include "store-api.hh"
+#include "strings.hh"
 #include "derivations.hh"
 #include "local-store.hh"
 #include "legacy.hh"
@@ -206,15 +207,15 @@ static int main_build_remote(int argc, char * * argv)
                         error
                             % drvstr
                             % neededSystem
-                            % dropEmptyInitThenConcatStringsSep<StringSet>(", ", requiredFeatures)
+                            % concatStringsSep<StringSet>(", ", requiredFeatures)
                             % machines.size();
 
                         for (auto & m : machines)
                             error
-                                % dropEmptyInitThenConcatStringsSep<StringSet>(", ", m.systemTypes)
+                                % concatStringsSep<StringSet>(", ", m.systemTypes)
                                 % m.maxJobs
-                                % dropEmptyInitThenConcatStringsSep<StringSet>(", ", m.supportedFeatures)
-                                % dropEmptyInitThenConcatStringsSep<StringSet>(", ", m.mandatoryFeatures);
+                                % concatStringsSep<StringSet>(", ", m.supportedFeatures)
+                                % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
 
                         printMsg(couldBuildLocally ? lvlChatty : lvlWarn, error.str());
 
