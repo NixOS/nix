@@ -9,6 +9,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix {
 
 Config::Config(StringMap initials)
@@ -362,7 +364,7 @@ template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() c
     StringSet stringifiedXpFeatures;
     for (const auto & feature : value)
         stringifiedXpFeatures.insert(std::string(showExperimentalFeature(feature)));
-    return dropEmptyInitThenConcatStringsSep(" ", stringifiedXpFeatures);
+    return concatStringsSep(" ", stringifiedXpFeatures);
 }
 
 template<> StringMap BaseSetting<StringMap>::parse(const std::string & str) const
