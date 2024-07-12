@@ -320,7 +320,7 @@ template<> void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append)
 
 template<> std::string BaseSetting<Strings>::to_string() const
 {
-    return dropEmptyInitThenConcatStringsSep(" ", value);
+    return concatStringsSep(" ", value);
 }
 
 template<> StringSet BaseSetting<StringSet>::parse(const std::string & str) const
@@ -336,7 +336,7 @@ template<> void BaseSetting<StringSet>::appendOrSet(StringSet newValue, bool app
 
 template<> std::string BaseSetting<StringSet>::to_string() const
 {
-    return dropEmptyInitThenConcatStringsSep(" ", value);
+    return concatStringsSep(" ", value);
 }
 
 template<> std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeature>>::parse(const std::string & str) const
