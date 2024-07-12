@@ -1,6 +1,8 @@
+#include <unordered_set>
+#include <queue>
+
 #include "command.hh"
 #include "run.hh"
-#include <queue>
 
 using namespace nix;
 

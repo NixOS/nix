@@ -8,7 +8,6 @@
 #include "signals.hh"
 
 #include <algorithm>
-#include <cctype>
 #include <exception>
 #include <iostream>
 
@@ -23,6 +22,7 @@
 
 #include <openssl/crypto.h>
 
+#include "exit.hh"
 
 namespace nix {
 

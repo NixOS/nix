@@ -1,3 +1,5 @@
+#include <unordered_set>
+
 #include "derivations.hh"
 #include "parsed-derivations.hh"
 #include "globals.hh"

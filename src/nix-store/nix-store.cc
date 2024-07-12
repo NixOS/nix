@@ -2,13 +2,11 @@
 #include "derivations.hh"
 #include "dotgraph.hh"
 #include "globals.hh"
-#include "build-result.hh"
 #include "store-cast.hh"
 #include "local-fs-store.hh"
 #include "log-store.hh"
 #include "serve-protocol.hh"
 #include "serve-protocol-connection.hh"
-#include "serve-protocol-impl.hh"
 #include "shared.hh"
 #include "graphml.hh"
 #include "legacy.hh"
@@ -23,12 +21,14 @@
 
 #include <iostream>
 #include <algorithm>
-#include <cstdio>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "build-result.hh"
+#include "exit.hh"
+#include "serve-protocol-impl.hh"
 
 namespace nix_store {
 

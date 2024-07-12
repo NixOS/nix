@@ -1,12 +1,14 @@
 #pragma once
 ///@file
 
-#include "types.hh"
-#include "hash.hh"
-#include "config.hh"
-
 #include <string>
 #include <future>
+
+#include "logging.hh"
+#include "types.hh"
+#include "ref.hh"
+#include "config.hh"
+#include "serialise.hh"
 
 namespace nix {
 

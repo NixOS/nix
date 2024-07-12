@@ -1,13 +1,13 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "sync.hh"
 #include "thread-pool.hh"
-#include "references.hh"
 #include "signals.hh"
 #include "keys.hh"
 
 #include <atomic>
+
+#include "exit.hh"
 
 using namespace nix;
 

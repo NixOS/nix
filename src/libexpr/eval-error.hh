@@ -1,7 +1,5 @@
 #pragma once
 
-#include <algorithm>
-
 #include "error.hh"
 #include "pos-idx.hh"
 

@@ -7,9 +7,9 @@
 #include "value.hh"
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
-#include "store-api.hh"
 
 #include "tests/libstore.hh"
 

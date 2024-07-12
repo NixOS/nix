@@ -6,11 +6,8 @@
 
 #include "value.hh"
 #include "symbol-table.hh"
-#include "error.hh"
-#include "position.hh"
 #include "eval-error.hh"
 #include "pos-idx.hh"
-#include "pos-table.hh"
 
 namespace nix {
 

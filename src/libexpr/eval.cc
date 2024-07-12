@@ -1,6 +1,6 @@
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "eval-settings.hh"
-#include "hash.hh"
 #include "primops.hh"
 #include "print-options.hh"
 #include "exit.hh"
@@ -16,7 +16,6 @@
 #include "print.hh"
 #include "filtering-source-accessor.hh"
 #include "memory-source-accessor.hh"
-#include "signals.hh"
 #include "gc-small-vector.hh"
 #include "url.hh"
 #include "fetch-to-store.hh"
@@ -24,7 +23,6 @@
 #include "parser-tab.hh"
 
 #include <algorithm>
-#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <cstring>

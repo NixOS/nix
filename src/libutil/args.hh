@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include <iostream>
 #include <functional>
 #include <map>
 #include <memory>
@@ -11,6 +10,7 @@
 
 #include "types.hh"
 #include "experimental-features.hh"
+#include "ref.hh"
 
 namespace nix {
 

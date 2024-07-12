@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
 
 #include "repl-interacter.hh"
 #include "repl.hh"
@@ -10,8 +9,6 @@
 #include "shared.hh"
 #include "config-global.hh"
 #include "eval.hh"
-#include "eval-cache.hh"
-#include "eval-inline.hh"
 #include "eval-settings.hh"
 #include "attr-path.hh"
 #include "signals.hh"
@@ -29,6 +26,7 @@
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "print.hh"
+#include "ref.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW

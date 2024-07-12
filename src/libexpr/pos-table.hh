@@ -1,10 +1,8 @@
 #pragma once
 
-#include <cinttypes>
-#include <numeric>
+#include <cstdint>
 #include <vector>
 
-#include "chunked-vector.hh"
 #include "pos-idx.hh"
 #include "position.hh"
 #include "sync.hh"

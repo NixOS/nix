@@ -3,7 +3,6 @@
 
 #include <map>
 #include <stack>
-#include <algorithm>
 
 #include <nlohmann/json.hpp>
 

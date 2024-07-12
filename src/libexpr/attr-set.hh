@@ -5,7 +5,6 @@
 #include "symbol-table.hh"
 
 #include <algorithm>
-#include <optional>
 
 namespace nix {
 

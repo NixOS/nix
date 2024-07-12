@@ -1,12 +1,10 @@
 #include <cstring>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 
-#include "config.hh"
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "globals.hh"
-#include "util.hh"
 #include "eval-settings.hh"
 
 #include "nix_api_expr.h"
