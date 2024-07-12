@@ -87,9 +87,9 @@ public:
         return p != other.p;
     }
 
-    bool operator < (const ref<T> & other) const
+    auto operator <=> (const ref<T> & other) const
     {
-        return p < other.p;
+        return p <=> other.p;
     }
 
 private:

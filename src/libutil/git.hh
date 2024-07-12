@@ -39,7 +39,8 @@ struct TreeEntry
     Mode mode;
     Hash hash;
 
-    GENERATE_CMP(TreeEntry, me->mode, me->hash);
+    bool operator ==(const TreeEntry &) const = default;
+    auto operator <=>(const TreeEntry &) const = default;
 };
 
 /**

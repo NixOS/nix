@@ -380,7 +380,7 @@ struct Completion {
     std::string completion;
     std::string description;
 
-    bool operator<(const Completion & other) const;
+    auto operator<=>(const Completion & other) const noexcept;
 };
 
 /**

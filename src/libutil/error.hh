@@ -75,10 +75,7 @@ struct Trace {
     TracePrint print = TracePrint::Default;
 };
 
-inline bool operator<(const Trace& lhs, const Trace& rhs);
-inline bool operator> (const Trace& lhs, const Trace& rhs);
-inline bool operator<=(const Trace& lhs, const Trace& rhs);
-inline bool operator>=(const Trace& lhs, const Trace& rhs);
+inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;

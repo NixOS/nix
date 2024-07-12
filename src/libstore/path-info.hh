@@ -32,17 +32,47 @@ struct SubstitutablePathInfo
 using SubstitutablePathInfos = std::map<StorePath, SubstitutablePathInfo>;
 
 
+/**
+ * Information about a store object.
+ *
+ * See `store/store-object` and `protocols/json/store-object-info` in
+ * the Nix manual
+ */
 struct UnkeyedValidPathInfo
 {
+    /**
+     * Path to derivation that produced this store object, if known.
+     */
     std::optional<StorePath> deriver;
+
     /**
      * \todo document this
      */
     Hash narHash;
+
+    /**
+     * Other store objects this store object referes to.
+     */
     StorePathSet references;
+
+    /**
+     * When this store object was registered in the store that contains
+     * it, if known.
+     */
     time_t registrationTime = 0;
-    uint64_t narSize = 0; // 0 = unknown
-    uint64_t id = 0; // internal use only
+
+    /**
+     * 0 = unknown
+     */
+    uint64_t narSize = 0;
+
+    /**
+     * internal use only: SQL primary key for on-disk store objects with
+     * `LocalStore`.
+     *
+     * @todo Remove, layer violation
+     */
+    uint64_t id = 0;
 
     /**
      * Whether the path is ultimately trusted, that is, it's a
@@ -75,7 +105,12 @@ struct UnkeyedValidPathInfo
 
     UnkeyedValidPathInfo(Hash narHash) : narHash(narHash) { };
 
-    DECLARE_CMP(UnkeyedValidPathInfo);
+    bool operator == (const UnkeyedValidPathInfo &) const noexcept;
+
+    /**
+     * @todo return `std::strong_ordering` once `id` is removed
+     */
+    std::weak_ordering operator <=> (const UnkeyedValidPathInfo &) const noexcept;
 
     virtual ~UnkeyedValidPathInfo() { }
 
@@ -95,7 +130,8 @@ struct UnkeyedValidPathInfo
 struct ValidPathInfo : UnkeyedValidPathInfo {
     StorePath path;
 
-    DECLARE_CMP(ValidPathInfo);
+    bool operator == (const ValidPathInfo &) const = default;
+    auto operator <=> (const ValidPathInfo &) const = default;
 
     /**
      * Return a fingerprint of the store path to be used in binary

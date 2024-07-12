@@ -27,9 +27,9 @@ struct Attr
     Attr(Symbol name, Value * value, PosIdx pos = noPos)
         : name(name), pos(pos), value(value) { };
     Attr() { };
-    bool operator < (const Attr & a) const
+    auto operator <=> (const Attr & a) const
     {
-        return name < a.name;
+        return name <=> a.name;
     }
 };
 

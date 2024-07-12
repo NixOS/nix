@@ -3,7 +3,6 @@
 
 #include "path.hh"
 #include "outputs-spec.hh"
-#include "comparator.hh"
 #include "config.hh"
 #include "ref.hh"
 
@@ -32,7 +31,8 @@ struct DerivedPathOpaque {
     static DerivedPathOpaque parse(const StoreDirConfig & store, std::string_view);
     nlohmann::json toJSON(const StoreDirConfig & store) const;
 
-    GENERATE_CMP(DerivedPathOpaque, me->path);
+    bool operator == (const DerivedPathOpaque &) const = default;
+    auto operator <=> (const DerivedPathOpaque &) const = default;
 };
 
 struct SingleDerivedPath;
@@ -79,7 +79,8 @@ struct SingleDerivedPathBuilt {
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
 
-    DECLARE_CMP(SingleDerivedPathBuilt);
+    bool operator == (const SingleDerivedPathBuilt &) const noexcept;
+    std::strong_ordering operator <=> (const SingleDerivedPathBuilt &) const noexcept;
 };
 
 using _SingleDerivedPathRaw = std::variant<
@@ -108,6 +109,9 @@ struct SingleDerivedPath : _SingleDerivedPathRaw {
     inline const Raw & raw() const {
         return static_cast<const Raw &>(*this);
     }
+
+    bool operator == (const SingleDerivedPath &) const = default;
+    auto operator <=> (const SingleDerivedPath &) const = default;
 
     /**
      * Get the store path this is ultimately derived from (by realising
@@ -202,7 +206,9 @@ struct DerivedPathBuilt {
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
 
-    DECLARE_CMP(DerivedPathBuilt);
+    bool operator == (const DerivedPathBuilt &) const noexcept;
+    // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
+    bool operator < (const DerivedPathBuilt &) const noexcept;
 };
 
 using _DerivedPathRaw = std::variant<
@@ -230,6 +236,10 @@ struct DerivedPath : _DerivedPathRaw {
     inline const Raw & raw() const {
         return static_cast<const Raw &>(*this);
     }
+
+    bool operator == (const DerivedPath &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
+    //auto operator <=> (const DerivedPath &) const = default;
 
     /**
      * Get the store path this is ultimately derived from (by realising

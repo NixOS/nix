@@ -3,11 +3,13 @@
 #include "path-info.hh"
 #include "store-api.hh"
 #include "json-utils.hh"
+#include "comparator.hh"
 
 namespace nix {
 
 GENERATE_CMP_EXT(
     ,
+    std::weak_ordering,
     UnkeyedValidPathInfo,
     me->deriver,
     me->narHash,
@@ -18,12 +20,6 @@ GENERATE_CMP_EXT(
     me->ultimate,
     me->sigs,
     me->ca);
-
-GENERATE_CMP_EXT(
-    ,
-    ValidPathInfo,
-    me->path,
-    static_cast<const UnkeyedValidPathInfo &>(*me));
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
