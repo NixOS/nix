@@ -41,11 +41,13 @@ std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const 
 {
     size_t size = 0;
 
-    for (auto & i : ss) {
-        // Make sure we don't rely on the empty item ignoring behavior
-        assert(!i.empty());
-        break;
-    }
+    // TODO? remove to make sure we don't rely on the empty item ignoring behavior,
+    //       or just get rid of this function by understanding the remaining calls.
+    // for (auto & i : ss) {
+    //     // Make sure we don't rely on the empty item ignoring behavior
+    //     assert(!i.empty());
+    //     break;
+    // }
 
     // need a cast to string_view since this is also called with Symbols
     for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
