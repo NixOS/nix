@@ -11,6 +11,8 @@
 #include <sstream>
 #include <optional>
 
+#include "strings.hh"
+
 namespace nix {
 
 void initLibUtil();
@@ -69,7 +71,7 @@ auto concatStrings(Parts && ... parts)
     -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
 {
     std::string_view views[sizeof...(parts)] = { parts... };
-    return dropEmptyInitThenConcatStringsSep({}, views);
+    return concatStringsSep({}, views);
 }
 
 
