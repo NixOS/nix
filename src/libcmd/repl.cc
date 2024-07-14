@@ -33,6 +33,8 @@
 #include <gc/gc_cpp.h>
 #endif
 
+#include "strings.hh"
+
 namespace nix {
 
 /**

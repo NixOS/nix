@@ -21,6 +21,8 @@
 #include <nlohmann/json.hpp>
 #include <iomanip>
 
+#include "strings-inline.hh"
+
 using namespace nix;
 using namespace nix::flake;
 using json = nlohmann::json;
@@ -802,6 +804,7 @@ struct CmdFlakeCheck : FlakeCommand
             throw Error("some errors were encountered during the evaluation");
 
         if (!omittedSystems.empty()) {
+            // TODO: empty system is not visible; render all as nix strings?
             warn(
                 "The check omitted these incompatible systems: %s\n"
                 "Use '--all-systems' to check all.",

@@ -35,6 +35,8 @@
 #include <sys/sysctl.h>
 #endif
 
+#include "strings.hh"
+
 namespace nix {
 
 
@@ -82,7 +84,7 @@ Settings::Settings()
         Strings ss;
         for (auto & p : tokenizeString<Strings>(*s, ":"))
             ss.push_back("@" + p);
-        builders = concatStringsSep(" ", ss);
+        builders = concatStringsSep("\n", ss);
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)

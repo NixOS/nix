@@ -171,6 +171,9 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
      */
     bool checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const;
 
+    /**
+     * References as store path basenames, including a self reference if it has one.
+     */
     Strings shortRefs() const;
 
     ValidPathInfo(const ValidPathInfo & other) = default;

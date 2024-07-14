@@ -10,6 +10,8 @@
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
 
+#include "strings-inline.hh"
+
 namespace nix {
 
 std::optional<StorePath> DerivationOutput::path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const

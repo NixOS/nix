@@ -41,6 +41,8 @@ extern std::string chrootHelperName;
 void chrootHelper(int argc, char * * argv);
 #endif
 
+#include "strings.hh"
+
 namespace nix {
 
 enum struct AliasStatus {

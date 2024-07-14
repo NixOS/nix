@@ -51,6 +51,8 @@
 
 #include <sqlite3.h>
 
+#include "strings.hh"
+
 
 namespace nix {
 

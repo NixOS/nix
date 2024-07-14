@@ -19,6 +19,8 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 
+#include "strings.hh"
+
 using namespace nix;
 
 struct DevelopSettings : Config

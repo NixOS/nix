@@ -32,6 +32,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix {
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,

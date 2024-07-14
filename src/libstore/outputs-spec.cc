@@ -5,6 +5,7 @@
 #include "regex-combinators.hh"
 #include "outputs-spec.hh"
 #include "path-regex.hh"
+#include "strings-inline.hh"
 
 namespace nix {
 

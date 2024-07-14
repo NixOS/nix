@@ -9,6 +9,8 @@
 #include <iterator>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix::flake {
 
 static FlakeRef getFlakeRef(

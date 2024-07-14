@@ -3,6 +3,7 @@
 #include "hook-instance.hh"
 #include "file-system.hh"
 #include "child.hh"
+#include "strings.hh"
 
 namespace nix {
 

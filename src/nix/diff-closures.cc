@@ -6,6 +6,8 @@
 
 #include <regex>
 
+#include "strings.hh"
+
 namespace nix {
 
 struct Info

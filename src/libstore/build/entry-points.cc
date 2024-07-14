@@ -4,6 +4,7 @@
 #  include "derivation-goal.hh"
 #endif
 #include "local-store.hh"
+#include "strings.hh"
 
 namespace nix {
 

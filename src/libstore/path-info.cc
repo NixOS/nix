@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "json-utils.hh"
 #include "comparator.hh"
+#include "strings.hh"
 
 namespace nix {
 

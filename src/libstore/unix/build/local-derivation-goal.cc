@@ -64,6 +64,8 @@
 #include <grp.h>
 #include <iostream>
 
+#include "strings.hh"
+
 namespace nix {
 
 void handleDiffHook(
