@@ -33,10 +33,14 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 
 
 /**
- * Concatenate the given strings with a separator between the
- * elements.
+ * Ignore any empty strings at the start of the list, and then concatenate the
+ * given strings with a separator between the elements.
+ *
+ * @deprecated This function exists for historical reasons. You probably just
+ *             want to use `concatStringsSep`.
  */
 template<class C>
+[[deprecated("Consider removing the empty string dropping behavior. If acceptable, use concatStringsSep instead.")]]
 std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
