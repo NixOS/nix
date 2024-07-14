@@ -14,9 +14,7 @@ Added <number omitted> variables.
   layerOne = { ... };
 }
 
-[
-  "https://example.com"
-]
+[ "https://example.com" ]
 
 [ "https://example.com" ]
 
