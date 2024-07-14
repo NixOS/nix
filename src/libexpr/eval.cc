@@ -49,6 +49,8 @@
 
 #endif
 
+#include "strings-inline.hh"
+
 using json = nlohmann::json;
 
 namespace nix {

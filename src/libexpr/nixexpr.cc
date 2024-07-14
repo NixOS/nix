@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <sstream>
 
+#include "strings-inline.hh"
+
 namespace nix {
 
 unsigned long Expr::nrExprs = 0;
