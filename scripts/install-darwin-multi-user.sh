@@ -4,7 +4,11 @@ set -eu
 set -o pipefail
 
 # System specific settings
-export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
+if [[ $(sw_vers -productVersion | cut -d '.' -f 1) -ge 15 ]]; then
+    export NIX_FIRST_BUILD_UID=${NIX_FIRST_BUILD_UID:-30001}
+else
+    export NIX_FIRST_BUILD_UID=${NIX_FIRST_BUILD_UID:-301}
+fi
 export NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
 
 readonly NIX_DAEMON_DEST=/Library/LaunchDaemons/org.nixos.nix-daemon.plist
