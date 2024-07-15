@@ -28,10 +28,7 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
         }
     }
 
-    const std::string name() override
-    {
-        return "Local Daemon Store";
-    }
+    const std::string name() override { return "Local Daemon Store"; }
 
     std::string doc() override;
 
@@ -42,7 +39,9 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     std::optional<std::string> path;
 };
 
-class UDSRemoteStore : public virtual UDSRemoteStoreConfig, public virtual IndirectRootStore, public virtual RemoteStore
+class UDSRemoteStore : public virtual UDSRemoteStoreConfig
+    , public virtual IndirectRootStore
+    , public virtual RemoteStore
 {
 public:
 
@@ -55,19 +54,13 @@ public:
     std::string getUri() override;
 
     static std::set<std::string> uriSchemes()
-    {
-        return {UNIX_SCHEME};
-    }
+    { return {UNIX_SCHEME}; }
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
-    {
-        return LocalFSStore::getFSAccessor(requireValidPath);
-    }
+    { return LocalFSStore::getFSAccessor(requireValidPath); }
 
     void narFromPath(const StorePath & path, Sink & sink) override
-    {
-        LocalFSStore::narFromPath(path, sink);
-    }
+    { LocalFSStore::narFromPath(path, sink); }
 
     /**
      * Implementation of `IndirectRootStore::addIndirectRoot()` which

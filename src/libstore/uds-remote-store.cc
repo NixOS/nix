@@ -6,13 +6,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <format>
 
 #ifdef _WIN32
-#  include <winsock2.h>
-#  include <afunix.h>
+# include <winsock2.h>
+# include <afunix.h>
 #else
-#  include <sys/socket.h>
-#  include <sys/un.h>
+# include <sys/socket.h>
+# include <sys/un.h>
 #endif
 
 namespace nix {
@@ -20,9 +21,10 @@ namespace nix {
 std::string UDSRemoteStoreConfig::doc()
 {
     return
-#include "uds-remote-store.md"
+        #include "uds-remote-store.md"
         ;
 }
+
 
 UDSRemoteStore::UDSRemoteStore(std::string_view scheme, std::string_view authority, const Params & params)
     : StoreConfig(params)
@@ -45,10 +47,12 @@ std::string UDSRemoteStore::getUri()
     return std::format("{}://{}", UNIX_SCHEME, getPathOrDefault());
 }
 
+
 void UDSRemoteStore::Connection::closeWrite()
 {
     shutdown(toSocket(fd.get()), SHUT_WR);
 }
+
 
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
@@ -67,6 +71,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     return conn;
 }
 
+
 void UDSRemoteStore::addIndirectRoot(const Path & path)
 {
     auto conn(getConnection());
@@ -74,6 +79,7 @@ void UDSRemoteStore::addIndirectRoot(const Path & path)
     conn.processStderr();
     readInt(conn->from);
 }
+
 
 static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regUDSRemoteStore;
 

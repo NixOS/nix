@@ -249,6 +249,8 @@
             ''^src/libstore/unix/pathlocks\.cc$''
             ''^src/libstore/posix-fs-canonicalise\.cc$''
             ''^src/libstore/posix-fs-canonicalise\.hh$''
+            ''^src/libstore/uds-remote-store\.cc$''
+            ''^src/libstore/uds-remote-store\.hh$''
             ''^src/libstore/windows/build\.cc$''
             ''^src/libstore/worker-protocol-impl\.hh$''
             ''^src/libstore/worker-protocol\.cc$''
