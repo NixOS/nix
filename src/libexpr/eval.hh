@@ -130,7 +130,7 @@ struct Constant
     typedef std::map<std::string, Value *> ValMap;
 #endif
 
-typedef std::map<PosIdx, DocComment> DocCommentMap;
+typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
 
 struct Env
 {
@@ -335,7 +335,7 @@ private:
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::map<SourcePath, DocCommentMap> positionToDocComment;
+    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
