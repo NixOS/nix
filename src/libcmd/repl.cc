@@ -632,8 +632,13 @@ ProcessLineResult NixRepl::processLine(std::string line)
             assert(attrs);
             auto attr = attrs->get(name);
             if (!attr) {
-                // Trigger the normal error
+                // When missing, trigger the normal exception
+                // e.g. :doc builtins.foo
+                // behaves like
+                // nix-repl> builtins.foo      
+                // error: attribute 'foo' missing
                 evalString(arg, v);
+                assert(false);
             }
             if (attr->pos) {
                 fallbackPos = attr->pos;
