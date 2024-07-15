@@ -324,6 +324,7 @@
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ [
               pkgs.buildPackages.cmake
+              pkgs.shellcheck
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)

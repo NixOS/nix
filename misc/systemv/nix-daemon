@@ -34,6 +34,7 @@ else
 fi
 
 # Source function library.
+# shellcheck source=/dev/null
 . /etc/init.d/functions
 
 LOCKFILE=/var/lock/subsys/nix-daemon
@@ -41,14 +42,20 @@ RUNDIR=/var/run/nix
 PIDFILE=${RUNDIR}/nix-daemon.pid
 RETVAL=0
 
-base=${0##*/}
+# https://www.shellcheck.net/wiki/SC3004
+# Check if gettext exists
+if ! type gettext > /dev/null 2>&1
+then
+  # If not, create a dummy function that returns the input verbatim
+  gettext() { printf '%s' "$1"; }
+fi
 
 start() {
 
     mkdir -p ${RUNDIR}
     chown ${NIX_DAEMON_USER}:${NIX_DAEMON_USER} ${RUNDIR}
 
-    echo -n $"Starting nix daemon... "
+    printf '%s' "$(gettext 'Starting nix daemon... ')"
 
     daemonize -u $NIX_DAEMON_USER -p ${PIDFILE} $NIX_DAEMON_BIN $NIX_DAEMON_OPTS
     RETVAL=$?
@@ -58,7 +65,7 @@ start() {
 }
 
 stop() {
-    echo -n $"Shutting down nix daemon: "
+    printf '%s' "$(gettext 'Shutting down nix daemon: ')"
     killproc -p ${PIDFILE} $NIX_DAEMON_BIN
     RETVAL=$?
     [ $RETVAL -eq 0 ] && rm -f ${LOCKFILE} ${PIDFILE}
@@ -67,7 +74,7 @@ stop() {
 }
 
 reload() {
-    echo -n $"Reloading nix daemon... "
+    printf '%s' "$(gettext 'Reloading nix daemon... ')"
     killproc -p ${PIDFILE} $NIX_DAEMON_BIN -HUP
     RETVAL=$?
     echo
@@ -105,7 +112,7 @@ case "$1" in
         fi
     ;;
   *)
-        echo $"Usage: $0 {start|stop|status|restart|condrestart}"
+        printf '%s' "$(gettext "Usage: $0 {start|stop|status|restart|condrestart}")"
         exit 2
     ;;
 esac
