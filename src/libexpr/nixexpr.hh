@@ -36,15 +36,10 @@ struct Value;
  */
 struct DocComment {
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcomment" // "nested comment start" is intentional
-
     /**
-     * Start of the comment, including `/**`.
+     * Start of the comment, including the opening, ie `/` and `**`.
      */
     PosIdx begin;
-
-#pragma GCC diagnostic pop
 
     /**
      * Position right after the final asterisk and `/` that terminate the comment.
