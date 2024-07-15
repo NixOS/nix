@@ -11,13 +11,53 @@
 
 namespace nix {
 
-
-struct Env;
-struct Value;
 class EvalState;
+class PosTable;
+struct Env;
 struct ExprWith;
 struct StaticEnv;
+struct Value;
 
+/**
+ * A documentation comment, in the sense of [RFC 145](https://github.com/NixOS/rfcs/blob/master/rfcs/0145-doc-strings.md)
+ *
+ * Note that this does not implement the following:
+ *  - argument attribute names ("formals"): TBD
+ *  - argument names: these are internal to the function and their names may not be optimal for documentation
+ *  - function arity (degree of currying or number of ':'s):
+ *      - Functions returning partially applied functions have a higher arity
+ *        than can be determined locally and without evaluation.
+ *        We do not want to present false data.
+ *      - Some functions should be thought of as transformations of other
+ *        functions. For instance `overlay -> overlay -> overlay` is the simplest
+ *        way to understand `composeExtensions`, but its implementation looks like
+ *        `f: g: final: prev: <...>`. The parameters `final` and `prev` are part
+ *        of the overlay concept, while distracting from the function's purpose.
+ */
+struct DocComment {
+
+    /**
+     * Start of the comment, including the opening, ie `/` and `**`.
+     */
+    PosIdx begin;
+
+    /**
+     * Position right after the final asterisk and `/` that terminate the comment.
+     */
+    PosIdx end;
+
+    /**
+     * Whether the comment is set.
+     *
+     * A `DocComment` is small enough that it makes sense to pass by value, and
+     * therefore baking optionality into it is also useful, to avoiding the memory
+     * overhead of `std::optional`.
+     */
+    operator bool() const { return static_cast<bool>(begin); }
+
+    std::string getInnerText(const PosTable & positions) const;
+
+};
 
 /**
  * An attribute path is a sequence of attribute names.
@@ -54,6 +94,7 @@ struct Expr
     virtual void eval(EvalState & state, Env & env, Value & v);
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol name);
+    virtual void setDocComment(DocComment docComment) { };
     virtual PosIdx getPos() const { return noPos; }
 };
 
@@ -156,6 +197,17 @@ struct ExprSelect : Expr
     ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
+
+    /**
+     * Evaluate the `a.b.c` part of `a.b.c.d`. This exists mostly for the purpose of :doc in the repl.
+     *
+     * @param[out] v The attribute set that should contain the last attribute name (if it exists).
+     * @return The last attribute name in `attrPath`
+     * 
+     * @note This does *not* evaluate the final attribute, and does not fail if that's the only attribute that does not exist.
+     */
+    Symbol evalExceptFinalSelect(EvalState & state, Env & env, Value & attrs);
+
     COMMON_METHODS
 };
 
@@ -278,6 +330,8 @@ struct ExprLambda : Expr
     Symbol arg;
     Formals * formals;
     Expr * body;
+    DocComment docComment;
+
     ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
         : pos(pos), arg(arg), formals(formals), body(body)
     {
@@ -290,6 +344,7 @@ struct ExprLambda : Expr
     std::string showNamePos(const EvalState & state) const;
     inline bool hasFormals() const { return formals != nullptr; }
     PosIdx getPos() const override { return pos; }
+    virtual void setDocComment(DocComment docComment) override;
     COMMON_METHODS
 };
 

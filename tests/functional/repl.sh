@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 source common.sh
+source characterisation/framework.sh
 
 testDir="$PWD"
 cd "$TEST_ROOT"
@@ -244,3 +245,42 @@ testReplResponseNoRegex '
   y = { a = 1 };
 }
 '
+
+# TODO: move init to characterisation/framework.sh
+badDiff=0
+badExitCode=0
+
+nixVersion="$(nix eval --impure --raw --expr 'builtins.nixVersion' --extra-experimental-features nix-command)"
+
+runRepl () {
+
+  # That is right, we are also filtering out the testdir _without underscores_.
+  # This is crazy, but without it, GHA will fail to run the tests, showing paths
+  # _with_ underscores in the set -x log, but _without_ underscores in the 
+  # supposed nix repl output. I have looked in a number of places, but I cannot
+  # find a mechanism that could cause this to happen.
+  local testDirNoUnderscores
+  testDirNoUnderscores="${testDir//_/}"
+
+  # TODO: pass arguments to nix repl; see lang.sh
+  nix repl 2>&1 \
+    | stripColors \
+    | sed \
+      -e "s@$testDir@/path/to/tests/functional@g" \
+      -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
+      -e "s@$nixVersion@<nix version>@g" \
+      -e "s@Added [0-9]* variables@Added <number omitted> variables@g" \
+    | grep -vF $'warning: you don\'t have Internet access; disabling some network-dependent features' \
+    ;
+}
+
+for test in $(cd "$testDir/repl"; echo *.in); do
+    test="$(basename "$test" .in)"
+    in="$testDir/repl/$test.in"
+    actual="$testDir/repl/$test.actual"
+    expected="$testDir/repl/$test.expected"
+    (cd "$testDir/repl"; set +x; runRepl 2>&1) < "$in" > "$actual"
+    diffAndAcceptInner "$test" "$actual" "$expected"
+done
+
+characterisationTestExit

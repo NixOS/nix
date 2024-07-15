@@ -559,6 +559,54 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .doc = doc,
             };
     }
+    if (v.isLambda()) {
+        auto exprLambda = v.payload.lambda.fun;
+
+        std::stringstream s(std::ios_base::out);
+        std::string name;
+        auto pos = positions[exprLambda->getPos()];
+        std::string docStr;
+
+        if (exprLambda->name) {
+            name = symbols[exprLambda->name];
+        }
+
+        if (exprLambda->docComment) {
+            docStr = exprLambda->docComment.getInnerText(positions);
+        }
+
+        if (name.empty()) {
+            s << "Function ";
+        }
+        else {
+            s << "Function `" << name << "`";
+            if (pos)
+                s << "\\\n  … " ;
+            else
+                s << "\\\n";
+        }
+        if (pos) {
+            s << "defined at " << pos;
+        }
+        if (!docStr.empty()) {
+            s << "\n\n";
+        }
+
+        s << docStr;
+
+        s << '\0'; // for making a c string below
+        std::string ss = s.str();
+
+        return Doc {
+            .pos = pos,
+            .name = name,
+            .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
+            .args = {},
+            .doc =
+                // FIXME: this leaks; make the field std::string?
+                strdup(ss.data()),
+        };
+    }
     return {};
 }
 
@@ -1365,6 +1413,22 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     }
 
     v = *vAttrs;
+}
+
+Symbol ExprSelect::evalExceptFinalSelect(EvalState & state, Env & env, Value & attrs)
+{
+    Value vTmp;
+    Symbol name = getName(attrPath[attrPath.size() - 1], state, env);
+
+    if (attrPath.size() == 1) {
+        e->eval(state, env, vTmp);
+    } else {
+        ExprSelect init(*this);
+        init.attrPath.pop_back();
+        init.eval(state, env, vTmp);
+    }
+    attrs = vTmp;
+    return name;
 }
 
 
@@ -2828,13 +2892,37 @@ Expr * EvalState::parse(
     const SourcePath & basePath,
     std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, rootFS, exprSymbols);
+    DocCommentMap tmpDocComments; // Only used when not origin is not a SourcePath
+    DocCommentMap *docComments = &tmpDocComments;
+
+    if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
+        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
+        docComments = &it->second;
+    }
+
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, *docComments, rootFS, exprSymbols);
 
     result->bindVars(*this, staticEnv);
 
     return result;
 }
 
+DocComment EvalState::getDocCommentForPos(PosIdx pos)
+{
+    auto pos2 = positions[pos];
+    auto path = pos2.getSourcePath();
+    if (!path)
+        return {};
+
+    auto table = positionToDocComment.find(*path);
+    if (table == positionToDocComment.end())
+        return {};
+
+    auto it = table->second.find(pos);
+    if (it == table->second.end())
+        return {};
+    return it->second;
+}
 
 std::string ExternalValueBase::coerceToString(EvalState & state, const PosIdx & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {

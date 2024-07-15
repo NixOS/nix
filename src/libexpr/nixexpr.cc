@@ -583,6 +583,22 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
     return fmt("%1% at %2%", id, state.positions[pos]);
 }
 
+void ExprLambda::setDocComment(DocComment docComment) {
+    // RFC 145 specifies that the innermost doc comment wins.
+    // See https://github.com/NixOS/rfcs/blob/master/rfcs/0145-doc-strings.md#ambiguous-placement
+    if (!this->docComment) {
+        this->docComment = docComment;
+
+        // Curried functions are defined by putting a function directly
+        // in the body of another function. To render docs for those, we
+        // need to propagate the doc comment to the innermost function.
+        //
+        // If we have our own comment, we've already propagated it, so this
+        // belongs in the same conditional.
+        body->setDocComment(docComment);
+    }
+};
+
 
 
 /* Position table. */
@@ -625,6 +641,24 @@ size_t SymbolTable::totalSize() const
     size_t n = 0;
     dump([&] (const std::string & s) { n += s.size(); });
     return n;
+}
+
+std::string DocComment::getInnerText(const PosTable & positions) const {
+    auto beginPos = positions[begin];
+    auto endPos = positions[end];
+    auto docCommentStr = beginPos.getSnippetUpTo(endPos).value_or("");
+
+    // Strip "/**" and "*/"
+    constexpr size_t prefixLen = 3;
+    constexpr size_t suffixLen = 2;
+    std::string docStr = docCommentStr.substr(prefixLen, docCommentStr.size() - prefixLen - suffixLen);
+    if (docStr.empty())
+        return {};
+    // Turn the now missing "/**" into indentation
+    docStr = "   " + docStr;
+    // Strip indentation (for the whole, potentially multi-line string)
+    docStr = stripIndentation(docStr);
+    return docStr;
 }
 
 }
