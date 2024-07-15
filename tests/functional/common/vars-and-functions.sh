@@ -297,6 +297,45 @@ onError() {
     done
 }
 
+# Prints an error message prefix referring to the last call into this file.
+# Ignores `expect` and `expectStderr` calls.
+# Set a special exit code when test suite functions are misused, so that
+# functions like expectStderr won't mistake them for expected Nix CLI errors.
+# Suggestion: -101 (negative to indicate very abnormal, and beyond the normal
+#             range of signals)
+# Example (showns as string): 'repl.sh:123: in call to grepQuiet: '
+# This function is inefficient, so it should only be used in error messages.
+callerPrefix() {
+  # Find the closes caller that's not from this file
+  local i file line fn savedFn
+  # Use `caller`
+  for i in $(seq 0 100); do
+    caller $i > /dev/null || {
+      if [[ -n "${file:-}" ]]; then
+        echo "$file:$line: ${savedFn+in call to $savedFn: }"
+      fi
+      break
+    }
+    line="$(caller $i | cut -d' ' -f1)"
+    fn="$(caller $i | cut -d' ' -f2)"
+    file="$(caller $i | cut -d' ' -f3)"
+    if [[ $file != "${BASH_SOURCE[0]}" ]]; then
+      echo "$file:$line: ${savedFn+in call to $savedFn: }"
+      return
+    fi
+    case "$fn" in
+      # Ignore higher order functions that don't report any misuse of themselves
+      # This way a misuse of a foo in `expectStderr 1 foo` will be reported as
+      # calling foo, not expectStderr.
+      expect|expectStderr|callerPrefix)
+        ;;
+      *)
+        savedFn="$fn"
+        ;;
+    esac
+  done
+}
+
 # `grep -v` doesn't work well for exit codes. We want `!(exist line l. l
 # matches)`. It gives us `exist line l. !(l matches)`.
 #

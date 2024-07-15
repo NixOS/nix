@@ -88,6 +88,10 @@ funBang () {
 expect 1 funBang
 unset funBang
 
+# callerPrefix can be used by the test framework to improve error messages
+# it reports about our call site here
+echo "<[$(callerPrefix)]>" | grepQuiet -F "<[test-infra.sh:$LINENO: ]>"
+
 # `grep -v -q` is not what we want for exit codes, but `grepInverse` is
 # Avoid `grep -v -q`. The following line proves the point, and if it fails,
 # we'll know that `grep` had a breaking change or `-v -q` may not be portable.
