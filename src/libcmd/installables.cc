@@ -444,11 +444,6 @@ ref<eval_cache::EvalCache> openEvalCache(
         : std::nullopt;
     auto rootLoader = [&state, lockedFlake]()
         {
-            /* For testing whether the evaluation cache is
-               complete. */
-            if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
-                throw Error("not everything is cached, but evaluation is not allowed");
-
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
