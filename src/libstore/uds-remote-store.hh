@@ -7,10 +7,10 @@
 
 namespace nix {
 
-const std::string UNIX_SCHEME = "unix";
-
 struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
 {
+
+    static constexpr char const * UNIX_SCHEME = "unix";
 
     // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
     // outlined in https://github.com/NixOS/nix/issues/10766
