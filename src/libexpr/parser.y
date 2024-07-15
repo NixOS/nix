@@ -48,7 +48,7 @@
 
 namespace nix {
 
-typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
+typedef std::map<PosIdx, DocComment> DocCommentMap;
 
 Expr * parseExprFromBuf(
     char * text,
