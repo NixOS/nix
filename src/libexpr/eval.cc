@@ -576,17 +576,17 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
         }
 
         if (name.empty()) {
-            s << HintFmt("Function ");
+            s << "Function ";
         }
         else {
-            s << HintFmt("Function '%s'", name);
+            s << "Function `" << name << "`";
             if (pos)
                 s << "\\\n  … " ;
             else
                 s << "\\\n";
         }
         if (pos) {
-            s << HintFmt("defined at %1%", pos);
+            s << "defined at " << pos;
         }
         if (!docStr.empty()) {
             s << "\n\n";
