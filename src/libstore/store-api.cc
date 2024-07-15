@@ -1294,7 +1294,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 // nixDaemonSocketFile. Why don't we just wire it all through?
                 // I believe there are cases where it will live reload so we want to
                 // continue to account for that.
-                return std::make_shared<UDSRemoteStore>(UDSRemoteStoreConfig::UNIX_SCHEME, "", params);
+                return std::make_shared<UDSRemoteStore>(UDSRemoteStoreConfig::scheme, "", params);
             #if __linux__
             else if (!pathExists(stateDir)
                 && params.empty()

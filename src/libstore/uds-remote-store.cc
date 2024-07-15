@@ -44,7 +44,7 @@ std::string UDSRemoteStore::getPathOrDefault() const
 
 std::string UDSRemoteStore::getUri()
 {
-    return std::format("{}://{}", UNIX_SCHEME, getPathOrDefault());
+    return std::format("{}://{}", scheme, getPathOrDefault());
 }
 
 
