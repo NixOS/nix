@@ -69,6 +69,7 @@ sources = files(
   'serve-protocol.cc',
   'store-reference.cc',
   'worker-protocol.cc',
+  'uds-remote-store.cc',
 )
 
 include_dirs = [include_directories('.')]
