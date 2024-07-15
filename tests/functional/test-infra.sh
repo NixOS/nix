@@ -108,3 +108,8 @@ unset res
 res=$(set -eu -o pipefail; echo foo | expect 1 grepQuietInverse foo | wc -c)
 (( res == 0 ))
 unset res
+
+# `grepQuiet` does not allow newlines in its arguments, because grep quietly
+# treats them as multiple queries.
+( echo foo; echo bar; ) | expectStderr -101 grepQuiet $'foo\nbar' \
+  | grepQuiet -E 'test-infra\.sh:[0-9]+: in call to grepQuiet: newline not allowed in arguments; grep would try each line individually as if connected by an OR operator'

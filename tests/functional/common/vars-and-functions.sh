@@ -336,13 +336,24 @@ callerPrefix() {
   done
 }
 
+checkGrepArgs() {
+    local arg
+    for arg in "$@"; do
+        if [[ "$arg" != "${arg//$'\n'/_}" ]]; then
+            echo "$(callerPrefix)newline not allowed in arguments; grep would try each line individually as if connected by an OR operator" >&2
+            return -101
+        fi
+    done
+}
+
 # `grep -v` doesn't work well for exit codes. We want `!(exist line l. l
 # matches)`. It gives us `exist line l. !(l matches)`.
 #
 # `!` normally doesn't work well with `set -e`, but when we wrap in a
 # function it *does*.
 grepInverse() {
-    ! grep "$@"
+    checkGrepArgs "$@" && \
+      ! grep "$@"
 }
 
 # A shorthand, `> /dev/null` is a bit noisy.
@@ -357,12 +368,14 @@ grepInverse() {
 # the producer into the pipe. But rest assured we've seen it happen in
 # CI reliably.
 grepQuiet() {
-    grep "$@" > /dev/null
+    checkGrepArgs "$@" && \
+      grep "$@" > /dev/null
 }
 
 # The previous two, combined
 grepQuietInverse() {
-    ! grep "$@" > /dev/null
+    checkGrepArgs "$@" && \
+      ! grep "$@" > /dev/null
 }
 
 # Return the number of arguments
