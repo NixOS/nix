@@ -17,6 +17,7 @@
 
   compact=/**boom*/x: x;
 
+  # https://github.com/NixOS/rfcs/blob/master/rfcs/0145-doc-strings.md#ambiguous-placement
   /** Ignore!!! */
   unambiguous = 
     /** Very close */
@@ -41,17 +42,19 @@
 
   # TODO
 
-  # /** This returns a documented function. */
-  # documentedArgs =
-  #   /** x */
-  #   x:
-  #   /** y */
-  #   y:
-  #   /** x + y */
-  #   x + y;
+  /** You won't see this. */
+  curriedArgs =
+    /** A documented function. */
+    x:
+    /** The function returned by applying once */
+    y:
+    /** A function body performing summation of two items */
+    x + y;
 
-  # /** Documented formals */
-  # documentedFormals = 
-  #   /** x */
-  #   x: x;
+  /** Documented formals (but you won't see this comment) */
+  documentedFormals =
+    /** Finds x */
+    { /** The x attribute */
+      x
+    }: x;
 }

@@ -7,24 +7,24 @@ error: value does not have documentation
 Attribute version
 
     … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:29:3
+    /path/to/tests/functional/repl/doc-comments.nix:30:3
 
     Immovably fixed.
 
 Attribute empty
 
     … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:32:3
+    /path/to/tests/functional/repl/doc-comments.nix:33:3
 
     Unchangeably constant.
 
 error:
        … while evaluating the attribute 'attr.undocument'
-         at /path/to/tests/functional/repl/doc-comments.nix:32:3:
-           31|   /** Unchangeably constant. */
-           32|   lib.attr.empty = { };
+         at /path/to/tests/functional/repl/doc-comments.nix:33:3:
+           32|   /** Unchangeably constant. */
+           33|   lib.attr.empty = { };
              |   ^
-           33|
+           34|
 
        error: attribute 'undocument' missing
        at «string»:1:1:
@@ -35,28 +35,28 @@ error:
 Attribute constant
 
     … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:26:3
+    /path/to/tests/functional/repl/doc-comments.nix:27:3
 
     Firmly rigid.
 
 Attribute version
 
     … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:29:3
+    /path/to/tests/functional/repl/doc-comments.nix:30:3
 
     Immovably fixed.
 
 Attribute empty
 
     … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:32:3
+    /path/to/tests/functional/repl/doc-comments.nix:33:3
 
     Unchangeably constant.
 
 Attribute undocumented
 
     … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:34:3
+    /path/to/tests/functional/repl/doc-comments.nix:35:3
 
     No documentation found.
 
@@ -87,11 +87,11 @@ error: attribute 'missing' missing
 
 error:
        … while evaluating the attribute 'attr.undocumental'
-         at /path/to/tests/functional/repl/doc-comments.nix:32:3:
-           31|   /** Unchangeably constant. */
-           32|   lib.attr.empty = { };
+         at /path/to/tests/functional/repl/doc-comments.nix:33:3:
+           32|   /** Unchangeably constant. */
+           33|   lib.attr.empty = { };
              |   ^
-           33|
+           34|
 
        error: attribute 'undocumental' missing
        at «string»:1:1:

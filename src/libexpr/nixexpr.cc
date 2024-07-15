@@ -584,6 +584,8 @@ std::string ExprLambda::showNamePos(const EvalState & state) const
 }
 
 void ExprLambda::setDocComment(DocComment docComment) {
+    // RFC 145 specifies that the innermost doc comment wins.
+    // See https://github.com/NixOS/rfcs/blob/master/rfcs/0145-doc-strings.md#ambiguous-placement
     if (!this->docComment) {
         this->docComment = docComment;
 
