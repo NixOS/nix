@@ -6,7 +6,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <format>
 
 #ifdef _WIN32
 # include <winsock2.h>
@@ -44,7 +43,15 @@ std::string UDSRemoteStore::getPathOrDefault() const
 
 std::string UDSRemoteStore::getUri()
 {
-    return std::format("{}://{}", scheme, getPathOrDefault());
+    if (path) {
+        return std::string(scheme) + "://" + *path;
+    } else {
+        // FIXME: Not clear why we return daemon here and not default to
+        // settings.nixDaemonSocketFile
+        //
+        // unix:// with no path also works. Change what we return?
+        return "daemon";
+    }
 }
 
 
