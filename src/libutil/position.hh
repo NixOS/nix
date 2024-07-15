@@ -64,7 +64,7 @@ struct Pos
     bool operator==(const Pos & rhs) const = default;
     auto operator<=>(const Pos & rhs) const = default;
 
-    std::string getSnippetUpTo(const Pos & end) const;
+    std::optional<std::string> getSnippetUpTo(const Pos & end) const;
 
     /**
      * Get the SourcePath, if the source was loaded from a file.

@@ -25,7 +25,7 @@ TEST(Position, getSnippetUpTo_1)
         ASSERT_EQ(start.getSnippetUpTo(start), "");
         ASSERT_EQ(start.getSnippetUpTo(end), "x");
         ASSERT_EQ(end.getSnippetUpTo(end), "");
-        ASSERT_EQ(end.getSnippetUpTo(start), "");
+        ASSERT_EQ(end.getSnippetUpTo(start), std::nullopt);
     }
     {
         // NOTE: line and column are actually 1-based indexes
@@ -37,7 +37,7 @@ TEST(Position, getSnippetUpTo_1)
         ASSERT_EQ(start.getSnippetUpTo(end), "");
 
         ASSERT_EQ(end.getSnippetUpTo(end), "");
-        ASSERT_EQ(end.getSnippetUpTo(start), "");
+        ASSERT_EQ(end.getSnippetUpTo(start), std::nullopt);
     }
     {
         Pos start(1, 1, o);
@@ -53,7 +53,7 @@ TEST(Position, getSnippetUpTo_1)
         ASSERT_EQ(start.getSnippetUpTo(start), "");
         ASSERT_EQ(start.getSnippetUpTo(end), "x");
         ASSERT_EQ(end.getSnippetUpTo(end), "");
-        ASSERT_EQ(end.getSnippetUpTo(start), "");
+        ASSERT_EQ(end.getSnippetUpTo(start), std::nullopt);
     }
 }
 TEST(Position, getSnippetUpTo_2)
@@ -65,6 +65,8 @@ TEST(Position, getSnippetUpTo_2)
         ASSERT_EQ(start.getSnippetUpTo(start), "");
         ASSERT_EQ(start.getSnippetUpTo(end), "a");
         ASSERT_EQ(end.getSnippetUpTo(end), "");
+
+        // nullopt? I feel like changing the column handling would just make it more fragile
         ASSERT_EQ(end.getSnippetUpTo(start), "");
     }
     {

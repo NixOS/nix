@@ -110,11 +110,11 @@ void Pos::LinesIterator::bump(bool atFirst)
     input.remove_prefix(eol);
 }
 
-std::string Pos::getSnippetUpTo(const Pos & end) const {
+std::optional<std::string> Pos::getSnippetUpTo(const Pos & end) const {
     assert(this->origin == end.origin);
 
     if (end.line < this->line)
-        return "";
+        return std::nullopt;
 
     if (auto source = getSource()) {
 
@@ -152,7 +152,7 @@ std::string Pos::getSnippetUpTo(const Pos & end) const {
         }
         return result;
     }
-    return "";
+    return std::nullopt;
 }
 
 

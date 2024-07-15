@@ -646,7 +646,7 @@ size_t SymbolTable::totalSize() const
 std::string DocComment::getInnerText(const PosTable & positions) const {
     auto beginPos = positions[begin];
     auto endPos = positions[end];
-    auto docCommentStr = beginPos.getSnippetUpTo(endPos);
+    auto docCommentStr = beginPos.getSnippetUpTo(endPos).value_or("");
 
     // Strip "/**" and "*/"
     constexpr size_t prefixLen = 3;
