@@ -236,7 +236,8 @@ expect() {
     expected="$1"
     shift
     "$@" && res=0 || res="$?"
-    if [[ $res -ne $expected ]]; then
+    # also match "negative" codes, which wrap around to >127
+    if [[ $res -ne $expected && $res -ne $[256 + expected] ]]; then
         echo "Expected exit code '$expected' but got '$res' from command ${*@Q}" >&2
         return 1
     fi
@@ -250,7 +251,8 @@ expectStderr() {
     expected="$1"
     shift
     "$@" 2>&1 && res=0 || res="$?"
-    if [[ $res -ne $expected ]]; then
+    # also match "negative" codes, which wrap around to >127
+    if [[ $res -ne $expected && $res -ne $[256 + expected] ]]; then
         echo "Expected exit code '$expected' but got '$res' from command ${*@Q}" >&2
         return 1
     fi

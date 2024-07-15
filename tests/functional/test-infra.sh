@@ -13,6 +13,25 @@ expect 1 false
 # `expect` will fail when we get it wrong
 expect 1 expect 0 false
 
+function ret() {
+  return $1
+}
+
+# `expect` can call functions, not just executables
+expect 0 ret 0
+expect 1 ret 1
+
+# `expect` supports negative exit codes
+expect -1 ret -1
+
+# or high positive ones, equivalent to negative ones
+expect 255 ret 255
+expect 255 ret -1
+expect -1 ret 255
+
+# but it doesn't confuse negative exit codes with positive ones
+expect 1 expect -10 ret 10
+
 noisyTrue () {
     echo YAY! >&2
     true
