@@ -48,6 +48,17 @@ class UDSRemoteStore : public virtual UDSRemoteStoreConfig
 {
 public:
 
+    /*
+    \deprecated This is the old API to construct the store.
+    A bit gross that we now pass empty string but this is knowing
+    that empty string will later default to the same nixDaemonSocketFile.
+    Why don't we just wire it all through?
+    I believe there are cases where it will live reload so we want to
+    continue to account for that.
+    */
+    UDSRemoteStore(const Params & params)
+        : nix::UDSRemoteStore(scheme, "", params) {}
+
     UDSRemoteStore(
         std::string_view scheme,
         // authority is the socket path
