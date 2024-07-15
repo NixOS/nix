@@ -351,9 +351,12 @@ checkGrepArgs() {
 #
 # `!` normally doesn't work well with `set -e`, but when we wrap in a
 # function it *does*.
+#
+# `command grep` lets us avoid re-checking the args by going directly to the
+# executable.
 grepInverse() {
     checkGrepArgs "$@" && \
-      ! grep "$@"
+      ! command grep "$@"
 }
 
 # A shorthand, `> /dev/null` is a bit noisy.
@@ -367,15 +370,26 @@ grepInverse() {
 # the closing of the pipe, the buffering of the pipe, and the speed of
 # the producer into the pipe. But rest assured we've seen it happen in
 # CI reliably.
+#
+# `command grep` lets us avoid re-checking the args by going directly to the
+# executable.
 grepQuiet() {
     checkGrepArgs "$@" && \
-      grep "$@" > /dev/null
+      command grep "$@" > /dev/null
 }
 
 # The previous two, combined
 grepQuietInverse() {
     checkGrepArgs "$@" && \
-      ! grep "$@" > /dev/null
+      ! command grep "$@" > /dev/null
+}
+
+# Wrap grep to remove its newline footgun; see checkGrepArgs.
+# Note that we keep the checkGrepArgs calls in the other helpers, because some
+# of them are negated and that would defeat this check.
+grep() {
+    checkGrepArgs "$@" && \
+      command grep "$@"
 }
 
 # Return the number of arguments
