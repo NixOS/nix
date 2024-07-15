@@ -32,10 +32,13 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
 
     std::string doc() override;
 
-    // The path to the unix-domain sock
-    // The default *could be* settings.nixDaemonSocketFile but that
-    // won't pick up live changes unfortunately. This optional handling is instead
-    // handled on opening of the connection
+    /**
+     * The path to the unix domain socket.
+     *
+     * The default *could be* settings.nixDaemonSocketFile but that
+     * won't pick up live changes unfortunately. This optional handling is instead
+     * handled on opening of the connection.
+     */
     std::optional<std::string> path;
 };
 
