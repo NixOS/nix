@@ -3,6 +3,10 @@ name: "CI"
 on:
   pull_request:
   push:
+    branches:
+      - detsys-main
+      - main
+      - master
 
 permissions:
   id-token: "write"
@@ -10,23 +14,41 @@ permissions:
 
 jobs:
 
-  tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          flakehub: true
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix flake check -L
+  build_x86_64-linux:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: UbuntuLatest32Cores128G
+
+  build_aarch64-linux:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: UbuntuLatest32Cores128GArm
+
+  build_aarch64-darwin:
+    uses: ./.github/workflows/build.yml
+    with:
+      os: macos-latest
+
+  test_x86_64-linux:
+    uses: ./.github/workflows/test.yml
+    needs: build_x86_64-linux
+    with:
+      os: UbuntuLatest32Cores128G
+
+  test_aarch64-linux:
+    uses: ./.github/workflows/test.yml
+    needs: build_aarch64-linux
+    with:
+      os: UbuntuLatest32Cores128GArm
+
+  test_aarch64-darwin:
+    uses: ./.github/workflows/test.yml
+    needs: build_aarch64-darwin
+    with:
+      os: macos-latest
 
   vm_tests:
-    needs: tests
+    needs: build_x86_64-linux
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +59,7 @@ jobs:
       - run: nix build -L .#hydraJobs.tests.githubFlakes .#hydraJobs.tests.tarballFlakes
 
   flake_regressions:
-    needs: tests
+    needs: build_x86_64-linux
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout nix
