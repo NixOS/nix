@@ -1289,7 +1289,12 @@ ref<Store> openStore(StoreReference && storeURI)
             if (access(stateDir.c_str(), R_OK | W_OK) == 0)
                 return std::make_shared<LocalStore>(params);
             else if (pathExists(settings.nixDaemonSocketFile))
-                return std::make_shared<UDSRemoteStore>(params);
+                // TODO(fzakaria): A bit gross that we now pass empty string
+                // but this is knowing that empty string will later default to the same
+                // nixDaemonSocketFile. Why don't we just wire it all through?
+                // I believe there are cases where it will live reload so we want to
+                // continue to account for that.
+                return std::make_shared<UDSRemoteStore>("unix", "", params);
             #if __linux__
             else if (!pathExists(stateDir)
                 && params.empty()
