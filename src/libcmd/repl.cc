@@ -668,12 +668,12 @@ ProcessLineResult NixRepl::processLine(std::string line)
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else if (fallbackPos) {
             std::stringstream ss;
-            ss << "Attribute `" << fallbackName << "`\n\n";
-            ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
+            ss << HintFmt("Attribute '%1%'", fallbackName) << "\n\n";
+            ss << HintFmt("  … defined at %1%", state->positions[fallbackPos]) << "\n\n";
             if (fallbackDoc) {
                 ss << fallbackDoc.getInnerText(state->positions);
             } else {
-                ss << "No documentation found.\n\n";
+                ss << HintFmt("No documentation found.") << "\n\n";
             }
 
             auto markdown = ss.str();
