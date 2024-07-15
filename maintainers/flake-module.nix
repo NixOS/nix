@@ -495,7 +495,6 @@
           excludes = [
             # We haven't linted these files yet
             ''^config/install-sh$''
-            ''^misc/systemv/nix-daemon$''
             ''^misc/bash/completion\.sh$''
             ''^misc/fish/completion\.fish$''
             ''^misc/zsh/completion\.zsh$''
