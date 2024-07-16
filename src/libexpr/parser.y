@@ -158,6 +158,9 @@ static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, P
 %nonassoc '?'
 %nonassoc NEGATE
 
+%precedence '.'
+%precedence OR_KW
+
 %%
 
 start: expr { state->result = $1; };
@@ -248,10 +251,6 @@ expr_select
     { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
     { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; }
-  | /* Backwards compatibility: because Nixpkgs has a rarely used
-       function named ‘or’, allow stuff like ‘map or [...]’. */
-    expr_simple OR_KW
-    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}); }
   | expr_simple
   ;
 
@@ -263,6 +262,9 @@ expr_simple
       else
           $$ = new ExprVar(CUR_POS, state->symbols.create($1));
   }
+  | /* Backwards compatibility: because Nixpkgs has a rarely used
+       function named ‘or’, allow stuff like ‘map or [...]’. */
+    OR_KW { $$ = new ExprVar(CUR_POS, state->s.or_); }
   | INT_LIT { $$ = new ExprInt($1); }
   | FLOAT_LIT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
