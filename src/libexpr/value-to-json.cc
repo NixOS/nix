@@ -58,7 +58,7 @@ json printValueAsJSON(EvalState & state, bool strict,
                 out = json::object();
                 for (auto & a : v.attrs()->lexicographicOrder(state.symbols)) {
                     try {
-                        out[state.symbols[a->name]] = printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore);
+                        out.emplace(state.symbols[a->name], printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
                     } catch (Error & e) {
                         e.addTrace(state.positions[a->pos],
                             HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));

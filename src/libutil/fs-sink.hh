@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "types.hh"
 #include "serialise.hh"
 #include "source-accessor.hh"
 #include "file-system.hh"
@@ -39,6 +38,19 @@ struct FileSystemObjectSink
         std::function<void(CreateRegularFileSink &)>) = 0;
 
     virtual void createSymlink(const CanonPath & path, const std::string & target) = 0;
+};
+
+/**
+ * An extension of `FileSystemObjectSink` that supports file types
+ * that are not supported by Nix's FSO model.
+ */
+struct ExtendedFileSystemObjectSink : virtual FileSystemObjectSink
+{
+    /**
+     * Create a hard link. The target must be the path of a previously
+     * encountered file relative to the root of the FSO.
+     */
+    virtual void createHardlink(const CanonPath & path, const CanonPath & target) = 0;
 };
 
 /**

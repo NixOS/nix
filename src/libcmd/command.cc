@@ -1,3 +1,5 @@
+#include <nlohmann/json.hpp>
+
 #include "command.hh"
 #include "markdown.hh"
 #include "store-api.hh"
@@ -6,8 +8,7 @@
 #include "nixexpr.hh"
 #include "profiles.hh"
 #include "repl.hh"
-
-#include <nlohmann/json.hpp>
+#include "strings.hh"
 
 extern char * * environ __attribute__((weak));
 
@@ -132,7 +133,7 @@ ref<EvalState> EvalCommand::getEvalState()
             #else
             std::make_shared<EvalState>(
             #endif
-                lookupPath, getEvalStore(), evalSettings, getStore())
+                lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore())
             ;
 
         evalState->repair = repair;

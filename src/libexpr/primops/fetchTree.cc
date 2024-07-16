@@ -85,7 +85,7 @@ static void fetchTree(
     Value & v,
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
-    fetchers::Input input;
+    fetchers::Input input { state.fetchSettings };
     NixStringContext context;
     std::optional<std::string> type;
     if (params.isFetchGit) type = "git";
@@ -148,7 +148,7 @@ static void fetchTree(
                     "attribute 'name' isn’t supported in call to 'fetchTree'"
                 ).atPos(pos).debugThrow();
 
-        input = fetchers::Input::fromAttrs(std::move(attrs));
+        input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
     } else {
         auto url = state.coerceToString(pos, *args[0], context,
                 "while evaluating the first argument passed to the fetcher",
@@ -161,13 +161,13 @@ static void fetchTree(
             if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
                 attrs.emplace("exportIgnore", Explicit<bool>{true});
             }
-            input = fetchers::Input::fromAttrs(std::move(attrs));
+            input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
                 state.error<EvalError>(
                     "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
                 ).atPos(pos).debugThrow();
-            input = fetchers::Input::fromURL(url);
+            input = fetchers::Input::fromURL(state.fetchSettings, url);
         }
     }
 

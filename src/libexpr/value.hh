@@ -2,7 +2,6 @@
 ///@file
 
 #include <cassert>
-#include <climits>
 #include <span>
 
 #include "symbol-table.hh"
@@ -112,7 +111,7 @@ class ExternalValueBase
      * Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
      */
-    virtual bool operator ==(const ExternalValueBase & b) const;
+    virtual bool operator ==(const ExternalValueBase & b) const noexcept;
 
     /**
      * Print the value as JSON. Defaults to unconvertable, i.e. throws an error

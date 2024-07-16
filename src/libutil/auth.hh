@@ -4,6 +4,7 @@
 
 #include "types.hh"
 #include "config.hh"
+#include "ref.hh"
 
 namespace nix::auth {
 

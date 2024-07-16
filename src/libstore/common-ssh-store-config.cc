@@ -1,6 +1,6 @@
 #include <regex>
 
-#include "ssh-store-config.hh"
+#include "common-ssh-store-config.hh"
 #include "ssh.hh"
 
 namespace nix {

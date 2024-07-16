@@ -2,6 +2,7 @@
 
 #include "file-descriptor.hh"
 #include "worker-protocol.hh"
+#include "ref.hh"
 
 #include <thread>
 

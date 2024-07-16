@@ -76,7 +76,7 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
             if (!a) {
                 std::set<std::string> attrNames;
                 for (auto & attr : *v->attrs())
-                    attrNames.insert(state.symbols[attr.name]);
+                    attrNames.insert(std::string(state.symbols[attr.name]));
 
                 auto suggestions = Suggestions::bestMatches(attrNames, attr);
                 throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);

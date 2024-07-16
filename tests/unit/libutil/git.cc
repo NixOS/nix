@@ -229,7 +229,7 @@ TEST_F(GitTest, both_roundrip) {
 
     mkSinkHook(CanonPath::root, root.hash, BlobMode::Regular);
 
-    ASSERT_EQ(*files, *files2);
+    ASSERT_EQ(files->root, files2->root);
 }
 
 TEST(GitLsRemote, parseSymrefLineWithReference) {

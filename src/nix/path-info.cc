@@ -9,6 +9,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 using namespace nix;
 using nlohmann::json;
 

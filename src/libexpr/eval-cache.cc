@@ -225,7 +225,7 @@ struct AttrDb
                 (key.first)
                 (symbols[key.second])
                 (AttrType::ListOfStrings)
-                (concatStringsSep("\t", l)).exec();
+                (dropEmptyInitThenConcatStringsSep("\t", l)).exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -435,12 +435,12 @@ std::vector<Symbol> AttrCursor::getAttrPath(Symbol name) const
 
 std::string AttrCursor::getAttrPathStr() const
 {
-    return concatStringsSep(".", root->state.symbols.resolve(getAttrPath()));
+    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath()));
 }
 
 std::string AttrCursor::getAttrPathStr(Symbol name) const
 {
-    return concatStringsSep(".", root->state.symbols.resolve(getAttrPath(name)));
+    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath(name)));
 }
 
 Value & AttrCursor::forceValue()
@@ -484,7 +484,7 @@ Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
     auto attrNames = getAttrs();
     std::set<std::string> strAttrNames;
     for (auto & name : attrNames)
-        strAttrNames.insert(root->state.symbols[name]);
+        strAttrNames.insert(std::string(root->state.symbols[name]));
 
     return Suggestions::bestMatches(strAttrNames, root->state.symbols[name]);
 }
