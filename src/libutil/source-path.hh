@@ -9,6 +9,8 @@
 #include "canon-path.hh"
 #include "source-accessor.hh"
 
+#include <boost/functional/hash.hpp> // for boost::hash_combine
+
 namespace nix {
 
 /**
@@ -114,8 +116,21 @@ struct SourcePath
     {
         return {accessor, accessor->resolveSymlinks(path, mode)};
     }
+
+    friend class std::hash<nix::SourcePath>;
 };
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path);
 
 }
+
+template<>
+struct std::hash<nix::SourcePath>
+{
+    std::size_t operator()(const nix::SourcePath & s) const noexcept
+    {
+        std::size_t hash = 0;
+        hash_combine(hash, s.accessor->number, s.path);
+        return hash;
+    }
+};
