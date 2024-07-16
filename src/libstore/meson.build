@@ -150,6 +150,7 @@ add_project_arguments(
 subdir('build-utils-meson/diagnostics')
 
 sources = files(
+  'auth-tunnel.cc',
   'binary-cache-store.cc',
   'build-result.cc',
   'build/derivation-goal.cc',
@@ -222,6 +223,7 @@ include_dirs = [
 ]
 
 headers = [config_h] + files(
+  'auth-tunnel.hh',
   'binary-cache-store.hh',
   'build-result.hh',
   'build/derivation-goal.hh',
