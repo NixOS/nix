@@ -56,7 +56,7 @@ EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lo
         builtinsAbortOnWarn = true;
 }
 
-Strings EvalSettings::getDefaultNixPath() const
+Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
     auto add = [&](const Path & p, const std::string & s = std::string()) {
@@ -69,11 +69,9 @@ Strings EvalSettings::getDefaultNixPath() const
         }
     };
 
-    if (!restrictEval && !pureEval) {
-        add(getNixDefExpr() + "/channels");
-        add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
-        add(rootChannelsDir());
-    }
+    add(getNixDefExpr() + "/channels");
+    add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
+    add(rootChannelsDir());
 
     return res;
 }
