@@ -1,8 +1,7 @@
 #include "uds-remote-store.hh"
 #include "unix-domain-socket.hh"
 #include "worker-protocol.hh"
-#include "args.hh"
-#include "config-impl.hh"
+#include "globals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
