@@ -25,7 +25,8 @@ static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
     state.allowPath(storePath);
 
     // Construct a dummy flakeref.
-    auto flakeRef = parseFlakeRef(fetchSettings,
+    auto flakeRef = parseFlakeRef(
+        fetchSettings,
         fmt("tarball+https://builtin-flake-schemas?narHash=%s",
             state.store->queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)));
 
@@ -43,8 +44,9 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
 #include "call-flake-schemas.nix.gen.hh"
         ;
 
-    auto lockedDefaultSchemasFlake =
-        defaultSchemasFlake ? flake::lockFlake(flakeSettings, state, *defaultSchemasFlake, {}) : getBuiltinDefaultSchemasFlake(state);
+    auto lockedDefaultSchemasFlake = defaultSchemasFlake
+                                         ? flake::lockFlake(flakeSettings, state, *defaultSchemasFlake, {})
+                                         : getBuiltinDefaultSchemasFlake(state);
     auto lockedDefaultSchemasFlakeFingerprint = lockedDefaultSchemasFlake.getFingerprint(state.store);
 
     std::optional<Fingerprint> fingerprint2;
