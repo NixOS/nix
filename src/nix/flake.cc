@@ -1240,28 +1240,50 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     }
                 };
 
+                // determine a friendly category name for the attribute in the flake
+                auto getCategory = [&attrPath, &attrPathS]() {
+                    if ((attrPath.size() == 2 && attrPathS[0] == "devShell") ||
+                        (attrPath.size() >= 2 && attrPathS[0] == "devShells")) {
+                        return "development environment";
+                    }
+                    if ((attrPath.size() == 3 && attrPathS[0] == "checks") ||
+                        (attrPath.size() >= 1 && attrPathS[0] == "hydraJobs")) {
+                        return "derivation";
+                    }
+                    return "package";
+                };
+
                 auto showDerivation = [&]()
                 {
                     auto name = visitor.getAttr(state->sName)->getString();
-                    if (json) {
-                        std::optional<std::string> description;
+                    // get the description if available in the meta tag
+                    std::optional<std::string> description;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
                             if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                                 description = aDescription->getString();
                         }
+                    if (json) {
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
                         if (description)
                             j.emplace("description", *description);
                     } else {
-                        logger->cout("%s: %s '%s'",
-                            headerPrefix,
-                            attrPath.size() == 2 && attrPathS[0] == "devShell" ? "development environment" :
-                            attrPath.size() >= 2 && attrPathS[0] == "devShells" ? "development environment" :
-                            attrPath.size() == 3 && attrPathS[0] == "checks" ? "derivation" :
-                            attrPath.size() >= 1 && attrPathS[0] == "hydraJobs" ? "derivation" :
-                            "package",
-                            name);
+                        // FIXME: If we can write to cout a bit easier
+                        // we can just write without having a newline at the end
+                        // and then optional append the description followed by
+                        // always a newline.
+                        if (description) {
+                            logger->cout("%s: %s '%s' - %s",
+                                headerPrefix,
+                                getCategory(),
+                                name,
+                                *description);
+                        } else {
+                            logger->cout("%s: %s '%s'",
+                                headerPrefix,
+                                getCategory(),
+                                name);
+                        }
                     }
                 };
 
