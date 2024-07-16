@@ -88,7 +88,9 @@ All options not listed here are passed to `nix-store
   cleared before the interactive shell is started, so you get an
   environment that more closely corresponds to the “real” Nix build. A
   few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-  retained.
+  retained.  Note that the shell used to run commands is obtained from
+  `NIX_BUILD_SHELL` / `<nixpkgs>` from `NIX_PATH`, and therefore not
+  affected by `--pure`.
 
 - `--packages` / `-p` *packages*…
 
