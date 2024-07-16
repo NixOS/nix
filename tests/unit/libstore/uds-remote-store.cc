@@ -8,7 +8,7 @@ TEST(UDSRemoteStore, constructConfig)
 {
     UDSRemoteStoreConfig config{"unix", "/tmp/socket", {}};
 
-    EXPECT_EQ(*config.path, "/tmp/socket");
+    EXPECT_EQ(config.path, "/tmp/socket");
 }
 
 TEST(UDSRemoteStore, constructConfigWrongScheme)

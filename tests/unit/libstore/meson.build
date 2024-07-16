@@ -58,7 +58,11 @@ sources = files(
   'derivation.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
+  'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',
+  'local-binary-cache-store.cc',
+  'local-overlay-store.cc',
+  'local-store.cc',
   'machines.cc',
   'nar-info-disk-cache.cc',
   'nar-info.cc',
@@ -67,11 +71,12 @@ sources = files(
   'path-info.cc',
   'path.cc',
   'references.cc',
+  's3-binary-cache-store.cc',
   'serve-protocol.cc',
   'ssh-store.cc',
   'store-reference.cc',
-  'worker-protocol.cc',
   'uds-remote-store.cc',
+  'worker-protocol.cc',
 )
 
 include_dirs = [include_directories('.')]

@@ -1,7 +1,6 @@
 #include "uds-remote-store.hh"
 #include "unix-domain-socket.hh"
 #include "worker-protocol.hh"
-#include "globals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,13 +24,10 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
     , RemoteStoreConfig(params)
+    , path{authority.empty() ? settings.nixDaemonSocketFile : authority}
 {
     if (scheme != UDSRemoteStoreConfig::scheme) {
         throw UsageError("Scheme must be 'unix'");
-    }
-
-    if (!authority.empty()) {
-        path.emplace(authority);
     }
 }
 
@@ -65,22 +61,15 @@ UDSRemoteStore::UDSRemoteStore(std::string_view scheme, std::string_view authori
 }
 
 
-std::string UDSRemoteStore::getPathOrDefault() const
-{
-    return path.value_or(settings.nixDaemonSocketFile);
-}
-
 std::string UDSRemoteStore::getUri()
 {
-    if (path) {
-        return std::string(scheme) + "://" + *path;
-    } else {
-        // FIXME: Not clear why we return daemon here and not default to
-        // settings.nixDaemonSocketFile
-        //
-        // unix:// with no path also works. Change what we return?
-        return "daemon";
-    }
+    return path == settings.nixDaemonSocketFile
+        ? // FIXME: Not clear why we return daemon here and not default
+          // to settings.nixDaemonSocketFile
+          //
+          // unix:// with no path also works. Change what we return?
+          "daemon"
+        : std::string(scheme) + "://" + path;
 }
 
 
@@ -97,7 +86,7 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     /* Connect to a daemon that does the privileged work for us. */
     conn->fd = createUnixDomainSocket();
 
-    nix::connect(toSocket(conn->fd.get()), getPathOrDefault());
+    nix::connect(toSocket(conn->fd.get()), path);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();

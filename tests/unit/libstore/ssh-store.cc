@@ -15,7 +15,9 @@ TEST(SSHStore, constructConfig)
                 // TODO #11106, no more split on space
                 "foo bar",
             },
-        }};
+        },
+    };
+
     EXPECT_EQ(
         config.remoteProgram.get(),
         (Strings{
@@ -23,4 +25,27 @@ TEST(SSHStore, constructConfig)
             "bar",
         }));
 }
+
+TEST(MountedSSHStore, constructConfig)
+{
+    MountedSSHStoreConfig config{
+        "mounted-ssh",
+        "localhost",
+        StoreConfig::Params{
+            {
+                "remote-program",
+                // TODO #11106, no more split on space
+                "foo bar",
+            },
+        },
+    };
+
+    EXPECT_EQ(
+        config.remoteProgram.get(),
+        (Strings{
+            "foo",
+            "bar",
+        }));
+}
+
 }

@@ -29,11 +29,10 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     /**
      * The path to the unix domain socket.
      *
-     * The default *could be* settings.nixDaemonSocketFile but that
-     * won't pick up live changes unfortunately. This optional handling is instead
-     * handled on opening of the connection.
+     * The default is `settings.nixDaemonSocketFile`, but we don't write
+     * that below, instead putting in the constructor.
      */
-    std::optional<std::string> path;
+    Path path;
 
 protected:
     static constexpr char const * scheme = "unix";
@@ -88,8 +87,6 @@ private:
     };
 
     ref<RemoteStore::Connection> openConnection() override;
-
-    std::string getPathOrDefault() const;
 };
 
 }
