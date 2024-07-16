@@ -6,11 +6,7 @@ namespace nix {
 
 TEST(UDSRemoteStore, constructConfig)
 {
-    UDSRemoteStoreConfig config {
-        "unix",
-        "/tmp/socket",
-        {}
-    };
+    UDSRemoteStoreConfig config{"unix", "/tmp/socket", {}};
 
     EXPECT_EQ(*config.path, "/tmp/socket");
 }
