@@ -80,4 +80,9 @@ void bind(Socket fd, const std::string & path);
  */
 void connect(Socket fd, const std::string & path);
 
+/**
+ * Create an unnamed pair of connected sockets.
+ */
+std::pair<AutoCloseFD, AutoCloseFD> socketPair();
+
 }

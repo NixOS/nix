@@ -35,6 +35,8 @@ enum struct ExperimentalFeature
     ConfigurableImpureEnv,
     MountedSSHStore,
     VerifiedFetches,
+    AuthForwarding,
+    PluggableAuth,
 };
 
 /**

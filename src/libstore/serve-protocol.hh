@@ -136,7 +136,7 @@ struct ServeProto::BuildOptions {
 /**
  * Convenience for sending operation codes.
  *
- * @todo Switch to using `ServeProto::Serialize` instead probably. But
+ * @todo Switch to using `ServeProto::Serialise` instead probably. But
  * this was not done at this time so there would be less churn.
  */
 inline Sink & operator << (Sink & sink, ServeProto::Command op)

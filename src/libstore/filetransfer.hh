@@ -12,6 +12,8 @@
 
 namespace nix {
 
+namespace auth { class Authenticator; }
+
 struct FileTransferSettings : Config
 {
     Setting<bool> enableHttp2{this, true, "http2",
@@ -65,9 +67,24 @@ struct FileTransferRequest
     std::optional<std::string> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
+    ref<auth::Authenticator> authenticator;
 
-    FileTransferRequest(std::string_view uri)
-        : uri(uri), parentAct(getCurActivity()) { }
+    /**
+     * The path to be used for authentication (replacing the path part
+     * of `uri`). This is needed for efficient authentication
+     * caching. E.g. for a binary cache, the `authPart` will typically
+     * be `/`, ensuring that all paths underneath `/`
+     * (e.g. `/nix-cache-info` or `/foo.narinfo`) can hit the same
+     * authentication cache entry.
+     */
+    std::optional<std::string> authPath;
+
+    /**
+     * Whether the authenticator *must* return authentication data.
+     */
+    bool requireAuth = false;
+
+    FileTransferRequest(std::string_view uri);
 
     std::string verb()
     {

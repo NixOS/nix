@@ -7,6 +7,8 @@
 #include "finally.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "auth.hh"
+#include "url.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -37,6 +39,12 @@ namespace nix {
 FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
+
+FileTransferRequest::FileTransferRequest(std::string_view uri)
+    : uri(uri)
+    , parentAct(getCurActivity())
+    , authenticator(auth::getAuthenticator())
+{ }
 
 struct curlFileTransfer : public FileTransfer
 {
@@ -70,6 +78,8 @@ struct curlFileTransfer : public FileTransfer
         bool acceptRanges = false;
 
         curl_off_t writtenToSink = 0;
+
+        std::optional<auth::AuthData> authData;
 
         inline static const std::set<long> successfulStatuses {200, 201, 204, 206, 304, 0 /* other protocol */};
         /* Get the HTTP status code, or 0 for other protocols. */
@@ -359,10 +369,23 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransferSettings.stalledDownloadTimeout.get());
 
-            /* If no file exist in the specified path, curl continues to work
-               anyway as if netrc support was disabled. */
-            curl_easy_setopt(req, CURLOPT_NETRC_FILE, settings.netrcFile.get().c_str());
-            curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+            auto url = parseURL(request.uri);
+            auth::AuthData authRequest = {
+                .protocol = url.scheme,
+                .host = url.authority,
+                .path = request.authPath.value_or(url.path),
+                // FIXME: add username
+            };
+            authData = request.authenticator->fill(authRequest, request.requireAuth);
+
+            if (authData) {
+                if (authData->userName)
+                    curl_easy_setopt(req, CURLOPT_USERNAME, authData->userName->c_str());
+                if (authData->password)
+                    curl_easy_setopt(req, CURLOPT_PASSWORD, authData->password->c_str());
+            }
+            else
+                debug("no auth data for '%s'", request.uri);
 
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
@@ -418,7 +441,17 @@ struct curlFileTransfer : public FileTransfer
                 if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
-                } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
+                } else if (httpStatus == 401) {
+                    if (authData)
+                        /* This authentication data didn't work, so
+                           erase it. */
+                        request.authenticator->reject(*authData);
+                    if (authData || request.requireAuth)
+                        // FIXME: call erase() on the auth and retry.
+                        err = Forbidden;
+                    else
+                        request.requireAuth = true;
+                } else if (httpStatus == 403 || httpStatus == 407) {
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
                 } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408 && httpStatus != 429) {
@@ -490,7 +523,10 @@ struct curlFileTransfer : public FileTransfer
                         || writtenToSink == 0
                         || (acceptRanges && encoding.empty())))
                 {
-                    int ms = request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
+                    int ms =
+                        httpStatus == 401
+                        ? 0
+                        : request.baseRetryTimeMs * std::pow(2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
                     if (writtenToSink)
                         warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
                     else

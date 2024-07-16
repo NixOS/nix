@@ -15,6 +15,10 @@
 #include "derivations.hh"
 #include "args.hh"
 #include "git.hh"
+#include "auth.hh"
+#include "auth-tunnel.hh"
+
+#include <sys/socket.h>
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 # include "monitor-fd.hh"
@@ -271,7 +275,7 @@ struct ClientSettings
 
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, WorkerProto::Version clientVersion,
-    Source & from, BufferedSink & to, WorkerProto::Op op)
+    FdSource & from, BufferedSink & to, WorkerProto::Op op)
 {
     WorkerProto::ReadConn rconn {
         .from = from,
@@ -1013,6 +1017,43 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case WorkerProto::Op::QueryFailedPaths:
     case WorkerProto::Op::ClearFailedPaths:
         throw Error("Removed operation %1%", op);
+
+    case WorkerProto::Op::InitCallback: {
+        // Indicate that we're ready to receive the file descriptor.
+        to << 0;
+        to.flush();
+
+        struct msghdr msg = {0};
+
+        char msgData[256];
+        struct iovec io = { .iov_base = msgData, .iov_len = sizeof(msgData) };
+        msg.msg_iov = &io;
+        msg.msg_iovlen = 1;
+
+        char controlData[256];
+        msg.msg_control = controlData;
+        msg.msg_controllen = sizeof(controlData);
+
+        if (recvmsg(from.fd, &msg, 0) < 0)
+            throw SysError("receiving callback socket");
+
+        AutoCloseFD fd(*((int *) CMSG_DATA(CMSG_FIRSTHDR(&msg))));
+        debug("received file descriptor %d from client", fd.get());
+
+        logger->startWork();
+
+        if (experimentalFeatureSettings.isEnabled(Xp::AuthForwarding)
+            && ((auth::authSettings.authForwarding == auth::AuthForwarding::TrustedUsers && trusted)
+                || (auth::authSettings.authForwarding == auth::AuthForwarding::AllUsers)))
+            auth::getAuthenticator()->addAuthSource(
+                makeTunneledAuthSource(store, clientVersion, std::move(fd)));
+
+        logger->stopWork();
+        to << 1;
+        to.flush();
+
+        break;
+    }
 
     default:
         throw Error("invalid operation %1%", op);

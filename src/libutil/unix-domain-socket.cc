@@ -14,13 +14,15 @@
 
 namespace nix {
 
+#ifdef SOCK_CLOEXEC
+#define MAYBE_SOCK_CLOEXEC SOCK_CLOEXEC
+#else
+#define MAYBE_SOCK_CLOEXEC 0
+#endif
+
 AutoCloseFD createUnixDomainSocket()
 {
-    AutoCloseFD fdSocket = toDescriptor(socket(PF_UNIX, SOCK_STREAM
-        #ifdef SOCK_CLOEXEC
-        | SOCK_CLOEXEC
-        #endif
-        , 0));
+    AutoCloseFD fdSocket = toDescriptor(socket(PF_UNIX, SOCK_STREAM | MAYBE_SOCK_CLOEXEC, 0));
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
 #ifndef _WIN32
@@ -112,6 +114,16 @@ void bind(Socket fd, const std::string & path)
 void connect(Socket fd, const std::string & path)
 {
     bindConnectProcHelper("connect", ::connect, fd, path);
+}
+
+std::pair<AutoCloseFD, AutoCloseFD> socketPair()
+{
+    int sockets[2];
+    if (socketpair(PF_UNIX, SOCK_STREAM | MAYBE_SOCK_CLOEXEC, 0, sockets))
+        throw SysError("creating a socket pair");
+    unix::closeOnExec(sockets[0]);
+    unix::closeOnExec(sockets[1]);
+    return {AutoCloseFD(sockets[0]), AutoCloseFD(sockets[1])};
 }
 
 }

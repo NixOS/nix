@@ -38,6 +38,9 @@ public:
     SyncBase(const T & data) : data(data) { }
     SyncBase(T && data) noexcept : data(std::move(data)) { }
 
+    template<class... Args>
+    SyncBase(Args &&... args) : data(std::forward<decltype(args)>(args)...) { }
+
     template<class L>
     class Lock
     {

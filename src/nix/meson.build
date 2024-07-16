@@ -48,6 +48,7 @@ subdir('build-utils-meson/generate-header')
 nix_sources = files(
   'add-to-store.cc',
   'app.cc',
+  'auth.cc',
   'build.cc',
   'bundle.cc',
   'cat.cc',

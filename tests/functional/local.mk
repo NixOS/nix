@@ -134,7 +134,8 @@ nix_tests = \
   impure-env.sh \
   debugger.sh \
   extra-sandbox-profile.sh \
-  help.sh
+  help.sh \
+  auth.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
   nix_tests += compute-levels.sh

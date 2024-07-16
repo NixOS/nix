@@ -11,7 +11,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION (1 << 8 | 37)
+#define PROTOCOL_VERSION (1 << 8 | 38)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -37,6 +37,7 @@ struct ValidPathInfo;
 struct UnkeyedValidPathInfo;
 enum BuildMode : uint8_t;
 enum TrustedFlag : bool;
+namespace auth { struct AuthData; }
 
 
 /**
@@ -51,6 +52,11 @@ struct WorkerProto
      * Enumeration of all the request types for the protocol.
      */
     enum struct Op : uint64_t;
+
+    /**
+     * Enumeration of all the request types for the callback mechanism.
+     */
+    enum struct CallbackOp : uint64_t;
 
     /**
      * Version type for the protocol.
@@ -178,6 +184,7 @@ enum struct WorkerProto::Op : uint64_t
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    InitCallback = 48,
 };
 
 struct WorkerProto::ClientHandshakeInfo
@@ -228,6 +235,12 @@ inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
     return s << static_cast<uint64_t>(op);
 }
 
+enum struct WorkerProto::CallbackOp : uint64_t
+{
+    FillAuth = 1,
+    RejectAuth = 2,
+};
+
 /**
  * Declare a canonical serialiser pair for the worker protocol.
  *
@@ -263,6 +276,10 @@ template<>
 DECLARE_WORKER_SERIALISER(std::optional<std::chrono::microseconds>);
 template<>
 DECLARE_WORKER_SERIALISER(WorkerProto::ClientHandshakeInfo);
+template<>
+DECLARE_WORKER_SERIALISER(auth::AuthData);
+template<>
+DECLARE_WORKER_SERIALISER(std::optional<auth::AuthData>);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);

@@ -119,6 +119,7 @@ subdir('build-utils-meson/diagnostics')
 sources = files(
   'archive.cc',
   'args.cc',
+  'auth.cc',
   'canon-path.cc',
   'compression.cc',
   'compute-levels.cc',
@@ -168,6 +169,7 @@ headers = [config_h] + files(
   'archive.hh',
   'args.hh',
   'args/root.hh',
+  'auth.hh',
   'callback.hh',
   'canon-path.hh',
   'chunked-vector.hh',
