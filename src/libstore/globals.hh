@@ -16,11 +16,6 @@ namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
-template<> SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
-template<> struct BaseSetting<SandboxMode>::trait;
-template<> std::string BaseSetting<SandboxMode>::to_string() const;
-template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category);
-
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
     MaxBuildJobsSetting(Config * options,
