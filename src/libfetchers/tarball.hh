@@ -1,10 +1,11 @@
 #pragma once
 
-#include "types.hh"
-#include "path.hh"
-#include "hash.hh"
-
 #include <optional>
+
+#include "hash.hh"
+#include "path.hh"
+#include "ref.hh"
+#include "types.hh"
 
 namespace nix {
 class Store;

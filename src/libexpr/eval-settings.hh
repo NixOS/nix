@@ -2,6 +2,7 @@
 ///@file
 
 #include "config.hh"
+#include "ref.hh"
 
 namespace nix {
 

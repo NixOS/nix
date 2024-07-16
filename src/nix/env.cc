@@ -1,6 +1,9 @@
+#include <unordered_set>
+#include <queue>
+
 #include "command.hh"
 #include "run.hh"
-#include <queue>
+#include "strings.hh"
 
 using namespace nix;
 
@@ -90,6 +93,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             }
         }
 
+        // TODO: split losslessly; empty means .
         auto unixPath = tokenizeString<Strings>(getEnv("PATH").value_or(""), ":");
         unixPath.insert(unixPath.begin(), pathAdditions.begin(), pathAdditions.end());
         auto unixPathString = concatStringsSep(":", unixPath);

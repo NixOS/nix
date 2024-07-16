@@ -3,7 +3,6 @@
 
 #include <map>
 #include <stack>
-#include <algorithm>
 
 #include <nlohmann/json.hpp>
 
@@ -74,7 +73,10 @@ struct NarAccessor : public SourceAccessor
         NarMember & createMember(const CanonPath & path, NarMember member)
         {
             size_t level = 0;
-            for (auto _ : path) ++level;
+            for (auto _ : path) {
+                (void)_;
+                ++level;
+            }
 
             while (parents.size() > level) parents.pop();
 

@@ -115,7 +115,7 @@ public:
     /**
      * Compare to another value of the same type.
      */
-    virtual bool operator==(const ExternalValueBase & b) const override
+    virtual bool operator==(const ExternalValueBase & b) const noexcept override
     {
         if (!desc.equal) {
             return false;

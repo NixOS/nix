@@ -3,21 +3,21 @@
 
 #include "attr-set.hh"
 #include "eval-error.hh"
-#include "eval-gc.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
 #include "symbol-table.hh"
 #include "config.hh"
 #include "experimental-features.hh"
+#include "position.hh"
+#include "pos-table.hh"
 #include "source-accessor.hh"
 #include "search-path.hh"
 #include "repl-exit-status.hh"
+#include "ref.hh"
 
 #include <map>
 #include <optional>
-#include <unordered_map>
-#include <mutex>
 #include <functional>
 
 namespace nix {
@@ -30,6 +30,7 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+namespace fetchers { struct Settings; }
 struct EvalSettings;
 class EvalState;
 class StorePath;
@@ -43,7 +44,7 @@ namespace eval_cache {
 /**
  * Function that implements a primop.
  */
-typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
+using PrimOpFun = void(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 /**
  * Info about a primitive operation, and its implementation
@@ -84,7 +85,7 @@ struct PrimOp
     /**
      * Implementation of the primop.
      */
-    std::function<std::remove_pointer<PrimOpFun>::type> fun;
+    std::function<PrimOpFun> fun;
 
     /**
      * Optional experimental for this to be gated on.
@@ -129,6 +130,8 @@ struct Constant
     typedef std::map<std::string, Value *> ValMap;
 #endif
 
+typedef std::map<PosIdx, DocComment> DocCommentMap;
+
 struct Env
 {
     Env * up;
@@ -162,6 +165,7 @@ struct DebugTrace {
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    const fetchers::Settings & fetchSettings;
     const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
@@ -305,15 +309,15 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::map<SourcePath, StorePath>> srcToStore;
+    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
 
     /**
      * A cache from path names to parse trees.
      */
 #if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
+    typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
 #else
-    typedef std::map<SourcePath, Expr *> FileParseCache;
+    typedef std::unordered_map<SourcePath, Expr *> FileParseCache;
 #endif
     FileParseCache fileParseCache;
 
@@ -321,11 +325,17 @@ private:
      * A cache from path names to values.
      */
 #if HAVE_BOEHMGC
-    typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
+    typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
 #else
-    typedef std::map<SourcePath, Value> FileEvalCache;
+    typedef std::unordered_map<SourcePath, Value> FileEvalCache;
 #endif
     FileEvalCache fileEvalCache;
+
+    /**
+     * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
+     * Grouped by file.
+     */
+    std::map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
@@ -353,6 +363,7 @@ public:
     EvalState(
         const LookupPath & _lookupPath,
         ref<Store> store,
+        const fetchers::Settings & fetchSettings,
         const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
@@ -767,6 +778,8 @@ public:
         const SourcePath & path,
         std::string_view pathArg,
         PosIdx pos);
+
+    DocComment getDocCommentForPos(PosIdx pos);
 
 private:
 
