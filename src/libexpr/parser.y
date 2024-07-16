@@ -189,6 +189,9 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 %nonassoc '?'
 %nonassoc NEGATE
 
+%precedence '.'
+%precedence OR_KW
+
 %%
 
 start: expr {
@@ -285,28 +288,15 @@ expr_op
   ;
 
 expr_app
-  : expr_app expr_select { $$ = makeCall(state->exprs, CUR_POS, $1, $2); $2->warnIfCursedOr(state->symbols, state->positions); }
-  | /* Once a ‘cursed or’ reaches this nonterminal, it is no longer cursed,
-       because the uncursed parse would also produce an expr_app. But we need
-       to remove the cursed status in order to prevent valid things like
-       `f (g or)` from triggering the warning. */
-    expr_select { $$ = $1; $$->resetCursedOr(); }
+  : expr_app expr_select { $$ = makeCall(state->exprs, CUR_POS, $1, $2); }
+  | expr_select
   ;
 
 expr_select
   : expr_simple '.' attrpath
     { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, $3, nullptr); }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, $3, $5); $5->warnIfCursedOr(state->symbols, state->positions); }
-  | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
-       allow stuff like ‘map or [...]’. This production is problematic (see
-       https://github.com/NixOS/nix/issues/11118) and will be refactored in the
-       future by treating `or` as a regular identifier. The refactor will (in
-       very rare cases, we think) change the meaning of expressions, so we mark
-       the ExprCall with data (establishing that it is a ‘cursed or’) that can
-       be used to emit a warning when an affected expression is parsed. */
-    expr_simple OR_KW
-    { $$ = state->exprs.add<ExprCall>(CUR_POS, $1, {state->exprs.add<ExprVar>(CUR_POS, state->s.or_)}, state->positions.add(state->origin, @$.endOffset)); }
+    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, $3, $5); }
   | expr_simple
   ;
 
@@ -318,6 +308,9 @@ expr_simple
       else
           $$ = state->exprs.add<ExprVar>(CUR_POS, state->symbols.create($1));
   }
+  | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
+       allow stuff like ‘map or [...]’. */
+    OR_KW { $$ = state->exprs.add<ExprVar>(CUR_POS, state->s.or_); }
   | INT_LIT { $$ = state->exprs.add<ExprInt>($1); }
   | FLOAT_LIT { $$ = state->exprs.add<ExprFloat>($1); }
   | '"' string_parts '"' { $$ = $2.toExpr(state->exprs); }
@@ -507,7 +500,7 @@ string_attr
   ;
 
 list
-  : list expr_select { $$ = std::move($1); $$.push_back($2); /* !!! dangerous */; $2->warnIfCursedOr(state->symbols, state->positions); }
+  : list expr_select { $$ = std::move($1); $$.push_back($2); /* !!! dangerous */; }
   | { }
   ;
 

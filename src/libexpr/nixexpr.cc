@@ -656,33 +656,4 @@ std::string DocComment::getInnerText(const PosTable & positions) const
     return docStr;
 }
 
-/* ‘Cursed or’ handling.
- *
- * In parser.y, every use of expr_select in a production must call one of the
- * two below functions.
- *
- * To be removed by https://github.com/NixOS/nix/pull/11121
- */
-
-void ExprCall::resetCursedOr()
-{
-    cursedOrEndPos.reset();
-}
-
-void ExprCall::warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions)
-{
-    if (cursedOrEndPos.has_value()) {
-        std::ostringstream out;
-        out << "at " << positions[pos]
-            << ": "
-               "This expression uses `or` as an identifier in a way that will change in a future Nix release.\n"
-               "Wrap this entire expression in parentheses to preserve its current meaning:\n"
-               "    ("
-            << positions[pos].getSnippetUpTo(positions[*cursedOrEndPos]).value_or("could not read expression")
-            << ")\n"
-               "Give feedback at https://github.com/NixOS/nix/pull/11121";
-        warn(out.str());
-    }
-}
-
 } // namespace nix
