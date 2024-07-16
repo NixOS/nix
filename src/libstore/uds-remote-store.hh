@@ -10,7 +10,10 @@ namespace nix {
 struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
 {
 
-    static constexpr char const * scheme = "unix";
+    protected:
+        static constexpr char const * scheme = "unix";
+    
+    public:
 
     // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
     // outlined in https://github.com/NixOS/nix/issues/10766
@@ -22,7 +25,10 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
         , LocalFSStoreConfig(params)
         , RemoteStoreConfig(params)
     {
-        assert(scheme == UDSRemoteStoreConfig::scheme && "Scheme must be 'unix'");
+        if (scheme != UDSRemoteStoreConfig::scheme) {
+            throw UsageError("Scheme must be 'unix'");
+        }
+
         if (!authority.empty()) {
             path.emplace(authority);
         }

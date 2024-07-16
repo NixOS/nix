@@ -15,4 +15,9 @@ TEST(UDSRemoteStore, constructConfig)
     EXPECT_EQ(*config.path, "/tmp/socket");
 }
 
+TEST(UDSRemoteStore, constructConfigWrongScheme)
+{
+    EXPECT_THROW(UDSRemoteStoreConfig("http", "/tmp/socket", {}), UsageError);
 }
+
+} // namespace nix
