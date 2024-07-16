@@ -10,6 +10,7 @@
 #include "callback.hh"
 #include "closure.hh"
 #include "filetransfer.hh"
+#include "strings.hh"
 
 namespace nix {
 

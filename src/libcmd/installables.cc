@@ -27,6 +27,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "strings-inline.hh"
+
 namespace nix {
 
 void completeFlakeInputPath(
@@ -374,6 +376,7 @@ void completeFlakeRefWithFragment(
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
+                        // FIXME: handle names with dots
                         completions.add(flakeRefS + "#" + prefixRoot + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
                     }
                 }

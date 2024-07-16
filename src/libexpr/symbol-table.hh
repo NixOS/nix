@@ -41,6 +41,11 @@ public:
     }
 
     friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+
+    bool empty() const
+    {
+        return s->empty();
+    }
 };
 
 /**

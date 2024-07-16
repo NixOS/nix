@@ -17,6 +17,8 @@
 #include <regex>
 #include <iomanip>
 
+#include "strings.hh"
+
 using namespace nix;
 
 struct ProfileElementSource
@@ -58,7 +60,7 @@ struct ProfileElement
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
-        return concatStringsSep(", ", names);
+        return dropEmptyInitThenConcatStringsSep(", ", names);
     }
 
     /**

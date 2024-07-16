@@ -23,6 +23,8 @@
 # include <io.h>
 #endif
 
+#include "strings-inline.hh"
+
 namespace fs = std::filesystem;
 
 namespace nix {

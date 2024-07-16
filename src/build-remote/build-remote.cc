@@ -16,6 +16,7 @@
 #include "serialise.hh"
 #include "build-result.hh"
 #include "store-api.hh"
+#include "strings.hh"
 #include "derivations.hh"
 #include "local-store.hh"
 #include "legacy.hh"
