@@ -41,4 +41,23 @@ Link: <https://example.org/hello/442793d9ec0584f6a6e82fa253850c8085bb150a.tar.gz
 For tarball flakes, the value of the `lastModified` flake attribute is
 defined as the timestamp of the newest file inside the tarball.
 
+## Gitea and Forgejo support
+
+Since Gitea v1.22.1 and Forgejo v7.0.4/v8.0.0, this protocol is supported in both, which can be used like this:
+
+```nix
+{
+    inputs = {
+        gitea-repo-schema.url = "https://<instance hostname>/<owner>/<repo>/archive/<ref>.tar.gz";
+
+        main-branch.url = "https://gitea.example/johndoe/some-nix-flake/archive/main.tar.gz";
+        other-branch.url = "https://gitea2.example/someotherperson/other-flake/archive/other.tar.gz";
+        non-flake = {
+            url = "https://forgejo.example/random-person/random-non-flake-repo/archive/main.tar.gz";
+            flake = false;
+        };
+    };
+}
+```
+
 [Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
