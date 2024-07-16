@@ -43,7 +43,9 @@ struct AuthSettings : Config
         )"};
 
     Setting<Path> netrcFile{
-        this, "", "netrc-file",
+        this,
+        "",
+        "netrc-file",
         R"(
           An absolute path to a `netrc` file. Nix will use the HTTP
           authentication credentials in this file when trying to download from
@@ -68,14 +70,18 @@ struct AuthSettings : Config
         )"};
 
     Setting<bool> storeAuth{
-        this, false, "store-auth",
+        this,
+        false,
+        "store-auth",
         R"(
           Whether to store user names and passwords using the
           authentication sources configured in [`auth-sources`](#conf-auth-sources).
         )"};
 
     Setting<AuthForwarding> authForwarding{
-        this, AuthForwarding::TrustedUsers, "auth-forwarding",
+        this,
+        AuthForwarding::TrustedUsers,
+        "auth-forwarding",
         R"(
           Whether to forward authentication data to the Nix daemon. This setting can have the following values:
 
@@ -83,7 +89,9 @@ struct AuthSettings : Config
           * `trusted-users`: Forwarding is only supported for [trusted users](#conf-trusted-users).
           * `all-users`: Forwarding is supported for all users.
         )",
-        {}, true, Xp::AuthForwarding};
+        {},
+        true,
+        Xp::AuthForwarding};
 };
 
 extern AuthSettings authSettings;
@@ -103,20 +111,20 @@ struct AuthData
     std::string toGitAuthData() const;
 };
 
-std::ostream & operator << (std::ostream & str, const AuthData & authData);
+std::ostream & operator<<(std::ostream & str, const AuthData & authData);
 
 struct AuthSource
 {
-    virtual ~AuthSource()
-    { }
+    virtual ~AuthSource() {}
 
     virtual std::optional<AuthData> get(const AuthData & request, bool required) = 0;
 
     virtual bool set(const AuthData & authData)
-    { return false; }
+    {
+        return false;
+    }
 
-    virtual void erase(const AuthData & authData)
-    { }
+    virtual void erase(const AuthData & authData) {}
 };
 
 class Authenticator
@@ -129,7 +137,8 @@ public:
 
     Authenticator(std::vector<ref<AuthSource>> authSources = {})
         : authSources(std::move(authSources))
-    { }
+    {
+    }
 
     std::optional<AuthData> fill(const AuthData & request, bool required);
 

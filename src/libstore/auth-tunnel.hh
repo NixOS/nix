@@ -17,11 +17,11 @@ struct AuthTunnel
     ~AuthTunnel();
 };
 
-namespace auth { struct AuthSource; }
+namespace auth {
+struct AuthSource;
+}
 
-ref<auth::AuthSource> makeTunneledAuthSource(
-    ref<StoreDirConfig> storeConfig,
-    WorkerProto::Version clientVersion,
-    AutoCloseFD && clientFd);
+ref<auth::AuthSource>
+makeTunneledAuthSource(ref<StoreDirConfig> storeConfig, WorkerProto::Version clientVersion, AutoCloseFD && clientFd);
 
 }

@@ -22,14 +22,14 @@ struct CmdAuthFill : Command
         return "obtain a user name and password from the configured authentication sources";
     }
 
-    #if 0
+#if 0
     std::string doc() override
     {
         return
-          #include "auth-fill.md"
+#  include "auth-fill.md"
           ;
     }
-    #endif
+#endif
 
     void run() override
     {
@@ -58,7 +58,10 @@ struct CmdAuth : NixMultiCommand
         return "authentication-related commands";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 };
 
 static auto rCmdAuth = registerCommand<CmdAuth>("auth");

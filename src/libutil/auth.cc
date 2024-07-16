@@ -15,32 +15,45 @@ namespace nix {
 using namespace auth;
 
 // FIXME: need to generalize defining enum settings.
-template<> AuthForwarding BaseSetting<AuthForwarding>::parse(const std::string & str) const
+template<>
+AuthForwarding BaseSetting<AuthForwarding>::parse(const std::string & str) const
 {
-    if (str == "false") return AuthForwarding::Disabled;
-    else if (str == "trusted-users") return AuthForwarding::TrustedUsers;
-    else if (str == "all-users") return AuthForwarding::AllUsers;
-    else throw UsageError("option '%s' has invalid value '%s'", name, str);
+    if (str == "false")
+        return AuthForwarding::Disabled;
+    else if (str == "trusted-users")
+        return AuthForwarding::TrustedUsers;
+    else if (str == "all-users")
+        return AuthForwarding::AllUsers;
+    else
+        throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> struct BaseSetting<AuthForwarding>::trait
+template<>
+struct BaseSetting<AuthForwarding>::trait
 {
     static constexpr bool appendable = false;
 };
 
-template<> std::string BaseSetting<AuthForwarding>::to_string() const
+template<>
+std::string BaseSetting<AuthForwarding>::to_string() const
 {
-    if (value == AuthForwarding::Disabled) return "false";
-    else if (value == AuthForwarding::TrustedUsers) return "trusted-users";
-    else if (value == AuthForwarding::AllUsers) return "all-users";
-    else abort();
+    if (value == AuthForwarding::Disabled)
+        return "false";
+    else if (value == AuthForwarding::TrustedUsers)
+        return "trusted-users";
+    else if (value == AuthForwarding::AllUsers)
+        return "all-users";
+    else
+        abort();
 }
 
-NLOHMANN_JSON_SERIALIZE_ENUM(AuthForwarding, {
-    {AuthForwarding::Disabled, "false"},
-    {AuthForwarding::TrustedUsers, "trusted-users"},
-    {AuthForwarding::AllUsers, "all-users"},
-});
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    AuthForwarding,
+    {
+        {AuthForwarding::Disabled, "false"},
+        {AuthForwarding::TrustedUsers, "trusted-users"},
+        {AuthForwarding::AllUsers, "all-users"},
+    });
 
 }
 
@@ -56,7 +69,8 @@ AuthData AuthData::parseGitAuthData(std::string_view raw)
 
     for (auto & line : tokenizeString<std::vector<std::string>>(raw, "\n")) {
         auto eq = line.find('=');
-        if (eq == line.npos) continue;
+        if (eq == line.npos)
+            continue;
         auto key = trim(line.substr(0, eq));
         auto value = trim(line.substr(eq + 1));
         if (key == "protocol")
@@ -83,7 +97,8 @@ std::optional<AuthData> AuthData::match(const AuthData & request) const
         return std::nullopt;
 
     // `request.path` must be within `path`.
-    if (path && request.path && !(*path == *request.path || request.path->substr(0, path->size() + 1) == *request.path + "/"))
+    if (path && request.path
+        && !(*path == *request.path || request.path->substr(0, path->size() + 1) == *request.path + "/"))
         return std::nullopt;
 
     if (userName && request.userName && *userName != request.userName)
@@ -103,17 +118,23 @@ std::optional<AuthData> AuthData::match(const AuthData & request) const
 std::string AuthData::toGitAuthData() const
 {
     std::string res;
-    if (protocol) res += fmt("protocol=%s\n", *protocol);
-    if (host) res += fmt("host=%s\n", *host);
-    if (path) res += fmt("path=%s\n", *path);
-    if (userName) res += fmt("username=%s\n", *userName);
-    if (password) res += fmt("password=%s\n", *password);
+    if (protocol)
+        res += fmt("protocol=%s\n", *protocol);
+    if (host)
+        res += fmt("host=%s\n", *host);
+    if (path)
+        res += fmt("path=%s\n", *path);
+    if (userName)
+        res += fmt("username=%s\n", *userName);
+    if (password)
+        res += fmt("password=%s\n", *password);
     return res;
 }
 
-std::ostream & operator << (std::ostream & str, const AuthData & authData)
+std::ostream & operator<<(std::ostream & str, const AuthData & authData)
 {
-    str << fmt("{protocol = %s, host=%s, path=%s, userName=%s, password=%s}",
+    str << fmt(
+        "{protocol = %s, host=%s, path=%s, userName=%s, password=%s}",
         authData.protocol.value_or(""),
         authData.host.value_or(""),
         authData.path.value_or(""),
@@ -133,7 +154,8 @@ struct NixAuthSource : AuthSource
     {
         if (pathExists(authDir))
             for (auto & file : std::filesystem::directory_iterator{authDir}) {
-                if (hasSuffix(file.path().filename().string(), "~")) continue;
+                if (hasSuffix(file.path().filename().string(), "~"))
+                    continue;
                 auto path = authDir / file.path().filename();
                 auto authData = AuthData::parseGitAuthData(readFile(path));
                 if (!authData.password)
@@ -154,7 +176,8 @@ struct NixAuthSource : AuthSource
 
     bool set(const AuthData & authData) override
     {
-        if (get(authData, false)) return true;
+        if (get(authData, false))
+            return true;
 
         auto authFile = authDir / fmt("auto-%s-%s", authData.host.value_or("none"), authData.userName.value_or("none"));
 
@@ -175,7 +198,8 @@ struct NetrcAuthSource : AuthSource
         // FIXME: read netrc lazily.
         debug("reading netrc '%s'", path);
 
-        if (!pathExists(path)) return;
+        if (!pathExists(path))
+            return;
 
         auto raw = readFile(path);
 
@@ -183,11 +207,11 @@ struct NetrcAuthSource : AuthSource
 
         auto whitespace = "\n\r\t ";
 
-        auto nextToken = [&]() -> std::optional<std::string_view>
-        {
+        auto nextToken = [&]() -> std::optional<std::string_view> {
             // Skip whitespace.
             auto n = remaining.find_first_not_of(whitespace);
-            if (n == remaining.npos) return std::nullopt;
+            if (n == remaining.npos)
+                return std::nullopt;
             remaining = remaining.substr(n);
 
             if (remaining.substr(0, 1) == "\"")
@@ -202,8 +226,7 @@ struct NetrcAuthSource : AuthSource
 
         std::optional<AuthData> curMachine;
 
-        auto flushMachine = [&]()
-        {
+        auto flushMachine = [&]() {
             if (curMachine) {
                 authDatas.push_back(std::move(*curMachine));
                 curMachine.reset();
@@ -214,35 +237,32 @@ struct NetrcAuthSource : AuthSource
             if (token == "machine") {
                 flushMachine();
                 auto name = nextToken();
-                if (!name) throw Error("netrc 'machine' token requires a name");
-                curMachine = AuthData {
-                    .protocol = "https",
-                    .host = std::string(*name)
-                };
-            }
-            else if (token == "default") {
+                if (!name)
+                    throw Error("netrc 'machine' token requires a name");
+                curMachine = AuthData{.protocol = "https", .host = std::string(*name)};
+            } else if (token == "default") {
                 flushMachine();
-                curMachine = AuthData {
+                curMachine = AuthData{
                     .protocol = "https",
                 };
-            }
-            else if (token == "login") {
-                if (!curMachine) throw Error("netrc 'login' token must be preceded by a 'machine'");
+            } else if (token == "login") {
+                if (!curMachine)
+                    throw Error("netrc 'login' token must be preceded by a 'machine'");
                 auto userName = nextToken();
-                if (!userName) throw Error("netrc 'login' token requires a user name");
+                if (!userName)
+                    throw Error("netrc 'login' token requires a user name");
                 curMachine->userName = std::string(*userName);
-            }
-            else if (token == "password") {
-                if (!curMachine) throw Error("netrc 'password' token must be preceded by a 'machine'");
+            } else if (token == "password") {
+                if (!curMachine)
+                    throw Error("netrc 'password' token must be preceded by a 'machine'");
                 auto password = nextToken();
-                if (!password) throw Error("netrc 'password' token requires a password");
+                if (!password)
+                    throw Error("netrc 'password' token requires a password");
                 curMachine->password = std::string(*password);
-            }
-            else if (token == "account") {
+            } else if (token == "account") {
                 // Ignore this.
                 nextToken();
-            }
-            else
+            } else
                 warn("unrecognized netrc token '%s'", *token);
         }
 
@@ -277,16 +297,17 @@ struct ExternalAuthSource : AuthSource
     std::optional<AuthData> get(const AuthData & request, bool required) override
     {
         try {
-            if (!enabled) return std::nullopt;
+            if (!enabled)
+                return std::nullopt;
 
-            auto response = AuthData::parseGitAuthData(
-                runProgram(program, true, {"get"}, request.toGitAuthData()));
+            auto response = AuthData::parseGitAuthData(runProgram(program, true, {"get"}, request.toGitAuthData()));
 
             if (!response.password)
                 return std::nullopt;
 
             AuthData res{request};
-            if (response.userName) res.userName = response.userName;
+            if (response.userName)
+                res.userName = response.userName;
             res.password = response.password;
             return res;
         } catch (SysError & e) {
@@ -303,7 +324,8 @@ struct ExternalAuthSource : AuthSource
     bool set(const AuthData & authData) override
     {
         try {
-            if (!enabled) return false;
+            if (!enabled)
+                return false;
 
             runProgram(program, true, {"store"}, authData.toGitAuthData());
 
@@ -322,7 +344,8 @@ struct ExternalAuthSource : AuthSource
     void erase(const AuthData & authData) override
     {
         try {
-            if (!enabled) return;
+            if (!enabled)
+                return;
 
             runProgram(program, true, {"erase"}, authData.toGitAuthData());
         } catch (SysError & e) {
@@ -369,17 +392,13 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
             // for the expected format of the phrases.
 
             if (!request.userName) {
-                res.userName = chomp(
-                    runProgram(*askPassHelper, true,
-                        {fmt("Username for '%s': ", request.host.value_or(""))},
-                        std::nullopt, true));
+                res.userName = chomp(runProgram(
+                    *askPassHelper, true, {fmt("Username for '%s': ", request.host.value_or(""))}, std::nullopt, true));
             }
 
             if (!request.password) {
-                res.password = chomp(
-                    runProgram(*askPassHelper, true,
-                        {fmt("Password for '%s': ", request.host.value_or(""))},
-                        std::nullopt, true));
+                res.password = chomp(runProgram(
+                    *askPassHelper, true, {fmt("Password for '%s': ", request.host.value_or(""))}, std::nullopt, true));
             }
 
             if (res.userName && res.password) {
@@ -429,8 +448,7 @@ ref<Authenticator> getAuthenticator()
                 else if (s == "builtin:netrc") {
                     if (authSettings.netrcFile != "")
                         authSources.push_back(make_ref<NetrcAuthSource>(authSettings.netrcFile));
-                }
-                else
+                } else
                     warn("unknown authentication sources '%s'", s);
             } else
                 authSources.push_back(make_ref<ExternalAuthSource>(s));

@@ -8,25 +8,22 @@
 
 namespace nix {
 
-AuthTunnel::AuthTunnel(
-    StoreDirConfig & storeConfig,
-    WorkerProto::Version clientVersion)
+AuthTunnel::AuthTunnel(StoreDirConfig & storeConfig, WorkerProto::Version clientVersion)
     : clientVersion(clientVersion)
 {
     auto sockets = socketPair();
     serverFd = std::move(sockets.first);
     clientFd = std::move(sockets.second);
 
-    serverThread = std::thread([this, clientVersion, &storeConfig]()
-    {
+    serverThread = std::thread([this, clientVersion, &storeConfig]() {
         try {
             FdSource fromSource(serverFd.get());
-            WorkerProto::ReadConn from {
+            WorkerProto::ReadConn from{
                 .from = fromSource,
                 .version = clientVersion,
             };
             FdSink toSource(serverFd.get());
-            WorkerProto::WriteConn to {
+            WorkerProto::WriteConn to{
                 .to = toSource,
                 .version = clientVersion,
             };
@@ -95,28 +92,25 @@ struct TunneledAuthSource : auth::AuthSource
         WorkerProto::ReadConn fromConn;
         WorkerProto::WriteConn toConn;
 
-        State(
-            WorkerProto::Version clientVersion,
-            AutoCloseFD && fd)
+        State(WorkerProto::Version clientVersion, AutoCloseFD && fd)
             : fd(std::move(fd))
             , from(this->fd.get())
             , to(this->fd.get())
-            , fromConn {.from = from, .version = clientVersion}
-            , toConn {.to = to, .version = clientVersion}
-        { }
+            , fromConn{.from = from, .version = clientVersion}
+            , toConn{.to = to, .version = clientVersion}
+        {
+        }
     };
 
     Sync<State> state_;
 
     ref<StoreDirConfig> storeConfig;
 
-    TunneledAuthSource(
-        ref<StoreDirConfig> storeConfig,
-        WorkerProto::Version clientVersion,
-        AutoCloseFD && fd)
+    TunneledAuthSource(ref<StoreDirConfig> storeConfig, WorkerProto::Version clientVersion, AutoCloseFD && fd)
         : state_(clientVersion, std::move(fd))
         , storeConfig(storeConfig)
-    { }
+    {
+    }
 
     std::optional<auth::AuthData> get(const auth::AuthData & request, bool required) override
     {
@@ -145,10 +139,8 @@ struct TunneledAuthSource : auth::AuthSource
     }
 };
 
-ref<auth::AuthSource> makeTunneledAuthSource(
-    ref<StoreDirConfig> storeConfig,
-    WorkerProto::Version clientVersion,
-    AutoCloseFD && clientFd)
+ref<auth::AuthSource>
+makeTunneledAuthSource(ref<StoreDirConfig> storeConfig, WorkerProto::Version clientVersion, AutoCloseFD && clientFd)
 {
     return make_ref<TunneledAuthSource>(storeConfig, clientVersion, std::move(clientFd));
 }
