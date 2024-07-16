@@ -13,12 +13,12 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    S3BinaryCacheStoreConfig(
-        std::string_view uriScheme,
-        std::string_view bucketName,
-        const Params & params);
+    S3BinaryCacheStoreConfig(std::string_view uriScheme, std::string_view bucketName, const Params & params);
 
-    const Setting<std::string> profile{this, "", "profile",
+    const Setting<std::string> profile{
+        this,
+        "",
+        "profile",
         R"(
           The name of the AWS configuration profile to use. By default
           Nix will use the `default` profile.
@@ -30,14 +30,20 @@ protected:
 
 public:
 
-    const Setting<std::string> region{this, defaultRegion, "region",
+    const Setting<std::string> region{
+        this,
+        defaultRegion,
+        "region",
         R"(
           The region of the S3 bucket. If your bucket is not in
           `us–east-1`, you should always explicitly specify the region
           parameter.
         )"};
 
-    const Setting<std::string> scheme{this, "", "scheme",
+    const Setting<std::string> scheme{
+        this,
+        "",
+        "scheme",
         R"(
           The scheme used for S3 requests, `https` (default) or `http`. This
           option allows you to disable HTTPS for binary caches which don't
@@ -49,7 +55,10 @@ public:
           > information.
         )"};
 
-    const Setting<std::string> endpoint{this, "", "endpoint",
+    const Setting<std::string> endpoint{
+        this,
+        "",
+        "endpoint",
         R"(
           The URL of the endpoint of an S3-compatible service such as MinIO.
           Do not specify this setting if you're using Amazon S3.
@@ -60,28 +69,30 @@ public:
           > addressing instead of virtual host based addressing.
         )"};
 
-    const Setting<std::string> narinfoCompression{this, "", "narinfo-compression",
-        "Compression method for `.narinfo` files."};
+    const Setting<std::string> narinfoCompression{
+        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
 
-    const Setting<std::string> lsCompression{this, "", "ls-compression",
-        "Compression method for `.ls` files."};
+    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
 
-    const Setting<std::string> logCompression{this, "", "log-compression",
+    const Setting<std::string> logCompression{
+        this,
+        "",
+        "log-compression",
         R"(
           Compression method for `log/*` files. It is recommended to
           use a compression method supported by most web browsers
           (e.g. `brotli`).
         )"};
 
-    const Setting<bool> multipartUpload{
-        this, false, "multipart-upload",
-        "Whether to use multi-part uploads."};
+    const Setting<bool> multipartUpload{this, false, "multipart-upload", "Whether to use multi-part uploads."};
 
     const Setting<uint64_t> bufferSize{
-        this, 5 * 1024 * 1024, "buffer-size",
-        "Size (in bytes) of each part in multi-part uploads."};
+        this, 5 * 1024 * 1024, "buffer-size", "Size (in bytes) of each part in multi-part uploads."};
 
-    const std::string name() override { return "S3 Binary Cache Store"; }
+    const std::string name() override
+    {
+        return "S3 Binary Cache Store";
+    }
 
     std::string doc() override;
 };
