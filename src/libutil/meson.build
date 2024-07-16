@@ -216,6 +216,7 @@ headers = [config_h] + files(
   'source-accessor.hh',
   'source-path.hh',
   'split.hh',
+  'std-hash.hh',
   'strings.hh',
   'strings-inline.hh',
   'suggestions.hh',

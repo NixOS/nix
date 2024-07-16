@@ -2,7 +2,7 @@
 
 #include <cinttypes>
 
-#include "util.hh"
+#include "std-hash.hh"
 
 namespace nix {
 
