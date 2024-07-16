@@ -54,8 +54,11 @@ badExitCode=0
 postprocess() {
     if [[ -e "lang/$1.postprocess" ]]; then
         (
+            # We could allow arbitrary interpreters in .postprocess, but that
+            # just exposes us to the complexity of not having /usr/bin/env in
+            # the sandbox. So let's just hardcode bash for now.
             set -x;
-            "lang/$1.postprocess" "lang/$1"
+            bash "lang/$1.postprocess" "lang/$1"
         )
     fi
 }
