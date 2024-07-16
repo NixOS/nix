@@ -475,9 +475,6 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     {
         return std::nullopt;
     }
-
-    static std::set<std::string> uriSchemes() { return {"s3"}; }
-
 };
 
 static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;

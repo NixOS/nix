@@ -67,6 +67,9 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 
     const std::string name() override { return "Local Store"; }
 
+    static std::set<std::string> uriSchemes()
+    { return {"local"}; }
+
     std::string doc() override;
 };
 
@@ -148,9 +151,6 @@ public:
         const Params & params);
 
     ~LocalStore();
-
-    static std::set<std::string> uriSchemes()
-    { return {"local"}; }
 
     /**
      * Implementations of abstract store API methods.

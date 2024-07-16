@@ -36,6 +36,10 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
 
 protected:
     static constexpr char const * scheme = "unix";
+
+public:
+    static std::set<std::string> uriSchemes()
+    { return {scheme}; }
 };
 
 class UDSRemoteStore : public virtual UDSRemoteStoreConfig
@@ -58,9 +62,6 @@ public:
         const Params & params);
 
     std::string getUri() override;
-
-    static std::set<std::string> uriSchemes()
-    { return {scheme}; }
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
     { return LocalFSStore::getFSAccessor(requireValidPath); }

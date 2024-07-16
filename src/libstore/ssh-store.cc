@@ -47,8 +47,6 @@ public:
     {
     }
 
-    static std::set<std::string> uriSchemes() { return {"ssh-ng"}; }
-
     std::string getUri() override
     {
         return *uriSchemes().begin() + "://" + host;
@@ -152,11 +150,6 @@ public:
         extraRemoteProgramArgs = {
             "--process-ops",
         };
-    }
-
-    static std::set<std::string> uriSchemes()
-    {
-        return {"mounted-ssh-ng"};
     }
 
     std::string getUri() override
