@@ -17,12 +17,39 @@
 
 namespace nix {
 
+UDSRemoteStoreConfig::UDSRemoteStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , LocalFSStoreConfig(params)
+    , RemoteStoreConfig(params)
+{
+    if (scheme != UDSRemoteStoreConfig::scheme) {
+        throw UsageError("Scheme must be 'unix'");
+    }
+
+    if (!authority.empty()) {
+        path.emplace(authority);
+    }
+}
+
+
 std::string UDSRemoteStoreConfig::doc()
 {
     return
         #include "uds-remote-store.md"
         ;
 }
+
+
+// A bit gross that we now pass empty string but this is knowing that
+// empty string will later default to the same nixDaemonSocketFile. Why
+// don't we just wire it all through? I believe there are cases where it
+// will live reload so we want to continue to account for that.
+UDSRemoteStore::UDSRemoteStore(const Params & params)
+    : UDSRemoteStore(scheme, "", params)
+{}
 
 
 UDSRemoteStore::UDSRemoteStore(std::string_view scheme, std::string_view authority, const Params & params)
@@ -35,6 +62,7 @@ UDSRemoteStore::UDSRemoteStore(std::string_view scheme, std::string_view authori
     , RemoteStore(params)
 {
 }
+
 
 std::string UDSRemoteStore::getPathOrDefault() const
 {

@@ -9,30 +9,18 @@ namespace nix {
 
 struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
 {
-
-    protected:
-        static constexpr char const * scheme = "unix";
-    
-    public:
-
     // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
     // outlined in https://github.com/NixOS/nix/issues/10766
     using LocalFSStoreConfig::LocalFSStoreConfig;
     using RemoteStoreConfig::RemoteStoreConfig;
 
-    UDSRemoteStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , RemoteStoreConfig(params)
-    {
-        if (scheme != UDSRemoteStoreConfig::scheme) {
-            throw UsageError("Scheme must be 'unix'");
-        }
-
-        if (!authority.empty()) {
-            path.emplace(authority);
-        }
-    }
+    /**
+     * @param authority is the socket path.
+     */
+    UDSRemoteStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const Params & params);
 
     const std::string name() override { return "Local Daemon Store"; }
 
@@ -46,6 +34,9 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
      * handled on opening of the connection.
      */
     std::optional<std::string> path;
+
+protected:
+    static constexpr char const * scheme = "unix";
 };
 
 class UDSRemoteStore : public virtual UDSRemoteStoreConfig
@@ -54,20 +45,16 @@ class UDSRemoteStore : public virtual UDSRemoteStoreConfig
 {
 public:
 
-    /*
-    \deprecated This is the old API to construct the store.
-    A bit gross that we now pass empty string but this is knowing
-    that empty string will later default to the same nixDaemonSocketFile.
-    Why don't we just wire it all through?
-    I believe there are cases where it will live reload so we want to
-    continue to account for that.
+    /**
+     * @deprecated This is the old API to construct the store.
     */
-    UDSRemoteStore(const Params & params)
-        : nix::UDSRemoteStore(scheme, "", params) {}
+    UDSRemoteStore(const Params & params);
 
+    /**
+     * @param authority is the socket path.
+     */
     UDSRemoteStore(
         std::string_view scheme,
-        // authority is the socket path
         std::string_view authority,
         const Params & params);
 
