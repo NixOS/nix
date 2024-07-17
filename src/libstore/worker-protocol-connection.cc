@@ -152,7 +152,6 @@ WorkerProto::BasicClientConnection::handshake(BufferedSink & to, Source & from, 
         throw Error("Nix daemon protocol version not supported");
     if (GET_PROTOCOL_MINOR(daemonVersion) < 10)
         throw Error("the Nix daemon version is too old");
-    to << localVersion;
 
     return std::min(daemonVersion, localVersion);
 }
