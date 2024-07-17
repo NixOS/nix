@@ -26,6 +26,7 @@ subproject('external-api-docs')
 subproject('libutil-c')
 subproject('libstore-c')
 subproject('libexpr-c')
+subproject('libmain-c')
 
 # Language Bindings
 subproject('perl')

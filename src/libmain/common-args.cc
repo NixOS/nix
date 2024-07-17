@@ -5,6 +5,7 @@
 #include "logging.hh"
 #include "loggers.hh"
 #include "util.hh"
+#include "plugin.hh"
 
 namespace nix {
 

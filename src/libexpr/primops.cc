@@ -719,7 +719,7 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .doc = R"(
       `builtins.genericClosure` iteratively computes the transitive closure over an arbitrary relation defined by a function.
 
-      It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attrbute sets:
+      It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attribute sets:
 
       - `startSet`:
         The initial list of attribute sets.
