@@ -43,7 +43,7 @@ struct EvalSettings : Config
 
     bool & readOnlyMode;
 
-    Strings getDefaultNixPath() const;
+    static Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
 
