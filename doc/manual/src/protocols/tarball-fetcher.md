@@ -43,21 +43,28 @@ defined as the timestamp of the newest file inside the tarball.
 
 ## Gitea and Forgejo support
 
-Since Gitea v1.22.1 and Forgejo v7.0.4/v8.0.0, this protocol is supported in both, which can be used like this:
+This protocol is supported by Gitea since v1.22.1 and by Forgejo since v7.0.4/v8.0.0 and can be used with the following flake URL schema:
 
-```nix
-{
-    inputs = {
-        gitea-repo-schema.url = "https://<instance hostname>/<owner>/<repo>/archive/<ref>.tar.gz";
+```
+https://<domain name>/<owner>/<repo>/archive/<reference or revison>.tar.gz
+```
 
-        main-branch.url = "https://gitea.example/johndoe/some-nix-flake/archive/main.tar.gz";
-        other-branch.url = "https://gitea2.example/someotherperson/other-flake/archive/other.tar.gz";
-        non-flake = {
-            url = "https://forgejo.example/random-person/random-non-flake-repo/archive/main.tar.gz";
-            flake = false;
-        };
-    };
-}
+> **Example**
+>
+>
+> ```nix
+> # flake.nix
+> {
+>    inputs = {
+>      foo.url = "https://gitea.example.org/some-person/some-flake/archive/main.tar.gz";
+>      bar.url = "https://gitea.example.org/some-other-person/other-flake/archive/442793d9ec0584f6a6e82fa253850c8085bb150a.tar.gz";
+>      qux = {
+>        url = "https://forgejo.example.org/another-person/some-non-flake-repo/archive/development.tar.gz";
+>        flake = false;
+>      };
+>    };
+>    outputs = { foo, bar, qux }: { /* ... */ };
+> }
 ```
 
 [Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
