@@ -1,4 +1,4 @@
-project('nix-main', 'cpp',
+project('nix-main-c', 'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -19,76 +19,60 @@ subdir('build-utils-meson/deps-lists')
 configdata = configuration_data()
 
 deps_private_maybe_subproject = [
-]
-deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
+  dependency('nix-main'),
+]
+deps_public_maybe_subproject = [
+  dependency('nix-util-c'),
+  dependency('nix-store-c'),
 ]
 subdir('build-utils-meson/subprojects')
 
-
-pubsetbuf_test = '''
-#include <iostream>
-
-using namespace std;
-
-char buf[1024];
-
-int main() {
-  cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
-}
-'''
-
-configdata.set(
-  'HAVE_PUBSETBUF',
-  cxx.compiles(pubsetbuf_test).to_int(),
-  description: 'Optionally used for buffering on standard error'
-)
+# TODO rename, because it will conflict with downstream projects
+configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 config_h = configure_file(
   configuration : configdata,
-  output : 'config-main.hh',
+  output : 'config-main.h',
 )
 
 add_project_arguments(
   # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
   # It would be nice for our headers to be idempotent instead.
+
+  # From C++ libraries, only for internals
   '-include', 'config-util.hh',
   '-include', 'config-store.hh',
   '-include', 'config-main.hh',
+
+  # From C libraries, for our public, installed headers too
+  '-include', 'config-util.h',
+  '-include', 'config-store.h',
+  '-include', 'config-main.h',
   language : 'cpp',
 )
 
 subdir('build-utils-meson/diagnostics')
 
 sources = files(
-  'common-args.cc',
-  'loggers.cc',
-  'plugin.cc',
-  'progress-bar.cc',
-  'shared.cc',
+  'nix_api_main.cc',
 )
-
-if host_machine.system() != 'windows'
-  sources += files(
-    'unix/stack.cc',
-  )
-endif
 
 include_dirs = [include_directories('.')]
 
 headers = [config_h] + files(
-  'common-args.hh',
-  'loggers.hh',
-  'plugin.hh',
-  'progress-bar.hh',
-  'shared.hh',
+  'nix_api_main.h',
 )
 
+subdir('build-utils-meson/export-all-symbols')
+
 this_library = library(
-  'nixmain',
+  'nixmainc',
   sources,
   dependencies : deps_public + deps_private + deps_other,
+  include_directories : include_dirs,
+  link_args: linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )

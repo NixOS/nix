@@ -11,6 +11,7 @@
 
 #include "machines.hh"
 #include "shared.hh"
+#include "plugin.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
 #include "serialise.hh"

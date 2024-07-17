@@ -52,6 +52,7 @@ let
     "nix-flake"
     "nix-flake-tests"
     "nix-main"
+    "nix-main-c"
     "nix-cmd"
     "nix-ng"
   ];

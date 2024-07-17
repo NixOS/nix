@@ -15,7 +15,6 @@
 #include <nlohmann/json.hpp>
 
 #ifndef _WIN32
-# include <dlfcn.h>
 # include <sys/utsname.h>
 #endif
 
@@ -334,60 +333,6 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
-
-Paths PluginFilesSetting::parse(const std::string & str) const
-{
-    if (pluginsLoaded)
-        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<Paths>::parse(str);
-}
-
-
-void initPlugins()
-{
-    assert(!settings.pluginFiles.pluginsLoaded);
-    for (const auto & pluginFile : settings.pluginFiles.get()) {
-        std::vector<std::filesystem::path> pluginFiles;
-        try {
-            auto ents = std::filesystem::directory_iterator{pluginFile};
-            for (const auto & ent : ents) {
-                checkInterrupt();
-                pluginFiles.emplace_back(ent.path());
-            }
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() != std::errc::not_a_directory)
-                throw;
-            pluginFiles.emplace_back(pluginFile);
-        }
-        for (const auto & file : pluginFiles) {
-            checkInterrupt();
-            /* handle is purposefully leaked as there may be state in the
-               DSO needed by the action of the plugin. */
-#ifndef _WIN32 // TODO implement via DLL loading on Windows
-            void *handle =
-                dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
-            if (!handle)
-                throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
-
-            /* Older plugins use a statically initialized object to run their code.
-               Newer plugins can also export nix_plugin_entry() */
-            void (*nix_plugin_entry)() = (void (*)())dlsym(handle, "nix_plugin_entry");
-            if (nix_plugin_entry)
-                nix_plugin_entry();
-#else
-                throw Error("could not dynamically open plugin file '%s'", file);
-#endif
-        }
-    }
-
-    /* Since plugins can add settings, try to re-apply previously
-       unknown settings. */
-    globalConfig.reapplyUnknownSettings();
-    globalConfig.warnUnknownSettings();
-
-    /* Tell the user if they try to set plugin-files after we've already loaded */
-    settings.pluginFiles.pluginsLoaded = true;
-}
 
 static void preloadNSS()
 {
