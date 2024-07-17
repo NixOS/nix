@@ -1,8 +1,7 @@
 #pragma once
 
 #include <cinttypes>
-
-#include "std-hash.hh"
+#include <functional>
 
 namespace nix {
 
@@ -43,9 +42,7 @@ public:
 
     size_t hash() const noexcept
     {
-        size_t h = 854125;
-        hash_combine(h, id);
-        return h;
+        return std::hash<uint32_t>{}(id);
     }
 };
 
