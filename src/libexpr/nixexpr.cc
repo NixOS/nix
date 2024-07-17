@@ -82,7 +82,9 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
         return sa < sb;
     });
     std::vector<Symbol> inherits;
-    std::map<ExprInheritFrom *, std::vector<Symbol>> inheritsFrom;
+    // We can use the displacement as a proxy for the order in which the symbols were parsed.
+    // The assignment of displacements should be deterministic, so that showBindings is deterministic.
+    std::map<Displacement, std::vector<Symbol>> inheritsFrom;
     for (auto & i : sorted) {
         switch (i->second.kind) {
         case AttrDef::Kind::Plain:
@@ -93,7 +95,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
         case AttrDef::Kind::InheritedFrom: {
             auto & select = dynamic_cast<ExprSelect &>(*i->second.e);
             auto & from = dynamic_cast<ExprInheritFrom &>(*select.e);
-            inheritsFrom[&from].push_back(i->first);
+            inheritsFrom[from.displ].push_back(i->first);
             break;
         }
         }
@@ -105,7 +107,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
     }
     for (const auto & [from, syms] : inheritsFrom) {
         str << "inherit (";
-        (*inheritFromExprs)[from->displ]->show(symbols, str);
+        (*inheritFromExprs)[from]->show(symbols, str);
         str << ")";
         for (auto sym : syms) str << " " << symbols[sym];
         str << "; ";
