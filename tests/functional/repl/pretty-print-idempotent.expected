@@ -1,0 +1,29 @@
+Nix <nix version>
+Type :? for help.
+Added <number omitted> variables.
+
+{ homepage = "https://example.com"; }
+
+{ homepage = "https://example.com"; }
+
+{
+  layerOne = { ... };
+}
+
+{
+  layerOne = { ... };
+}
+
+[ "https://example.com" ]
+
+[ "https://example.com" ]
+
+[
+  [ ... ]
+]
+
+[
+  [ ... ]
+]
+
+
