@@ -82,6 +82,7 @@ struct WorkerProto
      *
      * @todo remove once Hydra uses Store abstraction consistently.
      */
+    struct BasicConnection;
     struct BasicClientConnection;
     struct BasicServerConnection;
 

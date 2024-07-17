@@ -1020,8 +1020,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
 void processConnection(
     ref<Store> store,
-    FdSource & from,
-    FdSink & to,
+    FdSource && from,
+    FdSink && to,
     TrustedFlag trusted,
     RecursiveFlag recursive)
 {
@@ -1037,7 +1037,12 @@ void processConnection(
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
 
-    auto tunnelLogger = new TunnelLogger(to, clientVersion);
+    WorkerProto::BasicServerConnection conn;
+    conn.to = std::move(to);
+    conn.from = std::move(from);
+    conn.protoVersion = clientVersion;
+
+    auto tunnelLogger = new TunnelLogger(conn.to, clientVersion);
     auto prevLogger = nix::logger;
     // FIXME
     if (!recursive)
@@ -1049,12 +1054,6 @@ void processConnection(
         setInterrupted(false);
         printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
-
-    WorkerProto::BasicServerConnection conn {
-        .to = to,
-        .from = from,
-        .clientVersion = clientVersion,
-    };
 
     conn.postHandshake(*store, {
         .daemonNixVersion = nixVersion,
@@ -1071,13 +1070,13 @@ void processConnection(
     try {
 
         tunnelLogger->stopWork();
-        to.flush();
+        conn.to.flush();
 
         /* Process client requests. */
         while (true) {
             WorkerProto::Op op;
             try {
-                op = (enum WorkerProto::Op) readInt(from);
+                op = (enum WorkerProto::Op) readInt(conn.from);
             } catch (Interrupted & e) {
                 break;
             } catch (EndOfFile & e) {
@@ -1091,7 +1090,7 @@ void processConnection(
             debug("performing daemon worker op: %d", op);
 
             try {
-                performOp(tunnelLogger, store, trusted, recursive, clientVersion, from, to, op);
+                performOp(tunnelLogger, store, trusted, recursive, clientVersion, conn.from, conn.to, op);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the
@@ -1107,19 +1106,19 @@ void processConnection(
                 throw;
             }
 
-            to.flush();
+            conn.to.flush();
 
             assert(!tunnelLogger->state_.lock()->canSendStderr);
         };
 
     } catch (Error & e) {
         tunnelLogger->stopWork(&e);
-        to.flush();
+        conn.to.flush();
         return;
     } catch (std::exception & e) {
         auto ex = Error(e.what());
         tunnelLogger->stopWork(&ex);
-        to.flush();
+        conn.to.flush();
         return;
     }
 }

@@ -370,9 +370,12 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 }
 
                 //  Handle the connection.
-                FdSource from(remote.get());
-                FdSink to(remote.get());
-                processConnection(openUncachedStore(), from, to, trusted, NotRecursive);
+                processConnection(
+                    openUncachedStore(),
+                    FdSource(remote.get()),
+                    FdSink(remote.get()),
+                    trusted,
+                    NotRecursive);
 
                 exit(0);
             }, options);
@@ -437,9 +440,11 @@ static void forwardStdioConnection(RemoteStore & store) {
  */
 static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 {
-    FdSource from(STDIN_FILENO);
-    FdSink to(STDOUT_FILENO);
-    processConnection(store, from, to, trustClient, NotRecursive);
+    processConnection(
+        store,
+        FdSource(STDIN_FILENO),
+        FdSink(STDOUT_FILENO),
+        trustClient, NotRecursive);
 }
 
 /**
