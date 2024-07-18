@@ -1269,8 +1269,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
                             // If the string is too long then resize add ellipses
                             std::string desc;
-                            if (length > 80) {
-                                trimmed.resize(80);
+                            if (length > 77) {
+                                trimmed.resize(77);
                                 desc = trimmed.append("...");
                             }
                             else {
