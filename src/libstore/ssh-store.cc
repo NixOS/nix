@@ -89,43 +89,32 @@ protected:
     };
 };
 
-struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfig
+
+MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
+    : StoreConfig(params)
+    , RemoteStoreConfig(params)
+    , CommonSSHStoreConfig(params)
+    , SSHStoreConfig(params)
+    , LocalFSStoreConfig(params)
 {
-    using SSHStoreConfig::SSHStoreConfig;
-    using LocalFSStoreConfig::LocalFSStoreConfig;
+}
 
-    MountedSSHStoreConfig(StringMap params)
-        : StoreConfig(params)
-        , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(params)
-        , SSHStoreConfig(params)
-        , LocalFSStoreConfig(params)
-    {
-    }
+MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
+    : StoreConfig(params)
+    , RemoteStoreConfig(params)
+    , CommonSSHStoreConfig(scheme, host, params)
+    , SSHStoreConfig(params)
+    , LocalFSStoreConfig(params)
+{
+}
 
-    MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
-        : StoreConfig(params)
-        , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(scheme, host, params)
-        , SSHStoreConfig(params)
-        , LocalFSStoreConfig(params)
-    {
-    }
+std::string MountedSSHStoreConfig::doc()
+{
+    return
+      #include "mounted-ssh-store.md"
+      ;
+}
 
-    const std::string name() override { return "Experimental SSH Store with filesystem mounted"; }
-
-    std::string doc() override
-    {
-        return
-          #include "mounted-ssh-store.md"
-          ;
-    }
-
-    std::optional<ExperimentalFeature> experimentalFeature() const override
-    {
-        return ExperimentalFeature::MountedSSHStore;
-    }
-};
 
 /**
  * The mounted ssh store assumes that filesystems on the remote host are

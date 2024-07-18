@@ -6,6 +6,13 @@ namespace nix {
 struct DummyStoreConfig : virtual StoreConfig {
     using StoreConfig::StoreConfig;
 
+    DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
+        : StoreConfig(params)
+    {
+        if (!authority.empty())
+            throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
+    }
+
     const std::string name() override { return "Dummy Store"; }
 
     std::string doc() override
@@ -19,16 +26,13 @@ struct DummyStoreConfig : virtual StoreConfig {
 struct DummyStore : public virtual DummyStoreConfig, public virtual Store
 {
     DummyStore(std::string_view scheme, std::string_view authority, const Params & params)
-        : DummyStore(params)
-    {
-        if (!authority.empty())
-            throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
-    }
+        : StoreConfig(params)
+        , DummyStoreConfig(scheme, authority, params)
+        , Store(params)
+    { }
 
     DummyStore(const Params & params)
-        : StoreConfig(params)
-        , DummyStoreConfig(params)
-        , Store(params)
+        : DummyStore("dummy", "", params)
     { }
 
     std::string getUri() override
