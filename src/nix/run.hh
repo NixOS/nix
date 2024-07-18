@@ -10,7 +10,7 @@ enum struct UseLookupPath {
     DontUse
 };
 
-void runProgramInStore(ref<Store> store,
+void execProgramInStore(ref<Store> store,
     UseLookupPath useLookupPath,
     const std::string & program,
     const Strings & args,

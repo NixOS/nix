@@ -2,6 +2,7 @@
 #include <queue>
 
 #include "command.hh"
+#include "eval.hh"
 #include "run.hh"
 #include "strings.hh"
 
@@ -103,7 +104,11 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         for (auto & arg : command)
             args.push_back(arg);
 
-        runProgramInStore(store, UseLookupPath::Use, *command.begin(), args);
+        // Release our references to eval caches to ensure they are persisted to disk, because
+        // we are about to exec out of this process without running C++ destructors.
+        getEvalState()->evalCaches.clear();
+
+        execProgramInStore(store, UseLookupPath::Use, *command.begin(), args);
     }
 };
 
