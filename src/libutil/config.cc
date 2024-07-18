@@ -273,6 +273,25 @@ template<> std::string BaseSetting<std::optional<std::string>>::to_string() cons
     return value ? *value : "";
 }
 
+template<> std::optional<unsigned int> BaseSetting<std::optional<unsigned int>>::parse(const std::string & str) const
+{
+    if (str == "none") return std::nullopt;
+    else {
+        if (auto n = string2Int<unsigned int>(str))
+            return { *n };
+        else
+            throw UsageError("configuration setting '%s' should be 'none' or an integer", name);
+    }
+}
+
+template<> std::string BaseSetting<std::optional<unsigned int>>::to_string() const
+{
+    if (value)
+        return std::to_string(value.value());
+    else
+        return "none";
+}
+
 template<> bool BaseSetting<bool>::parse(const std::string & str) const
 {
     if (str == "true" || str == "yes" || str == "1")

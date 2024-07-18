@@ -105,6 +105,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 
 DECLARE_CONFIG_SERIALISER(std::string)
 DECLARE_CONFIG_SERIALISER(std::optional<std::string>)
+DECLARE_CONFIG_SERIALISER(std::optional<unsigned int>)
 DECLARE_CONFIG_SERIALISER(bool)
 DECLARE_CONFIG_SERIALISER(Strings)
 DECLARE_CONFIG_SERIALISER(StringSet)
