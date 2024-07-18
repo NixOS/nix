@@ -15,6 +15,8 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
         return "Local Binary Cache Store";
     }
 
+    static std::set<std::string> uriSchemes();
+
     std::string doc() override;
 };
 

@@ -51,8 +51,6 @@ struct LocalBinaryCacheStore : virtual LocalBinaryCacheStoreConfig, virtual Bina
         return "file://" + binaryCacheDir;
     }
 
-    static std::set<std::string> uriSchemes();
-
 protected:
 
     bool fileExists(const std::string & path) override;
@@ -121,7 +119,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
     return pathExists(binaryCacheDir + "/" + path);
 }
 
-std::set<std::string> LocalBinaryCacheStore::uriSchemes()
+std::set<std::string> LocalBinaryCacheStoreConfig::uriSchemes()
 {
     if (getEnv("_NIX_FORCE_HTTP") == "1")
         return {};

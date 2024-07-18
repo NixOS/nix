@@ -26,6 +26,8 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 
     const std::string name() override { return "SSH Store"; }
 
+    static std::set<std::string> uriSchemes() { return {"ssh"}; }
+
     std::string doc() override;
 };
 
@@ -45,8 +47,6 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     ref<Pool<Connection>> connections;
 
     SSHMaster master;
-
-    static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
     LegacySSHStore(
         std::string_view scheme,

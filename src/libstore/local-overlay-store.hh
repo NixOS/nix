@@ -63,6 +63,11 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         return ExperimentalFeature::LocalOverlayStore;
     }
 
+    static std::set<std::string> uriSchemes()
+    {
+        return { "local-overlay" };
+    }
+
     std::string doc() override;
 
 protected:
@@ -101,11 +106,6 @@ public:
     }
 
     LocalOverlayStore(std::string_view scheme, PathView path, const Params & params);
-
-    static std::set<std::string> uriSchemes()
-    {
-        return { "local-overlay" };
-    }
 
     std::string getUri() override
     {

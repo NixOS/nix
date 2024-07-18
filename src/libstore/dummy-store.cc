@@ -21,6 +21,10 @@ struct DummyStoreConfig : virtual StoreConfig {
           #include "dummy-store.md"
           ;
     }
+
+    static std::set<std::string> uriSchemes() {
+        return {"dummy"};
+    }
 };
 
 struct DummyStore : public virtual DummyStoreConfig, public virtual Store
@@ -52,10 +56,6 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     virtual std::optional<TrustedFlag> isTrustedClient() override
     {
         return Trusted;
-    }
-
-    static std::set<std::string> uriSchemes() {
-        return {"dummy"};
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override

@@ -23,6 +23,11 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
         return "Experimental SSH Store";
     }
 
+    static std::set<std::string> uriSchemes()
+    {
+        return {"ssh-ng"};
+    }
+
     std::string doc() override;
 };
 
@@ -38,6 +43,11 @@ struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfi
     const std::string name() override
     {
         return "Experimental SSH Store with filesystem mounted";
+    }
+
+    static std::set<std::string> uriSchemes()
+    {
+        return {"mounted-ssh-ng"};
     }
 
     std::string doc() override;
