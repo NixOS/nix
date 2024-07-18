@@ -292,6 +292,7 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = fmt("Enable the `%s` setting.", name),
         .category = category,
         .handler = {[this] { override(true); }},
@@ -299,6 +300,7 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = fmt("Disable the `%s` setting.", name),
         .category = category,
         .handler = {[this] { override(false); }},
