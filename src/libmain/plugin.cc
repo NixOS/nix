@@ -2,6 +2,8 @@
 #  include <dlfcn.h>
 #endif
 
+#include <filesystem>
+
 #include "config-global.hh"
 #include "signals.hh"
 
