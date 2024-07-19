@@ -1526,10 +1526,11 @@ void LocalDerivationGoal::startDaemon()
             debug("received daemon connection");
 
             auto workerThread = std::thread([store, remote{std::move(remote)}]() {
-                FdSource from(remote.get());
-                FdSink to(remote.get());
                 try {
-                    daemon::processConnection(store, from, to,
+                    daemon::processConnection(
+                        store,
+                        FdSource(remote.get()),
+                        FdSink(remote.get()),
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SystemError &) {

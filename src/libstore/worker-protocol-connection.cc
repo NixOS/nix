@@ -58,7 +58,7 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
         }
 
         else if (msg == STDERR_ERROR) {
-            if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
+            if (GET_PROTOCOL_MINOR(protoVersion) >= 26) {
                 ex = std::make_exception_ptr(readError(from));
             } else {
                 auto error = readString(from);
@@ -114,7 +114,7 @@ std::exception_ptr WorkerProto::BasicClientConnection::processStderrReturn(Sink 
             // explain to users what's going on when their daemon is
             // older than #4628 (2023).
             if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations)
-                && GET_PROTOCOL_MINOR(daemonVersion) <= 35) {
+                && GET_PROTOCOL_MINOR(protoVersion) <= 35) {
                 auto m = e.msg();
                 if (m.find("parsing derivation") != std::string::npos && m.find("expected string") != std::string::npos
                     && m.find("Derive([") != std::string::npos)
@@ -172,15 +172,15 @@ WorkerProto::ClientHandshakeInfo WorkerProto::BasicClientConnection::postHandsha
 {
     WorkerProto::ClientHandshakeInfo res;
 
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 14) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 14) {
         // Obsolete CPU affinity.
         to << 0;
     }
 
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 11)
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 11)
         to << false; // obsolete reserveSpace
 
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 33)
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 33)
         to.flush();
 
     return WorkerProto::Serialise<ClientHandshakeInfo>::read(store, *this);
@@ -188,12 +188,12 @@ WorkerProto::ClientHandshakeInfo WorkerProto::BasicClientConnection::postHandsha
 
 void WorkerProto::BasicServerConnection::postHandshake(const StoreDirConfig & store, const ClientHandshakeInfo & info)
 {
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 14 && readInt(from)) {
         // Obsolete CPU affinity.
         readInt(from);
     }
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 11)
         readInt(from); // obsolete reserveSpace
 
     WorkerProto::write(store, *this, info);
@@ -211,7 +211,7 @@ UnkeyedValidPathInfo WorkerProto::BasicClientConnection::queryPathInfo(
             throw InvalidPath(std::move(e.info()));
         throw;
     }
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 17) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 17) {
         bool valid;
         from >> valid;
         if (!valid)
@@ -223,10 +223,10 @@ UnkeyedValidPathInfo WorkerProto::BasicClientConnection::queryPathInfo(
 StorePathSet WorkerProto::BasicClientConnection::queryValidPaths(
     const StoreDirConfig & store, bool * daemonException, const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
-    assert(GET_PROTOCOL_MINOR(daemonVersion) >= 12);
+    assert(GET_PROTOCOL_MINOR(protoVersion) >= 12);
     to << WorkerProto::Op::QueryValidPaths;
     WorkerProto::write(store, *this, paths);
-    if (GET_PROTOCOL_MINOR(daemonVersion) >= 27) {
+    if (GET_PROTOCOL_MINOR(protoVersion) >= 27) {
         to << maybeSubstitute;
     }
     processStderr(daemonException);
