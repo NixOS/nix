@@ -29,7 +29,7 @@ libfetchers-tests_LIBS = \
     libstore-test-support libutil-test-support \
     libfetchers libstore libutil
 
-libfetchers-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
+libfetchers-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS) $(LIBGIT2_LIBS)
 
 ifdef HOST_WINDOWS
   # Increase the default reserved stack size to 65 MB so Nix doesn't run out of space

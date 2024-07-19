@@ -10,11 +10,11 @@
 
 #include <sys/types.h>
 
-namespace nix {
+namespace nix::flake {
 
-struct FlakeSettings : public Config
+struct Settings : public Config
 {
-    FlakeSettings();
+    Settings();
 
     Setting<bool> useRegistries{
         this, true, "use-registries", "Whether to use flake registries to resolve flake references.", {}, true};
@@ -38,8 +38,5 @@ struct FlakeSettings : public Config
         {"commit-lockfile-summary"},
         true};
 };
-
-// TODO: don't use a global variable.
-extern FlakeSettings flakeSettings;
 
 }

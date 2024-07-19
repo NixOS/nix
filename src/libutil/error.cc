@@ -46,27 +46,22 @@ std::ostream & operator <<(std::ostream & os, const HintFmt & hf)
 /**
  * An arbitrarily defined value comparison for the purpose of using traces in the key of a sorted container.
  */
-inline bool operator<(const Trace& lhs, const Trace& rhs)
+inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs)
 {
     // `std::shared_ptr` does not have value semantics for its comparison
     // functions, so we need to check for nulls and compare the dereferenced
     // values here.
     if (lhs.pos != rhs.pos) {
-        if (!lhs.pos)
-            return true;
-        if (!rhs.pos)
-            return false;
-        if (*lhs.pos != *rhs.pos)
-            return *lhs.pos < *rhs.pos;
+        if (auto cmp = bool{lhs.pos} <=> bool{rhs.pos}; cmp != 0)
+            return cmp;
+        if (auto cmp = *lhs.pos <=> *rhs.pos; cmp != 0)
+            return cmp;
     }
     // This formats a freshly formatted hint string and then throws it away, which
     // shouldn't be much of a problem because it only runs when pos is equal, and this function is
     // used for trace printing, which is infrequent.
-    return lhs.hint.str() < rhs.hint.str();
+    return lhs.hint.str() <=> rhs.hint.str();
 }
-inline bool operator> (const Trace& lhs, const Trace& rhs) { return rhs < lhs; }
-inline bool operator<=(const Trace& lhs, const Trace& rhs) { return !(lhs > rhs); }
-inline bool operator>=(const Trace& lhs, const Trace& rhs) { return !(lhs < rhs); }
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,

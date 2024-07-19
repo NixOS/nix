@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "ssh-store-config.hh"
+#include "common-ssh-store-config.hh"
 #include "store-api.hh"
 #include "ssh.hh"
 #include "callback.hh"
@@ -12,6 +12,11 @@ namespace nix {
 struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
+
+    LegacySSHStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const Params & params);
 
     const Setting<Strings> remoteProgram{this, {"nix-store"}, "remote-program",
         "Path to the `nix-store` executable on the remote machine."};

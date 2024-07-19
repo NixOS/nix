@@ -1,0 +1,15 @@
+Nix <nix version>
+Type :? for help.
+Added <number omitted> variables.
+
+Function multiply
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:10:14
+
+    Perform arithmetic multiplication. It's kind of like
+    repeated addition, very neat.
+
+      | multiply 2 3
+      | => 6
+
+

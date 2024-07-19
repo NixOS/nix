@@ -1,9 +1,8 @@
-#include <algorithm>
-
 #include "args/root.hh"
 #include "current-process.hh"
 #include "command.hh"
 #include "common-args.hh"
+#include "eval-gc.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "globals.hh"
@@ -19,6 +18,7 @@
 #include "users.hh"
 #include "network-proxy.hh"
 #include "eval-cache.hh"
+#include "flake/flake.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -40,6 +40,8 @@ extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char * * argv);
 #endif
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -242,7 +244,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     evalSettings.restrictEval = false;
     evalSettings.pureEval = false;
-    EvalState state({}, openStore("dummy://"), evalSettings);
+    EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
 
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
@@ -362,6 +364,7 @@ void mainWrapped(int argc, char * * argv)
 
     initNix();
     initGC();
+    flake::initLib(flakeSettings);
 
     #if __linux__
     if (isRootUser()) {
@@ -417,7 +420,7 @@ void mainWrapped(int argc, char * * argv)
             Xp::FetchTree,
         };
         evalSettings.pureEval = false;
-        EvalState state({}, openStore("dummy://"), evalSettings);
+        EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
         auto builtinsJson = nlohmann::json::object();
         for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
             auto b = nlohmann::json::object();
@@ -428,7 +431,7 @@ void mainWrapped(int argc, char * * argv)
             b["doc"] = trim(stripIndentation(primOp->doc));
             if (primOp->experimentalFeature)
                 b["experimental-feature"] = primOp->experimentalFeature;
-            builtinsJson[state.symbols[builtin.name]] = std::move(b);
+            builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
         }
         for (auto & [name, info] : state.constantInfos) {
             auto b = nlohmann::json::object();

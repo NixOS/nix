@@ -2,12 +2,10 @@
 #include "fetchers.hh"
 #include "cache.hh"
 #include "filetransfer.hh"
-#include "globals.hh"
 #include "store-api.hh"
 #include "archive.hh"
 #include "tarfile.hh"
 #include "types.hh"
-#include "split.hh"
 #include "store-path-accessor.hh"
 #include "store-api.hh"
 #include "git-utils.hh"
@@ -214,12 +212,14 @@ struct CurlInputScheme : InputScheme
 
     static const std::set<std::string> specialParams;
 
-    std::optional<Input> inputFromURL(const ParsedURL & _url, bool requireTree) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & _url, bool requireTree) const override
     {
         if (!isValidURL(_url, requireTree))
             return std::nullopt;
 
-        Input input;
+        Input input{settings};
 
         auto url = _url;
 
@@ -267,9 +267,11 @@ struct CurlInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
     {
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
 
         //input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
@@ -349,7 +351,7 @@ struct TarballInputScheme : CurlInputScheme
         result.accessor->setPathDisplay("«" + input.to_string() + "»");
 
         if (result.immutableUrl) {
-            auto immutableInput = Input::fromURL(*result.immutableUrl);
+            auto immutableInput = Input::fromURL(*input.settings, *result.immutableUrl);
             // FIXME: would be nice to support arbitrary flakerefs
             // here, e.g. git flakes.
             if (immutableInput.getType() != "tarball")

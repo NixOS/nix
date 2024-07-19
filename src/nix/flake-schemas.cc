@@ -2,6 +2,7 @@
 #include "eval-settings.hh"
 #include "fetch-to-store.hh"
 #include "memory-source-accessor.hh"
+#include "strings-inline.hh"
 
 namespace nix::flake_schemas {
 
@@ -25,12 +26,13 @@ static LockedFlake getBuiltinDefaultSchemasFlake(EvalState & state)
 
     // Construct a dummy flakeref.
     auto flakeRef = parseFlakeRef(
+        fetchSettings,
         fmt("tarball+https://builtin-flake-schemas?narHash=%s",
             state.store->queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)));
 
     auto flake = readFlake(state, flakeRef, flakeRef, flakeRef, state.rootPath(state.store->toRealPath(storePath)), {});
 
-    return lockFlake(state, flakeRef, {}, flake);
+    return lockFlake(flakeSettings, state, flakeRef, {}, flake);
 }
 
 std::tuple<ref<EvalCache>, ref<eval_cache::AttrCursor>>
@@ -42,8 +44,9 @@ call(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake, std::op
 #include "call-flake-schemas.nix.gen.hh"
         ;
 
-    auto lockedDefaultSchemasFlake =
-        defaultSchemasFlake ? flake::lockFlake(state, *defaultSchemasFlake, {}) : getBuiltinDefaultSchemasFlake(state);
+    auto lockedDefaultSchemasFlake = defaultSchemasFlake
+                                         ? flake::lockFlake(flakeSettings, state, *defaultSchemasFlake, {})
+                                         : getBuiltinDefaultSchemasFlake(state);
     auto lockedDefaultSchemasFlakeFingerprint = lockedDefaultSchemasFlake.getFingerprint(state.store);
 
     std::optional<Fingerprint> fingerprint2;
@@ -215,7 +218,7 @@ std::optional<FlakeRef> MixFlakeSchemas::getDefaultFlakeSchemas()
     if (!defaultFlakeSchemas)
         return std::nullopt;
     else
-        return parseFlakeRef(*defaultFlakeSchemas, absPath("."));
+        return parseFlakeRef(fetchSettings, *defaultFlakeSchemas, absPath("."));
 }
 
 }

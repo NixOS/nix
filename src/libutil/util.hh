@@ -11,6 +11,8 @@
 #include <sstream>
 #include <optional>
 
+#include "strings.hh"
+
 namespace nix {
 
 void initLibUtil();
@@ -33,13 +35,26 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 
 
 /**
- * Concatenate the given strings with a separator between the
- * elements.
+ * Ignore any empty strings at the start of the list, and then concatenate the
+ * given strings with a separator between the elements.
+ *
+ * @deprecated This function exists for historical reasons. You probably just
+ *             want to use `concatStringsSep`.
  */
 template<class C>
-std::string concatStringsSep(const std::string_view sep, const C & ss)
+[[deprecated("Consider removing the empty string dropping behavior. If acceptable, use concatStringsSep instead.")]]
+std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
+
+    // TODO? remove to make sure we don't rely on the empty item ignoring behavior,
+    //       or just get rid of this function by understanding the remaining calls.
+    // for (auto & i : ss) {
+    //     // Make sure we don't rely on the empty item ignoring behavior
+    //     assert(!i.empty());
+    //     break;
+    // }
+
     // need a cast to string_view since this is also called with Symbols
     for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
     std::string s;
@@ -358,6 +373,20 @@ inline std::string operator + (std::string_view s1, const char * s2)
     s.append(s1);
     s.append(s2);
     return s;
+}
+
+/**
+ * hash_combine() from Boost. Hash several hashable values together
+ * into a single hash.
+ */
+inline void hash_combine(std::size_t & seed) { }
+
+template <typename T, typename... Rest>
+inline void hash_combine(std::size_t & seed, const T & v, Rest... rest)
+{
+    std::hash<T> hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+    hash_combine(seed, rest...);
 }
 
 }

@@ -1,7 +1,5 @@
-#include "ssh-store-config.hh"
-#include "store-api.hh"
+#include "ssh-store.hh"
 #include "local-fs-store.hh"
-#include "remote-store.hh"
 #include "remote-store-connection.hh"
 #include "source-accessor.hh"
 #include "archive.hh"
@@ -12,23 +10,22 @@
 
 namespace nix {
 
-struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
+SSHStoreConfig::SSHStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , RemoteStoreConfig(params)
+    , CommonSSHStoreConfig(scheme, authority, params)
 {
-    using RemoteStoreConfig::RemoteStoreConfig;
-    using CommonSSHStoreConfig::CommonSSHStoreConfig;
+}
 
-    const Setting<Strings> remoteProgram{this, {"nix-daemon"}, "remote-program",
-        "Path to the `nix-daemon` executable on the remote machine."};
-
-    const std::string name() override { return "Experimental SSH Store"; }
-
-    std::string doc() override
-    {
-        return
-          #include "ssh-store.md"
-          ;
-    }
-};
+std::string SSHStoreConfig::doc()
+{
+    return
+      #include "ssh-store.md"
+      ;
+}
 
 class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
@@ -41,7 +38,7 @@ public:
         : StoreConfig(params)
         , RemoteStoreConfig(params)
         , CommonSSHStoreConfig(scheme, host, params)
-        , SSHStoreConfig(params)
+        , SSHStoreConfig(scheme, host, params)
         , Store(params)
         , RemoteStore(params)
         , master(createSSHMaster(
