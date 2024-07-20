@@ -13,8 +13,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        # https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+        os:
+          - name: "ubuntu-latest"
+            image: "ubuntu-latest"
+            os: "ubuntu"
+            system: "x86_64-linux"
+          - name: "macos-latest, aarch64-darwin"
+            image: "macos-latest"
+            os: "darwin"
+            system: "aarch64-darwin"
+          - name: "macos-14-large, x86_64-darwin"
+            image: "macos-14-large"
+            os: "darwin"
+            system: "x86_64-darwin"
+    runs-on: ${{ matrix.os.image }}
+    name: tests (${{ matrix.os.name }})
     timeout-minutes: 60
     steps:
     - uses: actions/checkout@v4
@@ -31,7 +45,8 @@ jobs:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-    - if: matrix.os == 'ubuntu-latest'
+    - name: Configuring swap space
+      if: matrix.os.os == 'ubuntu'
       run: |
         free -h
         swapon --show
@@ -48,7 +63,17 @@ jobs:
             free -h
           done
         ) &
-    - run: nix --experimental-features 'nix-command flakes' flake check -L
+    - name: Checking image `system`
+      run: |
+        echo Checking that the image is for the expected system and/or system detection works...
+        nixSystem="$(nix-instantiate --eval --expr 'builtins.currentSystem' | sed -e 's/"//g')"
+        echo "system: $nixSystem"
+        if [ "$nixSystem" != "${{ matrix.os.system }}" ]; then
+          echo "Expected system: ${{ matrix.os.system }} but got $nixSystem"
+          exit 1
+        fi
+    - name: Checking `nix flake check`
+      run: nix --experimental-features 'nix-command flakes' flake check -L
 
   # Steps to test CI automation in your own fork.
   # Cachix:
@@ -106,8 +131,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        # See `tests` above
+        os:
+          - name: "ubuntu-latest"
+            image: "ubuntu-latest"
+            os: "ubuntu"
+            system: "x86_64-linux"
+          - name: "macos-latest, aarch64-darwin"
+            image: "macos-latest"
+            os: "darwin"
+            system: "aarch64-darwin"
+          - name: "macos-14-large, x86_64-darwin"
+            image: "macos-14-large"
+            os: "darwin"
+            system: "x86_64-darwin"
+    runs-on: ${{ matrix.os.image }}
+    name: installer_test (${{ matrix.os.name }})
     steps:
     - uses: actions/checkout@v4
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
@@ -116,9 +155,9 @@ jobs:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
     - run: sudo apt install fish zsh
-      if: matrix.os == 'ubuntu-latest'
+      if: matrix.os.os == 'ubuntu'
     - run: brew install fish
-      if: matrix.os == 'macos-latest'
+      if: matrix.os.os == 'darwin'
     - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"
@@ -199,8 +238,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        # See `tests` above
+        os:
+          - name: "ubuntu-latest"
+            image: "ubuntu-latest"
+            os: "ubuntu"
+            system: "x86_64-linux"
+          - name: "macos-latest, aarch64-darwin"
+            image: "macos-latest"
+            os: "darwin"
+            system: "aarch64-darwin"
+          - name: "macos-14-large, x86_64-darwin"
+            image: "macos-14-large"
+            os: "darwin"
+            system: "x86_64-darwin"
+    runs-on: ${{ matrix.os.image }}
+    name: meson_build (${{ matrix.os.name }})
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
