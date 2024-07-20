@@ -86,7 +86,7 @@ struct ParserState
 
     void dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
     void dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos);
-    void addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos);
+    void addAttr(ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc);
     Formals * validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos,
         std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
@@ -110,11 +110,12 @@ inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx pre
     });
 }
 
-inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const PosIdx pos)
+inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc)
 {
     AttrPath::iterator i;
     // All attrpaths have at least one attr
     assert(!attrPath.empty());
+    auto pos = at(loc);
     // Checking attrPath validity.
     // ===========================
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
@@ -178,6 +179,12 @@ inline void ParserState::addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr *
         }
     } else {
         attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, e, pos));
+    }
+
+    auto it = lexerState.positionToDocComment.find(pos);
+    if (it != lexerState.positionToDocComment.end()) {
+        e->setDocComment(it->second);
+        lexerState.positionToDocComment.emplace(at(exprLoc), it->second);
     }
 }
 

@@ -366,18 +366,7 @@ ind_string_parts
 binds
   : binds[accum] attrpath '=' expr ';' {
       $$ = $accum;
-
-      auto pos = state->at(@attrpath);
-      auto exprPos = state->at(@expr);
-      {
-        auto it = state->lexerState.positionToDocComment.find(pos);
-        if (it != state->lexerState.positionToDocComment.end()) {
-          $expr->setDocComment(it->second);
-          state->lexerState.positionToDocComment.emplace(exprPos, it->second);
-        }
-      }
-
-      state->addAttr($$, std::move(*$attrpath), $expr, pos);
+      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
       delete $attrpath;
     }
   | binds[accum] INHERIT attrs ';'
