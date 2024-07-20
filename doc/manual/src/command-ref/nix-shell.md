@@ -120,6 +120,23 @@ All options not listed here are passed to `nix-store
   `bash` from `bashInteractive` found in `<nixpkgs>`, falling back to
   the `bash` found in `PATH` if not found.
 
+  Note that the default shell obtained using the method above may not
+  necessarily be the same as any shells requested in *path*. For
+  example, consider:
+
+  ```nix
+  #!/usr/bin/env -S nix-shell --pure
+  let
+    pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/854fdc68881791812eddd33b2fed94b954979a8e.tar.gz") {};
+  in
+  pkgs.mkShell {
+    buildInputs = pkgs.bashInteractive;
+  }
+  ```
+
+  Despite `--pure`, the above will not result in a fully reproducible
+  shell environment.
+
 {{#include ./env-common.md}}
 
 # Examples
