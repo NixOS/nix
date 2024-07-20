@@ -23,8 +23,8 @@ jobs:
             image: "macos-latest"
             os: "darwin"
             system: "aarch64-darwin"
-          - name: "macos-14-large, x86_64-darwin"
-            image: "macos-14-large"
+          - name: "macos-13, x86_64-darwin"
+            image: "macos-13"
             os: "darwin"
             system: "x86_64-darwin"
     runs-on: ${{ matrix.os.image }}
@@ -141,8 +141,8 @@ jobs:
             image: "macos-latest"
             os: "darwin"
             system: "aarch64-darwin"
-          - name: "macos-14-large, x86_64-darwin"
-            image: "macos-14-large"
+          - name: "macos-13, x86_64-darwin"
+            image: "macos-13"
             os: "darwin"
             system: "x86_64-darwin"
     runs-on: ${{ matrix.os.image }}
@@ -248,8 +248,8 @@ jobs:
             image: "macos-latest"
             os: "darwin"
             system: "aarch64-darwin"
-          - name: "macos-14-large, x86_64-darwin"
-            image: "macos-14-large"
+          - name: "macos-13, x86_64-darwin"
+            image: "macos-13"
             os: "darwin"
             system: "x86_64-darwin"
     runs-on: ${{ matrix.os.image }}
