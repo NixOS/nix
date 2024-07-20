@@ -291,10 +291,21 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
                 s2 = std::string(s2, 0, p + 1);
         }
 
-        es2->emplace_back(i->first, new ExprString(std::move(s2)));
+        // Ignore empty strings for a minor optimisation and AST simplification
+        if (s2 != "") {
+            es2->emplace_back(i->first, new ExprString(std::move(s2)));
+        }
     };
     for (; i != es.end(); ++i, --n) {
         std::visit(overloaded { trimExpr, trimString }, i->second);
+    }
+
+    // If there is nothing at all, return the empty string directly.
+    // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
+    if (es2->size() == 0) {
+        auto *const result = new ExprString("");
+        delete es2;
+        return result;
     }
 
     /* If this is a single string, then don't do a concatenation. */
