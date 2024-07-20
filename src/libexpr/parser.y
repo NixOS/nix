@@ -8,8 +8,8 @@
 %parse-param { nix::ParserState * state }
 %lex-param { void * scanner }
 %lex-param { nix::ParserState * state }
-%expect 1
-%expect-rr 1
+%expect 0
+%expect-rr 0
 
 %code requires {
 
@@ -133,8 +133,8 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %type <e> expr_select expr_simple expr_app
 %type <e> expr_pipe_from expr_pipe_into
 %type <list> expr_list
-%type <attrs> binds
-%type <formals> formals
+%type <attrs> binds binds1
+%type <formals> formals formal_set
 %type <formal> formal
 %type <attrNames> attrpath
 %type <inheritAttrs> attrs
@@ -180,22 +180,22 @@ expr_function
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | '{' formals '}' ':' expr_function[body]
-    { auto me = new ExprLambda(CUR_POS, state->validateFormals($formals), $body);
+  | formal_set ':' expr_function[body]
+    { auto me = new ExprLambda(CUR_POS, state->validateFormals($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | '{' formals '}' '@' ID ':' expr_function[body]
+  | formal_set '@' ID ':' expr_function[body]
     {
       auto arg = state->symbols.create($ID);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formals, CUR_POS, arg), $body);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
-  | ID '@' '{' formals '}' ':' expr_function[body]
+  | ID '@' formal_set ':' expr_function[body]
     {
       auto arg = state->symbols.create($ID);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formals, CUR_POS, arg), $body);
+      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -311,11 +311,13 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $$ = new ExprSelect(noPos, $3, state->s.body); }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(noPos, $3, state->s.body); }
   | REC '{' binds '}'
-    { $3->recursive = true; $$ = $3; }
-  | '{' binds '}'
-    { $$ = $2; }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
+  | '{' binds1 '}'
+    { $2->pos = CUR_POS; $$ = $2; }
+  | '{' '}'
+    { $$ = new ExprAttrs(CUR_POS); }
   | '[' expr_list ']' { $$ = $2; }
   ;
 
@@ -364,8 +366,13 @@ ind_string_parts
   ;
 
 binds
-  : binds[accum] attrpath '=' expr ';' {
-      $$ = $accum;
+  : binds1
+  | { $$ = new ExprAttrs; }
+  ;
+
+binds1
+  : binds1[accum] attrpath '=' expr ';'
+    { $$ = $accum;
       state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
       delete $attrpath;
     }
@@ -398,7 +405,11 @@ binds
       }
       delete $attrs;
     }
-  | { $$ = new ExprAttrs(state->at(@0)); }
+  | attrpath '=' expr ';'
+    { $$ = new ExprAttrs;
+      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      delete $attrpath;
+    }
   ;
 
 attrs
@@ -456,15 +467,19 @@ expr_list
   | { $$ = new ExprList; }
   ;
 
+formal_set
+  : '{' formals ',' ELLIPSIS '}' { $$ = $formals;    $$->ellipsis = true; }
+  | '{' ELLIPSIS '}'             { $$ = new Formals; $$->ellipsis = true; }
+  | '{' formals ',' '}'          { $$ = $formals;    $$->ellipsis = false; }
+  | '{' formals '}'              { $$ = $formals;    $$->ellipsis = false; }
+  | '{' '}'                      { $$ = new Formals; $$->ellipsis = false; }
+  ;
+
 formals
-  : formal ',' formals[accum]
+  : formals[accum] ',' formal
     { $$ = $accum; $$->formals.emplace_back(*$formal); delete $formal; }
   | formal
-    { $$ = new Formals; $$->formals.emplace_back(*$formal); $$->ellipsis = false; delete $formal; }
-  |
-    { $$ = new Formals; $$->ellipsis = false; }
-  | ELLIPSIS
-    { $$ = new Formals; $$->ellipsis = true; }
+    { $$ = new Formals; $$->formals.emplace_back(*$formal); delete $formal; }
   ;
 
 formal
