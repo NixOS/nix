@@ -89,8 +89,8 @@ All options not listed here are passed to `nix-store
   environment that more closely corresponds to the “real” Nix build. A
   few variables, in particular `HOME`, `USER` and `DISPLAY`, are
   retained.  Note that the shell used to run commands is obtained from
-  `NIX_BUILD_SHELL` / `<nixpkgs>` from `NIX_PATH`, and therefore not
-  affected by `--pure`.
+  [`NIX_BUILD_SHELL`](#env-NIX_BUILD_SHELL) / `<nixpkgs>` from
+  `NIX_PATH`, and therefore not affected by `--pure`.
 
 - `--packages` / `-p` *packages*…
 
@@ -114,7 +114,7 @@ All options not listed here are passed to `nix-store
 
 # Environment variables
 
-- `NIX_BUILD_SHELL`
+- <span id="env-NIX_BUILD_SHELL">[`NIX_BUILD_SHELL`](#env-NIX_BUILD_SHELL)</span>
 
   Shell used to start the interactive environment. Defaults to the
   `bash` from `bashInteractive` found in `<nixpkgs>`, falling back to
