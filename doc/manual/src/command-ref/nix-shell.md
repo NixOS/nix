@@ -117,8 +117,8 @@ All options not listed here are passed to `nix-store
 - `NIX_BUILD_SHELL`
 
   Shell used to start the interactive environment. Defaults to the
-  `bash` found in `<nixpkgs>`, falling back to the `bash` found in
-  `PATH` if not found.
+  `bash` from `bashInteractive` found in `<nixpkgs>`, falling back to
+  the `bash` found in `PATH` if not found.
 
 {{#include ./env-common.md}}
 
