@@ -430,4 +430,16 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     return out;
 }
 
+void panic(std::string_view msg)
+{
+    printError(msg);
+    printError("This was a fatal error, aborting.");
+    abort();
+}
+
+void panic(const char * file, int line, const char * func)
+{
+    panic(std::string("Unexpected condition in ") + func + " at " + file + ":" + std::to_string(line));
+}
+
 }

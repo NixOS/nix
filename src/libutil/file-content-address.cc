@@ -63,7 +63,7 @@ std::string_view renderFileIngestionMethod(FileIngestionMethod method)
     case FileIngestionMethod::Git:
         return "git";
     default:
-        abort();
+        unreachable();
     }
 }
 

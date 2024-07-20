@@ -164,7 +164,7 @@ public:
     Cache & getCache(State & state, const std::string & uri)
     {
         auto i = state.caches.find(uri);
-        if (i == state.caches.end()) abort();
+        if (i == state.caches.end()) unreachable();
         return i->second;
     }
 
@@ -211,7 +211,7 @@ public:
 
             {
                 auto r(state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority));
-                if (!r.next()) { abort(); }
+                if (!r.next()) { unreachable(); }
                 ret.id = (int) r.getInt(0);
             }
 

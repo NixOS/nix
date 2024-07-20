@@ -165,7 +165,7 @@ void LocalDerivationGoal::killSandbox(bool getStats)
             buildResult.cpuSystem = stats.cpuSystem;
         }
         #else
-        abort();
+        unreachable();
         #endif
     }
 

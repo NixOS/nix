@@ -7,6 +7,8 @@
 #include <condition_variable>
 #include <cassert>
 
+#include "error.hh"
+
 namespace nix {
 
 /**
@@ -47,7 +49,7 @@ public:
         friend SyncBase;
         Lock(SyncBase * s) : s(s), lk(s->mutex) { }
     public:
-        Lock(Lock && l) : s(l.s) { abort(); }
+        Lock(Lock && l) : s(l.s) { unreachable(); }
         Lock(const Lock & l) = delete;
         ~Lock() { }
 
