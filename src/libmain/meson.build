@@ -64,6 +64,7 @@ subdir('build-utils-meson/diagnostics')
 sources = files(
   'common-args.cc',
   'loggers.cc',
+  'plugin.cc',
   'progress-bar.cc',
   'shared.cc',
 )
@@ -79,6 +80,7 @@ include_dirs = [include_directories('.')]
 headers = [config_h] + files(
   'common-args.hh',
   'loggers.hh',
+  'plugin.hh',
   'progress-bar.hh',
   'shared.hh',
 )

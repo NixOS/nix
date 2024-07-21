@@ -38,6 +38,11 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
+    LocalStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const Params & params);
+
     Setting<bool> requireSigs{this,
         settings.requireSigs,
         "require-sigs",
@@ -61,6 +66,9 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         )"};
 
     const std::string name() override { return "Local Store"; }
+
+    static std::set<std::string> uriSchemes()
+    { return {"local"}; }
 
     std::string doc() override;
 };
@@ -143,9 +151,6 @@ public:
         const Params & params);
 
     ~LocalStore();
-
-    static std::set<std::string> uriSchemes()
-    { return {"local"}; }
 
     /**
      * Implementations of abstract store API methods.

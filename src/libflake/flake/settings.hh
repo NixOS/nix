@@ -10,11 +10,11 @@
 
 #include <sys/types.h>
 
-namespace nix {
+namespace nix::flake {
 
-struct FlakeSettings : public Config
+struct Settings : public Config
 {
-    FlakeSettings();
+    Settings();
 
     Setting<bool> useRegistries{
         this,
@@ -46,8 +46,5 @@ struct FlakeSettings : public Config
         true,
         Xp::Flakes};
 };
-
-// TODO: don't use a global variable.
-extern FlakeSettings flakeSettings;
 
 }

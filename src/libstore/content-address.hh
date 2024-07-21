@@ -73,6 +73,7 @@ struct ContentAddressMethod
 
     Raw raw;
 
+    bool operator ==(const ContentAddressMethod &) const = default;
     auto operator <=>(const ContentAddressMethod &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressMethod);
@@ -159,6 +160,7 @@ struct ContentAddress
      */
     Hash hash;
 
+    bool operator ==(const ContentAddress &) const = default;
     auto operator <=>(const ContentAddress &) const = default;
 
     /**
@@ -218,7 +220,9 @@ struct StoreReferences
      */
     size_t size() const;
 
-    auto operator <=>(const StoreReferences &) const = default;
+    bool operator ==(const StoreReferences &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const StoreReferences &) const = default;
 };
 
 // This matches the additional info that we need for makeTextPath
@@ -235,7 +239,9 @@ struct TextInfo
      */
     StorePathSet references;
 
-    auto operator <=>(const TextInfo &) const = default;
+    bool operator ==(const TextInfo &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const TextInfo &) const = default;
 };
 
 struct FixedOutputInfo
@@ -255,7 +261,9 @@ struct FixedOutputInfo
      */
     StoreReferences references;
 
-    auto operator <=>(const FixedOutputInfo &) const = default;
+    bool operator ==(const FixedOutputInfo &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const FixedOutputInfo &) const = default;
 };
 
 /**
@@ -272,7 +280,9 @@ struct ContentAddressWithReferences
 
     Raw raw;
 
-    auto operator <=>(const ContentAddressWithReferences &) const = default;
+    bool operator ==(const ContentAddressWithReferences &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
+    //auto operator <=>(const ContentAddressWithReferences &) const = default;
 
     MAKE_WRAPPER_CONSTRUCTOR(ContentAddressWithReferences);
 

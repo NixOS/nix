@@ -18,14 +18,10 @@
 
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
-#include <limits>
 #include <map>
-#include <unordered_map>
-#include <unordered_set>
 #include <memory>
 #include <string>
 #include <chrono>
-#include <variant>
 
 
 namespace nix {
@@ -220,6 +216,10 @@ public:
 
     virtual ~Store() { }
 
+    /**
+     * @todo move to `StoreConfig` one we store enough information in
+     * those to recover the scheme and authority in all cases.
+     */
     virtual std::string getUri() = 0;
 
     /**
@@ -901,7 +901,7 @@ struct Implementations
     {
         if (!registered) registered = new std::vector<StoreFactory>();
         StoreFactory factory{
-            .uriSchemes = T::uriSchemes(),
+            .uriSchemes = TConfig::uriSchemes(),
             .create =
                 ([](auto scheme, auto uri, auto & params)
                  -> std::shared_ptr<Store>

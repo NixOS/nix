@@ -31,23 +31,6 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     unsigned int parse(const std::string & str) const override;
 };
 
-struct PluginFilesSetting : public BaseSetting<Paths>
-{
-    bool pluginsLoaded = false;
-
-    PluginFilesSetting(Config * options,
-        const Paths & def,
-        const std::string & name,
-        const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<Paths>(def, true, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
-
-    Paths parse(const std::string & str) const override;
-};
-
 const uint32_t maxIdsPerBuild =
     #if __linux__
     1 << 16
@@ -1158,33 +1141,6 @@ public:
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
         "Number of seconds between checking free disk space."};
 
-    PluginFilesSetting pluginFiles{
-        this, {}, "plugin-files",
-        R"(
-          A list of plugin files to be loaded by Nix. Each of these files will
-          be dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
-          this symbol will be called. Alternatively, they can affect execution
-          through static initialization. In particular, these plugins may construct
-          static instances of RegisterPrimOp to add new primops or constants to the
-          expression language, RegisterStoreImplementation to add new store
-          implementations, RegisterCommand to add new subcommands to the `nix`
-          command, and RegisterSetting to add new nix config settings. See the
-          constructors for those types for more details.
-
-          Warning! These APIs are inherently unstable and may change from
-          release to release.
-
-          Since these files are loaded into the same address space as Nix
-          itself, they must be DSOs compatible with the instance of Nix
-          running at the time (i.e. compiled against the same headers, not
-          linked to any incompatible libraries). They should not be linked to
-          any Nix libs directly, as those will be available already at load
-          time.
-
-          If an entry in the list is a directory, all files in the directory
-          are loaded as plugins (non-recursively).
-        )"};
-
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};
 
@@ -1277,12 +1233,6 @@ public:
 
 // FIXME: don't use a global variable.
 extern Settings settings;
-
-/**
- * This should be called after settings are initialized, but before
- * anything else
- */
-void initPlugins();
 
 /**
  * Load the configuration (from `nix.conf`, `NIX_CONFIG`, etc.) into the

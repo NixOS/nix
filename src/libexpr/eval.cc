@@ -1,6 +1,6 @@
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "eval-settings.hh"
-#include "hash.hh"
 #include "primops.hh"
 #include "print-options.hh"
 #include "exit.hh"
@@ -16,7 +16,6 @@
 #include "print.hh"
 #include "filtering-source-accessor.hh"
 #include "memory-source-accessor.hh"
-#include "signals.hh"
 #include "gc-small-vector.hh"
 #include "url.hh"
 #include "fetch-to-store.hh"
@@ -24,7 +23,6 @@
 #include "parser-tab.hh"
 
 #include <algorithm>
-#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -50,6 +48,8 @@
 #  include <gc/gc_allocator.h>
 
 #endif
+
+#include "strings-inline.hh"
 
 using json = nlohmann::json;
 
@@ -217,9 +217,11 @@ static constexpr size_t BASE_ENV_SIZE = 128;
 EvalState::EvalState(
     const LookupPath & _lookupPath,
     ref<Store> store,
+    const fetchers::Settings & fetchSettings,
     const EvalSettings & settings,
     std::shared_ptr<Store> buildStore)
-    : settings{settings}
+    : fetchSettings{fetchSettings}
+    , settings{settings}
     , sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -557,6 +559,54 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .doc = doc,
             };
     }
+    if (v.isLambda()) {
+        auto exprLambda = v.payload.lambda.fun;
+
+        std::stringstream s(std::ios_base::out);
+        std::string name;
+        auto pos = positions[exprLambda->getPos()];
+        std::string docStr;
+
+        if (exprLambda->name) {
+            name = symbols[exprLambda->name];
+        }
+
+        if (exprLambda->docComment) {
+            docStr = exprLambda->docComment.getInnerText(positions);
+        }
+
+        if (name.empty()) {
+            s << "Function ";
+        }
+        else {
+            s << "Function `" << name << "`";
+            if (pos)
+                s << "\\\n  … " ;
+            else
+                s << "\\\n";
+        }
+        if (pos) {
+            s << "defined at " << pos;
+        }
+        if (!docStr.empty()) {
+            s << "\n\n";
+        }
+
+        s << docStr;
+
+        s << '\0'; // for making a c string below
+        std::string ss = s.str();
+
+        return Doc {
+            .pos = pos,
+            .name = name,
+            .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
+            .args = {},
+            .doc =
+                // FIXME: this leaks; make the field std::string?
+                strdup(ss.data()),
+        };
+    }
     return {};
 }
 
@@ -633,11 +683,11 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
         if (se.isWith && !env.values[0]->isThunk()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
-                vm[st[j.name]] = j.value;
+                vm.insert_or_assign(std::string(st[j.name]), j.value);
         } else {
             // iterate through staticenv bindings and add them.
             for (auto & i : se.vars)
-                vm[st[i.first]] = env.values[i.second];
+                vm.insert_or_assign(std::string(st[i.first]), env.values[i.second]);
         }
     }
 }
@@ -1011,7 +1061,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     if (!e)
         e = parseExprFromFile(resolvedPath);
 
-    fileParseCache[resolvedPath] = e;
+    fileParseCache.emplace(resolvedPath, e);
 
     try {
         auto dts = debugRepl
@@ -1034,8 +1084,8 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         throw;
     }
 
-    fileEvalCache[resolvedPath] = v;
-    if (path != resolvedPath) fileEvalCache[path] = v;
+    fileEvalCache.emplace(resolvedPath, v);
+    if (path != resolvedPath) fileEvalCache.emplace(path, v);
 }
 
 
@@ -1338,7 +1388,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 if (!(j = vAttrs->attrs()->get(name))) {
                     std::set<std::string> allAttrNames;
                     for (auto & attr : *vAttrs->attrs())
-                        allAttrNames.insert(state.symbols[attr.name]);
+                        allAttrNames.insert(std::string(state.symbols[attr.name]));
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
                     state.error<EvalError>("attribute '%1%' missing", state.symbols[name])
                         .atPos(pos).withSuggestions(suggestions).withFrame(env, *this).debugThrow();
@@ -1363,6 +1413,22 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     }
 
     v = *vAttrs;
+}
+
+Symbol ExprSelect::evalExceptFinalSelect(EvalState & state, Env & env, Value & attrs)
+{
+    Value vTmp;
+    Symbol name = getName(attrPath[attrPath.size() - 1], state, env);
+
+    if (attrPath.size() == 1) {
+        e->eval(state, env, vTmp);
+    } else {
+        ExprSelect init(*this);
+        init.attrPath.pop_back();
+        init.eval(state, env, vTmp);
+    }
+    attrs = vTmp;
+    return name;
 }
 
 
@@ -1496,7 +1562,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         if (!lambda.formals->has(i.name)) {
                             std::set<std::string> formalNames;
                             for (auto & formal : lambda.formals->formals)
-                                formalNames.insert(symbols[formal.name]);
+                                formalNames.insert(std::string(symbols[formal.name]));
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
                             error<TypeError>("function '%1%' called with unexpected argument '%2%'",
                                              (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
@@ -2826,13 +2892,37 @@ Expr * EvalState::parse(
     const SourcePath & basePath,
     std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, rootFS, exprSymbols);
+    DocCommentMap tmpDocComments; // Only used when not origin is not a SourcePath
+    DocCommentMap *docComments = &tmpDocComments;
+
+    if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
+        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
+        docComments = &it->second;
+    }
+
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, *docComments, rootFS, exprSymbols);
 
     result->bindVars(*this, staticEnv);
 
     return result;
 }
 
+DocComment EvalState::getDocCommentForPos(PosIdx pos)
+{
+    auto pos2 = positions[pos];
+    auto path = pos2.getSourcePath();
+    if (!path)
+        return {};
+
+    auto table = positionToDocComment.find(*path);
+    if (table == positionToDocComment.end())
+        return {};
+
+    auto it = table->second.find(pos);
+    if (it == table->second.end())
+        return {};
+    return it->second;
+}
 
 std::string ExternalValueBase::coerceToString(EvalState & state, const PosIdx & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
@@ -2842,7 +2932,7 @@ std::string ExternalValueBase::coerceToString(EvalState & state, const PosIdx & 
 }
 
 
-bool ExternalValueBase::operator==(const ExternalValueBase & b) const
+bool ExternalValueBase::operator==(const ExternalValueBase & b) const noexcept
 {
     return false;
 }

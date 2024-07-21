@@ -1,5 +1,5 @@
 #include "legacy-ssh-store.hh"
-#include "ssh-store-config.hh"
+#include "common-ssh-store-config.hh"
 #include "archive.hh"
 #include "pool.hh"
 #include "remote-store.hh"
@@ -14,6 +14,15 @@
 #include "callback.hh"
 
 namespace nix {
+
+LegacySSHStoreConfig::LegacySSHStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , CommonSSHStoreConfig(scheme, authority, params)
+{
+}
 
 std::string LegacySSHStoreConfig::doc()
 {
@@ -35,7 +44,7 @@ LegacySSHStore::LegacySSHStore(
     const Params & params)
     : StoreConfig(params)
     , CommonSSHStoreConfig(scheme, host, params)
-    , LegacySSHStoreConfig(params)
+    , LegacySSHStoreConfig(scheme, host, params)
     , Store(params)
     , connections(make_ref<Pool<Connection>>(
         std::max(1, (int) maxConnections),

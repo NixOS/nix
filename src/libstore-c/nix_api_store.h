@@ -43,17 +43,6 @@ nix_err nix_libstore_init(nix_c_context * context);
 nix_err nix_libstore_init_no_load_config(nix_c_context * context);
 
 /**
- * @brief Loads the plugins specified in Nix's plugin-files setting.
- *
- * Call this once, after calling your desired init functions and setting
- * relevant settings.
- *
- * @param[out] context Optional, stores error information
- * @return NIX_OK if the initialization was successful, an error code otherwise.
- */
-nix_err nix_init_plugins(nix_c_context * context);
-
-/**
  * @brief Open a nix store.
  *
  * Store instances may share state and resources behind the scenes.

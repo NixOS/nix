@@ -1,7 +1,9 @@
+#include <regex>
+
 #include "path-with-outputs.hh"
 #include "store-api.hh"
+#include "strings.hh"
 
-#include <regex>
 
 namespace nix {
 

@@ -1,13 +1,15 @@
 #pragma once
 ///@file
 
+#include "worker.hh"
 #include "store-api.hh"
 #include "goal.hh"
 #include "muxable-pipe.hh"
+#include <coroutine>
+#include <future>
+#include <source_location>
 
 namespace nix {
-
-class Worker;
 
 struct PathSubstitutionGoal : public Goal
 {
@@ -17,30 +19,9 @@ struct PathSubstitutionGoal : public Goal
     StorePath storePath;
 
     /**
-     * The path the substituter refers to the path as. This will be
-     * different when the stores have different names.
+     * Whether to try to repair a valid path.
      */
-    std::optional<StorePath> subPath;
-
-    /**
-     * The remaining substituters.
-     */
-    std::list<ref<Store>> subs;
-
-    /**
-     * The current substituter.
-     */
-    std::shared_ptr<Store> sub;
-
-    /**
-     * Whether a substituter failed.
-     */
-    bool substituterFailed = false;
-
-    /**
-     * Path info returned by the substituter's query info operation.
-     */
-    std::shared_ptr<const ValidPathInfo> info;
+    RepairFlag repair;
 
     /**
      * Pipe for the substituter's standard output.
@@ -52,31 +33,15 @@ struct PathSubstitutionGoal : public Goal
      */
     std::thread thr;
 
-    std::promise<void> promise;
-
-    /**
-     * Whether to try to repair a valid path.
-     */
-    RepairFlag repair;
-
-    /**
-     * Location where we're downloading the substitute.  Differs from
-     * storePath when doing a repair.
-     */
-    Path destPath;
-
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
-
-    typedef void (PathSubstitutionGoal::*GoalState)();
-    GoalState state;
 
     /**
      * Content address for recomputing store path
      */
     std::optional<ContentAddress> ca;
 
-    void done(
+    Done done(
         ExitCode result,
         BuildResult::Status status,
         std::optional<std::string> errorMsg = {});
@@ -96,22 +61,18 @@ public:
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
     }
 
-    void work() override;
-
     /**
      * The states.
      */
-    void init();
-    void tryNext();
-    void gotInfo();
-    void referencesValid();
-    void tryToRun();
-    void finished();
+    Co init() override;
+    Co gotInfo();
+    Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool& substituterFailed);
+    Co finished();
 
     /**
      * Callback used by the worker to write to the log.
      */
-    void handleChildOutput(Descriptor fd, std::string_view data) override;
+    void handleChildOutput(Descriptor fd, std::string_view data) override {};
     void handleEOF(Descriptor fd) override;
 
     /* Called by destructor, can't be overridden */

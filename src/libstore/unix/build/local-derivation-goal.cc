@@ -64,6 +64,8 @@
 #include <grp.h>
 #include <iostream>
 
+#include "strings.hh"
+
 namespace nix {
 
 void handleDiffHook(
@@ -175,7 +177,7 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 }
 
 
-void LocalDerivationGoal::tryLocalBuild()
+Goal::Co LocalDerivationGoal::tryLocalBuild()
 {
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
@@ -183,10 +185,10 @@ void LocalDerivationGoal::tryLocalBuild()
 
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
-        state = &DerivationGoal::tryToBuild;
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
-        return;
+        co_await Suspend{};
+        co_return tryToBuild();
     }
 
     assert(derivationType);
@@ -240,7 +242,8 @@ void LocalDerivationGoal::tryLocalBuild()
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
-            return;
+            co_await Suspend{};
+            co_return tryLocalBuild();
         }
     }
 
@@ -255,15 +258,13 @@ void LocalDerivationGoal::tryLocalBuild()
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, {}, std::move(e));
-        return;
+        co_return done(BuildResult::InputRejected, {}, std::move(e));
     }
 
-    /* This state will be reached when we get EOF on the child's
-       log pipe. */
-    state = &DerivationGoal::buildDone;
-
     started();
+    co_await Suspend{};
+    // after EOF on child
+    co_return buildDone();
 }
 
 static void chmod_(const Path & path, mode_t mode)
@@ -1526,10 +1527,11 @@ void LocalDerivationGoal::startDaemon()
             debug("received daemon connection");
 
             auto workerThread = std::thread([store, remote{std::move(remote)}]() {
-                FdSource from(remote.get());
-                FdSink to(remote.get());
                 try {
-                    daemon::processConnection(store, from, to,
+                    daemon::processConnection(
+                        store,
+                        FdSource(remote.get()),
+                        FdSink(remote.get()),
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SystemError &) {

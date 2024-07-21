@@ -143,6 +143,7 @@
             ''^src/libstore/common-protocol-impl\.hh$''
             ''^src/libstore/common-protocol\.cc$''
             ''^src/libstore/common-protocol\.hh$''
+            ''^src/libstore/common-ssh-store-config\.hh$''
             ''^src/libstore/content-address\.cc$''
             ''^src/libstore/content-address\.hh$''
             ''^src/libstore/daemon\.cc$''
@@ -215,7 +216,6 @@
             ''^src/libstore/serve-protocol\.hh$''
             ''^src/libstore/sqlite\.cc$''
             ''^src/libstore/sqlite\.hh$''
-            ''^src/libstore/ssh-store-config\.hh$''
             ''^src/libstore/ssh-store\.cc$''
             ''^src/libstore/ssh\.cc$''
             ''^src/libstore/ssh\.hh$''
@@ -495,7 +495,6 @@
           excludes = [
             # We haven't linted these files yet
             ''^config/install-sh$''
-            ''^misc/systemv/nix-daemon$''
             ''^misc/bash/completion\.sh$''
             ''^misc/fish/completion\.fish$''
             ''^misc/zsh/completion\.zsh$''

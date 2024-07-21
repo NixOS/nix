@@ -57,8 +57,7 @@ void Completions::add(std::string completion, std::string description)
     });
 }
 
-bool Completion::operator<(const Completion & other) const
-{ return completion < other.completion || (completion == other.completion && description < other.description); }
+auto Completion::operator<=>(const Completion & other) const noexcept = default;
 
 std::string completionMarker = "___COMPLETE___";
 

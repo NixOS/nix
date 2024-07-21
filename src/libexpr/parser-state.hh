@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <limits>
+
 #include "eval.hh"
 
 namespace nix {
@@ -20,25 +22,59 @@ struct StringToken
 
 struct ParserLocation
 {
-    int first_line, first_column;
-    int last_line, last_column;
+    int beginOffset;
+    int endOffset;
 
     // backup to recover from yyless(0)
-    int stashed_first_column, stashed_last_column;
+    int stashedBeginOffset, stashedEndOffset;
 
     void stash() {
-        stashed_first_column = first_column;
-        stashed_last_column = last_column;
+        stashedBeginOffset = beginOffset;
+        stashedEndOffset = endOffset;
     }
 
     void unstash() {
-        first_column = stashed_first_column;
-        last_column = stashed_last_column;
+        beginOffset = stashedBeginOffset;
+        endOffset = stashedEndOffset;
     }
+
+    /** Latest doc comment position, or 0. */
+    int doc_comment_first_column, doc_comment_last_column;
+};
+
+struct LexerState
+{
+    /**
+     * Tracks the distance to the last doc comment, in terms of lexer tokens.
+     *
+     * The lexer sets this to 0 when reading a doc comment, and increments it
+     * for every matched rule; see `lexer-helpers.cc`.
+     * Whitespace and comment rules decrement the distance, so that they result
+     * in a net 0 change in distance.
+     */
+    int docCommentDistance = std::numeric_limits<int>::max();
+
+    /**
+     * The location of the last doc comment.
+     *
+     * (stashing fields are not used)
+     */
+    ParserLocation lastDocCommentLoc;
+
+    /**
+     * @brief Maps some positions to a DocComment, where the comment is relevant to the location.
+     */
+    std::unordered_map<PosIdx, DocComment> & positionToDocComment;
+
+    PosTable & positions;
+    PosTable::Origin origin;
+
+    PosIdx at(const ParserLocation & loc);
 };
 
 struct ParserState
 {
+    const LexerState & lexerState;
     SymbolTable & symbols;
     PosTable & positions;
     Expr * result;
@@ -255,10 +291,21 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
                 s2 = std::string(s2, 0, p + 1);
         }
 
-        es2->emplace_back(i->first, new ExprString(std::move(s2)));
+        // Ignore empty strings for a minor optimisation and AST simplification
+        if (s2 != "") {
+            es2->emplace_back(i->first, new ExprString(std::move(s2)));
+        }
     };
     for (; i != es.end(); ++i, --n) {
         std::visit(overloaded { trimExpr, trimString }, i->second);
+    }
+
+    // If there is nothing at all, return the empty string directly.
+    // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
+    if (es2->size() == 0) {
+        auto *const result = new ExprString("");
+        delete es2;
+        return result;
     }
 
     /* If this is a single string, then don't do a concatenation. */
@@ -270,9 +317,14 @@ inline Expr * ParserState::stripIndentation(const PosIdx pos,
     return new ExprConcatStrings(pos, true, es2);
 }
 
+inline PosIdx LexerState::at(const ParserLocation & loc)
+{
+    return positions.add(origin, loc.beginOffset);
+}
+
 inline PosIdx ParserState::at(const ParserLocation & loc)
 {
-    return positions.add(origin, loc.first_column);
+    return positions.add(origin, loc.beginOffset);
 }
 
 }

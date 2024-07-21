@@ -1,4 +1,3 @@
-#include "archive.hh"
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
 #include "eval-inline.hh"
@@ -720,7 +719,7 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
     .doc = R"(
       `builtins.genericClosure` iteratively computes the transitive closure over an arbitrary relation defined by a function.
 
-      It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attrbute sets:
+      It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attribute sets:
 
       - `startSet`:
         The initial list of attribute sets.
@@ -1225,7 +1224,7 @@ static void derivationStrictInternal(
 
     for (auto & i : attrs->lexicographicOrder(state.symbols)) {
         if (i->name == state.sIgnoreNulls) continue;
-        const std::string & key = state.symbols[i->name];
+        auto key = state.symbols[i->name];
         vomit("processing attribute '%1%'", key);
 
         auto handleHashMode = [&](const std::string_view s) {
@@ -1309,7 +1308,7 @@ static void derivationStrictInternal(
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    (*jsonObject)[key] = printValueAsJSON(state, true, *i->value, pos, context);
+                    jsonObject->emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, pos, context_below);

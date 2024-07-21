@@ -2,6 +2,7 @@
 ///@file
 
 #include "config.hh"
+#include "ref.hh"
 
 namespace nix {
 
@@ -42,7 +43,7 @@ struct EvalSettings : Config
 
     bool & readOnlyMode;
 
-    Strings getDefaultNixPath() const;
+    static Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
 

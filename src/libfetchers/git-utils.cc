@@ -115,10 +115,10 @@ git_oid hashToOID(const Hash & hash)
     return oid;
 }
 
-Object lookupObject(git_repository * repo, const git_oid & oid)
+Object lookupObject(git_repository * repo, const git_oid & oid, git_object_t type = GIT_OBJECT_ANY)
 {
     Object obj;
-    if (git_object_lookup(Setter(obj), repo, &oid, GIT_OBJECT_ANY)) {
+    if (git_object_lookup(Setter(obj), repo, &oid, type)) {
         auto err = git_error_last();
         throw Error("getting Git object '%s': %s", oid, err->message);
     }
@@ -907,6 +907,61 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
 
         addToTree(*pathComponents.rbegin(), oid, GIT_FILEMODE_LINK);
+    }
+
+    void createHardlink(const CanonPath & path, const CanonPath & target) override
+    {
+        std::vector<std::string> pathComponents;
+        for (auto & c : path)
+            pathComponents.emplace_back(c);
+
+        if (!prepareDirs(pathComponents, false)) return;
+
+        // We can't just look up the path from the start of the root, since
+        // some parent directories may not have finished yet, so we compute
+        // a relative path that helps us find the right git_tree_builder or object.
+        auto relTarget = CanonPath(path).parent()->makeRelative(target);
+
+        auto dir = pendingDirs.rbegin();
+
+        // For each ../ component at the start, go up one directory.
+        // CanonPath::makeRelative() always puts all .. elements at the start,
+        // so they're all handled by this loop:
+        std::string_view relTargetLeft(relTarget);
+        while (hasPrefix(relTargetLeft, "../")) {
+            if (dir == pendingDirs.rend())
+                throw Error("invalid hard link target '%s' for path '%s'", target, path);
+            ++dir;
+            relTargetLeft = relTargetLeft.substr(3);
+        }
+        if (dir == pendingDirs.rend())
+            throw Error("invalid hard link target '%s' for path '%s'", target, path);
+
+        // Look up the remainder of the target, starting at the
+        // top-most `git_treebuilder`.
+        std::variant<git_treebuilder *, git_oid> curDir{dir->builder.get()};
+        Object tree; // needed to keep `entry` alive
+        const git_tree_entry * entry = nullptr;
+
+        for (auto & c : CanonPath(relTargetLeft)) {
+            if (auto builder = std::get_if<git_treebuilder *>(&curDir)) {
+                assert(*builder);
+                if (!(entry = git_treebuilder_get(*builder, std::string(c).c_str())))
+                    throw Error("cannot find hard link target '%s' for path '%s'", target, path);
+                curDir = *git_tree_entry_id(entry);
+            } else if (auto oid = std::get_if<git_oid>(&curDir)) {
+                tree = lookupObject(*repo, *oid, GIT_OBJECT_TREE);
+                if (!(entry = git_tree_entry_byname((const git_tree *) &*tree, std::string(c).c_str())))
+                    throw Error("cannot find hard link target '%s' for path '%s'", target, path);
+                curDir = *git_tree_entry_id(entry);
+            }
+        }
+
+        assert(entry);
+
+        addToTree(*pathComponents.rbegin(),
+            *git_tree_entry_id(entry),
+            git_tree_entry_filemode(entry));
     }
 
     Hash sync() override {
