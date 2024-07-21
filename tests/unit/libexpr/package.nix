@@ -41,8 +41,6 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
 
-  outputs = [ "out" "dev" ];
-
   nativeBuildInputs = [
     meson
     ninja
