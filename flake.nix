@@ -326,7 +326,8 @@
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ lib.optional
-              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform)
+              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform
+               && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages)
               pkgs.buildPackages.mesonEmulatorHook
             ++ [
               pkgs.buildPackages.cmake
