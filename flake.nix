@@ -314,6 +314,8 @@
             ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents.nix-store.mesonFlags)
             ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents.nix-fetchers.mesonFlags)
             ++ lib.optionals havePerl (map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents.nix-perl-bindings.mesonFlags))
+            ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents.nix-expr.mesonFlags)
+            ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents.nix-cmd.mesonFlags)
             ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
@@ -324,6 +326,7 @@
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ [
+              pkgs.buildPackages.mesonEmulatorHook
               pkgs.buildPackages.cmake
               pkgs.buildPackages.shellcheck
               modular.pre-commit.settings.package

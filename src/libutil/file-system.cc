@@ -416,7 +416,11 @@ void deletePath(const fs::path & path)
 
 void createDir(const Path & path, mode_t mode)
 {
-    if (mkdir(path.c_str(), mode) == -1)
+    if (mkdir(path.c_str()
+#ifndef _WIN32
+                , mode
+#endif
+                ) == -1)
         throw SysError("creating directory '%1%'", path);
 }
 
