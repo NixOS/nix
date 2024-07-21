@@ -278,6 +278,7 @@
             in
               "-D${prefix}:${rest}";
           havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
+          ignoreCrossFile = flags: builtins.filter (flag: !(lib.strings.hasInfix "cross-file" flag)) flags;
         in {
           pname = "shell-for-" + attrs.pname;
 
@@ -309,10 +310,12 @@
           };
 
           mesonFlags =
-            map (transformFlag "libutil") pkgs.nixComponents.nix-util.mesonFlags
-            ++ map (transformFlag "libstore") pkgs.nixComponents.nix-store.mesonFlags
-            ++ map (transformFlag "libfetchers") pkgs.nixComponents.nix-fetchers.mesonFlags
-            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nixComponents.nix-perl-bindings.mesonFlags)
+            map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents.nix-util.mesonFlags)
+            ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents.nix-store.mesonFlags)
+            ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents.nix-fetchers.mesonFlags)
+            ++ lib.optionals havePerl (map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents.nix-perl-bindings.mesonFlags))
+            ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents.nix-expr.mesonFlags)
+            ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents.nix-cmd.mesonFlags)
             ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
@@ -322,9 +325,16 @@
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
+            ++ lib.optional
+              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform
+                 # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
+                 && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
+                 && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
+                 && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages))
+              pkgs.buildPackages.mesonEmulatorHook
             ++ [
               pkgs.buildPackages.cmake
-              pkgs.shellcheck
+              pkgs.buildPackages.shellcheck
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)
