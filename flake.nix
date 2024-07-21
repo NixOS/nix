@@ -325,8 +325,10 @@
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
-            ++ [
+            ++ lib.optional
+              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform)
               pkgs.buildPackages.mesonEmulatorHook
+            ++ [
               pkgs.buildPackages.cmake
               pkgs.buildPackages.shellcheck
               modular.pre-commit.settings.package
