@@ -1,4 +1,5 @@
 { lib
+, buildPackages
 , stdenv
 , mkMesonDerivation
 , releaseTools
@@ -80,17 +81,21 @@ mkMesonDerivation (finalAttrs: {
   passthru = {
     tests = {
       run = runCommand "${finalAttrs.pname}-run" {
-      } ''
-        PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
+        meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+      } (lib.optionalString stdenv.hostPlatform.isWindows ''
+        export HOME="$PWD/home-dir"
+        mkdir -p "$HOME"
+      '' + ''
         export _NIX_TEST_UNIT_DATA=${./data}
-        nix-util-tests
+        ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
         touch $out
-      '';
+      '');
     };
   };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
+    mainProgram = finalAttrs.pname + stdenv.hostPlatform.extensions.executable;
   };
 
 })
