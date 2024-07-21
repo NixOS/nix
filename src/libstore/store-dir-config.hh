@@ -3,8 +3,9 @@
 #include "path.hh"
 #include "hash.hh"
 #include "content-address.hh"
+#include "store-reference.hh"
+#include "config-parse.hh"
 #include "globals.hh"
-#include "config.hh"
 
 #include <map>
 #include <string>
@@ -18,22 +19,25 @@ struct SourcePath;
 MakeError(BadStorePath, Error);
 MakeError(BadStorePathName, BadStorePath);
 
-struct StoreDirConfig : public Config
+template<template<typename> class F>
+struct StoreDirConfigT
 {
-    using Config::Config;
+    const F<Path> _storeDir;
+};
 
-    StoreDirConfig() = delete;
+struct StoreDirConfig : StoreDirConfigT<config::JustValue>
+{
+    static const StoreDirConfigT<config::JustValue> defaults;
+
+    using Descriptions = StoreDirConfigT<config::SettingInfo>;
+
+    static const Descriptions descriptions;
+
+    StoreDirConfig(const StoreReference::Params & params);
 
     virtual ~StoreDirConfig() = default;
 
-    const PathSetting storeDir_{this, settings.nixStore,
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
-    const Path storeDir = storeDir_;
+    const Path & storeDir = _storeDir.value;
 
     // pure methods
 

@@ -1,5 +1,5 @@
 #include "command.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "make-content-addressed.hh"
 #include "common-args.hh"
 

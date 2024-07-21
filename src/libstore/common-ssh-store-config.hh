@@ -7,27 +7,38 @@ namespace nix {
 
 class SSHMaster;
 
-struct CommonSSHStoreConfig : virtual StoreConfig
+template<template<typename> class F>
+struct CommonSSHStoreConfigT
 {
-    using StoreConfig::StoreConfig;
+    const F<Path> sshKey;
+    const F<std::string> sshPublicHostKey;
+    const F<bool> compress;
+    const F<std::string> remoteStore;
+};
 
-    CommonSSHStoreConfig(std::string_view scheme, std::string_view host, const Params & params);
+struct CommonSSHStoreConfig :
+    virtual Store::Config,
+    CommonSSHStoreConfigT<config::JustValue>
+{
+    struct Descriptions :
+        virtual Store::Config::Descriptions,
+        CommonSSHStoreConfigT<config::SettingInfo>
+    {
+        Descriptions();
+    };
 
-    const Setting<Path> sshKey{this, "", "ssh-key",
-        "Path to the SSH private key used to authenticate to the remote machine."};
+    static const Descriptions descriptions;
 
-    const Setting<std::string> sshPublicHostKey{this, "", "base64-ssh-public-host-key",
-        "The public host key of the remote machine."};
+    static CommonSSHStoreConfigT<config::JustValue> defaults;
 
-    const Setting<bool> compress{this, false, "compress",
-        "Whether to enable SSH compression."};
-
-    const Setting<std::string> remoteStore{this, "", "remote-store",
-        R"(
-          [Store URL](@docroot@/store/types/index.md#store-url-format)
-          to be used on the remote machine. The default is `auto`
-          (i.e. use the Nix daemon or `/nix/store` directly).
-        )"};
+    /**
+     * @param scheme Note this isn't stored by this mix-in class, but
+     * just used for better error messages.
+     */
+    CommonSSHStoreConfig(
+        std::string_view scheme,
+        std::string_view host,
+        const StoreReference::Params & params);
 
     /**
      * The `parseURL` function supports both IPv6 URIs as defined in

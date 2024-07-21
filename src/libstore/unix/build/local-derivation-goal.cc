@@ -1254,29 +1254,46 @@ bool LocalDerivationGoal::isAllowed(const DerivedPath & req)
     return this->isAllowed(pathPartOfReq(req));
 }
 
-
 struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 {
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    const std::string name() { return "Restricted Store"; }
-};
+    const std::string name() override { return "Restricted Store"; }
 
-/* A wrapper around LocalStore that only allows building/querying of
-   paths that are in the input closures of the build or were added via
-   recursive Nix calls. */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
-{
+    ref<Store> openStore() const override;
+
     ref<LocalStore> next;
 
     LocalDerivationGoal & goal;
 
-    RestrictedStore(const Params & params, ref<LocalStore> next, LocalDerivationGoal & goal)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , RestrictedStoreConfig(params)
-        , Store(params)
-        , LocalFSStore(params)
-        , next(next), goal(goal)
+    RestrictedStoreConfig(
+        const StoreReference::Params & params,
+        ref<LocalStore> next,
+        LocalDerivationGoal & goal)
+        : Store::Config{params}
+        , LocalFSStore::Config{params}
+        , next{next}
+        , goal{goal}
+    {
+    }
+};
+
+/**
+ * A wrapper around LocalStore that only allows building/querying of
+ * paths that are in the input closures of the build or were added via
+ * recursive Nix calls.
+ */
+struct RestrictedStore :
+    virtual RestrictedStoreConfig,
+    virtual IndirectRootStore,
+    virtual GcStore
+{
+    using Config = RestrictedStoreConfig;
+
+    RestrictedStore(const RestrictedStoreConfig & config)
+        : Store::Config(config)
+        , LocalFSStore::Config(config)
+        , RestrictedStore::Config(config)
+        , Store(static_cast<const Store::Config &>(*this))
+        , LocalFSStore(static_cast<const LocalFSStore::Config &>(*this))
     { }
 
     Path getRealStoreDir() override
@@ -1480,20 +1497,28 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
 };
 
 
+ref<Store> RestrictedStore::Config::openStore() const
+{
+    return make_ref<RestrictedStore>(*this);
+}
+
+
 void LocalDerivationGoal::startDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
 
-    Store::Params params;
+    StoreReference::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
     if (auto & optRoot = getLocalStore().rootDir.get())
         params["root"] = *optRoot;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
-    auto store = make_ref<RestrictedStore>(params,
+    auto store = RestrictedStore::Config{
+        params,
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(worker.store.shared_from_this())),
-        *this);
+        *this,
+    }.openStore();
 
     addedPaths.clear();
 

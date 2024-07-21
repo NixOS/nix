@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 #include "callback.hh"
+#include "store-registration.hh"
 
 namespace nix {
 
@@ -12,7 +13,7 @@ MakeError(UploadToHTTP, Error);
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
     std::string_view scheme,
     std::string_view _cacheUri,
-    const Params & params)
+    const StoreReference::Params & params)
     : StoreConfig(params)
     , BinaryCacheStoreConfig(params)
     , cacheUri(
@@ -35,10 +36,10 @@ std::string HttpBinaryCacheStoreConfig::doc()
 }
 
 
-class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
+class HttpBinaryCacheStore :
+    public virtual HttpBinaryCacheStoreConfig,
+    public virtual BinaryCacheStore
 {
-private:
-
     struct State
     {
         bool enabled = true;
@@ -49,15 +50,14 @@ private:
 
 public:
 
-    HttpBinaryCacheStore(
-        std::string_view scheme,
-        PathView cacheUri,
-        const Params & params)
-        : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , HttpBinaryCacheStoreConfig(scheme, cacheUri, params)
-        , Store(params)
-        , BinaryCacheStore(params)
+    using Config = HttpBinaryCacheStoreConfig;
+
+    HttpBinaryCacheStore(const Config & config)
+        : Store::Config{config}
+        , BinaryCacheStore::Config{config}
+        , HttpBinaryCacheStore::Config{config}
+        , Store{static_cast<const Store::Config &>(*this)}
+        , BinaryCacheStore{static_cast<const BinaryCacheStore::Config &>(*this)}
     {
         diskCache = getNarInfoDiskCache();
     }
@@ -207,6 +207,11 @@ protected:
     }
 };
 
-static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;
+ref<Store> HttpBinaryCacheStore::Config::openStore() const
+{
+    return make_ref<HttpBinaryCacheStore>(*this);
+}
+
+static RegisterStoreImplementation<HttpBinaryCacheStore> regHttpBinaryCacheStore;
 
 }

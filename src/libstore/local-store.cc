@@ -17,6 +17,9 @@
 #include "posix-source-accessor.hh"
 #include "keys.hh"
 #include "users.hh"
+#include "config-parse-impl.hh"
+#include "store-open.hh"
+#include "store-registration.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -56,12 +59,50 @@
 
 namespace nix {
 
-LocalStoreConfig::LocalStoreConfig(
+LocalStore::Config::Descriptions::Descriptions()
+    : Store::Config::Descriptions{Store::Config::descriptions}
+    , LocalFSStore::Config::Descriptions{LocalFSStore::Config::descriptions}
+    , LocalStoreConfigT<config::SettingInfo>{
+        .requireSigs = {
+            .name = "require-sigs",
+            .description = "Whether store paths copied into this store should have a trusted signature.",
+        },
+        .readOnly = {
+            .name = "read-only",
+            .description = R"(
+              Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
+
+              Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
+
+              Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
+
+              > **Warning**
+              > Do not use this unless the filesystem is read-only.
+              >
+              > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
+              > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
+            )",
+        },
+    }
+{}
+
+const LocalStore::Config::Descriptions LocalStore::Config::descriptions{};
+
+decltype(LocalStore::Config::defaults) LocalStore::Config::defaults = {
+    .requireSigs = {settings.requireSigs},
+    .readOnly = {false},
+};
+
+LocalStore::Config::LocalStoreConfig(
     std::string_view scheme,
     std::string_view authority,
-    const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(authority, params)
+    const StoreReference::Params & params)
+    : Store::Config(params)
+    , LocalFSStore::Config(authority, params)
+    , LocalStoreConfigT<config::JustValue>{
+        CONFIG_ROW(requireSigs),
+        CONFIG_ROW(readOnly),
+    }
 {
 }
 
@@ -70,6 +111,11 @@ std::string LocalStoreConfig::doc()
     return
         #include "local-store.md"
         ;
+}
+
+ref<Store> LocalStore::Config::openStore() const
+{
+    return make_ref<LocalStore>(*this);
 }
 
 struct LocalStore::State::Stmts {
@@ -192,15 +238,12 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
     }
 }
 
-LocalStore::LocalStore(
-    std::string_view scheme,
-    PathView path,
-    const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(path, params)
-    , LocalStoreConfig(scheme, path, params)
-    , Store(params)
-    , LocalFSStore(params)
+LocalStore::LocalStore(const Config & config)
+    : Store::Config{config}
+    , LocalFSStore::Config{config}
+    , LocalStore::Config{config}
+    , Store{static_cast<const Store::Config &>(*this)}
+    , LocalFSStore{static_cast<const LocalFSStore::Config &>(*this)}
     , dbDir(stateDir + "/db")
     , linksDir(realStoreDir + "/.links")
     , reservedPath(dbDir + "/reserved")
@@ -474,12 +517,6 @@ LocalStore::LocalStore(
                     (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
-}
-
-
-LocalStore::LocalStore(const Params & params)
-    : LocalStore("local", "", params)
-{
 }
 
 
@@ -1512,7 +1549,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : std::filesystem::directory_iterator{realStoreDir.to_string()}) {
+    for (auto & i : std::filesystem::directory_iterator{realStoreDir.get()}) {
         checkInterrupt();
         try {
             storePathsInStoreDir.insert({i.path().filename().string()});
@@ -1802,6 +1839,6 @@ std::optional<std::string> LocalStore::getVersion()
     return nixVersion;
 }
 
-static RegisterStoreImplementation<LocalStore, LocalStoreConfig> regLocalStore;
+static RegisterStoreImplementation<LocalStore> regLocalStore;
 
 }  // namespace nix

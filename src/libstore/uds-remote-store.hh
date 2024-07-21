@@ -7,7 +7,9 @@
 
 namespace nix {
 
-struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
+struct UDSRemoteStoreConfig :
+    virtual LocalFSStoreConfig,
+    virtual RemoteStoreConfig
 {
     // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
     // outlined in https://github.com/NixOS/nix/issues/10766
@@ -34,7 +36,7 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
      */
     Path path;
 
-protected:
+private:
     static constexpr char const * scheme = "unix";
 
 public:
@@ -42,24 +44,12 @@ public:
     { return {scheme}; }
 };
 
-class UDSRemoteStore : public virtual UDSRemoteStoreConfig
-    , public virtual IndirectRootStore
-    , public virtual RemoteStore
+struct UDSRemoteStore :
+    virtual UDSRemoteStoreConfig,
+    virtual IndirectRootStore,
+    virtual RemoteStore
 {
-public:
-
-    /**
-     * @deprecated This is the old API to construct the store.
-    */
-    UDSRemoteStore(const Params & params);
-
-    /**
-     * @param authority is the socket path.
-     */
-    UDSRemoteStore(
-        std::string_view scheme,
-        std::string_view authority,
-        const Params & params);
+    UDSRemoteStore(const UDSRemoteStoreConfig &);
 
     std::string getUri() override;
 

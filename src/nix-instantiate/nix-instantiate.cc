@@ -8,7 +8,7 @@
 #include "signals.hh"
 #include "value-to-xml.hh"
 #include "value-to-json.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
 #include "legacy.hh"

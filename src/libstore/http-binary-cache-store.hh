@@ -4,9 +4,8 @@ namespace nix {
 
 struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
-
-    HttpBinaryCacheStoreConfig(std::string_view scheme, std::string_view _cacheUri, const Params & params);
+    HttpBinaryCacheStoreConfig(
+        std::string_view scheme, std::string_view cacheUri, const StoreReference::Params & params);
 
     Path cacheUri;
 
@@ -25,6 +24,8 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     }
 
     std::string doc() override;
+
+    ref<Store> openStore() const override;
 };
 
 }

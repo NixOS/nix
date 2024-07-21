@@ -5,25 +5,88 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "derivations.hh"
+#include "config-parse-impl.hh"
 
 namespace nix {
 
-LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
-    : StoreConfig(params)
-    // Default `?root` from `rootDir` if non set
-    // FIXME don't duplicate description once we don't have root setting
-    , rootDir{
-        this,
-        !rootDir.empty() && params.count("root") == 0
-            ? (std::optional<Path>{rootDir})
-            : std::nullopt,
-        "root",
-        "Directory prefixed to all other paths."}
+LocalFSStore::Config::Descriptions::Descriptions()
+    : Store::Config::Descriptions{Store::Config::descriptions}
+    , LocalFSStoreConfigT<config::SettingInfo>{
+        .rootDir = {
+            .name = "root",
+            .description = "Directory prefixed to all other paths.",
+        },
+        .stateDir = {
+            .name = "state",
+            .description = "Directory where Nix will store state.",
+        },
+        .logDir = {
+            .name = "log",
+            .description = "directory where Nix will store log files.",
+        },
+        .realStoreDir{
+            .name = "real",
+            .description = "Physical path of the Nix store.",
+        },
+    }
+{}
+
+const LocalFSStore::Config::Descriptions LocalFSStore::Config::descriptions{};
+
+LocalFSStoreConfigT<config::JustValue> LocalFSStore::Config::defaults(
+    const Store::Config & storeConfig,
+    const std::optional<Path> rootDir)
+{
+    return {
+        .rootDir = {std::nullopt},
+        .stateDir = {rootDir ? *rootDir + "/nix/var/nix" : settings.nixStateDir},
+        .logDir = {rootDir ? *rootDir + "/nix/var/log/nix" : settings.nixLogDir},
+        .realStoreDir = {rootDir ? *rootDir + "/nix/store" : storeConfig.storeDir},
+    };
+}
+
+/**
+ * @param rootDir Fallback if not in `params`
+ */
+auto localFSStoreConfig(
+    const Store::Config & storeConfig,
+    const std::optional<Path> _rootDir,
+    const StoreReference::Params & params)
+{
+    const auto & descriptions = LocalFSStore::Config::descriptions;
+
+    auto rootDir = descriptions.rootDir.parseConfig(params)
+        .value_or(config::JustValue{.value = std::move(_rootDir)});
+
+    auto defaults = LocalFSStore::Config::defaults(storeConfig, rootDir.value);
+
+    return LocalFSStoreConfigT<config::JustValue>{
+        CONFIG_ROW(rootDir),
+        CONFIG_ROW(stateDir),
+        CONFIG_ROW(logDir),
+        CONFIG_ROW(realStoreDir),
+    };
+}
+
+LocalFSStore::Config::LocalFSStoreConfig(const StoreReference::Params & params)
+    : StoreConfig{params}
+    , LocalFSStoreConfigT<config::JustValue>{localFSStoreConfig(*this, std::nullopt, params)}
 {
 }
 
-LocalFSStore::LocalFSStore(const Params & params)
-    : Store(params)
+LocalFSStore::Config::LocalFSStoreConfig(PathView rootDir, const StoreReference::Params & params)
+    : StoreConfig(params)
+    , LocalFSStoreConfigT<config::JustValue>{localFSStoreConfig(
+        *this,
+        // Default `?root` from `rootDir` if non set
+        !rootDir.empty() ? (std::optional<Path>{rootDir}) : std::nullopt,
+        params)}
+{
+}
+
+LocalFSStore::LocalFSStore(const Config & config)
+    : LocalFSStore::Config{config}
+    , Store{static_cast<const Store::Config &>(*this)}
 {
 }
 
@@ -97,8 +160,8 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
         Path logPath =
             j == 0
-            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-            : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
+            ? fmt("%s/%s/%s/%s", logDir.get(), drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
+            : fmt("%s/%s/%s", logDir.get(), drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))

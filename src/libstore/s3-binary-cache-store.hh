@@ -7,87 +7,40 @@
 
 namespace nix {
 
-struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+template<template<typename> class F>
+struct S3BinaryCacheStoreConfigT
 {
+    const F<std::string> profile;
+    const F<std::string> region;
+    const F<std::string> scheme;
+    const F<std::string> endpoint;
+    const F<std::string> narinfoCompression;
+    const F<std::string> lsCompression;
+    const F<std::string> logCompression;
+    const F<bool> multipartUpload;
+    const F<uint64_t> bufferSize;
+};
+
+struct S3BinaryCacheStoreConfig :
+    virtual BinaryCacheStoreConfig,
+    S3BinaryCacheStoreConfigT<config::JustValue>
+{
+    struct Descriptions :
+        virtual Store::Config::Descriptions,
+        virtual BinaryCacheStore::Config::Descriptions,
+        S3BinaryCacheStoreConfigT<config::SettingInfo>
+    {
+        Descriptions();
+    };
+
+    static const Descriptions descriptions;
+
+    static S3BinaryCacheStoreConfigT<config::JustValue> defaults;
+
+    S3BinaryCacheStoreConfig(
+        std::string_view uriScheme, std::string_view bucketName, const StoreReference::Params & params);
+
     std::string bucketName;
-
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
-
-    S3BinaryCacheStoreConfig(std::string_view uriScheme, std::string_view bucketName, const Params & params);
-
-    const Setting<std::string> profile{
-        this,
-        "",
-        "profile",
-        R"(
-          The name of the AWS configuration profile to use. By default
-          Nix will use the `default` profile.
-        )"};
-
-protected:
-
-    constexpr static const char * defaultRegion = "us-east-1";
-
-public:
-
-    const Setting<std::string> region{
-        this,
-        defaultRegion,
-        "region",
-        R"(
-          The region of the S3 bucket. If your bucket is not in
-          `us–east-1`, you should always explicitly specify the region
-          parameter.
-        )"};
-
-    const Setting<std::string> scheme{
-        this,
-        "",
-        "scheme",
-        R"(
-          The scheme used for S3 requests, `https` (default) or `http`. This
-          option allows you to disable HTTPS for binary caches which don't
-          support it.
-
-          > **Note**
-          >
-          > HTTPS should be used if the cache might contain sensitive
-          > information.
-        )"};
-
-    const Setting<std::string> endpoint{
-        this,
-        "",
-        "endpoint",
-        R"(
-          The URL of the endpoint of an S3-compatible service such as MinIO.
-          Do not specify this setting if you're using Amazon S3.
-
-          > **Note**
-          >
-          > This endpoint must support HTTPS and will use path-based
-          > addressing instead of virtual host based addressing.
-        )"};
-
-    const Setting<std::string> narinfoCompression{
-        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
-
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
-
-    const Setting<std::string> logCompression{
-        this,
-        "",
-        "log-compression",
-        R"(
-          Compression method for `log/*` files. It is recommended to
-          use a compression method supported by most web browsers
-          (e.g. `brotli`).
-        )"};
-
-    const Setting<bool> multipartUpload{this, false, "multipart-upload", "Whether to use multi-part uploads."};
-
-    const Setting<uint64_t> bufferSize{
-        this, 5 * 1024 * 1024, "buffer-size", "Size (in bytes) of each part in multi-part uploads."};
 
     const std::string name() override
     {
@@ -100,13 +53,17 @@ public:
     }
 
     std::string doc() override;
+
+    ref<Store> openStore() const override;
 };
 
-class S3BinaryCacheStore : public virtual BinaryCacheStore
+struct S3BinaryCacheStore : virtual BinaryCacheStore
 {
+    using Config = S3BinaryCacheStoreConfig;
+
 protected:
 
-    S3BinaryCacheStore(const Params & params);
+    S3BinaryCacheStore(const Config &);
 
 public:
 

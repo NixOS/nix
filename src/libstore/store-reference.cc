@@ -1,5 +1,7 @@
 #include <regex>
 
+#include <nlohmann/json.hpp>
+
 #include "error.hh"
 #include "url.hh"
 #include "store-reference.hh"

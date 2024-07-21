@@ -34,36 +34,36 @@ struct OptimiseStats
     uint64_t bytesFreed = 0;
 };
 
-struct LocalStoreConfig : virtual LocalFSStoreConfig
+template<template<typename> class F>
+struct LocalStoreConfigT
 {
-    using LocalFSStoreConfig::LocalFSStoreConfig;
+    const F<bool> requireSigs;
+    const F<bool> readOnly;
+};
+
+struct LocalStoreConfig :
+    virtual Store::Config,
+    virtual LocalFSStore::Config,
+    LocalStoreConfigT<config::JustValue>
+{
+    struct Descriptions :
+        virtual Store::Config::Descriptions,
+        virtual LocalFSStore::Config::Descriptions,
+        LocalStoreConfigT<config::SettingInfo>
+    {
+        Descriptions();
+    };
+
+    static const Descriptions descriptions;
+
+    static LocalStoreConfigT<config::JustValue> defaults;
+
+    LocalStoreConfig(const StoreReference::Params &);
 
     LocalStoreConfig(
         std::string_view scheme,
         std::string_view authority,
-        const Params & params);
-
-    Setting<bool> requireSigs{this,
-        settings.requireSigs,
-        "require-sigs",
-        "Whether store paths copied into this store should have a trusted signature."};
-
-    Setting<bool> readOnly{this,
-        false,
-        "read-only",
-        R"(
-          Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
-
-          Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
-
-          Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
-
-          > **Warning**
-          > Do not use this unless the filesystem is read-only.
-          >
-          > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
-          > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
-        )"};
+        const StoreReference::Params & params);
 
     const std::string name() override { return "Local Store"; }
 
@@ -71,12 +71,19 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
     { return {"local"}; }
 
     std::string doc() override;
+
+    ref<Store> openStore() const override;
 };
 
-class LocalStore : public virtual LocalStoreConfig
-    , public virtual IndirectRootStore
-    , public virtual GcStore
+class LocalStore :
+    public virtual LocalStoreConfig,
+    public virtual IndirectRootStore,
+    public virtual GcStore
 {
+public:
+
+    using Config = LocalStoreConfig;
+
 private:
 
     /**
@@ -144,11 +151,7 @@ public:
      * Initialise the local store, upgrading the schema if
      * necessary.
      */
-    LocalStore(const Params & params);
-    LocalStore(
-        std::string_view scheme,
-        PathView path,
-        const Params & params);
+    LocalStore(const Config & params);
 
     ~LocalStore();
 

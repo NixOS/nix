@@ -12,7 +12,7 @@
 #include "eval-settings.hh"
 #include "attr-path.hh"
 #include "signals.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "log-store.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
@@ -635,7 +635,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 // When missing, trigger the normal exception
                 // e.g. :doc builtins.foo
                 // behaves like
-                // nix-repl> builtins.foo      
+                // nix-repl> builtins.foo
                 // error: attribute 'foo' missing
                 evalString(arg, v);
                 assert(false);

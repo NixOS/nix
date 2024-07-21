@@ -1,6 +1,6 @@
 #include "file-system.hh"
 #include "signals.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "store-cast.hh"
 #include "gc-store.hh"
 #include "profiles.hh"

@@ -1,7 +1,5 @@
 #if ENABLE_S3
 
-#include <assert.h>
-
 #include "s3.hh"
 #include "s3-binary-cache-store.hh"
 #include "nar-info.hh"
@@ -9,6 +7,8 @@
 #include "globals.hh"
 #include "compression.hh"
 #include "filetransfer.hh"
+#include "config-parse-impl.hh"
+#include "store-registration.hh"
 
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
@@ -187,28 +187,118 @@ S3Helper::FileTransferResult S3Helper::getObject(
     return res;
 }
 
-S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
-    : BinaryCacheStoreConfig(params)
-    , BinaryCacheStore(params)
-{ }
 
+S3BinaryCacheStore::Config::Descriptions::Descriptions()
+    : Store::Config::Descriptions{Store::Config::descriptions}
+    , BinaryCacheStore::Config::Descriptions{BinaryCacheStore::Config::descriptions}
+    , S3BinaryCacheStoreConfigT<config::SettingInfo>{
+        .profile{
+            .name = "profile",
+            .description = R"(
+              The name of the AWS configuration profile to use. By default
+              Nix will use the `default` profile.
+            )",
+        },
+        .region{
+            .name = "region",
+            .description = R"(
+              The region of the S3 bucket. If your bucket is not in
+              `us–east-1`, you should always explicitly specify the region
+              parameter.
+            )",
+        },
+        .scheme{
+            .name = "scheme",
+            .description = R"(
+              The scheme used for S3 requests, `https` (default) or `http`. This
+              option allows you to disable HTTPS for binary caches which don't
+              support it.
 
-S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
-    std::string_view uriScheme,
-    std::string_view bucketName,
-    const Params & params)
-    : StoreConfig(params)
-    , BinaryCacheStoreConfig(params)
-    , bucketName(bucketName)
+              > **Note**
+              >
+              > HTTPS should be used if the cache might contain sensitive
+              > information.
+            )",
+        },
+        .endpoint{
+            .name = "endpoint",
+            .description = R"(
+              The URL of the endpoint of an S3-compatible service such as MinIO.
+              Do not specify this setting if you're using Amazon S3.
+
+              > **Note**
+              >
+              > This endpoint must support HTTPS and will use path-based
+              > addressing instead of virtual host based addressing.
+            )",
+        },
+        .narinfoCompression{
+            .name = "narinfo-compression",
+            .description = "Compression method for `.narinfo` files.",
+        },
+        .lsCompression{
+            .name = "ls-compression",
+            .description = "Compression method for `.ls` files.",
+        },
+        .logCompression{
+            .name = "log-compression",
+            .description = R"(
+              Compression method for `log/*` files. It is recommended to
+              use a compression method supported by most web browsers
+              (e.g. `brotli`).
+            )",
+        },
+        .multipartUpload{
+            .name = "multipart-upload",
+            .description = "Whether to use multi-part uploads.",
+        },
+        .bufferSize{
+            .name = "buffer-size",
+            .description = "Size (in bytes) of each part in multi-part uploads.",
+        },
+    }
+{}
+
+const S3BinaryCacheStore::Config::Descriptions S3BinaryCacheStore::Config::descriptions{};
+
+decltype(S3BinaryCacheStore::Config::defaults) S3BinaryCacheStore::Config::defaults = {
+    .profile{""},
+    .region{Aws::Region::US_EAST_1},
+    .scheme{""},
+    .endpoint{""},
+    .narinfoCompression{""},
+    .lsCompression{""},
+    .logCompression{""},
+    .multipartUpload{false},
+    .bufferSize{5 * 1024 * 1024},
+};
+
+S3BinaryCacheStore::Config::S3BinaryCacheStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const StoreReference::Params & params)
+    : Store::Config(params)
+    , BinaryCacheStore::Config(params)
+    , S3BinaryCacheStoreConfigT<config::JustValue>{
+        CONFIG_ROW(profile),
+        CONFIG_ROW(region),
+        CONFIG_ROW(scheme),
+        CONFIG_ROW(endpoint),
+        CONFIG_ROW(narinfoCompression),
+        CONFIG_ROW(lsCompression),
+        CONFIG_ROW(logCompression),
+        CONFIG_ROW(multipartUpload),
+        CONFIG_ROW(bufferSize),
+    }
 {
-    // Don't want to use use AWS SDK in header, so we check the default
-    // here. TODO do this better after we overhaul the store settings
-    // system.
-    assert(std::string{defaultRegion} == std::string{Aws::Region::US_EAST_1});
-
     if (bucketName.empty())
-        throw UsageError("`%s` store requires a bucket name in its Store URI", uriScheme);
+        throw UsageError("`%s` store requires a bucket name in its Store URI", scheme);
 }
+
+
+S3BinaryCacheStore::S3BinaryCacheStore(const Config & config)
+    : BinaryCacheStore(config)
+{ }
 
 std::string S3BinaryCacheStoreConfig::doc()
 {
@@ -220,22 +310,17 @@ std::string S3BinaryCacheStoreConfig::doc()
 
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
 {
-    std::string bucketName;
-
     Stats stats;
 
     S3Helper s3Helper;
 
-    S3BinaryCacheStoreImpl(
-        std::string_view uriScheme,
-        std::string_view bucketName,
-        const Params & params)
-        : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , S3BinaryCacheStoreConfig(uriScheme, bucketName, params)
-        , Store(params)
-        , BinaryCacheStore(params)
-        , S3BinaryCacheStore(params)
+    S3BinaryCacheStoreImpl(const Config & config)
+        : Store::Config{config}
+        , BinaryCacheStore::Config{config}
+        , S3BinaryCacheStore::Config{config}
+        , Store{static_cast<const Store::Config &>(*this)}
+        , BinaryCacheStore{static_cast<const BinaryCacheStore::Config &>(*this)}
+        , S3BinaryCacheStore{static_cast<const S3BinaryCacheStore::Config &>(*this)}
         , s3Helper(profile, region, scheme, endpoint)
     {
         diskCache = getNarInfoDiskCache();
@@ -477,7 +562,12 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     }
 };
 
-static RegisterStoreImplementation<S3BinaryCacheStoreImpl, S3BinaryCacheStoreConfig> regS3BinaryCacheStore;
+ref<Store> S3BinaryCacheStoreImpl::Config::openStore() const
+{
+    return make_ref<S3BinaryCacheStoreImpl>(*this);
+}
+
+static RegisterStoreImplementation<S3BinaryCacheStoreImpl> regS3BinaryCacheStore;
 
 }
 

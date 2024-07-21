@@ -23,6 +23,24 @@
 
 namespace nix {
 
+#if 0
+    const Setting<int> maxConnections{this, 1, "max-connections",
+        "Maximum number of concurrent connections to the Nix daemon."};
+
+    const Setting<unsigned int> maxConnectionAge{this,
+        std::numeric_limits<unsigned int>::max(),
+        "max-connection-age",
+        "Maximum age of a connection before it is closed."};
+
+    const Setting<int> maxConnections{this, 1, "max-connections",
+        "Maximum number of concurrent connections to the Nix daemon."};
+
+    const Setting<unsigned int> maxConnectionAge{this,
+        std::numeric_limits<unsigned int>::max(),
+        "max-connection-age",
+        "Maximum age of a connection before it is closed."};
+#endif
+
 /* TODO: Separate these store types into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
     : RemoteStoreConfig(params)

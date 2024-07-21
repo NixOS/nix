@@ -13,6 +13,7 @@
 #include "callback.hh"
 #include "signals.hh"
 #include "archive.hh"
+#include "config-parse-impl.hh"
 
 #include <chrono>
 #include <future>
@@ -24,9 +25,74 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(const Params & params)
-    : BinaryCacheStoreConfig(params)
-    , Store(params)
+BinaryCacheStore::Config::Descriptions::Descriptions()
+    : Store::Config::Descriptions{Store::Config::descriptions}
+    , BinaryCacheStoreConfigT<config::SettingInfo>{
+        .compression = {
+            .name = "compression",
+            .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",
+        },
+        .writeNARListing = {
+            .name = "write-nar-listing",
+            .description = "Whether to write a JSON file that lists the files in each NAR.",
+        },
+        .writeDebugInfo = {
+            .name = "index-debug-info",
+            .description = R"(
+              Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
+              fetch debug info on demand
+            )",
+        },
+        .secretKeyFile{
+            .name = "secret-key",
+            .description = "Path to the secret key used to sign the binary cache.",
+        },
+        .localNarCache{
+            .name = "local-nar-cache",
+            .description = "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`.",
+        },
+        .parallelCompression{
+            .name = "parallel-compression",
+            .description = "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`.",
+        },
+        .compressionLevel{
+            .name = "compression-level",
+            .description = R"(
+              The *preset level* to be used when compressing NARs.
+              The meaning and accepted values depend on the compression method selected.
+              `-1` specifies that the default compression level should be used.
+            )",
+        },
+    }
+{}
+
+const BinaryCacheStore::Config::Descriptions BinaryCacheStore::Config::descriptions{};
+
+decltype(BinaryCacheStore::Config::defaults) BinaryCacheStore::Config::defaults = {
+    .compression = {"xz"},
+    .writeNARListing{false},
+    .writeDebugInfo{false},
+    .secretKeyFile{""},
+    .localNarCache{""},
+    .parallelCompression{false},
+    .compressionLevel{-1},
+};
+
+BinaryCacheStore::Config::BinaryCacheStoreConfig(const StoreReference::Params & params)
+    : StoreConfig{params}
+    , BinaryCacheStoreConfigT<config::JustValue>{
+        CONFIG_ROW(compression),
+        CONFIG_ROW(secretKeyFile),
+        CONFIG_ROW(localNarCache),
+        CONFIG_ROW(parallelCompression),
+        CONFIG_ROW(compressionLevel),
+    }
+{
+}
+
+BinaryCacheStore::BinaryCacheStore(const Config & config)
+    : Config{config}
+    , Store{static_cast<const Store::Config &>(*this)}
 {
     if (secretKeyFile != "")
         signer = std::make_unique<LocalSigner>(

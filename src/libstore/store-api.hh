@@ -9,7 +9,6 @@
 #include "lru-cache.hh"
 #include "sync.hh"
 #include "globals.hh"
-#include "config.hh"
 #include "path-info.hh"
 #include "repair-flag.hh"
 #include "store-dir-config.hh"
@@ -41,7 +40,7 @@ namespace nix {
  * 2. A class `Foo : virtual Store, virtual FooConfig` that contains the
  *   implementation of the store.
  *
- *   This class is expected to have a constructor `Foo(const Params & params)`
+ *   This class is expected to have a constructor `Foo(const StoreReference::Params & params)`
  *   that calls `StoreConfig(params)` (otherwise you're gonna encounter an
  *   `assertion failure` when trying to instantiate it).
  *
@@ -97,17 +96,37 @@ struct KeyedBuildResult;
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
-struct StoreConfig : public StoreDirConfig
+template<template<typename> class F>
+struct StoreConfigT
 {
-    using Params = StoreReference::Params;
+    const F<int> pathInfoCacheSize;
+    const F<bool> isTrusted;
+    F<int> priority;
+    F<bool> wantMassQuery;
+    F<StringSet> systemFeatures;
+};
 
-    using StoreDirConfig::StoreDirConfig;
+StoreConfigT<config::JustValue> parseStoreConfig(const StoreReference::Params &);
+struct StoreConfig :
+    StoreDirConfig,
+    StoreConfigT<config::JustValue>
+{
+    struct Descriptions :
+        StoreDirConfig::Descriptions,
+        StoreConfigT<config::SettingInfo>
+    {
+        Descriptions();
+    };
 
-    StoreConfig() = delete;
+    static const StoreConfigT<config::JustValue> defaults;
 
-    static StringSet getDefaultSystemFeatures();
+    static const Descriptions descriptions;
+
+    StoreConfig(const StoreReference::Params &);
 
     virtual ~StoreConfig() { }
+
+    static StringSet getDefaultSystemFeatures();
 
     /**
      * The name of this type of store.
@@ -131,42 +150,19 @@ struct StoreConfig : public StoreDirConfig
         return std::nullopt;
     }
 
-    const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
-        "Size of the in-memory store path metadata cache."};
-
-    const Setting<bool> isTrusted{this, false, "trusted",
-        R"(
-          Whether paths from this store can be used as substitutes
-          even if they are not signed by a key listed in the
-          [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys)
-          setting.
-        )"};
-
-    Setting<int> priority{this, 0, "priority",
-        R"(
-          Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
-          A lower value means a higher priority.
-        )"};
-
-    Setting<bool> wantMassQuery{this, false, "want-mass-query",
-        R"(
-          Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
-        )"};
-
-    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
-        "system-features",
-        R"(
-          Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
-
-          Example: `"kvm"`
-        )",
-        {},
-        // Don't document the machine-specific default value
-        false};
+    /**
+     * Open a store of the type corresponding to this configuration
+     * type.
+     */
+    virtual ref<Store> openStore() const = 0;
 };
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
 {
+public:
+
+    using Config = StoreConfig;
+
 protected:
 
     struct PathInfoCacheValue {
@@ -205,14 +201,9 @@ protected:
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
-    Store(const Params & params);
+    Store(const Store::Config & config);
 
 public:
-    /**
-     * Perform any necessary effectful operation to make the store up and
-     * running
-     */
-    virtual void init() {};
 
     virtual ~Store() { }
 
@@ -855,74 +846,6 @@ void removeTempRoots();
  */
 StorePath resolveDerivedPath(Store &, const SingleDerivedPath &, Store * evalStore = nullptr);
 OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
-
-
-/**
- * @return a Store object to access the Nix store denoted by
- * ‘uri’ (slight misnomer...).
- */
-ref<Store> openStore(StoreReference && storeURI);
-
-
-/**
- * Opens the store at `uri`, where `uri` is in the format expected by `StoreReference::parse`
-
- */
-ref<Store> openStore(const std::string & uri = settings.storeUri.get(),
-    const Store::Params & extraParams = Store::Params());
-
-
-/**
- * @return the default substituter stores, defined by the
- * ‘substituters’ option and various legacy options.
- */
-std::list<ref<Store>> getDefaultSubstituters();
-
-struct StoreFactory
-{
-    std::set<std::string> uriSchemes;
-    /**
-     * The `authorityPath` parameter is `<authority>/<path>`, or really
-     * whatever comes after `<scheme>://` and before `?<query-params>`.
-     */
-    std::function<std::shared_ptr<Store> (
-        std::string_view scheme,
-        std::string_view authorityPath,
-        const Store::Params & params)> create;
-    std::function<std::shared_ptr<StoreConfig> ()> getConfig;
-};
-
-struct Implementations
-{
-    static std::vector<StoreFactory> * registered;
-
-    template<typename T, typename TConfig>
-    static void add()
-    {
-        if (!registered) registered = new std::vector<StoreFactory>();
-        StoreFactory factory{
-            .uriSchemes = TConfig::uriSchemes(),
-            .create =
-                ([](auto scheme, auto uri, auto & params)
-                 -> std::shared_ptr<Store>
-                 { return std::make_shared<T>(scheme, uri, params); }),
-            .getConfig =
-                ([]()
-                 -> std::shared_ptr<StoreConfig>
-                 { return std::make_shared<TConfig>(StringMap({})); })
-        };
-        registered->push_back(factory);
-    }
-};
-
-template<typename T, typename TConfig>
-struct RegisterStoreImplementation
-{
-    RegisterStoreImplementation()
-    {
-        Implementations::add<T, TConfig>();
-    }
-};
 
 
 /**

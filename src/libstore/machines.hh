@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <nlohmann/json.hpp>
+
 #include "ref.hh"
 #include "store-reference.hh"
 

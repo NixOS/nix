@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 #include "signals.hh"
+#include "store-registration.hh"
 
 #include <atomic>
 
@@ -10,7 +11,7 @@ namespace nix {
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
     std::string_view scheme,
     PathView binaryCacheDir,
-    const Params & params)
+    const StoreReference::Params & params)
     : StoreConfig(params)
     , BinaryCacheStoreConfig(params)
     , binaryCacheDir(binaryCacheDir)
@@ -26,21 +27,18 @@ std::string LocalBinaryCacheStoreConfig::doc()
 }
 
 
-struct LocalBinaryCacheStore : virtual LocalBinaryCacheStoreConfig, virtual BinaryCacheStore
+struct LocalBinaryCacheStore :
+    virtual LocalBinaryCacheStoreConfig,
+    virtual BinaryCacheStore
 {
-    /**
-     * @param binaryCacheDir `file://` is a short-hand for `file:///`
-     * for now.
-     */
-    LocalBinaryCacheStore(
-        std::string_view scheme,
-        PathView binaryCacheDir,
-        const Params & params)
-        : StoreConfig(params)
-        , BinaryCacheStoreConfig(params)
-        , LocalBinaryCacheStoreConfig(scheme, binaryCacheDir, params)
-        , Store(params)
-        , BinaryCacheStore(params)
+    using Config = LocalBinaryCacheStoreConfig;
+
+    LocalBinaryCacheStore(const Config & config)
+        : Store::Config{config}
+        , BinaryCacheStore::Config{config}
+        , LocalBinaryCacheStore::Config{config}
+        , Store{static_cast<const Store::Config &>(*this)}
+        , BinaryCacheStore{static_cast<const BinaryCacheStore::Config &>(*this)}
     {
     }
 
@@ -127,6 +125,6 @@ std::set<std::string> LocalBinaryCacheStoreConfig::uriSchemes()
         return {"file"};
 }
 
-static RegisterStoreImplementation<LocalBinaryCacheStore, LocalBinaryCacheStoreConfig> regLocalBinaryCacheStore;
+static RegisterStoreImplementation<LocalBinaryCacheStore> regLocalBinaryCacheStore;
 
 }

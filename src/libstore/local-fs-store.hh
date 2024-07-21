@@ -7,9 +7,36 @@
 
 namespace nix {
 
-struct LocalFSStoreConfig : virtual StoreConfig
+template<template<typename> class F>
+struct LocalFSStoreConfigT
 {
-    using StoreConfig::StoreConfig;
+    const F<std::optional<Path>> rootDir;
+    const F<Path> stateDir;
+    const F<Path> logDir;
+    const F<Path> realStoreDir;
+};
+
+struct LocalFSStoreConfig :
+    virtual Store::Config,
+    LocalFSStoreConfigT<config::JustValue>
+{
+    struct Descriptions :
+        virtual Store::Config::Descriptions,
+        LocalFSStoreConfigT<config::SettingInfo>
+    {
+        Descriptions();
+    };
+
+    static const Descriptions descriptions;
+
+    /**
+     * The other defaults depend on the choice of `storeDir` and `rootDir`
+     */
+    static LocalFSStoreConfigT<config::JustValue> defaults(
+        const Store::Config &,
+        const std::optional<Path> rootDir);
+
+    LocalFSStoreConfig(const StoreReference::Params &);
 
     /**
      * Used to override the `root` settings. Can't be done via modifying
@@ -18,38 +45,22 @@ struct LocalFSStoreConfig : virtual StoreConfig
      *
      * @todo Make this less error-prone with new store settings system.
      */
-    LocalFSStoreConfig(PathView path, const Params & params);
-
-    const OptionalPathSetting rootDir{this, std::nullopt,
-        "root",
-        "Directory prefixed to all other paths."};
-
-    const PathSetting stateDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
-        "state",
-        "Directory where Nix will store state."};
-
-    const PathSetting logDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
-        "log",
-        "directory where Nix will store log files."};
-
-    const PathSetting realStoreDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real",
-        "Physical path of the Nix store."};
+    LocalFSStoreConfig(PathView path, const StoreReference::Params & params);
 };
 
-class LocalFSStore : public virtual LocalFSStoreConfig,
-    public virtual Store,
-    public virtual GcStore,
-    public virtual LogStore
+struct LocalFSStore :
+    virtual LocalFSStoreConfig,
+    virtual Store,
+    virtual GcStore,
+    virtual LogStore
 {
-public:
+    using Config = LocalFSStoreConfig;
+
     inline static std::string operationName = "Local Filesystem Store";
 
     const static std::string drvsLogDir;
 
-    LocalFSStore(const Params & params);
+    LocalFSStore(const Config & params);
 
     void narFromPath(const StorePath & path, Sink & sink) override;
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;

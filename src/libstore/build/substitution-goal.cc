@@ -1,4 +1,5 @@
 #include "worker.hh"
+#include "store-open.hh"
 #include "substitution-goal.hh"
 #include "nar-info.hh"
 #include "finally.hh"

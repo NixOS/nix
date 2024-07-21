@@ -1,4 +1,5 @@
 #include "store-api.hh"
+#include "store-registration.hh"
 #include "callback.hh"
 
 namespace nix {
@@ -6,8 +7,17 @@ namespace nix {
 struct DummyStoreConfig : virtual StoreConfig {
     using StoreConfig::StoreConfig;
 
-    DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
+    struct Descriptions : virtual Store::Config::Descriptions
+    {
+        Descriptions()
+            : StoreConfig::Descriptions{Store::Config::descriptions}
+        {}
+    };
+
+    static const Descriptions descriptions;
+
+    DummyStoreConfig(std::string_view scheme, std::string_view authority, const StoreReference::Params & params)
+        : StoreConfig{params}
     {
         if (!authority.empty())
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
@@ -25,18 +35,22 @@ struct DummyStoreConfig : virtual StoreConfig {
     static std::set<std::string> uriSchemes() {
         return {"dummy"};
     }
+
+    ref<Store> openStore() const override;
 };
+
+
+const DummyStoreConfig::Descriptions DummyStoreConfig::descriptions{};
+
 
 struct DummyStore : public virtual DummyStoreConfig, public virtual Store
 {
-    DummyStore(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
-        , DummyStoreConfig(scheme, authority, params)
-        , Store(params)
-    { }
+    using Config = DummyStoreConfig;
 
-    DummyStore(const Params & params)
-        : DummyStore("dummy", "", params)
+    DummyStore(const Config & config)
+        : StoreConfig(config)
+        , DummyStoreConfig(config)
+        , Store{static_cast<const Store::Config &>(*this)}
     { }
 
     std::string getUri() override
@@ -86,6 +100,11 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     { unsupported("getFSAccessor"); }
 };
 
-static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;
+ref<Store> DummyStore::Config::openStore() const
+{
+    return make_ref<DummyStore>(*this);
+}
+
+static RegisterStoreImplementation<DummyStore> regDummyStore;
 
 }
