@@ -60,7 +60,7 @@ Notes on issues and pull requests are posted as comments and linked from the mee
 [All meeting notes](https://discourse.nixos.org/search?expanded=true&q=Nix%20team%20meeting%20minutes%20%23%20%23dev%3Anix%20in%3Atitle%20order%3Alatest_topic) are published on Discourse under the [Nix category](https://discourse.nixos.org/c/dev/nix/50).
 
 Team meetings are generally open to anyone interested.
-We can make exceptions to discuss sensitive issues, such as security incidents or people matters.
+We may have a closed meeting to discuss sensitive issues, such as security incidents.
 Contact any team member to get a calendar invite for reminders and updates.
 
 ## Project board protocol
