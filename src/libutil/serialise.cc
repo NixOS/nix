@@ -218,12 +218,8 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
 
         void finish() override
         {
-            if (!coro) return;
-            if (!*coro) abort();
-            {
+            if (coro && *coro)
                 (*coro)(true);
-            }
-            if (*coro) abort();
         }
     };
 
