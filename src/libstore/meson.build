@@ -55,6 +55,7 @@ configdata.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
 check_funcs = [
   # Optionally used for canonicalising files from the build
   'lchown',
+  'statvfs',
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec.underscorify().to_upper()
