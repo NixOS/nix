@@ -9,6 +9,8 @@ source common.sh
 
 set -o pipefail
 
+skipTest "Too memory instensive for CI. Attempt to reduce memory usage was unsuccessful, because it made detection of the bug unreliable."
+
 # Regression test for #11141. The stack pointer corrector assigned the base
 # instead of the top (which resides at the low end of the stack). Sounds confusing?
 # Stacks grow downwards, so that's why this mistake happened.
