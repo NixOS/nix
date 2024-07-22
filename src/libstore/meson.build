@@ -100,6 +100,23 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
+# AWS C++ SDK has bad pkg-config
+aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
+configdata.set('ENABLE_S3', aws_s3.found().to_int())
+if aws_s3.found()
+  aws_s3 = declare_dependency(
+    include_directories: include_directories(aws_s3.get_variable('includedir')),
+    link_args: [
+      '-L' + aws_s3.get_variable('libdir'),
+      '-laws-cpp-sdk-transfer',
+      '-laws-cpp-sdk-s3',
+      '-laws-cpp-sdk-core',
+      '-laws-crt-cpp',
+    ],
+  )
+endif
+deps_other += aws_s3
+
 subdir('build-utils-meson/generate-header')
 
 generated_headers = []
