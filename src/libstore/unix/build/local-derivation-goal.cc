@@ -32,7 +32,7 @@
 #include <sys/socket.h>
 
 #if HAVE_STATVFS
-#include <sys/statvfs.h>
+# include <sys/statvfs.h>
 #endif
 
 /* Includes required for chroot support. */
@@ -56,8 +56,8 @@
 #endif
 
 #if __APPLE__
-#include <spawn.h>
-#include <sys/sysctl.h>
+# include <spawn.h>
+# include <sys/sysctl.h>
 #endif
 
 #include <pwd.h>
@@ -214,7 +214,7 @@ Goal::Co LocalDerivationGoal::tryLocalBuild()
     }
 
     auto & localStore = getLocalStore();
-    if (localStore.storeDir != localStore.realStoreDir.get()) {
+    if (localStore.storeDir != localStore.config->realStoreDir.get()) {
         #if __linux__
             useChroot = true;
         #else
@@ -354,7 +354,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
         auto & localStore = getLocalStore();
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(localStore.realStoreDir.get().c_str(), &st) == 0 &&
+        if (statvfs(localStore.config->realStoreDir.get().c_str(), &st) == 0 &&
             (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 &&
@@ -500,7 +500,7 @@ void LocalDerivationGoal::startBuilder()
             concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
             settings.thisSystem,
-            concatStringsSep<StringSet>(", ", worker.store.systemFeatures));
+            concatStringsSep<StringSet>(", ", worker.store.config.systemFeatures));
 
     /* Create a temporary directory where the build will take
        place. */
@@ -1254,33 +1254,46 @@ bool LocalDerivationGoal::isAllowed(const DerivedPath & req)
     return this->isAllowed(pathPartOfReq(req));
 }
 
-
-struct RestrictedStoreConfig : virtual LocalFSStoreConfig
+/**
+ * A wrapper around LocalStore that only allows building/querying of
+ * paths that are in the input closures of the build or were added via
+ * recursive Nix calls.
+ */
+struct RestrictedStore :
+    virtual IndirectRootStore,
+    virtual GcStore
 {
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    const std::string name() { return "Restricted Store"; }
-};
+    ref<const LocalStore::Config> config;
 
-/* A wrapper around LocalStore that only allows building/querying of
-   paths that are in the input closures of the build or were added via
-   recursive Nix calls. */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
-{
     ref<LocalStore> next;
 
     LocalDerivationGoal & goal;
 
-    RestrictedStore(const Params & params, ref<LocalStore> next, LocalDerivationGoal & goal)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , RestrictedStoreConfig(params)
-        , Store(params)
-        , LocalFSStore(params)
-        , next(next), goal(goal)
-    { }
+    RestrictedStore(
+        ref<LocalStore::Config> config,
+        ref<LocalStore> next,
+        LocalDerivationGoal & goal)
+        : Store{*config}
+        , LocalFSStore{*config}
+        , config{config}
+        , next{next}
+        , goal{goal}
+    {
+    }
+
+    static ref<RestrictedStore> make(
+        ref<LocalStore> next,
+        LocalDerivationGoal & goal)
+    {
+        ref<LocalStore::Config> config = make_ref<LocalStore::Config>(*next->config);
+        config->pathInfoCacheSize.value = 0;
+        config->stateDir.value = "/no-such-path";
+        config->logDir.value = "/no-such-path";
+        return make_ref<RestrictedStore>(std::move(config), std::move(next), goal);
+    }
 
     Path getRealStoreDir() override
-    { return next->realStoreDir; }
+    { return next->config->realStoreDir; }
 
     std::string getUri() override
     { return next->getUri(); }
@@ -1484,14 +1497,7 @@ void LocalDerivationGoal::startDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
 
-    Store::Params params;
-    params["path-info-cache-size"] = "0";
-    params["store"] = worker.store.storeDir;
-    if (auto & optRoot = getLocalStore().rootDir.get())
-        params["root"] = *optRoot;
-    params["state"] = "/no-such-path";
-    params["log"] = "/no-such-path";
-    auto store = make_ref<RestrictedStore>(params,
+    auto store = RestrictedStore::make(
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(worker.store.shared_from_this())),
         *this);
 
@@ -1821,7 +1827,7 @@ void LocalDerivationGoal::runChild()
                 createDirs(chrootRootDir + "/dev/shm");
                 createDirs(chrootRootDir + "/dev/pts");
                 ss.push_back("/dev/full");
-                if (worker.store.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
+                if (worker.store.config.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                     ss.push_back("/dev/kvm");
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");

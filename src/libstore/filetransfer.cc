@@ -715,7 +715,7 @@ struct curlFileTransfer : public FileTransfer
     }
 
 #if ENABLE_S3
-    std::tuple<std::string, std::string, Store::Params> parseS3Uri(std::string uri)
+    std::tuple<std::string, std::string, StoreReference::Params> parseS3Uri(std::string uri)
     {
         auto [path, params] = splitUriAndParams(uri);
 

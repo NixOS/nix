@@ -16,7 +16,7 @@
 #include "globals.hh"
 #include "serialise.hh"
 #include "build-result.hh"
-#include "store-api.hh"
+#include "store-open.hh"
 #include "strings.hh"
 #include "derivations.hh"
 #include "local-store.hh"
@@ -44,7 +44,7 @@ static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 
 static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
     for (auto & feature : requiredFeatures)
-        if (!store.systemFeatures.get().count(feature)) return false;
+        if (!store.config.systemFeatures.get().count(feature)) return false;
     return true;
 }
 
@@ -85,7 +85,7 @@ static int main_build_remote(int argc, char * * argv)
            that gets cleared on reboot, but it wouldn't work on macOS. */
         auto currentLoadName = "/current-load";
         if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
-            currentLoad = std::string { localStore->stateDir } + currentLoadName;
+            currentLoad = std::string { localStore->config.stateDir } + currentLoadName;
         else
             currentLoad = settings.nixStateDir + currentLoadName;
 

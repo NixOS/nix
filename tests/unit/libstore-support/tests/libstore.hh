@@ -5,6 +5,7 @@
 #include <gmock/gmock.h>
 
 #include "store-api.hh"
+#include "store-open.hh"
 
 namespace nix {
 

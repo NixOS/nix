@@ -57,6 +57,7 @@ sources = files(
   'derivation-advanced-attrs.cc',
   'derivation.cc',
   'derived-path.cc',
+  'dummy-store.cc',
   'downstream-placeholder.cc',
   'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',

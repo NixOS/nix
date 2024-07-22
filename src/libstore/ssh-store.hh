@@ -8,17 +8,25 @@
 
 namespace nix {
 
-struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
+template<template<typename> class F>
+struct SSHStoreConfigT
 {
-    using CommonSSHStoreConfig::CommonSSHStoreConfig;
-    using RemoteStoreConfig::RemoteStoreConfig;
+    F<Strings> remoteProgram;
+};
 
-    SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
+                        Store::Config,
+                        RemoteStore::Config,
+                        CommonSSHStoreConfig,
+                        SSHStoreConfigT<config::JustValue>
+{
+    static config::SettingDescriptionMap descriptions();
 
-    const Setting<Strings> remoteProgram{
-        this, {"nix-daemon"}, "remote-program", "Path to the `nix-daemon` executable on the remote machine."};
+    std::optional<LocalFSStore::Config> mounted;
 
-    const std::string name() override
+    SSHStoreConfig(std::string_view scheme, std::string_view authority, const StoreReference::Params & params);
+
+    static const std::string name()
     {
         return "Experimental SSH Store";
     }
@@ -28,34 +36,9 @@ struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
         return {"ssh-ng"};
     }
 
-    std::string doc() override;
-};
+    static std::string doc();
 
-struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfig
-{
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    using SSHStoreConfig::SSHStoreConfig;
-
-    MountedSSHStoreConfig(StringMap params);
-
-    MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params);
-
-    const std::string name() override
-    {
-        return "Experimental SSH Store with filesystem mounted";
-    }
-
-    static std::set<std::string> uriSchemes()
-    {
-        return {"mounted-ssh-ng"};
-    }
-
-    std::string doc() override;
-
-    std::optional<ExperimentalFeature> experimentalFeature() const override
-    {
-        return ExperimentalFeature::MountedSSHStore;
-    }
+    ref<Store> openStore() const override;
 };
 
 }

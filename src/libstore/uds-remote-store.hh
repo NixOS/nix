@@ -7,12 +7,17 @@
 
 namespace nix {
 
-struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
+struct UDSRemoteStoreConfig :
+    std::enable_shared_from_this<UDSRemoteStoreConfig>,
+    Store::Config,
+    LocalFSStore::Config,
+    RemoteStore::Config
 {
-    // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
-    // outlined in https://github.com/NixOS/nix/issues/10766
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    using RemoteStoreConfig::RemoteStoreConfig;
+    static config::SettingDescriptionMap descriptions();
+
+    UDSRemoteStoreConfig(const StoreReference::Params & params)
+        : UDSRemoteStoreConfig{"unix", "", params}
+    {}
 
     /**
      * @param authority is the socket path.
@@ -20,11 +25,11 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     UDSRemoteStoreConfig(
         std::string_view scheme,
         std::string_view authority,
-        const Params & params);
+        const StoreReference::Params & params);
 
-    const std::string name() override { return "Local Daemon Store"; }
+    static const std::string name() { return "Local Daemon Store"; }
 
-    std::string doc() override;
+    static std::string doc();
 
     /**
      * The path to the unix domain socket.
@@ -34,32 +39,21 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
      */
     Path path;
 
-protected:
-    static constexpr char const * scheme = "unix";
-
-public:
     static std::set<std::string> uriSchemes()
-    { return {scheme}; }
+    { return {"unix"}; }
+
+    ref<Store> openStore() const override;
 };
 
-class UDSRemoteStore : public virtual UDSRemoteStoreConfig
-    , public virtual IndirectRootStore
-    , public virtual RemoteStore
+struct UDSRemoteStore :
+    virtual IndirectRootStore,
+    virtual RemoteStore
 {
-public:
+    using Config = UDSRemoteStoreConfig;
 
-    /**
-     * @deprecated This is the old API to construct the store.
-    */
-    UDSRemoteStore(const Params & params);
+    ref<const Config> config;
 
-    /**
-     * @param authority is the socket path.
-     */
-    UDSRemoteStore(
-        std::string_view scheme,
-        std::string_view authority,
-        const Params & params);
+    UDSRemoteStore(ref<const Config>);
 
     std::string getUri() override;
 

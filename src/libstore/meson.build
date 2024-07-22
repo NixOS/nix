@@ -55,6 +55,7 @@ configdata.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
 check_funcs = [
   # Optionally used for canonicalising files from the build
   'lchown',
+  'statvfs',
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec.underscorify().to_upper()
@@ -98,6 +99,20 @@ deps_public += nlohmann_json
 
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
+
+# AWS C++ SDK has bad pkg-config
+aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
+configdata.set('ENABLE_S3', aws_s3.found().to_int())
+if aws_s3.found()
+  aws_s3 = declare_dependency(
+    include_directories: include_directories(aws_s3.get_variable('includedir')),
+    link_args: [
+      '-L' + aws_s3.get_variable('libdir'),
+      '-laws-cpp-sdk-s3',
+    ],
+  )
+endif
+deps_other += aws_s3
 
 subdir('build-utils-meson/generate-header')
 
@@ -163,6 +178,7 @@ sources = files(
   'builtins/unpack-channel.cc',
   'common-protocol.cc',
   'common-ssh-store-config.cc',
+  'config-parse.cc',
   'content-address.cc',
   'daemon.cc',
   'derivations.cc',
@@ -210,6 +226,8 @@ sources = files(
   'ssh-store.cc',
   'ssh.cc',
   'store-api.cc',
+  'store-dir-config.cc',
+  'store-registration.cc',
   'store-reference.cc',
   'uds-remote-store.cc',
   'worker-protocol-connection.cc',
@@ -282,6 +300,8 @@ headers = [config_h] + files(
   'sqlite.hh',
   'ssh.hh',
   'store-api.hh',
+  'store-open.hh',
+  'store-registration.hh',
   'store-cast.hh',
   'store-dir-config.hh',
   'store-reference.hh',
