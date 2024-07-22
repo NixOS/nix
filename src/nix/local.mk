@@ -55,3 +55,9 @@ $(d)/main.cc: \
 $(d)/profile.cc: $(d)/profile.md
 
 $(d)/profile.md: $(d)/profiles.md.gen.hh
+
+src/nix/flake.cc: src/nix/call-flake-schemas.nix.gen.hh src/nix/builtin-flake-schemas.nix.gen.hh
+
+src/nix/builtin-flake-schemas.nix: $(default_flake_schemas)/flake.nix
+	$(trace-gen) cp $^ $@
+	@chmod +w $@

@@ -8,6 +8,7 @@
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
+  inputs.flake-schemas.url = "github:DeterminateSystems/flake-schemas";
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
@@ -20,8 +21,7 @@
   inputs.pre-commit-hooks.inputs.flake-compat.follows = "";
   inputs.pre-commit-hooks.inputs.gitignore.follows = "";
 
-  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
-
+  outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, flake-schemas, ... }:
 
     let
       inherit (nixpkgs) lib;
@@ -157,6 +157,8 @@
         };
 
     in {
+      schemas = flake-schemas.schemas;
+
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix-perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);

@@ -131,4 +131,6 @@ scope: {
   inherit resolvePath filesetToSource;
 
   mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
+
+  inherit (inputs) flake-schemas;
 }

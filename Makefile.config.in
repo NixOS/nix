@@ -37,6 +37,7 @@ checkbindir = @checkbindir@
 checklibdir = @checklibdir@
 datadir = @datadir@
 datarootdir = @datarootdir@
+default_flake_schemas = @default_flake_schemas@
 docdir = @docdir@
 embedded_sandbox_shell = @embedded_sandbox_shell@
 exec_prefix = @exec_prefix@
