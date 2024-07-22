@@ -1,4 +1,5 @@
 { lib
+, buildPackages
 , stdenv
 , mkMesonDerivation
 , releaseTools
@@ -41,8 +42,6 @@ mkMesonDerivation (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
-
-  outputs = [ "out" "dev" ];
 
   nativeBuildInputs = [
     meson
@@ -94,17 +93,22 @@ mkMesonDerivation (finalAttrs: {
             ../../functional/derivation
           ];
         };
-      in runCommand "${finalAttrs.pname}-run" {} ''
-        PATH="${lib.makeBinPath [ finalAttrs.finalPackage ]}:$PATH"
+      in runCommand "${finalAttrs.pname}-run" {
+        meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+      } (lib.optionalString stdenv.hostPlatform.isWindows ''
+        export HOME="$PWD/home-dir"
+        mkdir -p "$HOME"
+      '' + ''
         export _NIX_TEST_UNIT_DATA=${data + "/unit/libstore/data"}
-        nix-store-tests
+        ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
         touch $out
-      '';
+      '');
     };
   };
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
+    mainProgram = finalAttrs.pname + stdenv.hostPlatform.extensions.executable;
   };
 
 })
