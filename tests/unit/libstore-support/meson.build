@@ -25,6 +25,8 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
+subdir('build-utils-meson/threads')
+
 rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
 
