@@ -340,7 +340,7 @@ static void main_nix_build(int argc, char * * argv)
         exprs = {state->parseStdin()};
     else
         for (auto i : remainingArgs) {
-            auto baseDir = inShebang && !packages ? absPath(dirOf(script)) : i;
+            auto baseDir = inShebang && !packages ? absPath(dirOf(script)) : Path { i };
 
             if (fromArgs)
                 exprs.push_back(state->parseExprFromString(

@@ -927,8 +927,8 @@ void runPostBuildHook(
     };
     LogSink sink(act);
 
-    runProgram2({
-        .program = settings.postBuildHook,
+    runProgram2(RunOptions {
+        .program = settings.postBuildHook.to_string(),
         .environment = hookEnvironment,
         .standardOut = &sink,
         .mergeStderrToStdout = true,

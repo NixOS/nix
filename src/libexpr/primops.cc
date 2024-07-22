@@ -2363,7 +2363,7 @@ static void addPath(
                 auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
                 // FIXME: we should scanForReferences on the path before adding it
                 refs = state.store->queryPathInfo(storePath)->references;
-                path = {state.rootFS, CanonPath(state.store->toRealPath(storePath) + subPath)};
+                path = {state.rootFS, CanonPath{state.store->toRealPath(storePath).string()} / subPath};
             } catch (Error &) { // FIXME: should be InvalidPathError
             }
         }

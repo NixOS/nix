@@ -22,8 +22,7 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
             ? _cacheUri
             : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
 {
-    while (!cacheUri.empty() && cacheUri.back() == '/')
-        cacheUri.pop_back();
+    cacheUri = cacheUri.parent_path();
 }
 
 
