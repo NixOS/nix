@@ -1245,6 +1245,7 @@ StorePath LocalStore::addToStoreFromDump(
         });
         try {
             got = source.read(dumpBuffer.get() + oldSize, want);
+            if (!got) break;
         } catch (EndOfFile &) {
             inMemory = true;
             break;

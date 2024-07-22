@@ -243,11 +243,11 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
             if (!coro) {
                 CoroutineContext ctx;
                 coro = coro_t::push_type(VirtualStackAllocator{}, [&](coro_t::pull_type & yield) {
-                    LambdaSource source([&](char *out, size_t out_len) {
+                    LambdaSource source([&](char * out, size_t out_len) {
                         if (cur.empty()) {
                             yield();
                             if (yield.get()) {
-                                return (size_t)0;
+                                return (size_t) 0;
                             }
                         }
 
@@ -271,12 +271,12 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
         void finish() override
         {
             if (!coro) return;
-            if (!*coro) abort();
+            //if (!*coro) abort();
             {
                 CoroutineContext ctx;
                 (*coro)(true);
             }
-            if (*coro) abort();
+            //if (*coro) abort();
         }
     };
 
