@@ -2610,6 +2610,11 @@ void EvalState::printStatistics()
 #if HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
+    double gcFullOnlyTime = ({
+        auto ms = GC_get_full_gc_total_time();
+        ms * 0.001;
+    });
+    auto gcCycles = getGCCycles();
 #endif
 
     auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
@@ -2620,6 +2625,13 @@ void EvalState::printStatistics()
 #ifndef _WIN32 // TODO implement
     topObj["cpuTime"] = cpuTime;
 #endif
+    topObj["time"] = {
+        {"cpu", cpuTime},
+#ifdef HAVE_BOEHMGC
+        {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
+        {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
+#endif
+    };
     topObj["envs"] = {
         {"number", nrEnvs},
         {"elements", nrValuesInEnvs},
@@ -2661,6 +2673,7 @@ void EvalState::printStatistics()
     topObj["gc"] = {
         {"heapSize", heapSize},
         {"totalBytes", totalBytes},
+        {"cycles", gcCycles},
     };
 #endif
 
