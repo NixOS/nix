@@ -529,9 +529,19 @@ static void prim_fetchurl(EvalState & state, const PosIdx pos, Value * * args, V
 
 static RegisterPrimOp primop_fetchurl({
     .name = "__fetchurl",
-    .args = {"url"},
+    .args = {"arg"},
     .doc = R"(
       Download the specified URL and return the path of the downloaded file.
+      `arg` can be either a string denoting the URL, or an attribute set with the following attributes:
+
+      - `url`
+
+        The URL of the file to download.
+
+      - `name` (default: the last path component of the URL)
+
+        A name for the file in the store. This can be useful if the URL has any
+        characters that are invalid for the store.
 
       Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
