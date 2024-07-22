@@ -155,6 +155,10 @@ static inline void initGCReal()
        there. */
     GC_set_no_dls(1);
 
+    /* Enable perf measurements. This is just a setting; not much of a
+       start of something. */
+    GC_start_performance_measurement();
+
     GC_INIT();
 
     GC_set_oom_fn(oomHandler);
@@ -205,6 +209,7 @@ static inline void initGCReal()
 #endif
 
 static bool gcInitialised = false;
+static GC_word gcCyclesAfterInit = 0;
 
 void initGC()
 {
@@ -216,6 +221,7 @@ void initGC()
 #endif
 
     gcInitialised = true;
+    gcCyclesAfterInit = GC_get_gc_no();
 }
 
 void assertGCInitialized()
@@ -223,4 +229,10 @@ void assertGCInitialized()
     assert(gcInitialised);
 }
 
+size_t getGCCycles()
+{
+    assertGCInitialized();
+    return GC_get_gc_no() - gcCyclesAfterInit;
 }
+
+} // namespace nix
