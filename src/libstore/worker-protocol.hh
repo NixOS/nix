@@ -82,6 +82,7 @@ struct WorkerProto
      *
      * @todo remove once Hydra uses Store abstraction consistently.
      */
+    struct BasicConnection;
     struct BasicClientConnection;
     struct BasicServerConnection;
 
@@ -183,8 +184,7 @@ enum struct WorkerProto::Op : uint64_t
 struct WorkerProto::ClientHandshakeInfo
 {
     /**
-     * The version of the Nix daemon that is processing our requests
-.
+     * The version of the Nix daemon that is processing our requests.
      *
      * Do note, it may or may not communicating with another daemon,
      * rather than being an "end" `LocalStore` or similar.

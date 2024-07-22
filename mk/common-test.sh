@@ -4,7 +4,7 @@
 # remove file extension.
 
 test_name=$(echo -n "${test?must be defined by caller (test runner)}" | sed \
-    -e "s|^tests/unit/[^/]*/data/||" \
+    -e "s|^src/[^/]*-test/data/||" \
     -e "s|^tests/functional/||" \
     -e "s|\.sh$||" \
     )

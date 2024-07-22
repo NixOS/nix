@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <cstddef>
+
 namespace nix {
 
 /**
@@ -12,5 +14,10 @@ void initGC();
  * Make sure `initGC` has already been called.
  */
 void assertGCInitialized();
+
+/**
+ * The number of GC cycles since initGC().
+ */
+size_t getGCCycles();
 
 }

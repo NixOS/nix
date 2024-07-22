@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 writeSimpleFlake "$TEST_HOME"
 cd "$TEST_HOME"

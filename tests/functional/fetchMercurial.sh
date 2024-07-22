@@ -4,6 +4,8 @@ source common.sh
 
 [[ $(type -p hg) ]] || skipTest "Mercurial not installed"
 
+TODO_NixOS
+
 clearStore
 
 # Intentionally not in a canonical form

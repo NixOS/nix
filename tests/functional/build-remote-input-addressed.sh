@@ -23,7 +23,7 @@ EOF
     chmod +x "$TEST_ROOT/post-build-hook.sh"
     rm -f "$TEST_ROOT/post-hook-counter"
 
-    echo "post-build-hook = $TEST_ROOT/post-build-hook.sh" >> "$NIX_CONF_DIR/nix.conf"
+    echo "post-build-hook = $TEST_ROOT/post-build-hook.sh" >> "$test_nix_conf"
 }
 
 registerBuildHook

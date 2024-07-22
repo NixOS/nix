@@ -2,7 +2,9 @@
 
 source common.sh
 
-clearStore
+TODO_NixOS
+
+clearStoreIfPossible
 clearCacheCache
 
 # Fails without remote builders

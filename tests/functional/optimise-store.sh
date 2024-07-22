@@ -2,10 +2,13 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 outPath1=$(echo 'with import ./config.nix; mkDerivation { name = "foo1"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --auto-optimise-store)
 outPath2=$(echo 'with import ./config.nix; mkDerivation { name = "foo2"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --auto-optimise-store)
+
+TODO_NixOS # ignoring the client-specified setting 'auto-optimise-store', because it is a restricted setting and you are not a trusted user
+  # TODO: only continue when trusted user or root
 
 inode1="$(stat --format=%i $outPath1/foo)"
 inode2="$(stat --format=%i $outPath2/foo)"

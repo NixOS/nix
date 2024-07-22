@@ -2,6 +2,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "config-global.hh"
 
 #include <nlohmann/json.hpp>
 

@@ -116,9 +116,12 @@ let
             storeInfo = commandInfo.stores;
             inherit inlineHTML;
           };
+          hasInfix = infix: content:
+            builtins.stringLength content != builtins.stringLength (replaceStrings [ infix ] [ "" ] content);
         in
         optionalString (details ? doc) (
-          if match ".*@store-types@.*" details.doc != null
+          # An alternate implementation with builtins.match stack overflowed on some systems.
+          if hasInfix "@store-types@" details.doc
           then help-stores
           else details.doc
         );

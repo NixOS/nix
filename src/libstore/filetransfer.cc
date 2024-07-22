@@ -1,5 +1,6 @@
 #include "filetransfer.hh"
 #include "globals.hh"
+#include "config-global.hh"
 #include "store-api.hh"
 #include "s3.hh"
 #include "compression.hh"

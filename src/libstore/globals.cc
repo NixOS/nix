@@ -1,4 +1,5 @@
 #include "globals.hh"
+#include "config-global.hh"
 #include "current-process.hh"
 #include "archive.hh"
 #include "args.hh"
@@ -14,7 +15,6 @@
 #include <nlohmann/json.hpp>
 
 #ifndef _WIN32
-# include <dlfcn.h>
 # include <sys/utsname.h>
 #endif
 
@@ -33,6 +33,8 @@
 #ifdef __APPLE__
 #include <sys/sysctl.h>
 #endif
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -81,7 +83,7 @@ Settings::Settings()
         Strings ss;
         for (auto & p : tokenizeString<Strings>(*s, ":"))
             ss.push_back("@" + p);
-        builders = concatStringsSep(" ", ss);
+        builders = concatStringsSep("\n", ss);
     }
 
 #if defined(__linux__) && defined(SANDBOX_SHELL)
@@ -123,12 +125,12 @@ Settings::Settings()
     };
 }
 
-void loadConfFile()
+void loadConfFile(AbstractConfig & config)
 {
     auto applyConfigFile = [&](const Path & path) {
         try {
             std::string contents = readFile(path);
-            globalConfig.applyConfig(contents, path);
+            config.applyConfig(contents, path);
         } catch (SystemError &) { }
     };
 
@@ -136,7 +138,7 @@ void loadConfFile()
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
-    globalConfig.resetOverridden();
+    config.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
@@ -145,7 +147,7 @@ void loadConfFile()
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
     if (nixConfEnv.has_value()) {
-        globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
+        config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
 
 }
@@ -302,18 +304,21 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = "Enable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = "Disable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
+        .aliases = aliases,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
         .handler = {[this]() { override(smRelaxed); }}
@@ -331,60 +336,6 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
-
-Paths PluginFilesSetting::parse(const std::string & str) const
-{
-    if (pluginsLoaded)
-        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<Paths>::parse(str);
-}
-
-
-void initPlugins()
-{
-    assert(!settings.pluginFiles.pluginsLoaded);
-    for (const auto & pluginFile : settings.pluginFiles.get()) {
-        std::vector<std::filesystem::path> pluginFiles;
-        try {
-            auto ents = std::filesystem::directory_iterator{pluginFile};
-            for (const auto & ent : ents) {
-                checkInterrupt();
-                pluginFiles.emplace_back(ent.path());
-            }
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() != std::errc::not_a_directory)
-                throw;
-            pluginFiles.emplace_back(pluginFile);
-        }
-        for (const auto & file : pluginFiles) {
-            checkInterrupt();
-            /* handle is purposefully leaked as there may be state in the
-               DSO needed by the action of the plugin. */
-#ifndef _WIN32 // TODO implement via DLL loading on Windows
-            void *handle =
-                dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
-            if (!handle)
-                throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
-
-            /* Older plugins use a statically initialized object to run their code.
-               Newer plugins can also export nix_plugin_entry() */
-            void (*nix_plugin_entry)() = (void (*)())dlsym(handle, "nix_plugin_entry");
-            if (nix_plugin_entry)
-                nix_plugin_entry();
-#else
-                throw Error("could not dynamically open plugin file '%s'", file);
-#endif
-        }
-    }
-
-    /* Since plugins can add settings, try to re-apply previously
-       unknown settings. */
-    globalConfig.reapplyUnknownSettings();
-    globalConfig.warnUnknownSettings();
-
-    /* Tell the user if they try to set plugin-files after we've already loaded */
-    settings.pluginFiles.pluginsLoaded = true;
-}
 
 static void preloadNSS()
 {
@@ -437,7 +388,7 @@ void initLibStore(bool loadConfig) {
     initLibUtil();
 
     if (loadConfig)
-        loadConfFile();
+        loadConfFile(globalConfig);
 
     preloadNSS();
 

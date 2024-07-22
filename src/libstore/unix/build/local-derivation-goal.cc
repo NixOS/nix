@@ -64,6 +64,8 @@
 #include <grp.h>
 #include <iostream>
 
+#include "strings.hh"
+
 namespace nix {
 
 void handleDiffHook(
@@ -175,7 +177,7 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 }
 
 
-void LocalDerivationGoal::tryLocalBuild()
+Goal::Co LocalDerivationGoal::tryLocalBuild()
 {
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
@@ -183,10 +185,10 @@ void LocalDerivationGoal::tryLocalBuild()
 
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
-        state = &DerivationGoal::tryToBuild;
         worker.waitForBuildSlot(shared_from_this());
         outputLocks.unlock();
-        return;
+        co_await Suspend{};
+        co_return tryToBuild();
     }
 
     assert(derivationType);
@@ -240,7 +242,8 @@ void LocalDerivationGoal::tryLocalBuild()
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
-            return;
+            co_await Suspend{};
+            co_return tryLocalBuild();
         }
     }
 
@@ -255,15 +258,13 @@ void LocalDerivationGoal::tryLocalBuild()
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, {}, std::move(e));
-        return;
+        co_return done(BuildResult::InputRejected, {}, std::move(e));
     }
 
-    /* This state will be reached when we get EOF on the child's
-       log pipe. */
-    state = &DerivationGoal::buildDone;
-
     started();
+    co_await Suspend{};
+    // after EOF on child
+    co_return buildDone();
 }
 
 static void chmod_(const Path & path, mode_t mode)
@@ -503,8 +504,24 @@ void LocalDerivationGoal::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    tmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+    topTmpDir = createTempDir(settings.buildDir.get().value_or(""), "nix-build-" + std::string(drvPath.name()), false, false, 0700);
+#if __APPLE__
+    if (false) {
+#else
+    if (useChroot) {
+#endif
+        /* If sandboxing is enabled, put the actual TMPDIR underneath
+           an inaccessible root-owned directory, to prevent outside
+           access.
 
+           On macOS, we don't use an actual chroot, so this isn't
+           possible. Any mitigation along these lines would have to be
+           done directly in the sandbox profile. */
+        tmpDir = topTmpDir + "/build";
+        createDir(tmpDir, 0700);
+    } else {
+        tmpDir = topTmpDir;
+    }
     chownToBuilder(tmpDir);
 
     for (auto & [outputName, status] : initialOutputs) {
@@ -672,15 +689,19 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
-        deletePath(chrootRootDir);
+        chrootParentDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
+        autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
 
-        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootRootDir);
+        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
-        // FIXME: make this 0700
+        if (mkdir(chrootParentDir.c_str(), 0700) == -1)
+            throw SysError("cannot create '%s'", chrootRootDir);
+
+        chrootRootDir = chrootParentDir + "/root";
+
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
@@ -1505,10 +1526,11 @@ void LocalDerivationGoal::startDaemon()
             debug("received daemon connection");
 
             auto workerThread = std::thread([store, remote{std::move(remote)}]() {
-                FdSource from(remote.get());
-                FdSink to(remote.get());
                 try {
-                    daemon::processConnection(store, from, to,
+                    daemon::processConnection(
+                        store,
+                        FdSource(remote.get()),
+                        FdSink(remote.get()),
                         NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SystemError &) {
@@ -2489,7 +2511,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 auto fim = outputHash.method.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                 {
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
@@ -2531,7 +2553,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             {
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
             }
@@ -2554,7 +2576,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 rewriteOutput(outputRewrites);
                 HashResult narHashAndSize = hashPath(
                     {getFSSourceAccessor(), CanonPath(actualPath)},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
@@ -2904,6 +2926,24 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
         };
 
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (get(*structuredAttrs, "allowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "allowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedRequisites")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "disallowedReferences")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
+            }
+            if (get(*structuredAttrs, "maxClosureSize")){
+                warn("'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
+            }
             if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
                 if (auto output = get(*outputChecks, outputName)) {
                     Checks checks;
@@ -2952,7 +2992,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 
 void LocalDerivationGoal::deleteTmpDir(bool force)
 {
-    if (tmpDir != "") {
+    if (topTmpDir != "") {
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv->isBuiltin()) {
@@ -2960,7 +3000,8 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
             chmod(tmpDir.c_str(), 0755);
         }
         else
-            deletePath(tmpDir);
+            deletePath(topTmpDir);
+        topTmpDir = "";
         tmpDir = "";
     }
 }

@@ -30,7 +30,6 @@ We aim to achieve this by improving the contributor experience and attracting mo
 ## Members
 
 - Eelco Dolstra (@edolstra) – Team lead
-- Théophane Hufschmitt (@thufschmitt)
 - Valentin Gagarin (@fricklerhandwerk)
 - Thomas Bereknyei (@tomberek)
 - Robert Hensing (@roberth)
@@ -51,7 +50,7 @@ The team meets twice a week (times are denoted in the [Europe/Amsterdam](https:/
        - mark it as draft if it is blocked on the contributor
        - escalate it back to the team by moving it to To discuss, and leaving a comment as to why the issue needs to be discussed again.
 
-- Work meeting: [Mondays 13:00-15:00 Europe/Amsterdam](https://www.google.com/calendar/event?eid=Ym52NDdzYnRic2NzcDcybjZiNDhpNzhpa3NfMjAyNDA1MTNUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
+- Work meeting: [Mondays 14:00-16:00 Europe/Amsterdam](https://www.google.com/calendar/event?eid=Ym52NDdzYnRic2NzcDcybjZiNDhpNzhpa3NfMjAyNDA1MTNUMTIwMDAwWiBiOW81MmZvYnFqYWs4b3E4bGZraGczdDBxZ0Bn)
 
   1. Code review on pull requests from [In review](#in-review).
   2. Other chores and tasks.

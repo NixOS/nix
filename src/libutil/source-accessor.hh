@@ -4,6 +4,7 @@
 
 #include "canon-path.hh"
 #include "hash.hh"
+#include "ref.hh"
 
 namespace nix {
 
@@ -151,9 +152,9 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
         return number == x.number;
     }
 
-    bool operator < (const SourceAccessor & x) const
+    auto operator <=> (const SourceAccessor & x) const
     {
-        return number < x.number;
+        return number <=> x.number;
     }
 
     void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");

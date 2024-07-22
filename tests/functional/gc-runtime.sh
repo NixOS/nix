@@ -11,6 +11,8 @@ esac
 
 set -m # enable job control, needed for kill
 
+TODO_NixOS
+
 profiles="$NIX_STATE_DIR"/profiles
 rm -rf "$profiles"
 

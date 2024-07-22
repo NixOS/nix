@@ -41,21 +41,6 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
     return st.st_mtime + settings.tarballTtl > now;
 }
 
-bool touchCacheFile(const Path & path, time_t touch_time)
-{
-#ifndef _WIN32 // TODO implement
-    struct timeval times[2];
-    times[0].tv_sec = touch_time;
-    times[0].tv_usec = 0;
-    times[1].tv_sec = touch_time;
-    times[1].tv_usec = 0;
-
-    return lutimes(path.c_str(), times) == 0;
-#else
-    return false;
-#endif
-}
-
 Path getCachePath(std::string_view key, bool shallow)
 {
     return getCacheDir()
@@ -179,7 +164,9 @@ static const Hash nullRev{HashAlgorithm::SHA1};
 
 struct GitInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(
+        const Settings & settings,
+        const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "git" &&
             url.scheme != "git+http" &&
@@ -205,7 +192,7 @@ struct GitInputScheme : InputScheme
 
         attrs.emplace("url", url2.to_string());
 
-        return inputFromAttrs(attrs);
+        return inputFromAttrs(settings, attrs);
     }
 
 
@@ -237,7 +224,9 @@ struct GitInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(
+        const Settings & settings,
+        const Attrs & attrs) const override
     {
         for (auto & [name, _] : attrs)
             if (name == "verifyCommit"
@@ -253,7 +242,7 @@ struct GitInputScheme : InputScheme
                 throw BadURL("invalid Git branch/tag name '%s'", *ref);
         }
 
-        Input input;
+        Input input{settings};
         input.attrs = attrs;
         auto url = fixGitURL(getStrAttr(attrs, "url"));
         parseURL(url);
@@ -381,13 +370,13 @@ struct GitInputScheme : InputScheme
         /* URL of the repo, or its path if isLocal. Never a `file` URL. */
         std::string url;
 
-        void warnDirty() const
+        void warnDirty(const Settings & settings) const
         {
             if (workdirInfo.isDirty) {
-                if (!fetchSettings.allowDirty)
+                if (!settings.allowDirty)
                     throw Error("Git tree '%s' is dirty", url);
 
-                if (fetchSettings.warnDirty)
+                if (settings.warnDirty)
                     warn("Git tree '%s' is dirty", url);
             }
         }
@@ -594,8 +583,11 @@ struct GitInputScheme : InputScheme
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.url);
                 }
 
-                if (!touchCacheFile(localRefFile, now))
-                    warn("could not update mtime for file '%s': %s", localRefFile, strerror(errno));
+                try {
+                    setWriteTime(localRefFile, now, now);
+                } catch (Error & e) {
+                    warn("could not update mtime for file '%s': %s", localRefFile, e.msg());
+                }
                 if (!originalRef && !storeCachedHead(repoInfo.url, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);
             }
@@ -665,7 +657,7 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{ exportIgnore });
                 attrs.insert_or_assign("submodules", Explicit<bool>{ true });
                 attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
-                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
@@ -723,7 +715,7 @@ struct GitInputScheme : InputScheme
                 // TODO: fall back to getAccessorFromCommit-like fetch when submodules aren't checked out
                 // attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
 
-                auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
+                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] =
                     submoduleInput.getAccessor(store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
@@ -755,7 +747,7 @@ struct GitInputScheme : InputScheme
 
             verifyCommit(input, repo);
         } else {
-            repoInfo.warnDirty();
+            repoInfo.warnDirty(*input.settings);
 
             if (repoInfo.workdirInfo.headRev) {
                 input.attrs.insert_or_assign("dirtyRev",

@@ -1,6 +1,7 @@
 #include <sstream>
 
 #include "command.hh"
+#include "exit.hh"
 #include "logging.hh"
 #include "serve-protocol.hh"
 #include "shared.hh"

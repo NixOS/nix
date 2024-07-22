@@ -43,20 +43,6 @@ std::vector<std::string> InstallableFlake::getActualAttrPaths()
     return res;
 }
 
-Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake)
-{
-    auto vFlake = state.allocValue();
-
-    callFlake(state, lockedFlake, *vFlake);
-
-    auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
-    assert(aOutputs);
-
-    state.forceValue(*aOutputs->value, aOutputs->value->determinePos(noPos));
-
-    return aOutputs->value;
-}
-
 static std::string showAttrPaths(const std::vector<std::string> & paths)
 {
     std::string s;
@@ -210,7 +196,8 @@ std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
         flake::LockFlags lockFlagsApplyConfig = lockFlags;
         // FIXME why this side effect?
         lockFlagsApplyConfig.applyNixConfig = true;
-        _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlagsApplyConfig));
+        _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(
+            flakeSettings, *state, flakeRef, lockFlagsApplyConfig));
     }
     return _lockedFlake;
 }

@@ -16,16 +16,12 @@
  */
 
 #include "suggestions.hh"
-#include "ref.hh"
-#include "types.hh"
 #include "fmt.hh"
 
 #include <cstring>
 #include <list>
 #include <memory>
-#include <map>
 #include <optional>
-#include <compare>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -79,10 +75,7 @@ struct Trace {
     TracePrint print = TracePrint::Default;
 };
 
-inline bool operator<(const Trace& lhs, const Trace& rhs);
-inline bool operator> (const Trace& lhs, const Trace& rhs);
-inline bool operator<=(const Trace& lhs, const Trace& rhs);
-inline bool operator>=(const Trace& lhs, const Trace& rhs);
+inline std::strong_ordering operator<=>(const Trace& lhs, const Trace& rhs);
 
 struct ErrorInfo {
     Verbosity level;
@@ -127,6 +120,8 @@ protected:
 
 public:
     BaseError(const BaseError &) = default;
+    BaseError& operator=(const BaseError &) = default;
+    BaseError& operator=(BaseError &&) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
@@ -155,6 +150,7 @@ public:
         : err(e)
     { }
 
+    /** The error message without "error: " prefixed to it. */
     std::string message() {
         return err.msg.str();
     }

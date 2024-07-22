@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 # https://github.com/NixOS/nix/issues/6572
 issue_6572_independent_outputs() {

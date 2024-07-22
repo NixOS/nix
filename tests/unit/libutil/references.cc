@@ -15,7 +15,7 @@ struct RewriteParams {
             strRewrites.insert(from + "->" + to);
         return os <<
             "OriginalString: " << bar.originalString << std::endl <<
-            "Rewrites: " << concatStringsSep(",", strRewrites) << std::endl <<
+            "Rewrites: " << dropEmptyInitThenConcatStringsSep(",", strRewrites) << std::endl <<
             "Expected result: " << bar.finalString;
     }
 };

@@ -1,7 +1,5 @@
 { lib
-, stdenv
-, releaseTools
-, fileset
+, mkMesonDerivation
 
 , meson
 , ninja
@@ -9,30 +7,34 @@
 
 # Configuration Options
 
-, versionSuffix ? ""
+, version
 }:
 
-stdenv.mkDerivation (finalAttrs: {
-  pname = "nix-external-api-docs";
-  version = lib.fileContents ./.version + versionSuffix;
+let
+  inherit (lib) fileset;
+in
 
-  src = fileset.toSource {
-    root = ../..;
-    fileset =
-      let
-        cpp = fileset.fileFilter (file: file.hasExt "cc" || file.hasExt "h");
-      in
-      fileset.unions [
-        ./meson.build
-        ./doxygen.cfg.in
-        ./README.md
-        # Source is not compiled, but still must be available for Doxygen
-        # to gather comments.
-        (cpp ../libexpr-c)
-        (cpp ../libstore-c)
-        (cpp ../libutil-c)
-      ];
-  };
+mkMesonDerivation (finalAttrs: {
+  pname = "nix-external-api-docs";
+  inherit version;
+
+  workDir = ./.;
+  fileset =
+    let
+      cpp = fileset.fileFilter (file: file.hasExt "cc" || file.hasExt "h");
+    in
+    fileset.unions [
+      ./.version
+      ../../.version
+      ./meson.build
+      ./doxygen.cfg.in
+      ./README.md
+      # Source is not compiled, but still must be available for Doxygen
+      # to gather comments.
+      (cpp ../libexpr-c)
+      (cpp ../libstore-c)
+      (cpp ../libutil-c)
+    ];
 
   nativeBuildInputs = [
     meson
@@ -40,14 +42,10 @@ stdenv.mkDerivation (finalAttrs: {
     doxygen
   ];
 
-  postUnpack = ''
-    sourceRoot=$sourceRoot/src/external-api-docs
-  '';
-
   preConfigure =
-    # "Inline" .version so it's not a symlink, and includes the suffix
     ''
-      echo ${finalAttrs.version} > .version
+      chmod u+w ./.version
+      echo ${finalAttrs.version} > ./.version
     '';
 
   postInstall = ''

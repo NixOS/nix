@@ -51,8 +51,19 @@
 
 #include <sqlite3.h>
 
+#include "strings.hh"
+
 
 namespace nix {
+
+LocalStoreConfig::LocalStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , LocalFSStoreConfig(authority, params)
+{
+}
 
 std::string LocalStoreConfig::doc()
 {
@@ -181,10 +192,13 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
     }
 }
 
-LocalStore::LocalStore(const Params & params)
+LocalStore::LocalStore(
+    std::string_view scheme,
+    PathView path,
+    const Params & params)
     : StoreConfig(params)
-    , LocalFSStoreConfig(params)
-    , LocalStoreConfig(params)
+    , LocalFSStoreConfig(path, params)
+    , LocalStoreConfig(scheme, path, params)
     , Store(params)
     , LocalFSStore(params)
     , dbDir(stateDir + "/db")
@@ -463,19 +477,8 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
-LocalStore::LocalStore(
-    std::string_view scheme,
-    PathView path,
-    const Params & _params)
-    : LocalStore([&]{
-        // Default `?root` from `path` if non set
-        if (!path.empty() && _params.count("root") == 0) {
-            auto params = _params;
-            params.insert_or_assign("root", std::string { path });
-            return params;
-        }
-        return _params;
-    }())
+LocalStore::LocalStore(const Params & params)
+    : LocalStore("local", "", params)
 {
 }
 
@@ -1155,7 +1158,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     auto fim = specified.method.getFileIngestionMethod();
                     switch (fim) {
                     case FileIngestionMethod::Flat:
-                    case FileIngestionMethod::Recursive:
+                    case FileIngestionMethod::NixArchive:
                     {
                         HashModuloSink caSink {
                             specified.hash.algo,
@@ -1253,7 +1256,7 @@ StorePath LocalStore::addToStoreFromDump(
     std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
 
-    bool methodsMatch = ContentAddressMethod(FileIngestionMethod(dumpMethod)) == hashMethod;
+    bool methodsMatch = static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod();
 
     /* If the methods don't match, our streaming hash of the dump is the
        wrong sort, and we need to rehash. */
@@ -1314,7 +1317,7 @@ StorePath LocalStore::addToStoreFromDump(
                 auto fim = hashMethod.getFileIngestionMethod();
                 switch (fim) {
                 case FileIngestionMethod::Flat:
-                case FileIngestionMethod::Recursive:
+                case FileIngestionMethod::NixArchive:
                     restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
                     break;
                 case FileIngestionMethod::Git:
@@ -1330,7 +1333,7 @@ StorePath LocalStore::addToStoreFromDump(
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
             auto narHash = std::pair { dumpHash, size };
-            if (dumpMethod != FileSerialisationMethod::Recursive || hashAlgo != HashAlgorithm::SHA256) {
+            if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink { HashAlgorithm::SHA256 };
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
@@ -1423,7 +1426,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 PosixSourceAccessor::createAtRoot(link.path()),
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::NixArchive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     link.path(), name, hash);

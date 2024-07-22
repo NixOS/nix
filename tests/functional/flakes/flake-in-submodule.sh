@@ -15,6 +15,8 @@ source common.sh
 
 requireGit
 
+TODO_NixOS
+
 clearStore
 
 # Submodules can't be fetched locally by default.

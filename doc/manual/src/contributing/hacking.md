@@ -122,7 +122,6 @@ Run `make` with [`-e` / `--environment-overrides`](https://www.gnu.org/software/
 
   The docs can take a while to build, so you may want to disable this for local development.
 - `ENABLE_FUNCTIONAL_TESTS=yes` to enable building the functional tests.
-- `ENABLE_UNIT_TESTS=yes` to enable building the unit tests.
 - `OPTIMIZE=1` to enable optimizations.
 - `libraries=libutil programs=` to only build a specific library.
 

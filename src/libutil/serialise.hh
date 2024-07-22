@@ -159,13 +159,7 @@ struct FdSource : BufferedSource
     FdSource(Descriptor fd) : fd(fd) { }
     FdSource(FdSource &&) = default;
 
-    FdSource & operator=(FdSource && s)
-    {
-        fd = s.fd;
-        s.fd = INVALID_DESCRIPTOR;
-        read = s.read;
-        return *this;
-    }
+    FdSource & operator=(FdSource && s) = default;
 
     bool good() override;
 protected:

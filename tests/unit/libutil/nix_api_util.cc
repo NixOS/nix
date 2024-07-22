@@ -1,4 +1,4 @@
-#include "config.hh"
+#include "config-global.hh"
 #include "args.hh"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"

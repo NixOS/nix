@@ -9,11 +9,11 @@
 
 #include <sys/types.h>
 
-namespace nix {
+namespace nix::fetchers {
 
-struct FetchSettings : public Config
+struct Settings : public Config
 {
-    FetchSettings();
+    Settings();
 
     Setting<StringMap> accessTokens{this, {}, "access-tokens",
         R"(
@@ -70,30 +70,6 @@ struct FetchSettings : public Config
     Setting<bool> warnDirty{this, true, "warn-dirty",
         "Whether to warn about dirty Git/Mercurial trees."};
 
-    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
-        R"(
-          Path or URI of the global flake registry.
-
-          When empty, disables the global flake registry.
-        )",
-        {}, true, Xp::Flakes};
-
-    Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries to resolve flake references.",
-        {}, true, Xp::Flakes};
-
-    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
-        "Whether to accept nix configuration from a flake without prompting.",
-        {}, true, Xp::Flakes};
-
-    Setting<std::string> commitLockFileSummary{
-        this, "", "commit-lock-file-summary",
-        R"(
-          The commit summary to use when committing changed flake lock files. If
-          empty, the summary is generated based on the action performed.
-        )",
-        {"commit-lockfile-summary"}, true, Xp::Flakes};
-
     Setting<bool> trustTarballsFromGitForges{
         this, true, "trust-tarballs-from-git-forges",
         R"(
@@ -109,9 +85,13 @@ struct FetchSettings : public Config
           e.g. `github:NixOS/patchelf/7c2f768bf9601268a4e71c2ebe91e2011918a70f?narHash=sha256-PPXqKY2hJng4DBVE0I4xshv/vGLUskL7jl53roB8UdU%3D`.
         )"};
 
-};
+    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
+        R"(
+          Path or URI of the global flake registry.
 
-// FIXME: don't use a global variable.
-extern FetchSettings fetchSettings;
+          When empty, disables the global flake registry.
+        )",
+        {}, true, Xp::Flakes};
+};
 
 }

@@ -10,6 +10,8 @@ if [[ -z "${NIX_DAEMON_PACKAGE-}" ]]; then
     skipTest "not using the Nix daemon"
 fi
 
+TODO_NixOS
+
 killDaemon
 
 # Fill the db using the older Nix

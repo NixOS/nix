@@ -54,6 +54,9 @@ perl/Makefile.config
 # /src/libfetchers
 /tests/unit/libfetchers/libnixfetchers-tests
 
+# /src/libflake
+/tests/unit/libflake/libnixflake-tests
+
 # /src/libstore/
 *.gen.*
 /src/libstore/tests

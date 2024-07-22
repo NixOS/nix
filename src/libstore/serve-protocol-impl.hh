@@ -10,7 +10,6 @@
 
 #include "serve-protocol.hh"
 #include "length-prefixed-protocol-helper.hh"
-#include "store-api.hh"
 
 namespace nix {
 

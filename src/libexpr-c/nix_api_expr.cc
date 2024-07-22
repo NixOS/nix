@@ -1,12 +1,11 @@
 #include <cstring>
-#include <iostream>
 #include <stdexcept>
 #include <string>
 
-#include "config.hh"
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "globals.hh"
-#include "util.hh"
+#include "eval-settings.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -15,10 +14,10 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#ifdef HAVE_BOEHMGC
-#include <mutex>
-#define GC_INCLUDE_NEW 1
-#include "gc_cpp.h"
+#if HAVE_BOEHMGC
+#  include <mutex>
+#  define GC_INCLUDE_NEW 1
+#  include "gc_cpp.h"
 #endif
 
 nix_err nix_libexpr_init(nix_c_context * context)
@@ -106,7 +105,23 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
             for (size_t i = 0; lookupPath_c[i] != nullptr; i++)
                 lookupPath.push_back(lookupPath_c[i]);
 
-        return new EvalState{nix::EvalState(nix::LookupPath::parse(lookupPath), store->ptr)};
+        void * p = ::operator new(
+            sizeof(EvalState),
+            static_cast<std::align_val_t>(alignof(EvalState)));
+        auto * p2 = static_cast<EvalState *>(p);
+        new (p) EvalState {
+            .fetchSettings = nix::fetchers::Settings{},
+            .settings = nix::EvalSettings{
+                nix::settings.readOnlyMode,
+            },
+            .state = nix::EvalState(
+                nix::LookupPath::parse(lookupPath),
+                store->ptr,
+                p2->fetchSettings,
+                p2->settings),
+        };
+        loadConfFile(p2->settings);
+        return p2;
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -116,7 +131,7 @@ void nix_state_free(EvalState * state)
     delete state;
 }
 
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
 std::unordered_map<
     const void *,
     unsigned int,
@@ -192,7 +207,7 @@ nix_err nix_value_decref(nix_c_context * context, nix_value *x)
 
 void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd))
 {
-#ifdef HAVE_BOEHMGC
+#if HAVE_BOEHMGC
     GC_REGISTER_FINALIZER(obj, finalizer, cd, 0, 0);
 #endif
 }

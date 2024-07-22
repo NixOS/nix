@@ -312,7 +312,7 @@
 
 - [package attribute set]{#package-attribute-set}
 
-  An [attribute set](@docroot@/language/values.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
+  An [attribute set](@docroot@/language/types.md#attribute-set) containing the attribute `type = "derivation";` (derivation for historical reasons), as well as other attributes, such as
   - attributes that refer to the files of a [package], typically in the form of [derivation outputs](#output),
   - attributes that declare something about how the package is supposed to be installed or used,
   - other metadata or arbitrary attributes.
@@ -325,9 +325,9 @@
 
   See [String interpolation](./language/string-interpolation.md) for details.
 
-  [string]: ./language/values.md#type-string
-  [path]: ./language/values.md#type-path
-  [attribute name]: ./language/values.md#attribute-set
+  [string]: ./language/types.md#type-string
+  [path]: ./language/types.md#type-path
+  [attribute name]: ./language/types.md#attribute-set
 
 - [base directory]{#gloss-base-directory}
 
