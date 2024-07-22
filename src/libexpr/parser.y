@@ -1,4 +1,4 @@
-%glr-parser
+%define api.location.type { ::nix::ParserLocation }
 %define api.pure
 %locations
 %define parse.error verbose
@@ -9,7 +9,6 @@
 %lex-param { void * scanner }
 %lex-param { nix::ParserState * state }
 %expect 0
-%expect-rr 0
 
 %code requires {
 
@@ -27,7 +26,17 @@
 #include "eval-settings.hh"
 #include "parser-state.hh"
 
-#define YYLTYPE ::nix::ParserLocation
+// Bison seems to have difficulty growing the parser stack when using C++ with
+// a custom location type. This undocumented macro tells Bison that our
+// location type is "trivially copyable" in C++-ese, so it is safe to use the
+// same memcpy macro it uses to grow the stack that it uses with its own
+// default location type. Without this, we get "error: memory exhausted" when
+// parsing some large Nix files. Our other options are to increase the initial
+// stack size (200 by default) to be as large as we ever want to support (so
+// that growing the stack is unnecessary), or redefine the stack-relocation
+// macro ourselves (which is also undocumented).
+#define YYLTYPE_IS_TRIVIAL 1
+
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParserState * state)
 
@@ -77,7 +86,7 @@ YY_DECL;
 
 using namespace nix;
 
-#define CUR_POS state->at(*yylocp)
+#define CUR_POS state->at(yyloc)
 
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)

@@ -20,6 +20,7 @@ struct StringToken
     operator std::string_view() const { return {p, l}; }
 };
 
+// This type must be trivially copyable; see YYLTYPE_IS_TRIVIAL in parser.y.
 struct ParserLocation
 {
     int beginOffset;
