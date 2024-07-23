@@ -483,13 +483,17 @@ struct FramedSource : Source
 
     ~FramedSource()
     {
-        if (!eof) {
-            while (true) {
-                auto n = readInt(from);
-                if (!n) break;
-                std::vector<char> data(n);
-                from(data.data(), n);
+        try {
+            if (!eof) {
+                while (true) {
+                    auto n = readInt(from);
+                    if (!n) break;
+                    std::vector<char> data(n);
+                    from(data.data(), n);
+                }
             }
+        } catch (...) {
+            ignoreException();
         }
     }
 
