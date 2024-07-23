@@ -151,6 +151,8 @@ public:
      * Force creation of the .drv file in the Nix store.
      */
     StorePath forceDerivation();
+
+    std::string showType();
 };
 
 }
