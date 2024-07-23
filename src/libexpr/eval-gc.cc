@@ -206,10 +206,17 @@ static inline void initGCReal()
     }
 }
 
+static size_t gcCyclesAfterInit = 0;
+
+size_t getGCCycles()
+{
+    assertGCInitialized();
+    return static_cast<size_t>(GC_get_gc_no()) - gcCyclesAfterInit;
+}
+
 #endif
 
 static bool gcInitialised = false;
-static GC_word gcCyclesAfterInit = 0;
 
 void initGC()
 {
@@ -218,21 +225,16 @@ void initGC()
 
 #if HAVE_BOEHMGC
     initGCReal();
+
+    gcCyclesAfterInit = GC_get_gc_no();
 #endif
 
     gcInitialised = true;
-    gcCyclesAfterInit = GC_get_gc_no();
 }
 
 void assertGCInitialized()
 {
     assert(gcInitialised);
-}
-
-size_t getGCCycles()
-{
-    assertGCInitialized();
-    return GC_get_gc_no() - gcCyclesAfterInit;
 }
 
 } // namespace nix
