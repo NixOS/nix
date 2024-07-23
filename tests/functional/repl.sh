@@ -311,7 +311,10 @@ for test in $(cd "$testDir/repl"; echo *.in); do
     in="$testDir/repl/$test.in"
     actual="$testDir/repl/$test.actual"
     expected="$testDir/repl/$test.expected"
-    (cd "$testDir/repl"; set +x; runRepl 2>&1) < "$in" > "$actual"
+    (cd "$testDir/repl"; set +x; runRepl 2>&1) < "$in" > "$actual" || {
+        echo "FAIL: $test (exit code $?)" >&2
+        badExitCode=1
+    }
     diffAndAcceptInner "$test" "$actual" "$expected"
 done
 
