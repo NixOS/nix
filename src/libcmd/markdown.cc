@@ -4,8 +4,8 @@
 #include "terminal.hh"
 
 #if HAVE_LOWDOWN
-# include <sys/queue.h>
-# include <lowdown.h>
+#  include <sys/queue.h>
+#  include <lowdown.h>
 #endif
 
 namespace nix {
@@ -15,7 +15,8 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
 #if HAVE_LOWDOWN
     int windowWidth = getWindowSize().second;
 
-    struct lowdown_opts opts {
+    struct lowdown_opts opts
+    {
         .type = LOWDOWN_TERM,
         .maxdepth = 20,
         .cols = (size_t) std::max(windowWidth - 5, 60),
