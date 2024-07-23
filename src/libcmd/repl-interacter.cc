@@ -19,6 +19,7 @@ extern "C" {
 #include "repl-interacter.hh"
 #include "file-system.hh"
 #include "repl.hh"
+#include "environment-variables.hh"
 
 namespace nix {
 
@@ -179,6 +180,19 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
         return false;
     input += s;
     input += '\n';
+
+#ifndef USE_READLINE
+    // editline doesn't echo the input to the output when non-interactive, unlike readline
+    // this results in a different behavior when running tests. The echoing is
+    // quite useful for reading the test output, so we add it here.
+    if (auto e = getEnv("_NIX_TEST_REPL_ECHO"); s && e && *e == "1")
+    {
+        // This is probably not right for multi-line input, but we don't use that
+        // in the characterisation tests, so it's fine.
+        std::cout << "nix-repl> " << s << std::endl;
+    }
+#endif
+
     return true;
 }
 
