@@ -249,20 +249,18 @@ Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#built
 
 An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
 
-An attribute name can be an identifier or a [string](#string).
-An identifier must start with a letter (`a-z`, `A-Z`) or underscore (`_`), and can otherwise contain letters (`a-z`, `A-Z`), numbers (`0-9`), underscores (`_`), apostrophes (`'`), or dashes (`-`).
+An attribute *name* can be an [identifier](./identifiers.md) or a [string](#string-literal).
 
 > **Syntax**
 >
-> *name* = *identifier* | *string* \
-> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
+> *name* → *identifier* | *string*
 
 Names and values are separated by an equal sign (`=`).
 Each value is an arbitrary expression terminated by a semicolon (`;`).
 
 > **Syntax**
 >
-> *attrset* = `{` [ *name* `=` *expr* `;` ]... `}`
+> *attrset* → `{` [ *name* `=` *expr* `;` ]... `}`
 
 Attributes can appear in any order.
 An attribute name may only occur once.
