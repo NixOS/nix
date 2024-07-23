@@ -121,7 +121,7 @@ void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
     osStackBase = (char *) osStackLimit + osStackSize;
     // NOTE: We assume the stack grows down, as it does on all architectures we support.
     //       Architectures that grow the stack up are rare.
-    if (sp >= osStackBase || sp < osStackLimit) { // lo is outside the os stack
+    if (sp >= osStackBase || sp < osStackLimit) { // sp is outside the os stack
         sp = osStackLimit;
     }
 }
