@@ -262,12 +262,21 @@ badExitCode=0
 
 nixVersion="$(nix eval --impure --raw --expr 'builtins.nixVersion' --extra-experimental-features nix-command)"
 
+# TODO: write a repl interacter for testing. Papering over the differences between readline / editline and between platforms is a pain.
+
 # I couldn't get readline and editline to agree on the newline before the prompt,
-# so let's just force it to be one empty line. Ideally we get the two to agree
-# or use a simpler interacter for testing.
+# so let's just force it to be one empty line.
 stripEmptyLinesBeforePrompt() {
   # --null-data:  treat input as NUL-terminated instead of newline-terminated
   sed --null-data 's/\n\n*nix-repl>/\n\nnix-repl>/g'
+}
+
+# We don't get a final prompt on darwin, so we strip this as well.
+stripFinalPrompt() {
+  # Strip the final prompt and/or any trailing spaces
+  sed --null-data \
+    -e 's/\(.*[^\n]\)\n\n*nix-repl>[ \n]*$/\1/' \
+    -e 's/[ \n]*$/\n/'
 }
 
 runRepl () {
@@ -285,7 +294,9 @@ runRepl () {
   _NIX_TEST_REPL_ECHO=1 \
   nix repl 2>&1 \
     | stripColors \
+    | tr -d '\0' \
     | stripEmptyLinesBeforePrompt \
+    | stripFinalPrompt \
     | sed \
       -e "s@$testDir@/path/to/tests/functional@g" \
       -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \

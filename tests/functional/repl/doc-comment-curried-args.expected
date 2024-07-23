@@ -26,5 +26,3 @@ nix-repl> "This won't produce docs; no support for arbitrary values"
 
 nix-repl> :doc x 2
 error: value does not have documentation
-
-nix-repl> 

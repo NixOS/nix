@@ -15,5 +15,3 @@ Perform *arithmetic* multiplication. It's kind of like repeated **addition**, ve
 multiply 2 3
 => 6
 ```
-
-nix-repl> 

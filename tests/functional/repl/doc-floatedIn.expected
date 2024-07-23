@@ -9,5 +9,3 @@ Function `floatedIn`\
   … defined at /path/to/tests/functional/repl/doc-comments.nix:16:5
 
 This also works.
-
-nix-repl> 

@@ -9,5 +9,3 @@ Function `measurement`\
   … defined at /path/to/tests/functional/repl/doc-comments.nix:13:17
 
 👈 precisely this wide 👉
-
-nix-repl> 

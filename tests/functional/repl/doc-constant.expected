@@ -108,5 +108,3 @@ error:
             1| lib.attr.undocumental
              | ^
        Did you mean undocumented?
-
-nix-repl> 

@@ -27,5 +27,3 @@ Function `strictPost`\
   … defined at /path/to/tests/functional/repl/doc-comments.nix:41:53
 
 Here's another way to do this
-
-nix-repl> 

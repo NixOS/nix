@@ -35,5 +35,3 @@ nix-repl> twoDeepList
 [
   [ ... ]
 ]
-
-nix-repl> 
