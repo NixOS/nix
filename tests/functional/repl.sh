@@ -262,6 +262,14 @@ badExitCode=0
 
 nixVersion="$(nix eval --impure --raw --expr 'builtins.nixVersion' --extra-experimental-features nix-command)"
 
+# I couldn't get readline and editline to agree on the newline before the prompt,
+# so let's just force it to be one empty line. Ideally we get the two to agree
+# or use a simpler interacter for testing.
+stripEmptyLinesBeforePrompt() {
+  # --null-data:  treat input as NUL-terminated instead of newline-terminated
+  sed --null-data 's/\n\n*nix-repl>/\n\nnix-repl>/g'
+}
+
 runRepl () {
 
   # That is right, we are also filtering out the testdir _without underscores_.
@@ -273,8 +281,11 @@ runRepl () {
   testDirNoUnderscores="${testDir//_/}"
 
   # TODO: pass arguments to nix repl; see lang.sh
+  _NIX_TEST_RAW_MARKDOWN=1 \
+  _NIX_TEST_REPL_ECHO=1 \
   nix repl 2>&1 \
     | stripColors \
+    | stripEmptyLinesBeforePrompt \
     | sed \
       -e "s@$testDir@/path/to/tests/functional@g" \
       -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
