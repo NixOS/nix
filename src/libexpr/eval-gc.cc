@@ -86,12 +86,13 @@ void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
     auto pthread_id = reinterpret_cast<pthread_t>(_pthread_id);
     pthread_attr_t pattr;
     size_t osStackSize;
-    void * osStackLow;
+    // The low address of the stack, which grows down.
+    void * osStackLimit;
     void * osStackBase;
 
 #  ifdef __APPLE__
     osStackSize = pthread_get_stacksize_np(pthread_id);
-    osStackLow = pthread_get_stackaddr_np(pthread_id);
+    osStackLimit = pthread_get_stackaddr_np(pthread_id);
 #  else
     if (pthread_attr_init(&pattr)) {
         throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
@@ -110,18 +111,18 @@ void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
 #    else
 #      error "Need one of `pthread_attr_get_np` or `pthread_getattr_np`"
 #    endif
-    if (pthread_attr_getstack(&pattr, &osStackLow, &osStackSize)) {
+    if (pthread_attr_getstack(&pattr, &osStackLimit, &osStackSize)) {
         throw Error("fixupBoehmStackPointer: pthread_attr_getstack failed");
     }
     if (pthread_attr_destroy(&pattr)) {
         throw Error("fixupBoehmStackPointer: pthread_attr_destroy failed");
     }
 #  endif
-    osStackBase = (char *) osStackLow + osStackSize;
+    osStackBase = (char *) osStackLimit + osStackSize;
     // NOTE: We assume the stack grows down, as it does on all architectures we support.
     //       Architectures that grow the stack up are rare.
-    if (sp >= osStackBase || sp < osStackLow) { // lo is outside the os stack
-        sp = osStackLow;
+    if (sp >= osStackBase || sp < osStackLimit) { // lo is outside the os stack
+        sp = osStackLimit;
     }
 }
 
