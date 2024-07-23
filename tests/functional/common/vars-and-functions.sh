@@ -306,7 +306,8 @@ onError() {
 # Example (showns as string): 'repl.sh:123: in call to grepQuiet: '
 # This function is inefficient, so it should only be used in error messages.
 callerPrefix() {
-  # Find the closes caller that's not from this file
+  # Find the closest caller that's not from this file
+  # using the bash `caller` builtin.
   local i file line fn savedFn
   # Use `caller`
   for i in $(seq 0 100); do
