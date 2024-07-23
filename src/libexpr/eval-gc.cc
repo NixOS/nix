@@ -84,7 +84,9 @@ void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
 {
     void *& sp = *sp_ptr;
     auto pthread_id = reinterpret_cast<pthread_t>(_pthread_id);
+#  ifndef __APPLE__
     pthread_attr_t pattr;
+#  endif
     size_t osStackSize;
     void * osStackLow;
     void * osStackBase;
