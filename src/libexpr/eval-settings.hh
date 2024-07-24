@@ -47,6 +47,8 @@ struct EvalSettings : Config
 
     static bool isPseudoUrl(std::string_view s);
 
+    static Strings parseNixPath(const std::string & s);
+
     static std::string resolvePseudoUrl(std::string_view url);
 
     LookupPathHooks lookupPathHooks;
@@ -71,7 +73,7 @@ struct EvalSettings : Config
     )"};
 
     Setting<Strings> nixPath{
-        this, getDefaultNixPath(), "nix-path",
+        this, {}, "nix-path",
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of
