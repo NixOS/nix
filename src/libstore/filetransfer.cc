@@ -858,7 +858,7 @@ void FileTransfer::download(
            buffer). We don't wait forever to prevent stalling the
            download thread. (Hopefully sleeping will throttle the
            sender.) */
-        if (state->data.size() > 1024 * 1024) {
+        if (state->data.size() > fileTransferSettings.downloadBufferSize) {
             debug("download buffer is full; going to sleep");
             state.wait_for(state->request, std::chrono::seconds(10));
         }
