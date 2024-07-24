@@ -7,7 +7,7 @@
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
-  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2/v1.8.1"; flake = false; };
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
