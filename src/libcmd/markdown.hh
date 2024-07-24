@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "types.hh"
+#include <string_view>
 
 namespace nix {
 
