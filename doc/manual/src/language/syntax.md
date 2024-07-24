@@ -253,9 +253,9 @@ Attribute sets are written enclosed in curly brackets (`{ }`).
 Attribute names and attribute values are separated by an equal sign (`=`).
 Each value can be an arbitrary expression, terminated by a semicolon (`;`)
 
-Attribute names can be any [name].
+An attribute name is a string without context, and is denoted by a [name] (an [identifier](./identifiers.md#identifiers) or [string literal](#string-literal)).
 
-[name]: ./identifiers.md#name
+[name]: ./identifiers.md#names
 
 > **Syntax**
 >

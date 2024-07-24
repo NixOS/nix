@@ -16,7 +16,7 @@ An *identifier* is an [ASCII](https://en.wikipedia.org/wiki/ASCII) character seq
 
 # Names
 
-A name can be an [identifier](#identifier) or a [string](#string).
+A name can be an [identifier](#identifier) or a [string literal](./syntax.md#string-literal).
 
 > **Syntax**
 >
