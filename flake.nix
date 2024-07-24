@@ -1,24 +1,22 @@
 {
   description = "The purely functional package manager";
 
-  # TODO switch to nixos-23.11-small
-  #      https://nixpk.gs/pr-tracker.html?pr=291954
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
-  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2/v1.8.1"; flake = false; };
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
-  inputs.pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+  inputs.git-hooks-nix.url = "github:cachix/git-hooks.nix";
   # work around https://github.com/NixOS/nix/issues/7730
   inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
-  inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.pre-commit-hooks.inputs.nixpkgs-stable.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs-stable.follows = "nixpkgs";
   # work around 7730 and https://github.com/NixOS/nix/issues/7807
-  inputs.pre-commit-hooks.inputs.flake-compat.follows = "";
-  inputs.pre-commit-hooks.inputs.gitignore.follows = "";
+  inputs.git-hooks-nix.inputs.flake-compat.follows = "";
+  inputs.git-hooks-nix.inputs.gitignore.follows = "";
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
 
