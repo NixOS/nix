@@ -1,4 +1,4 @@
-# Identifier
+# Identifiers
 
 An *identifier* is an [ASCII](https://en.wikipedia.org/wiki/ASCII) character sequence that:
 - Starts with a letter (`a-z`, `A-Z`) or underscore (`_`)
@@ -13,6 +13,16 @@ An *identifier* is an [ASCII](https://en.wikipedia.org/wiki/ASCII) character seq
 > **Syntax**
 >
 > *identifier* ~ `[A-Za-z_][A-Za-z0-9_'-]*`
+
+# Names
+
+A name can be an [identifier](#identifier) or a [string](#string).
+
+> **Syntax**
+>
+> *name* → *identifier* | *string*
+
+Names are used in [attribute sets](./syntax.md#attrs-literal), [`let` bindings](./syntax.md#let-expressions), and [`inherit`](./syntax.md#inheriting attributes).
 
 # Keywords
 
