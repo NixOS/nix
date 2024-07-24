@@ -337,7 +337,7 @@ EvalState::EvalState(
         for (auto & i : lookupPathFromArguments.elements) {
             lookupPath.elements.emplace_back(LookupPath::Elem {i});
         }
-        /* $NIX_PATH overriding regular settings is implemented as a hack in `applyConfig()` */
+        /* $NIX_PATH overriding regular settings is implemented as a hack in `initGC()` */
         for (auto & i : settings.nixPath.get()) {
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
         }

@@ -47,6 +47,8 @@ struct EvalSettings : Config
 
     static bool isPseudoUrl(std::string_view s);
 
+    static std::string parseNixPath(const std::string & s);
+
     static std::string resolvePseudoUrl(std::string_view url);
 
     LookupPathHooks lookupPathHooks;

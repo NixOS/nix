@@ -125,57 +125,6 @@ Settings::Settings()
     };
 }
 
-// FIXME: this is a duplicate from eval-settings.hh, but we can't import that here
-// if we want to maintain proper separation of concerns
-static bool isPseudoUrl(std::string_view s)
-{
-    if (s.compare(0, 8, "channel:") == 0) return true;
-    size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
-    std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
-}
-
-/* Very hacky way to translate `$NIX_PATH`, which is colon-separated,
- * into `nix-path`, which is space-separated.
- * The trick is that it can contain URLs,
- * e.g. "nixpkgs=https://bla...:foo=https://"
- */
-static std::string parseNixPath(const std::string & s)
-{
-    std::string result;
-    auto p = s.begin();
-    while (p != s.end()) {
-        if (!result.empty()) {
-            result += " ";
-        }
-
-        auto start = p;
-        auto start2 = p;
-        while (p != s.end() && *p != ':') {
-            if (*p == '=') start2 = p + 1;
-            ++p;
-        }
-
-        if (p == s.end()) {
-            if (p != start) result += std::string(start, p);
-            break;
-        }
-
-        if (*p == ':') {
-            auto prefix = std::string(start2, s.end());
-            if (isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
-                ++p;
-                while (p != s.end() && *p != ':') ++p;
-            }
-            result += std::string(start, p);
-            if (p == s.end()) break;
-        }
-        ++p;
-    }
-    return result;
-}
-
 void loadConfFile(AbstractConfig & config)
 {
     auto applyConfigFile = [&](const Path & path) {
@@ -199,12 +148,6 @@ void loadConfFile(AbstractConfig & config)
     auto nixConfEnv = getEnv("NIX_CONFIG");
     if (nixConfEnv.has_value()) {
         config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
-    }
-
-    // NIX_PATH must override the regular setting
-    // See the comment in applyConfig
-    if (auto nixPathEnv = getEnv("NIX_PATH")) {
-        config.set("nix-path", parseNixPath(nixPathEnv.value()));
     }
 
 }

@@ -6,6 +6,50 @@
 
 namespace nix {
 
+/* Very hacky way to translate `$NIX_PATH`, which is colon-separated,
+ * into `nix-path`, which is space-separated.
+ * The trick is that it can contain URLs,
+ * e.g. "nixpkgs=https://bla...:foo=https://"
+ */
+std::string EvalSettings::parseNixPath(const std::string & s)
+{
+
+    std::string result;
+    auto p = s.begin();
+
+    while (p != s.end()) {
+        if (!result.empty()) {
+            result += " ";
+        }
+        auto start = p;
+        auto start2 = p;
+
+        while (p != s.end() && *p != ':') {
+            if (*p == '=') start2 = p + 1;
+            ++p;
+        }
+
+        if (p == s.end()) {
+            if (p != start) result += std::string(start, p);
+            break;
+        }
+
+        if (*p == ':') {
+            auto prefix = std::string(start2, s.end());
+            if (isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
+                ++p;
+                while (p != s.end() && *p != ':') ++p;
+            }
+            result += std::string(start, p);
+            if (p == s.end()) break;
+        }
+
+        ++p;
+    }
+
+    return result;
+}
+
 EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lookupPathHooks)
     : readOnlyMode{readOnlyMode}
     , lookupPathHooks{lookupPathHooks}

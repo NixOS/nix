@@ -171,7 +171,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
             set(name, value);
 
     // Then apply other settings
-    // XXX: NIX_PATH must override the regular setting!
+    // XXX: NIX_PATH must override the regular setting! This is done in `initGC()`
     // Environment variables overriding settings should probably be part of the Config mechanism,
     // but at the time of writing it's not worth building that for just one thing
     for (const auto & [name, value] : parsedContents) {
