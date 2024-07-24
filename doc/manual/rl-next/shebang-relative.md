@@ -8,7 +8,7 @@ issues:
 ---
 
 <!-- unfortunately no link target for the specific syntax -->
-Relative [path](@docroot@/language/values.md#type-path) literals in `nix-shell` shebang scripts' options are now resolved relative to the [script's location](@docroot@/glossary?highlight=base%20directory#gloss-base-directory).
+Relative [path](@docroot@/language/types.md#type-path) literals in `nix-shell` shebang scripts' options are now resolved relative to the [script's location](@docroot@/glossary.md?highlight=base%20directory#gloss-base-directory).
 Previously they were resolved relative to the current working directory.
 
 For example, consider the following script in `~/myproject/say-hi`:
