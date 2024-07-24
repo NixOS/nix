@@ -155,6 +155,9 @@ DownloadTarballResult downloadTarball(
 
     // TODO: fall back to cached value if download fails.
 
+    auto act = std::make_unique<Activity>(*logger, lvlInfo, actUnknown,
+        fmt("unpacking '%s' into the Git cache", url));
+
     AutoDelete cleanupTemp;
 
     /* Note: if the download is cached, `importTarball()` will receive
@@ -178,6 +181,8 @@ DownloadTarballResult downloadTarball(
         : TarArchive{*source};
     auto parseSink = getTarballCache()->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
+
+    act.reset();
 
     auto res(_res->lock());
 
