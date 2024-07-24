@@ -18,57 +18,6 @@ Config::Config(StringMap initials)
     : AbstractConfig(std::move(initials))
 { }
 
-// FIXME: this is a duplicate from eval-settings.hh, but we can't import that here
-// if we want to maintain proper separation of concerns
-static bool isPseudoUrl(std::string_view s)
-{
-    if (s.compare(0, 8, "channel:") == 0) return true;
-    size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
-    std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
-}
-
-/* Very hacky way to translate `$NIX_PATH`, which is colon-separated,
- * into `nix-path`, which is space-separated.
- * The trick is that it can contain URLs,
- * e.g. "nixpkgs=https://bla...:foo=https://"
- */
-static std::string parseNixPath(const std::string & s)
-{
-    std::string result;
-    auto p = s.begin();
-    while (p != s.end()) {
-        if (!result.empty()) {
-            result += " ";
-        }
-
-        auto start = p;
-        auto start2 = p;
-        while (p != s.end() && *p != ':') {
-            if (*p == '=') start2 = p + 1;
-            ++p;
-        }
-
-        if (p == s.end()) {
-            if (p != start) result += std::string(start, p);
-            break;
-        }
-
-        if (*p == ':') {
-            auto prefix = std::string(start2, s.end());
-            if (isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
-                ++p;
-                while (p != s.end() && *p != ':') ++p;
-            }
-            result += std::string(start, p);
-            if (p == s.end()) break;
-        }
-        ++p;
-    }
-    return result;
-}
-
 bool Config::set(const std::string & name, const std::string & value)
 {
     bool append = false;
@@ -225,14 +174,10 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
     // XXX: NIX_PATH must override the regular setting!
     // Environment variables overriding settings should probably be part of the Config mechanism,
     // but at the time of writing it's not worth building that for just one thing
-    bool overrideNixPath = false;
-    if (auto nixPathEnv = getEnv("NIX_PATH")) {
-        overrideNixPath = true;
-        set("nix-path", parseNixPath(nixPathEnv.value()));
-    }
     for (const auto & [name, value] : parsedContents) {
         if (name != "experimental-features" && name != "extra-experimental-features") {
-            if (overrideNixPath && (name == "nix-path" || name == "extra-nix-path")) {
+            if ((name == "nix-path" || name == "extra-nix-path")
+                && getEnv("NIX_PATH").has_value()) {
                 continue;
             }
             set(name, value);
