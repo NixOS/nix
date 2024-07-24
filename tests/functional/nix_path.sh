@@ -42,7 +42,7 @@ done
 # finding something that's not in any of the default paths fails
 ( ! $(nix-instantiate --find-file test) )
 
-echo "nix-path = test=$TEST_ROOT/from-nix-path-file" >> $NIX_CONF_DIR/nix.conf
+echo "nix-path = test=$TEST_ROOT/from-nix-path-file" >> "$test_nix_conf"
 
 # Use nix.conf in absence of NIX_PATH
 [[ $(nix-instantiate --find-file test) = $TEST_ROOT/from-nix-path-file ]]
