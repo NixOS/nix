@@ -6,21 +6,15 @@
 
 namespace nix {
 
-/* Very hacky way to translate `$NIX_PATH`, which is colon-separated,
- * into `nix-path`, which is space-separated.
- * The trick is that it can contain URLs,
- * e.g. "nixpkgs=https://bla...:foo=https://"
- */
-std::string EvalSettings::parseNixPath(const std::string & s)
+/* Very hacky way to parse $NIX_PATH, which is colon-separated, but
+   can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
+Strings EvalSettings::parseNixPath(const std::string & s)
 {
+    Strings res;
 
-    std::string result;
     auto p = s.begin();
 
     while (p != s.end()) {
-        if (!result.empty()) {
-            result += " ";
-        }
         auto start = p;
         auto start2 = p;
 
@@ -30,24 +24,24 @@ std::string EvalSettings::parseNixPath(const std::string & s)
         }
 
         if (p == s.end()) {
-            if (p != start) result += std::string(start, p);
+            if (p != start) res.push_back(std::string(start, p));
             break;
         }
 
         if (*p == ':') {
             auto prefix = std::string(start2, s.end());
-            if (isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
+            if (EvalSettings::isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
                 ++p;
                 while (p != s.end() && *p != ':') ++p;
             }
-            result += std::string(start, p);
+            res.push_back(std::string(start, p));
             if (p == s.end()) break;
         }
 
         ++p;
     }
 
-    return result;
+    return res;
 }
 
 EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lookupPathHooks)
