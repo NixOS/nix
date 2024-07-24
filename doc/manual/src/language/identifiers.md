@@ -28,16 +28,16 @@ Names are used in [attribute sets](./syntax.md#attrs-literal), [`let` bindings](
 
 These keywords are reserved and cannot be used as [identifiers](#identifiers):
 
-- [`if`][if]
-- [`then`][if]
-- [`else`][if]
-- [`let`][let]
-- [`in`][let]
 - [`assert`](./syntax.md#assertions)
+- [`else`][if]
+- [`if`][if]
+- [`in`][let]
 - [`inherit`](./syntax.md#inheriting-attributes)
-- [`rec`](./syntax.md#recursive-sets)
-- [`with`](./syntax.md#with-expressions)
+- [`let`][let]
 - [`or`](./operators.md#attribute-selection) (see note)
+- [`rec`](./syntax.md#recursive-sets)
+- [`then`][if]
+- [`with`](./syntax.md#with-expressions)
 
 [if]: ./syntax.md#conditionals
 [let]: ./syntax.md#let-expressions
