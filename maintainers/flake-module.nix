@@ -2,7 +2,7 @@
 
 {
   imports = [
-    inputs.pre-commit-hooks.flakeModule
+    inputs.git-hooks-nix.flakeModule
   ];
 
   perSystem = { config, pkgs, ... }: {
