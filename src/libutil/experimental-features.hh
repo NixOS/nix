@@ -35,6 +35,7 @@ enum struct ExperimentalFeature
     ConfigurableImpureEnv,
     MountedSSHStore,
     VerifiedFetches,
+    PipeOperators,
 };
 
 /**

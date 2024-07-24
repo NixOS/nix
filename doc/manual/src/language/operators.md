@@ -26,12 +26,16 @@
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
 | Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | right         | 14         |
+| [Pipe operator] (experimental)         | *expr* `\|>` *func*                        | left          | 15         |
+| [Pipe operator] (experimental)         | *func* `<\|` *expr*                        | right         | 15         |
 
 [string]: ./types.md#type-string
 [path]: ./types.md#type-path
-[number]: ./types.md#type-float <!-- TODO(@rhendric, #10970): rationalize this -->
+[number]: ./types.md#type-float
 [list]: ./types.md#list
 [attribute set]: ./types.md#attribute-set
+
+<!-- TODO(@rhendric, #10970): ^ rationalize number -> int/float -->
 
 ## Attribute selection
 
@@ -182,3 +186,34 @@ Equivalent to `!`*b1* `||` *b2*.
 
 [Logical implication]: #logical-implication
 
+## Pipe operators
+
+- *a* `|>` *b* is equivalent to *b* *a*
+- *a* `<|` *b* is equivalent to *a* *b*
+
+> **Example**
+>
+> ```
+> nix-repl> 1 |> builtins.add 2 |> builtins.mul 3
+> 9
+>
+> nix-repl> builtins.add 1 <| builtins.mul 2 <| 3
+> 7
+> ```
+
+> **Warning**
+>
+> This syntax is part of an
+> [experimental feature](@docroot@/contributing/experimental-features.md)
+> and may change in future releases.
+>
+> To use this syntax, make sure the
+> [`pipe-operators` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-pipe-operators)
+> is enabled.
+> For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
+>
+> ```
+> extra-experimental-features = pipe-operators
+> ```
+
+[Pipe operator]: #pipe-operators
