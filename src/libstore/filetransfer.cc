@@ -854,6 +854,8 @@ void FileTransfer::download(
            sender.) */
         if (state->data.size() > fileTransferSettings.downloadBufferSize) {
             debug("download buffer is full; going to sleep");
+            static bool haveWarned = false;
+            warnOnce(haveWarned, "download buffer is full; consider increasing the 'download-buffer-size' setting");
             state.wait_for(state->request, std::chrono::seconds(10));
         }
 
