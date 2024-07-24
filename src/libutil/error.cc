@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "error.hh"
 #include "environment-variables.hh"
 #include "signals.hh"
@@ -430,16 +432,36 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     return out;
 }
 
+/** Write to stderr in a robust and minimal way, considering that the process
+ * may be in a bad state.
+ */
+static void writeErr(std::string_view buf)
+{
+    while (!buf.empty()) {
+        auto n = write(STDERR_FILENO, buf.data(), buf.size());
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            abort();
+        }
+        buf = buf.substr(n);
+    }
+}
+
 void panic(std::string_view msg)
 {
-    printError(msg);
-    printError("This was a fatal error, aborting.");
+    writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL );
+    writeErr(msg);
+    writeErr("\n");
     abort();
 }
 
 void panic(const char * file, int line, const char * func)
 {
-    panic(std::string("Unexpected condition in ") + func + " at " + file + ":" + std::to_string(line));
+    char buf[512];
+    int n = snprintf(buf, sizeof(buf), "Unexpected condition in %s at %s:%d", func, file, line);
+    if (n < 0)
+        panic("Unexpected condition and could not format error message");
+    panic(std::string_view(buf, std::min(static_cast<int>(sizeof(buf)), n)));
 }
 
 }

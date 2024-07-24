@@ -275,17 +275,13 @@ void throwExceptionSelfCheck();
 
 /**
  * Print a message and abort().
- *
- * @note: This assumes that the logger is operational
  */
 [[noreturn]]
 void panic(std::string_view msg);
 
 /**
  * Print a basic error message with source position and abort().
- * Use the unreachable macro to call this.
- *
- * @note: This assumes that the logger is operational
+ * Use the unreachable() macro to call this.
  */
 [[noreturn]]
 void panic(const char * file, int line, const char * func);
@@ -295,6 +291,6 @@ void panic(const char * file, int line, const char * func);
  *
  * @note: This assumes that the logger is operational
  */
-#define unreachable() (panic(__FILE__, __LINE__, __func__))
+#define unreachable() (::nix::panic(__FILE__, __LINE__, __func__))
 
 }
