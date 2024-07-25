@@ -26,3 +26,5 @@ This also applies to `nix-shell` shebang scripts. Consider the following example
 This will now load `shell.nix` from the script's directory, if it exists; `default.nix` otherwise.
 
 The old behavior can be opted into by setting the option [`nix-shell-always-looks-for-shell-nix`](@docroot@/command-ref/conf-file.md#conf-nix-shell-always-looks-for-shell-nix) to `false`.
+
+Author: [**Robert Hensing (@roberth)**](https://github.com/roberth)

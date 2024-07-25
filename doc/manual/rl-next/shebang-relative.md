@@ -60,3 +60,5 @@ Example:
 #!nix -c bash
 hello
 ```
+
+Author: [**Robert Hensing (@roberth)**](https://github.com/roberth)
