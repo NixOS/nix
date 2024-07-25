@@ -140,6 +140,7 @@ public:
 };
 
 #ifndef _WIN32 // Not needed on Windows, where we don't fork
+namespace unix {
 
 /**
  * Close all file descriptors except those listed in the given set.
@@ -152,13 +153,16 @@ void closeMostFDs(const std::set<Descriptor> & exceptions);
  */
 void closeOnExec(Descriptor fd);
 
+} // namespace unix
 #endif
 
-#ifdef _WIN32
-# if _WIN32_WINNT >= 0x0600
+#if defined(_WIN32) && _WIN32_WINNT >= 0x0600
+namespace windows {
+
 Path handleToPath(Descriptor handle);
 std::wstring handleToFileName(Descriptor handle);
-# endif
+
+} // namespace windows
 #endif
 
 MakeError(EndOfFile, Error);

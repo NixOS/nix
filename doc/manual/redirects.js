@@ -1,7 +1,7 @@
 // redirect rules for URL fragments (client-side) to prevent link rot.
 // this must be done on the client side, as web servers do not see the fragment part of the URL.
 // it will only work with JavaScript enabled in the browser, but this is the best we can do here.
-// see ./_redirects for path redirects (client-side)
+// see src/_redirects for path redirects (server-side)
 
 // redirects are declared as follows:
 // each entry has as its key a path matching the requested URL path, relative to the mdBook document root.
@@ -238,12 +238,12 @@ const redirects = {
     "attr-system": "language/derivations.html#attr-system",
     "ssec-derivation": "language/derivations.html",
     "ch-expression-language": "language/index.html",
-    "sec-constructs": "language/constructs.html",
-    "sect-let-language": "language/constructs.html#let-language",
-    "ss-functions": "language/constructs.html#functions",
+    "sec-constructs": "language/syntax.html",
+    "sect-let-language": "language/syntax.html#let-expressions",
+    "ss-functions": "language/syntax.html#functions",
     "sec-language-operators": "language/operators.html",
     "table-operators": "language/operators.html",
-    "ssec-values": "language/values.html",
+    "ssec-values": "language/types.html",
     "gloss-closure": "glossary.html#gloss-closure",
     "gloss-derivation": "glossary.html#gloss-derivation",
     "gloss-deriver": "glossary.html#gloss-deriver",
@@ -335,11 +335,15 @@ const redirects = {
     "ssec-relnotes-2.2": "release-notes/rl-2.2.html",
     "ssec-relnotes-2.3": "release-notes/rl-2.3.html",
   },
-  "language/values.html": {
+  "language/types.html": {
     "simple-values": "#primitives",
     "lists": "#list",
     "strings": "#string",
     "attribute-sets": "#attribute-set",
+    "type-number": "#type-int",
+  },
+  "language/syntax.html": {
+    "scoping-rules": "scoping.html",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",

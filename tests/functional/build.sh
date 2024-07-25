@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 # Make sure that 'nix build' returns all outputs by default.
 nix build -f multiple-outputs.nix --json a b --no-link | jq --exit-status '
@@ -135,6 +135,18 @@ nix build "$drv^*" --no-link --json | jq --exit-status '
 
 # Make sure that `--impure` works (regression test for https://github.com/NixOS/nix/issues/6488)
 nix build --impure -f multiple-outputs.nix --json e --no-link | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*multiple-outputs-e.drv")) and
+    (.outputs | keys == ["a_a", "b"]))
+'
+
+# Make sure that the 3 types of aliases work
+# BaseSettings<T>, BaseSettings<bool>, and BaseSettings<SandboxMode>.
+nix build --impure -f multiple-outputs.nix --json e --no-link \
+    --build-max-jobs 3 \
+    --gc-keep-outputs \
+    --build-use-sandbox | \
+    jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-e.drv")) and
     (.outputs | keys == ["a_a", "b"]))

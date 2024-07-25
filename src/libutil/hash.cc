@@ -41,7 +41,7 @@ Hash::Hash(HashAlgorithm algo) : algo(algo)
 }
 
 
-bool Hash::operator == (const Hash & h2) const
+bool Hash::operator == (const Hash & h2) const noexcept
 {
     if (hashSize != h2.hashSize) return false;
     for (unsigned int i = 0; i < hashSize; i++)
@@ -50,13 +50,13 @@ bool Hash::operator == (const Hash & h2) const
 }
 
 
-std::strong_ordering Hash::operator <=> (const Hash & h) const
+std::strong_ordering Hash::operator <=> (const Hash & h) const noexcept
 {
-    if (auto cmp = algo <=> h.algo; cmp != 0) return cmp;
     if (auto cmp = hashSize <=> h.hashSize; cmp != 0) return cmp;
     for (unsigned int i = 0; i < hashSize; i++) {
         if (auto cmp = hash[i] <=> h.hash[i]; cmp != 0) return cmp;
     }
+    if (auto cmp = algo <=> h.algo; cmp != 0) return cmp;
     return std::strong_ordering::equivalent;
 }
 

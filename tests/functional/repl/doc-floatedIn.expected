@@ -1,0 +1,11 @@
+Nix <nix version>
+Type :? for help.
+Added <number omitted> variables.
+
+Function floatedIn
+    … defined at
+    /path/to/tests/functional/repl/doc-comments.nix:16:5
+
+    This also works.
+
+

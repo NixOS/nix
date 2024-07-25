@@ -1,11 +1,12 @@
+#include <vector>
+#include <pwd.h>
+#include <grp.h>
+
 #include "user-lock.hh"
 #include "file-system.hh"
 #include "globals.hh"
 #include "pathlocks.hh"
 #include "users.hh"
-
-#include <pwd.h>
-#include <grp.h>
 
 namespace nix {
 

@@ -3,11 +3,14 @@
 #include "path-info.hh"
 #include "store-api.hh"
 #include "json-utils.hh"
+#include "comparator.hh"
+#include "strings.hh"
 
 namespace nix {
 
 GENERATE_CMP_EXT(
     ,
+    std::weak_ordering,
     UnkeyedValidPathInfo,
     me->deriver,
     me->narHash,
@@ -18,12 +21,6 @@ GENERATE_CMP_EXT(
     me->ultimate,
     me->sigs,
     me->ca);
-
-GENERATE_CMP_EXT(
-    ,
-    ValidPathInfo,
-    me->path,
-    static_cast<const UnkeyedValidPathInfo &>(*me));
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
@@ -48,15 +45,21 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
     if (! ca)
         return std::nullopt;
 
-    return std::visit(overloaded {
-        [&](const TextIngestionMethod &) -> ContentAddressWithReferences {
+    switch (ca->method.raw) {
+        case ContentAddressMethod::Raw::Text:
+        {
             assert(references.count(path) == 0);
             return TextInfo {
                 .hash = ca->hash,
                 .references = references,
             };
-        },
-        [&](const FileIngestionMethod & m2) -> ContentAddressWithReferences {
+        }
+
+        case ContentAddressMethod::Raw::Flat:
+        case ContentAddressMethod::Raw::NixArchive:
+        case ContentAddressMethod::Raw::Git:
+        default:
+        {
             auto refs = references;
             bool hasSelfReference = false;
             if (refs.count(path)) {
@@ -64,15 +67,15 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
                 refs.erase(path);
             }
             return FixedOutputInfo {
-                .method = m2,
+                .method = ca->method.getFileIngestionMethod(),
                 .hash = ca->hash,
                 .references = {
                     .others = std::move(refs),
                     .self = hasSelfReference,
                 },
             };
-        },
-    }, ca->method.raw);
+        }
+    }
 }
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
@@ -127,22 +130,18 @@ ValidPathInfo::ValidPathInfo(
       : UnkeyedValidPathInfo(narHash)
       , path(store.makeFixedOutputPathFromCA(name, ca))
 {
+    this->ca = ContentAddress {
+        .method = ca.getMethod(),
+        .hash = ca.getHash(),
+    };
     std::visit(overloaded {
         [this](TextInfo && ti) {
             this->references = std::move(ti.references);
-            this->ca = ContentAddress {
-                .method = TextIngestionMethod {},
-                .hash = std::move(ti.hash),
-            };
         },
         [this](FixedOutputInfo && foi) {
             this->references = std::move(foi.references.others);
             if (foi.references.self)
                 this->references.insert(path);
-            this->ca = ContentAddress {
-                .method = std::move(foi.method),
-                .hash = std::move(foi.hash),
-            };
         },
     }, std::move(ca).raw);
 }

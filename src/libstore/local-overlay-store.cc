@@ -18,11 +18,11 @@ Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) {
     return upperLayer + "/" + path.to_string();
 }
 
-LocalOverlayStore::LocalOverlayStore(const Params & params)
+LocalOverlayStore::LocalOverlayStore(std::string_view scheme, PathView path, const Params & params)
     : StoreConfig(params)
-    , LocalFSStoreConfig(params)
+    , LocalFSStoreConfig(path, params)
     , LocalStoreConfig(params)
-    , LocalOverlayStoreConfig(params)
+    , LocalOverlayStoreConfig(scheme, path, params)
     , Store(params)
     , LocalFSStore(params)
     , LocalStore(params)

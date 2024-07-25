@@ -23,4 +23,4 @@ maintainers/*.md @fricklerhandwerk
 src/**/*.md @fricklerhandwerk
 
 # Libstore layer
-/src/libstore @thufschmitt @ericson2314
+/src/libstore @ericson2314

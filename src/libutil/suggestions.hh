@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "comparator.hh"
 #include "types.hh"
 #include <set>
 
@@ -20,7 +19,8 @@ public:
 
     std::string to_string() const;
 
-    GENERATE_CMP(Suggestion, me->distance, me->suggestion)
+    bool operator ==(const Suggestion &) const = default;
+    auto operator <=>(const Suggestion &) const = default;
 };
 
 class Suggestions {
@@ -35,8 +35,8 @@ public:
     ) const;
 
     static Suggestions bestMatches (
-        std::set<std::string> allMatches,
-        std::string query
+        const std::set<std::string> & allMatches,
+        std::string_view query
     );
 
     Suggestions& operator+=(const Suggestions & other);

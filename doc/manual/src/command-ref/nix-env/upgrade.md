@@ -28,42 +28,48 @@ version is installed.
 
 # Flags
 
-  - `--lt`\
-    Only upgrade a derivation to newer versions. This is the default.
+- `--lt`
 
-  - `--leq`\
-    In addition to upgrading to newer versions, also “upgrade” to
-    derivations that have the same version. Version are not a unique
-    identification of a derivation, so there may be many derivations
-    that have the same version. This flag may be useful to force
-    “synchronisation” between the installed and available derivations.
+  Only upgrade a derivation to newer versions. This is the default.
 
-  - `--eq`\
-    *Only* “upgrade” to derivations that have the same version. This may
-    not seem very useful, but it actually is, e.g., when there is a new
-    release of Nixpkgs and you want to replace installed applications
-    with the same versions built against newer dependencies (to reduce
-    the number of dependencies floating around on your system).
+- `--leq`
 
-  - `--always`\
-    In addition to upgrading to newer versions, also “upgrade” to
-    derivations that have the same or a lower version. I.e., derivations
-    may actually be downgraded depending on what is available in the
-    active Nix expression.
+  In addition to upgrading to newer versions, also “upgrade” to
+  derivations that have the same version. Version are not a unique
+  identification of a derivation, so there may be many derivations
+  that have the same version. This flag may be useful to force
+  “synchronisation” between the installed and available derivations.
 
-  - `--prebuilt-only` / `-b`\
-    Use only derivations for which a substitute is registered, i.e.,
-    there is a pre-built binary available that can be downloaded in lieu
-    of building the derivation. Thus, no packages will be built from
-    source.
+- `--eq`
 
-  - `--preserve-installed` / `-P`\
-    Do not remove derivations with a name matching one of the
-    derivations being installed. Usually, trying to have two versions of
-    the same package installed in the same generation of a profile will
-    lead to an error in building the generation, due to file name
-    clashes between the two versions. However, this is not the case for
-    all packages.
+  *Only* “upgrade” to derivations that have the same version. This may
+  not seem very useful, but it actually is, e.g., when there is a new
+  release of Nixpkgs and you want to replace installed applications
+  with the same versions built against newer dependencies (to reduce
+  the number of dependencies floating around on your system).
+
+- `--always`
+
+  In addition to upgrading to newer versions, also “upgrade” to
+  derivations that have the same or a lower version. I.e., derivations
+  may actually be downgraded depending on what is available in the
+  active Nix expression.
+
+- `--prebuilt-only` / `-b`
+
+  Use only derivations for which a substitute is registered, i.e.,
+  there is a pre-built binary available that can be downloaded in lieu
+  of building the derivation. Thus, no packages will be built from
+  source.
+
+- `--preserve-installed` / `-P`
+
+  Do not remove derivations with a name matching one of the
+  derivations being installed. Usually, trying to have two versions of
+  the same package installed in the same generation of a profile will
+  lead to an error in building the generation, due to file name
+  clashes between the two versions. However, this is not the case for
+  all packages.
 
 {{#include ./opt-common.md}}
 

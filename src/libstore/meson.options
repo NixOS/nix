@@ -1,0 +1,25 @@
+# vim: filetype=meson
+
+option('embedded-sandbox-shell', type : 'boolean', value : false,
+  description : 'include the sandbox shell in the Nix binary',
+)
+
+option('seccomp-sandboxing', type : 'feature',
+  description : 'build support for seccomp sandboxing (recommended unless your arch doesn\'t support libseccomp, only relevant on Linux)',
+)
+
+option('sandbox-shell', type : 'string', value : 'busybox',
+  description : 'path to a statically-linked shell to use as /bin/sh in sandboxes (usually busybox)',
+)
+
+option('store-dir', type : 'string', value : '/nix/store',
+  description : 'path of the Nix store',
+)
+
+option('state-dir', type : 'string', value : '/nix/var',
+  description : 'path to store state in for Nix',
+)
+
+option('log-dir', type : 'string', value : '/nix/var/log/nix',
+  description : 'path to store logs in for Nix',
+)

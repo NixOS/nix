@@ -23,7 +23,8 @@ nix_tests = \
   remote-store.sh \
   legacy-ssh-store.sh \
   lang.sh \
-  lang-test-infra.sh \
+  lang-gc.sh \
+  characterisation-test-infra.sh \
   experimental-features.sh \
   fetchMercurial.sh \
   gc-auto.sh \
@@ -106,6 +107,7 @@ nix_tests = \
   eval-store.sh \
   why-depends.sh \
   derivation-json.sh \
+  derivation-advanced-attributes.sh \
   import-derivation.sh \
   nix_path.sh \
   case-hack.sh \

@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 path=$(nix-build dependencies.nix --no-out-link)

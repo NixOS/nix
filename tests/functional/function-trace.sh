@@ -21,12 +21,12 @@ expect_trace() {
                <(echo "$expect") \
                <(echo "$actual")
     ) && result=0 || result=$?
-    if [ $result -eq 0 ]; then
+    if [ "$result" -eq 0 ]; then
         echo " ok."
     else
         echo " failed. difference:"
         echo "$msg"
-        return $result
+        return "$result"
     fi
 }
 

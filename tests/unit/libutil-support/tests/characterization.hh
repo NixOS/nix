@@ -5,6 +5,7 @@
 
 #include "types.hh"
 #include "environment-variables.hh"
+#include "file-system.hh"
 
 namespace nix {
 

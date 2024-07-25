@@ -2,6 +2,8 @@
 
 source common.sh
 
+TODO_NixOS
+
 clearStore
 
 path=$(nix-store -q $(nix-instantiate fixed.nix -A good.0))

@@ -6,7 +6,7 @@ set -u
 
 requireGit
 
-clearStore
+clearStoreIfPossible
 
 rootRepo=$TEST_ROOT/gitSubmodulesRoot
 subRepo=$TEST_ROOT/gitSubmodulesSub

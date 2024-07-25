@@ -122,7 +122,7 @@ void Pipe::create()
 
 #if _WIN32_WINNT >= 0x0600
 
-std::wstring handleToFileName(HANDLE handle) {
+std::wstring windows::handleToFileName(HANDLE handle) {
     std::vector<wchar_t> buf(0x100);
     DWORD dw = GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED);
     if (dw == 0) {
@@ -141,7 +141,7 @@ std::wstring handleToFileName(HANDLE handle) {
 }
 
 
-Path handleToPath(HANDLE handle) {
+Path windows::handleToPath(HANDLE handle) {
     return os_string_to_string(handleToFileName(handle));
 }
 

@@ -2,7 +2,9 @@
 
 source common.sh
 
-clearStore
+TODO_NixOS
+
+clearStoreIfPossible
 
 rm -f $TEST_ROOT/result*
 
@@ -35,7 +37,7 @@ outPath=$(nix-store -q $drvPath)
 echo "building b..."
 outPath=$(nix-build multiple-outputs.nix -A b --no-out-link)
 echo "output path is $outPath"
-[ "$(cat "$outPath"/file)" = "success" ]
+[ "$(cat "$outPath/file")" = "success" ]
 
 # Test nix-build on a derivation with multiple outputs.
 outPath1=$(nix-build multiple-outputs.nix -A a -o $TEST_ROOT/result)

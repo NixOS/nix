@@ -2,7 +2,7 @@
 
 source common.sh
 
-clearStore
+clearStoreIfPossible
 
 if nix-instantiate --readonly-mode ./import-derivation.nix; then
     echo "read-only evaluation of an imported derivation unexpectedly failed"
@@ -11,4 +11,4 @@ fi
 
 outPath=$(nix-build ./import-derivation.nix --no-out-link)
 
-[ "$(cat $outPath)" = FOO579 ]
+[ "$(cat "$outPath")" = FOO579 ]

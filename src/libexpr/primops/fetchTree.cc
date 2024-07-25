@@ -1,4 +1,4 @@
-#include "libfetchers/attrs.hh"
+#include "attrs.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
@@ -85,7 +85,7 @@ static void fetchTree(
     Value & v,
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
-    fetchers::Input input;
+    fetchers::Input input { state.fetchSettings };
     NixStringContext context;
     std::optional<std::string> type;
     if (params.isFetchGit) type = "git";
@@ -148,7 +148,7 @@ static void fetchTree(
                     "attribute 'name' isn’t supported in call to 'fetchTree'"
                 ).atPos(pos).debugThrow();
 
-        input = fetchers::Input::fromAttrs(std::move(attrs));
+        input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
     } else {
         auto url = state.coerceToString(pos, *args[0], context,
                 "while evaluating the first argument passed to the fetcher",
@@ -161,20 +161,20 @@ static void fetchTree(
             if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
                 attrs.emplace("exportIgnore", Explicit<bool>{true});
             }
-            input = fetchers::Input::fromAttrs(std::move(attrs));
+            input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
                 state.error<EvalError>(
                     "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
                 ).atPos(pos).debugThrow();
-            input = fetchers::Input::fromURL(url);
+            input = fetchers::Input::fromURL(state.fetchSettings, url);
         }
     }
 
-    if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
+    if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isLocked()) {
+    if (state.settings.pureEval && !input.isLocked()) {
         auto fetcher = "fetchTree";
         if (params.isFetchGit)
             fetcher = "fetchGit";
@@ -431,7 +431,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     state.forceValue(*args[0], pos);
 
-    if (args[0]->type() == nAttrs) {
+    bool isArgAttrs = args[0]->type() == nAttrs;
+    bool nameAttrPassed = false;
+
+    if (isArgAttrs) {
 
         for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
@@ -439,8 +442,10 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
                 url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
             else if (n == "sha256")
                 expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), HashAlgorithm::SHA256);
-            else if (n == "name")
+            else if (n == "name") {
+                nameAttrPassed = true;
                 name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
+            }
             else
                 state.error<EvalError>("unsupported argument '%s' to '%s'", n, who)
                 .atPos(pos).debugThrow();
@@ -453,14 +458,27 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
     if (who == "fetchTarball")
-        url = evalSettings.resolvePseudoUrl(*url);
+        url = state.settings.resolvePseudoUrl(*url);
 
     state.checkURI(*url);
 
     if (name == "")
         name = baseNameOf(*url);
 
-    if (evalSettings.pureEval && !expectedHash)
+    try {
+        checkName(name);
+    } catch (BadStorePathName & e) {
+        auto resolution =
+            nameAttrPassed ? HintFmt("Please change the value for the 'name' attribute passed to '%s', so that it can create a valid store path.", who) :
+            isArgAttrs ? HintFmt("Please add a valid 'name' attribute to the argument for '%s', so that it can create a valid store path.", who) :
+            HintFmt("Please pass an attribute set with 'url' and 'name' attributes to '%s',  so that it can create a valid store path.", who);
+
+        state.error<EvalError>(
+            std::string("invalid store path name when fetching URL '%s': %s. %s"), *url, Uncolored(e.message()), Uncolored(resolution.str()))
+        .atPos(pos).debugThrow();
+    }
+
+    if (state.settings.pureEval && !expectedHash)
         state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who).atPos(pos).debugThrow();
 
     // early exit if pinned and already in the store
@@ -468,7 +486,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
-                .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+                .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
                 .hash = *expectedHash,
                 .references = {}
             });
@@ -511,9 +529,19 @@ static void prim_fetchurl(EvalState & state, const PosIdx pos, Value * * args, V
 
 static RegisterPrimOp primop_fetchurl({
     .name = "__fetchurl",
-    .args = {"url"},
+    .args = {"arg"},
     .doc = R"(
       Download the specified URL and return the path of the downloaded file.
+      `arg` can be either a string denoting the URL, or an attribute set with the following attributes:
+
+      - `url`
+
+        The URL of the file to download.
+
+      - `name` (default: the last path component of the URL)
+
+        A name for the file in the store. This can be useful if the URL has any
+        characters that are invalid for the store.
 
       Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",

@@ -27,38 +27,38 @@ When using public key authentication, you can avoid typing the passphrase with `
 
 # Options
 
-  - `--to`
+- `--to`
 
-    Copy the closure of _paths_ from a Nix store accessible from the local machine to the Nix store on the remote _machine_.
-    This is the default behavior.
+  Copy the closure of _paths_ from a Nix store accessible from the local machine to the Nix store on the remote _machine_.
+  This is the default behavior.
 
-  - `--from`
+- `--from`
 
-    Copy the closure of _paths_ from the Nix store on the remote _machine_ to the local machine's specified Nix store.
+  Copy the closure of _paths_ from the Nix store on the remote _machine_ to the local machine's specified Nix store.
 
-  - `--gzip`
+- `--gzip`
 
-    Enable compression of the SSH connection.
+  Enable compression of the SSH connection.
 
-  - `--include-outputs`
+- `--include-outputs`
 
-    Also copy the outputs of [store derivation]s included in the closure.
+  Also copy the outputs of [store derivation]s included in the closure.
 
-    [store derivation]: @docroot@/glossary.md#gloss-store-derivation
+  [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
-  - `--use-substitutes` / `-s`
+- `--use-substitutes` / `-s`
 
-    Attempt to download missing store objects on the target from [substituters](@docroot@/command-ref/conf-file.md#conf-substituters).
-    Any store objects that cannot be substituted on the target are still copied normally from the source.
-    This is useful, for instance, if the connection between the source and target machine is slow, but the connection between the target machine and `cache.nixos.org` (the default binary cache server) is fast.
+  Attempt to download missing store objects on the target from [substituters](@docroot@/command-ref/conf-file.md#conf-substituters).
+  Any store objects that cannot be substituted on the target are still copied normally from the source.
+  This is useful, for instance, if the connection between the source and target machine is slow, but the connection between the target machine and `cache.nixos.org` (the default binary cache server) is fast.
 
 {{#include ./opt-common.md}}
 
 # Environment variables
 
-  - `NIX_SSHOPTS`
+- `NIX_SSHOPTS`
 
-    Additional options to be passed to `ssh` on the command line.
+  Additional options to be passed to `ssh` on the command line.
 
 {{#include ./env-common.md}}
 

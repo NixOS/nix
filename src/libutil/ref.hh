@@ -1,9 +1,7 @@
 #pragma once
 ///@file
 
-#include <compare>
 #include <memory>
-#include <exception>
 #include <stdexcept>
 
 namespace nix {
@@ -89,9 +87,9 @@ public:
         return p != other.p;
     }
 
-    bool operator < (const ref<T> & other) const
+    auto operator <=> (const ref<T> & other) const
     {
-        return p < other.p;
+        return p <=> other.p;
     }
 
 private:

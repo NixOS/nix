@@ -1,9 +1,8 @@
-#include <algorithm>
-
 #include "args/root.hh"
 #include "current-process.hh"
 #include "command.hh"
 #include "common-args.hh"
+#include "eval-gc.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 #include "globals.hh"
@@ -19,6 +18,7 @@
 #include "users.hh"
 #include "network-proxy.hh"
 #include "eval-cache.hh"
+#include "flake/flake.hh"
 
 #include <sys/types.h>
 #include <regex>
@@ -40,6 +40,8 @@ extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char * * argv);
 #endif
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -162,7 +164,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         {"ls-store", { AliasStatus::Deprecated, {"store", "ls"}}},
         {"make-content-addressable", { AliasStatus::Deprecated, {"store", "make-content-addressed"}}},
         {"optimise-store", { AliasStatus::Deprecated, {"store", "optimise"}}},
-        {"ping-store", { AliasStatus::Deprecated, {"store", "ping"}}},
+        {"ping-store", { AliasStatus::Deprecated, {"store", "info"}}},
         {"sign-paths", { AliasStatus::Deprecated, {"store", "sign"}}},
         {"shell", { AliasStatus::AcceptedShorthand, {"env", "shell"}}},
         {"show-derivation", { AliasStatus::Deprecated, {"derivation", "show"}}},
@@ -242,7 +244,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     evalSettings.restrictEval = false;
     evalSettings.pureEval = false;
-    EvalState state({}, openStore("dummy://"));
+    EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
 
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
@@ -333,7 +335,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "generated-doc/help-stores.md"
+          #include "help-stores.md.gen.hh"
           ;
     }
 
@@ -362,6 +364,7 @@ void mainWrapped(int argc, char * * argv)
 
     initNix();
     initGC();
+    flake::initLib(flakeSettings);
 
     #if __linux__
     if (isRootUser()) {
@@ -418,36 +421,29 @@ void mainWrapped(int argc, char * * argv)
             Xp::FetchTree,
         };
         evalSettings.pureEval = false;
-        EvalState state({}, openStore("dummy://"));
-        auto res = nlohmann::json::object();
-        res["builtins"] = ({
-            auto builtinsJson = nlohmann::json::object();
-            for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
-                auto b = nlohmann::json::object();
-                if (!builtin.value->isPrimOp()) continue;
-                auto primOp = builtin.value->primOp();
-                if (!primOp->doc) continue;
-                b["arity"] = primOp->arity;
-                b["args"] = primOp->args;
-                b["doc"] = trim(stripIndentation(primOp->doc));
+        EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
+        auto builtinsJson = nlohmann::json::object();
+        for (auto & builtin : *state.baseEnv.values[0]->attrs()) {
+            auto b = nlohmann::json::object();
+            if (!builtin.value->isPrimOp()) continue;
+            auto primOp = builtin.value->primOp();
+            if (!primOp->doc) continue;
+            b["args"] = primOp->args;
+            b["doc"] = trim(stripIndentation(primOp->doc));
+            if (primOp->experimentalFeature)
                 b["experimental-feature"] = primOp->experimentalFeature;
-                builtinsJson[state.symbols[builtin.name]] = std::move(b);
-            }
-            std::move(builtinsJson);
-        });
-        res["constants"] = ({
-            auto constantsJson = nlohmann::json::object();
-            for (auto & [name, info] : state.constantInfos) {
-                auto c = nlohmann::json::object();
-                if (!info.doc) continue;
-                c["doc"] = trim(stripIndentation(info.doc));
-                c["type"] = showType(info.type, false);
-                c["impure-only"] = info.impureOnly;
-                constantsJson[name] = std::move(c);
-            }
-            std::move(constantsJson);
-        });
-        logger->cout("%s", res);
+            builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
+        }
+        for (auto & [name, info] : state.constantInfos) {
+            auto b = nlohmann::json::object();
+            if (!info.doc) continue;
+            b["doc"] = trim(stripIndentation(info.doc));
+            b["type"] = showType(info.type, false);
+            if (info.impureOnly)
+                b["impure-only"] = true;
+            builtinsJson[name] = std::move(b);
+        }
+        logger->cout("%s", builtinsJson);
         return;
     }
 

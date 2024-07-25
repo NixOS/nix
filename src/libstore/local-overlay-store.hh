@@ -8,10 +8,15 @@ namespace nix {
 struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 {
     LocalOverlayStoreConfig(const StringMap & params)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , LocalStoreConfig(params)
+        : LocalOverlayStoreConfig("local-overlay", "", params)
     { }
+
+    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
+        : StoreConfig(params)
+        , LocalFSStoreConfig(path, params)
+        , LocalStoreConfig(scheme, path, params)
+    {
+    }
 
     const Setting<std::string> lowerStoreUri{(StoreConfig*) this, "", "lower-store",
         R"(
@@ -58,6 +63,11 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         return ExperimentalFeature::LocalOverlayStore;
     }
 
+    static std::set<std::string> uriSchemes()
+    {
+        return { "local-overlay" };
+    }
+
     std::string doc() override;
 
 protected:
@@ -90,19 +100,12 @@ class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual
     ref<LocalFSStore> lowerStore;
 
 public:
-    LocalOverlayStore(const Params & params);
-
-    LocalOverlayStore(std::string_view scheme, PathView path, const Params & params)
-        : LocalOverlayStore(params)
+    LocalOverlayStore(const Params & params)
+        : LocalOverlayStore("local-overlay", "", params)
     {
-        if (!path.empty())
-            throw UsageError("local-overlay:// store url doesn't support path part, only scheme and query params");
     }
 
-    static std::set<std::string> uriSchemes()
-    {
-        return { "local-overlay" };
-    }
+    LocalOverlayStore(std::string_view scheme, PathView path, const Params & params);
 
     std::string getUri() override
     {

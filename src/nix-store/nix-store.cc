@@ -2,13 +2,11 @@
 #include "derivations.hh"
 #include "dotgraph.hh"
 #include "globals.hh"
-#include "build-result.hh"
 #include "store-cast.hh"
 #include "local-fs-store.hh"
 #include "log-store.hh"
 #include "serve-protocol.hh"
 #include "serve-protocol-connection.hh"
-#include "serve-protocol-impl.hh"
 #include "shared.hh"
 #include "graphml.hh"
 #include "legacy.hh"
@@ -23,12 +21,14 @@
 
 #include <iostream>
 #include <algorithm>
-#include <cstdio>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "build-result.hh"
+#include "exit.hh"
+#include "serve-protocol-impl.hh"
 
 namespace nix_store {
 
@@ -194,10 +194,10 @@ static void opAdd(Strings opFlags, Strings opArgs)
    store. */
 static void opAddFixed(Strings opFlags, Strings opArgs)
 {
-    auto method = FileIngestionMethod::Flat;
+    ContentAddressMethod method = ContentAddressMethod::Raw::Flat;
 
     for (auto & i : opFlags)
-        if (i == "--recursive") method = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = ContentAddressMethod::Raw::NixArchive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.empty())
@@ -223,7 +223,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     auto method = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
-        if (i == "--recursive") method = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::NixArchive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3)
@@ -563,7 +563,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             if (!hashGiven) {
                 HashResult hash = hashPath(
                     {store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) }},
-                    FileSerialisationMethod::Recursive, HashAlgorithm::SHA256);
+                    FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 info->narHash = hash.first;
                 info->narSize = hash.second;
             }

@@ -1,16 +1,14 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
-#include <climits>
 
-#include "libcmd/repl-interacter.hh"
+#include "repl-interacter.hh"
 #include "repl.hh"
 
 #include "ansicolor.hh"
 #include "shared.hh"
+#include "config-global.hh"
 #include "eval.hh"
-#include "eval-cache.hh"
-#include "eval-inline.hh"
 #include "eval-settings.hh"
 #include "attr-path.hh"
 #include "signals.hh"
@@ -28,11 +26,15 @@
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "print.hh"
+#include "ref.hh"
+#include "value.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
 #include <gc/gc_cpp.h>
 #endif
+
+#include "strings.hh"
 
 namespace nix {
 
@@ -615,6 +617,38 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (command == ":doc") {
         Value v;
+
+        auto expr = parseString(arg);
+        std::string fallbackName;
+        PosIdx fallbackPos;
+        DocComment fallbackDoc;
+        if (auto select = dynamic_cast<ExprSelect *>(expr)) {
+            Value vAttrs;
+            auto name = select->evalExceptFinalSelect(*state, *env, vAttrs);
+            fallbackName = state->symbols[name];
+
+            state->forceAttrs(vAttrs, noPos, "while evaluating an attribute set to look for documentation");
+            auto attrs = vAttrs.attrs();
+            assert(attrs);
+            auto attr = attrs->get(name);
+            if (!attr) {
+                // When missing, trigger the normal exception
+                // e.g. :doc builtins.foo
+                // behaves like
+                // nix-repl> builtins.foo      
+                // error: attribute 'foo' missing
+                evalString(arg, v);
+                assert(false);
+            }
+            if (attr->pos) {
+                fallbackPos = attr->pos;
+                fallbackDoc = state->getDocCommentForPos(fallbackPos);
+            }
+
+        } else {
+            evalString(arg, v);
+        }
+
         evalString(arg, v);
         if (auto doc = state->getDoc(v)) {
             std::string markdown;
@@ -632,6 +666,19 @@ ProcessLineResult NixRepl::processLine(std::string line)
             markdown += stripIndentation(doc->doc);
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
+        } else if (fallbackPos) {
+            std::stringstream ss;
+            ss << "Attribute `" << fallbackName << "`\n\n";
+            ss << "  … defined at " << state->positions[fallbackPos] << "\n\n";
+            if (fallbackDoc) {
+                ss << fallbackDoc.getInnerText(state->positions);
+            } else {
+                ss << "No documentation found.\n\n";
+            }
+
+            auto markdown = ss.str();
+            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+
         } else
             throw Error("value does not have documentation");
     }
@@ -689,14 +736,14 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
 
-    auto flakeRef = parseFlakeRef(flakeRefS, absPath("."), true);
+    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, absPath("."), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
 
     Value v;
 
     flake::callFlake(*state,
-        flake::lockFlake(*state, flakeRef,
+        flake::lockFlake(flakeSettings, *state, flakeRef,
             flake::LockFlags {
                 .updateLockFile = false,
                 .useRegistries = !evalSettings.pureEval,
