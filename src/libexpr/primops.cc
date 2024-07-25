@@ -1942,7 +1942,7 @@ static RegisterPrimOp primop_findFile(PrimOp {
       >   }
       >   ```
 
-      Search paths can also point to source trees using [flake URLs](@docroot@/command-ref/nix3-flake.md#url-like-syntax).
+      Search paths can also point to source trees using [flake URLs](@docroot@/command-ref/new-cli/nix3-flake.md#url-like-syntax).
 
 
       > **Example**
