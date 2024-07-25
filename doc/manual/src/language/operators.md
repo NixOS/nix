@@ -42,12 +42,6 @@
 Select the attribute denoted by attribute path *attrpath* from [attribute set] *attrset*.
 If the attribute doesn’t exist, return the *expr* after `or` if provided, otherwise abort evaluation.
 
-An attribute path is a dot-separated list of [attribute names](./types.md#attribute-set).
-
-> **Syntax**
->
-> *attrpath* = *name* [ `.` *name* ]...
-
 [Attribute selection]: #attribute-selection
 
 ## Has attribute
