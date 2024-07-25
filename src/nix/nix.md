@@ -50,7 +50,7 @@ manual](https://nixos.org/manual/nix/stable/).
 
 > **Warning** \
 > Installables are part of the unstable
-> [`nix-command` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-nix-command),
+> [`nix-command` experimental feature](@docroot@/development/experimental-features.md#xp-feature-nix-command),
 > and subject to change without notice.
 
 Many `nix` subcommands operate on one or more *installables*.
@@ -70,9 +70,9 @@ That is, Nix will operate on the default flake output attribute of the flake in 
 
 > **Warning** \
 > Flake output attribute installables depend on both the
-> [`flakes`](@docroot@/contributing/experimental-features.md#xp-feature-flakes)
+> [`flakes`](@docroot@/development/experimental-features.md#xp-feature-flakes)
 > and
-> [`nix-command`](@docroot@/contributing/experimental-features.md#xp-feature-nix-command)
+> [`nix-command`](@docroot@/development/experimental-features.md#xp-feature-nix-command)
 > experimental features, and subject to change without notice.
 
 Example: `nixpkgs#hello`

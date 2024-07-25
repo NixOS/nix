@@ -383,7 +383,7 @@ static RegisterPrimOp primop_fetchTree({
       - `"mercurial"`
 
      *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
-     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
+     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
 
       > **Example**
       >
@@ -670,12 +670,12 @@ static RegisterPrimOp primop_fetchGit({
 
         Whether to check `rev` for a signature matching `publicKey` or `publicKeys`.
         If `verifyCommit` is enabled, then `fetchGit` cannot use a local repository with uncommitted changes.
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
       - `publicKey`
 
         The public key against which `rev` is verified if `verifyCommit` is enabled.
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
       - `keytype` (default: `"ssh-ed25519"`)
 
@@ -687,7 +687,7 @@ static RegisterPrimOp primop_fetchGit({
         - `"ssh-ed25519"`
         - `"ssh-ed25519-sk"`
         - `"ssh-rsa"`
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
       - `publicKeys`
 
@@ -701,7 +701,7 @@ static RegisterPrimOp primop_fetchGit({
         }
         ```
 
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
 
       Here are some examples of how to use `fetchGit`.
