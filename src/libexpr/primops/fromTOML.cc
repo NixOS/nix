@@ -2,7 +2,11 @@
 #include "eval-inline.hh"
 
 #include <sstream>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
 #include <toml.hpp>
+#pragma GCC diagnostic pop
 
 namespace nix {
 
