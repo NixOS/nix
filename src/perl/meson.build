@@ -25,6 +25,7 @@ nix_perl_conf.set('PACKAGE_VERSION', meson.project_version())
 error_args = [
   '-Wdeprecated-copy',
   '-Wdeprecated-declarations',
+  '-Werror=suggest-override',
   '-Werror=unused-result',
   '-Wignored-qualifiers',
   '-Wno-duplicate-decl-specifier',
