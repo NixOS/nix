@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="504" height="320" class="svgbob"><style>.svgbob line, .svgbob path, .svgbob circle, .svgbob rect, .svgbob polygon {
+    stroke: black;
+    stroke-width: 2;
+    stroke-opacity: 1;
+    fill-opacity: 1;
+    stroke-linecap: round;
+    stroke-linejoin: miter;
+}
+.svgbob text {
+    white-space: pre;
+    fill: black;
+    font-family: Iosevka Fixed, monospace;
+    font-size: 14px;
+}
+.svgbob rect.backdrop {
+    stroke: none;
+    fill: white;
+}
+.svgbob .broken {
+    stroke-dasharray: 8;
+}
+.svgbob .filled {
+    fill: black;
+}
+.svgbob .bg_filled {
+    fill: white;
+    stroke-width: 1;
+}
+.svgbob .nofill {
+    fill: white;
+}
+.svgbob .end_marked_arrow {
+    marker-end: url(#arrow);
+}
+.svgbob .start_marked_arrow {
+    marker-start: url(#arrow);
+}
+.svgbob .end_marked_diamond {
+    marker-end: url(#diamond);
+}
+.svgbob .start_marked_diamond {
+    marker-start: url(#diamond);
+}
+.svgbob .end_marked_circle {
+    marker-end: url(#circle);
+}
+.svgbob .start_marked_circle {
+    marker-start: url(#circle);
+}
+.svgbob .end_marked_open_circle {
+    marker-end: url(#open_circle);
+}
+.svgbob .start_marked_open_circle {
+    marker-start: url(#open_circle);
+}
+.svgbob .end_marked_big_open_circle {
+    marker-end: url(#big_open_circle);
+}
+.svgbob .start_marked_big_open_circle {
+    marker-start: url(#big_open_circle);
+}<!--separator--></style><defs><marker id="arrow" viewBox="-2 -2 8 8" refX="4" refY="2" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 0,4 4,2 0,0"></polygon></marker><marker id="diamond" viewBox="-2 -2 8 8" refX="4" refY="2" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,2 2,0 4,2 2,4 0,2"></polygon></marker><marker id="circle" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><circle cx="4" cy="4" r="2" class="filled"></circle></marker><marker id="open_circle" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><circle cx="4" cy="4" r="2" class="bg_filled"></circle></marker><marker id="big_open_circle" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><circle cx="4" cy="4" r="3" class="bg_filled"></circle></marker></defs><rect class="backdrop" x="0" y="0" width="504" height="320"></rect><rect x="4" y="8" width="224" height="288" class="solid nofill" rx="0"></rect><rect x="20" y="40" width="192" height="240" class="solid nofill" rx="0"></rect><rect x="36" y="72" width="160" height="192" class="solid nofill" rx="0"></rect><rect x="52" y="104" width="128" height="32" class="solid nofill" rx="0"></rect><text x="90" y="124" >object</text><text x="146" y="124" >a</text><rect x="52" y="216" width="128" height="32" class="solid nofill" rx="0"></rect><text x="90" y="236" >object</text><text x="146" y="236" >b</text><text x="98" y="92" >heap</text><line x1="116" y1="144" x2="116" y2="160" class="solid"></line><text x="90" y="172" >pointer</text><line x1="116" y1="176" x2="116" y2="196" class="solid"></line><polygon points="112,196 120,196 116,208" class="filled"></polygon><text x="90" y="60" >memory</text><text x="82" y="28" >program</text><rect x="268" y="8" width="224" height="288" class="solid nofill" rx="0"></rect><rect x="284" y="40" width="192" height="240" class="solid nofill" rx="0"></rect><rect x="300" y="72" width="160" height="192" class="solid nofill" rx="0"></rect><rect x="316" y="104" width="128" height="32" class="solid nofill" rx="0"></rect><text x="362" y="124" >file</text><text x="402" y="124" >a</text><rect x="316" y="216" width="128" height="32" class="solid nofill" rx="0"></rect><text x="362" y="236" >file</text><text x="402" y="236" >b</text><text x="338" y="92" >file</text><text x="378" y="92" >system</text><line x1="380" y1="144" x2="380" y2="160" class="solid"></line><text x="362" y="172" >path</text><line x1="380" y1="176" x2="380" y2="196" class="solid"></line><polygon points="376,196 384,196 380,208" class="filled"></polygon><text x="362" y="60" >disk</text><text x="314" y="28" >operating</text><text x="394" y="28" >system</text></svg>
