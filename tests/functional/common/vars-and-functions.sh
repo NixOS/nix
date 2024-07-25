@@ -190,7 +190,7 @@ isDaemonNewer () {
 
 skipTest () {
     echo "$1, skipping this test..." >&2
-    exit 99
+    exit 77
 }
 
 TODO_NixOS() {

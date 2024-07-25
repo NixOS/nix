@@ -28,7 +28,7 @@ run_test
 
 if [[ "$status" = 0 ]]; then
   echo "$post_run_msg [${green}PASS$normal]"
-elif [[ "$status" = 99 ]]; then
+elif [[ "$status" = 77 ]]; then
   echo "$post_run_msg [${yellow}SKIP$normal]"
 else
   echo "$post_run_msg [${red}FAIL$normal]"
