@@ -7,6 +7,7 @@
 #include "finally.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "url.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -83,13 +84,21 @@ struct curlFileTransfer : public FileTransfer
             return httpStatus;
         }
 
+        std::string formatActivity(const std::string & url)
+        {
+            // Strip query parameters for security.
+            auto parsedUrl = parseURL(url);
+            parsedUrl.query.clear();
+            return fmt(request.data ? "uploading '%s'" : "downloading '%s'", parsedUrl.to_string());
+        }
+
         TransferItem(curlFileTransfer & fileTransfer,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
             , act(*logger, lvlTalkative, actFileTransfer,
-                fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
+                formatActivity(request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
@@ -192,8 +201,10 @@ struct curlFileTransfer : public FileTransfer
         {
             char * effectiveUriCStr = nullptr;
             curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
-            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr)
+            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr) {
                 result.urls.push_back(effectiveUriCStr);
+                act.update(formatActivity(effectiveUriCStr));
+            }
         }
 
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
