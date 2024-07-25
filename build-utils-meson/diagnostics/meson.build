@@ -1,13 +1,11 @@
 add_project_arguments(
-  '-Wno-deprecated-declarations',
-  '-Wimplicit-fallthrough',
+  '-Wdeprecated-copy',
+  '-Werror=suggest-override',
   '-Werror=switch',
   '-Werror=switch-enum',
   '-Werror=unused-result',
-  '-Wdeprecated-copy',
   '-Wignored-qualifiers',
-  # Enable assertions in libstdc++ by default. Harmless on libc++. Benchmarked
-  # at ~1% overhead in `nix search`.
-  #
+  '-Wimplicit-fallthrough',
+  '-Wno-deprecated-declarations',
   language : 'cpp',
 )
