@@ -387,7 +387,7 @@ struct curlFileTransfer : public FileTransfer
             auto httpStatus = getHTTPStatus();
 
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
-                request.verb(), request.uri, code, httpStatus, result.bodySize);
+                request.verb(), result.urls.back(), code, httpStatus, result.bodySize);
 
             appendCurrentUrl();
 
@@ -479,17 +479,18 @@ struct curlFileTransfer : public FileTransfer
                     response = std::move(errorSink->s);
                 auto exc =
                     code == CURLE_ABORTED_BY_CALLBACK && getInterrupted()
-                    ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted", request.verb(), request.uri)
+                    ? FileTransferError(Interrupted, std::move(response), "%s of '%s' was interrupted",
+                        request.verb(), result.urls.back())
                     : httpStatus != 0
                     ? FileTransferError(err,
                         std::move(response),
                         "unable to %s '%s': HTTP error %d%s",
-                        request.verb(), request.uri, httpStatus,
+                        request.verb(), result.urls.back(), httpStatus,
                         code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
                         "unable to %s '%s': %s (%d)",
-                        request.verb(), request.uri, curl_easy_strerror(code), code);
+                        request.verb(), result.urls.back(), curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
