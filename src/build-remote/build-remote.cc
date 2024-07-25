@@ -264,7 +264,20 @@ connected:
         auto inputs = readStrings<PathSet>(source);
         auto wantedOutputs = readStrings<StringSet>(source);
 
-        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri.render()) + ".upload-lock", true);
+        AutoCloseFD uploadLock;
+        {
+            auto setUpdateLock = [&](auto && fileName){
+                uploadLock = openLockFile(currentLoad + "/" + escapeUri(fileName) + ".upload-lock", true);
+            };
+            try {
+                setUpdateLock(storeUri.render());
+            } catch (SysError & e) {
+                if (e.errNo != ENAMETOOLONG) throw;
+                // Try again hashing the store URL so we have a shorter path
+                auto h = hashString(HashAlgorithm::MD5, storeUri.render());
+                setUpdateLock(h.to_string(HashFormat::Base64, false));
+            }
+        }
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri.render()));
