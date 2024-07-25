@@ -22,7 +22,7 @@ A name can be an [identifier](#identifier) or a [string literal](./syntax.md#str
 >
 > *name* → *identifier* | *string*
 
-Names are used in [attribute sets](./syntax.md#attrs-literal), [`let` bindings](./syntax.md#let-expressions), and [`inherit`](./syntax.md#inheriting attributes).
+Names are used in [attribute sets](./syntax.md#attrs-literal), [`let` bindings](./syntax.md#let-expressions), and [`inherit`](./syntax.md#inheriting-attributes).
 
 # Keywords
 

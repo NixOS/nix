@@ -28,6 +28,8 @@
   - [Data Types](language/types.md)
     - [String context](language/string-context.md)
   - [Syntax and semantics](language/syntax.md)
+    - [Expressions]()
+      - [Variables](language/variables.md)
     - [Identifiers](language/identifiers.md)
     - [Scoping rules](language/scope.md)
     - [String interpolation](language/string-interpolation.md)
