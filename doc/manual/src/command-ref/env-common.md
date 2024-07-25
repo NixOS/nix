@@ -9,22 +9,26 @@ Most Nix commands interpret the following environment variables:
 
 - <span id="env-NIX_PATH">[`NIX_PATH`](#env-NIX_PATH)</span>
 
-  A colon-separated list of directories used to look up the location of Nix
-  expressions using [paths](@docroot@/language/types.md#type-path)
-  enclosed in angle brackets (i.e., `<path>`),
-  e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
-  [`-I` option](@docroot@/command-ref/opt-common.md#opt-I).
+  A colon-separated list of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
 
-  If `NIX_PATH` is not set at all, Nix will fall back to the following list in [impure](@docroot@/command-ref/conf-file.md#conf-pure-eval) and [unrestricted](@docroot@/command-ref/conf-file.md#conf-restrict-eval) evaluation mode:
+  This environment variable overrides the value of the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path).
 
-  1. `$HOME/.nix-defexpr/channels`
-  2. `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
-  3. `/nix/var/nix/profiles/per-user/root/channels`
+  It can be extended using the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I).
+
+  > **Example**
+  >
+  > ```bash
+  > $ export NIX_PATH=`/home/eelco/Dev:nixos-config=/etc/nixos
+  > ```
 
   If `NIX_PATH` is set to an empty string, resolving search paths will always fail.
-  For example, attempting to use `<nixpkgs>` will produce:
 
-      error: file 'nixpkgs' was not found in the Nix search path
+  > **Example**
+  >
+  > ```bash
+  > $ NIX_PATH= nix-instantiate --eval '<nixpkgs>'
+  > error: file 'nixpkgs' was not found in the Nix search path (add it using $NIX_PATH or -I)
+  > ```
 
 - <span id="env-NIX_IGNORE_SYMLINK_STORE">[`NIX_IGNORE_SYMLINK_STORE`](#env-NIX_IGNORE_SYMLINK_STORE)</span>
 

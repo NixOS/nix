@@ -22,13 +22,13 @@ nix-instantiate --eval -E '<by-relative-path/simple.nix>' --restrict-eval
 #
 # | precedence             | hard-coded | nix-path in file | extra-nix-path in file | nix-path in env | extra-nix-path in env | NIX_PATH  | nix-path  | extra-nix-path  | -I              |
 # |------------------------|------------|------------------|------------------------|-----------------|-----------------------|-----------|-----------|-----------------|-----------------|
-# | hard-coded             | x          | ^override        | ^append                | ^override       | ^append               | ^override | ^override | ^append         | ^append         |
-# | nix-path in file       |            | last wins        | ^append                | ^override       | ^append               | ^override | ^override | ^append         | ^append         |
-# | extra-nix-path in file |            |                  | append in order        | ^override       | ^append               | ^override | ^override | ^append         | ^append         |
-# | nix-path in env        |            |                  |                        | last wins       | ^append               | ^override | ^override | ^append         | ^append         |
-# | extra-nix-path in env  |            |                  |                        |                 | append in order       | ^override | ^override | ^append         | ^append         |
-# | NIX_PATH               |            |                  |                        |                 |                       | x         | ^override | ^append         | ^append         |
-# | nix-path               |            |                  |                        |                 |                       |           | last wins | ^append         | ^append         |
+# | hard-coded             | x          | ^override        | ^append                | ^override       | ^append               | ^override | ^override | ^append         | ^prepend        |
+# | nix-path in file       |            | last wins        | ^append                | ^override       | ^append               | ^override | ^override | ^append         | ^prepend        |
+# | extra-nix-path in file |            |                  | append in order        | ^override       | ^append               | ^override | ^override | ^append         | ^prepend        |
+# | nix-path in env        |            |                  |                        | last wins       | ^append               | ^override | ^override | ^append         | ^prepend        |
+# | extra-nix-path in env  |            |                  |                        |                 | append in order       | ^override | ^override | ^append         | ^prepend        |
+# | NIX_PATH               |            |                  |                        |                 |                       | x         | ^override | ^append         | ^prepend        |
+# | nix-path               |            |                  |                        |                 |                       |           | last wins | ^append         | ^prepend        |
 # | extra-nix-path         |            |                  |                        |                 |                       |           |           | append in order | append in order |
 # | -I                     |            |                  |                        |                 |                       |           |           |                 | append in order |
 
@@ -59,6 +59,8 @@ echo "nix-path = test=$TEST_ROOT/from-nix-path-file" >> "$test_nix_conf"
 
 # -I extends NIX_PATH
 [[ $(NIX_PATH=test=$TEST_ROOT/from-NIX_PATH nix-instantiate -I test=$TEST_ROOT/from-I --find-file test/only-from-I.nix) = $TEST_ROOT/from-I/only-from-I.nix ]]
+# -I takes precedence over NIX_PATH
+[[ $(NIX_PATH=test=$TEST_ROOT/from-NIX_PATH nix-instantiate -I test=$TEST_ROOT/from-I --find-file test) = $TEST_ROOT/from-I ]]
 # if -I does not have the desired entry, the value from NIX_PATH is used
 [[ $(NIX_PATH=test=$TEST_ROOT/from-NIX_PATH nix-instantiate -I test=$TEST_ROOT/from-I --find-file test/only-from-NIX_PATH.nix) = $TEST_ROOT/from-NIX_PATH/only-from-NIX_PATH.nix ]]
 
