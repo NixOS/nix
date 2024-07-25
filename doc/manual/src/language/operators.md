@@ -198,11 +198,11 @@ Equivalent to `!`*b1* `||` *b2*.
 > **Warning**
 >
 > This syntax is part of an
-> [experimental feature](@docroot@/contributing/experimental-features.md)
+> [experimental feature](@docroot@/development/experimental-features.md)
 > and may change in future releases.
 >
 > To use this syntax, make sure the
-> [`pipe-operators` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-pipe-operators)
+> [`pipe-operators` experimental feature](@docroot@/development/experimental-features.md#xp-feature-pipe-operators)
 > is enabled.
 > For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
 >
