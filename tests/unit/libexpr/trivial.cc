@@ -182,6 +182,60 @@ namespace nix {
         ASSERT_THAT(v, IsIntEq(15));
     }
 
+    TEST_F(TrivialExpressionTest, forwardPipe) {
+        auto v = eval("1 |> builtins.add 2 |> builtins.mul 3");
+        ASSERT_THAT(v, IsIntEq(9));
+    }
+
+    TEST_F(TrivialExpressionTest, backwardPipe) {
+        auto v = eval("builtins.add 1 <| builtins.mul 2 <| 3");
+        ASSERT_THAT(v, IsIntEq(7));
+    }
+
+    TEST_F(TrivialExpressionTest, forwardPipeEvaluationOrder) {
+        auto v = eval("1 |> null |> (x: 2)");
+        ASSERT_THAT(v, IsIntEq(2));
+    }
+
+    TEST_F(TrivialExpressionTest, backwardPipeEvaluationOrder) {
+        auto v = eval("(x: 1) <| null <| 2");
+        ASSERT_THAT(v, IsIntEq(1));
+    }
+
+    TEST_F(TrivialExpressionTest, differentPipeOperatorsDoNotAssociate) {
+        ASSERT_THROW(eval("(x: 1) <| 2 |> (x: 3)"), ParseError);
+    }
+
+    TEST_F(TrivialExpressionTest, differentPipeOperatorsParensLeft) {
+        auto v = eval("((x: 1) <| 2) |> (x: 3)");
+        ASSERT_THAT(v, IsIntEq(3));
+    }
+
+    TEST_F(TrivialExpressionTest, differentPipeOperatorsParensRight) {
+        auto v = eval("(x: 1) <| (2 |> (x: 3))");
+        ASSERT_THAT(v, IsIntEq(1));
+    }
+
+    TEST_F(TrivialExpressionTest, forwardPipeLowestPrecedence) {
+        auto v = eval("false -> true |> (x: !x)");
+        ASSERT_THAT(v, IsFalse());
+    }
+
+    TEST_F(TrivialExpressionTest, backwardPipeLowestPrecedence) {
+        auto v = eval("(x: !x) <| false -> true");
+        ASSERT_THAT(v, IsFalse());
+    }
+
+    TEST_F(TrivialExpressionTest, forwardPipeStrongerThanElse) {
+        auto v = eval("if true then 1 else 2 |> 3");
+        ASSERT_THAT(v, IsIntEq(1));
+    }
+
+    TEST_F(TrivialExpressionTest, backwardPipeStrongerThanElse) {
+        auto v = eval("if true then 1 else 2 <| 3");
+        ASSERT_THAT(v, IsIntEq(1));
+    }
+
     TEST_F(TrivialExpressionTest, bindOr) {
         auto v = eval("{ or = 1; }");
         ASSERT_THAT(v, IsAttrsOfSize(1));
