@@ -635,17 +635,8 @@ Pos PosTable::operator[](PosIdx p) const
 }
 
 
-
-/* Symbol table. */
-
-size_t SymbolTable::totalSize() const
+std::string DocComment::getInnerText(const PosTable & positions) const
 {
-    size_t n = 0;
-    dump([&] (const std::string & s) { n += s.size(); });
-    return n;
-}
-
-std::string DocComment::getInnerText(const PosTable & positions) const {
     auto beginPos = positions[begin];
     auto endPos = positions[end];
     auto docCommentStr = beginPos.getSnippetUpTo(endPos).value_or("");
