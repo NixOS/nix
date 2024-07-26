@@ -103,7 +103,7 @@ TEST_F(GitUtilsTest, sink_hardlink)
         sink->createHardlink(CanonPath("foo-1.1/link"), CanonPath("hello"));
         FAIL() << "Expected an exception";
     } catch (const nix::Error & e) {
-        ASSERT_THAT(e.msg(), testing::HasSubstr("invalid hard link target"));
+        ASSERT_THAT(e.msg(), testing::HasSubstr("cannot find hard link target"));
         ASSERT_THAT(e.msg(), testing::HasSubstr("/hello"));
         ASSERT_THAT(e.msg(), testing::HasSubstr("foo-1.1/link"));
     }
