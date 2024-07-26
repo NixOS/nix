@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "common-eval-args.hh"
 #include "installable-value.hh"
 
 namespace nix {
@@ -78,7 +79,7 @@ struct InstallableFlake : InstallableValue
  */
 static inline FlakeRef defaultNixpkgsFlakeRef()
 {
-    return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
+    return FlakeRef::fromAttrs(fetchSettings, {{"type","indirect"}, {"id", "nixpkgs"}});
 }
 
 ref<eval_cache::EvalCache> openEvalCache(

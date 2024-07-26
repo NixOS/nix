@@ -22,6 +22,8 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 using json = nlohmann::json;
 
 namespace nix {

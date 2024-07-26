@@ -91,7 +91,7 @@ A environment variables that Google Test accepts are also worth knowing:
 Putting the two together, one might run
 
 ```bash
-GTEST_BREIF=1 GTEST_FILTER='ErrorTraceTest.*' meson test nix-expr-tests -v
+GTEST_BRIEF=1 GTEST_FILTER='ErrorTraceTest.*' meson test nix-expr-tests -v
 ```
 
 for short but comprensive output.

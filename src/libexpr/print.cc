@@ -299,6 +299,9 @@ private:
             output << ANSI_NORMAL;
     }
 
+    /**
+     * @note This may force items.
+     */
     bool shouldPrettyPrintAttrs(AttrVec & v)
     {
         if (!options.shouldPrettyPrint() || v.empty()) {
@@ -314,6 +317,9 @@ private:
         if (!item) {
             return true;
         }
+
+        // It is ok to force the item(s) here, because they will be printed anyway.
+        state.forceValue(*item, item->determinePos(noPos));
 
         // Pretty-print single-item attrsets only if they contain nested
         // structures.
@@ -371,6 +377,9 @@ private:
         }
     }
 
+    /**
+     * @note This may force items.
+     */
     bool shouldPrettyPrintList(std::span<Value * const> list)
     {
         if (!options.shouldPrettyPrint() || list.empty()) {
@@ -386,6 +395,9 @@ private:
         if (!item) {
             return true;
         }
+
+        // It is ok to force the item(s) here, because they will be printed anyway.
+        state.forceValue(*item, item->determinePos(noPos));
 
         // Pretty-print single-item lists only if they contain nested
         // structures.

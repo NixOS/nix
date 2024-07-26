@@ -4,12 +4,14 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include "fetch-settings.hh"
 #include "value.hh"
 #include "nixexpr.hh"
+#include "nixexpr.hh"
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "eval-inline.hh"
 #include "eval-settings.hh"
-#include "store-api.hh"
 
 #include "tests/libstore.hh"
 
@@ -24,7 +26,7 @@ namespace nix {
         protected:
             LibExprTest()
                 : LibStoreTest()
-                , state({}, store, evalSettings, nullptr)
+                , state({}, store, fetchSettings, evalSettings, nullptr)
             {
                 evalSettings.nixPath = {};
             }
@@ -43,6 +45,7 @@ namespace nix {
             }
 
             bool readOnlyMode = true;
+            fetchers::Settings fetchSettings{};
             EvalSettings evalSettings{readOnlyMode};
             EvalState state;
     };

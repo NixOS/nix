@@ -73,7 +73,7 @@ void RemoteStore::initConnection(Connection & conn)
         StringSink saved;
         TeeSource tee(conn.from, saved);
         try {
-            conn.daemonVersion = WorkerProto::BasicClientConnection::handshake(
+            conn.protoVersion = WorkerProto::BasicClientConnection::handshake(
                 conn.to, tee, PROTOCOL_VERSION);
         } catch (SerialisationError & e) {
             /* In case the other side is waiting for our input, close
@@ -115,7 +115,7 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.buildCores
        << settings.useSubstitutes;
 
-    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
+    if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 12) {
         std::map<std::string, Config::SettingInfo> overrides;
         settings.getSettings(overrides, true); // libstore settings
         fileTransferSettings.getSettings(overrides, true);
@@ -128,7 +128,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(settings.useSubstitutes.name);
         overrides.erase(loggerSettings.showTrace.name);
         overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
-        overrides.erase(settings.pluginFiles.name);
+        overrides.erase("plugin-files");
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;
@@ -175,7 +175,7 @@ bool RemoteStore::isValidPathUncached(const StorePath & path)
 StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 12) {
         StorePathSet res;
         for (auto & i : paths)
             if (isValidPath(i)) res.insert(i);
@@ -198,7 +198,7 @@ StorePathSet RemoteStore::queryAllValidPaths()
 StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 {
     auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 12) {
         StorePathSet res;
         for (auto & i : paths) {
             conn->to << WorkerProto::Op::HasSubstitutes << printStorePath(i);
@@ -221,7 +221,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
 
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 12) {
 
         for (auto & i : pathsMap) {
             SubstitutablePathInfo info;
@@ -241,7 +241,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
     } else {
 
         conn->to << WorkerProto::Op::QuerySubstitutablePathInfos;
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 22) {
+        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 22) {
             StorePathSet paths;
             for (auto & path : pathsMap)
                 paths.insert(path.first);
@@ -368,7 +368,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 25) {
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 25) {
 
         conn->to
             << WorkerProto::Op::AddToStore
@@ -485,7 +485,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 {
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 18) {
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 18) {
         auto source2 = sinkToSource([&](Sink & sink) {
             sink << 1 // == path follows
                 ;
@@ -513,11 +513,11 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
 
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
+        if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 23) {
             conn.withFramedSink([&](Sink & sink) {
                 copyNAR(source, sink);
             });
-        } else if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21) {
+        } else if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 21) {
             conn.processStderr(0, &source);
         } else {
             copyNAR(source, conn->to);
@@ -554,7 +554,7 @@ void RemoteStore::addMultipleToStore(
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
-    if (GET_PROTOCOL_MINOR(getConnection()->daemonVersion) >= 32) {
+    if (GET_PROTOCOL_MINOR(getConnection()->protoVersion) >= 32) {
         auto conn(getConnection());
         conn->to
             << WorkerProto::Op::AddMultipleToStore
@@ -572,7 +572,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::RegisterDrvOutput;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 31) {
         conn->to << info.id.to_string();
         conn->to << std::string(info.outPath.to_string());
     } else {
@@ -587,7 +587,7 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     try {
         auto conn(getConnection());
 
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
+        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 27) {
             warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
             return callback(nullptr);
         }
@@ -597,7 +597,7 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
         conn.processStderr();
 
         auto real = [&]() -> std::shared_ptr<const Realisation> {
-            if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+            if (GET_PROTOCOL_MINOR(conn->protoVersion) < 31) {
                 auto outPaths = WorkerProto::Serialise<std::set<StorePath>>::read(
                     *this, *conn);
                 if (outPaths.empty())
@@ -644,9 +644,9 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
 
     auto conn(getConnection());
     conn->to << WorkerProto::Op::BuildPaths;
-    assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
+    assert(GET_PROTOCOL_MINOR(conn->protoVersion) >= 13);
     WorkerProto::write(*this, *conn, drvPaths);
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 15)
         conn->to << buildMode;
     else
         /* Old daemons did not take a 'buildMode' parameter, so we
@@ -667,7 +667,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 34) {
         conn->to << WorkerProto::Op::BuildPathsWithResults;
         WorkerProto::write(*this, *conn, paths);
         conn->to << buildMode;
@@ -841,7 +841,7 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
 {
     {
         auto conn(getConnection());
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 19)
+        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 19)
             // Don't hold the connection handle in the fallback case
             // to prevent a deadlock.
             goto fallback;
@@ -889,7 +889,7 @@ void RemoteStore::connect()
 unsigned int RemoteStore::getProtocol()
 {
     auto conn(connections->get());
-    return conn->daemonVersion;
+    return conn->protoVersion;
 }
 
 std::optional<TrustedFlag> RemoteStore::isTrustedClient()

@@ -93,13 +93,7 @@ mkMesonDerivation (finalAttrs: {
     LDFLAGS = "-fuse-ld=gold";
   };
 
-  enableParallelBuilding = true;
-
   separateDebugInfo = !stdenv.hostPlatform.isStatic;
-
-  # TODO `releaseTools.coverageAnalysis` in Nixpkgs needs to be updated
-  # to work with `strictDeps`.
-  strictDeps = true;
 
   hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 

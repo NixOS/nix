@@ -1,7 +1,8 @@
 #pragma once
 ///@file
 
-#include "types.hh"
+#include <limits>
+#include <string>
 
 namespace nix {
 /**

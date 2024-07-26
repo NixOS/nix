@@ -73,7 +73,7 @@ static int listPossibleCallback(char * s, char *** avp)
 {
     auto possible = curRepl->completePrefix(s);
 
-    if (possible.size() > (INT_MAX / sizeof(char *)))
+    if (possible.size() > (std::numeric_limits<int>::max() / sizeof(char *)))
         throw Error("too many completions");
 
     int ac = 0;

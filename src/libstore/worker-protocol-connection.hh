@@ -6,7 +6,7 @@
 
 namespace nix {
 
-struct WorkerProto::BasicClientConnection
+struct WorkerProto::BasicConnection
 {
     /**
      * Send with this.
@@ -19,14 +19,45 @@ struct WorkerProto::BasicClientConnection
     FdSource from;
 
     /**
-     * Worker protocol version used for the connection.
-     *
-     * Despite its name, it is actually the maximum version both
-     * sides support. (If the maximum doesn't exist, we would fail to
-     * establish a connection and produce a value of this type.)
+     * The protocol version agreed by both sides.
      */
-    WorkerProto::Version daemonVersion;
+    WorkerProto::Version protoVersion;
 
+    /**
+     * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
+     * factored out serve protocol serializers with a
+     * `LegacySSHStore::Connection`.
+     *
+     * The serve protocol connection types are unidirectional, unlike
+     * this type.
+     */
+    operator WorkerProto::ReadConn()
+    {
+        return WorkerProto::ReadConn{
+            .from = from,
+            .version = protoVersion,
+        };
+    }
+
+    /**
+     * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
+     * factored out serve protocol serializers with a
+     * `LegacySSHStore::Connection`.
+     *
+     * The serve protocol connection types are unidirectional, unlike
+     * this type.
+     */
+    operator WorkerProto::WriteConn()
+    {
+        return WorkerProto::WriteConn{
+            .to = to,
+            .version = protoVersion,
+        };
+    }
+};
+
+struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
+{
     /**
      * Flush to direction
      */
@@ -60,38 +91,6 @@ struct WorkerProto::BasicClientConnection
      */
     ClientHandshakeInfo postHandshake(const StoreDirConfig & store);
 
-    /**
-     * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
-     * factored out serve protocol serializers with a
-     * `LegacySSHStore::Connection`.
-     *
-     * The serve protocol connection types are unidirectional, unlike
-     * this type.
-     */
-    operator WorkerProto::ReadConn()
-    {
-        return WorkerProto::ReadConn{
-            .from = from,
-            .version = daemonVersion,
-        };
-    }
-
-    /**
-     * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
-     * factored out serve protocol serializers with a
-     * `LegacySSHStore::Connection`.
-     *
-     * The serve protocol connection types are unidirectional, unlike
-     * this type.
-     */
-    operator WorkerProto::WriteConn()
-    {
-        return WorkerProto::WriteConn{
-            .to = to,
-            .version = daemonVersion,
-        };
-    }
-
     void addTempRoot(const StoreDirConfig & remoteStore, bool * daemonException, const StorePath & path);
 
     StorePathSet queryValidPaths(
@@ -124,43 +123,8 @@ struct WorkerProto::BasicClientConnection
     void importPaths(const StoreDirConfig & store, bool * daemonException, Source & source);
 };
 
-struct WorkerProto::BasicServerConnection
+struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
 {
-    /**
-     * Send with this.
-     */
-    FdSink & to;
-
-    /**
-     * Receive with this.
-     */
-    FdSource & from;
-
-    /**
-     * Worker protocol version used for the connection.
-     *
-     * Despite its name, it is actually the maximum version both
-     * sides support. (If the maximum doesn't exist, we would fail to
-     * establish a connection and produce a value of this type.)
-     */
-    WorkerProto::Version clientVersion;
-
-    operator WorkerProto::ReadConn()
-    {
-        return WorkerProto::ReadConn{
-            .from = from,
-            .version = clientVersion,
-        };
-    }
-
-    operator WorkerProto::WriteConn()
-    {
-        return WorkerProto::WriteConn{
-            .to = to,
-            .version = clientVersion,
-        };
-    }
-
     /**
      * Establishes connection, negotiating version.
      *

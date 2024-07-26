@@ -259,6 +259,8 @@ Currently the `type` attribute can be one of the following:
   `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
   can be dropped.
 
+  This can also be used to set the location of gitea/forgejo branches. [See here](@docroot@/protocols/tarball-fetcher.md#gitea-and-forgejo-support)
+
 * `file`: Plain files or directory tarballs, either over http(s) or from the local
   disk.
 

@@ -208,3 +208,23 @@ jobs:
       # Only meson packages that don't have a tests.run derivation.
       # Those that have it are already built and tested as part of nix flake check.
       - run: nix build -L .#hydraJobs.build.{nix-cmd,nix-main}.$(nix-instantiate --eval --expr builtins.currentSystem | sed -e 's/"//g')
+
+  flake_regressions:
+    needs: vm_tests
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout nix
+        uses: actions/checkout@v4
+      - name: Checkout flake-regressions
+        uses: actions/checkout@v4
+        with:
+          repository: NixOS/flake-regressions
+          path: flake-regressions
+      - name: Checkout flake-regressions-data
+        uses: actions/checkout@v4
+        with:
+          repository: NixOS/flake-regressions-data
+          path: flake-regressions/tests
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix build --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH scripts/flake-regressions.sh

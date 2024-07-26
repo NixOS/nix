@@ -48,10 +48,6 @@ mkMesonDerivation (finalAttrs: {
     echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> ''${!outputDoc}/nix-support/hydra-build-products
   '';
 
-  enableParallelBuilding = true;
-
-  strictDeps = true;
-
   meta = {
     platforms = lib.platforms.all;
   };

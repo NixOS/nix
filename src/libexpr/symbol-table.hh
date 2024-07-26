@@ -51,6 +51,11 @@ public:
     }
 
     friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+
+    bool empty() const
+    {
+        return s.empty();
+    }
 };
 
 /**
@@ -73,9 +78,8 @@ public:
 
     explicit operator bool() const { return id > 0; }
 
-    bool operator<(const Symbol other) const { return id < other.id; }
+    auto operator<=>(const Symbol other) const { return id <=> other.id; }
     bool operator==(const Symbol other) const { return id == other.id; }
-    bool operator!=(const Symbol other) const { return id != other.id; }
 
     friend class std::hash<Symbol>;
 };

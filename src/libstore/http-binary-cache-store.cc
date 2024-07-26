@@ -1,4 +1,4 @@
-#include "binary-cache-store.hh"
+#include "http-binary-cache-store.hh"
 #include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
@@ -8,25 +8,36 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
-struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
+
+HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
+    std::string_view scheme,
+    std::string_view _cacheUri,
+    const Params & params)
+    : StoreConfig(params)
+    , BinaryCacheStoreConfig(params)
+    , cacheUri(
+        std::string { scheme }
+        + "://"
+        + (!_cacheUri.empty()
+            ? _cacheUri
+            : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    while (!cacheUri.empty() && cacheUri.back() == '/')
+        cacheUri.pop_back();
+}
 
-    const std::string name() override { return "HTTP Binary Cache Store"; }
 
-    std::string doc() override
-    {
-        return
-          #include "http-binary-cache-store.md"
-          ;
-    }
-};
+std::string HttpBinaryCacheStoreConfig::doc()
+{
+    return
+      #include "http-binary-cache-store.md"
+      ;
+}
+
 
 class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
 {
 private:
-
-    Path cacheUri;
 
     struct State
     {
@@ -40,23 +51,14 @@ public:
 
     HttpBinaryCacheStore(
         std::string_view scheme,
-        PathView _cacheUri,
+        PathView cacheUri,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
-        , HttpBinaryCacheStoreConfig(params)
+        , HttpBinaryCacheStoreConfig(scheme, cacheUri, params)
         , Store(params)
         , BinaryCacheStore(params)
-        , cacheUri(
-            std::string { scheme }
-            + "://"
-            + (!_cacheUri.empty()
-                ? _cacheUri
-                : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
     {
-        while (!cacheUri.empty() && cacheUri.back() == '/')
-            cacheUri.pop_back();
-
         diskCache = getNarInfoDiskCache();
     }
 
@@ -79,14 +81,6 @@ public:
             }
             diskCache->createCache(cacheUri, storeDir, wantMassQuery, priority);
         }
-    }
-
-    static std::set<std::string> uriSchemes()
-    {
-        static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
-        auto ret = std::set<std::string>({"http", "https"});
-        if (forceHttp) ret.insert("file");
-        return ret;
     }
 
 protected:

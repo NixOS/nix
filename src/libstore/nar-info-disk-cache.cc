@@ -7,6 +7,8 @@
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>
 
+#include "strings.hh"
+
 namespace nix {
 
 static const char * schema = R"sql(

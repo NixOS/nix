@@ -85,7 +85,7 @@ static void fetchTree(
     Value & v,
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
-    fetchers::Input input;
+    fetchers::Input input { state.fetchSettings };
     NixStringContext context;
     std::optional<std::string> type;
     if (params.isFetchGit) type = "git";
@@ -148,7 +148,7 @@ static void fetchTree(
                     "attribute 'name' isn’t supported in call to 'fetchTree'"
                 ).atPos(pos).debugThrow();
 
-        input = fetchers::Input::fromAttrs(std::move(attrs));
+        input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
     } else {
         auto url = state.coerceToString(pos, *args[0], context,
                 "while evaluating the first argument passed to the fetcher",
@@ -161,13 +161,13 @@ static void fetchTree(
             if (!attrs.contains("exportIgnore") && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
                 attrs.emplace("exportIgnore", Explicit<bool>{true});
             }
-            input = fetchers::Input::fromAttrs(std::move(attrs));
+            input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
         } else {
             if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
                 state.error<EvalError>(
                     "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
                 ).atPos(pos).debugThrow();
-            input = fetchers::Input::fromURL(url);
+            input = fetchers::Input::fromURL(state.fetchSettings, url);
         }
     }
 
@@ -383,7 +383,7 @@ static RegisterPrimOp primop_fetchTree({
       - `"mercurial"`
 
      *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
-     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
+     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
 
       > **Example**
       >
@@ -529,9 +529,19 @@ static void prim_fetchurl(EvalState & state, const PosIdx pos, Value * * args, V
 
 static RegisterPrimOp primop_fetchurl({
     .name = "__fetchurl",
-    .args = {"url"},
+    .args = {"arg"},
     .doc = R"(
       Download the specified URL and return the path of the downloaded file.
+      `arg` can be either a string denoting the URL, or an attribute set with the following attributes:
+
+      - `url`
+
+        The URL of the file to download.
+
+      - `name` (default: the last path component of the URL)
+
+        A name for the file in the store. This can be useful if the URL has any
+        characters that are invalid for the store.
 
       Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
@@ -660,12 +670,12 @@ static RegisterPrimOp primop_fetchGit({
 
         Whether to check `rev` for a signature matching `publicKey` or `publicKeys`.
         If `verifyCommit` is enabled, then `fetchGit` cannot use a local repository with uncommitted changes.
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
       - `publicKey`
 
         The public key against which `rev` is verified if `verifyCommit` is enabled.
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
       - `keytype` (default: `"ssh-ed25519"`)
 
@@ -677,7 +687,7 @@ static RegisterPrimOp primop_fetchGit({
         - `"ssh-ed25519"`
         - `"ssh-ed25519-sk"`
         - `"ssh-rsa"`
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
       - `publicKeys`
 
@@ -691,7 +701,7 @@ static RegisterPrimOp primop_fetchGit({
         }
         ```
 
-        Requires the [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+        Requires the [`verified-fetches` experimental feature](@docroot@/development/experimental-features.md#xp-feature-verified-fetches).
 
 
       Here are some examples of how to use `fetchGit`.

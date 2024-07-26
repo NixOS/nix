@@ -1,24 +1,22 @@
 {
   description = "The purely functional package manager";
 
-  # TODO switch to nixos-23.11-small
-  #      https://nixpk.gs/pr-tracker.html?pr=291954
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
-  inputs.libgit2 = { url = "github:libgit2/libgit2"; flake = false; };
+  inputs.libgit2 = { url = "github:libgit2/libgit2/v1.8.1"; flake = false; };
 
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
-  inputs.pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+  inputs.git-hooks-nix.url = "github:cachix/git-hooks.nix";
   # work around https://github.com/NixOS/nix/issues/7730
   inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
-  inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.pre-commit-hooks.inputs.nixpkgs-stable.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs-stable.follows = "nixpkgs";
   # work around 7730 and https://github.com/NixOS/nix/issues/7807
-  inputs.pre-commit-hooks.inputs.flake-compat.follows = "";
-  inputs.pre-commit-hooks.inputs.gitignore.follows = "";
+  inputs.git-hooks-nix.inputs.flake-compat.follows = "";
+  inputs.git-hooks-nix.inputs.gitignore.follows = "";
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-regression, libgit2, ... }:
 
@@ -278,6 +276,7 @@
             in
               "-D${prefix}:${rest}";
           havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
+          ignoreCrossFile = flags: builtins.filter (flag: !(lib.strings.hasInfix "cross-file" flag)) flags;
         in {
           pname = "shell-for-" + attrs.pname;
 
@@ -309,10 +308,12 @@
           };
 
           mesonFlags =
-            map (transformFlag "libutil") pkgs.nixComponents.nix-util.mesonFlags
-            ++ map (transformFlag "libstore") pkgs.nixComponents.nix-store.mesonFlags
-            ++ map (transformFlag "libfetchers") pkgs.nixComponents.nix-fetchers.mesonFlags
-            ++ lib.optionals havePerl (map (transformFlag "perl") pkgs.nixComponents.nix-perl-bindings.mesonFlags)
+            map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents.nix-util.mesonFlags)
+            ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents.nix-store.mesonFlags)
+            ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents.nix-fetchers.mesonFlags)
+            ++ lib.optionals havePerl (map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents.nix-perl-bindings.mesonFlags))
+            ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents.nix-expr.mesonFlags)
+            ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents.nix-cmd.mesonFlags)
             ;
 
           nativeBuildInputs = attrs.nativeBuildInputs or []
@@ -322,8 +323,16 @@
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
+            ++ lib.optional
+              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform
+                 # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
+                 && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
+                 && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
+                 && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages))
+              pkgs.buildPackages.mesonEmulatorHook
             ++ [
               pkgs.buildPackages.cmake
+              pkgs.buildPackages.shellcheck
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)

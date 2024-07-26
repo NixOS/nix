@@ -190,18 +190,13 @@ This section covers syntax and semantics of the Nix language.
 
 ### Path {#path-literal}
 
-  *Paths* are distinct from strings and can be expressed by path literals such as `./builder.sh`.
-
-  Paths are suitable for referring to local files, and are often preferable over strings.
-  - Path values do not contain trailing slashes, `.` and `..`, as they are resolved when evaluating a path literal.
-  - Path literals are automatically resolved relative to their [base directory](@docroot@/glossary.md#gloss-base-directory).
-  - The files referred to by path values are automatically copied into the Nix store when used in a string interpolation or concatenation.
-  - Tooling can recognize path literals and provide additional features, such as autocompletion, refactoring automation and jump-to-file.
+  *Paths* can be expressed by path literals such as `./builder.sh`.
 
   A path literal must contain at least one slash to be recognised as such.
   For instance, `builder.sh` is not a path:
   it's parsed as an expression that selects the attribute `sh` from the variable `builder`.
 
+  Path literals are resolved relative to their [base directory](@docroot@/glossary.md#gloss-base-directory).
   Path literals may also refer to absolute paths by starting with a slash.
 
   > **Note**
@@ -214,15 +209,6 @@ This section covers syntax and semantics of the Nix language.
   If the first component of a path is a `~`, it is interpreted such that the rest of the path were relative to the user's home directory.
   For example, `~/foo` would be equivalent to `/home/edolstra/foo` for a user whose home directory is `/home/edolstra`.
   Path literals that start with `~` are not allowed in [pure](@docroot@/command-ref/conf-file.md#conf-pure-eval) evaluation.
-
-  Paths can be used in [string interpolation] and string concatenation.
-  For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` from the same directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
-
-  Note that the Nix language assumes that all input files will remain _unchanged_ while evaluating a Nix expression.
-  For example, assume you used a file path in an interpolated string during a `nix repl` session.
-  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents. Use `:r` to reset the repl as needed.
-
-  [store path]: @docroot@/store/store-path.md
 
   Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 
@@ -261,37 +247,76 @@ Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#built
 
 ## Attribute Set {#attrs-literal}
 
-An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
+An attribute set is a collection of name-value-pairs called *attributes*.
 
-An attribute name can be an identifier or a [string](#string).
-An identifier must start with a letter (`a-z`, `A-Z`) or underscore (`_`), and can otherwise contain letters (`a-z`, `A-Z`), numbers (`0-9`), underscores (`_`), apostrophes (`'`), or dashes (`-`).
+Attribute sets are written enclosed in curly brackets (`{ }`).
+Attribute names and attribute values are separated by an equal sign (`=`).
+Each value can be an arbitrary expression, terminated by a semicolon (`;`)
 
-> **Syntax**
->
-> *name* = *identifier* | *string* \
-> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
+An attribute name is a string without context, and is denoted by a [name] (an [identifier](./identifiers.md#identifiers) or [string literal](#string-literal)).
 
-Names and values are separated by an equal sign (`=`).
-Each value is an arbitrary expression terminated by a semicolon (`;`).
+[name]: ./identifiers.md#names
 
 > **Syntax**
 >
-> *attrset* = `{` [ *name* `=` *expr* `;` ]... `}`
+> *attrset* → `{` { *name* `=` *expr* `;` } `}`
 
 Attributes can appear in any order.
-An attribute name may only occur once.
+An attribute name may only occur once in each attribute set.
 
-Example:
+> **Example**
+>
+> This defines an attribute set with attributes named:
+> - `x` with the value `123`, an integer
+> - `text` with the value `"Hello"`, a string
+> - `y` where the value is the result of applying the function `f` to the attribute set `{ bla = 456; }`
+>
+> ```nix
+> {
+>   x = 123;
+>   text = "Hello";
+>   y = f { bla = 456; };
+> }
+> ```
 
-```nix
-{
-  x = 123;
-  text = "Hello";
-  y = f { bla = 456; };
-}
-```
+Attributes in nested attribute sets can be written using *attribute paths*.
 
-This defines a set with attributes named `x`, `text`, `y`.
+> **Syntax**
+>
+> *attrset* → `{` { *attrpath* `=` *expr* `;` } `}`
+
+An attribute path is a dot-separated list of [names][name].
+
+> **Syntax**
+>
+> *attrpath* = *name* { `.` *name* }
+
+<!-- -->
+
+> **Example**
+>
+> ```nix
+> { a.b.c = 1; a.b.d = 2; }
+> ```
+>
+>     {
+>       a = {
+>         b = {
+>           c = 1;
+>           d = 2;
+>         };
+>       };
+>     }
+
+Attribute names can also be set implicitly by using the [`inherit` keyword](#inheriting-attributes).
+
+> **Example**
+>
+> ```nix
+> { inherit (builtins) true; }
+> ```
+>
+>     { true = true; }
 
 Attributes can be accessed with the [`.` operator](./operators.md#attribute-selection).
 

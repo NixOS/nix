@@ -12,9 +12,26 @@
 }:
 
 let
+  prevStdenv = stdenv;
+in
+
+let
   inherit (pkgs) lib;
 
   root = ../.;
+
+  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64
+    then darwinStdenv
+    else prevStdenv;
+
+  # Fix the following error with the default x86_64-darwin SDK:
+  #
+  #     error: aligned allocation function of type 'void *(std::size_t, std::align_val_t)' is only available on macOS 10.13 or newer
+  #
+  # Despite the use of the 10.13 deployment target here, the aligned
+  # allocation function Clang uses with this setting actually works
+  # all the way back to 10.6.
+  darwinStdenv = pkgs.overrideSDK prevStdenv { darwinMinVersion = "10.13"; };
 
   # Nixpkgs implements this by returning a subpath into the fetched Nix sources.
   resolvePath = p: p;
@@ -42,6 +59,19 @@ let
       # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
       fileset = null;
       workDir = null;
+    };
+
+  # Work around weird `--as-needed` linker behavior with BSD, see
+  # https://github.com/mesonbuild/meson/issues/3593
+  bsdNoLinkAsNeeded = finalAttrs: prevAttrs:
+    lib.optionalAttrs stdenv.hostPlatform.isBSD {
+      mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [];
+    };
+
+  miscGoodPractice = finalAttrs: prevAttrs:
+    {
+      strictDeps = prevAttrs.strictDeps or true;
+      enableParallelBuilding = true;
     };
 
 in
@@ -113,5 +143,14 @@ scope: {
 
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
+  mkMesonDerivation = f: let
+    exts = [
+      miscGoodPractice
+      bsdNoLinkAsNeeded
+      localSourceLayer
+    ];
+  in stdenv.mkDerivation
+   (lib.extends
+     (lib.foldr lib.composeExtensions (_: _: {}) exts)
+     f);
 }

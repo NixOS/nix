@@ -28,6 +28,8 @@ deps_public_maybe_subproject = [
 ]
 subdir('build-utils-meson/subprojects')
 
+subdir('build-utils-meson/threads')
+
 subdir('build-utils-meson/export-all-symbols')
 
 add_project_arguments(
@@ -88,11 +90,16 @@ nix_sources = files(
   'store-info.cc',
   'store-repair.cc',
   'store.cc',
-  'unix/daemon.cc',
   'upgrade-nix.cc',
   'verify.cc',
   'why-depends.cc',
 )
+
+if host_machine.system() != 'windows'
+  nix_sources += files(
+    'unix/daemon.cc',
+  )
+endif
 
 nix_sources += [
   gen_header.process('doc/manual/generate-manpage.nix'),
@@ -103,12 +110,6 @@ nix_sources += [
   gen_header.process('profiles.md'),
   gen_header.process('help-stores.md'),
 ]
-
-if host_machine.system() != 'windows'
-  nix_sources += files(
-    'unix/daemon.cc',
-  )
-endif
 
 # The rest of the subdirectories aren't separate components,
 # just source files in another directory, so we process them here.
@@ -146,9 +147,7 @@ nix_store_sources = files(
 # Hurray for Meson list flattening!
 sources = [
   nix_sources,
-  build_remote_sources,
   nix_build_sources,
-  nix_channel_sources,
   unpack_channel_gen,
   nix_collect_garbage_sources,
   nix_copy_closure_sources,
@@ -157,6 +156,13 @@ sources = [
   nix_instantiate_sources,
   nix_store_sources,
 ]
+
+if host_machine.system() != 'windows'
+  sources += [
+    build_remote_sources,
+    nix_channel_sources,
+  ]
+endif
 
 include_dirs = [include_directories('.')]
 

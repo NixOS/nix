@@ -1,5 +1,4 @@
 #include "users.hh"
-#include "config-global.hh"
 #include "globals.hh"
 #include "profiles.hh"
 #include "eval.hh"
@@ -9,7 +8,7 @@ namespace nix {
 
 /* Very hacky way to parse $NIX_PATH, which is colon-separated, but
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
-static Strings parseNixPath(const std::string & s)
+Strings EvalSettings::parseNixPath(const std::string & s)
 {
     Strings res;
 
@@ -49,15 +48,12 @@ EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lo
     : readOnlyMode{readOnlyMode}
     , lookupPathHooks{lookupPathHooks}
 {
-    auto var = getEnv("NIX_PATH");
-    if (var) nixPath = parseNixPath(*var);
-
-    var = getEnv("NIX_ABORT_ON_WARN");
+    auto var = getEnv("NIX_ABORT_ON_WARN");
     if (var && (var == "1" || var == "yes" || var == "true"))
         builtinsAbortOnWarn = true;
 }
 
-Strings EvalSettings::getDefaultNixPath() const
+Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
     auto add = [&](const Path & p, const std::string & s = std::string()) {
@@ -70,11 +66,9 @@ Strings EvalSettings::getDefaultNixPath() const
         }
     };
 
-    if (!restrictEval && !pureEval) {
-        add(getNixDefExpr() + "/channels");
-        add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
-        add(rootChannelsDir());
-    }
+    add(getNixDefExpr() + "/channels");
+    add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
+    add(rootChannelsDir());
 
     return res;
 }

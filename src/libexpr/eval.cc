@@ -1,6 +1,6 @@
 #include "eval.hh"
+#include "eval-gc.hh"
 #include "eval-settings.hh"
-#include "hash.hh"
 #include "primops.hh"
 #include "print-options.hh"
 #include "exit.hh"
@@ -16,7 +16,6 @@
 #include "print.hh"
 #include "filtering-source-accessor.hh"
 #include "memory-source-accessor.hh"
-#include "signals.hh"
 #include "gc-small-vector.hh"
 #include "url.hh"
 #include "fetch-to-store.hh"
@@ -24,7 +23,6 @@
 #include "parser-tab.hh"
 
 #include <algorithm>
-#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -50,6 +48,8 @@
 #  include <gc/gc_allocator.h>
 
 #endif
+
+#include "strings-inline.hh"
 
 using json = nlohmann::json;
 
@@ -214,11 +214,13 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 static constexpr size_t BASE_ENV_SIZE = 128;
 
 EvalState::EvalState(
-    const LookupPath & _lookupPath,
+    const LookupPath & lookupPathFromArguments,
     ref<Store> store,
+    const fetchers::Settings & fetchSettings,
     const EvalSettings & settings,
     std::shared_ptr<Store> buildStore)
-    : settings{settings}
+    : fetchSettings{fetchSettings}
+    , settings{settings}
     , sWith(symbols.create("<with>"))
     , sOutPath(symbols.create("outPath"))
     , sDrvPath(symbols.create("drvPath"))
@@ -326,12 +328,21 @@ EvalState::EvalState(
     vStringSymlink.mkString("symlink");
     vStringUnknown.mkString("unknown");
 
-    /* Initialise the Nix expression search path. */
+    /* Construct the Nix expression search path. */
+    assert(lookupPath.elements.empty());
     if (!settings.pureEval) {
-        for (auto & i : _lookupPath.elements)
+        for (auto & i : lookupPathFromArguments.elements) {
             lookupPath.elements.emplace_back(LookupPath::Elem {i});
-        for (auto & i : settings.nixPath.get())
+        }
+        /* $NIX_PATH overriding regular settings is implemented as a hack in `initGC()` */
+        for (auto & i : settings.nixPath.get()) {
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
+        }
+        if (!settings.restrictEval) {
+            for (auto & i : EvalSettings::getDefaultNixPath()) {
+                lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
+            }
+        }
     }
 
     /* Allow access to all paths in the search path. */
@@ -555,6 +566,54 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .args = v2->primOp()->args,
                 .doc = doc,
             };
+    }
+    if (v.isLambda()) {
+        auto exprLambda = v.payload.lambda.fun;
+
+        std::stringstream s(std::ios_base::out);
+        std::string name;
+        auto pos = positions[exprLambda->getPos()];
+        std::string docStr;
+
+        if (exprLambda->name) {
+            name = symbols[exprLambda->name];
+        }
+
+        if (exprLambda->docComment) {
+            docStr = exprLambda->docComment.getInnerText(positions);
+        }
+
+        if (name.empty()) {
+            s << "Function ";
+        }
+        else {
+            s << "Function `" << name << "`";
+            if (pos)
+                s << "\\\n  … " ;
+            else
+                s << "\\\n";
+        }
+        if (pos) {
+            s << "defined at " << pos;
+        }
+        if (!docStr.empty()) {
+            s << "\n\n";
+        }
+
+        s << docStr;
+
+        s << '\0'; // for making a c string below
+        std::string ss = s.str();
+
+        return Doc {
+            .pos = pos,
+            .name = name,
+            .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
+            .args = {},
+            .doc =
+                // FIXME: this leaks; make the field std::string?
+                strdup(ss.data()),
+        };
     }
     return {};
 }
@@ -1389,6 +1448,22 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     v = *vAttrs;
 }
 
+Symbol ExprSelect::evalExceptFinalSelect(EvalState & state, Env & env, Value & attrs)
+{
+    Value vTmp;
+    Symbol name = getName(attrPath[attrPath.size() - 1], state, env);
+
+    if (attrPath.size() == 1) {
+        e->eval(state, env, vTmp);
+    } else {
+        ExprSelect init(*this);
+        init.attrPath.pop_back();
+        init.eval(state, env, vTmp);
+    }
+    attrs = vTmp;
+    return name;
+}
+
 
 void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
 {
@@ -1794,9 +1869,24 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
-        std::ostringstream out;
-        cond->show(state.symbols, out);
-        state.error<AssertionError>("assertion '%1%' failed", out.str()).atPos(pos).withFrame(env, *this).debugThrow();
+        auto exprStr = ({
+            std::ostringstream out;
+            cond->show(state.symbols, out);
+            out.str();
+        });
+
+        if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
+            try {
+                Value v1; eq->e1->eval(state, env, v1);
+                Value v2; eq->e2->eval(state, env, v2);
+                state.assertEqValues(v1, v2, eq->pos, "in an equality assertion");
+            } catch (AssertionError & e) {
+                e.addTrace(state.positions[pos], "while evaluating the condition of the assertion '%s'", exprStr);
+                throw;
+            }
+        }
+
+        state.error<AssertionError>("assertion '%1%' failed", exprStr).atPos(pos).withFrame(env, *this).debugThrow();
     }
     body->eval(state, env, v);
 }
@@ -2453,6 +2543,214 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
 }
 
 
+
+// NOTE: This implementation must match eqValues!
+// We accept this burden because informative error messages for
+// `assert a == b; x` are critical for our users' testing UX.
+void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx)
+{
+    // This implementation must match eqValues.
+    forceValue(v1, pos);
+    forceValue(v2, pos);
+
+    if (&v1 == &v2)
+        return;
+
+    // Special case type-compatibility between float and int
+    if ((v1.type() == nInt || v1.type() == nFloat) && (v2.type() == nInt || v2.type() == nFloat)) {
+        if (eqValues(v1, v2, pos, errorCtx)) {
+            return;
+        } else {
+            error<AssertionError>(
+                "%s with value '%s' is not equal to %s with value '%s'",
+                showType(v1),
+                ValuePrinter(*this, v1, errorPrintOptions),
+                showType(v2),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+    }
+
+    if (v1.type() != v2.type()) {
+        error<AssertionError>(
+            "%s of value '%s' is not equal to %s of value '%s'",
+            showType(v1),
+            ValuePrinter(*this, v1, errorPrintOptions),
+            showType(v2),
+            ValuePrinter(*this, v2, errorPrintOptions))
+            .debugThrow();
+    }
+
+    switch (v1.type()) {
+    case nInt:
+        if (v1.integer() != v2.integer()) {
+            error<AssertionError>("integer '%d' is not equal to integer '%d'", v1.integer(), v2.integer()).debugThrow();
+        }
+        return;
+
+    case nBool:
+        if (v1.boolean() != v2.boolean()) {
+            error<AssertionError>(
+                "boolean '%s' is not equal to boolean '%s'",
+                ValuePrinter(*this, v1, errorPrintOptions),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+        return;
+
+    case nString:
+        if (strcmp(v1.c_str(), v2.c_str()) != 0) {
+            error<AssertionError>(
+                "string '%s' is not equal to string '%s'",
+                ValuePrinter(*this, v1, errorPrintOptions),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+        return;
+
+    case nPath:
+        if (v1.payload.path.accessor != v2.payload.path.accessor) {
+            error<AssertionError>(
+                "path '%s' is not equal to path '%s' because their accessors are different",
+                ValuePrinter(*this, v1, errorPrintOptions),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+        if (strcmp(v1.payload.path.path, v2.payload.path.path) != 0) {
+            error<AssertionError>(
+                "path '%s' is not equal to path '%s'",
+                ValuePrinter(*this, v1, errorPrintOptions),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+        return;
+
+    case nNull:
+        return;
+
+    case nList:
+        if (v1.listSize() != v2.listSize()) {
+            error<AssertionError>(
+                "list of size '%d' is not equal to list of size '%d', left hand side is '%s', right hand side is '%s'",
+                v1.listSize(),
+                v2.listSize(),
+                ValuePrinter(*this, v1, errorPrintOptions),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+        for (size_t n = 0; n < v1.listSize(); ++n) {
+            try {
+                assertEqValues(*v1.listElems()[n], *v2.listElems()[n], pos, errorCtx);
+            } catch (Error & e) {
+                e.addTrace(positions[pos], "while comparing list element %d", n);
+                throw;
+            }
+        }
+        return;
+
+    case nAttrs: {
+        if (isDerivation(v1) && isDerivation(v2)) {
+            auto i = v1.attrs()->get(sOutPath);
+            auto j = v2.attrs()->get(sOutPath);
+            if (i && j) {
+                try {
+                    assertEqValues(*i->value, *j->value, pos, errorCtx);
+                    return;
+                } catch (Error & e) {
+                    e.addTrace(positions[pos], "while comparing a derivation by its '%s' attribute", "outPath");
+                    throw;
+                }
+                assert(false);
+            }
+        }
+
+        if (v1.attrs()->size() != v2.attrs()->size()) {
+            error<AssertionError>(
+                "attribute names of attribute set '%s' differs from attribute set '%s'",
+                ValuePrinter(*this, v1, errorPrintOptions),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+
+        // Like normal comparison, we compare the attributes in non-deterministic Symbol index order.
+        // This function is called when eqValues has found a difference, so to reliably
+        // report about its result, we should follow in its literal footsteps and not
+        // try anything fancy that could lead to an error.
+        Bindings::const_iterator i, j;
+        for (i = v1.attrs()->begin(), j = v2.attrs()->begin(); i != v1.attrs()->end(); ++i, ++j) {
+            if (i->name != j->name) {
+                // A difference in a sorted list means that one attribute is not contained in the other, but we don't
+                // know which. Let's find out. Could use <, but this is more clear.
+                if (!v2.attrs()->get(i->name)) {
+                    error<AssertionError>(
+                        "attribute name '%s' is contained in '%s', but not in '%s'",
+                        symbols[i->name],
+                        ValuePrinter(*this, v1, errorPrintOptions),
+                        ValuePrinter(*this, v2, errorPrintOptions))
+                        .debugThrow();
+                }
+                if (!v1.attrs()->get(j->name)) {
+                    error<AssertionError>(
+                        "attribute name '%s' is missing in '%s', but is contained in '%s'",
+                        symbols[j->name],
+                        ValuePrinter(*this, v1, errorPrintOptions),
+                        ValuePrinter(*this, v2, errorPrintOptions))
+                        .debugThrow();
+                }
+                assert(false);
+            }
+            try {
+                assertEqValues(*i->value, *j->value, pos, errorCtx);
+            } catch (Error & e) {
+                // The order of traces is reversed, so this presents as
+                //  where left hand side is
+                //    at <pos>
+                //  where right hand side is
+                //    at <pos>
+                //  while comparing attribute '<name>'
+                if (j->pos != noPos)
+                    e.addTrace(positions[j->pos], "where right hand side is");
+                if (i->pos != noPos)
+                    e.addTrace(positions[i->pos], "where left hand side is");
+                e.addTrace(positions[pos], "while comparing attribute '%s'", symbols[i->name]);
+                throw;
+            }
+        }
+        return;
+    }
+
+    case nFunction:
+        error<AssertionError>("distinct functions and immediate comparisons of identical functions compare as unequal")
+            .debugThrow();
+
+    case nExternal:
+        if (!(*v1.external() == *v2.external())) {
+            error<AssertionError>(
+                "external value '%s' is not equal to external value '%s'",
+                ValuePrinter(*this, v1, errorPrintOptions),
+                ValuePrinter(*this, v2, errorPrintOptions))
+                .debugThrow();
+        }
+        return;
+
+    case nFloat:
+        // !!!
+        if (!(v1.fpoint() == v2.fpoint())) {
+            error<AssertionError>("float '%f' is not equal to float '%f'", v1.fpoint(), v2.fpoint()).debugThrow();
+        }
+        return;
+
+    case nThunk: // Must not be left by forceValue
+        assert(false);
+    default: // Note that we pass compiler flags that should make `default:` unreachable.
+        // Also note that this probably ran after `eqValues`, which implements
+        // the same logic more efficiently (without having to unwind stacks),
+        // so maybe `assertEqValues` and `eqValues` are out of sync. Check it for solutions.
+        error<EvalError>("assertEqValues: cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).panic();
+    }
+}
+
+// This implementation must match assertEqValues
 bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx)
 {
     forceValue(v1, pos);
@@ -2526,11 +2824,13 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return *v1.external() == *v2.external();
 
         case nFloat:
+            // !!!
             return v1.fpoint() == v2.fpoint();
 
         case nThunk: // Must not be left by forceValue
-        default:
-            error<EvalError>("cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).debugThrow();
+            assert(false);
+        default: // Note that we pass compiler flags that should make `default:` unreachable.
+            error<EvalError>("eqValues: cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).panic();
     }
 }
 
@@ -2588,6 +2888,11 @@ void EvalState::printStatistics()
 #if HAVE_BOEHMGC
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
+    double gcFullOnlyTime = ({
+        auto ms = GC_get_full_gc_total_time();
+        ms * 0.001;
+    });
+    auto gcCycles = getGCCycles();
 #endif
 
     auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
@@ -2598,6 +2903,13 @@ void EvalState::printStatistics()
 #ifndef _WIN32 // TODO implement
     topObj["cpuTime"] = cpuTime;
 #endif
+    topObj["time"] = {
+        {"cpu", cpuTime},
+#ifdef HAVE_BOEHMGC
+        {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
+        {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
+#endif
+    };
     topObj["envs"] = {
         {"number", nrEnvs},
         {"elements", nrValuesInEnvs},
@@ -2639,6 +2951,7 @@ void EvalState::printStatistics()
     topObj["gc"] = {
         {"heapSize", heapSize},
         {"totalBytes", totalBytes},
+        {"cycles", gcCycles},
     };
 #endif
 
@@ -2870,13 +3183,37 @@ Expr * EvalState::parse(
     const SourcePath & basePath,
     std::shared_ptr<StaticEnv> & staticEnv)
 {
-    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, rootFS, exprSymbols);
+    DocCommentMap tmpDocComments; // Only used when not origin is not a SourcePath
+    DocCommentMap *docComments = &tmpDocComments;
+
+    if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
+        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
+        docComments = &it->second;
+    }
+
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, *docComments, rootFS, exprSymbols);
 
     result->bindVars(*this, staticEnv);
 
     return result;
 }
 
+DocComment EvalState::getDocCommentForPos(PosIdx pos)
+{
+    auto pos2 = positions[pos];
+    auto path = pos2.getSourcePath();
+    if (!path)
+        return {};
+
+    auto table = positionToDocComment.find(*path);
+    if (table == positionToDocComment.end())
+        return {};
+
+    auto it = table->second.find(pos);
+    if (it == table->second.end())
+        return {};
+    return it->second;
+}
 
 std::string ExternalValueBase::coerceToString(EvalState & state, const PosIdx & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
@@ -2886,7 +3223,7 @@ std::string ExternalValueBase::coerceToString(EvalState & state, const PosIdx & 
 }
 
 
-bool ExternalValueBase::operator==(const ExternalValueBase & b) const
+bool ExternalValueBase::operator==(const ExternalValueBase & b) const noexcept
 {
     return false;
 }

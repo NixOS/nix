@@ -95,7 +95,7 @@ struct AttrDb
     {
         try {
             auto state(_state->lock());
-            if (!failed)
+            if (!failed && state->txn->active)
                 state->txn->commit();
             state->txn.reset();
         } catch (...) {
@@ -225,7 +225,7 @@ struct AttrDb
                 (key.first)
                 (symbols[key.second])
                 (AttrType::ListOfStrings)
-                (concatStringsSep("\t", l)).exec();
+                (dropEmptyInitThenConcatStringsSep("\t", l)).exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -435,12 +435,12 @@ std::vector<Symbol> AttrCursor::getAttrPath(Symbol name) const
 
 std::string AttrCursor::getAttrPathStr() const
 {
-    return concatStringsSep(".", root->state.symbols.resolve(getAttrPath()));
+    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath()));
 }
 
 std::string AttrCursor::getAttrPathStr(Symbol name) const
 {
-    return concatStringsSep(".", root->state.symbols.resolve(getAttrPath(name)));
+    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath(name)));
 }
 
 Value & AttrCursor::forceValue()

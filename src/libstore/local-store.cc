@@ -51,8 +51,19 @@
 
 #include <sqlite3.h>
 
+#include "strings.hh"
+
 
 namespace nix {
+
+LocalStoreConfig::LocalStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const Params & params)
+    : StoreConfig(params)
+    , LocalFSStoreConfig(authority, params)
+{
+}
 
 std::string LocalStoreConfig::doc()
 {
@@ -181,10 +192,13 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
     }
 }
 
-LocalStore::LocalStore(const Params & params)
+LocalStore::LocalStore(
+    std::string_view scheme,
+    PathView path,
+    const Params & params)
     : StoreConfig(params)
-    , LocalFSStoreConfig(params)
-    , LocalStoreConfig(params)
+    , LocalFSStoreConfig(path, params)
+    , LocalStoreConfig(scheme, path, params)
     , Store(params)
     , LocalFSStore(params)
     , dbDir(stateDir + "/db")
@@ -463,19 +477,8 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
-LocalStore::LocalStore(
-    std::string_view scheme,
-    PathView path,
-    const Params & _params)
-    : LocalStore([&]{
-        // Default `?root` from `path` if non set
-        if (!path.empty() && _params.count("root") == 0) {
-            auto params = _params;
-            params.insert_or_assign("root", std::string { path });
-            return params;
-        }
-        return _params;
-    }())
+LocalStore::LocalStore(const Params & params)
+    : LocalStore("local", "", params)
 {
 }
 

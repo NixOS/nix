@@ -2,6 +2,7 @@
 ///@file
 
 #include "config.hh"
+#include "ref.hh"
 
 namespace nix {
 
@@ -42,9 +43,11 @@ struct EvalSettings : Config
 
     bool & readOnlyMode;
 
-    Strings getDefaultNixPath() const;
+    static Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
+
+    static Strings parseNixPath(const std::string & s);
 
     static std::string resolvePseudoUrl(std::string_view url);
 
@@ -62,7 +65,7 @@ struct EvalSettings : Config
           extern "C" typedef void (*ValueInitialiser) (EvalState & state, Value & v);
           ```
 
-          The [Nix C++ API documentation](@docroot@/contributing/documentation.md#api-documentation) has more details on evaluator internals.
+          The [Nix C++ API documentation](@docroot@/development/documentation.md#api-documentation) has more details on evaluator internals.
 
         - `builtins.exec` *arguments*
 
@@ -70,7 +73,7 @@ struct EvalSettings : Config
     )"};
 
     Setting<Strings> nixPath{
-        this, getDefaultNixPath(), "nix-path",
+        this, {}, "nix-path",
         R"(
           List of search paths to use for [lookup path](@docroot@/language/constructs/lookup-path.md) resolution.
           This setting determines the value of

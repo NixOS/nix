@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cinttypes>
-#include <numeric>
+#include <cstdint>
 #include <vector>
 
 #include "pos-idx.hh"

@@ -190,11 +190,11 @@ struct VirtualStackAllocator {
 class DefaultStackAllocator : public StackAllocator {
     boost::coroutines2::default_stack stack;
 
-    boost::context::stack_context allocate() {
+    boost::context::stack_context allocate() override {
         return stack.allocate();
     }
 
-    void deallocate(boost::context::stack_context sctx) {
+    void deallocate(boost::context::stack_context sctx) override {
         stack.deallocate(sctx);
     }
 };
