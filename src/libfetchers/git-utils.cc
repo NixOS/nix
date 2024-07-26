@@ -131,7 +131,7 @@ T peelObject(git_repository * repo, git_object * obj, git_object_t type)
     T obj2;
     if (git_object_peel((git_object * *) (typename T::pointer *) Setter(obj2), obj, type)) {
         auto err = git_error_last();
-        throw Error("peeling Git object '%s': %s", git_object_id(obj), err->message);
+        throw Error("peeling Git object '%s': %s", *git_object_id(obj), err->message);
     }
     return obj2;
 }
