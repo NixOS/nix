@@ -260,7 +260,7 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
                 });
             }
 
-            if (!*coro) { abort(); }
+            if (!*coro) { unreachable(); }
 
             if (!cur.empty()) {
                 CoroutineContext ctx;
@@ -271,12 +271,12 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
         void finish() override
         {
             if (!coro) return;
-            if (!*coro) abort();
+            if (!*coro) unreachable();
             {
                 CoroutineContext ctx;
                 (*coro)(true);
             }
-            if (*coro) abort();
+            if (*coro) unreachable();
         }
     };
 
@@ -316,7 +316,7 @@ std::unique_ptr<Source> sinkToSource(
                 });
             }
 
-            if (!*coro) { eof(); abort(); }
+            if (!*coro) { eof(); unreachable(); }
 
             if (pos == cur.size()) {
                 if (!cur.empty()) {

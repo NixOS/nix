@@ -33,7 +33,7 @@ Sink & operator << (Sink & sink, const Logger::Fields & fields)
             sink << f.i;
         else if (f.type == Logger::Field::tString)
             sink << f.s;
-        else abort();
+        else unreachable();
     }
     return sink;
 }

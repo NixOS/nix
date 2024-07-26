@@ -7,6 +7,7 @@
 
 #include "types.hh"
 #include "chunked-vector.hh"
+#include "error.hh"
 
 namespace nix {
 
@@ -113,7 +114,7 @@ public:
     SymbolStr operator[](Symbol s) const
     {
         if (s.id == 0 || s.id > store.size())
-            abort();
+            unreachable();
         return SymbolStr(store[s.id - 1]);
     }
 

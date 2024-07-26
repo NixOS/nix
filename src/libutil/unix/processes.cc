@@ -182,7 +182,7 @@ static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 #endif
     if (pid != 0) return pid;
     fun();
-    abort();
+    unreachable();
 }
 
 
