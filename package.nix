@@ -216,7 +216,8 @@ in {
   ] ++ lib.optional stdenv.hostPlatform.isStatic unixtools.hexdump
   ;
 
-  buildInputs = lib.optionals doBuild [
+  buildInputs = lib.optionals doBuild (
+  [
     brotli
     bzip2
     curl
@@ -237,16 +238,14 @@ in {
     ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid
     # There have been issues building these dependencies
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
-      (aws-sdk-cpp.override {
-        apis = ["s3" "transfer"];
-        customMemoryManagement = false;
-      })
-  ;
+      aws-sdk-cpp
+  );
 
-  propagatedBuildInputs = [
+  propagatedBuildInputs = lib.optionals doBuild ([
     boost
     nlohmann_json
-  ] ++ lib.optional enableGC boehmgc;
+  ] ++ lib.optional enableGC boehmgc
+  );
 
   dontBuild = !attrs.doBuild;
   doCheck = attrs.doCheck;

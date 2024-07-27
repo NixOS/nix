@@ -79,6 +79,15 @@ scope: {
   inherit stdenv versionSuffix;
   version = lib.fileContents ../.version + versionSuffix;
 
+  aws-sdk-cpp = (pkgs.aws-sdk-cpp.override {
+    apis = [ "s3" "transfer" ];
+    customMemoryManagement = false;
+  }).overrideAttrs {
+    # only a stripped down version is built, which takes a lot less resources
+    # to build, so we don't need a "big-parallel" machine.
+    requiredSystemFeatures = [ ];
+  };
+
   libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";
     src = pkgs.fetchurl {
