@@ -24,8 +24,8 @@ struct GCOptions
      *
      * - `gcDeleteDead`: actually delete the latter set.
      *
-     * - `gcDeleteSpecific`: delete the paths listed in
-     *    `pathsToDelete`, insofar as they are not reachable.
+     * - `gcDeleteSpecific`: delete all the paths, and fail if one of them
+     *   isn't dead.
      */
     typedef enum {
         gcReturnLive,
@@ -45,7 +45,8 @@ struct GCOptions
     bool ignoreLiveness{false};
 
     /**
-     * For `gcDeleteSpecific`, the paths to delete.
+     * The paths from which to delete.
+     * If empty, and `action` is not `gcDeleteSpecific`, act on the whole store.
      */
     StorePathSet pathsToDelete;
 
