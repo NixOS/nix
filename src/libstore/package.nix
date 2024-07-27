@@ -66,10 +66,7 @@ mkMesonDerivation (finalAttrs: {
   ] ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
     # There have been issues building these dependencies
     ++ lib.optional (stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin))
-      (aws-sdk-cpp.override {
-        apis = ["s3" "transfer"];
-        customMemoryManagement = false;
-      })
+      aws-sdk-cpp
   ;
 
   propagatedBuildInputs = [
