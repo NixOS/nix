@@ -143,6 +143,7 @@
 
           nix_noTests = final.nix.override {
             doInstallCheck = false;
+            doCheck = false;
           };
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
