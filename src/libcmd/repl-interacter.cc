@@ -35,6 +35,7 @@ void sigintHandler(int signo)
 
 static detail::ReplCompleterMixin * curRepl; // ugly
 
+#ifndef USE_READLINE
 static char * completionCallback(char * s, int * match)
 {
     auto possible = curRepl->completePrefix(s);
@@ -101,6 +102,7 @@ static int listPossibleCallback(char * s, char *** avp)
 
     return ac;
 }
+#endif
 
 ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleterMixin * repl)
 {
