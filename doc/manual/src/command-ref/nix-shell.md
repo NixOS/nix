@@ -297,3 +297,9 @@ with import <nixpkgs> {};
 
 runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
 ```
+
+Aside from the very first line, which is a directive to the operating system,
+the `#! nix-shell` lines do not need to be at the beginning of the file. This
+can be useful for working around syntactic restrictions in languages like
+ECMAScript, Erlang, PHP, and Ruby, where the `#! nix-shell` lines must be
+hidden inside comments.
