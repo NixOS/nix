@@ -10,8 +10,6 @@
 #include "compression.hh"
 #include "filetransfer.hh"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch-enum"
 #include <aws/core/Aws.h>
 #include <aws/core/VersionConfig.h>
 #include <aws/core/auth/AWSCredentialsProvider.h>
@@ -27,7 +25,6 @@
 #include <aws/s3/model/ListObjectsRequest.h>
 #include <aws/s3/model/PutObjectRequest.h>
 #include <aws/transfer/TransferManager.h>
-#pragma GCC diagnostic pop
 
 using namespace Aws::Transfer;
 
