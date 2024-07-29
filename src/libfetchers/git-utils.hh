@@ -102,6 +102,7 @@ struct GitRepo
     /**
      * If the specified Git object is a directory with a single entry
      * that is a directory, return the ID of that object.
+     * Otherwise, return the passed ID unchanged.
      */
     virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
