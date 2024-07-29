@@ -77,7 +77,7 @@ TEST_F(GitUtilsTest, sink_basic)
 
     // sink->createHardlink("foo-1.1/links/foo-2", CanonPath("foo-1.1/hello"));
 
-    auto result = sink->sync();
+    auto result = repo->dereferenceSingletonDirectory(sink->sync());
     auto accessor = repo->getAccessor(result, false);
     auto entries = accessor->readDirectory(CanonPath::root);
     ASSERT_EQ(entries.size(), 5);
@@ -103,7 +103,7 @@ TEST_F(GitUtilsTest, sink_hardlink)
         sink->createHardlink(CanonPath("foo-1.1/link"), CanonPath("hello"));
         FAIL() << "Expected an exception";
     } catch (const nix::Error & e) {
-        ASSERT_THAT(e.msg(), testing::HasSubstr("invalid hard link target"));
+        ASSERT_THAT(e.msg(), testing::HasSubstr("cannot find hard link target"));
         ASSERT_THAT(e.msg(), testing::HasSubstr("/hello"));
         ASSERT_THAT(e.msg(), testing::HasSubstr("foo-1.1/link"));
     }

@@ -167,7 +167,8 @@ DownloadTarballResult downloadTarball(
                 TarArchive{path};
           })
         : TarArchive{*source};
-    auto parseSink = getTarballCache()->getFileSystemObjectSink();
+    auto tarballCache = getTarballCache();
+    auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
 
     act.reset();
@@ -182,7 +183,8 @@ DownloadTarballResult downloadTarball(
         infoAttrs = cached->value;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
-        infoAttrs.insert_or_assign("treeHash", parseSink->sync().gitRev());
+        infoAttrs.insert_or_assign("treeHash",
+            tarballCache->dereferenceSingletonDirectory(parseSink->sync()).gitRev());
         infoAttrs.insert_or_assign("lastModified", uint64_t(lastModified));
         if (res->immutableUrl)
             infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
