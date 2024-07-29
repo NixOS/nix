@@ -15,13 +15,12 @@
 
 #if __linux__
 # include <mutex>
-# include <sys/resource.h>
 # include "cgroup.hh"
 # include "namespaces.hh"
 #endif
 
 #ifndef _WIN32
-# include <sys/mount.h>
+# include <sys/resource.h>
 #endif
 
 namespace nix {
