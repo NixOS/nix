@@ -70,7 +70,10 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
         inline static const std::set<long> successfulStatuses {200, 201, 204, 206, 304, 0 /* other protocol */};
+
         /* Get the HTTP status code, or 0 for other protocols. */
         long getHTTPStatus()
         {
@@ -372,10 +375,14 @@ struct curlFileTransfer : public FileTransfer
 
         void finish(CURLcode code)
         {
+            auto finishTime = std::chrono::steady_clock::now();
+
             auto httpStatus = getHTTPStatus();
 
-            debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
-                request.verb(), request.uri, code, httpStatus, result.bodySize);
+            debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
+                request.verb(), request.uri, code, httpStatus, result.bodySize,
+                std::chrono::duration_cast<std::chrono::milliseconds>(finishTime - startTime).count() / 1000.0f
+                );
 
             appendCurrentUrl();
 
@@ -850,8 +857,10 @@ void FileTransfer::download(
            buffer). We don't wait forever to prevent stalling the
            download thread. (Hopefully sleeping will throttle the
            sender.) */
-        if (state->data.size() > 1024 * 1024) {
+        if (state->data.size() > fileTransferSettings.downloadBufferSize) {
             debug("download buffer is full; going to sleep");
+            static bool haveWarned = false;
+            warnOnce(haveWarned, "download buffer is full; consider increasing the 'download-buffer-size' setting");
             state.wait_for(state->request, std::chrono::seconds(10));
         }
 
