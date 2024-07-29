@@ -98,6 +98,17 @@ struct GitRepo
      * serialisation. This is memoised on-disk.
      */
     virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
+
+    /**
+     * If the specified Git object is a directory with a single entry
+     * that is a directory or a non-executable regular file, return
+     * the ID of that object.
+     *
+     * Note: We don't do this for executable files because they don't
+     * have a tree hash in the Git object model that distinguishes
+     * them from non-executable files.
+     */
+    virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
 
 ref<GitRepo> getTarballCache();

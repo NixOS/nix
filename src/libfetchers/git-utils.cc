@@ -486,6 +486,24 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         return narHash;
     }
+
+    Hash dereferenceSingletonDirectory(const Hash & oid_) override
+    {
+        auto oid = hashToOID(oid_);
+
+        /* If the root directory contains  */
+        auto _tree = lookupObject(*this, oid, GIT_OBJECT_TREE);
+        auto tree = (const git_tree *) &*_tree;
+
+        if (git_tree_entrycount(tree) == 1) {
+            auto entry = git_tree_entry_byindex(tree, 0);
+            auto mode = git_tree_entry_filemode(entry);
+            if (mode == GIT_FILEMODE_BLOB || mode == GIT_FILEMODE_TREE)
+                oid = *git_tree_entry_id(entry);
+        }
+
+        return toHash(oid);
+    }
 };
 
 ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare)
@@ -990,21 +1008,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         updateBuilders({});
 
         auto [oid, _name] = popBuilder();
-
-        /* If the root directory contains a single entry that is a
-           directory or a non-executable regular file, return that as
-           the top-level object. We don't do this for executables
-           because they don't have a tree hash in the Git object
-           model. */
-        auto _tree = lookupObject(*repo, oid, GIT_OBJECT_TREE);
-        auto tree = (const git_tree *) &*_tree;
-
-        if (git_tree_entrycount(tree) == 1) {
-            auto entry = git_tree_entry_byindex(tree, 0);
-            auto mode = git_tree_entry_filemode(entry);
-            if (mode == GIT_FILEMODE_BLOB || mode == GIT_FILEMODE_TREE)
-                oid = *git_tree_entry_id(entry);
-        }
 
         return toHash(oid);
     }

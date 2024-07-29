@@ -255,11 +255,12 @@ struct GitArchiveInputScheme : InputScheme
         });
 
         TarArchive archive { *source };
-        auto parseSink = getTarballCache()->getFileSystemObjectSink();
+        auto tarballCache = getTarballCache();
+        auto parseSink = tarballCache->getFileSystemObjectSink();
         auto lastModified = unpackTarfileToSink(archive, *parseSink);
 
         TarballInfo tarballInfo {
-            .treeHash = parseSink->sync(),
+            .treeHash = tarballCache->dereferenceSingletonDirectory(parseSink->sync()),
             .lastModified = lastModified
         };
 
