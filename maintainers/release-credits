@@ -148,12 +148,19 @@ handle_to_name_cache.save()
 
 entries = list()
 
+def is_bot(handle):
+    return handle.endswith("[bot]")
+
 for handle in handles:
     name = handle_to_name_cache.values[handle]
     if name is None:
         # This way it looks more regular
         name = handle
-    entries += [ f"- {name} [**(@{handle})**](https://github.com/{handle})" ]
+
+    # Note to bots: I'm only doing this because it would distract humans, and
+    # therefore delay your creation. I'm sorry; it's for your benefit.
+    if not is_bot(handle):
+        entries += [ f"- {name} [**(@{handle})**](https://github.com/{handle})" ]
 
 def shuffle(entries):
     salt = os.urandom(16)
