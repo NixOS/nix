@@ -216,7 +216,7 @@ void Worker::childStarted(GoalPtr goal, const std::set<MuxablePipePollState::Com
             nrLocalBuilds++;
             break;
         default:
-            abort();
+            unreachable();
         }
     }
 }
@@ -239,7 +239,7 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
             nrLocalBuilds--;
             break;
         default:
-            abort();
+            unreachable();
         }
     }
 

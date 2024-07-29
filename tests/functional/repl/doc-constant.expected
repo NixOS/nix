@@ -1,23 +1,27 @@
 Nix <nix version>
 Type :? for help.
+
+nix-repl> :l doc-comments.nix
 Added <number omitted> variables.
 
+nix-repl> :doc constant
 error: value does not have documentation
 
-Attribute version
+nix-repl> :doc lib.version
+Attribute `version`
 
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:30:3
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:30:3
 
-    Immovably fixed.
+Immovably fixed.
 
-Attribute empty
+nix-repl> :doc lib.attr.empty
+Attribute `empty`
 
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:33:3
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:33:3
 
-    Unchangeably constant.
+Unchangeably constant.
 
+nix-repl> :doc lib.attr.undocument
 error:
        … while evaluating the attribute 'attr.undocument'
          at /path/to/tests/functional/repl/doc-comments.nix:33:3:
@@ -32,59 +36,65 @@ error:
              | ^
        Did you mean undocumented?
 
-Attribute constant
+nix-repl> :doc (import ./doc-comments.nix).constant
+Attribute `constant`
 
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:27:3
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:27:3
 
-    Firmly rigid.
+Firmly rigid.
 
-Attribute version
+nix-repl> :doc (import ./doc-comments.nix).lib.version
+Attribute `version`
 
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:30:3
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:30:3
 
-    Immovably fixed.
+Immovably fixed.
 
-Attribute empty
+nix-repl> :doc (import ./doc-comments.nix).lib.attr.empty
+Attribute `empty`
 
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:33:3
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:33:3
 
-    Unchangeably constant.
+Unchangeably constant.
 
-Attribute undocumented
+nix-repl> :doc (import ./doc-comments.nix).lib.attr.undocumented
+Attribute `undocumented`
 
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:35:3
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:35:3
 
-    No documentation found.
+No documentation found.
 
+nix-repl> :doc missing
 error: undefined variable 'missing'
        at «string»:1:1:
             1| missing
              | ^
 
+nix-repl> :doc constanz
 error: undefined variable 'constanz'
        at «string»:1:1:
             1| constanz
              | ^
 
+nix-repl> :doc missing.attr
 error: undefined variable 'missing'
        at «string»:1:1:
             1| missing.attr
              | ^
 
+nix-repl> :doc lib.missing
 error: attribute 'missing' missing
        at «string»:1:1:
             1| lib.missing
              | ^
 
+nix-repl> :doc lib.missing.attr
 error: attribute 'missing' missing
        at «string»:1:1:
             1| lib.missing.attr
              | ^
 
+nix-repl> :doc lib.attr.undocumental
 error:
        … while evaluating the attribute 'attr.undocumental'
          at /path/to/tests/functional/repl/doc-comments.nix:33:3:
@@ -98,5 +108,3 @@ error:
             1| lib.attr.undocumental
              | ^
        Did you mean undocumented?
-
-

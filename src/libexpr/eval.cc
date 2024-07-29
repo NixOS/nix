@@ -149,7 +149,7 @@ std::string_view showType(ValueType type, bool withArticle)
         case nFloat: return WA("a", "float");
         case nThunk: return WA("a", "thunk");
     }
-    abort();
+    unreachable();
 }
 
 
@@ -780,7 +780,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
             case ReplExitStatus::Continue:
                 break;
             default:
-                abort();
+                unreachable();
         }
     }
 }
@@ -1149,7 +1149,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
 
 void Expr::eval(EvalState & state, Env & env, Value & v)
 {
-    abort();
+    unreachable();
 }
 
 
@@ -1582,7 +1582,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                 .withFrame(*fun.payload.lambda.env, lambda)
                                 .debugThrow();
                         }
-                    abort(); // can't happen
+                    unreachable();
                 }
             }
 

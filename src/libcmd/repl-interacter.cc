@@ -19,6 +19,7 @@ extern "C" {
 #include "repl-interacter.hh"
 #include "file-system.hh"
 #include "repl.hh"
+#include "environment-variables.hh"
 
 namespace nix {
 
@@ -34,6 +35,7 @@ void sigintHandler(int signo)
 
 static detail::ReplCompleterMixin * curRepl; // ugly
 
+#ifndef USE_READLINE
 static char * completionCallback(char * s, int * match)
 {
     auto possible = curRepl->completePrefix(s);
@@ -100,6 +102,7 @@ static int listPossibleCallback(char * s, char *** avp)
 
     return ac;
 }
+#endif
 
 ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleterMixin * repl)
 {
@@ -175,10 +178,23 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
         return true;
     }
 
+    // editline doesn't echo the input to the output when non-interactive, unlike readline
+    // this results in a different behavior when running tests. The echoing is
+    // quite useful for reading the test output, so we add it here.
+    if (auto e = getEnv("_NIX_TEST_REPL_ECHO"); s && e && *e == "1")
+    {
+#ifndef USE_READLINE
+        // This is probably not right for multi-line input, but we don't use that
+        // in the characterisation tests, so it's fine.
+        std::cout << promptForType(promptType) << s << std::endl;
+#endif
+    }
+
     if (!s)
         return false;
     input += s;
     input += '\n';
+
     return true;
 }
 

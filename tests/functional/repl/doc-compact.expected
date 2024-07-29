@@ -1,11 +1,11 @@
 Nix <nix version>
 Type :? for help.
+
+nix-repl> :l doc-comments.nix
 Added <number omitted> variables.
 
-Function compact
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:18:20
+nix-repl> :doc compact
+Function `compact`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:18:20
 
-    boom
-
-
+boom

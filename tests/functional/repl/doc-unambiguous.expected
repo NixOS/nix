@@ -1,11 +1,11 @@
 Nix <nix version>
 Type :? for help.
+
+nix-repl> :l doc-comments.nix
 Added <number omitted> variables.
 
-Function unambiguous
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:24:5
+nix-repl> :doc unambiguous
+Function `unambiguous`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:24:5
 
-    Very close
-
-
+Very close

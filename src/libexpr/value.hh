@@ -285,7 +285,7 @@ public:
         if (invalidIsThunk)
             return nThunk;
         else
-            abort();
+            unreachable();
     }
 
     inline void finishValue(InternalType newType, Payload newPayload)

@@ -559,7 +559,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                        non-blocking flag from the server socket, so
                        explicitly make it blocking. */
                     if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
-                        abort();
+                        panic("Could not set non-blocking flag on client socket");
 
                     while (true) {
                         try {
