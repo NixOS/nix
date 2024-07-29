@@ -62,6 +62,7 @@ endif
 boost = dependency(
   'boost',
   modules : ['context', 'coroutine'],
+  include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
