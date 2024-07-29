@@ -560,10 +560,10 @@ static RegisterPrimOp primop_fetchTarball({
       Download the specified URL, unpack it and return the path of the
       unpacked tree. The file must be a tape archive (`.tar`) compressed
       with `gzip`, `bzip2` or `xz`. If the tarball consists of a
-      single directory or non-executable file, then the top-level path
-      component of the files in the tarball is removed. The typical
-      use of the function is to obtain external Nix expression
-      dependencies, such as a particular version of Nixpkgs, e.g.
+      single directory, then the top-level path component of the files
+      in the tarball is removed. The typical use of the function is to
+      obtain external Nix expression dependencies, such as a
+      particular version of Nixpkgs, e.g.
 
       ```nix
       with import (fetchTarball https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz) {};
