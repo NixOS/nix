@@ -491,14 +491,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         auto oid = hashToOID(oid_);
 
-        /* If the root directory contains  */
         auto _tree = lookupObject(*this, oid, GIT_OBJECT_TREE);
         auto tree = (const git_tree *) &*_tree;
 
         if (git_tree_entrycount(tree) == 1) {
             auto entry = git_tree_entry_byindex(tree, 0);
             auto mode = git_tree_entry_filemode(entry);
-            if (mode == GIT_FILEMODE_BLOB || mode == GIT_FILEMODE_TREE)
+            if (mode == GIT_FILEMODE_TREE)
                 oid = *git_tree_entry_id(entry);
         }
 

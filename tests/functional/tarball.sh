@@ -92,15 +92,7 @@ path="$(nix flake prefetch --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .s
 [[ -d "$path/foo" ]]
 [[ -d "$path/bar" ]]
 
-# Test a tarball that has a single non-executable regular file.
-rm -rf "$TEST_ROOT/tar_root"
-mkdir -p "$TEST_ROOT/tar_root"
-echo bar > "$TEST_ROOT/tar_root/foo"
-tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
-path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"
-[[ $(cat "$path") = bar ]]
-
-# Test a tarball that has a single executable regular file.
+# Test a tarball that has a single regular file.
 rm -rf "$TEST_ROOT/tar_root"
 mkdir -p "$TEST_ROOT/tar_root"
 echo bar > "$TEST_ROOT/tar_root/foo"

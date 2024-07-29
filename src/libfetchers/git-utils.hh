@@ -101,12 +101,7 @@ struct GitRepo
 
     /**
      * If the specified Git object is a directory with a single entry
-     * that is a directory or a non-executable regular file, return
-     * the ID of that object.
-     *
-     * Note: We don't do this for executable files because they don't
-     * have a tree hash in the Git object model that distinguishes
-     * them from non-executable files.
+     * that is a directory, return the ID of that object.
      */
     virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
