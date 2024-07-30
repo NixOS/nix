@@ -137,7 +137,7 @@ std::optional<Path> getSelfExe()
 {
     static auto cached = []() -> std::optional<Path>
     {
-        #if __linux__
+        #if __linux__ || __GNU__
         return readLink("/proc/self/exe");
         #elif __APPLE__
         char buf[1024];
