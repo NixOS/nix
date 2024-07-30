@@ -421,4 +421,9 @@ install_headers(headers, subdir : 'nix', preserve_path : true)
 
 libraries_private = []
 
+extra_pkg_config_variables = {
+  'localstatedir' : get_option('state-dir'),
+  'storedir' : get_option('store-dir'),
+}
+
 subdir('build-utils-meson/export')

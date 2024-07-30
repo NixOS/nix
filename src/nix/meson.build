@@ -16,9 +16,11 @@ cxx = meson.get_compiler('cpp')
 
 subdir('build-utils-meson/deps-lists')
 
+nix_store = dependency('nix-store')
+
 deps_private_maybe_subproject = [
   dependency('nix-util'),
-  dependency('nix-store'),
+  nix_store,
   dependency('nix-expr'),
   dependency('nix-flake'),
   dependency('nix-fetchers'),
@@ -244,3 +246,8 @@ custom_target(
 )
 # TODO(Ericson3214): Dosen't yet work
 #meson.override_find_program(linkname, t)
+
+state_dir = nix_store.get_variable('localstatedir')
+store_dir = nix_store.get_variable('storedir')
+subdir('scripts')
+subdir('misc')

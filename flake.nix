@@ -224,6 +224,7 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d;
           default = self.packages.${system}.nix;
+          nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
         }
@@ -272,6 +273,7 @@
       devShells = let
         makeShell = pkgs: stdenv: (pkgs.nix.override { inherit stdenv; forDevShell = true; }).overrideAttrs (attrs:
         let
+          buildCanExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
           modular = devFlake.getSystem stdenv.buildPlatform.system;
           transformFlag = prefix: flag:
             assert builtins.isString flag;
@@ -325,11 +327,12 @@
             ++ pkgs.nixComponents.nix-store.nativeBuildInputs
             ++ pkgs.nixComponents.nix-fetchers.nativeBuildInputs
             ++ lib.optionals havePerl pkgs.nixComponents.nix-perl-bindings.nativeBuildInputs
+            ++ lib.optionals buildCanExecuteHost pkgs.nixComponents.nix-manual.baseNativeBuildInputs
             ++ pkgs.nixComponents.nix-internal-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-external-api-docs.nativeBuildInputs
             ++ pkgs.nixComponents.nix-functional-tests.baseNativeBuildInputs
             ++ lib.optional
-              (!stdenv.buildPlatform.canExecute stdenv.hostPlatform
+              (!buildCanExecuteHost
                  # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
                  && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
                  && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
