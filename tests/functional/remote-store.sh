@@ -36,3 +36,10 @@ NIX_REMOTE= nix-store --dump-db > $TEST_ROOT/d2
 cmp $TEST_ROOT/d1 $TEST_ROOT/d2
 
 killDaemon
+
+# Test 'unforwarded-settings'.
+extraDaemonFlags=("--trusted-users" "")
+startDaemon
+nix store info --netrc-file /foo 2>&1 | grepQuiet "ignoring the client-specified setting 'netrc-file'"
+nix store info --netrc-file /foo --unforwarded-settings netrc-file 2>&1 | grep -v "ignoring the client-specified setting 'netrc-file'"
+killDaemon

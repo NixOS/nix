@@ -99,6 +99,12 @@ public:
      */
     Path nixDaemonSocketFile;
 
+    Setting<StringSet> unforwardedSettings{this, {}, "unforwarded-settings",
+        R"(
+          The names of settings that will not be forwarded from the
+          Nix client to the Nix daemon.
+        )"};
+
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
         R"(
           The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
