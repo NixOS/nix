@@ -17,6 +17,10 @@
 # define FS_ROOT FS_SEP
 #endif
 
+#ifndef PATH_MAX
+# define PATH_MAX 4096
+#endif
+
 namespace nix {
 
 /* ----------- tests for util.hh ------------------------------------------------*/
