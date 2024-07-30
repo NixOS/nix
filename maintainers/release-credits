@@ -1,4 +1,5 @@
 #!/usr/bin/env nix
+# vim: set filetype=python:
 #!nix develop --impure --expr
 #!nix ``
 #!nix   let flake = builtins.getFlake ("git+file://" + toString ../.);

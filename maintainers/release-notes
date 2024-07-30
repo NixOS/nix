@@ -1,4 +1,5 @@
 #!/usr/bin/env nix
+# vim: set filetype=bash:
 #!nix shell .#changelog-d --command bash
 
 # --- CONFIGURATION ---
