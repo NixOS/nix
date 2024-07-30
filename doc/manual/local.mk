@@ -223,8 +223,13 @@ $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/
 			sed -i "s,@docroot@,$$docroot,g" "$$file"; \
 		done; \
 		set -euo pipefail; \
-		RUST_LOG=warn mdbook build "$$tmp/manual" -d $(DESTDIR)$(docdir)/manual.tmp 2>&1 \
-			| { grep -Fv "because fragment resolution isn't implemented" || :; }; \
+		( \
+		    cd "$$tmp/manual"; \
+		    RUST_LOG=warn \
+		        MDBOOK_SUBSTITUTE_SEARCH=$(d)/src \
+		        mdbook build -d $(DESTDIR)$(docdir)/manual.tmp 2>&1 \
+			    | { grep -Fv "because fragment resolution isn't implemented" || :; } \
+		); \
 		rm -rf "$$tmp/manual"
 	@rm -rf $(DESTDIR)$(docdir)/manual
 	@mv $(DESTDIR)$(docdir)/manual.tmp/html $(DESTDIR)$(docdir)/manual
