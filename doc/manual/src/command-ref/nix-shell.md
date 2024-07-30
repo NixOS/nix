@@ -297,3 +297,8 @@ with import <nixpkgs> {};
 
 runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
 ```
+
+The script's file name is passed as the first argument to the interpreter specified by the `-i` flag.
+
+Aside from the very first line, which is a directive to the operating system, the additional `#! nix-shell` lines do not need to be at the beginning of the file.
+This allows wrapping them in block comments for languages where `#` does not start a comment, such as ECMAScript, Erlang, PHP, or Ruby.
