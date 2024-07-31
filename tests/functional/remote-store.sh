@@ -41,5 +41,7 @@ killDaemon
 extraDaemonFlags=("--trusted-users" "")
 startDaemon
 nix store info --netrc-file /foo 2>&1 | grepQuiet "ignoring the client-specified setting 'netrc-file'"
-nix store info --netrc-file /foo --unforwarded-settings netrc-file 2>&1 | grep -v "ignoring the client-specified setting 'netrc-file'"
+if nix store info --netrc-file /foo --client-only-settings netrc-file 2>&1 | grep "ignoring the client-specified setting 'netrc-file'"; then
+    exit 1
+fi
 killDaemon

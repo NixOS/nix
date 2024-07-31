@@ -99,7 +99,7 @@ public:
      */
     Path nixDaemonSocketFile;
 
-    Setting<StringSet> unforwardedSettings{this, {}, "unforwarded-settings",
+    Setting<StringSet> clientOnlySettings{this, {}, "client-only-settings",
         R"(
           The names of settings that will not be forwarded from the
           Nix client to the Nix daemon.

@@ -129,8 +129,8 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(loggerSettings.showTrace.name);
         overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
         overrides.erase("plugin-files");
-        overrides.erase(settings.unforwardedSettings.name);
-        for (auto & i : settings.unforwardedSettings.get())
+        overrides.erase(settings.clientOnlySettings.name);
+        for (auto & i : settings.clientOnlySettings.get())
             overrides.erase(i);
         conn.to << overrides.size();
         for (auto & i : overrides)
