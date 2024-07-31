@@ -36,7 +36,7 @@ The following must be escaped to represent them within a string, by prefixing wi
 > "\""
 > ```
 >
->    "\""
+>     "\""
 
 - Backslash (`\`)
 
@@ -46,7 +46,7 @@ The following must be escaped to represent them within a string, by prefixing wi
 > "\\"
 > ```
 >
->    "\\"
+>     "\\"
 
 - Dollar sign followed by an opening curly bracket (`${`) – "dollar-curly"
 
@@ -56,7 +56,7 @@ The following must be escaped to represent them within a string, by prefixing wi
 > "\${"
 > ```
 >
->    "\${"
+>     "\${"
 
 The newline, carriage return, and tab characters can be written as `\n`, `\r` and `\t`, respectively.
 
@@ -68,7 +68,7 @@ A "double-dollar-curly" (`$${`) can be written literally.
 > "$${"
 > ```
 >
->    "$\${"
+>     "$\${"
 
 String values are output on the terminal with Nix-specific escaping.
 Strings written to files will contain the characters encoded by the escaping.
@@ -107,10 +107,11 @@ each line, so the resulting string is
 > >
 > > The following indented string is prefixed with tabs:
 > >
-> > ''
+> > <pre><code class="nohighlight">''
 > > 	all:
 > > 		@echo hello
 > > ''
+> > </code></pre>
 > >
 > >     "\tall:\n\t\t@echo hello\n"
 
