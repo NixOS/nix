@@ -2860,8 +2860,10 @@ void EvalState::printStatistics()
     topObj["cpuTime"] = cpuTime;
 #endif
     topObj["time"] = {
+#ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
-#ifdef HAVE_BOEHMGC
+#endif
+#if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
 #endif
