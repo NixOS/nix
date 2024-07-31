@@ -174,7 +174,7 @@
 
   For the builtin `convertHash`, the `toHashFormat` parameter now accepts the same hash formats as the `--to`/`--from`
   parameters of the `nix hash conert` command: `"base16"`, `"nix32"`, `"base64"`, and `"sri"`. The former `"base32"` value
-  remains as a deprecated alias for `"base32"`. Please convert your code from:
+  remains as a deprecated alias for `"nix32"`. Please convert your code from:
 
   ```nix
   builtins.convertHash { inherit hash hashAlgo; toHashFormat = "base32";}
