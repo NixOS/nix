@@ -2,11 +2,11 @@
 
 ### Significant changes
 
-- Harden the user sandboxing
+- Harden user sandboxing
 
   The build directory has been hardened against interference with the outside world by nesting it inside another directory owned by (and only readable by) the daemon user.
 
-  This is a low severity security fix, [CVE-2024-38531](https://www.cve.org/CVERecord?id=CVE-2024-38531), that was handled through the GitHub Security Advisories interface, and hence was merged directly in commit [2dd7f8f42](https://github.com/NixOS/nix/commit/2dd7f8f42da374d9fee4d424c1c6f82bcb36b393) instead of a PR.
+  This is a low severity security fix, [CVE-2024-38531](https://www.cve.org/CVERecord?id=CVE-2024-38531).
 
   Credit: [**@alois31**](https://github.com/alois31), [**Linus Heckemann (@lheckemann)**](https://github.com/lheckemann)
   Co-authors: [**@edolstra**](https://github.com/edolstra)
@@ -99,7 +99,7 @@
 
   Author: [**Eelco Dolstra (@edolstra)**](https://github.com/edolstra)
 
-- nix3-build: show all FOD errors with `--keep-going` [#10734](https://github.com/NixOS/nix/pull/10734)
+- `nix build`: show all FOD errors with `--keep-going` [#10734](https://github.com/NixOS/nix/pull/10734)
 
   The [`nix build`](@docroot@/command-ref/new-cli/nix3-build.md) command has been updated to improve the behavior of the [`--keep-going`] flag. Now, when `--keep-going` is used, all hash-mismatch errors of failing fixed-output derivations (FODs) are displayed, similar to the behavior for other build failures. This enhancement ensures that all relevant build errors are shown, making it easier for users to update multiple derivations at once or to diagnose and fix issues.
 
@@ -109,21 +109,19 @@
 
 - Build with Meson [#2503](https://github.com/NixOS/nix/issues/2503) [#10378](https://github.com/NixOS/nix/pull/10378) [#10855](https://github.com/NixOS/nix/pull/10855) [#10904](https://github.com/NixOS/nix/pull/10904) [#10908](https://github.com/NixOS/nix/pull/10908) [#10914](https://github.com/NixOS/nix/pull/10914) [#10933](https://github.com/NixOS/nix/pull/10933) [#10936](https://github.com/NixOS/nix/pull/10936) [#10954](https://github.com/NixOS/nix/pull/10954) [#10955](https://github.com/NixOS/nix/pull/10955) [#10963](https://github.com/NixOS/nix/pull/10963) [#10967](https://github.com/NixOS/nix/pull/10967) [#10973](https://github.com/NixOS/nix/pull/10973) [#11034](https://github.com/NixOS/nix/pull/11034) [#11054](https://github.com/NixOS/nix/pull/11054) [#11055](https://github.com/NixOS/nix/pull/11055) [#11060](https://github.com/NixOS/nix/pull/11060) [#11064](https://github.com/NixOS/nix/pull/11064) [#11155](https://github.com/NixOS/nix/pull/11155)
 
-  These changes aim to replace the use of autotools and make with Meson for building various components of Nix. Additionally, each library is built in its own derivation, leveraging Meson's "subprojects" feature to allow a single development shell for building all libraries while also supporting separate builds. This approach aims to improve productivity and build modularity, compared to both make and a monolithic Meson-based derivation.
+  These changes aim to replace the use of autotools and `make` with Meson for building various components of Nix. Additionally, each library is built in its own derivation, leveraging Meson's "subprojects" feature to allow a single development shell for building all libraries while also supporting separate builds. This approach aims to improve productivity and build modularity, compared to both make and a monolithic Meson-based derivation.
 
   Special thanks to everyone who has contributed to the Meson port, particularly [**@p01arst0rm**](https://github.com/p01arst0rm) and [**@Qyriad**](https://github.com/Qyriad).
 
   Authors: [**John Ericson (@Ericson2314)**](https://github.com/Ericson2314), [**Tom Bereknyei**](https://github.com/tomberek), [**Théophane Hufschmitt (@thufschmitt)**](https://github.com/thufschmitt), [**Valentin Gagarin (@fricklerhandwerk)**](https://github.com/fricklerhandwerk), [**Robert Hensing (@roberth)**](https://github.com/roberth)
   Co-authors: [**@p01arst0rm**](https://github.com/p01arst0rm), [**@Qyriad**](https://github.com/Qyriad)
 
-- Eval cache: fix cache regressions [#10570](https://github.com/NixOS/nix/issues/10570) [#11086](https://github.com/NixOS/nix/pull/11086)
+- Evaluation cache: fix cache regressions [#10570](https://github.com/NixOS/nix/issues/10570) [#11086](https://github.com/NixOS/nix/pull/11086)
 
   This update addresses two bugs in the evaluation cache system:
 
-  1. Regression in #10570: The evaluation cache was not being persisted in `nix develop` because `evalCaches` retained references to the caches and was never freed.
+  1. Regression in #10570: The evaluation cache was not being persisted in `nix develop`.
   2. Nix could sometimes try to commit the evaluation cache SQLite transaction without there being an active transaction, resulting in non-error errors being printed.
-
-  These bug fixes ensure that the evaluation cache is correctly managed and errors are appropriately handled.
 
   Author: [**Lexi Mattick (@kognise)**](https://github.com/kognise)
 
@@ -137,9 +135,9 @@
 
   Author: [**John Ericson (@Ericson2314)**](https://github.com/Ericson2314)
 
-- CL options `--arg-from-file` and `--arg-from-stdin` [#9913](https://github.com/NixOS/nix/pull/9913)
+- CLI options `--arg-from-file` and `--arg-from-stdin` [#9913](https://github.com/NixOS/nix/pull/9913)
 
-  The `--debugger` now prints source location information, instead of the
+- The `--debugger` now prints source location information, instead of the
   pointers of source location information. Before:
 
   ```
@@ -160,11 +158,7 @@
      133|     in
   ```
 
-- Make `nix store gc` use the auto-GC policy [#7851](https://github.com/NixOS/nix/pull/7851)
-
-
-
-- Stop vendoring toml11
+- Stop vendoring `toml11`
 
   We don't apply any patches to it, and vendoring it locks users into
   bugs (it hasn't been updated since its introduction in late 2021).
@@ -176,7 +170,7 @@
   Hash format `base32` was renamed to `nix32` since it used a special nix-specific character set for
   [Base32](https://en.wikipedia.org/wiki/Base32).
 
-  ## Deprecation: Use `nix32` instead of `base32` as `toHashFormat`
+  **Deprecation**: Use `nix32` instead of `base32` as `toHashFormat`
 
   For the builtin `convertHash`, the `toHashFormat` parameter now accepts the same hash formats as the `--to`/`--from`
   parameters of the `nix hash conert` command: `"base16"`, `"nix32"`, `"base64"`, and `"sri"`. The former `"base32"` value
@@ -233,7 +227,7 @@
   hello
   ```
 
-  Older versions of `nix-shell` would resolve `shell.nix` relative to the current working directory; home in this example:
+  Older versions of `nix-shell` would resolve `shell.nix` relative to the current working directory, such as the user's home directory in this example:
 
   ```console
   [hostname:~]$ ./myproject/say-hi
@@ -258,20 +252,6 @@
   This is technically a breaking change, so we have added an option so you can adapt independently of your Nix update.
   The old behavior can be opted into by setting the option [`nix-shell-shebang-arguments-relative-to-script`](@docroot@/command-ref/conf-file.md#conf-nix-shell-shebang-arguments-relative-to-script) to `false`.
   This option will be removed in a future release.
-
-  **`nix` command shebang**
-
-  The experimental [`nix` command shebang](@docroot@/command-ref/new-cli/nix.md?highlight=shebang#shebang-interpreter) already behaves in this script-relative manner.
-
-  Example:
-
-  ```shell
-  #!/usr/bin/env nix
-  #!nix develop
-  #!nix --expr ``import ./shell.nix``
-  #!nix -c bash
-  hello
-  ```
 
   Author: [**Robert Hensing (@roberth)**](https://github.com/roberth)
 
