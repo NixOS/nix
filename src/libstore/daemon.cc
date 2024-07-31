@@ -1025,19 +1025,20 @@ void processConnection(
 #endif
 
     /* Exchange the greeting. */
-    WorkerProto::Version clientVersion =
+    auto [protoVersion, features] =
         WorkerProto::BasicServerConnection::handshake(
-            to, from, PROTOCOL_VERSION);
+            to, from, PROTOCOL_VERSION, WorkerProto::allFeatures);
 
-    if (clientVersion < 0x10a)
+    if (protoVersion < 0x10a)
         throw Error("the Nix client version is too old");
 
     WorkerProto::BasicServerConnection conn;
     conn.to = std::move(to);
     conn.from = std::move(from);
-    conn.protoVersion = clientVersion;
+    conn.protoVersion = protoVersion;
+    conn.features = features;
 
-    auto tunnelLogger = new TunnelLogger(conn.to, clientVersion);
+    auto tunnelLogger = new TunnelLogger(conn.to, protoVersion);
     auto prevLogger = nix::logger;
     // FIXME
     if (!recursive)

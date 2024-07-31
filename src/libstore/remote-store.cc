@@ -73,8 +73,11 @@ void RemoteStore::initConnection(Connection & conn)
         StringSink saved;
         TeeSource tee(conn.from, saved);
         try {
-            conn.protoVersion = WorkerProto::BasicClientConnection::handshake(
-                conn.to, tee, PROTOCOL_VERSION);
+            auto [protoVersion, features] = WorkerProto::BasicClientConnection::handshake(
+                conn.to, tee, PROTOCOL_VERSION,
+                WorkerProto::allFeatures);
+            conn.protoVersion = protoVersion;
+            conn.features = features;
         } catch (SerialisationError & e) {
             /* In case the other side is waiting for our input, close
                it. */
@@ -87,6 +90,9 @@ void RemoteStore::initConnection(Connection & conn)
         }
 
         static_cast<WorkerProto::ClientHandshakeInfo &>(conn) = conn.postHandshake(*this);
+
+        for (auto & feature : conn.features)
+            debug("negotiated feature '%s'", feature);
 
         auto ex = conn.processStderrReturn();
         if (ex) std::rethrow_exception(ex);
