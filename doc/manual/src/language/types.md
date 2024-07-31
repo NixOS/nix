@@ -45,7 +45,7 @@ The function [`builtins.isBool`](builtins.md#builtins-isBool) can be used to det
 A _string_ in the Nix language is an immutable, finite-length sequence of bytes, along with a [string context](string-context.md).
 Nix does not assume or support working natively with character encodings.
 
-String values without string context can be expressed as [string literals](syntax.md#string-literal).
+String values without string context can be expressed as [string literals](string-literals.md).
 The function [`builtins.isString`](builtins.md#builtins-isString) can be used to determine if a value is a string.
 
 ### Path {#type-path}
