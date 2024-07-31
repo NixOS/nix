@@ -334,6 +334,7 @@
             ++ [
               pkgs.buildPackages.cmake
               pkgs.buildPackages.shellcheck
+              pkgs.buildPackages.changelog-d
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)
