@@ -14,7 +14,7 @@ expect 1 false
 expect 1 expect 0 false
 
 function ret() {
-  return $1
+  return "$1"
 }
 
 # `expect` can call functions, not just executables
@@ -48,6 +48,7 @@ expectStderr 1 noisyFalse | grepQuiet NAY
 
 # `set -o pipefile` is enabled
 
+# shellcheck disable=SC2317# shellcheck disable=SC2317
 pipefailure () {
     # shellcheck disable=SC2216
     true | false | true
@@ -55,6 +56,7 @@ pipefailure () {
 expect 1 pipefailure
 unset pipefailure
 
+# shellcheck disable=SC2317
 pipefailure () {
     # shellcheck disable=SC2216
     false | true | true
@@ -82,6 +84,7 @@ expect 1 useUnbound
 # ! alone unfortunately negates `set -e`, but it works in functions:
 # shellcheck disable=SC2251
 ! true
+# shellcheck disable=SC2317
 funBang () {
     ! true
 }
