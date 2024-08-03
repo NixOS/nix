@@ -4,6 +4,7 @@
 #include "url-parts.hh"
 #include "fetchers.hh"
 #include "registry.hh"
+#include <filesystem>
 
 namespace nix {
 
@@ -100,8 +101,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         path = absPath(path, baseDir);
 
         if (isFlake) {
-
-            if (!S_ISDIR(lstat(path).st_mode)) {
+            if (!std::filesystem::is_directory(std::filesystem::symlink_status(path))) {
                 if (baseNameOf(path) == "flake.nix") {
                     // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
                     warn(
@@ -118,7 +118,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 notice("path '%s' does not contain a 'flake.nix', searching up",path);
 
                 // Save device to detect filesystem boundary
-                dev_t device = lstat(path).st_dev;
+                dev_t device = unix::lstat(path).st_dev;
                 bool found = false;
                 while (path != "/") {
                     if (pathExists(path + "/flake.nix")) {
@@ -127,7 +127,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     } else if (pathExists(path + "/.git"))
                         throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
                     else {
-                        if (lstat(path).st_dev != device)
+                        if (unix::lstat(path).st_dev != device)
                             throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
                     }
                     path = dirOf(path);

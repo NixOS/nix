@@ -852,7 +852,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (name == "." || name == "..") continue;
             Path path = linksDir + "/" + name;
 
-            auto st = lstat(path);
+            auto st = unix::lstat(path);
 
             if (st.st_nlink != 1) {
                 actualSize += st.st_size;
