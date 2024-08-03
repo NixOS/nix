@@ -2455,8 +2455,8 @@ static void addPath(
 
         std::unique_ptr<PathFilter> filter;
         if (filterFun)
-            filter = std::make_unique<PathFilter>([&](const Path & p) {
-                auto p2 = CanonPath(p.string());
+            filter = std::make_unique<PathFilter>([&](const PathView & p) {
+                auto p2 = CanonPath(p.native());
                 return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
             });
 

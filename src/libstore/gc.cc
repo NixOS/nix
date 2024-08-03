@@ -202,8 +202,8 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         std::string::size_type pos = 0, end;
 
         while ((end = contents.find((char) 0, pos)) != std::string::npos) {
-            Path root(contents, pos, end - pos);
-            debug("got temporary root '%s'", root.native());
+            std::string root(contents, pos, end - pos);
+            debug("got temporary root '%s'", root);
             tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
             pos = end + 1;
         }
@@ -244,7 +244,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             else {
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
-                    if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
+                    if (isInDir(path, stateDir / "/" / gcRootsDir / "/auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
                         unlink(path.c_str());
                     }
@@ -285,8 +285,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
+    findRoots(stateDir / "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
+    findRoots(stateDir / "/profiles", std::filesystem::file_type::unknown, roots);
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
@@ -631,8 +631,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        GCLimitReached if we've deleted enough garbage. */
     auto deleteFromStore = [&](std::string_view baseName)
     {
-        Path path = storeDir + "/" + std::string(baseName);
-        Path realPath = realStoreDir + "/" + std::string(baseName);
+        Path path = storeDir / std::string(baseName);
+        Path realPath = realStoreDir / std::string(baseName);
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an

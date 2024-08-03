@@ -11,10 +11,10 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         : LocalOverlayStoreConfig("local-overlay", "", params)
     { }
 
-    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
+    LocalOverlayStoreConfig(std::string_view scheme, Path path, const Params & params)
         : StoreConfig(params)
         , LocalFSStoreConfig(path, params)
-        , LocalStoreConfig(scheme, path, params)
+        , LocalStoreConfig(scheme, path.string(), params)
     {
     }
 
@@ -105,7 +105,7 @@ public:
     {
     }
 
-    LocalOverlayStore(std::string_view scheme, PathView path, const Params & params);
+    LocalOverlayStore(std::string_view scheme, Path path, const Params & params);
 
     std::string getUri() override
     {

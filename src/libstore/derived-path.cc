@@ -152,7 +152,7 @@ std::string DerivedPath::to_string_legacy(const StoreDirConfig & store) const
 
 DerivedPath::Opaque DerivedPath::Opaque::parse(const StoreDirConfig & store, std::string_view s)
 {
-    return {store.parseStorePath(s)};
+    return {store.parseStorePath(PathView{s})};
 }
 
 void drvRequireExperiment(

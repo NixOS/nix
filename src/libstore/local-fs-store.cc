@@ -8,7 +8,7 @@
 
 namespace nix {
 
-LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
+LocalFSStoreConfig::LocalFSStoreConfig(Path rootDir, const Params & params)
     : StoreConfig(params)
     // Default `?root` from `rootDir` if non set
     // FIXME don't duplicate description once we don't have root setting

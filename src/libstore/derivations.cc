@@ -311,7 +311,7 @@ static DerivationOutput parseDerivationOutput(
         }
         validatePath(pathS);
         return DerivationOutput::InputAddressed {
-            .path = store.parseStorePath(pathS),
+            .path = store.parseStorePath(PathView{pathS}),
         };
     }
 }
@@ -438,7 +438,7 @@ Derivation parseDerivation(
         expect(str, "(");
         auto drvPath = parsePath(str);
         expect(str, ",");
-        drv.inputDrvs.map.insert_or_assign(store.parseStorePath(*drvPath), parseDerivedPathMapNode(store, str, version));
+        drv.inputDrvs.map.insert_or_assign(store.parseStorePath(PathView{*drvPath}), parseDerivedPathMapNode(store, str, version));
         expect(str, ")");
     }
 

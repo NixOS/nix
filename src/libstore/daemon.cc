@@ -678,7 +678,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto & localFSStore = require<LocalFSStore>(*store);
         localFSStore.addPermRoot(storePath, gcRoot);
         logger->stopWork();
-        conn.to << gcRoot;
+        conn.to << PathView{gcRoot};
         break;
     }
 
@@ -740,7 +740,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         gcStore.collectGarbage(options, results);
         logger->stopWork();
 
-        conn.to << results.paths << results.bytesFreed << 0 /* obsolete */;
+        for (auto & p : results.paths) {
+            conn.to << PathView{p};
+        }
+        conn.to << results.bytesFreed << 0 /* obsolete */;
 
         break;
     }

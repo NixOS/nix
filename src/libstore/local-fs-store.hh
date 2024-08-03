@@ -18,7 +18,7 @@ struct LocalFSStoreConfig : virtual StoreConfig
      *
      * @todo Make this less error-prone with new store settings system.
      */
-    LocalFSStoreConfig(PathView path, const Params & params);
+    LocalFSStoreConfig(Path path, const Params & params);
 
     const OptionalPathSetting rootDir{this, std::nullopt,
         "root",

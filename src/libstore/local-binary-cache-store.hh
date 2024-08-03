@@ -6,7 +6,7 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    LocalBinaryCacheStoreConfig(std::string_view scheme, PathView binaryCacheDir, const Params & params);
+    LocalBinaryCacheStoreConfig(std::string_view scheme, Path binaryCacheDir, const Params & params);
 
     Path binaryCacheDir;
 
