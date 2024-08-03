@@ -62,7 +62,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     #ifndef _WIN32
             outPipe->readSide.get()
     #else
-            &outPipe
+            &*outPipe
     #endif
         }, true, false);
 

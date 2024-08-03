@@ -247,37 +247,76 @@ Elements in a list can be accessed using [`builtins.elemAt`](./builtins.md#built
 
 ## Attribute Set {#attrs-literal}
 
-An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
+An attribute set is a collection of name-value-pairs called *attributes*.
 
-An attribute name can be an identifier or a [string](#string).
-An identifier must start with a letter (`a-z`, `A-Z`) or underscore (`_`), and can otherwise contain letters (`a-z`, `A-Z`), numbers (`0-9`), underscores (`_`), apostrophes (`'`), or dashes (`-`).
+Attribute sets are written enclosed in curly brackets (`{ }`).
+Attribute names and attribute values are separated by an equal sign (`=`).
+Each value can be an arbitrary expression, terminated by a semicolon (`;`)
 
-> **Syntax**
->
-> *name* = *identifier* | *string* \
-> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
+An attribute name is a string without context, and is denoted by a [name] (an [identifier](./identifiers.md#identifiers) or [string literal](#string-literal)).
 
-Names and values are separated by an equal sign (`=`).
-Each value is an arbitrary expression terminated by a semicolon (`;`).
+[name]: ./identifiers.md#names
 
 > **Syntax**
 >
-> *attrset* = `{` [ *name* `=` *expr* `;` ]... `}`
+> *attrset* → `{` { *name* `=` *expr* `;` } `}`
 
 Attributes can appear in any order.
-An attribute name may only occur once.
+An attribute name may only occur once in each attribute set.
 
-Example:
+> **Example**
+>
+> This defines an attribute set with attributes named:
+> - `x` with the value `123`, an integer
+> - `text` with the value `"Hello"`, a string
+> - `y` where the value is the result of applying the function `f` to the attribute set `{ bla = 456; }`
+>
+> ```nix
+> {
+>   x = 123;
+>   text = "Hello";
+>   y = f { bla = 456; };
+> }
+> ```
 
-```nix
-{
-  x = 123;
-  text = "Hello";
-  y = f { bla = 456; };
-}
-```
+Attributes in nested attribute sets can be written using *attribute paths*.
 
-This defines a set with attributes named `x`, `text`, `y`.
+> **Syntax**
+>
+> *attrset* → `{` { *attrpath* `=` *expr* `;` } `}`
+
+An attribute path is a dot-separated list of [names][name].
+
+> **Syntax**
+>
+> *attrpath* = *name* { `.` *name* }
+
+<!-- -->
+
+> **Example**
+>
+> ```nix
+> { a.b.c = 1; a.b.d = 2; }
+> ```
+>
+>     {
+>       a = {
+>         b = {
+>           c = 1;
+>           d = 2;
+>         };
+>       };
+>     }
+
+Attribute names can also be set implicitly by using the [`inherit` keyword](#inheriting-attributes).
+
+> **Example**
+>
+> ```nix
+> { inherit (builtins) true; }
+> ```
+>
+>     { true = true; }
 
 Attributes can be accessed with the [`.` operator](./operators.md#attribute-selection).
 

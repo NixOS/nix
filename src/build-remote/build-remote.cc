@@ -101,7 +101,7 @@ static int main_build_remote(int argc, char * * argv)
         }
 
         std::optional<StorePath> drvPath;
-        StoreReference storeUri;
+        std::string storeUri;
 
         while (true) {
 
@@ -234,17 +234,16 @@ static int main_build_remote(int argc, char * * argv)
                 lock = -1;
 
                 try {
+                    storeUri = bestMachine->storeUri.render();
 
-                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", bestMachine->storeUri.render()));
+                    Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", storeUri));
 
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
-                    storeUri = bestMachine->storeUri;
-
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
                     printError("cannot build on '%s': %s%s",
-                        bestMachine->storeUri.render(), e.what(),
+                        storeUri, e.what(),
                         msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;
@@ -259,15 +258,28 @@ connected:
 
         assert(sshStore);
 
-        std::cerr << "# accept\n" << storeUri.render() << "\n";
+        std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
         auto wantedOutputs = readStrings<StringSet>(source);
 
-        AutoCloseFD uploadLock = openLockFile(currentLoad + "/" + escapeUri(storeUri.render()) + ".upload-lock", true);
+        AutoCloseFD uploadLock;
+        {
+            auto setUpdateLock = [&](auto && fileName){
+                uploadLock = openLockFile(currentLoad + "/" + escapeUri(fileName) + ".upload-lock", true);
+            };
+            try {
+                setUpdateLock(storeUri);
+            } catch (SysError & e) {
+                if (e.errNo != ENAMETOOLONG) throw;
+                // Try again hashing the store URL so we have a shorter path
+                auto h = hashString(HashAlgorithm::MD5, storeUri);
+                setUpdateLock(h.to_string(HashFormat::Base64, false));
+            }
+        }
 
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri.render()));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
 
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
@@ -280,7 +292,7 @@ connected:
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri.render()));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
             copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
@@ -318,7 +330,7 @@ connected:
             optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
             auto & result = *optResult;
             if (!result.success())
-                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri.render(), result.errorMsg);
+                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
         } else {
             copyClosure(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
             auto res = sshStore->buildPathsWithResults({
@@ -361,7 +373,7 @@ connected:
         }
 
         if (!missingPaths.empty()) {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri.render()));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
             if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
                 for (auto & path : missingPaths)
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */

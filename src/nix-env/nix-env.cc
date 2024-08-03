@@ -1159,7 +1159,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     case cvEqual: ch = '='; break;
                     case cvGreater: ch = '<'; break;
                     case cvUnavail: ch = '-'; break;
-                    default: abort();
+                    default: unreachable();
                 }
 
                 if (xmlOutput) {

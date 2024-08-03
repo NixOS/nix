@@ -61,10 +61,32 @@ let
       workDir = null;
     };
 
+  # Work around weird `--as-needed` linker behavior with BSD, see
+  # https://github.com/mesonbuild/meson/issues/3593
+  bsdNoLinkAsNeeded = finalAttrs: prevAttrs:
+    lib.optionalAttrs stdenv.hostPlatform.isBSD {
+      mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [];
+    };
+
+  miscGoodPractice = finalAttrs: prevAttrs:
+    {
+      strictDeps = prevAttrs.strictDeps or true;
+      enableParallelBuilding = true;
+    };
+
 in
 scope: {
   inherit stdenv versionSuffix;
   version = lib.fileContents ../.version + versionSuffix;
+
+  aws-sdk-cpp = (pkgs.aws-sdk-cpp.override {
+    apis = [ "s3" "transfer" ];
+    customMemoryManagement = false;
+  }).overrideAttrs {
+    # only a stripped down version is built, which takes a lot less resources
+    # to build, so we don't need a "big-parallel" machine.
+    requiredSystemFeatures = [ ];
+  };
 
   libseccomp = pkgs.libseccomp.overrideAttrs (_: rec {
     version = "2.5.5";
@@ -130,5 +152,14 @@ scope: {
 
   inherit resolvePath filesetToSource;
 
-  mkMesonDerivation = f: stdenv.mkDerivation (lib.extends localSourceLayer f);
+  mkMesonDerivation = f: let
+    exts = [
+      miscGoodPractice
+      bsdNoLinkAsNeeded
+      localSourceLayer
+    ];
+  in stdenv.mkDerivation
+   (lib.extends
+     (lib.foldr lib.composeExtensions (_: _: {}) exts)
+     f);
 }

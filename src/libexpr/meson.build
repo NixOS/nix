@@ -32,6 +32,7 @@ subdir('build-utils-meson/threads')
 boost = dependency(
   'boost',
   modules : ['container', 'context'],
+  include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -55,7 +56,12 @@ if bdw_gc.found()
 endif
 configdata.set('HAVE_BOEHMGC', bdw_gc.found().to_int())
 
-toml11 = dependency('toml11', version : '>=3.7.0', method : 'cmake')
+toml11 = dependency(
+  'toml11',
+  version : '>=3.7.0',
+  method : 'cmake',
+  include_type: 'system',
+)
 deps_other += toml11
 
 config_h = configure_file(

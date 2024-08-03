@@ -134,7 +134,7 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
         return {SourcePath{path.accessor, CanonPath(fn.substr(0, colon))}, lineno};
     } catch (std::invalid_argument & e) {
         fail();
-        abort();
+        unreachable();
     }
 }
 

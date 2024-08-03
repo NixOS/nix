@@ -1,24 +1,28 @@
 Nix <nix version>
 Type :? for help.
+
+nix-repl> :l doc-comments.nix
 Added <number omitted> variables.
 
-Function curriedArgs
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:48:5
+nix-repl> :doc curriedArgs
+Function `curriedArgs`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:48:5
 
-    A documented function.
+A documented function.
 
+nix-repl> x = curriedArgs 1        
 
+nix-repl> "Note that users may not expect this to behave as it currently does"
 "Note that users may not expect this to behave as it currently does"
 
-Function curriedArgs
-    … defined at
-    /path/to/tests/functional/repl/doc-comments.nix:50:5
+nix-repl> :doc x
+Function `curriedArgs`\
+  … defined at /path/to/tests/functional/repl/doc-comments.nix:50:5
 
-    The function returned by applying once
+The function returned by applying once
 
-"This won't produce documentation, because we can't actually document arbitrary values"
+nix-repl> "This won't produce docs; no support for arbitrary values"
+"This won't produce docs; no support for arbitrary values"
 
+nix-repl> :doc x 2
 error: value does not have documentation
-
-

@@ -299,25 +299,28 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
-    else abort();
+    else unreachable();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
+        .aliases = aliases,
         .description = "Enable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
+        .aliases = aliases,
         .description = "Disable sandboxing.",
         .category = category,
         .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
+        .aliases = aliases,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
         .handler = {[this]() { override(smRelaxed); }}

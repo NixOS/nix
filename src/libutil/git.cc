@@ -201,7 +201,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
     case SourceAccessor::tRegular:   return Mode::Regular;
     case SourceAccessor::tDirectory: return Mode::Directory;
     case SourceAccessor::tMisc:      return std::nullopt;
-    default: abort();
+    default: unreachable();
     }
 }
 

@@ -126,14 +126,37 @@ Object lookupObject(git_repository * repo, const git_oid & oid, git_object_t typ
 }
 
 template<typename T>
-T peelObject(git_repository * repo, git_object * obj, git_object_t type)
+T peelObject(git_object * obj, git_object_t type)
 {
     T obj2;
     if (git_object_peel((git_object * *) (typename T::pointer *) Setter(obj2), obj, type)) {
         auto err = git_error_last();
-        throw Error("peeling Git object '%s': %s", git_object_id(obj), err->message);
+        throw Error("peeling Git object '%s': %s", *git_object_id(obj), err->message);
     }
     return obj2;
+}
+
+template<typename T>
+T dupObject(typename T::pointer obj)
+{
+    T obj2;
+    if (git_object_dup((git_object * *) (typename T::pointer *) Setter(obj2), (git_object *) obj))
+        throw Error("duplicating object '%s': %s", *git_object_id((git_object *) obj), git_error_last()->message);
+    return obj2;
+}
+
+/**
+ * Peel the specified object (i.e. follow tag and commit objects) to
+ * either a blob or a tree.
+ */
+static Object peelToTreeOrBlob(git_object * obj)
+{
+    /* git_object_peel() doesn't handle blob objects, so handle those
+       specially. */
+    if (git_object_type(obj) == GIT_OBJECT_BLOB)
+        return dupObject<Object>(obj);
+    else
+        return peelObject<Object>(obj, GIT_OBJECT_TREE);
 }
 
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
@@ -166,7 +189,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         std::unordered_set<git_oid> done;
         std::queue<Commit> todo;
 
-        todo.push(peelObject<Commit>(*this, lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT));
+        todo.push(peelObject<Commit>(lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT));
 
         while (auto commit = pop(todo)) {
             if (!done.insert(*git_commit_id(commit->get())).second) continue;
@@ -184,7 +207,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     uint64_t getLastModified(const Hash & rev) override
     {
-        auto commit = peelObject<Commit>(*this, lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT);
+        auto commit = peelObject<Commit>(lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT);
 
         return git_commit_time(commit.get());
     }
@@ -463,6 +486,23 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         return narHash;
     }
+
+    Hash dereferenceSingletonDirectory(const Hash & oid_) override
+    {
+        auto oid = hashToOID(oid_);
+
+        auto _tree = lookupObject(*this, oid, GIT_OBJECT_TREE);
+        auto tree = (const git_tree *) &*_tree;
+
+        if (git_tree_entrycount(tree) == 1) {
+            auto entry = git_tree_entry_byindex(tree, 0);
+            auto mode = git_tree_entry_filemode(entry);
+            if (mode == GIT_FILEMODE_TREE)
+                oid = *git_tree_entry_id(entry);
+        }
+
+        return toHash(oid);
+    }
 };
 
 ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare)
@@ -476,11 +516,11 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, 
 struct GitSourceAccessor : SourceAccessor
 {
     ref<GitRepoImpl> repo;
-    Tree root;
+    Object root;
 
     GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev)
         : repo(repo_)
-        , root(peelObject<Tree>(*repo, lookupObject(*repo, hashToOID(rev)).get(), GIT_OBJECT_TREE))
+        , root(peelToTreeOrBlob(lookupObject(*repo, hashToOID(rev)).get()))
     {
     }
 
@@ -506,7 +546,7 @@ struct GitSourceAccessor : SourceAccessor
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         if (path.isRoot())
-            return Stat { .type = tDirectory };
+            return Stat { .type = git_object_type(root.get()) == GIT_OBJECT_TREE ? tDirectory : tRegular };
 
         auto entry = lookup(path);
         if (!entry)
@@ -616,10 +656,10 @@ struct GitSourceAccessor : SourceAccessor
     std::optional<Tree> lookupTree(const CanonPath & path)
     {
         if (path.isRoot()) {
-            Tree tree;
-            if (git_tree_dup(Setter(tree), root.get()))
-                throw Error("duplicating directory '%s': %s", showPath(path), git_error_last()->message);
-            return tree;
+            if (git_object_type(root.get()) == GIT_OBJECT_TREE)
+                return dupObject<Tree>((git_tree *) &*root);
+            else
+                return std::nullopt;
         }
 
         auto entry = lookup(path);
@@ -646,10 +686,10 @@ struct GitSourceAccessor : SourceAccessor
     std::variant<Tree, Submodule> getTree(const CanonPath & path)
     {
         if (path.isRoot()) {
-            Tree tree;
-            if (git_tree_dup(Setter(tree), root.get()))
-                throw Error("duplicating directory '%s': %s", showPath(path), git_error_last()->message);
-            return tree;
+            if (git_object_type(root.get()) == GIT_OBJECT_TREE)
+                return dupObject<Tree>((git_tree *) &*root);
+            else
+                throw Error("Git root object '%s' is not a directory", *git_object_id(root.get()));
         }
 
         auto entry = need(path);
@@ -669,6 +709,9 @@ struct GitSourceAccessor : SourceAccessor
 
     Blob getBlob(const CanonPath & path, bool expectSymlink)
     {
+        if (!expectSymlink && git_object_type(root.get()) == GIT_OBJECT_BLOB)
+            return dupObject<Blob>((git_blob *) &*root);
+
         auto notExpected = [&]()
         {
             throw Error(
@@ -782,8 +825,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     std::vector<PendingDir> pendingDirs;
 
-    size_t componentsToStrip = 1;
-
     void pushBuilder(std::string name)
     {
         git_treebuilder * b;
@@ -838,9 +879,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     bool prepareDirs(const std::vector<std::string> & pathComponents, bool isDir)
     {
         std::span<const std::string> pathComponents2{pathComponents};
-
-        if (pathComponents2.size() <= componentsToStrip) return false;
-        pathComponents2 = pathComponents2.subspan(componentsToStrip);
 
         updateBuilders(
             isDir
@@ -964,7 +1002,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             git_tree_entry_filemode(entry));
     }
 
-    Hash sync() override {
+    Hash sync() override
+    {
         updateBuilders({});
 
         auto [oid, _name] = popBuilder();

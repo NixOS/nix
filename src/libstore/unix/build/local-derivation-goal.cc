@@ -165,7 +165,7 @@ void LocalDerivationGoal::killSandbox(bool getStats)
             buildResult.cpuSystem = stats.cpuSystem;
         }
         #else
-        abort();
+        unreachable();
         #endif
     }
 
@@ -1259,7 +1259,7 @@ bool LocalDerivationGoal::isAllowed(const DerivedPath & req)
 struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
-    const std::string name() { return "Restricted Store"; }
+    const std::string name() override { return "Restricted Store"; }
 };
 
 /* A wrapper around LocalStore that only allows building/querying of
@@ -1703,10 +1703,13 @@ void setupSeccomp()
             throw SysError("unable to add seccomp rule");
     }
 
-    /* Prevent builders from creating EAs or ACLs. Not all filesystems
+    /* Prevent builders from using EAs or ACLs. Not all filesystems
        support these, and they're not allowed in the Nix store because
        they're not representable in the NAR serialisation. */
-    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0 ||
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(getxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lgetxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fgetxattr), 0) != 0 ||
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0 ||
         seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lsetxattr), 0) != 0 ||
         seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
         throw SysError("unable to add seccomp rule");

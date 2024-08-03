@@ -8,7 +8,7 @@ namespace nix {
 
 /* Very hacky way to parse $NIX_PATH, which is colon-separated, but
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
-static Strings parseNixPath(const std::string & s)
+Strings EvalSettings::parseNixPath(const std::string & s)
 {
     Strings res;
 
@@ -48,10 +48,7 @@ EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lo
     : readOnlyMode{readOnlyMode}
     , lookupPathHooks{lookupPathHooks}
 {
-    auto var = getEnv("NIX_PATH");
-    if (var) nixPath = parseNixPath(*var);
-
-    var = getEnv("NIX_ABORT_ON_WARN");
+    auto var = getEnv("NIX_ABORT_ON_WARN");
     if (var && (var == "1" || var == "yes" || var == "true"))
         builtinsAbortOnWarn = true;
 }

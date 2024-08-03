@@ -29,4 +29,8 @@ ifdef HOST_OS
     HOST_SOLARIS = 1
     HOST_UNIX = 1
   endif
+  ifeq ($(HOST_KERNEL), gnu)
+    HOST_HURD = 1
+    HOST_UNIX = 1
+  endif
 endif

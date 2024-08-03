@@ -33,7 +33,7 @@ nlohmann::json attrsToJSON(const Attrs & attrs)
             json[attr.first] = *v;
         } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
             json[attr.first] = v->t;
-        } else abort();
+        } else unreachable();
     }
     return json;
 }
@@ -99,7 +99,7 @@ std::map<std::string, std::string> attrsToQuery(const Attrs & attrs)
             query.insert_or_assign(attr.first, *v);
         } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
             query.insert_or_assign(attr.first, v->t ? "1" : "0");
-        } else abort();
+        } else unreachable();
     }
     return query;
 }

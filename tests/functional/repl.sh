@@ -262,6 +262,23 @@ badExitCode=0
 
 nixVersion="$(nix eval --impure --raw --expr 'builtins.nixVersion' --extra-experimental-features nix-command)"
 
+# TODO: write a repl interacter for testing. Papering over the differences between readline / editline and between platforms is a pain.
+
+# I couldn't get readline and editline to agree on the newline before the prompt,
+# so let's just force it to be one empty line.
+stripEmptyLinesBeforePrompt() {
+  # --null-data:  treat input as NUL-terminated instead of newline-terminated
+  sed --null-data 's/\n\n*nix-repl>/\n\nnix-repl>/g'
+}
+
+# We don't get a final prompt on darwin, so we strip this as well.
+stripFinalPrompt() {
+  # Strip the final prompt and/or any trailing spaces
+  sed --null-data \
+    -e 's/\(.*[^\n]\)\n\n*nix-repl>[ \n]*$/\1/' \
+    -e 's/[ \n]*$/\n/'
+}
+
 runRepl () {
 
   # That is right, we are also filtering out the testdir _without underscores_.
@@ -273,8 +290,13 @@ runRepl () {
   testDirNoUnderscores="${testDir//_/}"
 
   # TODO: pass arguments to nix repl; see lang.sh
+  _NIX_TEST_RAW_MARKDOWN=1 \
+  _NIX_TEST_REPL_ECHO=1 \
   nix repl 2>&1 \
     | stripColors \
+    | tr -d '\0' \
+    | stripEmptyLinesBeforePrompt \
+    | stripFinalPrompt \
     | sed \
       -e "s@$testDir@/path/to/tests/functional@g" \
       -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
@@ -289,7 +311,10 @@ for test in $(cd "$testDir/repl"; echo *.in); do
     in="$testDir/repl/$test.in"
     actual="$testDir/repl/$test.actual"
     expected="$testDir/repl/$test.expected"
-    (cd "$testDir/repl"; set +x; runRepl 2>&1) < "$in" > "$actual"
+    (cd "$testDir/repl"; set +x; runRepl 2>&1) < "$in" > "$actual" || {
+        echo "FAIL: $test (exit code $?)" >&2
+        badExitCode=1
+    }
     diffAndAcceptInner "$test" "$actual" "$expected"
 done
 

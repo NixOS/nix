@@ -190,7 +190,7 @@ isDaemonNewer () {
 
 skipTest () {
     echo "$1, skipping this test..." >&2
-    exit 99
+    exit 77
 }
 
 TODO_NixOS() {
@@ -236,7 +236,8 @@ expect() {
     expected="$1"
     shift
     "$@" && res=0 || res="$?"
-    if [[ $res -ne $expected ]]; then
+    # also match "negative" codes, which wrap around to >127
+    if [[ $res -ne $expected && $res -ne $[256 + expected] ]]; then
         echo "Expected exit code '$expected' but got '$res' from command ${*@Q}" >&2
         return 1
     fi
@@ -250,7 +251,8 @@ expectStderr() {
     expected="$1"
     shift
     "$@" 2>&1 && res=0 || res="$?"
-    if [[ $res -ne $expected ]]; then
+    # also match "negative" codes, which wrap around to >127
+    if [[ $res -ne $expected && $res -ne $[256 + expected] ]]; then
         echo "Expected exit code '$expected' but got '$res' from command ${*@Q}" >&2
         return 1
     fi
@@ -295,13 +297,67 @@ onError() {
     done
 }
 
+# Prints an error message prefix referring to the last call into this file.
+# Ignores `expect` and `expectStderr` calls.
+# Set a special exit code when test suite functions are misused, so that
+# functions like expectStderr won't mistake them for expected Nix CLI errors.
+# Suggestion: -101 (negative to indicate very abnormal, and beyond the normal
+#             range of signals)
+# Example (showns as string): 'repl.sh:123: in call to grepQuiet: '
+# This function is inefficient, so it should only be used in error messages.
+callerPrefix() {
+  # Find the closest caller that's not from this file
+  # using the bash `caller` builtin.
+  local i file line fn savedFn
+  # Use `caller`
+  for i in $(seq 0 100); do
+    caller $i > /dev/null || {
+      if [[ -n "${file:-}" ]]; then
+        echo "$file:$line: ${savedFn+in call to $savedFn: }"
+      fi
+      break
+    }
+    line="$(caller $i | cut -d' ' -f1)"
+    fn="$(caller $i | cut -d' ' -f2)"
+    file="$(caller $i | cut -d' ' -f3)"
+    if [[ $file != "${BASH_SOURCE[0]}" ]]; then
+      echo "$file:$line: ${savedFn+in call to $savedFn: }"
+      return
+    fi
+    case "$fn" in
+      # Ignore higher order functions that don't report any misuse of themselves
+      # This way a misuse of a foo in `expectStderr 1 foo` will be reported as
+      # calling foo, not expectStderr.
+      expect|expectStderr|callerPrefix)
+        ;;
+      *)
+        savedFn="$fn"
+        ;;
+    esac
+  done
+}
+
+checkGrepArgs() {
+    local arg
+    for arg in "$@"; do
+        if [[ "$arg" != "${arg//$'\n'/_}" ]]; then
+            echo "$(callerPrefix)newline not allowed in arguments; grep would try each line individually as if connected by an OR operator" >&2
+            return -101
+        fi
+    done
+}
+
 # `grep -v` doesn't work well for exit codes. We want `!(exist line l. l
 # matches)`. It gives us `exist line l. !(l matches)`.
 #
 # `!` normally doesn't work well with `set -e`, but when we wrap in a
 # function it *does*.
+#
+# `command grep` lets us avoid re-checking the args by going directly to the
+# executable.
 grepInverse() {
-    ! grep "$@"
+    checkGrepArgs "$@" && \
+      ! command grep "$@"
 }
 
 # A shorthand, `> /dev/null` is a bit noisy.
@@ -315,13 +371,26 @@ grepInverse() {
 # the closing of the pipe, the buffering of the pipe, and the speed of
 # the producer into the pipe. But rest assured we've seen it happen in
 # CI reliably.
+#
+# `command grep` lets us avoid re-checking the args by going directly to the
+# executable.
 grepQuiet() {
-    grep "$@" > /dev/null
+    checkGrepArgs "$@" && \
+      command grep "$@" > /dev/null
 }
 
 # The previous two, combined
 grepQuietInverse() {
-    ! grep "$@" > /dev/null
+    checkGrepArgs "$@" && \
+      ! command grep "$@" > /dev/null
+}
+
+# Wrap grep to remove its newline footgun; see checkGrepArgs.
+# Note that we keep the checkGrepArgs calls in the other helpers, because some
+# of them are negated and that would defeat this check.
+grep() {
+    checkGrepArgs "$@" && \
+      command grep "$@"
 }
 
 # Return the number of arguments
