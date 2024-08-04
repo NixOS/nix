@@ -74,7 +74,7 @@ struct InstallableFlake : InstallableValue
  * have their own Nixpkgs input, or other installables.
  *
  * It is a layer violation for Nix to know about Nixpkgs; currently just
- * `nix develop` does. Be wary of using this /
+ * `nix develop` and `nix fmt` does. Be wary of using this /
  * `InstallableFlake::nixpkgsFlakeRef` more places.
  */
 static inline FlakeRef defaultNixpkgsFlakeRef()
