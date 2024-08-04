@@ -780,6 +780,7 @@ struct CmdFlakeCheck : FlakeCommand
                             || name == "homeConfigurations"
                             || name == "homeModule"
                             || name == "homeModules"
+                            || name == "modules"
                             || name == "nixopsConfigurations"
                             )
                             // Known but unchecked community attribute
