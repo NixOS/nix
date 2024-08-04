@@ -31,6 +31,9 @@ TEST_F(nix_api_util_context, nix_context_error)
     }
     ASSERT_EQ(ctx->last_err_code, NIX_ERR_UNKNOWN);
     ASSERT_EQ(*ctx->last_err, err_msg_ref);
+
+    nix_clear_err(ctx);
+    ASSERT_EQ(ctx->last_err_code, NIX_OK);
 }
 
 TEST_F(nix_api_util_context, nix_set_err_msg)
