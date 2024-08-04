@@ -69,7 +69,7 @@ std::string UDSRemoteStore::getUri()
           //
           // unix:// with no path also works. Change what we return?
           "daemon"
-        : std::string(scheme) + "://" + path;
+        : std::string(scheme) + "://" + path.string();
 }
 
 

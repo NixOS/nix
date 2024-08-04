@@ -210,7 +210,7 @@ public:
             };
 
             {
-                auto r(state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority));
+                auto r(state->insertCache.use()(uri)(time(0))(storeDir.string())(wantMassQuery)(priority));
                 if (!r.next()) { unreachable(); }
                 ret.id = (int) r.getInt(0);
             }

@@ -147,7 +147,7 @@ public:
     LocalStore(const Params & params);
     LocalStore(
         std::string_view scheme,
-        std::string_view path,
+        Path path,
         const Params & params);
 
     ~LocalStore();

@@ -481,7 +481,7 @@ void LocalDerivationGoal::startBuilder()
                 destroyCgroup(prevCgroup);
             }
 
-            writeFile(cgroupFile, *cgroup);
+            writeFile(cgroupFile, PathView{*cgroup});
         }
 
         #else
@@ -623,19 +623,20 @@ void LocalDerivationGoal::startBuilder()
         pathsInChroot.clear();
 
         for (auto i : settings.sandboxPaths.get()) {
-            if (i.empty()) continue;
+            auto istr = i.string();
+            if (istr.empty()) continue;
             bool optional = false;
-            if (i[i.size() - 1] == '?') {
+            if (istr[istr.size() - 1] == '?') {
                 optional = true;
-                i.pop_back();
+                istr.pop_back();
             }
-            size_t p = i.find('=');
+            size_t p = istr.find('=');
             if (p == std::string::npos)
-                pathsInChroot[i] = {i, optional};
+                pathsInChroot[istr] = {istr, optional};
             else
-                pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
+                pathsInChroot[istr.substr(0, p)] = {istr.substr(p + 1), optional};
         }
-        if (hasPrefix(worker.store.storeDir, tmpDirInSandbox))
+        if (hasPrefix(PathView{worker.store.storeDir}, PathView{tmpDirInSandbox}))
         {
             throw Error("`sandbox-build-dir` must not contain the storeDir");
         }
@@ -653,7 +654,7 @@ void LocalDerivationGoal::startBuilder()
                 throw;
             }
         for (auto & i : closure) {
-            auto p = worker.store.printStorePath(i);
+            auto p = worker.store.toRealPath(i);
             pathsInChroot.insert_or_assign(p, p);
         }
 
@@ -744,7 +745,7 @@ void LocalDerivationGoal::startBuilder()
            can be bind-mounted).  !!! As an extra security
            precaution, make the fake Nix store only writable by the
            build user. */
-        Path chrootStoreDir = chrootRootDir + worker.store.storeDir;
+        Path chrootStoreDir = chrootRootDir / worker.store.storeDir;
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
 
@@ -827,9 +828,9 @@ void LocalDerivationGoal::startBuilder()
                 } else {
                     auto p = line.find('=');
                     if (p == std::string::npos)
-                        pathsInChroot[line] = line;
+                        pathsInChroot[line] = Path{line};
                     else
-                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
+                        pathsInChroot[line.substr(0, p)] = Path{line.substr(p + 1)};
                 }
             }
         }
@@ -1000,13 +1001,13 @@ void LocalDerivationGoal::startBuilder()
             uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
             uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
 
-            writeFile("/proc/" + std::to_string(pid) / "uid_map",
+            writeFile(Path{"/proc/" + std::to_string(pid) + "/uid_map"},
                 fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
 
             if (!buildUser || buildUser->getUIDCount() == 1)
-                writeFile("/proc/" + std::to_string(pid) / "setgroups", "deny");
+                writeFile(Path{"/proc/" + std::to_string(pid) + "/setgroups"}, "deny");
 
-            writeFile("/proc/" + std::to_string(pid) / "gid_map",
+            writeFile(Path{"/proc/" + std::to_string(pid) + "/gid_map"},
                 fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
         } else {
             debug("note: not using a user namespace");
@@ -1810,7 +1811,7 @@ void LocalDerivationGoal::runChild()
 
                Marking chrootRootDir as MS_SHARED causes pivot_root()
                to fail with EINVAL. Don't know why. */
-            Path chrootStoreDir = chrootRootDir + worker.store.storeDir;
+            Path chrootStoreDir = chrootRootDir / worker.store.storeDir;
 
             if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
                 throw SysError("unable to bind mount the Nix store", chrootStoreDir);
@@ -1885,7 +1886,7 @@ void LocalDerivationGoal::runChild()
                     chmod_(dst, 0555);
                 } else
                 #endif
-                    doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
+                    doBind(i.second.source, chrootRootDir / i.first, i.second.optional);
             }
 
             /* Bind a new instance of procfs on /proc. */
@@ -2282,7 +2283,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
        real reason why we aren't using the chroot dir */
     auto toRealPathChroot = [&](const Path & p) -> Path {
         return useChroot && !needsHashRewrite()
-            ? chrootRootDir + p
+            ? chrootRootDir / p
             : worker.store.toRealPath(p);
     };
 
@@ -2520,7 +2521,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     HashModuloSink caSink { outputHash.hashAlgo, oldHashPart };
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
-                        {getFSSourceAccessor(), CanonPath(actualPath)},
+                        {getFSSourceAccessor(), CanonPath(PathView{actualPath})},
                         caSink,
                         (FileSerialisationMethod) fim);
                     return caSink.finish().first;
@@ -2528,7 +2529,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(
                         outputHash.hashAlgo,
-                        {getFSSourceAccessor(), CanonPath(tmpDir / "tmp")}).hash;
+                        {getFSSourceAccessor(), CanonPath(PathView{tmpDir / "tmp"})}).hash;
                 }
                 }
                 assert(false);
@@ -2556,7 +2557,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
             {
                 HashResult narHashAndSize = hashPath(
-                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    {getFSSourceAccessor(), CanonPath(PathView{actualPath})},
                     FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.first;
                 newInfo0.narSize = narHashAndSize.second;
@@ -2579,7 +2580,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         std::string { requiredFinalPath.hashPart() });
                 rewriteOutput(outputRewrites);
                 HashResult narHashAndSize = hashPath(
-                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    {getFSSourceAccessor(), CanonPath(PathView{actualPath})},
                     FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
@@ -2699,7 +2700,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             if (newInfo.narHash != oldInfo.narHash) {
                 worker.checkMismatch = true;
                 if (settings.runDiffHook || settings.keepFailed) {
-                    auto dst = worker.store.toRealPath(finalDestPath + checkSuffix);
+                    auto dst = worker.store.toRealPath(finalDestPath / checkSuffix);
                     deletePath(dst);
                     movePath(actualPath, dst);
 

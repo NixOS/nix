@@ -194,11 +194,11 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 
 LocalStore::LocalStore(
     std::string_view scheme,
-    PathView path,
+    Path path,
     const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(path, params)
-    , LocalStoreConfig(scheme, path, params)
+    , LocalStoreConfig(scheme, PathView{path}, params)
     , Store(params)
     , LocalFSStore(params)
     , dbDir(stateDir / "db")

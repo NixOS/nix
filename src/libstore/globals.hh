@@ -950,7 +950,7 @@ public:
     Setting<bool> printMissing{this, true, "print-missing",
         "Whether to print what paths need to be built or downloaded."};
 
-    Setting<std::string> preBuildHook{
+    Setting<Path> preBuildHook{
         this, "", "pre-build-hook",
         R"(
           If set, the path to a program that can set extra derivation-specific

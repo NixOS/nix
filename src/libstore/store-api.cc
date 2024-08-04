@@ -44,7 +44,7 @@ std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(PathView path) const
     if (slash == path.npos)
         return {parseStorePath(path), CanonPath::root};
     else
-        return {parseStorePath(path.substr(0, slash)), CanonPath{path.substr(slash)}};
+        return {parseStorePath(PathView{path.substr(0, slash)}), CanonPath{path.substr(slash)}};
 }
 
 
@@ -1312,7 +1312,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 auto chrootStore = getDataDir() + "/nix/root";
                 if (!pathExists(chrootStore)) {
                     try {
-                        createDirs(chrootStore);
+                        createDirs(Path{chrootStore});
                     } catch (SystemError & e) {
                         return std::make_shared<LocalStore>(params);
                     }

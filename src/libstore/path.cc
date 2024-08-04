@@ -103,7 +103,7 @@ std::set<StorePath> StoreDirConfig::parseStorePathSet(PathSet paths) const
     return result;
 }
 
-std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
+std::optional<StorePath> StoreDirConfig::maybeParseStorePath(PathView path) const
 {
     try {
         return parseStorePath(path);

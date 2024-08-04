@@ -50,7 +50,7 @@ public:
 
     HttpBinaryCacheStore(
         std::string_view scheme,
-        PathView cacheUri,
+        std::string_view cacheUri,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)

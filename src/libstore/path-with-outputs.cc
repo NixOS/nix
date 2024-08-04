@@ -90,7 +90,7 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 StorePathWithOutputs parsePathWithOutputs(const StoreDirConfig & store, std::string_view pathWithOutputs)
 {
     auto [path, outputs] = parsePathWithOutputs(pathWithOutputs);
-    return StorePathWithOutputs { store.parseStorePath(path), std::move(outputs) };
+    return StorePathWithOutputs { store.parseStorePath(PathView{path}), std::move(outputs) };
 }
 
 

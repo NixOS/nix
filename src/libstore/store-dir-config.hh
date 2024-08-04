@@ -40,7 +40,7 @@ struct StoreDirConfig : public Config
     StorePath parseStorePath(PathView path) const;
     std::set<StorePath> parseStorePathSet(PathSet paths) const;
 
-    std::optional<StorePath> maybeParseStorePath(std::string_view path) const;
+    std::optional<StorePath> maybeParseStorePath(PathView path) const;
 
     std::string printStorePath(const StorePath & path) const;
     std::set<std::string> printStorePathSet(const StorePathSet & paths) const;
