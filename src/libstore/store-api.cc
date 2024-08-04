@@ -1302,7 +1302,7 @@ ref<Store> openStore(StoreReference && storeURI)
                 /* If /nix doesn't exist, there is no daemon socket, and
                    we're not root, then automatically set up a chroot
                    store in ~/.local/share/nix/root. */
-                auto chrootStore = getDataDir() + "/nix/root";
+                auto chrootStore = getDataDir() + "/root";
                 if (!pathExists(chrootStore)) {
                     try {
                         createDirs(chrootStore);

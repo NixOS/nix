@@ -116,7 +116,7 @@ static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
 
 Path getUserRegistryPath()
 {
-    return getConfigDir() + "/nix/registry.json";
+    return getConfigDir() + "/registry.json";
 }
 
 std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
@@ -159,7 +159,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, re
         if (!hasPrefix(path, "/")) {
             auto storePath = downloadFile(store, path, "flake-registry.json").storePath;
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(storePath, getCacheDir() + "/nix/flake-registry.json");
+                store2->addPermRoot(storePath, getCacheDir() + "/flake-registry.json");
             path = store->toRealPath(storePath);
         }
 

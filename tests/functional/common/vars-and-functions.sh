@@ -56,6 +56,10 @@ fi # ! isTestOnNixOS
 
 unset NIX_PATH
 export HOME=$TEST_HOME
+unset NIX_STATE_HOME
+unset NIX_DATA_HOME
+unset NIX_CONFIG_HOME
+unset NIX_CACHE_HOME
 unset XDG_STATE_HOME
 unset XDG_DATA_HOME
 unset XDG_CONFIG_HOME
