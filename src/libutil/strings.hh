@@ -13,12 +13,32 @@ namespace nix {
  *
  * See also `basicSplitString()`, which preserves empty strings between separators, as well as at the start and end.
  */
+template<class C, class CharT = char>
+C basicTokenizeString(std::basic_string_view<CharT> s, std::basic_string_view<CharT> separators);
+
+/**
+ * Like `basicTokenizeString` but specialized to the default `char`
+ */
 template<class C>
 C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 
 extern template std::list<std::string> tokenizeString(std::string_view s, std::string_view separators);
 extern template std::set<std::string> tokenizeString(std::string_view s, std::string_view separators);
 extern template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
+
+/**
+ * Split a string, preserving empty strings between separators, as well as at the start and end.
+ *
+ * Returns a non-empty collection of strings.
+ */
+template<class C, class CharT = char>
+C basicSplitString(std::basic_string_view<CharT> s, std::basic_string_view<CharT> separators);
+template<typename C>
+C splitString(std::string_view s, std::string_view separators);
+
+extern template std::list<std::string> splitString(std::string_view s, std::string_view separators);
+extern template std::set<std::string> splitString(std::string_view s, std::string_view separators);
+extern template std::vector<std::string> splitString(std::string_view s, std::string_view separators);
 
 /**
  * Concatenate the given strings with a separator between the elements.

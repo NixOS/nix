@@ -4,8 +4,8 @@
 
 namespace nix {
 
-template<class C>
-C tokenizeString(std::string_view s, std::string_view separators)
+template<class C, class CharT>
+C basicTokenizeString(std::basic_string_view<CharT> s, std::basic_string_view<CharT> separators)
 {
     C result;
     auto pos = s.find_first_not_of(separators, 0);
@@ -13,14 +13,42 @@ C tokenizeString(std::string_view s, std::string_view separators)
         auto end = s.find_first_of(separators, pos + 1);
         if (end == s.npos)
             end = s.size();
-        result.insert(result.end(), std::string(s, pos, end - pos));
+        result.insert(result.end(), std::basic_string<CharT>(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
     return result;
 }
 
 template<class C>
-std::string concatStringsSep(const std::string_view sep, const C & ss)
+C tokenizeString(std::string_view s, std::string_view separators)
+{
+    return basicTokenizeString<C, char>(s, separators);
+}
+
+template<class C, class CharT>
+C basicSplitString(std::basic_string_view<CharT> s, std::basic_string_view<CharT> separators)
+{
+    C result;
+    size_t pos = 0;
+    while (pos <= s.size()) {
+        auto end = s.find_first_of(separators, pos);
+        if (end == s.npos)
+            end = s.size();
+        result.insert(result.end(), std::basic_string<CharT>(s, pos, end - pos));
+        pos = end + 1;
+    }
+
+    return result;
+}
+
+template<class C>
+C splitString(std::string_view s, std::string_view separators)
+{
+    return basicSplitString<C, char>(s, separators);
+}
+
+template<class CharT, class C>
+std::basic_string<CharT> basicConcatStringsSep(const std::basic_string_view<CharT> sep, const C & ss)
 {
     size_t size = 0;
     bool tail = false;
@@ -28,10 +56,10 @@ std::string concatStringsSep(const std::string_view sep, const C & ss)
     for (const auto & s : ss) {
         if (tail)
             size += sep.size();
-        size += std::string_view(s).size();
+        size += std::basic_string_view<CharT>{s}.size();
         tail = true;
     }
-    std::string s;
+    std::basic_string<CharT> s;
     s.reserve(size);
     tail = false;
     for (auto & i : ss) {
@@ -41,6 +69,12 @@ std::string concatStringsSep(const std::string_view sep, const C & ss)
         tail = true;
     }
     return s;
+}
+
+template<class C>
+std::string concatStringsSep(const std::string_view sep, const C & ss)
+{
+    return basicConcatStringsSep<char, C>(sep, ss);
 }
 
 template<class C>

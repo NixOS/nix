@@ -52,6 +52,7 @@ sources = files(
   'closure.cc',
   'compression.cc',
   'config.cc',
+  'executable-path.cc',
   'file-content-address.cc',
   'git.cc',
   'hash.cc',

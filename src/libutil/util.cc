@@ -1,5 +1,6 @@
 #include "util.hh"
 #include "fmt.hh"
+#include "file-path.hh"
 
 #include <array>
 #include <cctype>

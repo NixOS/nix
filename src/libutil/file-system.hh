@@ -264,6 +264,12 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 Path defaultTempDir();
 
 /**
+ * Interpret `exe` as a location in the ambient file system and return
+ * whether it exists AND is executable.
+ */
+bool isExecutableFileAmbient(const std::filesystem::path & exe);
+
+/**
  * Used in various places.
  */
 typedef std::function<bool(const Path & path)> PathFilter;
