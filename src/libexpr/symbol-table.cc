@@ -33,7 +33,7 @@ Symbol SymbolTable::create(std::string_view s)
     auto domain = hash % symbolDomains.size();
 
     {
-        auto symbols(symbolDomains[domain].read());
+        auto symbols(symbolDomains[domain].readLock());
         auto it = symbols->find(s);
         if (it != symbols->end())
             return Symbol(it->second);
@@ -63,7 +63,7 @@ size_t SymbolTable::size() const
 {
     size_t res = 0;
     for (auto & domain : symbolDomains)
-        res += domain.read()->size();
+        res += domain.readLock()->size();
     return res;
 }
 

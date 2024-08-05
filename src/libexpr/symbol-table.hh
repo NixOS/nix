@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "types.hh"
+#include "chunked-vector.hh"
 #include "sync.hh"
 
 namespace nix {
@@ -120,7 +121,7 @@ public:
     SymbolStr operator[](Symbol s) const
     {
         if (s.id == 0 || s.id > arena.size)
-            abort();
+            unreachable();
         return SymbolStr(std::string_view(arena.data + s.id));
     }
 

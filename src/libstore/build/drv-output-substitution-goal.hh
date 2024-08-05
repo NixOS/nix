@@ -36,7 +36,7 @@ public:
     Co init() override;
     Co realisationFetched(std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
 
-    void timedOut(Error && ex) override { abort(); };
+    void timedOut(Error && ex) override { unreachable(); };
 
     std::string key() override;
 

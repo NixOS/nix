@@ -50,7 +50,7 @@ public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();
 
-    void timedOut(Error && ex) override { abort(); };
+    void timedOut(Error && ex) override { unreachable(); };
 
     /**
      * We prepend "a$" to the key name to ensure substitution goals

@@ -325,7 +325,7 @@ public:
             case tThunk: case tApp: case tPending: case tAwaited: case tFailed: return nThunk;
             case tUninitialized:
             default:
-                abort();
+                unreachable();
         }
     }
 

@@ -143,6 +143,7 @@
 
           nix_noTests = final.nix.override {
             doInstallCheck = false;
+            doCheck = false;
           };
 
           # See https://github.com/NixOS/nixpkgs/pull/214409
@@ -333,6 +334,7 @@
             ++ [
               pkgs.buildPackages.cmake
               pkgs.buildPackages.shellcheck
+              pkgs.buildPackages.changelog-d
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install"
                 modular.pre-commit.settings.installationScript)

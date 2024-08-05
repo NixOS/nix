@@ -56,7 +56,7 @@ public:
         if (p.id == 0)
             return nullptr;
 
-        auto state(state_.read());
+        auto state(state_.readLock());
         const auto idx = p.id - 1;
         /* We want the last key <= idx, so we'll take prev(first key >
            idx). This is guaranteed to never rewind origin.begin

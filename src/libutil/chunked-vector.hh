@@ -6,6 +6,8 @@
 #include <vector>
 #include <limits>
 
+#include "error.hh"
+
 namespace nix {
 
 /**
@@ -30,7 +32,7 @@ private:
     auto & addChunk()
     {
         if (size_ >= std::numeric_limits<uint32_t>::max() - ChunkSize)
-            abort();
+            unreachable();
         chunks.emplace_back();
         chunks.back().reserve(ChunkSize);
         return chunks.back();

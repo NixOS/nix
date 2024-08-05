@@ -20,6 +20,7 @@ deps_private_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
   dependency('nix-expr'),
+  dependency('nix-flake'),
   dependency('nix-fetchers'),
   dependency('nix-main'),
   dependency('nix-cmd'),

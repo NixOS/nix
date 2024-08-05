@@ -426,7 +426,7 @@ static void prim_typeOf(EvalState & state, const PosIdx pos, Value * * args, Val
             t = args[0]->external()->typeOf();
             break;
         case nFloat: t = "float"; break;
-        case nThunk: abort();
+        case nThunk: unreachable();
     }
     v.mkString(t);
 }
@@ -1843,34 +1843,6 @@ static RegisterPrimOp primop_findFile(PrimOp {
     .doc = R"(
       Find *lookup-path* in *search-path*.
 
-      A search path is represented list of [attribute sets](./types.md#attribute-set) with two attributes:
-      - `prefix` is a relative path.
-      - `path` denotes a file system location
-      The exact syntax depends on the command line interface.
-
-      Examples of search path attribute sets:
-
-      - ```
-        {
-          prefix = "nixos-config";
-          path = "/etc/nixos/configuration.nix";
-        }
-        ```
-
-      - ```
-        {
-          prefix = "";
-          path = "/nix/var/nix/profiles/per-user/root/channels";
-        }
-        ```
-
-      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/types.md#type-path) of the match:
-
-      - If *lookup-path* matches `prefix`, then the remainder of *lookup-path* (the "suffix") is searched for within the directory denoted by `path`.
-        Note that the `path` may need to be downloaded at this point to look inside.
-      - If the suffix is found inside that directory, then the entry is a match.
-        The combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
-
       [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](#builtins-nixPath):
 
       ```nix
@@ -1882,6 +1854,119 @@ static RegisterPrimOp primop_findFile(PrimOp {
       ```nix
       builtins.findFile builtins.nixPath "nixpkgs"
       ```
+
+      A search path is represented as a list of [attribute sets](./types.md#attribute-set) with two attributes:
+      - `prefix` is a relative path.
+      - `path` denotes a file system location
+
+      Examples of search path attribute sets:
+
+      - ```
+        {
+          prefix = "";
+          path = "/nix/var/nix/profiles/per-user/root/channels";
+        }
+        ```
+      - ```
+        {
+          prefix = "nixos-config";
+          path = "/etc/nixos/configuration.nix";
+        }
+        ```
+      - ```
+        {
+          prefix = "nixpkgs";
+          path = "https://github.com/NixOS/nixpkgs/tarballs/master";
+        }
+        ```
+      - ```
+        {
+          prefix = "nixpkgs";
+          path = "channel:nixpkgs-unstable";
+        }
+        ```
+      - ```
+        {
+          prefix = "flake-compat";
+          path = "flake:github:edolstra/flake-compat";
+        }
+        ```
+
+      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/types.md#type-path) of the match:
+
+      - If a prefix of `lookup-path` matches `prefix`, then the remainder of *lookup-path* (the "suffix") is searched for within the directory denoted by `path`.
+        The contents of `path` may need to be downloaded at this point to look inside.
+
+      - If the suffix is found inside that directory, then the entry is a match.
+        The combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
+
+      > **Example**
+      >
+      > A *search-path* value
+      >
+      > ```
+      > [
+      >   {
+      >     prefix = "";
+      >     path = "/home/eelco/Dev";
+      >   }
+      >   {
+      >     prefix = "nixos-config";
+      >     path = "/etc/nixos";
+      >   }
+      > ]
+      > ```
+      >
+      > and a *lookup-path* value `"nixos-config"` will cause Nix to try `/home/eelco/Dev/nixos-config` and `/etc/nixos` in that order and return the first path that exists.
+
+      If `path` starts with `http://` or `https://`, it is interpreted as the URL of a tarball that will be downloaded and unpacked to a temporary location.
+      The tarball must consist of a single top-level directory.
+
+      The URLs of the tarballs from the official `nixos.org` channels can be abbreviated as `channel:<channel-name>`.
+      See [documentation on `nix-channel`](@docroot@/command-ref/nix-channel.md) for details about channels.
+
+      > **Example**
+      >
+      > These two search path entries are equivalent:
+      >
+      > - ```
+      >   {
+      >     prefix = "nixpkgs";
+      >     path = "channel:nixpkgs-unstable";
+      >   }
+      >   ```
+      > - ```
+      >   {
+      >     prefix = "nixpkgs";
+      >     path = "https://nixos.org/channels/nixos-unstable/nixexprs.tar.xz";
+      >   }
+      >   ```
+
+      Search paths can also point to source trees using [flake URLs](@docroot@/command-ref/new-cli/nix3-flake.md#url-like-syntax).
+
+
+      > **Example**
+      >
+      > The search path entry
+      >
+      > ```
+      > {
+      >   prefix = "nixpkgs";
+      >   path = "flake:nixpkgs";
+      > }
+      > ```
+      > specifies that the prefix `nixpkgs` shall refer to the source tree downloaded from the `nixpkgs` entry in the flake registry.
+      >
+      > Similarly
+      >
+      > ```
+      > {
+      >   prefix = "nixpkgs";
+      >   path = "flake:github:nixos/nixpkgs/nixos-22.05";
+      > }
+      > ```
+      >
+      > makes `<nixpkgs>` refer to a particular branch of the `NixOS/nixpkgs` repository on GitHub.
     )",
     .fun = prim_findFile,
 });
@@ -4760,6 +4845,13 @@ void EvalState::createBaseEnv()
         .type = nList,
         .doc = R"(
           The value of the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path): a list of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
+
+          > **Example**
+          >
+          > ```bash
+          > $ NIX_PATH= nix-instantiate --eval --expr "builtins.nixPath" -I foo=bar --no-pure-eval
+          > [ { path = "bar"; prefix = "foo"; } ]
+          > ```
 
           Lookup path expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and
           [`builtins.findFile`](./builtins.html#builtins-findFile):

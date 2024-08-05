@@ -297,7 +297,7 @@ template<> std::string BaseSetting<SandboxMode>::to_string() const
     if (value == smEnabled) return "true";
     else if (value == smRelaxed) return "relaxed";
     else if (value == smDisabled) return "false";
-    else abort();
+    else unreachable();
 }
 
 template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)

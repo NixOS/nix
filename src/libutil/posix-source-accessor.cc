@@ -99,7 +99,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
     Path absPath = makeAbsPath(path).string();
 
     {
-        auto cache(_cache[domain].read());
+        auto cache(_cache[domain].readLock());
         auto i = cache->find(absPath);
         if (i != cache->end()) return i->second;
     }

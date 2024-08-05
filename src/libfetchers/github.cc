@@ -254,12 +254,18 @@ struct GitArchiveInputScheme : InputScheme
             getFileTransfer()->download(std::move(req), sink);
         });
 
+        auto act = std::make_unique<Activity>(*logger, lvlInfo, actUnknown,
+            fmt("unpacking '%s' into the Git cache", input.to_string()));
+
         TarArchive archive { *source };
-        auto parseSink = getTarballCache()->getFileSystemObjectSink();
+        auto tarballCache = getTarballCache();
+        auto parseSink = tarballCache->getFileSystemObjectSink();
         auto lastModified = unpackTarfileToSink(archive, *parseSink);
 
+        act.reset();
+
         TarballInfo tarballInfo {
-            .treeHash = parseSink->sync(),
+            .treeHash = tarballCache->dereferenceSingletonDirectory(parseSink->sync()),
             .lastModified = lastModified
         };
 

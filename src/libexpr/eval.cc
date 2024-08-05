@@ -149,7 +149,7 @@ std::string_view showType(ValueType type, bool withArticle)
         case nFloat: return WA("a", "float");
         case nThunk: return WA("a", "thunk");
     }
-    abort();
+    unreachable();
 }
 
 
@@ -779,7 +779,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
             case ReplExitStatus::Continue:
                 break;
             default:
-                abort();
+                unreachable();
         }
     }
 }
@@ -1093,14 +1093,14 @@ struct ExprParseFile : Expr
 
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    auto resolvedPath = getOptional(*importResolutionCache.read(), path);
+    auto resolvedPath = getOptional(*importResolutionCache.readLock(), path);
 
     if (!resolvedPath) {
         resolvedPath = resolveExprPath(path);
         importResolutionCache.lock()->emplace(path, *resolvedPath);
     }
 
-    if (auto v2 = get(*fileEvalCache.read(), *resolvedPath)) {
+    if (auto v2 = get(*fileEvalCache.readLock(), *resolvedPath)) {
         forceValue(*const_cast<Value *>(v2), noPos);
         v = *v2;
         return;
@@ -1173,7 +1173,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
 
 void Expr::eval(EvalState & state, Env & env, Value & v)
 {
-    abort();
+    unreachable();
 }
 
 
@@ -1610,7 +1610,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                 .withFrame(*fun.payload.lambda.env, lambda)
                                 .debugThrow();
                         }
-                    abort(); // can't happen
+                    unreachable();
                 }
             }
 
@@ -2904,8 +2904,10 @@ void EvalState::printStatistics()
     topObj["cpuTime"] = cpuTime;
 #endif
     topObj["time"] = {
+#ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
-#ifdef HAVE_BOEHMGC
+#endif
+#if HAVE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
 #endif
