@@ -4,6 +4,8 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "store-api.hh"
+// Need specialization involving `SymbolStr` just in this one module.
+#include "strings-inline.hh"
 
 namespace nix::eval_cache {
 
