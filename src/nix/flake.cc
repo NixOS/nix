@@ -17,6 +17,7 @@
 #include "eval-cache.hh"
 #include "markdown.hh"
 #include "users.hh"
+#include "terminal.hh"
 
 #include <nlohmann/json.hpp>
 #include <iomanip>
@@ -1263,18 +1264,16 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             "package";
                         if (description && !description->empty()) {
                             // Trim the string and only display the first line of the description.
+                            const size_t maxLength = 77;
                             auto trimmed = nix::trim(*description);
                             auto newLinePos = trimmed.find('\n');
-                            auto length = newLinePos != std::string::npos ? newLinePos : trimmed.size();
+                            auto length = newLinePos != std::string::npos ? newLinePos : trimmed.length();
 
-                            // If the string is too long then resize add ellipses
-                            std::string desc;
-                            if (length > 77) {
-                                trimmed.resize(77);
-                                desc = trimmed.append("...");
-                            }
-                            else {
-                                desc = trimmed.substr(0, length);
+                            // Resize/sanitize the string and if it's too long add ellipses
+                            std::string desc = filterANSIEscapes(trimmed, false, length);
+                            if (desc.length() > maxLength) {
+                                desc.resize(maxLength);
+                                desc = desc.append("...");
                             }
 
                             logger->cout("%s: %s '%s' - '%s'", headerPrefix, type, name, desc);
