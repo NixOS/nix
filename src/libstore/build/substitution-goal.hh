@@ -66,7 +66,7 @@ public:
      */
     Co init() override;
     Co gotInfo();
-    Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool& substituterFailed);
+    Co tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
     Co finished();
 
     /**
